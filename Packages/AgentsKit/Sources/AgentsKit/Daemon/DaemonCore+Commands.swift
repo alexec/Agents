@@ -456,6 +456,8 @@ extension DaemonCore {
     /// is how Claude says a sign-in has expired (the same test 043 uses on servers).
     static func signInReason(_ error: any Error) -> String? {
         switch error {
+        case let error as JSONRPCError where unsignedProvider(error) != nil:
+            return "it isn’t signed in to \(unsignedProvider(error) ?? "that provider")"
         case let error as JSONRPCError where error.isAuthRequired || isAuthenticationFailure(error):
             return error.message
         case ACPSessionError.needsSignIn:
@@ -1651,7 +1653,16 @@ extension DaemonCore {
             await record(.optionChanged(id: request.optionID, value: request.value), for: request.agentID)
             return []
         }
-        let options = try await session.setOption(id: request.optionID, value: request.value)
+        let options: [ConfigOption]
+        do {
+            options = try await session.setOption(id: request.optionID, value: request.value)
+        } catch let error as JSONRPCError where Self.unsignedProvider(error) != nil {
+            // A model of a provider the runtime is not signed in to (049, OpenCode): said
+            // as a sign-in, with the sheet, not as the protocol's "invalid params".
+            guard let agent = agents[request.agentID], let runtime = RuntimeCatalog.runtime(id: agent.runtimeID) else { throw error }
+            askForSignIn(runtimeID: runtime.id, agentID: request.agentID)
+            throw signInNeeded(runtime: runtime, because: Self.signInReason(error) ?? error.message)
+        }
         if var agent = agents[request.agentID] {
             agent.advertisedOptions = options
             agent.startOptions.values[request.optionID] = request.value

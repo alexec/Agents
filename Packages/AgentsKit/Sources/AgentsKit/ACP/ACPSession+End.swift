@@ -40,7 +40,7 @@ extension ACPSession {
             environment: environment,
             onStandardError: { relay.errored($0) },
             onExit: { relay.exited($0) })
-        let session = ACPSession(transport: process.transport, process: process,
+        let session = ACPSession(transport: process.transport, process: process, program: executable,
                                  capabilities: capabilities, launch: launch,
                                  authMethodBeforeContinuing: authMethodBeforeContinuing)
         relay.setHandlers(

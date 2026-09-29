@@ -110,10 +110,76 @@ struct OpenCodeRuntimeTests {
         for line in sys.stdin:
             message = json.loads(line)
             if message.get("method") == "initialize":
+                # As OpenCode does: the command only for a client that asks the older way.
+                asks = message["params"]["clientCapabilities"].get("_meta", {}).get("terminal-auth")
+                method = {"id": "opencode-login", "name": "Login with opencode"}
+                if asks:
+                    method["_meta"] = {"terminal-auth": {"command": "opencode", "args": ["auth", "login"]}}
                 print(json.dumps({"jsonrpc": "2.0", "id": message["id"], "result": {
                     "protocolVersion": 1, "agentCapabilities": {"loadSession": True, "sessionCapabilities": {"resume": {}, "list": {}}},
-                    "authMethods": [], "agentInfo": {"name": "OpenCode", "version": "0.0.0-fake"}}}), flush=True)
+                    "authMethods": [method], "agentInfo": {"name": "OpenCode", "version": "0.0.0-fake"}}}), flush=True)
         """#
+
+    // MARK: Signing in (Story 3)
+
+    @Test func onlyOpenCodeIsAskedForItsSignInCommandTheOlderWay() {
+        let opencode = ProcessSessionLauncher.capabilities(for: ToolPolicyCatalog.opencode).wire
+        #expect(opencode["_meta"]?["terminal-auth"] == .bool(true))
+        #expect(opencode["auth"]?["terminal"] == .bool(true))
+        for policy in ToolPolicyCatalog.builtIn where policy.runtimeID != "opencode" {
+            let wire = ProcessSessionLauncher.capabilities(for: policy).wire
+            #expect(wire["_meta"]?["terminal-auth"] == nil,
+                    "\(policy.runtimeID): Claude's adapter adds a terminal command to every method when asked")
+        }
+    }
+
+    @Test func aSignInCommandNamingTheProgramBareIsPointedAtTheAppsCopy() throws {
+        let method = try JSONDecoder().decode(ACP.AuthMethod.self, from: Data(#"""
+            {"id":"opencode-login","name":"Login with opencode",
+             "_meta":{"terminal-auth":{"command":"opencode","args":["auth","login"],"label":"OpenCode Login"}}}
+            """#.utf8))
+        let program = URL(filePath: "/tmp/root/tools/opencode/current/bin/opencode")
+        #expect(method.naming(program: program).terminalCommand == "/tmp/root/tools/opencode/current/bin/opencode auth login")
+        #expect(method.naming(program: program)._meta?["terminal-auth"]?["label"] == .string("OpenCode Login"))
+        // The real root has a space in it: the command still pastes into Terminal whole.
+        let spaced = URL(filePath: "/Users/a/Library/Application Support/Agents/tools/opencode/current/bin/opencode")
+        let command = try #require(method.naming(program: spaced).terminalCommand)
+        #expect(command == "'/Users/a/Library/Application Support/Agents/tools/opencode/current/bin/opencode' auth login")
+        #expect(RuntimeLaunchCatalog.opencode.providerSignOutCommand(from: command)
+                == "'/Users/a/Library/Application Support/Agents/tools/opencode/current/bin/opencode' auth logout")
+        #expect(RuntimeLaunchCatalog.launch(for: "copilot").providerSignOutCommand(from: command) == nil)
+        // A command that names something else is the runtime's word, kept.
+        #expect(method.naming(program: URL(filePath: "/usr/bin/grok")).terminalCommand == "opencode auth login")
+    }
+
+    /// Through a real handshake: the program the app started is what the sheet hands over,
+    /// never a bare `opencode` for the PATH to resolve (Story 2, AS-2).
+    @Test func theHandshakeHandsBackTheAppsCopyAsTheSignInCommand() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("opencode-auth-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: root) }
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        let program = root.appendingPathComponent("opencode")
+        fm.createFile(atPath: program.path, contents: Data(Self.fakeOpenCode.utf8), attributes: [.posixPermissions: 0o700])
+        let session = try ACPSession.launch(executable: program, arguments: ["acp"], cwd: root,
+                                            environment: ["PATH": "/usr/bin:/bin"],
+                                            capabilities: ProcessSessionLauncher.capabilities(for: ToolPolicyCatalog.opencode))
+        let result = try await session.initialize()
+        await session.end(gracePeriod: .seconds(1))
+        #expect(result.authMethods?.first?.terminalCommand == "\(program.path) auth login")
+    }
+
+    @Test func openCodesRefusalsReadAsSignIns() {
+        let unsigned = JSONRPCError(code: -32602, message: "Invalid params: model not found: anthropic/claude-haiku-4-5",
+                                    data: ["providerId": .string("anthropic"), "modelId": .string("anthropic/claude-haiku-4-5")])
+        #expect(DaemonCore.unsignedProvider(unsigned) == "anthropic")
+        #expect(DaemonCore.signInReason(unsigned) == "it isn’t signed in to anthropic")
+        let refused = JSONRPCError(code: -32603, message: "Internal error: API key is invalid.",
+                                   data: ["service": .string("session"), "errorName": .string("APIError")])
+        #expect(DaemonCore.signInReason(refused) != nil)
+        // Another runtime's "invalid params" is not a sign-in.
+        #expect(DaemonCore.signInReason(JSONRPCError(code: -32602, message: "Invalid params: bad value")) == nil)
+    }
 
     // MARK: A zero is not a price (049 P2)
 

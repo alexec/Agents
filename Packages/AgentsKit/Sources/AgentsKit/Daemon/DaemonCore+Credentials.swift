@@ -238,6 +238,17 @@ extension DaemonCore {
         // Google's words for a Gemini key it does not know (046, contracts/credentials.md).
         return error.message.contains("Failed to authenticate") || error.message.contains("API key not valid")
             || error.message.contains("API_KEY_INVALID")
+            // OpenCode's, for a provider key the provider refused (049 research R6).
+            || error.message.contains("API key is invalid")
+    }
+
+    /// The provider a runtime says it is not signed in to, when it names one: OpenCode
+    /// refuses a model of a provider nobody signed in to with `-32602` "model not found"
+    /// and `data.providerId` (049 research R6), and `-32000` may carry the same field.
+    static func unsignedProvider(_ error: JSONRPCError) -> String? {
+        guard case .object(let data)? = error.data, let provider = data["providerId"]?.stringValue,
+              error.isAuthRequired || (error.code == -32602 && error.message.contains("model not found")) else { return nil }
+        return provider
     }
 
     /// Why the window could not relay `runtimeID`'s sign-in: what the asking connection

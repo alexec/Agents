@@ -26,6 +26,20 @@ public struct RuntimeLaunch: Hashable, Sendable {
     public var turnNoticePattern: String?
     /// Words the sign-in sheet shows beside some of the runtime's own sign-in methods.
     public var signInNotice: SignInNotice?
+    /// Whether the handshake asks for the runtime's sign-in command the older way,
+    /// `clientCapabilities._meta["terminal-auth"]` (049: OpenCode names its command only then).
+    public var asksForTerminalAuthCommand: Bool = false
+    /// For a runtime whose sign-in adds one provider at a time and works with none (049:
+    /// OpenCode's free models): the sign-in stays on the sheet while it is ready, and the
+    /// sheet names how to sign a provider out — the sign-in command with its last word
+    /// swapped for this one — since the runtime has no sign-out over ACP.
+    public var providerSignOutWord: String? = nil
+
+    /// The command that signs a provider out, from the command that signs one in.
+    public func providerSignOutCommand(from signIn: String) -> String? {
+        guard let providerSignOutWord, let space = signIn.lastIndex(of: " ") else { return nil }
+        return signIn[..<space] + " " + providerSignOutWord
+    }
 
     public struct SignInNotice: Hashable, Sendable {
         /// Quoted as it is.
@@ -45,7 +59,8 @@ public struct RuntimeLaunch: Hashable, Sendable {
 
     public init(runtimeID: String, environment: [String: String?] = [:], hiddenAuthMethods: [String] = [],
                 turnErrorPrefix: String? = nil, turnErrorPrefixes: [String] = [],
-                turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil) {
+                turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil,
+                asksForTerminalAuthCommand: Bool = false, providerSignOutWord: String? = nil) {
         self.runtimeID = runtimeID
         self.environment = environment
         self.hiddenAuthMethods = hiddenAuthMethods
@@ -53,6 +68,8 @@ public struct RuntimeLaunch: Hashable, Sendable {
             : turnErrorPrefix.map { [$0] } ?? []
         self.turnNoticePattern = turnNoticePattern
         self.signInNotice = signInNotice
+        self.asksForTerminalAuthCommand = asksForTerminalAuthCommand
+        self.providerSignOutWord = providerSignOutWord
     }
 
     /// What a turn's own words say about how it failed, when they start with one of
@@ -194,7 +211,11 @@ public enum RuntimeLaunchCatalog {
             "OPENCODE_DISABLE_SHARE": "1",
             "OPENCODE_AUTH_CONTENT": nil,
             "OPENCODE_ENABLE_QUESTION_TOOL": nil,
-        ])
+        ],
+        // Without it OpenCode offers "Login with opencode" and no command (R6).
+        asksForTerminalAuthCommand: true,
+        // `opencode auth login` adds a provider; `opencode auth logout` takes one away.
+        providerSignOutWord: "logout")
 
     public static let builtIn: [RuntimeLaunch] = [antigravity, copilot, cursor, opencode]
 

@@ -192,12 +192,18 @@ public actor ACPSession {
     private let events: AsyncStream<ACPSessionEvent>
     private let eventsContinuation: AsyncStream<ACPSessionEvent>.Continuation
 
+    /// The file this session's runtime was started from, when the app started it: a sign-in
+    /// command that names it by its bare name is pointed back at it.
+    let program: URL?
+
     public init(transport: any LineTransport,
                 process: RuntimeProcess? = nil,
+                program: URL? = nil,
                 capabilities: ACP.ClientCapabilities = .none,
                 launch: RuntimeLaunch? = nil,
                 authMethodBeforeContinuing: String? = nil) {
         let box = self.box
+        self.program = program
         self.capabilities = capabilities
         self.launch = launch
         self.authMethodBeforeContinuing = authMethodBeforeContinuing
@@ -226,7 +232,10 @@ public actor ACPSession {
             "clientCapabilities": capabilities.wire,
         ]
         let result = try await connection.call(ACP.Method.initialize, params)
-        let decoded = try result.decode(ACP.InitializeResult.self)
+        var decoded = try result.decode(ACP.InitializeResult.self)
+        if let program {
+            decoded.authMethods = decoded.authMethods?.map { $0.naming(program: program) }
+        }
         initializeResult = decoded
         guard decoded.speaksOurVersion else {
             throw ACPSessionError.unsupportedProtocolVersion(decoded.protocolVersion ?? 0)

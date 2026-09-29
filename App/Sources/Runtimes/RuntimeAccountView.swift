@@ -17,8 +17,18 @@ struct RuntimeAccountView: View {
     private var account: RuntimeAccount { model.accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID) }
     private var name: String { RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID }
 
-    private var notice: RuntimeLaunch.SignInNotice? {
-        RuntimeLaunchCatalog.launch(for: runtimeID).signInNotice
+    private var launch: RuntimeLaunch { RuntimeLaunchCatalog.launch(for: runtimeID) }
+    private var notice: RuntimeLaunch.SignInNotice? { launch.signInNotice }
+
+    /// Ready or not, a runtime that signs in one provider at a time (049: OpenCode) keeps
+    /// offering the next one.
+    private var offersSignIn: Bool {
+        !account.authMethods.isEmpty && (account.state != .ready || launch.providerSignOutWord != nil)
+    }
+
+    /// How to sign a provider out, for a runtime with no sign-out the app can call.
+    private var providerSignOut: String? {
+        account.authMethods.compactMap(\.terminalCommand).first.flatMap(launch.providerSignOutCommand(from:))
     }
 
     var body: some View {
@@ -29,7 +39,7 @@ struct RuntimeAccountView: View {
                 .foregroundStyle((account.state == .needsSignIn ? StateTint.failure : .none)
                                     .style(or: .secondary))
 
-            if account.state != .ready, !account.authMethods.isEmpty {
+            if offersSignIn {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(account.orderedAuthMethods, id: \.id) { method in
                         Button(method.name ?? method.id) {
@@ -51,6 +61,12 @@ struct RuntimeAccountView: View {
                         Text(notice.text).appText(.fine).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Link(notice.linkTitle, destination: notice.link).appText(.fine)
+                    }
+                    if let providerSignOut {
+                        Text("To sign a provider out, run \(providerSignOut) in a terminal.")
+                            .appText(.fine).foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }

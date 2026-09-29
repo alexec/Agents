@@ -1361,10 +1361,12 @@ public struct ProcessSessionLauncher: SessionLauncher {
     }
 
     /// What the app offers a runtime at the handshake: everything it can serve, less file
-    /// reading for a runtime that must read files itself (046: Gemini).
+    /// reading for a runtime that must read files itself (046: Gemini), plus the older
+    /// terminal sign-in flag for a runtime that needs it (049: OpenCode).
     static func capabilities(for policy: ToolPolicy) -> ACP.ClientCapabilities {
         var capabilities = ACP.ClientCapabilities.app
         if policy.readsFilesItself { capabilities.readTextFile = false }
+        capabilities.terminalAuthMeta = RuntimeLaunchCatalog.launch(for: policy.runtimeID).asksForTerminalAuthCommand
         return capabilities
     }
 
