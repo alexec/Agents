@@ -64,7 +64,7 @@ struct AgentRuntimesSettingsView: View {
     }
 }
 
-/// A runtime's allowance, in the Pool page's words (065, contracts/runtime-state.md).
+/// A runtime's allowance, in `PoolWords` (065, contracts/runtime-state.md).
 private struct RuntimeAllowanceRow: View {
     @Environment(AppModel.self) private var model
     let row: RuntimeAllowances.Row

@@ -232,7 +232,6 @@ struct PromptBar: View {
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
                 .task(id: "\(agent.id)-\(agent.cwd.path)") { await model.loadAgentWorktrees(of: agent) }
                 Spacer(minLength: 8)
-                ContinueWithMenu(agent: agent)
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {

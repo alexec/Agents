@@ -67,7 +67,7 @@ struct SettingsWindow: View {
             await model.refreshRuntimes()
             await refreshShared()
         }
-        // Asked for from elsewhere in the app: the Pool page's "Edit the pool" (052).
+        // Asked for from elsewhere in the app: a link that names a Settings pane.
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
             pane.wrappedValue = asked
@@ -98,7 +98,6 @@ struct SettingsWindow: View {
         case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
-        case .pool: FormColumn { PoolSettingsView() }
         case .devices: FormColumn { DevicesPane() }
         case .servers: FormColumn { ServersSettingsView() }
         }
@@ -112,7 +111,7 @@ struct SettingsWindow: View {
 enum SettingsPane: String, Hashable, CaseIterable {
     // Keep the old persisted raw value so Settings opens on the same pane after upgrade.
     case appearance = "general"
-    case runtimes, shared, spending, pool, devices, servers
+    case runtimes, shared, spending, devices, servers
 
     var title: String {
         switch self {
@@ -120,7 +119,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
-        case .pool: "Pool"
         case .devices: "Devices"
         case .servers: "Servers"
         }
@@ -132,7 +130,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
-        case .pool: "arrow.triangle.swap"
         case .devices: "iphone"
         case .servers: "server.rack"
         }
@@ -140,7 +137,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
 
     /// Appearance on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
-    static let groups: [[SettingsPane]] = [[.appearance], [.runtimes, .spending, .pool], [.shared], [.devices, .servers]]
+    static let groups: [[SettingsPane]] = [[.appearance], [.runtimes, .spending], [.shared], [.devices, .servers]]
 }
 
 /// The Settings scene's window has no grow box, and `windowResizability` on that

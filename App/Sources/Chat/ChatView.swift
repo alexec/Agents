@@ -65,9 +65,6 @@ struct ChatView: View {
             open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
             terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
-            // A switch note's two links (052).
-            adjustSwitch: { [model] record in model.adjustingSwitch = record },
-            showPool: { [model] in model.showsPool = true },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in runtimeID.flatMap { model.accounts[$0]?.canSteer } ?? false },
             // The sidebar's Changes pane, open at that edit (035 FR-014).
