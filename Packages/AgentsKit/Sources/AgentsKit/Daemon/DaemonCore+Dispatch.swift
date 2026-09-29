@@ -506,6 +506,8 @@ extension DaemonCore {
 
             case DaemonAPI.Method.poolState:
                 let request = (try? require(params, as: DaemonAPI.PoolStateRequest.self)) ?? .init()
+                // Someone is looking at the pool: ask what is left, behind the answer.
+                Task { await self.measureAllowances() }
                 return .success(try JSONValue.encoding(await poolStatus(days: request.days)))
 
             case DaemonAPI.Method.poolSet:

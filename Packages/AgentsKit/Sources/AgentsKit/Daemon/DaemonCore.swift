@@ -335,6 +335,9 @@ public actor DaemonCore {
     var rateLimitAttempts: [UUID: Int] = [:]
     /// The latest plan window each agent's runtime reported (R2).
     var latestRateLimit: [UUID: RateLimitInfo] = [:]
+    /// Credentials whose allowance is being asked for now, so opening the Pool page
+    /// twice starts one runtime, not two.
+    var measuringAllowances: Set<String> = []
     /// A chat whose allowance ran out this turn, waiting for its runtime to be let go
     /// before it carries on (052). `resend` is whether the turn failed and its prompt
     /// goes again.

@@ -14,6 +14,8 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     public var learnedFrom: Source
     /// The latest plan window the runtime reported, for the return time (R2).
     public var lastRateLimit: RateLimitInfo?
+    /// A measured plan window. This is display data, never evidence that a turn can run.
+    public var reading: AllowanceReading?
     /// What the app has recorded spending on this credential, for credit entries.
     public var spent: Spent
     /// Rate limits in a row, trimmed to the policy's window (R7).
@@ -21,6 +23,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
 
     public init(credentialKey: String, entryID: UUID, status: Status = .available, since: Date,
                 learnedFrom: Source = .person, lastRateLimit: RateLimitInfo? = nil,
+                reading: AllowanceReading? = nil,
                 spent: Spent = .known(nil), rateLimitStreak: [Date] = []) {
         self.credentialKey = credentialKey
         self.entryID = entryID
@@ -28,6 +31,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         self.since = since
         self.learnedFrom = learnedFrom
         self.lastRateLimit = lastRateLimit
+        self.reading = reading
         self.spent = spent
         self.rateLimitStreak = rateLimitStreak
     }

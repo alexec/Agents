@@ -408,6 +408,15 @@ public actor ACPSession {
         _ = try await connection.call(ACP.Method.disableProvider, ["providerId": .string(id)])
     }
 
+    // MARK: The allowance
+
+    /// Grok's plan usage (`_x.ai/billing`), read as a reading. Nil from a runtime
+    /// that answered but said nothing we can use; a runtime without it throws.
+    public func grokAllowance(at: Date) async throws -> AllowanceReading? {
+        let result = try await connection.call(ACP.Method.grokBilling, .object([:]))
+        return AllowanceReading.grokBilling(result, at: at)
+    }
+
     // MARK: The sessions a runtime is holding
 
     /// Every conversation this runtime has in this folder, including ones this app did
