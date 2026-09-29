@@ -39,3 +39,21 @@ struct RuntimeAllowancesTests {
         #expect(AllowanceState.runtimeID(of: "claude:sign-in") == "claude")
     }
 }
+
+/// Where a chat whose allowance ran out sits in the list (065, US2 scenario 2, R7).
+@Suite("A spent allowance in the list")
+struct SpentAllowanceGroupTests {
+    @Test func itIsPausedNotNeedsYouNorWaiting() {
+        let group = AgentGroup(for: .stopped, wantsEyes: false, report: nil, outcomeAsked: false,
+                               parked: false, endedReason: .allowanceSpent)
+        #expect(group == .stopped)
+        #expect(group.title == "Paused")
+        #expect(EndedReason.allowanceSpent.summary == "Its allowance ran out")
+    }
+
+    @Test func aRateLimitThatPersistedStillNeedsYou() {
+        let group = AgentGroup(for: .stopped, wantsEyes: false, report: nil, outcomeAsked: false,
+                               parked: false, endedReason: .rateLimited)
+        #expect(group == .needsAttention)
+    }
+}

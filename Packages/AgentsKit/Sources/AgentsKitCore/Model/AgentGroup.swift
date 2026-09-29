@@ -64,7 +64,9 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .finished: self = Self.settled(wantsEyes || wantsAnswer || isUnread || (outcomeAsked && report == nil), report,
                                             waitingOnEvents: waitingOnEvents)
         case .stopped where waitingForAllowance: self = .waiting
-        case .stopped: self = endedReason == .cancelled || endedReason == .stoppedByAgent ? .stopped : .needsAttention
+        // A spent allowance is Paused, not Needs you (065, R7): the way on is a new chat,
+        // which the chat itself cannot be nagged into.
+        case .stopped: self = [.cancelled, .stoppedByAgent, .allowanceSpent].contains(endedReason) ? .stopped : .needsAttention
         case .archived: self = .archived
         }
     }
