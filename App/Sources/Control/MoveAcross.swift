@@ -29,7 +29,7 @@ final class MoveAcross {
         let locations = StoreLocations.default
         do {
             phase = .moving("Setting up the control plane…")
-            try ControlMove.prepare(control: services.controlRoot, from: locations)
+            try await ControlMove.prepare(control: services.controlRoot, from: locations)
 
             phase = .moving("Handing this Mac’s agents to the control plane…")
             // The window's own daemon lets go; launchd starts the host in its place, from

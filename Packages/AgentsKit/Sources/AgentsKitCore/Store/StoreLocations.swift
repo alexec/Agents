@@ -215,7 +215,7 @@ public struct StoreLocations: Sendable {
     }
 }
 
-enum StoreCoding {
+public enum StoreCoding {
     /// ISO 8601 with fractional seconds: the record stays readable with `cat`, and a
     /// timestamp survives a round trip to the millisecond. Anything finer than that
     /// does not, which matters nowhere and is worth knowing anyway.
@@ -233,7 +233,7 @@ enum StoreCoding {
         return f
     }()
 
-    static let encoder: JSONEncoder = {
+    public static let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .custom { date, encoder in
             var c = encoder.singleValueContainer()
@@ -246,7 +246,7 @@ enum StoreCoding {
         return e
     }()
 
-    static let decoder: JSONDecoder = {
+    public static let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             let text = try decoder.singleValueContainer().decode(String.self)
@@ -266,7 +266,7 @@ extension StoreCoding {
     /// Move a file that exists and cannot be read out of the way, keeping it beside
     /// the original. The stores that read such a file as empty go on to write that
     /// empty value back, and without this the only copy of what somebody set is gone.
-    static func setAside(_ url: URL) {
+    public static func setAside(_ url: URL) {
         let stamp = Int(Date().timeIntervalSince1970)
         let aside = url.appendingPathExtension("unreadable-\(stamp)")
         try? FileManager.default.moveItem(at: url, to: aside)
@@ -275,9 +275,9 @@ extension StoreCoding {
 
 /// One element of a list that is kept only if it decodes, so that one bad entry costs
 /// that entry rather than the list.
-struct Lossy<Element: Decodable>: Decodable {
-    let value: Element?
-    init(from decoder: Decoder) throws {
+public struct Lossy<Element: Decodable>: Decodable {
+    public let value: Element?
+    public init(from decoder: Decoder) throws {
         value = try? Element(from: decoder)
     }
 }

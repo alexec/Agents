@@ -193,7 +193,7 @@ violations.
   - build with `-IDEBuildingContinueBuildingAfterErrors=YES`, and add `-continue-building-after-errors` to the target's Swift flags while US1 is under way (S5).
 
   The developer configuration stays as it is until T112.
-- [ ] T044a [US1] Move the pure types the window needs into `Packages/AgentsKit/Sources/AgentsKitCore/` (S5):
+- [x] T044a (whole files for CredentialStore/Check, BrowserPolicy, FileProbe, StoreLocations with StoreCoding and Lossy, MachineID; `WorkflowPaths`, `MCPCatalogWords` and `ControlBonjour` split out, since WorkflowFile needs the YAML parser) [US1] Move the pure types the window needs into `Packages/AgentsKit/Sources/AgentsKitCore/` (S5):
   - `CredentialStore` and `CredentialCheck` (from `AgentsKit/Credentials`);
   - `MCPCatalogWords` (from `AgentsKit/Daemon/DaemonCore+MCPCatalog.swift`);
   - `BrowserPolicy`, and the `FileProbe` value type without its `read` (from `AgentsKit/Files`);

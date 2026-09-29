@@ -27,7 +27,7 @@ public actor ControlNet {
     /// Codes being shown, by the identity a connection holding one offers.
     private var codes: [String: (code: ControlCode, expires: Date)] = [:]
 
-    public static let serviceType = "_agents-control._tcp"
+    public static let serviceType = ControlBonjour.serviceType
     public static let portVariable = "AGENTS_CONTROL_PORT"
     public static let defaultPort: UInt16 = 8791
 
