@@ -43,11 +43,21 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
 4. **At start-up** a copy probes the store:
    - it writes `copies/<id>.json`;
    - it creates a probe key with `absent` twice, and expects the second to conflict;
+   - it puts the probe again with a stale `If-Match`, and expects a conflict;
    - it deletes the probe.
 
-   - it puts the probe again with a stale `If-Match`, and expects a conflict.
-
    A bucket that ignores conditions fails this probe, and the copy refuses to start.
+5. **The folder backend.**
+   - A key is a file path, and the ETag is SHA-256 of the contents.
+   - A `put` takes `flock` on `<key>.lock`, compares, writes a temporary file, `fsync`s it and
+     renames it into place.
+   - It is for one machine only.
+6. **The S3 backend.**
+   - Plain HTTPS with SigV4, and path-style addressing if `AGENTS_STORE_PATH_STYLE=1` (MinIO).
+   - Credentials come from the environment, the standard AWS files, or (in the host app) an
+     inherited descriptor, and never from the store.
+7. **No secrets in the store.** That means no private keys and no code secrets, only their
+   hashes.
 8. **What counts as a conflict** (S4). A conditional put answered 412, 409, or 404 (an
    `If-Match` on a key that is gone) throws `StoreError.conflict`.
 9. **ETags verbatim.** An ETag is sent back exactly as the store gave it, quotes included.
@@ -60,17 +70,6 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
     `.matching(etag)`: the record with `forgotten: true` and `rev` bumped. Readers treat a
     tombstone as absent, and any copy deletes tombstones older than seven days. Spent codes,
     expired codes and old events are deleted plainly, since a race there changes nothing.
-5. **The folder backend.**
-   - A key is a file path, and the ETag is SHA-256 of the contents.
-   - A `put` takes `flock` on `<key>.lock`, compares, writes a temporary file, `fsync`s it and
-     renames it into place.
-   - It is for one machine only.
-6. **The S3 backend.**
-   - Plain HTTPS with SigV4, and path-style addressing if `AGENTS_STORE_PATH_STYLE=1` (MinIO).
-   - Credentials come from the environment, the standard AWS files, or (in the host app) an
-     inherited descriptor, and never from the store.
-7. **No secrets in the store.** That means no private keys and no code secrets, only their
-   hashes.
 
 ## Copying a store
 

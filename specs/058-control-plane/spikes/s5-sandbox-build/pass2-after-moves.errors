@@ -1,0 +1,107 @@
+App/Sources/AppModel.swift:1011:21: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1035:21: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1076:21: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1251:19: error: cannot find 'DaemonLock' in scope
+App/Sources/AppModel.swift:1269:19: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1452:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1455:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1456:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1462:44: error: cannot infer type of closure parameter 'id' without a type annotation
+App/Sources/AppModel.swift:1462:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1465:20: error: cannot find 'SignInRelays' in scope
+App/Sources/AppModel.swift:1465:78: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/AppModel.swift:1467:45: error: cannot infer type of closure parameter 'id' without a type annotation
+App/Sources/AppModel.swift:1467:49: error: cannot infer type of closure parameter 'runtimeID' without a type annotation
+App/Sources/AppModel.swift:1467:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1469:26: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/AppModel.swift:1471:65: error: cannot find 'SignInRelays' in scope
+App/Sources/AppModel.swift:1473:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1476:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1482:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1528:9: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1616:15: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:1665:13: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:2748:60: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:2759:59: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:2785:47: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:2822:74: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:440:16: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:453:29: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:520:32: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:902:25: error: cannot find 'hosts' in scope
+App/Sources/AppModel.swift:967:21: error: cannot find 'hosts' in scope
+App/Sources/Chat/ChatView.swift:184:15: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Chat/ChatView.swift:188:18: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Chat/OfflineStrip.swift:14:18: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Chat/PromptBar.swift:307:50: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Chat/PromptBar.swift:308:27: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Chat/PromptBar.swift:419:44: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Chat/PromptBar.swift:777:45: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Commands/AgentsCommands.swift:239:22: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Commands/AgentsCommands.swift:241:21: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/ContentView.swift:75:41: error: referencing subscript 'subscript(dynamicMember:)' requires wrapper 'Bindable<AppModel>'
+App/Sources/ContentView.swift:75:47: error: value of type 'AppModel' has no dynamic member 'hosts' using key path from root type 'AppModel'
+App/Sources/ContentView.swift:76:41: error: referencing subscript 'subscript(dynamicMember:)' requires wrapper 'Bindable<AppModel>'
+App/Sources/ContentView.swift:76:47: error: value of type 'AppModel' has no dynamic member 'hosts' using key path from root type 'AppModel'
+App/Sources/ContentView.swift:76:66: error: cannot assign value of type 'Binding<Subject>?' to type 'Binding<Subject>'
+App/Sources/Control/ControlConfig.swift:108:82: error: missing argument for parameter 'link' in call
+App/Sources/Control/ControlConfig.swift:36:9: error: cannot find 'ControlPlane' in scope
+App/Sources/Control/ControlConfig.swift:71:63: error: cannot find type 'LocalServices' in scope
+App/Sources/Control/ControlConfig.swift:75:74: error: cannot find 'Daemon' in scope
+App/Sources/Control/ControlConfig.swift:76:22: error: cannot find 'Daemon' in scope
+App/Sources/Control/ControlConfig.swift:91:22: error: cannot find 'ControlPlane' in scope
+App/Sources/Control/ControlConfig.swift:92:54: error: cannot find 'connectUnixSocket' in scope
+App/Sources/Control/ControlSettingsModel.swift:156:21: error: cannot find 'LocalServices' in scope
+App/Sources/Control/FirstRunView.swift:135:19: error: cannot find type 'LocalServices' in scope
+App/Sources/Control/FirstRunView.swift:140:20: error: cannot find type 'LocalServices' in scope
+App/Sources/Control/MoveAcross.swift:21:18: error: cannot find type 'ControlMove' in scope
+App/Sources/Control/MoveAcross.swift:22:28: error: cannot find 'LocalServices' in scope
+App/Sources/Control/MoveAcross.swift:25:19: error: cannot find 'ControlMove' in scope
+App/Sources/Control/MoveAcross.swift:32:17: error: cannot find 'ControlMove' in scope
+App/Sources/Control/MoveAcross.swift:64:27: error: cannot find 'ControlMove' in scope
+App/Sources/Control/MoveAcross.swift:69:18: error: cannot find 'ControlMove' in scope
+App/Sources/Hosts/HostHeading.swift:12:24: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Hosts/HostHeading.swift:19:22: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Hosts/Lending.swift:17:23: error: cannot find 'hosts' in scope
+App/Sources/Hosts/Lending.swift:22:30: error: cannot find 'SignInRelays' in scope
+App/Sources/Hosts/Lending.swift:23:30: error: cannot find 'SignInRelays' in scope
+App/Sources/Hosts/Lending.swift:34:29: error: cannot find 'hosts' in scope
+App/Sources/Hosts/Lending.swift:37:81: error: cannot find 'hosts' in scope
+App/Sources/Hosts/Lending.swift:48:36: error: cannot find 'hosts' in scope
+App/Sources/Hosts/Lending.swift:49:22: error: cannot find 'hosts' in scope
+App/Sources/Hosts/Lending.swift:86:29: error: cannot find 'hosts' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:11:33: error: cannot find type 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:15:39: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Hosts/RebuiltServerSheet.swift:26:42: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Hosts/RebuiltServerSheet.swift:58:34: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Hosts/RebuiltServerSheet.swift:59:19: error: cannot find 'HostSet' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:61:38: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:62:28: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:63:33: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:76:33: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Hosts/RebuiltServerSheet.swift:87:26: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:88:15: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Hosts/RemoteFolderSheet.swift:18:39: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Hosts/RemoteFolderSheet.swift:70:34: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Projects/CloneSheet.swift:33:75: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Projects/CloneSheet.swift:66:22: error: cannot find 'DaemonCore' in scope
+App/Sources/Projects/ProjectAgentsView.swift:105:65: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Projects/ProjectListView.swift:136:54: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+App/Sources/Projects/ProjectListView.swift:137:48: error: cannot find 'AddServerSheet' in scope
+App/Sources/Projects/ProjectListView.swift:419:23: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Projects/ProjectSettingsSheet.swift:203:49: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Projects/WorkflowPage.swift:305:39: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Settings/ArchiveSettingsView.swift:46:17: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+App/Sources/Settings/CostSettingsView.swift:46:17: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+App/Sources/Settings/ServersSettingsView.swift:105:22: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Settings/ServersSettingsView.swift:132:39: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Settings/ServersSettingsView.swift:15:26: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Settings/ServersSettingsView.swift:164:36: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Settings/ServersSettingsView.swift:42:42: error: cannot find 'AddServerSheet' in scope
+App/Sources/Settings/ServersSettingsView.swift:69:24: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Settings/ServersSettingsView.swift:69:60: error: cannot find 'SignInRelays' in scope
+App/Sources/Settings/ServersSettingsView.swift:71:21: error: cannot find 'ServerBinaries' in scope
+App/Sources/Settings/ServersSettingsView.swift:74:53: error: cannot find 'SignInRelays' in scope
+App/Sources/Settings/ServersSettingsView.swift:95:22: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Sidebar/FilesPane.swift:46:64: error: value of type 'AppModel' has no member 'hosts'
+App/Sources/Sidebar/MacPageActions.swift:19:33: error: value of type 'AppModel' has no member 'hosts'

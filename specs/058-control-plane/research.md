@@ -546,3 +546,27 @@ These run before the code they gate (plan Phase 0):
       before relying on R2 for leases.
 - **S5: a sandboxed archive.** Archive the Mac app with the sandbox on and the reduced link,
   and list what fails to build. That list is the real size of R12.
+  - **Result, 2026-09-28** ([spikes/s5-sandbox-build/RESULTS.md](spikes/s5-sandbox-build/RESULTS.md)):
+    **48 app files fail.**
+    - Linking only `AgentsKitCore` gave 271 errors in 37 files, and 11 more files appeared
+      once `HostSet` was taken away. Every app and `Shared/UI` file (95) also has to import
+      `AgentsKitCore` instead of `AgentsKit`.
+    - Moving eight pure types into Core leaves 107 errors in 24 files, all of them host
+      management:
+      - `HostSet` and the ssh servers UI;
+      - sign-in relays;
+      - `LocalServices` and the move;
+      - the local endpoint in `ControlConfig`;
+      - `model.hosts` in about 20 views.
+    - **The types to move into Core:** `CredentialStore` and `CredentialCheck`,
+      `MCPCatalogWords`, `BrowserPolicy`, the `FileProbe` value type, the path part of
+      `WorkflowFile`, `ControlNet.serviceType`, a window-root part of `StoreLocations`, and
+      `MachineID` if the sandbox allows its `gethostuuid`.
+    - **Linking only Core does not catch disk access.** `FileManager` and `contentsOf` reads,
+      `NSWorkspace` on paths and `PresenceReporter`'s `dlsym` all compile against Core and
+      would fail quietly at run time. Some are in files R12 did not list: `AgentsSetup`,
+      `ProjectRow`, `ImageFile`, `MacPageActions`, `PluginsSection`, `SharedSettingsView` and
+      `ChatView`. A grep gate is needed as well as the link.
+    - **Tooling:** Xcode stops compiling other batches after the first failure. Build with
+      `-IDEBuildingContinueBuildingAfterErrors=YES`, and add `-continue-building-after-errors`
+      to the target's Swift flags while working through US1.

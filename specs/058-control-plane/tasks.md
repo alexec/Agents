@@ -69,7 +69,7 @@ replaced, and removing what they left is a task in this list.
   - two writers racing one lease key 100 times (exactly one wins each round).
 
   Record the results in research.md S4.
-- [ ] T025 [P] Spike S5, a sandboxed archive. On a throwaway branch in a scratch worktree (never this tree), turn on `com.apple.security.app-sandbox` in `App/Agents.entitlements` and link only `AgentsKitCore` for the Agents target in `project.yml`. Run `xcodegen`, then build. List every file that fails and why. Record the list in research.md S5; it sizes US1's tasks T044–T053. Delete the scratch worktree afterwards.
+- [x] T025 (48 files fail; eight types move to Core; disk and NSWorkspace calls need a grep gate; spikes/s5-sandbox-build/RESULTS.md) [P] Spike S5, a sandboxed archive. On a throwaway branch in a scratch worktree (never this tree), turn on `com.apple.security.app-sandbox` in `App/Agents.entitlements` and link only `AgentsKitCore` for the Agents target in `project.yml`. Run `xcodegen`, then build. List every file that fails and why. Record the list in research.md S5; it sizes US1's tasks T044–T053. Delete the scratch worktree afterwards.
 - [ ] T026 Create the package skeleton `Packages/ControlPlane/Package.swift`:
   - platforms macOS 27, and Linux via the static SDK;
   - targets `ControlPlaneKit`, `agents-control` and `ControlPlaneKitTests`;
@@ -190,7 +190,21 @@ violations.
   - link `AgentsKitCore` only;
   - no `Contents/Helpers`, `Resources/servers` or `Resources/toolsets` in that configuration.
 
+  - swap `import AgentsKit` for `import AgentsKitCore` in every `App/` and `Shared/UI` file the store configuration builds (95 files, S5);
+  - build with `-IDEBuildingContinueBuildingAfterErrors=YES`, and add `-continue-building-after-errors` to the target's Swift flags while US1 is under way (S5).
+
   The developer configuration stays as it is until T112.
+- [ ] T044a [US1] Move the pure types the window needs into `Packages/AgentsKit/Sources/AgentsKitCore/` (S5):
+  - `CredentialStore` and `CredentialCheck` (from `AgentsKit/Credentials`);
+  - `MCPCatalogWords` (from `AgentsKit/Daemon/DaemonCore+MCPCatalog.swift`);
+  - `BrowserPolicy`, and the `FileProbe` value type without its `read` (from `AgentsKit/Files`);
+  - the path part of `WorkflowFile` (from `AgentsKit/Workflows`);
+  - `ControlNet.serviceType`;
+  - a window-root part of `StoreLocations`;
+  - `MachineID`, if its `gethostuuid` works in the sandbox (checked in T053).
+
+  `agentsd` and the tests keep building, and nothing moved imports `Process` or POSIX file calls.
+- [ ] T044b [US1] Write `scripts/check-store-window.sh`, run by the store build: under `AGENTS_STORE`, fail on `FileManager`, `contentsOf:`, `NSWorkspace` given a path, `dlsym`, `Process` or `posix_spawn` in `App/` and `Shared/UI` outside an allow-list (the container, and `mac/*` results). Linking only Core does not catch these (S5).
 - [ ] T045 [P] [US1] Write the Mac host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/MacHostMethods.swift`:
   - `mac/reveal {path}`, `mac/open {path, app?}` and `mac/terminal {path?, command?}`, operator only, answered only on macOS with `NSWorkspace`;
   - Linux answers `unsupportedHere`;
@@ -199,18 +213,18 @@ violations.
 - [ ] T047 [US1] Replace every `isOnThisMac` direct read with host calls. The places:
   - in `App/Sources/AppModel.swift`, `textFile` becomes `files/read` and `pathIsThere` becomes `files/stat`;
   - `App/Sources/Projects/WorkflowPage.swift`, `WorkflowRow.swift`, `App/Sources/Sidebar/BackgroundPane.swift`, `FilesPane.swift` and `App/Sources/AgentList/AgentRow.swift`;
-  - `App/Sources/Settings/SharedSkillsPage.swift` and `SharedInstructionsPage.swift`, which use `shared/*`.
+  - the shared pages (`App/Sources/Settings/SharedSettingsView.swift` and its pages), which use `shared/*`;
+  - `App/Sources/Projects/AgentsSetup.swift` (reads, writes and lists `AGENTS.md`), `ProjectRow.swift` (home folder), `ImageFile.swift` and `MacPageActions.swift` (S5);
+  - `CloneSheet.swift`, which uses a new host field, the host's clone parent, instead of `DaemonCore.defaultCloneParent()` (S5).
 
   Keep `ThisMacHost` only to decide whether Reveal and Open are offered.
-- [ ] T048 [US1] Send Reveal in Finder, Open in another app and open Terminal through `mac/*` on this Mac's host. The places are `App/Sources/Sidebar/OpenElsewhere.swift`, `App/Sources/Commands/AgentsCommands.swift`, `AgentRow.swift`, `BackgroundPane.swift` and `RuntimeAccountView.swift`.
-- [ ] T049 [US1] Remove from the window, under `AGENTS_STORE`:
-  - `SocketLink` use and `DaemonLock`;
-  - `LocalServices`, which moves in T055;
-  - `HostSet`, `ServerConnection`, `SSHCommand`, `SSHMaster` and `ServerBinaries`;
-  - `ClaudeKeychainSignIn`, `MacSignInRelay` and `SignInRelays`, which move in T091;
-  - `WindowFiles`.
-
-  Use the S5 list (T025) as the checklist, and make the store configuration build.
+- [ ] T048 [US1] Send Reveal in Finder, Open in another app and open Terminal through `mac/*` on this Mac's host. The places are `App/Sources/Sidebar/OpenElsewhere.swift`, `App/Sources/Commands/AgentsCommands.swift`, `AgentRow.swift`, `BackgroundPane.swift` and `RuntimeAccountView.swift`, and also `PluginsSection.swift`, `SharedSettingsView.swift`, `AgentsSetup.swift` and `ChatView.swift` (S5: 16 files use `NSWorkspace` on paths).
+- [ ] T049a [US1] `AppModel` reaches every host only through the control plane's host list (`controlHosts`), and drops `DaemonClient()` (the `SocketLink` default) and `DaemonLock`, under `AGENTS_STORE` (S5: about 24 sites in `AppModel`).
+- [ ] T049b [US1] Retire the window's ssh servers under `AGENTS_STORE`:
+  - remove `HostSet`, `ServerConnection`, `SSHCommand`, `SSHMaster`, `ServerBinaries`, `AddServerFlow`'s ssh path and `RebuiltServerSheet`;
+  - move `ClaudeKeychainSignIn`, `MacSignInRelay` and `SignInRelays` out, in T091;
+  - make the views that read `model.hosts` read the control plane's hosts: `ChatView`, `PromptBar`, `OfflineStrip`, `AgentsCommands`, `HostHeading`, `Lending`, `RemoteFolderSheet`, `ProjectAgentsView`, `ProjectSettingsSheet`, `ProjectListView`, `WorkflowPage`, `FilesPane`, `MacPageActions`, `CloneSheet`, `ServersSettingsView`, `ContentView`, `ArchiveSettingsView` and `CostSettingsView` (S5).
+- [ ] T049c [US1] `ControlConfig` is a remote endpoint only under `AGENTS_STORE`: no local socket, `Daemon.platform`, or *run a host here*. `LocalServices`, `MoveAcross`, `WindowFiles` and `FirstRunView`'s *Run one here* leave the window (they move to the host app in T055 and T086). Afterwards the store configuration builds with no errors (the S5 list, `spikes/s5-sandbox-build/pass2-after-moves.errors`, is the checklist).
 - [ ] T050 [US1] In `App/Sources/Control/ControlConfig.swift`, the config holds `url`, `pin` and the client id in the container's defaults, with the key in the window's keychain. `AppModel` builds every client from one `ControlLink` over `WebSocketLink`. It has no path without a control plane under `AGENTS_STORE` (FR-028).
 - [ ] T051 [US1] Build frame K in `App/Sources/Control/FirstRunView.swift` and `ConnectSheet.swift`, after Alex approves it (T028). It has the two states. *Set one up on this Mac* opens the host app's download page URL, taken from `Info.plist` `AgentsHostDownloadURL`, and Bonjour finds an installed host app.
 - [ ] T052 [US1] Presence under the sandbox: in `App/Sources/Presence/PresenceReporter.swift`, drop the `CGSSessionScreenIsLocked` probe. The window reports only its own activity, and the Mac host reports the lock state. Check with 043's presence tests.
@@ -218,7 +232,9 @@ violations.
   - screenshot each step;
   - check the window has no child processes and there is no sandbox violation in `/usr/bin/log`;
   - open the store build from Finder and dial a control plane on another machine, and record the Local Network prompt and what refusing it does (S2 left this open);
-  - check Reveal and the shared skills page reach the host.
+  - check Reveal and the shared skills page reach the host;
+  - check `MachineID` works inside the sandbox, or record what `ThisMacHost` uses instead (S5);
+  - run `scripts/check-store-window.sh` (T044b) and see it pass.
 
   Record it in `specs/058-control-plane/walks/us1-store.md`.
 
