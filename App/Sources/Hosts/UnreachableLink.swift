@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import Foundation
 
 /// A link to nowhere: every call fails at once with `offline` (037). Handed out for a

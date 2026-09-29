@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// A host's heading in the project list (037, wireframes/mac-projects.svg): its name,

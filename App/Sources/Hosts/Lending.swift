@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import Foundation
 
 /// A server asked for a credential this window has none of (043, FR-015): asked of the

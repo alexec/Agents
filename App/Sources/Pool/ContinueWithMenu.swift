@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// The runtime control on a chat's prompt bar (052, wireframes §2): the per-chat

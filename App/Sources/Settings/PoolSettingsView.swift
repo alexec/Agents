@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Settings ▸ Pool (052, US2; wireframes §4): the switch, the entries in the order to

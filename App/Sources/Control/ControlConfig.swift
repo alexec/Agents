@@ -1,3 +1,4 @@
+#if !AGENTS_STORE
 import AgentsKit
 import AgentsKitCore
 import Foundation
@@ -119,3 +120,4 @@ enum ControlConfig {
         return membership
     }
 }
+#endif

@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// What happened, what came of it, and who is still waiting (042 US2; wireframes §1).

@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Add a skill (059, look/ frames B, C and E): search skills.sh, look at one skill as its

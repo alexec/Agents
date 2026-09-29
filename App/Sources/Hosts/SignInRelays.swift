@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import Foundation
 
 /// The sign-ins this Mac relays to its servers (047 Codex's, 056 Claude's): one relay per

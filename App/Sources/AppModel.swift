@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import Foundation
 import Observation
 
@@ -396,8 +399,12 @@ final class AppModel {
 
     /// This Mac's host: through the control plane when the window has one (058). Set
     /// once more when first run chooses one.
+    #if AGENTS_STORE
+    private var client = ControlConfig.macClient()
+    #else
     private var client = ControlConfig.endpoint.flatMap(ControlConfig.link).map { DaemonClient(link: $0.link(for: .mac)) }
         ?? DaemonClient()
+    #endif
     /// The one connection to the control plane every host's client is carried on (058).
     private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
     /// Every host the control plane has besides this Mac's, each with a client of its own
@@ -1236,6 +1243,7 @@ final class AppModel {
     /// Step two of the move: the window's own daemon quits, leaving its agents to be
     /// picked up by the host that replaces it, and the window does not start another.
     /// A turn in flight refuses the quit, and nothing has changed.
+    #if !AGENTS_STORE
     func letTheOldDaemonGo() async throws {
         holdingForMove = true
         do {
@@ -1252,6 +1260,7 @@ final class AppModel {
             try? await Task.sleep(for: .milliseconds(250))
         }
     }
+    #endif
 
     /// The move stopped before the window adopted the control plane: back to the old way.
     func resumeTheOldWay() async {
@@ -1262,6 +1271,7 @@ final class AppModel {
 
     /// First run has a control plane (058): from here the window is its client, and
     /// this Mac's host is reached through it.
+    #if !AGENTS_STORE
     func adoptControlPlane(root: URL) async {
         ControlConfig.save(root)
         holdingForMove = false
@@ -1272,6 +1282,7 @@ final class AppModel {
         }
         await adopt(.local(root))
     }
+    #endif
 
     /// First run has paired with a control plane elsewhere (058, frame C).
     func adopt(_ endpoint: ControlConfig.Endpoint) async {
@@ -1462,13 +1473,21 @@ final class AppModel {
         hosts.claudeWanted = { [weak self] id in
             guard let self else { return false }
             // This Mac's own Claude sign-in, relayed (056).
+            #if AGENTS_STORE
+            return false
+            #else
             return SignInRelays.canRelay(RuntimeCatalog.claude.id) && !(self.hosts.host(id)?.ownSignInOnly ?? false)
+            #endif
         }
         hosts.toolsetWanted = { [weak self] id, runtimeID in
             guard let self else { return false }
             guard !(self.hosts.host(id)?.ownSignInOnly ?? false) else { return false }
             // A key in Settings, or this Mac's own sign-in relayed (047).
+            #if AGENTS_STORE
+            return self.credentials.record(runtimeID) != nil
+            #else
             return self.credentials.record(runtimeID) != nil || SignInRelays.canRelay(runtimeID)
+            #endif
         }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)

@@ -10,29 +10,17 @@ public enum ControlJoin {
         public init(_ description: String) { self.description = description }
     }
 
+    /// NIO's dial, for `ControlCodeUse`.
+    public static let nio: ControlCodeUse.Dial = { url, pin in try await ControlDial.connect(url, pin: pin) }
+
     /// Opens a socket to `url` and proves `credentials` on it.
     public static func dial(_ url: URL, pin: String?, as credentials: ControlAuth.Credentials) async throws -> PrefixReader {
-        guard let origin = ControlAuth.origin(url) else { throw Failure("\(url) is not an address to dial") }
-        let socket = try await ControlDial.connect(url, pin: pin)
-        return try await ControlAuth.join(socket, origin: origin, as: credentials).transport
+        try await ControlCodeUse.join(url, pin: pin, as: credentials, dial: nio)
     }
 
     /// Uses a version 2 code once: says who this is with `method`, and returns the reply.
     public static func announce(_ code: ControlCode, method: String, params: JSONValue) async throws -> DaemonAPI.Admitted {
-        guard let text = code.url, let url = URL(string: text), let id = ControlAuth.codeID(secret: code.secret) else {
-            throw Failure("that code has no address; it is from the first build")
-        }
-        let identity: ControlAuth.Identity = if case .host = code.purpose { .enrolling(id) } else { .pairing(id) }
-        let reader = try await dial(url, pin: code.pin, as: .init(identity: identity, key: ControlAuth.codeKey(secret: code.secret),
-                                                                 kind: "host", controlKey: code.controlKey))
-        defer { reader.close() }
-        try reader.write(line: JSONRPCCodec.encode(.request(id: .number(1), method: method, params: params)))
-        guard let line = try await reader.next(within: 15) else { throw Failure("the control plane did not answer") }
-        switch try JSONRPCCodec.decode(line: line) {
-        case .success(_, let result): return try result.decode(DaemonAPI.Admitted.self)
-        case .failure(_, let error): throw error
-        default: throw Failure("the control plane answered something else: \(line)")
-        }
+        try await ControlCodeUse.announce(code, method: method, params: params, kind: "host", dial: nio)
     }
 
     /// A host enrols with a host code, and keeps what it needs to dial again.

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The App Store window (058, research R12): sandboxed, and a client only. Every
+	     agent, file and terminal is a host's, reached through the control plane. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- The control plane's WebSocket, and Bonjour to find one on this network. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- Dictation. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- A file the person picks or drops, to attach it; a folder, only its path is sent. -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
+</dict>
+</plist>

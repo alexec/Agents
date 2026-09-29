@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Settings ▸ Servers (037, wireframes/mac-settings-servers.svg): each server, how it is
