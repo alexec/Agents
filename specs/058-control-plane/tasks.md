@@ -83,7 +83,7 @@ replaced, and removing what they left is a task in this list.
 
 **Purpose**: settle the new and changed screens before any UI code. Alex approves them.
 
-- [ ] T027 [P] Draw frames K–N in `specs/058-control-plane/look/wireframes.html`, the same style as A–J, and export `k.png`–`n.png`. The frames:
+- [x] T027 (K, K2, L, M, M2, N; look/README.md) [P] Draw frames K–N in `specs/058-control-plane/look/wireframes.html`, the same style as A–J, and export `k.png`–`n.png`. The frames:
   - **K**: the window's first run, in two states: the host app is absent, which gives *Connect to a control plane* and *Set one up on this Mac*, pointing to the download; and the host app is found by Bonjour, which gives *Pair with “Alex's Mac”*.
   - **L**: the host app's window: this host's state, the code to pair a window or phone, *Run the control plane here*, *Join one elsewhere*, *Relay for my devices*, and the move. Also where the control plane keeps its store: *This Mac* (the default) or *A bucket* (endpoint, bucket, prefix, access key, secret, and a Check button), plus *Switch store…* once it is running.
   - **M**: Add a Server, with two tabs: *Run a command*, showing a host code and the one-line command; and *Install over ssh*, with the destination and a key used once.
