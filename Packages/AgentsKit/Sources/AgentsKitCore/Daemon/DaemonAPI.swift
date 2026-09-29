@@ -159,6 +159,9 @@ public enum DaemonAPI {
         /// Nor this one. Another of that MCP server's tools: the agent asking that a
         /// file be put in front of the user.
         public static let agentsShowFile = "agents/showFile"
+        /// The helper relaying `ask_form`: the agent asking the person a question and
+        /// waiting for the answer. The daemon holds the form as an elicitation.
+        public static let agentsAskForm = "agents/askForm"
         /// A window asking the daemon to write what the person typed on a live page
         /// (022). The daemon writes rather than the window, so that it knows the
         /// person did — that is what lets it tell the agent on its next turn.
@@ -983,6 +986,46 @@ public enum DaemonAPI {
         public init(token: String, file: ShownFile) {
             self.token = token
             self.file = file
+        }
+    }
+
+    /// What the MCP helper sends when an agent calls `ask_form`. The token does the
+    /// same work it does for a suggestion, and the questions become a form
+    /// elicitation the daemon holds until the person answers — including on the phone.
+    public struct AskFormRequest: Codable, Sendable {
+        public var token: String
+        public var title: String?
+        public var questions: [Question]
+
+        public struct Question: Codable, Sendable {
+            public var id: String
+            public var prompt: String
+            public var options: [Option]?
+            public var allowMultiple: Bool?
+
+            public struct Option: Codable, Sendable {
+                public var id: String
+                public var label: String?
+
+                public init(id: String, label: String? = nil) {
+                    self.id = id
+                    self.label = label
+                }
+            }
+
+            public init(id: String, prompt: String, options: [Option]? = nil,
+                        allowMultiple: Bool? = nil) {
+                self.id = id
+                self.prompt = prompt
+                self.options = options
+                self.allowMultiple = allowMultiple
+            }
+        }
+
+        public init(token: String, title: String? = nil, questions: [Question]) {
+            self.token = token
+            self.title = title
+            self.questions = questions
         }
     }
 

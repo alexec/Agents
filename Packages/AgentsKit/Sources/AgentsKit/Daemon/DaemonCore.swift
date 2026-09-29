@@ -235,6 +235,9 @@ public actor DaemonCore {
     /// Answered when the lease comes, the wait runs out, or the agent is stopped.
     var openWaits: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
     var openWaitStarted: [UUID: Date] = [:]
+    /// `ask_form` calls waiting on the person's answer, by the elicitation's id.
+    /// Answered when they accept, skip or cancel, or when the agent is stopped.
+    var openAsks: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
     /// The one timer, aimed at the book's next deadline. Re-aimed after every change.
     var leaseTimer: Task<Void, Never>?
     /// Tells the windows once a minute while anything is held, so "minutes left"

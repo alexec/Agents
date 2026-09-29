@@ -552,6 +552,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ShowFileRequest.self)
                 return .success(["note": .string(try await showFile(request))])
 
+            case DaemonAPI.Method.agentsAskForm:
+                let request = try require(params, as: DaemonAPI.AskFormRequest.self)
+                return .success(["note": .string(try await askForm(request))])
+
             case DaemonAPI.Method.artifactWrite:
                 let request = try require(params, as: DaemonAPI.ArtifactWriteRequest.self)
                 try await artifactWrite(request)

@@ -31,6 +31,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsSuggestPrompts,
         DaemonAPI.Method.agentsReportOutcome,
         DaemonAPI.Method.agentsShowFile,
+        DaemonAPI.Method.agentsAskForm,
         DaemonAPI.Method.agentsManageWorkflows,
         DaemonAPI.Method.agentsStartHelper,
         DaemonAPI.Method.agentsStopHelper,
