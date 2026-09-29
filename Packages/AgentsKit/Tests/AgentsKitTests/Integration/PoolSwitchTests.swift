@@ -247,14 +247,15 @@ struct PoolSwitchTests {
         #expect(switches.map(\.to.runtimeID) == ["codex", "copilot"])
     }
 
-    @Test func everyoneOutStopsWithASentence() async throws {
+    @Test func everyoneOutWaitsWithASentence() async throws {
         let (core, work, _, _) = try await core([try spent(), try spent(), try spent()])
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        await eventually("it gave up") {
+        await eventually("it waits for a check") {
             (try? await kinds(core, id).contains {
-                if case .runtimeNote(let t) = $0 { t.hasPrefix("Every other runtime in the pool is out") } else { false }
+                if case .runtimeNote(let t) = $0 { t.hasPrefix("Every runtime in the pool is out. This chat waits") } else { false }
             }) == true
         }
+        #expect(await core.agent(id)?.allowanceWait != nil)
         #expect(await core.agent(id)?.endedReason == .allowanceSpent)
         #expect(await core.agent(id)?.state != .finished)
     }

@@ -65,15 +65,23 @@ That needs the app to recognise the refusal, which it does per runtime:
 
 | Runtime | Spent allowance | Rate limit | When it is back |
 | --- | --- | --- | --- |
-| **Claude** | Recognised: Claude says so in a form the app reads. Paid extra usage starting counts as spent. | Recognised, and tried again on the same runtime: after 30 seconds, then 2 minutes. Three in ten minutes counts as spent. | The time Claude's plan window gives. |
-| **Codex** | Recognised, as for Claude, on this Mac and on a server that signs in through this Mac. | Recognised, as for Claude. | When Codex says; otherwise it is tried again after an hour. |
-| **Gemini** | Recognised from Google's sentence about the daily quota. On free or prepaid credit, also when the app's count of what it cost reaches the amount, or the credit's date passes. | Recognised from Google's 429. | The free tier: midnight Pacific. Credit: when you mark it available or raise the amount. |
-| **Antigravity** | Treated as a rate limit, since Google uses the same words for both: three in ten minutes counts as spent. | Recognised from "Resource has been exhausted". | Tried again after an hour. |
-| **Copilot** | Recognised from "You have exceeded your monthly quota". | Not yet recognised. | Tried again after an hour when spent without a window. |
-| **Grok** | Recognised from Grok's 402 "usage balance exhausted" (Build / SuperGrok). | Not yet recognised. | Tried again after an hour when spent without a window. |
-| **Cursor** | Recognised from "Upgrade your plan to continue". | Not yet recognised. | Tried again after an hour when spent without a window. |
+| **Claude** | Recognised: Claude says so in a form the app reads. Paid extra usage starting counts as spent. | Recognised, and tried again on the same runtime: after 30 seconds, then 2 minutes. Three in ten minutes counts as spent. | Checked every four hours; its plan window is shown when known. |
+| **Codex** | Recognised, as for Claude, on this Mac and on a server that signs in through this Mac. | Recognised, as for Claude. | Checked every four hours; its plan window is shown when known. |
+| **Gemini** | Recognised from Google's sentence about the daily quota. On free or prepaid credit, also when the app's count of what it cost reaches the amount, or the credit's date passes. | Recognised from Google's 429. | Free tier: checked every four hours; its daily reset is shown. Credit: when you mark it available or raise the amount. |
+| **Antigravity** | Treated as a rate limit, since Google uses the same words for both: three in ten minutes counts as spent. | Recognised from "Resource has been exhausted". | Checked after four hours. |
+| **Copilot** | Recognised from "You have exceeded your monthly quota". | Not yet recognised. | Checked after four hours when spent without a window. |
+| **Grok** | Recognised from Grok's 402 "usage balance exhausted" (Build / SuperGrok). | Not yet recognised. | Checked after four hours when spent without a window. |
+| **Cursor** | Recognised from "Upgrade your plan to continue". | Not yet recognised. | Checked after four hours when spent without a window. |
 
-An error the app does not recognise never moves a chat: it stops, as before.
+An ordinary runtime error or crash also takes that runtime out of the pool. A later
+successful turn puts it back. Each availability check asks for a short reply on a small
+model in a read-only mode where the runtime offers one. A successful reply puts it back
+in the pool, even if the provider's stated reset time has not arrived. A failed check
+leaves it out and schedules another four hours later. The stated reset time alone never
+restores availability.
+
+An error the app does not recognise stops that turn. The runtime leaves the pool, so the
+next prompt can use another available runtime.
 
 ## What each gets from `~/.agents`
 

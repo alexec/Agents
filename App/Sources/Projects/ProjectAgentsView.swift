@@ -1,9 +1,11 @@
 import AgentsKit
 import SwiftUI
 
-/// The project itself, with no session picked: its name, somewhere to say what you want
-/// done, and its pull requests, workflows and worktrees. Its sessions are the middle
-/// column's (`SessionsColumn`).
+/// The project itself, with no session picked: its name and somewhere to say what you
+/// want done. Nothing else. Its sessions, pull requests, Ready issues and workflows are
+/// the middle column's (`SessionsColumn`); its worktrees, skills and plugins are
+/// Configuration's. A plugin waiting for an OK is one line here, since no agent is given
+/// it until somebody looks.
 ///
 /// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
 /// options, the folders and servers, attachments, dictation, the lot. On a project page
@@ -16,8 +18,6 @@ struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
     @State private var showingConfiguration = false
-
-    static let cardSpacing: CGFloat = 2
 
     private var folder: URL? { model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
@@ -43,14 +43,12 @@ struct ProjectAgentsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 heading
-                SectionHeading(title: "New session")
-                    .chatColumn()
-                    .padding(.top, 6)
                 // Its own margins, the same as in a chat, so it is not padded twice.
                 // The folder is this project's and not the bar's to change.
                 PromptBar(folderIsFixed: true)
-                    .padding(.top, -10)
-                agents
+                    .padding(.top, 4)
+                waitingPlugins
+                    .chatColumn()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -67,13 +65,8 @@ struct ProjectAgentsView: View {
         .onChange(of: folder) { _, folder in
             adopt(folder)
         }
-        // The pull requests the daemon has, then a refresh, each time a project opens
-        // (038 FR-008). Never polled from here.
         .task(id: folder) {
-            if let folder {
-                await model.loadPullRequests(for: folder)
-                await model.loadGitHubProjectBoard(for: folder)
-            }
+            if let folder { await model.refreshPlugins(in: folder) }
         }
     }
 
@@ -148,51 +141,37 @@ struct ProjectAgentsView: View {
             """
     }
 
-    /// Everything working on this project, each one a card you can go into.
-    ///
-    /// One `GlassEffectContainer` around the lot, so the cards blend with each other
-    /// rather than each carrying its own separate render.
-    private var agents: some View {
-        GlassEffectContainer(spacing: Self.cardSpacing) {
-            LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
-                // What the work is on, between what is happening and what will (038).
-                // Absent on a project that is not on GitHub.
-                PullRequestsSection(folder: folder, selection: $selection)
-                GitHubProjectBoardSection(selection: $selection, folder: folder)
-
-                // Under the agents: what will happen, after what is happening. See
-                // `WorkflowsSection` for why that order.
-                WorkflowsSection(folder: folder, selection: $selection)
-
-                // Setup of skills, servers, plugins and instructions is on Configuration.
-                // A plugin that is waiting stays here, where the work is (S2).
-                PluginsSection(folder: folder)
-
-                // Worktrees the app made here, which outlive the agents in them (030).
-                WorktreesSection(folder: folder)
+    /// Plugins new or changed since they were approved, which no agent is given until
+    /// somebody says so on Configuration.
+    @ViewBuilder
+    private var waitingPlugins: some View {
+        let waiting = model.plugins(in: folder).filter { $0.awaitingApproval != nil }
+        if !waiting.isEmpty {
+            HStack(spacing: 10) {
+                Image(systemName: "hand.raised")
+                    .tinted(.attention)
+                    .accessibilityHidden(true)
+                Text(waiting.count == 1
+                     ? "Plugin \(waiting[0].name) is waiting for your OK"
+                     : "\(waiting.count) plugins are waiting for your OK")
+                    .appText(.supporting)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Button("Review") { showingConfiguration = true }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
             }
-            .chatColumn()
-            .padding(.bottom, 28)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .paperRow()
+            .padding(.top, 18)
         }
-        .animation(.default, value: model.agents.map(\.state))
-        // Parking moves a chat without changing its state (040).
-        .animation(.default, value: model.agents.map(\.parking))
-        // Who is working in which worktree changes when an agent is archived or
-        // brought back, and a worktree's git status as a turn ends, so the list is
-        // asked for again whenever an agent here changes state. Not polled.
-        .onChange(of: states) { Task { await model.loadDraftWorktrees() } }
-    }
-
-    /// Every agent's state on this page, archived ones included.
-    private var states: [AgentState] {
-        AgentGroup.allCases.flatMap { model.agents(in: model.selectedProjectKey, group: $0) }.map(\.state)
     }
 
 }
 
-
-/// One of the page's three parts — starting a session, the sessions, the workflows —
-/// a step above the `GroupHeading`s inside them.
+/// A part of a page, a step above the `GroupHeading`s inside it.
 struct SectionHeading: View {
     let title: String
 

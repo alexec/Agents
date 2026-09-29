@@ -50,7 +50,7 @@ public struct SwitchRecord: Codable, Hashable, Sendable, Identifiable {
     }
 
     public enum Reason: String, Codable, Hashable, Sendable {
-        case allowanceSpent, overage, creditUsedUp, rateLimitPersisted, everyoneOutResumed, byHand
+        case allowanceSpent, overage, creditUsedUp, rateLimitPersisted, runtimeFailed, everyoneOutResumed, byHand
     }
 }
 

@@ -12,7 +12,7 @@ struct PoolWordsTests {
         var state = AllowanceState(credentialKey: "k", entryID: UUID(), since: now)
         #expect(PoolWords.state(state, now: now) == "Available")
         state.markOut(.allowanceSpent, until: now.addingTimeInterval(3600), payment: .allowance(label: nil), now: now, from: .typedFailure)
-        #expect(PoolWords.state(state, now: now).hasPrefix("Out until "))
+        #expect(PoolWords.state(state, now: now).hasPrefix("Out · reset "))
         state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .words)
         #expect(PoolWords.state(state, now: now).contains("trying again after"))
         state.markOut(.creditUsedUp, until: nil, payment: .prepaid(amount: nil, expires: nil), now: now, from: .ledger)
@@ -35,14 +35,14 @@ struct PoolWordsTests {
 
     @Test func theNotesNameTheRuntime() {
         #expect(PoolWords.ranOut("claude", returnsAt: nil, now: now) == "Claude’s allowance ran out.")
-        #expect(PoolWords.ranOut("codex", returnsAt: now.addingTimeInterval(60), now: now).hasPrefix("Codex’s allowance ran out, until "))
+        #expect(PoolWords.ranOut("codex", returnsAt: now.addingTimeInterval(60), now: now).hasPrefix("Codex’s allowance ran out. Its provider says it resets at "))
         // The app's own retry is never passed off as a return time.
         var retrying = AllowanceState(credentialKey: "codex:sign-in", entryID: UUID(), since: now)
         retrying.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .typedFailure)
         #expect(PoolWords.ranOut("codex", state: retrying, now: now).hasPrefix("Codex’s allowance ran out. It is tried again after "))
         var told = AllowanceState(credentialKey: "codex:sign-in", entryID: UUID(), since: now)
         told.markOut(.allowanceSpent, until: now.addingTimeInterval(60), payment: .allowance(label: nil), now: now, from: .typedFailure)
-        #expect(PoolWords.ranOut("codex", state: told, now: now).hasPrefix("Codex’s allowance ran out, until "))
+        #expect(PoolWords.ranOut("codex", state: told, now: now).hasPrefix("Codex’s allowance ran out. Its provider says it resets at "))
         #expect(PoolWords.creditGone("gemini") == "Gemini’s credit is used up.")
     }
 }

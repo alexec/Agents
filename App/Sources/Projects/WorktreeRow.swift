@@ -21,9 +21,12 @@ struct WorktreesSection: View {
     var body: some View {
         if folder != nil, model.draftCwd == folder, model.draftWorktrees.isRepository {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Worktrees")
-                    .appText(.reading).fontWeight(.semibold)
-                    .accessibilityAddTraits(.isHeader)
+                Button("Clean up worktrees") {
+                    model.offeredPrompt = "Remove worktrees and delete branches for any work that has been merged to the default branch."
+                }
+                .buttonStyle(.paper)
+                .appText(.fine)
+                Spacer()
                 Button {
                     Task { await model.loadDraftWorktrees() }
                 } label: {
@@ -34,14 +37,8 @@ struct WorktreesSection: View {
                 .foregroundStyle(.secondary)
                 .help("Refresh worktrees")
                 .accessibilityLabel("Refresh worktrees")
-                Spacer()
-                Button("Clean up worktrees") {
-                    model.offeredPrompt = "Remove worktrees and delete branches for any work that has been merged to the default branch."
-                }
-                .buttonStyle(.paper)
-                .appText(.fine)
             }
-            .padding(.top, 22)
+            .padding(.top, 12)
             .padding(.bottom, 2)
             .padding(.leading, 2)
             ForEach(worktrees) { worktree in
