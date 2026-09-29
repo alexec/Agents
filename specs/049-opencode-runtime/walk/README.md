@@ -117,3 +117,14 @@ After every walk (`/tmp/run-oc`, `oc4`, `oc6`, `oc7`, the devbox): your own `~/.
 `~/.local/share/opencode`, `~/.local/state/opencode`, `~/.cache/opencode` and `~/.opencode` have
 nothing newer than 2026-09-12, before this work began, and there is no `auth.json` in the real
 home. No share link appears in either scratch home or in the devbox's OpenCode data.
+
+# Builds and suite (T038, T040), 2026-09-29
+
+On `9c58fc2c` (main `c3dd955b` merged in): `build-linux-agentsd.sh` (both architectures), the
+Remote for the generic iOS simulator, and the Mac app all build. The full suite, three runs each
+on this branch and on main, alternating: this branch failed `noCallSiteNamesAStateColourItself`
+(main's own, from 066) every run, and `onlyGeminiReadsFilesItself`, which compared OpenCode's
+whole capabilities with `.app` although OpenCode alone now also asks for its terminal sign-in
+command; it now checks file reading only. main failed the colour rule every run, plus timing
+failures that come and go (43 issues on its first, cold run). After the fix, and with T003's
+fixture test: 2,836 tests, the colour rule the only failure.

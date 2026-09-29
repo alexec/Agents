@@ -401,7 +401,9 @@ struct ToolPolicyTests {
         #expect(!gemini.readTextFile)
         #expect(gemini.writeTextFile)
         for policy in ToolPolicyCatalog.builtIn where policy.runtimeID != RuntimeCatalog.gemini.id {
-            #expect(ProcessSessionLauncher.capabilities(for: policy) == .app, "\(policy.runtimeID)")
+            let capabilities = ProcessSessionLauncher.capabilities(for: policy)
+            #expect(capabilities.readTextFile == ACP.ClientCapabilities.app.readTextFile, "\(policy.runtimeID)")
+            #expect(capabilities.writeTextFile == ACP.ClientCapabilities.app.writeTextFile, "\(policy.runtimeID)")
         }
     }
 

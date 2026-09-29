@@ -36,7 +36,7 @@ run-app skill), never on the real home.
     `source: "github:anomalyco/opencode@v1.18.33"`, `minFreeBytes: 500000000`.
   - Every platform has `command: "opencode"` and `arguments: []`.
   - Check that `darwin-aarch64.sha256` is `24b12873e605b3db3387cb355f43ba7451cd6065c180d8c188663337d2eeb553` (R1).
-- [ ] T003 [P] Save the probe's ACP replies as fixtures in
+- [x] T003 [P] Save the probe's ACP replies as fixtures in
   `Tests/Fixtures/opencode/`: `initialize.json` (with terminal-auth `_meta`),
   `session-new.json`, `set-model-unknown-provider.json` (-32602 with `data.providerId`),
   `prompt-invalid-key.json` (-32603 APIError) and `usage-zero-cost.json`. Re-record them with
@@ -287,13 +287,13 @@ sign-ins per run.
   (:24), so the fallback isn't relied on.
 - [x] T037 In `App/Sources/Runtimes/InstallAgentsSheet.swift` (:141-148), the `downloadNote`
   names "GitHub" for `github.com` hosts, as it names "Google" for `dl.google.com`.
-- [ ] T038 Build both schemes sequentially, skipping plugin validation (see memory), and
+- [x] T038 Build both schemes sequentially, skipping plugin validation (see memory), and
   `scripts/build-linux-agentsd.sh`. Then run the full suite on this branch and on main, three
   runs each, and compare them (the suite is flaky under load).
 - [x] T039 SC-005 check (quickstart §10): hash the scratch home's `~/.config/opencode` and
   `auth.json` before and after all the walks. Record that the app wrote nothing and that no
   share happened.
-- [ ] T040 Remote: build for the generic simulator only. The phone look (an OpenCode row in the
+- [x] T040 Remote: build for the generic simulator only. The phone look (an OpenCode row in the
   start form and runtime menu, and no "$0") is Alex's.
 
 ---
