@@ -13,7 +13,7 @@ struct SwitchNote: View {
             Text("⇄ " + note.headline)
                 .appText(.reading).fontWeight(.semibold)
             ForEach(note.lines, id: \.self) { line in
-                Text(line).appText(.fine).foregroundStyle(.secondary)
+                Text(line).appText(.reading).foregroundStyle(.secondary)
             }
         }
         .padding(14)
@@ -33,13 +33,13 @@ struct HandoffLine: View {
     var body: some View {
         DisclosureGroup(isExpanded: $isOpen) {
             Text(markdown)
-                .appText(.fine)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
             Text("What it was handed (\(characters.formatted()) characters)")
-                .appText(.fine).foregroundStyle(.tertiary)
+                .appText(.reading).foregroundStyle(.tertiary)
         }
     }
 }

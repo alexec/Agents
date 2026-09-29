@@ -12,13 +12,13 @@ enum PromptWords {
     /// While it works, the field says what happens to what you type rather than what the
     /// agent is doing. The state line in the transcript says that.
     static func placeholder(for agent: Agent) -> String {
-        if agent.state.hasTurnInFlight { return "Say what next, and it goes when this turn ends" }
+        if agent.state.hasTurnInFlight { return "What do you want to do next?" }
         switch agent.state {
         // `.starting` cannot reach here — it answers true to `hasTurnInFlight`, so the
         // guard above has already returned. Named anyway, because the compiler asks and
         // because a silent `default:` is how the next new state gets the wrong words.
-        case .starting, .running, .waitingOnUser: return "Say what next"
-        case .finished, .stopped: return "Say what next"
+        case .starting, .running, .waitingOnUser: return askPlaceholder
+        case .finished, .stopped: return askPlaceholder
         case .archived: return "Say what next, and this comes back"
         }
     }
@@ -28,7 +28,12 @@ enum PromptWords {
         agent.state.hasTurnInFlight || !agent.queuedPrompts.isEmpty
     }
 
+    /// The prompt's own words when nothing better is on offer.
+    static let askPlaceholder = "What do you want to do?"
     static func sendSymbol(willQueue: Bool) -> String { willQueue ? "arrow.up.to.line" : "arrow.up" }
+    /// Where send is while the agent works and nothing is typed: the one way to stop it.
+    static let stopSymbol = "stop.fill"
+    static let stopHelp = "Stop this agent and stay on the chat"
     static func sendLabel(willQueue: Bool) -> String { willQueue ? "Queue" : "Send" }
     static func sendHelp(willQueue: Bool) -> String {
         willQueue ? "Queue this, to go when the turn ends" : "Send"
@@ -47,14 +52,11 @@ enum PromptWords {
 /// Where the agent is working, how full it is, and what runs it: the row above the
 /// field once an agent exists.
 ///
-/// Settled facts, so labels rather than controls. They still sit on raised paper: the
-/// transcript scrolls under this row. The meter is each app's, because each works out
-/// its own help text; its place in the row is not.
-struct PromptHeader<Meter: View>: View {
+/// What the agent holds, waits for and runs in the background, above the prompt.
+/// Live, so shown only while it is so. The settled facts — its place, its runtime,
+/// what it has used — are not drawn here: the pills under the prompt are the settings.
+struct PromptHeader: View {
     let agent: Agent
-    /// The branch the project folder is on, once asked. Nil in a worktree, or in a
-    /// folder that is no repository.
-    var projectFolderBranch: String?
     /// What the agent holds and waits for (036), drawn as a row of its own above
     /// this one. Nil draws nothing.
     var leaseStatus: LeaseStatus? = nil
@@ -71,10 +73,6 @@ struct PromptHeader<Meter: View>: View {
     var background: [BackgroundItem] = []
     var backgroundActions = BackgroundActions()
     var compactBackground = false
-    /// What stands where the place is named, when an app can move the agent from here:
-    /// the Mac's Worktree choice (053). Nil names the place as a label, as the phone does.
-    var place: AnyView? = nil
-    @ViewBuilder let meter: () -> Meter
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -89,45 +87,9 @@ struct PromptHeader<Meter: View>: View {
             if let leaseStatus {
                 LeaseRow(status: leaseStatus, open: openLease)
             }
-            facts
         }
     }
 
-    private var facts: some View {
-        HStack(spacing: 12) {
-            // The branch is the place worth naming. In a worktree that is the worktree:
-            // its folder is the project's name again, or a subfolder of it (030). In the
-            // project folder it is whatever is checked out there, which is not always
-            // main. Only a folder in no repository is named as a folder.
-            if let place {
-                place
-            } else {
-                Label(branch ?? agent.cwd.lastPathComponent,
-                      systemImage: branch == nil ? "folder" : "arrow.triangle.branch")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .paperRaised(in: Capsule())
-                    .help(agent.cwd.path(percentEncoded: false))
-            }
-            Spacer(minLength: 8)
-            meter()
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .paperRaised(in: Capsule())
-            Text(PromptWords.runtimeName(agent.runtimeID))
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .paperRaised(in: Capsule())
-        }
-    }
-
-    private var branch: String? { agent.worktree?.name ?? projectFolderBranch }
 }
 
 /// Said above the field when the open agent may take no more prompts, with exactly two

@@ -215,9 +215,12 @@ struct PromptBar: View {
     private var whereAndWhat: some View {
         HStack(spacing: 12) {
             if let agent {
-                // The phone's row too (033).
+                VStack(alignment: .leading, spacing: 8) {
+                    // Where it works, and the way to move it (053).
+                    if let place = agentPlace(agent) {
+                        place
+                }
                 PromptHeader(agent: agent,
-                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder],
                              leaseStatus: model.work.leaseStatus(of: agent.id),
                              openLease: { model.showResources(at: $0) },
                              waitStatus: agent.eventWait?.isOpen == true ? model.work.waitStatus(of: agent) : nil,
@@ -225,34 +228,32 @@ struct PromptBar: View {
                              openWait: { model.showEvents(at: .waitingNow) },
                              cancelWait: { Task { await model.cancelWait(of: agent.id) } },
                              background: agent.background,
-                             backgroundActions: backgroundActions(agent),
-                             place: agentPlace(agent)) {
-                    ContextMeter(agent: agent)
+                             backgroundActions: backgroundActions(agent))
                 }
-                .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
                 .task(id: "\(agent.id)-\(agent.cwd.path)") { await model.loadAgentWorktrees(of: agent) }
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
             } else {
-                Button(action: chooseFolder) {
-                    HStack(spacing: 5) {
-                        Image(systemName: folderIsFixed ? "folder.fill" : "folder")
-                        // The folder's own name. The path it sits under is rarely the
-                        // thing you are checking, and it is in the tooltip when it is.
-                        Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
-                            .lineLimit(1)
+                // On a project page the folder is the project, named in the middle of
+                // the page; only a session with no project yet chooses one.
+                if !folderIsFixed {
+                    Button(action: chooseFolder) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "folder")
+                            // The folder's own name. The path it sits under is rarely the
+                            // thing you are checking, and it is in the tooltip when it is.
+                            Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
+                                .lineLimit(1)
+                        }
                     }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+                    .help(folderHelp)
                 }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                // On a project page the folder is the project. Changing it there would
-                // start the agent somewhere else and file it under a different project,
-                // which is not something a prompt on this page should be able to do.
-                .disabled(folderIsFixed)
-                .help(folderHelp)
 
                 if model.draftWorktrees.isRepository {
                     worktreeChooser
                 }
+                reachButton
 
                 Spacer(minLength: 8)
 
@@ -400,18 +401,34 @@ struct PromptBar: View {
             .help(dictation.isListening ? "Stop dictating" : "Dictate")
             .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
 
-            Button(action: send) {
-                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
+            // While it works and nothing is typed, send is stop. Type and it is send
+            // again, queueing what is typed for when the turn ends.
+            if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    Task { await model.stop(agent.id) }
+                } label: {
+                    Image(systemName: PromptWords.stopSymbol)
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.paperProminent)
+                .buttonBorderShape(.circle)
+                .help(PromptWords.stopHelp)
+                .accessibilityLabel("Stop")
+            } else {
+                Button(action: send) {
+                    Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.paperProminent)
+                .buttonBorderShape(.circle)
+                .disabled(!canSend)
+                .keyboardShortcut(.return, modifiers: .command)
+                .help(targetOffline ? "\(model.hosts.label(targetHost)) is offline"
+                                    : PromptWords.sendHelp(willQueue: willQueue))
+                .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
             }
-            .buttonStyle(.paperProminent)
-            .buttonBorderShape(.circle)
-            .disabled(!canSend)
-            .keyboardShortcut(.return, modifiers: .command)
-            .help(targetOffline ? "\(model.hosts.label(targetHost)) is offline"
-                                : PromptWords.sendHelp(willQueue: willQueue))
-            .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
@@ -619,7 +636,7 @@ struct PromptBar: View {
         // one text style and one origin, and this way the words sit in it exactly as
         // the typed ones will.
         if let suggestion { return suggestion.prompt }
-        guard let agent else { return "Say what's next" }
+        guard let agent else { return PromptWords.askPlaceholder }
         return PromptWords.placeholder(for: agent)
     }
 
@@ -678,29 +695,15 @@ struct PromptBar: View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 permissionOptions(shown)
-                if isNew {
-                    Button {
-                        isShowingReach = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(reachTitle)
-                            Image(systemName: "chevron.down")
-                                // Decorative: a glyph in a capsule, not text (FR-015).
-                                .font(.system(size: 8, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .appText(.fine)
-                    .fixedSize()
-                    .paperRaised(in: .capsule)
-                    .help("Folders and MCP servers this agent may reach")
-                }
                 Spacer(minLength: 16)
                 otherOptions(shown)
+                // What it has used, beside how it thinks.
+                if let agent {
+                    ContextMeter(agent: agent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .paperRaised(in: Capsule())
+                }
             }
             // The raised capsules are drawn to their own edge, and a scroll view clips
             // at its bounds. A point either side keeps their edge and shadow from being shaved.
@@ -719,17 +722,44 @@ struct PromptBar: View {
         }
     }
 
-    @ViewBuilder
-    private func permissionOptions(_ shown: [ConfigOption]) -> some View {
-        ForEach(shown.filter(\.isAboutPermission)) { option in
-            OptionMenu(option: option, chosen: binding(for: option), labelled: true)
+    /// The permission mode, as its value alone: it is the leftmost pill, and that is
+    /// what it is.
+    /// Folders and MCP servers a new agent may reach, beside where it starts.
+    private var reachButton: some View {
+        Button {
+            isShowingReach = true
+        } label: {
+            HStack(spacing: 4) {
+                Text(reachTitle)
+                Image(systemName: "chevron.down")
+                    // Decorative: a glyph in a capsule, not text (FR-015).
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .contentShape(Capsule())
         }
+        .buttonStyle(.plain)
+        .appText(.fine)
+        .fixedSize()
+        .paperRaised(in: .capsule)
+        .help("Folders and MCP servers this agent may reach")
     }
 
     @ViewBuilder
+    private func permissionOptions(_ shown: [ConfigOption]) -> some View {
+        ForEach(shown.filter(\.isAboutPermission)) { option in
+            OptionMenu(option: option, chosen: binding(for: option))
+        }
+    }
+
+    /// Everything else as one pill: the model, its effort and fast mode.
+    @ViewBuilder
     private func otherOptions(_ shown: [ConfigOption]) -> some View {
-        ForEach(shown.filter { !$0.isAboutPermission }) { option in
-            OptionMenu(option: option, chosen: binding(for: option), labelled: true)
+        let others = shown.filter { !$0.isAboutPermission }
+        if !others.isEmpty {
+            ModelPill(options: others, binding: binding(for:))
         }
     }
 

@@ -141,6 +141,8 @@ public enum DaemonAPI {
         public static let agentsPark = "agents/park"
         public static let agentsUnpark = "agents/unpark"
         public static let agentsTranscript = "agents/transcript"
+        /// The conversation's finished turns, each as its ask and its last block.
+        public static let agentsTurns = "agents/turns"
         /// What an agent changed: the files its runtime reported editing, and — where its
         /// folder is in git — what git sees changed since it started (035). Built by the
         /// daemon because a window holds only a page of the transcript, and the list has
@@ -1033,8 +1035,33 @@ public enum DaemonAPI {
         public var agentID: UUID
         public var before: Int?
         public var limit: Int
+        /// Nothing before this entry: the turn in progress starts here, and the turns
+        /// before it come from `agents/turns`.
+        public var from: Int?
 
-        public init(agentID: UUID, before: Int? = nil, limit: Int = 200) {
+        public init(agentID: UUID, before: Int? = nil, limit: Int = 200, from: Int? = nil) {
+            self.agentID = agentID
+            self.before = before
+            self.limit = limit
+            self.from = from
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            before = try c.decodeIfPresent(Int.self, forKey: .before)
+            limit = try c.decodeIfPresent(Int.self, forKey: .limit) ?? 200
+            from = try c.decodeIfPresent(Int.self, forKey: .from)
+        }
+    }
+
+    public struct TurnsRequest: Codable, Sendable {
+        public var agentID: UUID
+        /// Turns before this one, by its position among the finished turns.
+        public var before: Int?
+        public var limit: Int
+
+        public init(agentID: UUID, before: Int? = nil, limit: Int = 50) {
             self.agentID = agentID
             self.before = before
             self.limit = limit
@@ -1044,7 +1071,7 @@ public enum DaemonAPI {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             agentID = try c.decode(UUID.self, forKey: .agentID)
             before = try c.decodeIfPresent(Int.self, forKey: .before)
-            limit = try c.decodeIfPresent(Int.self, forKey: .limit) ?? 200
+            limit = try c.decodeIfPresent(Int.self, forKey: .limit) ?? 50
         }
     }
 

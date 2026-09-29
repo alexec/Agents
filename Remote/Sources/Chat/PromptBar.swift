@@ -48,7 +48,6 @@ struct PromptBar: View {
         VStack(alignment: .leading, spacing: 12) {
             if isShowingEverything {
                 PromptHeader(agent: agent,
-                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder],
                              leaseStatus: model.work.leaseStatus(of: agent.id),
                              waitStatus: agent.eventWait?.isOpen == true ? model.work.waitStatus(of: agent) : nil,
                              waitHint: agent.eventWait.map(EventWords.hint) ?? "",
@@ -57,10 +56,7 @@ struct PromptBar: View {
                                 stop: { [model] item in await model.stopBackground(item, of: agent.id) },
                                 steps: { [chatActions] item in chatActions.subagentSteps?(item.id) }),
                              // One line on a phone, the Mac's rows on an iPad (frame E).
-                             compactBackground: sizeClass == .compact) {
-                    ContextMeter(agent: agent)
-                }
-                .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
+                             compactBackground: sizeClass == .compact)
                 CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
                                 goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
                     RaiseTheLimitOnTheMac()
@@ -210,16 +206,32 @@ struct PromptBar: View {
             .buttonBorderShape(.circle)
             .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
 
-            Button(action: send) {
-                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
+            // While it works and nothing is typed, send is stop. Type and it is send
+            // again, queueing what is typed for when the turn ends.
+            if model.canStop(agent), !model.isStale, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    Task { await model.stop(agent.id) }
+                } label: {
+                    Image(systemName: PromptWords.stopSymbol)
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.paperProminent)
+                .buttonBorderShape(.circle)
+                .help(PromptWords.stopHelp)
+                .accessibilityLabel("Stop")
+            } else {
+                Button(action: send) {
+                    Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.paperProminent)
+                .buttonBorderShape(.circle)
+                .disabled(!canSend)
+                .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
+                .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")
             }
-            .buttonStyle(.paperProminent)
-            .buttonBorderShape(.circle)
-            .disabled(!canSend)
-            .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
-            .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
@@ -443,9 +455,15 @@ struct PromptBar: View {
                     OptionMenu(option: option, chosen: binding(for: option))
                 }
                 Spacer(minLength: 16)
-                ForEach(shown.filter { !$0.isAboutPermission }) { option in
-                    OptionMenu(option: option, chosen: binding(for: option))
+                let others = shown.filter { !$0.isAboutPermission }
+                if !others.isEmpty {
+                    ModelPill(options: others, binding: binding(for:))
                 }
+                // What it has used, beside how it thinks.
+                ContextMeter(agent: agent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .paperRaised(in: Capsule())
             }
             .padding(.vertical, 1)
             .frame(minWidth: optionsWidth, alignment: .leading)

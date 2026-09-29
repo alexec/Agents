@@ -124,7 +124,7 @@ and follow what it asks. To check, click **Claude** above the prompt and choose 
 sign out, providers…**: the sheet names the account you are signed in with. Then come back
 here.
 
-Click in the prompt, where it says **Say what's next**, type:
+Click in the prompt, where it says **What do you want to do?**, type:
 
 ```text
 Why does the test fail? Fix it.

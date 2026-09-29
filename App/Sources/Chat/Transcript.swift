@@ -20,8 +20,11 @@ struct Transcript: View {
     var body: some View {
         ChatTranscript(agent: agent,
                        items: items,
+                       stored: model.work.turns,
                        hasMore: model.transcriptHasMore,
-                       entryCount: model.entries.count,
+                       // Turns count as growth at the front too, so an earlier page of
+                       // them holds the reader's place as entries do.
+                       entryCount: model.entries.count + model.work.turns.count,
                        isComingBack: model.isComingBack(agent),
                        settleKey: model.selection,
                        loadEarlier: { await model.loadEarlier() },

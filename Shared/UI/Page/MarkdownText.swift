@@ -12,7 +12,14 @@ import SwiftUI
 ///
 /// Inline marks arrive as attributes on the text, from the same parse that found the
 /// blocks. Nothing here parses anything.
+extension EnvironmentValues {
+    /// Whether text takes the width it is offered or only the width it needs. The
+    /// person's own message hugs its words, at the right of the chat.
+    @Entry var textFillsWidth = true
+}
+
 struct MarkdownText: View {
+    @Environment(\.textFillsWidth) private var fillsWidth
     let markdown: String
     /// The document's own location, when there is one, so a relative image can be
     /// found. Nil in the conversation, where there is no document to be relative to —
@@ -62,7 +69,7 @@ struct MarkdownText: View {
                 view(for: block, caret: index == blocks.count - 1 ? caret : nil)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
     }
 
     @ViewBuilder

@@ -17,6 +17,7 @@ import UIKit
 /// relative image; the phone's scrolls code sideways at a width where wrapping it would
 /// make it unreadable.
 struct BlocksView: View {
+    @Environment(\.textFillsWidth) private var fillsWidth
     let blocks: [ContentBlock]
 
     var body: some View {
@@ -25,7 +26,7 @@ struct BlocksView: View {
                 view(for: block)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
     }
 
     @ViewBuilder
@@ -43,13 +44,13 @@ struct BlocksView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             } else {
                 Label("A picture that cannot be drawn here", systemImage: "photo")
-                    .appText(.supporting)
+                    .appText(.reading)
                     .foregroundStyle(.secondary)
             }
 
         case .audio:
             Label("Audio", systemImage: "waveform")
-                .appText(.supporting)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
 
         case .resourceLink(let uri, let name, _, _, _):
@@ -58,21 +59,21 @@ struct BlocksView: View {
                 if let url = URL(string: uri) { NSWorkspace.shared.open(url) }
             } label: {
                 Label(name, systemImage: "doc")
-                    .appText(.supporting)
+                    .appText(.reading)
             }
             .buttonStyle(.link)
             #else
             // A file on the Mac. The phone names it and cannot open it.
             let _ = uri
             Label(name, systemImage: "doc")
-                .appText(.supporting)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
             #endif
 
         case .resource(let uri, let text, _, _, _):
             VStack(alignment: .leading, spacing: 4) {
                 Text(URL(string: uri)?.lastPathComponent ?? uri)
-                    .appText(.fine)
+                    .appText(.reading)
                     .foregroundStyle(.tertiary)
                 if let text { MarkdownText(markdown: text) }
             }
@@ -81,7 +82,7 @@ struct BlocksView: View {
             // Kept rather than dropped, and shown as what it is.
             Text(raw["type"]?.stringValue.map { "Something this app does not draw yet: \($0)" }
                  ?? "Something this app does not draw yet")
-                .appText(.fine)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
         }
     }
@@ -183,7 +184,7 @@ struct PlanView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                     Text(entry.content)
-                        .appText(.supporting)
+                        .appText(.reading)
                         .foregroundStyle(entry.status == .completed ? .secondary : .primary)
                         .strikethrough(plan.state == .withdrawn)
                 }
@@ -193,7 +194,7 @@ struct PlanView: View {
             }
             if plan.state == .withdrawn {
                 Text("The agent dropped this plan")
-                    .appText(.fine)
+                    .appText(.reading)
                     .foregroundStyle(.secondary)
             }
         }
@@ -233,7 +234,7 @@ struct ServedRequestLine: View {
                 Text(message).tinted(.failure)
             }
         }
-        .appText(.fine)
+        .appText(.reading)
         .foregroundStyle(.secondary)
     }
 }

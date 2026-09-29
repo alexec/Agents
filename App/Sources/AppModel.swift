@@ -64,7 +64,7 @@ final class AppModel {
     var elicitations: [ElicitationRequest] { work.elicitations }
     var entries: [TranscriptEntry] { work.entries }
     var transcriptItems: [TranscriptItem] { work.transcriptItems }
-    var transcriptHasMore: Bool { work.hasMoreBefore }
+    var transcriptHasMore: Bool { work.hasMoreOfTheConversation }
     var filesToShow: [UUID: ShownFile] { work.filesToShow }
     /// What the reader will allow and what today has cost. Nil until the daemon has
     /// said, which is how every surface knows to show nothing rather than a zero.
@@ -1702,25 +1702,56 @@ final class AppModel {
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
         await attempt {
-            let page = try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsTranscript,
-                                                  DaemonAPI.TranscriptRequest(agentID: selection),
-                                                  returning: TranscriptPage.self)
+            let client = self.client(forAgent: selection)
+            // The finished turns first, as summaries; then the transcript from where the
+            // turn in progress starts. A daemon too old to keep turns gives the lot.
+            let turns = (try? await client.call(DaemonAPI.Method.agentsTurns,
+                                                DaemonAPI.TurnsRequest(agentID: selection),
+                                                returning: TurnsPage.self))
+                ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
+            let page = try await client.call(DaemonAPI.Method.agentsTranscript,
+                                             DaemonAPI.TranscriptRequest(agentID: selection, from: turns.openStart),
+                                             returning: TranscriptPage.self)
             // Clicking through chats quickly can have the answer for the last one
             // arrive after the next was picked. It is dropped, not shown under the
             // wrong name.
             guard self.selection == selection else { return }
+            self.work.replaceTurns(with: turns)
             self.work.replaceTranscript(with: page)
         }
+    }
+
+    /// Every entry of a finished turn, for the chat to open it.
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
+        let page = try? await client(forAgent: agentID).call(
+            DaemonAPI.Method.agentsTranscript,
+            DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
+                                        limit: range.count, from: range.lowerBound),
+            returning: TranscriptPage.self)
+        return page?.entries ?? []
     }
 
     /// The window only ever asks for a page. A transcript that has been going for hours
     /// is not something to load whole.
     func loadEarlier() async {
-        guard let selection, work.hasMoreBefore else { return }
+        guard let selection, work.hasMoreOfTheConversation else { return }
+        // Past the start of the turn in progress, the turns before it.
+        if !work.hasMoreBefore {
+            await attempt {
+                let turns = try await self.client(forAgent: selection).call(
+                    DaemonAPI.Method.agentsTurns,
+                    DaemonAPI.TurnsRequest(agentID: selection, before: self.work.firstTurn),
+                    returning: TurnsPage.self)
+                guard self.selection == selection else { return }
+                self.work.prependTurns(turns)
+            }
+            return
+        }
         await attempt {
             let page = try await self.client(forAgent: selection).call(
                 DaemonAPI.Method.agentsTranscript,
-                DaemonAPI.TranscriptRequest(agentID: selection, before: self.work.firstEntryIndex),
+                DaemonAPI.TranscriptRequest(agentID: selection, before: self.work.firstEntryIndex,
+                                            from: self.work.openTurnStart),
                 returning: TranscriptPage.self)
             // The same as `loadTranscript`: an earlier page of a chat no longer open
             // does not belong on top of the one that is.
