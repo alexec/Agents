@@ -26,6 +26,8 @@ if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool c
 | `stop_agent` | Stops an agent this agent started, as your **Stop** would. | The runtime decides. |
 | `park_agent` | Parks an agent this agent started, as your **Park** would. If it is still working, it finishes its turn first. It stays listed under **Parked** and keeps its place until you archive it. | The runtime decides. |
 | `list_my_agents` | Lists the agents this agent started that are not archived, what each is doing and last said, and how many of the five places are in use. | The runtime decides. |
+| `list_sessions` | Lists the sessions in this project, most recent first, its own included: each one's id, title, runtime, status and what it last said. Nothing from another project. | No. The app answers. |
+| `read_session` | Reads one session in this project, by its id or exact title: what you asked, what the agent said, the tools it ran and the files they touched, what it said of how the work went, and its plan as it last stood. A long one keeps the first request and the latest turns and says how many were left out. Reading it changes nothing. A title used twice, a retired session, or one not in this project is refused in words. Used when you ask an agent to continue another session's work. | No. The app answers. |
 | `lease_resource` | Takes a turn with something only one agent should use at a time: a simulator, a browser, the screen, or anything it names. Waits up to 45 seconds if someone else holds it, then keeps the agent's place in line. A lease lasts 30 minutes unless the agent asks for up to 240, and calling it again extends it. | The runtime decides. |
 | `release_resource` | Gives back a lease, or leaves the line for one. | The runtime decides. |
 | `list_resources` | Lists what can be leased on this Mac, and who holds or is waiting for what. | The runtime decides. |
@@ -39,7 +41,8 @@ if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool c
 
 `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` are given only to an
 agent that you or a workflow started. An agent started by another agent cannot start
-agents of its own. Only you can archive an agent.
+agents of its own. Only you can archive an agent. `list_sessions` and `read_session` are
+given to every agent, including one another agent started.
 
 ## See also
 

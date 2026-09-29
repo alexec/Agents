@@ -18,7 +18,5 @@ Nothing here needs doing; it is for understanding.
   one machine, and an agent can have a worktree of its own.
 - [Leases on shared resources](leases.md): how agents take turns with the screen, a
   browser or a simulator, and what you can end.
-- [Why chats carry on when a plan runs out](runtime-pool.md): the pool of runtimes, and
-  why credit that can grow without a limit is kept out of it.
 - [How the phone and iPad reach the Mac](phone-and-ipad.md): the local connection,
   notifications, and what each device can do.

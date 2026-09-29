@@ -1,144 +1,86 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, server]
-description: Have a chat carry on with another runtime when its plan's allowance runs out, without ever paying by use.
+description: When a chat's allowance runs out, see which runtimes are free and start a new chat that continues its work.
 ---
 
 # Keep going when a runtime runs out
 
 Plans such as Claude Max, ChatGPT and Copilot come with a generous allowance, and then stop
-you for a few hours. You can set up a **pool** of runtimes you are happy to use, in order.
-When a chat's allowance runs out, it carries on with the next runtime in the pool that isn't
-out, with the conversation so far and the message it was refused. Nothing is ever put on a bill
-that can grow: an API key joins the pool only on free or prepaid credit.
+you for a few hours. When a chat's allowance runs out, the chat stops on its runtime and says
+so. To go on, start a new chat on a runtime that isn't out and ask it to continue the first
+one. The new agent reads what the first chat asked, said and did, and carries on from there.
+The first chat stays as it was.
 
 ## Before you start
 
-- At least two runtimes installed and signed in, each on its own plan. See
-  [Sign a runtime in](sign-a-runtime-in.md).
+- At least two runtimes installed and signed in. See [Sign a runtime in](sign-a-runtime-in.md).
 - Recognising a spent allowance works for Claude, Codex, Gemini, Antigravity, Copilot, Cursor
   and Grok. See [Runtimes](../reference/runtimes.md).
 
-## Set up the pool
+## When a chat runs out
 
-1. Open **Settings ▸ Pool**.
-2. Turn on **Carry chats on with the next runtime when one runs out**.
-3. Use **Add a runtime** to add each runtime you are happy to carry on with. Only runtimes
-   that are installed and signed in are offered.
-4. Drag the rows into the order to try them in. The first one that isn't out is used.
-5. Optionally, choose a **Model** for a runtime: the model a chat is started on when it moves
-   there and no level decides (see Matching models below).
+The turn ends, and a note in the conversation says so: **Claude's allowance ran out, until
+07:00.** The time is there only when the runtime gave one. The chat moves to **Paused**, with
+**Its allowance ran out** under its name. Nothing else happens: no other runtime is started,
+and the chat does not wait to carry on.
 
-## Add credit on an API key
+The runtime is marked out for every chat, so you can see it before you pick it again. Other
+chats on it are not stopped. You can still send one a message. If that turn works, the
+runtime is back.
 
-A key can join the pool only if its spending stops by itself when the credit is gone. Today
-that is a Gemini key, the one key this Mac lends to a runtime.
+A rate limit is different. The same chat tries again on the same runtime after a short wait,
+and says when. Three rate limits in ten minutes on one chat count as the allowance running
+out.
 
-1. Save the key first in **Settings ▸ Agent Runtimes**, under Gemini.
-2. In **Settings ▸ Pool**, choose **Add credit on an API key…**.
-3. Pick what kind of credit it is: **Free tier, no billing on the key**, **Free credit** or
-   **Prepaid, with auto-recharge off**. **Billed with no limit** is shown but can't be picked.
-4. For free or prepaid credit, give the amount and, if it has one, the expiry date. The app
-   counts what each turn costs against it and stops using the key when it is spent or past its
-   date, before the provider says no.
-5. **Add**. The key goes last in the pool, after every plan.
+## See which runtimes are out
 
-The app can't see a provider's billing settings. It takes your word for the kind of credit, so
-check with the provider that auto-recharge is off.
+1. Open **Settings ▸ Agent Runtimes** and pick a runtime.
+2. Under **Allowance**, read where it stands: **Available**, **Rate limited · trying again at
+   02:21**, **Out · reset 07:00 · checking after 09:00**, **Out since 22:27 · checking after
+   02:27** or **Credit used up · checking after 02:27**.
+3. Where the runtime says so, a second line shows what is left of its plan: **28% left this
+   week · resets Sun 20:39 · as of 14:02**. Grok is asked each time the page opens, at most
+   every five minutes. Claude says it during a turn, usually once a limit is near.
 
-## What a switch looks like
+On the iPhone and iPad, **Runtimes** is at the foot of **Spending**, with a red dot while a
+runtime is out.
 
-When a chat's allowance runs out:
+A new chat about to start on a runtime that is out says so above the prompt: **Claude is out.
+The app checks it again at 02:27.** You can still send.
 
-- The chat shows a tinted note: **Claude's allowance ran out, until 07:00. Carried on with
-  Codex.** Under it are the model, effort and mode the chat carried on with and where each came
-  from, what was handed over, and anything not carried, such as "always allow" answers.
-- **What it was handed** folds open to the conversation as the new runtime received it.
-- The new runtime starts a fresh conversation, is given this one so far, and answers the message
-  that was refused. You don't type it again.
-- The mode is never looser than the chat's own: a chat that asks before editing carries on with
-  a mode that asks too.
-- On the sessions list, the chat has a **⇄** mark: its tooltip says where it came from and
-  when.
+## Continue the work in a new chat
 
-If every runtime in the pool is out, the chat waits for the next availability check, and
-carries on by itself once one passes: **Every runtime in the pool is out. This chat waits, and
-Claude is checked at 07:00; it carries on once one is back.** Checks come four hours after a
-runtime went out, and every four hours after a check that fails; a provider's reset time is
-shown but never puts a runtime back by itself. Its icon stays grey, with an hourglass. If none is
-due a check — only credit is left, and credit comes back when you say so — it stops and says so. Your next message, **Stop**, **Park** or **Archive** ends the wait.
+1. Start a new chat in the same project, on a runtime that isn't out.
+2. Ask it to continue the other chat by its title: **Please continue the work of Login
+   redirect.**
 
-## Read the Pool page
+The agent finds that chat in the project and reads its history: what you asked, what it said,
+the tools it ran and the files they touched, and its plan as it last stood. A long chat is
+shortened from the middle, and the history says how many turns were left out. The files are
+already as the first chat left them.
 
-**Pool**, last in the sidebar's Activity section, has a red dot while a runtime is out, and a
-line such as **1 out · 3 chats on Codex**. The page shows:
+If two chats have that title, the agent is told and shows you each, and you say which. It can
+also list the chats in the project, or be given a chat's id.
 
-- **Runtimes, in order**: each with how it is paid for and its state in words, such as
-  **Available**, **Out · reset 07:00 · checking after 09:00**, **Rate limited · trying again at 02:21** or **Credit used
-  up**. **Mark available** is on any that is out.
-  Under it, where the runtime says so, is what is left of its plan: **28% left this week ·
-  resets Sun 20:39 · as of 14:02**. Grok is asked each time the page opens, at most every five
-  minutes. Claude says it during a turn, usually only once a limit is near or reached. Other
-  runtimes have no way to say it yet. The line is only shown: whether a chat runs is still the
-  state above it.
-- **Waiting for an allowance**: chats waiting, with when each is next checked, and **Stop waiting**.
-- **Matching models**: see below.
-- **Recent switches**: when, which chat, from which runtime to which, and why. **Show the last
-  30 days** goes further back.
+## Bring a runtime back
 
-On the iPhone and iPad, **Pool** is under **Spending**, with the same dot. Mark available and
-Stop waiting are swipe actions.
+The app checks an out runtime every four hours: a short conversation on a small model, in a
+read-only mode, asked to reply "OK". If it answers, the runtime is back. A provider's reset time
+is shown, but the runtime is not treated as back until a check or a turn works.
 
-## Mark a runtime available
-
-If you know a runtime is back before the app does (you bought more credit, or a new month
-started), choose **Mark available** on its row. It is used again from the next switch. If you
-were wrong, it costs one refused turn, and it is marked out again.
-
-## Match models across runtimes
-
-**Matching models** on the Pool page is a grid: one column per runtime, one row per **level** you
-name, such as *Strongest* or *Everyday*. When a chat switches, it keeps its level. If it was on
-Claude's Opus and Opus is in *Strongest*, it carries on with *Strongest*'s Codex model.
-
-- Click a cell to choose that runtime's model for the level. A model sits in one level at most:
-  choosing it in another moves it there.
-- **Add a level**, and use a level's name for **Rename…**, **Move up**, **Move down** and
-  **Remove this level**.
-- A model a runtime no longer offers is struck through, and a switch treats that cell as empty.
-- Without a level, a chat carries on with the pool entry's **Model**, else the model last chosen
-  for that runtime, else the runtime's default.
-
-## Continue with another runtime yourself
-
-Use the runtime menu on the prompt bar:
-
-- The tick at the top, **Carry on when Claude runs out**, turns switching off or on for this
-  chat only.
-- **Continue with** lists the pool's runtimes with their state, then every other runtime.
-  Runtimes that are out can still be picked.
-
-Picking one opens a sheet: each setting as it is now, as it will be, and where that came from.
-Each new value is a menu of what the runtime offers, with modes looser than the chat's left out.
-**Remember this for next time** puts the model you pick beside the chat's in a Matching models
-level. **Continue on …** moves the chat. Nothing is sent until your next message, which carries
-the conversation so far with it. While a turn is running, the sheet says **Stop the turn first**.
-
-After an automatic switch, **Change what it carried on with…** on the note opens the same sheet
-for the runtime the chat is on. Your changes apply from its next turn, and nothing is started or
-sent again.
-
-On the iPhone and iPad, **Continue with** is on the chat's menu, with the same sheet as a list.
+If you know it is back sooner, because you bought more credit or a new month started, choose
+**Mark available** under **Allowance**, or swipe the runtime on the phone. If you were wrong, it
+costs one refused turn, and it is marked out again.
 
 ## On servers
 
-The pool is the Mac's, and each connected server uses it. A server's Codex signs in through this
-Mac's ChatGPT sign-in, so it spends this Mac's plan. When that plan runs out on either side, the
-other knows at once, while the Agents window is open: a chat there moves before it is refused.
+A server's Codex and Claude sign in through this Mac, so they spend this Mac's plans. When a
+plan runs out on either side, the other knows while the Agents window is open.
 
 ## See also
 
-- [Why chats carry on when a plan runs out](../explanation/runtime-pool.md)
 - [Limit what agents spend](limit-spending.md)
 - [Sign a runtime in](sign-a-runtime-in.md)
 - [Statuses and groups](../reference/statuses.md)
+- [Tools the app gives agents](../reference/agent-tools.md)
