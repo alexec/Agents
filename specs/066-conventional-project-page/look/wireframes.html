@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><title>066 wireframes</title><style>
 /* Wireframes for a conventional project page (066). Lo-fi on purpose, in 057's paper style.
-   Open with #a … #e to see one frame alone. */
+   Open with #a … #c to see one frame alone. */
 body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
 body.one .frame{display:none}body.one .frame:target{display:flex}
 .frame{display:flex;flex-direction:column;gap:8px}
@@ -79,7 +79,7 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
 <!-- ============ A ============ -->
 <div class="frame" id="a">
 <div class="cap">A · A project with nothing open</div>
-<div class="sub">The middle column is the project's sessions, and nothing else. The right pane is an empty new chat, with the prompt at the bottom where every chat has it.</div>
+<div class="sub">The middle column is the project's sessions, then its workflows, then Archived. The right pane is an empty new chat, with the prompt at the bottom where every chat has it.</div>
 <div class="win">
   <div class="side">
     <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
@@ -107,6 +107,10 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
     <div class="lh">Working <span class="count">2</span></div>
     <div class="row"><span class="ic">✳</span><div class="body"><div class="t">Review the design of the app</div><div class="d">Reading the project page…</div></div></div>
     <div class="row"><span class="ic">✳</span><div class="body"><div class="t">065: read another agent's work</div><div class="d">Writing the spec…</div></div></div>
+    <div class="lh">Workflows <span class="count">3</span></div>
+    <div class="row"><span class="ic" style="color:#e07b39">✋</span><div class="body"><div class="t">Nightly build</div><div class="d">Waiting for your OK · every day at 03:00</div></div></div>
+    <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Catch up after sleep</div><div class="d">When this Mac wakes · last ran 07:12</div></div></div>
+    <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Merge when green</div><div class="d">On custom.build_green · last ran yesterday</div></div></div>
     <div class="lh">▸ Archived <span class="count">407</span></div>
   </div>
   <div class="detail">
@@ -119,54 +123,57 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
       <div class="chips"><span class="chip">Mode: Auto ▾</span><span class="chip">Reach: this folder ▾</span><span class="chip">Model: Default ▾</span><span class="chip">Effort: Default ▾</span><span class="chip" style="margin-left:auto">📎</span><span class="chip">🎙</span><span class="chip">↑</span></div>
     </div>
   </div>
-  <div class="n" style="left:232px;top:430px;max-width:320px">✎ Compose, as in Mail (⌘N). Replaces the "New session" row.</div>
-  <div class="n" style="left:232px;top:480px;max-width:320px">One kind of row: every row opens its chat on the right.</div>
-  <div class="n" style="left:600px;top:400px;max-width:300px">Same place as the prompt in a chat. Sending turns this pane into the session.</div>
+  <div class="n" style="left:600px;top:470px;max-width:320px">✎ Compose, as in Mail (⌘N). Replaces the "New session" row.</div>
+  <div class="n" style="left:600px;top:180px;max-width:320px">Every row opens on the right: a session its chat, a workflow its page.</div>
+  <div class="n" style="left:600px;top:400px;max-width:420px">Same place as the prompt in a chat. Sending turns this pane into the session.</div>
   <div class="n" style="left:760px;top:84px;max-width:300px;top:92px">One banner for anything waiting for an OK: a plugin or a workflow</div>
 </div>
 </div>
 
-<!-- ============ B ============ -->
+<!-- ============ D ============ -->
 <div class="frame" id="b">
-<div class="cap">B · Project Settings ▸ Workflows</div>
-<div class="sub">Workflows are rules the project follows, so they sit with its settings, as Mail keeps Rules in its settings. What a workflow starts is a session, which shows in the list like any other.</div>
+<div class="cap">B · A workflow, opened on the right</div>
+<div class="sub">Clicking a workflow under the sessions opens its page beside the list, as a session opens its chat. The list stays where it is.</div>
 <div class="win">
   <div class="side">
     <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
     <div class="h">Projects</div>
     <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
     <div class="p">www.alexecollins.com</div>
+    <div class="p">RelaxedCounting</div>
+    <div class="p">Where</div>
+    <div class="p">Rehang</div>
+    <div class="p">Scribe</div>
+    <div class="foot">Keeping this Mac awake</div>
   </div>
-  <div class="mid"></div>
-  <div class="detail"></div>
-  <div class="sheetveil">
-    <div class="sheet">
-      <div class="nav">
-        <div>General</div>
-        <div>Instructions &amp; skills</div>
-        <div>Plugins</div>
-        <div>MCP servers</div>
-        <div class="on">Workflows <span class="badge"></span></div>
-      </div>
-      <div class="main">
-        <div class="line" style="align-items:center"><span style="font:600 17px -apple-system">Workflows</span><span class="btn">＋ New Workflow…</span></div>
-        <div class="card" style="padding:0;gap:0">
-          <div class="line" style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);background:#fbefd9"><span><b>✋ Nightly build</b><br><span class="meta">Changed since you approved it · every day at 03:00</span></span><span style="display:flex;gap:6px;align-items:center"><span class="btn">Review…</span></span></div>
-          <div class="line" style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06)"><span><b>Catch up after sleep</b><br><span class="meta">When this Mac wakes · last ran 07:12</span></span><span class="meta">›</span></div>
-          <div class="line" style="padding:10px 14px"><span><b>Merge when green</b><br><span class="meta">On custom.build_green · last ran yesterday</span></span><span class="meta">›</span></div>
-        </div>
-        <div class="meta">Each workflow is a file in .agents/workflows. Click one to see what it does, its runs, and Run Now.</div>
-        <span class="btn primary done">Done</span>
-      </div>
+  <div class="mid">
+    <div class="tb"><span class="search">⌕ Search sessions</span><span class="icon">✎</span></div>
+    <div class="lh">Needs you <span class="count">2</span></div>
+    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">058 control plane</div><div class="d">I've caught up on the 058 control-plane…</div></div></div>
+    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">Simplify the project page</div><div class="d">Merged to main 4228c8f3…</div></div></div>
+    <div class="lh">Workflows <span class="count">3</span></div>
+    <div class="row on"><span class="ic" style="color:#e07b39">✋</span><div class="body"><div class="t">Nightly build</div><div class="d">Waiting for your OK · every day at 03:00</div></div></div>
+    <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Catch up after sleep</div><div class="d">When this Mac wakes · last ran 07:12</div></div></div>
+    <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Merge when green</div><div class="d">On custom.build_green · last ran yesterday</div></div></div>
+  </div>
+  <div class="detail">
+    <div class="tb"><span class="title">Nightly build</span><span style="display:flex;gap:6px"><span class="btn">Run Now</span><span class="btn primary">Approve</span></span></div>
+    <div class="page">
+      <h1>Nightly build</h1>
+      <div class="meta">.agents/workflows/nightly-build.md · changed since you approved it</div>
+      <div class="card"><div class="k">When</div><div>Every day at 03:00</div></div>
+      <div class="card"><div class="k">What it asks</div><div class="bar" style="width:90%"></div><div class="bar" style="width:70%"></div></div>
+      <div class="card"><div class="k">Runs</div>
+        <div class="line"><span>Last night 03:00 — published custom.build_green</span><span class="btn">Open session</span></div></div>
     </div>
   </div>
-  <div class="n" style="left:720px;top:470px;max-width:300px">Click a row: its page opens inside the sheet with a ‹ back, as System Settings drills in. Right-click: Run Now, Archive.</div>
+  <div class="n" style="left:232px;top:430px;max-width:320px">Right-click a workflow: Open, Run Now, Approve, Archive</div>
+  <div class="n" style="left:600px;top:560px;max-width:320px">Today's workflow page, moved into the right pane; it no longer replaces the whole page</div>
 </div>
 </div>
-
 <!-- ============ C ============ -->
 <div class="frame" id="c">
-<div class="cap">C · Project Settings ▸ General</div>
+<div class="cap">C · Project Settings, as a sheet</div>
 <div class="sub">Opened from the toolbar, the project's context menu, or Project ▸ Settings… (⌥⌘,). It takes the name, place and money off the page.</div>
 <div class="win">
   <div class="side">
@@ -184,7 +191,6 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
         <div>Instructions &amp; skills</div>
         <div>Plugins</div>
         <div>MCP servers</div>
-        <div>Workflows <span class="badge"></span></div>
       </div>
       <div class="main">
         <div style="font:600 17px -apple-system">General</div>
@@ -204,41 +210,4 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
 </div>
 </div>
 
-<!-- ============ D ============ -->
-<div class="frame" id="d">
-<div class="cap">D · Alternative: Sessions | Workflows over the list</div>
-<div class="sub">Keeps workflows beside the work. A two-way switch at the top of the column; a workflow opens its page on the right, as a session opens its chat.</div>
-<div class="win">
-  <div class="side">
-    <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-    <div class="h">Projects</div>
-    <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
-    <div class="p">www.alexecollins.com</div>
-    <div class="p">RelaxedCounting</div>
-    <div class="p">Where</div>
-    <div class="p">Rehang</div>
-    <div class="p">Scribe</div>
-    <div class="foot">Keeping this Mac awake</div>
-  </div>
-  <div class="mid">
-    <div class="tb"><span class="search">⌕ Search workflows</span><span class="icon">✎</span></div>
-    <div class="seg"><span>Sessions</span><span class="on">Workflows<i>3</i><b></b></span></div>
-    <div class="row on"><span class="ic" style="color:#e07b39">✋</span><div class="body"><div class="t">Nightly build</div><div class="d">Waiting for your OK · every day at 03:00</div></div></div>
-    <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Catch up after sleep</div><div class="d">When this Mac wakes · last ran 07:12</div></div></div>
-    <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Merge when green</div><div class="d">On custom.build_green · last ran yesterday</div></div></div>
-  </div>
-  <div class="detail">
-    <div class="tb"><span class="title">Nightly build</span><span style="display:flex;gap:6px"><span class="btn">Run Now</span><span class="btn primary">Approve</span></span></div>
-    <div class="page">
-      <h1>Nightly build</h1>
-      <div class="meta">.agents/workflows/nightly-build.md · changed since you approved it</div>
-      <div class="card"><div class="k">When</div><div>Every day at 03:00</div></div>
-      <div class="card"><div class="k">What it asks</div><div class="bar" style="width:90%"></div><div class="bar" style="width:70%"></div></div>
-      <div class="card"><div class="k">Runs</div>
-        <div class="line"><span>Last night 03:00 — published custom.build_green</span><span class="btn">Open session</span></div></div>
-    </div>
-  </div>
-  <div class="n" style="left:232px;top:300px;max-width:320px">Two segments is thin for a scope bar; that is why B is recommended</div>
-</div>
-</div>
 </body></html>
