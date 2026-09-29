@@ -39,9 +39,20 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     public var lastSeen: Date?
     /// A device's own report of whether it may show a notification (021).
     public var mayNotify: Bool?
+    /// Whose it is (FR-012). One person for now; absent in records written before the store.
+    public var owner: PersonID?
+    /// Bumped on every write, so no two versions of a record have the same bytes
+    /// (contracts/store.md rule 10).
+    public var rev: Int
+    /// Forgotten: kept as a tombstone, read as absent (rule 11).
+    public var forgotten: Bool?
 
     public init(id: UUID, name: String, kind: Kind, publicKey: Data, grant: Grant,
-                paired: Date, lastSeen: Date? = nil, mayNotify: Bool? = nil) {
+                paired: Date, lastSeen: Date? = nil, mayNotify: Bool? = nil,
+                owner: PersonID? = nil, rev: Int = 0, forgotten: Bool? = nil) {
+        self.owner = owner
+        self.rev = rev
+        self.forgotten = forgotten
         self.id = id
         self.name = name
         self.kind = kind
@@ -91,10 +102,22 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     public var installed: Bool
     /// The machine it runs on, so a window can tell a host on its own Mac (R11).
     public var machineID: String?
+    /// A macOS host that runs the iCloud relay and mailbox for its person's devices (R10).
+    public var relay: Bool?
+    public var owner: PersonID?
+    /// As `ClientRecord.rev`.
+    public var rev: Int
+    /// Removed: kept as a tombstone, read as absent.
+    public var forgotten: Bool?
 
     public init(id: HostID, name: String, publicKey: Data? = nil, reach: HostReach = .dialOut,
                 platform: String = "", version: String = "", installed: Bool = false,
-                machineID: String? = nil) {
+                machineID: String? = nil, relay: Bool? = nil, owner: PersonID? = nil,
+                rev: Int = 0, forgotten: Bool? = nil) {
+        self.relay = relay
+        self.owner = owner
+        self.rev = rev
+        self.forgotten = forgotten
         self.id = id
         self.name = name
         self.publicKey = publicKey
@@ -152,11 +175,101 @@ public struct ControlSettings: Codable, Hashable, Sendable {
     /// The host on the same machine. A legacy client's bare lines go there.
     public var homeHost: HostID?
     public var machineID: String
+    /// The one address clients and hosts are given (R8), and the pin of its certificate
+    /// when that is not publicly trusted (R6). Absent on the first build's control plane.
+    public var url: String?
+    public var pin: String?
+    /// The control plane's public key, X9.63. The private half is never in the store.
+    public var controlKey: Data?
+    public var owner: PersonID?
+    public var created: Date?
+    public var rev: Int?
 
-    public init(name: String, port: Int = 8790, homeHost: HostID? = nil, machineID: String) {
+    public init(name: String, port: Int = 8790, homeHost: HostID? = nil, machineID: String,
+                url: String? = nil, pin: String? = nil, controlKey: Data? = nil,
+                owner: PersonID? = nil, created: Date? = nil) {
         self.name = name
         self.port = port
         self.homeHost = homeHost
         self.machineID = machineID
+        self.url = url
+        self.pin = pin
+        self.controlKey = controlKey
+        self.owner = owner
+        self.created = created
+    }
+}
+
+/// Whom records belong to (FR-012). One person per control plane for now; the id is
+/// there so a team can be added later without moving what is stored.
+public struct PersonID: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
+    public var rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+    public init(from decoder: any Decoder) throws { rawValue = try decoder.singleValueContainer().decode(String.self) }
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(rawValue)
+    }
+    public var description: String { rawValue }
+    public static func make() -> PersonID { PersonID(rawValue: UUID().uuidString.lowercased()) }
+}
+
+/// `people/<id>.json`.
+public struct Person: Codable, Hashable, Sendable {
+    public var id: PersonID
+    public var name: String
+    public init(id: PersonID, name: String) {
+        self.id = id
+        self.name = name
+    }
+}
+
+/// `leases/<host>.json`: which copy holds a host's uplink (R5, data-model.md "Lease").
+public struct HostLease: Codable, Hashable, Sendable {
+    public var host: HostID
+    public var copy: String
+    /// Bumped on every takeover, so a lease never repeats its bytes (rule 10).
+    public var epoch: Int
+    public var expires: Date
+    public init(host: HostID, copy: String, epoch: Int, expires: Date) {
+        self.host = host
+        self.copy = copy
+        self.epoch = epoch
+        self.expires = expires
+    }
+    public static let lifetime: TimeInterval = 30
+    public static let renewEvery: TimeInterval = 10
+}
+
+/// `copies/<id>.json`: a live copy of the control plane, and where the others reach it.
+public struct CopyRecord: Codable, Hashable, Sendable {
+    public var id: String
+    public var peerURL: String
+    public var started: Date
+    public var heartbeat: Date
+    public init(id: String, peerURL: String, started: Date, heartbeat: Date) {
+        self.id = id
+        self.peerURL = peerURL
+        self.started = started
+        self.heartbeat = heartbeat
+    }
+    public static let beatEvery: TimeInterval = 10
+    public static let goneAfter: TimeInterval = 30
+}
+
+/// `events/<day>/<ulid>.json`: a change, for a copy that missed its broadcast.
+public struct ControlEvent: Codable, Hashable, Sendable {
+    public enum Kind: String, Codable, Sendable {
+        case clientForgotten, grantChanged, clientPaired, hostEnrolled, hostRemoved, hostMoved
+    }
+    public var kind: Kind
+    public var subject: String
+    public var at: Date
+    public var by: String
+    public init(kind: Kind, subject: String, at: Date, by: String) {
+        self.kind = kind
+        self.subject = subject
+        self.at = at
+        self.by = by
     }
 }

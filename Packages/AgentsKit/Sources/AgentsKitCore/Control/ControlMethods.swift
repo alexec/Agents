@@ -48,28 +48,32 @@ public actor ControlMethods: ControlHandling {
     public static let notHere = JSONRPCError(code: DaemonAPI.Failure.notSupported,
                                              message: "This control plane cannot do that yet.")
 
-    private let store: GrantStore
+    private let records: ControlRecords
     private let version: String
     private var hooks: Hooks
     private var settings: ControlSettings
-    private var clients: [ClientRecord]
-    private var hosts: [HostID: HostRecord]
     private weak var router: ControlRouter?
 
     private let startedAt = Date()
     private let port: Int?
     private let awayFromHome: Bool
 
-    public init(store: GrantStore, settings: ControlSettings, version: String, hooks: Hooks = Hooks(),
+    /// `settings` is what `records` has, or made (`ControlRecords.settings(orMake:)`):
+    /// the records are read before this is made, so every accessor below is current.
+    public init(records: ControlRecords, settings: ControlSettings, version: String, hooks: Hooks = Hooks(),
                 port: Int? = nil, awayFromHome: Bool = false) {
         self.port = port
         self.awayFromHome = awayFromHome
-        self.store = store
+        self.records = records
         self.settings = settings
         self.version = version
         self.hooks = hooks
-        self.clients = store.loadClients()
-        self.hosts = Dictionary(store.loadHosts().map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// Reads the store again: the backstop for a change another copy made (R4).
+    public func refresh() async throws {
+        try await records.load()
+        if let fresh = await records.settings { settings = fresh }
     }
 
     public func attach(_ router: ControlRouter) { self.router = router }
@@ -78,40 +82,53 @@ public actor ControlMethods: ControlHandling {
     /// records, and the records need the listener's hooks).
     public func setHooks(_ hooks: Hooks) { self.hooks = hooks }
 
-    public var knownHosts: [HostID] { Array(hosts.keys) }
-    public var allClients: [ClientRecord] { clients }
-    public var allHosts: [HostRecord] { Array(hosts.values) }
-    public func client(_ id: UUID) -> ClientRecord? { clients.first { $0.id == id } }
-    public func host(_ id: HostID) -> HostRecord? { hosts[id] }
+    public var knownHosts: [HostID] { get async { await records.hosts.map(\.id) } }
+    public var allClients: [ClientRecord] { get async { await records.clients } }
+    public var allHosts: [HostRecord] { get async { await records.hosts } }
+    public func client(_ id: UUID) async -> ClientRecord? { await records.client(id) }
+    public func host(_ id: HostID) async -> HostRecord? { await records.host(id) }
     public var controlSettings: ControlSettings { settings }
 
     // MARK: Records the executable changes
 
     /// A client that has paired, or this Mac's own window arriving on the local socket.
-    public func admit(_ client: ClientRecord) throws {
-        if let index = clients.firstIndex(where: { $0.id == client.id }) {
-            clients[index].lastSeen = Date()
-            clients[index].name = client.name
-        } else {
-            clients.append(client)
+    ///
+    /// `lastSeen` is written at most hourly (R4): a connect is not a write.
+    public func admit(_ client: ClientRecord) async throws {
+        do {
+            try await admitOnce(client)
+        } catch StoreError.conflict {
+            try await records.load()
+            try await admitOnce(client)
         }
-        try store.saveClients(clients)
-        let changed = clients
+        let changed = await records.clients
         Task { await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
                                               ["client": .string(client.id.uuidString)], operatorsOnly: true) }
         Task { await hooks.clientsChanged(changed) }
     }
 
-    /// A host that has enrolled, or this Mac's own host arriving on the local socket.
-    public func enroll(_ host: HostRecord) throws {
-        hosts[host.id] = host
-        try store.saveHosts(Array(hosts.values).sorted { $0.id.rawValue < $1.id.rawValue })
+    private func admitOnce(_ client: ClientRecord) async throws {
+        if var known = await records.client(client.id) {
+            let stale = known.lastSeen.map { Date().timeIntervalSince($0) > 3600 } ?? true
+            guard stale || known.name != client.name else { return }
+            known.lastSeen = Date()
+            known.name = client.name
+            try await records.save(known)
+        } else {
+            var fresh = client
+            fresh.lastSeen = fresh.lastSeen ?? Date()
+            try await records.save(fresh)
+        }
     }
 
-    public func setHomeHost(_ host: HostID) throws {
+    /// A host that has enrolled, or this Mac's own host arriving on the local socket.
+    public func enroll(_ host: HostRecord) async throws {
+        try await records.save(host)
+    }
+
+    public func setHomeHost(_ host: HostID) async throws {
         guard settings.homeHost != host else { return }
-        settings.homeHost = host
-        try store.saveSettings(settings)
+        settings = try await records.changeSettings { $0.homeHost = host }
     }
 
     // MARK: ControlHandling
@@ -139,6 +156,14 @@ public actor ControlMethods: ControlHandling {
     }
 
     public func handle(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
+        do {
+            return try await answer(method: method, params: params, from: caller)
+        } catch let error as StoreError {
+            throw error.rpcError
+        }
+    }
+
+    private func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
         guard Self.anyGrant.contains(method) || caller.grant == .operator else {
             throw JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                message: "\(method) is not open to this client (\(caller.grant.rawValue)).")
@@ -156,7 +181,7 @@ public actor ControlMethods: ControlHandling {
         case DaemonAPI.Method.hostsList:
             return try JSONValue.encoding(await hostList())
         case DaemonAPI.Method.clientsList, DaemonAPI.Method.devicesList:
-            return try JSONValue.encoding(clients)
+            return try JSONValue.encoding(await records.clients)
         case DaemonAPI.Method.clientsStartPairing:
             let grant = (params?["grant"]?.stringValue).flatMap(Grant.init(rawValue:)) ?? .device
             return try await hooks.startPairing(grant)
@@ -167,8 +192,7 @@ public actor ControlMethods: ControlHandling {
             return [:]
         case DaemonAPI.Method.clientsSetGrant:
             let request = try Self.require(params, as: DaemonAPI.ClientGrantRequest.self)
-            clients = try GrantStore.settingGrant(request.grant, of: request.client, in: clients)
-            try store.saveClients(clients)
+            try await records.setGrant(request.grant, of: request.client)
             await router?.setGrant(request.grant, of: request.client)
             await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
                                            ["client": .string(request.client.uuidString)], operatorsOnly: true)
@@ -182,7 +206,7 @@ public actor ControlMethods: ControlHandling {
             } else {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Which client?")
             }
-            try forget(id)
+            try await forget(id)
             return [:]
         case DaemonAPI.Method.hostsStartEnroll:
             return try await hooks.startEnroll()
@@ -196,10 +220,9 @@ public actor ControlMethods: ControlHandling {
             return [:]
         case DaemonAPI.Method.hostsRemove:
             let request = try Self.require(params, as: DaemonAPI.HostRequest.self)
-            guard hosts.removeValue(forKey: request.host) != nil else {
+            guard try await records.remove(request.host) else {
                 throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(request.host.rawValue).")
             }
-            try store.saveHosts(Array(hosts.values))
             await router?.forgetHost(request.host)
             await hooks.hostsChanged()
             return [:]
@@ -214,14 +237,14 @@ public actor ControlMethods: ControlHandling {
             return [:]
         case DaemonAPI.Method.hostHello:
             let hello = try Self.require(params, as: DaemonAPI.HostHello.self)
-            var record = hosts[host] ?? HostRecord(id: host, name: hello.name ?? host.rawValue)
+            var record = await records.host(host) ?? HostRecord(id: host, name: hello.name ?? host.rawValue)
             record.version = hello.version
             record.platform = hello.platform
             record.machineID = hello.machineID
             if let name = hello.name { record.name = name }
-            if record != hosts[host] { try enroll(record) }
+            try await enroll(record)
             if hello.machineID == settings.machineID, settings.homeHost == nil {
-                try setHomeHost(host)
+                try await setHomeHost(host)
                 await router?.setHomeHost(host)
             }
             await router?.broadcastControl(DaemonAPI.Notification.controlHostChanged,
@@ -237,10 +260,9 @@ public actor ControlMethods: ControlHandling {
 
     // MARK: Helpers
 
-    private func forget(_ id: UUID) throws {
-        clients = try GrantStore.forgetting(id, in: clients)
-        try store.saveClients(clients)
-        let changed = clients
+    private func forget(_ id: UUID) async throws {
+        try await records.forget(id)
+        let changed = await records.clients
         Task {
             await router?.forgetClient(id)
             await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
@@ -251,7 +273,7 @@ public actor ControlMethods: ControlHandling {
 
     private func hostList() async -> [DaemonAPI.ControlHost] {
         let states = await router?.hostStates ?? [:]
-        return hosts.values.sorted { $0.id.rawValue < $1.id.rawValue }.map { record in
+        return await records.hosts.map { record in
             let state = states[record.id] ?? .offline(since: Date())
             return DaemonAPI.ControlHost(id: record.id, name: record.name, platform: record.platform,
                                          version: record.version,

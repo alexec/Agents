@@ -46,17 +46,22 @@ public final class ControlPlane: @unchecked Sendable {
     /// What the window on this Mac is called when the Mac has no name to give it.
     public static let windowName = "This Mac"
 
+    /// Where the records are kept: a folder store in the control root (contracts/store.md).
+    public static func store(root: URL) -> FolderStore { FolderStore(root: root.appendingPathComponent("store", isDirectory: true)) }
+
+    static func freshSettings() -> ControlSettings {
+        ControlSettings(name: Host.current().localizedName ?? "This Mac", machineID: MachineID.current)
+    }
+
     public init(root: URL, version: String, port: Int? = nil, awayFromHome: Bool = false) {
         self.root = root
-        let store = GrantStore(root: root)
-        let settings = store.loadSettings()
-            ?? ControlSettings(name: Host.current().localizedName ?? "This Mac", machineID: MachineID.current)
-        try? store.saveSettings(settings)
-        let methods = ControlMethods(store: store, settings: settings, version: version,
+        let records = ControlRecords(store: Self.store(root: root))
+        self.records = records
+        let settings = Self.freshSettings()
+        let methods = ControlMethods(records: records, settings: settings, version: version,
                                      port: port, awayFromHome: awayFromHome)
         self.methods = methods
-        self.router = ControlRouter(handler: methods, knownHosts: store.loadHosts().map(\.id),
-                                    homeHost: settings.homeHost)
+        self.router = ControlRouter(handler: methods)
         self.name = settings.name
         self.servers = SSHHosts(root: root, installedBy: settings.name)
         #if canImport(Network) && canImport(CryptoKit)
@@ -72,6 +77,7 @@ public final class ControlPlane: @unchecked Sendable {
     }
 
     private let name: String
+    private let records: ControlRecords
     /// Servers reached over ssh (US3).
     let servers: SSHHosts
     #if canImport(Network) && canImport(CryptoKit)
@@ -97,6 +103,10 @@ public final class ControlPlane: @unchecked Sendable {
     }
 
     public func start() async throws {
+        _ = try await records.settings(orMake: Self.freshSettings)
+        try await methods.refresh()
+        for host in await methods.knownHosts { await router.know(host) }
+        await router.setHomeHost(await methods.controlSettings.homeHost)
         await methods.attach(router)
         let servers = self.servers
         let methods = self.methods

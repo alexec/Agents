@@ -18,40 +18,46 @@ struct ControlMoveTests {
                kind: .iPhone, announcedAt: Date(), mayNotify: true)
     }
 
-    @Test func pairedDevicesBecomeDeviceClientsWithTheirOwnKeys() throws {
+    func records(_ control: URL) async throws -> ControlRecords {
+        let records = ControlRecords(store: ControlPlane.store(root: control))
+        try await records.load()
+        return records
+    }
+
+    @Test func pairedDevicesBecomeDeviceClientsWithTheirOwnKeys() async throws {
         let (locations, control) = try roots()
         defer { try? FileManager.default.removeItem(at: control.deletingLastPathComponent()) }
         let phone = device("Alex's iPhone")
         try DeviceStore(locations: locations).save([phone])
 
-        try ControlMove.prepare(control: control, from: locations)
+        try await ControlMove.prepare(control: control, from: locations)
 
-        let clients = GrantStore(root: control).loadClients()
+        let clients = await try records(control).clients
         #expect(clients.count == 1)
         #expect(clients[0].id == phone.id)
         #expect(clients[0].publicKey == phone.publicKey)
         #expect(clients[0].grant == .device)
-        #expect(GrantStore(root: control).loadSettings()?.homeHost == .mac)
+        #expect(await try records(control).settings?.homeHost == .mac)
         // The old root is only read.
         #expect(DeviceStore(locations: locations).load().map(\.id) == [phone.id])
     }
 
-    @Test func runningItAgainChangesNothing() throws {
+    @Test func runningItAgainChangesNothing() async throws {
         let (locations, control) = try roots()
         defer { try? FileManager.default.removeItem(at: control.deletingLastPathComponent()) }
         try DeviceStore(locations: locations).save([device("iPad")])
-        try ControlMove.prepare(control: control, from: locations)
-        let first = GrantStore(root: control).loadClients()
-        try ControlMove.prepare(control: control, from: locations)
-        #expect(GrantStore(root: control).loadClients() == first)
+        try await ControlMove.prepare(control: control, from: locations)
+        let first = await try records(control).clients
+        try await ControlMove.prepare(control: control, from: locations)
+        #expect(await try records(control).clients == first)
     }
 
-    @Test func aControlRootWithClientsOfItsOwnIsRefused() throws {
+    @Test func aControlRootWithClientsOfItsOwnIsRefused() async throws {
         let (locations, control) = try roots()
         defer { try? FileManager.default.removeItem(at: control.deletingLastPathComponent()) }
-        try GrantStore(root: control).saveClients([ClientRecord(id: UUID(), name: "Studio", kind: .mac,
-                                                                publicKey: Data([1]), grant: .operator, paired: Date())])
-        #expect(throws: ControlMove.Refusal.alreadyUsed) { try ControlMove.prepare(control: control, from: locations) }
+        try await records(control).save(ClientRecord(id: UUID(), name: "Studio", kind: .mac,
+                                                     publicKey: Data([1]), grant: .operator, paired: Date()))
+        await #expect(throws: ControlMove.Refusal.alreadyUsed) { try await ControlMove.prepare(control: control, from: locations) }
     }
 
     @Test func theWindowsServersAreKeptRenamedNotDeleted() throws {

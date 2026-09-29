@@ -71,9 +71,7 @@ struct ControlGrantTests {
     }
 
     @Test func theControlPlanesOwnOperatorMethodsAreRefusedToADevice() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("grants-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let methods = ControlMethods(store: GrantStore(root: root),
+        let methods = ControlMethods(records: ControlRecords(store: MemoryStore()),
                                      settings: ControlSettings(name: "test", machineID: "m"), version: "1")
         let device = ControlRouter.Caller(session: UUID(), client: UUID(), grant: .device, kind: .iPhone)
         for method in [DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget,
@@ -90,33 +88,35 @@ struct ControlGrantTests {
 }
 
 @Suite("The control plane's records")
-struct GrantStoreTests {
-    func scratch() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("grant-store-\(UUID())")
+struct ControlRecordsTests {
+    func folder() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("records-\(UUID())")
     }
 
-    @Test func clientsHostsAndSettingsSurviveARestart() throws {
-        let root = scratch()
+    @Test func clientsHostsAndSettingsSurviveARestart() async throws {
+        let root = folder()
         defer { try? FileManager.default.removeItem(at: root) }
-        let store = GrantStore(root: root)
+        let records = ControlRecords(store: FolderStore(root: root))
+        let settings = try await records.settings { ControlSettings(name: "Alex's Mac", machineID: "m1") }
+        #expect(settings.owner != nil)
         let window = client(.operator)
         let phone = client(.device)
-        try store.saveClients([window, phone])
-        try store.saveHosts([HostRecord(id: .mac, name: "This Mac", machineID: "m1"),
-                             HostRecord(id: HostID(rawValue: "k3v9x0qa"), name: "devbox",
-                                        reach: .ssh(destination: "agents@127.0.0.1", hostKeyFingerprint: nil))])
-        try store.saveSettings(ControlSettings(name: "Alex's Mac", homeHost: .mac, machineID: "m1"))
+        try await records.save(window)
+        try await records.save(phone)
+        try await records.save(HostRecord(id: .mac, name: "This Mac", machineID: "m1"))
+        _ = try await records.changeSettings { $0.homeHost = .mac }
 
-        let again = GrantStore(root: root)
-        #expect(Set(again.loadClients().map(\.id)) == [window.id, phone.id])
-        #expect(again.loadClients().first { $0.id == phone.id }?.grant == .device)
-        #expect(again.loadHosts().count == 2)
-        #expect(again.loadHosts().first { $0.id.rawValue == "k3v9x0qa" }?.reach.isSSH == true)
-        #expect(again.loadSettings()?.homeHost == .mac)
+        let again = ControlRecords(store: FolderStore(root: root))
+        try await again.load()
+        #expect(Set(await again.clients.map(\.id)) == [window.id, phone.id])
+        #expect(await again.client(phone.id)?.grant == .device)
+        #expect(await again.client(phone.id)?.owner == settings.owner)
+        #expect(await again.hosts.map(\.id) == [.mac])
+        #expect(await again.settings?.homeHost == .mac)
     }
 
     @Test func aDaemonsDevicesAreReadAsDeviceClientsWithTheirKeys() throws {
-        let root = scratch()
+        let root = folder()
         defer { try? FileManager.default.removeItem(at: root) }
         let key = Data((0..<65).map { UInt8($0) })
         let device = Device(id: UUID(), publicKey: key, name: "Alex's iPhone", kind: .iPhone,
@@ -124,7 +124,7 @@ struct GrantStoreTests {
         let locations = StoreLocations(root: root)
         try DeviceStore(locations: locations).save([device])
 
-        let clients = GrantStore.legacyDevices(at: locations.devices)
+        let clients = ControlRecords.legacyDevices(at: locations.devices)
         #expect(clients.count == 1)
         #expect(clients[0].id == device.id)
         #expect(clients[0].publicKey == key)
@@ -132,24 +132,75 @@ struct GrantStoreTests {
         #expect(clients[0].kind == .iPhone)
     }
 
-    @Test func theLastOperatorCanBeNeitherDemotedNorForgotten() throws {
+    @Test func theLastOperatorCanBeNeitherDemotedNorForgotten() async throws {
+        let records = ControlRecords(store: MemoryStore())
         let window = client(.operator)
         let phone = client(.device)
-        let both = [window, phone]
-        #expect(throws: JSONRPCError.self) { _ = try GrantStore.settingGrant(.device, of: window.id, in: both) }
-        #expect(throws: JSONRPCError.self) { _ = try GrantStore.forgetting(window.id, in: both) }
+        try await records.save(window)
+        try await records.save(phone)
+        await #expect(throws: JSONRPCError.self) { try await records.setGrant(.device, of: window.id) }
+        await #expect(throws: JSONRPCError.self) { try await records.forget(window.id) }
         // With a second operator, either may go.
-        let promoted = try GrantStore.settingGrant(.operator, of: phone.id, in: both)
-        let demoted = try GrantStore.settingGrant(.device, of: window.id, in: promoted)
-        #expect(demoted.filter { $0.grant == .operator }.map(\.id) == [phone.id])
-        #expect(try GrantStore.forgetting(phone.id, in: both).count == 1)
+        try await records.setGrant(.operator, of: phone.id)
+        try await records.setGrant(.device, of: window.id)
+        #expect(await records.clients.filter { $0.grant == .operator }.map(\.id) == [phone.id])
+        try await records.forget(window.id)
+        #expect(await records.clients.map(\.id) == [phone.id])
     }
 
-    @Test func anUnreadableFileIsNobody() throws {
-        let root = scratch()
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try Data("not json".utf8).write(to: root.appendingPathComponent("clients.json"))
-        #expect(GrantStore(root: root).loadClients().isEmpty)
+    /// Rule 11: a forgotten client is a tombstone, which reads as absent everywhere.
+    @Test func forgettingWritesATombstoneThatReadsAsAbsent() async throws {
+        let store = MemoryStore()
+        let records = ControlRecords(store: store)
+        let window = client(.operator)
+        let phone = client(.device)
+        try await records.save(window)
+        try await records.save(phone)
+        try await records.forget(phone.id)
+        let stored = try #require(try await store.get(ControlRecords.clientKey(phone.id)))
+        let tombstone = try ControlRecords.decoder.decode(ClientRecord.self, from: stored.data)
+        #expect(tombstone.forgotten == true)
+        let elsewhere = ControlRecords(store: store)
+        try await elsewhere.load()
+        #expect(await elsewhere.client(phone.id) == nil)
+        #expect(await elsewhere.clients.map(\.id) == [window.id])
+    }
+
+    /// Two copies read the same client; the second to write loses and changes nothing
+    /// (FR-008), even when the first wrote the record back to how it was (rule 10).
+    @Test func aChangeMadeAgainstAStaleReadIsRefused() async throws {
+        let store = MemoryStore()
+        let a = ControlRecords(store: store)
+        let window = client(.operator)
+        let phone = client(.device)
+        try await a.save(window)
+        try await a.save(phone)
+        let b = ControlRecords(store: store)
+        try await b.load()
+        try await a.setGrant(.operator, of: phone.id)
+        try await a.setGrant(.device, of: phone.id)
+        await #expect(throws: StoreError.conflict(key: ControlRecords.clientKey(phone.id))) {
+            try await b.setGrant(.operator, of: phone.id)
+        }
+        try await b.load()
+        #expect(await b.client(phone.id)?.grant == .device)
+    }
+
+    @Test func twoCopiesStartingOnAnEmptyStoreAgreeOnOneSettings() async throws {
+        let store = MemoryStore()
+        let first = ControlRecords(store: store)
+        let second = ControlRecords(store: store)
+        async let one = first.settings { ControlSettings(name: "one", machineID: "m") }
+        async let two = second.settings { ControlSettings(name: "two", machineID: "m") }
+        let (x, y) = try await (one, two)
+        #expect(x == y)
+    }
+
+    @Test func anUnreadableObjectIsNobody() async throws {
+        let store = MemoryStore()
+        _ = try await store.put(ControlRecords.clientsPrefix + "junk.json", Data("not json".utf8), when: .absent)
+        let records = ControlRecords(store: store)
+        try await records.load()
+        #expect(await records.clients.isEmpty)
     }
 }

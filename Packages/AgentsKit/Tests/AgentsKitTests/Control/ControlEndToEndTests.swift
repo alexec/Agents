@@ -16,8 +16,7 @@ struct ControlEndToEndTests {
 
     /// Each host answers any call with its own name and the role it was asked with.
     func rig(hosts: [HostID], grant: Grant = .operator) async -> Rig {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cp-e2e-\(UUID())")
-        let methods = ControlMethods(store: GrantStore(root: root),
+        let methods = ControlMethods(records: ControlRecords(store: MemoryStore()),
                                      settings: ControlSettings(name: "test", machineID: "m"), version: "1")
         let router = ControlRouter(handler: methods, homeHost: hosts.first)
         await methods.attach(router)

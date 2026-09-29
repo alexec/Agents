@@ -33,28 +33,23 @@ public enum ControlMove {
         let agents = ((try? FileManager.default.contentsOfDirectory(atPath: locations.agents.path)) ?? [])
             .filter { !$0.hasPrefix(".") }.count
         return Summary(agents: agents,
-                       devices: GrantStore.legacyDevices(at: locations.devices).map(\.name),
+                       devices: ControlRecords.legacyDevices(at: locations.devices).map(\.name),
                        servers: HostStore(locations: locations).load().all.map(\.label))
     }
 
-    /// Step one: the control root, with the host's devices as device clients and this
-    /// Mac's host named as the home host. The old root is only read. Run again after a
-    /// move that got this far and stopped, it finds its own work and changes nothing.
-    public static func prepare(control: URL, from locations: StoreLocations) throws {
-        let store = GrantStore(root: control)
-        let devices = GrantStore.legacyDevices(at: locations.devices)
-        let clients = store.loadClients()
-        let hosts = store.loadHosts()
+    /// Step one: the control plane's store, with the host's devices as device clients and
+    /// this Mac's host named as the home host. The old root is only read. Run again after
+    /// a move that got this far and stopped, it finds its own work and changes nothing.
+    public static func prepare(control: URL, from locations: StoreLocations) async throws {
+        let records = ControlRecords(store: ControlPlane.store(root: control))
+        try await records.load()
+        let devices = ControlRecords.legacyDevices(at: locations.devices)
         let ours = Set(devices.map(\.id))
-        let foreign = clients.filter { !ours.contains($0.id) && !($0.kind == .mac && $0.publicKey.isEmpty) }
-        guard foreign.isEmpty, hosts.allSatisfy({ $0.id == .mac }) else { throw Refusal.alreadyUsed }
-        var merged = clients
-        for device in devices where !merged.contains(where: { $0.id == device.id }) { merged.append(device) }
-        try store.saveClients(merged)
-        var settings = store.loadSettings()
-            ?? ControlSettings(name: Host.current().localizedName ?? "This Mac", machineID: MachineID.current)
-        settings.homeHost = .mac
-        try store.saveSettings(settings)
+        let foreign = await records.clients.filter { !ours.contains($0.id) && !($0.kind == .mac && $0.publicKey.isEmpty) }
+        guard foreign.isEmpty, await records.hosts.allSatisfy({ $0.id == .mac }) else { throw Refusal.alreadyUsed }
+        for device in devices where await records.client(device.id) == nil { try await records.save(device) }
+        _ = try await records.settings(orMake: ControlPlane.freshSettings)
+        _ = try await records.changeSettings { $0.homeHost = .mac }
     }
 
     /// The servers the window reached by ssh before the move.
