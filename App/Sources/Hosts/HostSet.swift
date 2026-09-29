@@ -281,7 +281,7 @@ final class HostSet {
     }
 
     private func follow(_ id: HostID, _ connection: ServerConnection) {
-        Task {
+        Task { [weak self] in
             await connection.setOnState { [weak self] state in
                 await self?.moved(id, to: state)
             }
@@ -292,7 +292,7 @@ final class HostSet {
                 await self?.toolsetMoved(id, runtimeID, to: next)
             }
             let now = await connection.claude
-            claudeMoved(id, to: now)
+            self?.claudeMoved(id, to: now)
         }
     }
 

@@ -226,7 +226,7 @@ public final class RelayTransport: LineTransport, @unchecked Sendable {
             let ticker = Task {
                 // A tick is a poke on a timer; the loop below cannot tell them apart.
                 while !Task.isCancelled {
-                    let waiting = await self.isWaitingOnAnAnswer
+                    let waiting = self.isWaitingOnAnAnswer
                     try? await Task.sleep(for: waiting ? min(every, .milliseconds(250)) : every)
                     await self.tick()
                 }

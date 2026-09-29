@@ -198,7 +198,7 @@ public actor ServerConnection {
                 return
             }
             if !first, await reachRunningDaemon() {
-                try? await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: false))
+                _ = try? await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: false))
                 await client.disconnect()
                 try await installer.waitForDaemonGone()
             }

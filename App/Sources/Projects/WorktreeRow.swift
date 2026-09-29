@@ -92,12 +92,12 @@ struct WorktreeRow: View {
         var text = Text(branch)
         if let status = worktree.status {
             let summary = Text(status.summary)
-            text = text + Text(" · ") + (status.hasPendingWork ? summary.foregroundStyle(.secondary) : summary)
+            text = Text("\(text) · \(status.hasPendingWork ? summary.foregroundStyle(.secondary) : summary)")
         }
         switch worktree.agents.count {
         case 0: return text
-        case 1: return text + Text(" · 1 agent working")
-        case let count: return text + Text(" · \(count) agents working")
+        case 1: return Text("\(text) · 1 agent working")
+        case let count: return Text("\(text) · \(count) agents working")
         }
     }
 

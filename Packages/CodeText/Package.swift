@@ -37,6 +37,10 @@ let grammarTargets: [Target] = grammars.map { grammar in
         ])
 }
 
+let grammarDependencies: [Target.Dependency] = grammars.map { grammar in
+    Target.Dependency.target(name: "TS_\(grammar.name)")
+}
+
 let package = Package(
     name: "CodeText",
     platforms: [.macOS("27.0"), .iOS("27.0")],
@@ -50,11 +54,13 @@ let package = Package(
         .target(
             name: "CodeText",
             dependencies: [.product(name: "SwiftTreeSitter", package: "swift-tree-sitter")]
-                + grammars.map { .target(name: "TS_\($0.name)") },
-            resources: [.copy("Queries")]),
+                + grammarDependencies,
+            resources: [.copy("Queries")],
+            swiftSettings: [.treatAllWarnings(as: .error)]),
         .testTarget(
             name: "CodeTextTests",
             dependencies: ["CodeText"],
-            resources: [.copy("Samples")]),
+            resources: [.copy("Samples")],
+            swiftSettings: [.treatAllWarnings(as: .error)]),
     ]
 )

@@ -34,7 +34,7 @@ struct StaleBanner: View {
                 .appText(.fine)
                 .accessibilityHidden(true)
             if let lead {
-                (Text(lead).foregroundStyle(.primary).fontWeight(.semibold) + Text(" — \(line)"))
+                Text("\(Text(lead).foregroundStyle(.primary).fontWeight(.semibold)) — \(line)")
                     .appText(.fine)
             } else {
                 Text(line)

@@ -68,7 +68,7 @@ public enum HostKeyCheck {
     public static func fetch(_ ssh: SSHCommand) async throws -> Fetched {
         let file = FileManager.default.temporaryDirectory
             .appendingPathComponent("agents-hostkey-\(UUID().uuidString)")
-        FileManager.default.createFile(atPath: file.path, contents: nil)
+        _ = FileManager.default.createFile(atPath: file.path, contents: nil)
         let out = try await ssh.run(ssh.keyFetchArguments(knownHosts: file))
         let written = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
         guard !written.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -103,7 +103,7 @@ public enum HostKeyCheck {
                                                 withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
         if !FileManager.default.fileExists(atPath: target) {
-            FileManager.default.createFile(atPath: target, contents: nil, attributes: [.posixPermissions: 0o600])
+            _ = FileManager.default.createFile(atPath: target, contents: nil, attributes: [.posixPermissions: 0o600])
         }
         let handle = try FileHandle(forWritingTo: targetURL)
         defer { try? handle.close() }

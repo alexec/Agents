@@ -25,11 +25,12 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0"),
     ],
     targets: [
-        .target(name: "AgentsKitCore"),
+        .target(name: "AgentsKitCore", swiftSettings: [.treatAllWarnings(as: .error)]),
         // Nothing here, deliberately. `agentsd` links this library, and the daemon
         // moves terminal bytes without parsing them. SwiftTerm belongs to the app,
         // where it is declared against the app target in `project.yml`.
-        .target(name: "AgentsKit", dependencies: ["AgentsKitCore", "CShims"]),
+        .target(name: "AgentsKit", dependencies: ["AgentsKitCore", "CShims"],
+                swiftSettings: [.treatAllWarnings(as: .error)]),
         // Three one-line C wrappers the Linux build of `agentsd` needs, because Swift
         // cannot call a variadic C function there (037). The Mac uses them too, so there
         // is one path rather than two.
@@ -41,6 +42,7 @@ let package = Package(
         .testTarget(
             name: "AgentsKitTests",
             dependencies: ["AgentsKit", "AgentsKitCore",
-                           .product(name: "SwiftTerm", package: "SwiftTerm")]),
+                           .product(name: "SwiftTerm", package: "SwiftTerm")],
+            swiftSettings: [.treatAllWarnings(as: .error)]),
     ]
 )

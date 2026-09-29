@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Search and detail against the official MCP Registry (060, R1, R2).
 struct MCPRegistry: Sendable {

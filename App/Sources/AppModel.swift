@@ -735,7 +735,7 @@ final class AppModel {
     /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
     /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
-        try? await client.call(DaemonAPI.Method.workflowsRun,
+        _ = try? await client.call(DaemonAPI.Method.workflowsRun,
                                DaemonAPI.WorkflowRequest(folder: summary.folder,
                                                          workflowID: summary.workflowID))
     }
@@ -743,7 +743,7 @@ final class AppModel {
     /// Put one away, or bring it back. The person's answer to a workflow an agent
     /// wrote, which is what makes writing one not need asking first.
     func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async {
-        try? await client.call(DaemonAPI.Method.workflowsArchive,
+        _ = try? await client.call(DaemonAPI.Method.workflowsArchive,
                                DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
                                                                 workflowID: summary.workflowID,
                                                                 archived: archived))
@@ -2702,6 +2702,7 @@ final class AppModel {
         }
     }
 
+    @discardableResult
     private func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
         do {
             try await work()
