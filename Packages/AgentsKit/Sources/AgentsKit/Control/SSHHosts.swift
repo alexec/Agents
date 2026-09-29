@@ -49,9 +49,10 @@ actor SSHHosts {
               let made = try? ServerHost(sshName: request.destination.trimmingCharacters(in: .whitespaces)) else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That isn’t something ssh can connect to.")
         }
+        loadDialOuts()
         if let known = await plane?.methods.allHosts.first(where: { record in
             if case .ssh(let destination, _) = record.reach { return destination == made.sshName }
-            return false
+            return dialOuts[record.id.rawValue]?.destination == made.sshName
         }) {
             throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: "\(known.name) is already a host.")
         }
@@ -71,6 +72,7 @@ actor SSHHosts {
                 return ["needsTrust": .string(fresh.fingerprint), "name": .string(made.label)]
             }
         }
+        if let dialled = try await enrolByDialling(made, fingerprint: fingerprint) { return dialled }
         let record = HostRecord(id: made.id, name: made.label,
                                 reach: .ssh(destination: made.sshName, hostKeyFingerprint: fingerprint),
                                 installed: true)
@@ -133,7 +135,13 @@ actor SSHHosts {
         guard let record = await plane?.methods.host(host) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(host.rawValue).")
         }
-        try await connect(record)
+        if record.reach.isSSH {
+            try await connect(record)
+            return
+        }
+        loadDialOuts()
+        guard let dial = dialOuts[host.rawValue] else { return }
+        try await startDialOut(dial, host: host, name: record.name)
     }
 
     /// Hosts that are no longer on record are let go: their masters stop, their agents stay.
@@ -144,6 +152,10 @@ actor SSHHosts {
             await connection.disconnect()
             connections[id] = nil
         }
+        loadDialOuts()
+        let before = dialOuts.count
+        dialOuts = dialOuts.filter { kept.contains(HostID(rawValue: $0.key)) }
+        if dialOuts.count != before { saveDialOuts() }
     }
 
     /// Every server on record, as the control plane starts.
@@ -151,6 +163,99 @@ actor SSHHosts {
         for record in records where record.reach.isSSH {
             Task { try? await self.connect(record) }
         }
+        loadDialOuts()
+        for record in records where !record.reach.isSSH {
+            guard let dial = dialOuts[record.id.rawValue] else { continue }
+            let name = record.name
+            Task { try? await self.startDialOut(dial, host: record.id, name: name) }
+        }
+    }
+
+    /// Install the binary and start the daemon with a host code. If it dials in, it is a
+    /// dial-out host and the ssh master is let go. If it cannot reach the control plane,
+    /// the daemon is stopped and the caller reaches it over ssh instead (FR-013, T044).
+    private func enrolByDialling(_ made: ServerHost, fingerprint: String?) async throws -> JSONValue? {
+        guard let code = await plane?.enrolmentCode() else { return nil }
+        let before = Set(await plane?.methods.allHosts.map(\.id) ?? [])
+        let attempt = ServerConnection(
+            hostID: made.id, ssh: ssh(made.sshName, id: made.id),
+            socket: folder.appendingPathComponent("\(made.id.rawValue).sock"), installedBy: installedBy,
+            binary: { await Self.binary(for: $0) })
+        await attempt.setLaunchArguments(["--control-code", code, "--host-name", made.label])
+        await attempt.setOnState { [weak self] state in
+            if case .connecting(let step) = state { await self?.progress(made.label, step.rawValue) }
+        }
+        await attempt.connect()
+        guard case .connected = await attempt.state else {
+            if case .failed(let problem) = await attempt.state {
+                throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: "\(made.label): \(Self.words(problem))")
+            }
+            throw JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "\(made.label) could not be reached.")
+        }
+        if let found = await waitForDialOut(named: made.label, notIn: before) {
+            var record = found
+            record.installed = true
+            record.name = made.label
+            try await plane?.methods.enroll(record)
+            dialOuts[record.id.rawValue] = DialOut(destination: made.sshName, fingerprint: fingerprint)
+            saveDialOuts()
+            await attempt.disconnect()
+            await plane?.router.broadcastControl(DaemonAPI.Notification.controlHostChanged,
+                                                 ControlRouter.describe(record.id, .online))
+            return ["host": .string(record.id.rawValue), "name": .string(record.name),
+                    "platform": .string(record.platform)]
+        }
+        await attempt.stopDaemon()
+        await attempt.disconnect()
+        return nil
+    }
+
+    /// A new host of this name, enrolled by the code we just handed the server.
+    private func waitForDialOut(named name: String, notIn before: Set<HostID>) async -> HostRecord? {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(12))
+        var seen: HostRecord?
+        while ContinuousClock.now < deadline {
+            let hosts = await plane?.methods.allHosts ?? []
+            if let found = hosts.first(where: { !before.contains($0.id) && $0.name == name }) {
+                seen = found
+                if await plane?.router.state(of: found.id)?.isOnline == true {
+                    return await plane?.methods.host(found.id) ?? found
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return seen
+    }
+
+    /// Start a dial-out daemon that already enrolled. A fresh ssh, not a master: if the
+    /// process is up it returns at once, and if the machine rebooted this brings it back.
+    private func startDialOut(_ dial: DialOut, host: HostID, name: String) async throws {
+        var command = ssh(dial.destination, id: host)
+        command.controlPath = nil
+        try await ServerInstaller(ssh: command).startDaemon(extra: ["--control-network", "--host-name", name])
+    }
+
+    private struct DialOut: Codable {
+        var destination: String
+        var fingerprint: String?
+    }
+
+    private var dialOuts: [String: DialOut] = [:]
+    private var dialOutsLoaded = false
+    private var dialOutFile: URL { folder.appendingPathComponent("dial-out.json") }
+
+    private func loadDialOuts() {
+        guard !dialOutsLoaded else { return }
+        dialOutsLoaded = true
+        guard let data = try? Data(contentsOf: dialOutFile),
+              let decoded = try? JSONDecoder().decode([String: DialOut].self, from: data) else { return }
+        dialOuts = decoded
+    }
+
+    private func saveDialOuts() {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        guard let data = try? JSONEncoder().encode(dialOuts) else { return }
+        try? data.write(to: dialOutFile, options: .atomic)
     }
 
     private func progress(_ name: String, _ step: String) async {

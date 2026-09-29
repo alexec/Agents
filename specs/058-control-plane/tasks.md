@@ -89,7 +89,7 @@ or on Alex's paired devices.
 
 ## Phase 3: User Story 1
 
-**MVP as built (2026-09-26):** this Mac's window and host reach the control plane over two same-user Unix sockets in the control root (`control.sock` and `hosts.sock`), with roles by code signature (`RolePolicy.forControl`). The control plane runs inside the bridge process when it is given `--control-root` or `AGENTS_CONTROL_ROOT`. T018–T020 (TLS listener, host PSKs), T022 (TLS dialer), T023/T029 (a saved config and pairing), T025–T028 are still open. Today the window takes `--control-root` and goes through the control plane for host `mac` only; servers still use `HostSet`. — The Mac window works through the control plane (P1) 🎯 MVP
+**MVP as built:** this Mac's window and host reach the control plane over two same-user Unix sockets in the control root (`control.sock` and `hosts.sock`), with roles by code signature (`RolePolicy.forControl`). The control plane runs inside the bridge process when it is given `--control-root` or `AGENTS_CONTROL_ROOT`. The window's clients all come from that one control link, and `HostSet` stays only for a window with no control plane. Disk reads and Finder stay on this Mac's host. The window's own files live under `window/` once a control plane is set. — The Mac window works through the control plane (P1) 🎯 MVP
 
 **Goal**: a scratch window paired as operator does everything it does today, through `agents-control` to an `agentsd --control` on this Mac.
 
@@ -108,14 +108,14 @@ or on Alex's paired devices.
   - Both imply `--serve`.
 - [x] T022 (`ControlDialling`) [US1] Write a macOS TLS-PSK dialer for `ControlUplink` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ControlUplink+Network.swift`, reusing `LinkTLS` from `AgentsKitCore/Remote/LinkTLS.swift`. Keep it behind `canImport(Network)`.
 - [x] T023 (and a remote endpoint, a membership and key in the window’s root) [US1] Write `ControlConfig` for the window in `App/Sources/Control/ControlConfig.swift`. It holds the control-plane address and the window's client id, in defaults scoped by root (the scratch-defaults lesson). The window's key goes in the keychain.
-- [ ] T024 [US1] In `App/Sources/AppModel.swift`, when `ControlConfig` exists, build clients from one `ControlLink`: one `DaemonClient` per host from `hosts/list` and `control/hostChanged`, instead of `SocketLink` + `HostSet`. Without it, keep today's path untouched (R7 Transition).
-- [ ] T025 [US1] Write `ThisMacHost` in `App/Sources/Control/ThisMacHost.swift` (R11): the `HostID` whose `machineID` matches this Mac. Replace the `host == .mac` gates with it in:
+- [x] T024 (one `ControlLink`; `HostSet` starts only when there is no control plane) [US1] In `App/Sources/AppModel.swift`, when `ControlConfig` exists, build clients from one `ControlLink`: one `DaemonClient` per host from `hosts/list` and `control/hostChanged`, instead of `SocketLink` + `HostSet`. Without it, keep today's path untouched (R7 Transition).
+- [x] T025 (`ThisMacHost`; Finder and disk reads stay on this Mac, `files/*` for the rest) [US1] Write `ThisMacHost` in `App/Sources/Control/ThisMacHost.swift` (R11): the `HostID` whose `machineID` matches this Mac. Replace the `host == .mac` gates with it in:
   - `App/Sources/Sidebar/FilesPane.swift`, plus pictures and `OpenElsewhere.swift`
   - `BackgroundPane`, `AgentRow` (Show in Finder, `worktreeIsThere`), `WorkflowPage` and `WorkflowRow`, with the `files/*` RPC path for other hosts
-- [ ] T026 [US1] Move the window's own files (`credentials.json`, relay certificates, `hosts.log`) out of the host root and into the window's support folder when `ControlConfig` exists, in `App/Sources/Hosts/Lending.swift` and the files that write them.
-- [ ] T027 [US1] Credentials: lend through each host's `DaemonClient` over its channel, operator only (FR-020). Check `App/Sources/Hosts/Lending.swift` needs nothing beyond its new client source.
+- [x] T026 (`WindowFiles` moves them under `window/` once, and the keychain service stays the root's) [US1] Move the window's own files (`credentials.json`, relay certificates, `hosts.log`) out of the host root and into the window's support folder when `ControlConfig` exists, in `App/Sources/Hosts/Lending.swift` and the files that write them.
+- [x] T027 (lent on the host's channel; the hosts page says the relay needs this Mac on the same network) [US1] Credentials: lend through each host's `DaemonClient` over its channel, operator only (FR-020). Check `App/Sources/Hosts/Lending.swift` needs nothing beyond its new client source.
   - Show `SignInRelays` for servers as "needs this Mac on the same network" (the regression R9 states).
-- [ ] T028 [US1] Show the away state in the sidebar (frame H): every host's projects stay listed but greyed, under one strip, **Can't reach the control plane**, that names the expected address. The strip goes in `App/Sources/Sidebar/` next to today's offline-server strip, reusing `HostProblem+Words.swift`.
+- [x] T028 (`ControlAwayStrip`; projects stay listed and grey while it is up) [US1] Show the away state in the sidebar (frame H): every host's projects stay listed but greyed, under one strip, **Can't reach the control plane**, that names the expected address. The strip goes in `App/Sources/Sidebar/` next to today's offline-server strip, reusing `HostProblem+Words.swift`.
 - [x] T029 (Connect… pairs with a code; walks/network.md) [US1] Pairing the window: the window's pairing client (`clients/announce` with kind `mac`) goes in `App/Sources/Control/WindowPairing.swift`, reusing `DeviceKey` and `NetworkLink` from AgentsKitCore. Check the keychain access group builds for macOS.
   - For walks, the env var `AGENTS_CONTROL=<code>` pairs without UI.
 - [x] T030 [US1] (walks/us1.md) Walk: quickstart steps 1–6 on `/tmp/cp-walk` with a real Claude turn. Screenshot each step. Record the result in `specs/058-control-plane/walks/us1.md`.
@@ -162,7 +162,7 @@ or on Alex's paired devices.
   - `HostRecord.reach` is `ssh(…)`.
 - [x] T041 [US3] `hosts/remove {host, purge?}` revokes the key and closes the uplink at once. It never stops or deletes the host's agents (FR-014).
 - [x] T042 (Settings ▸ Control plane ▸ Hosts ▸ Add a Server; the window keeps a client per control-plane host) [US3] Point `App/Sources/Hosts/AddServerFlow.swift` and `AddServerSheet.swift` at `hosts/install` when `ControlConfig` exists. Render the progress notifications and the trust step. Today's path stays when it doesn't.
-- [ ] T043 [US3] Spike S1 (R8) in `Packages/AgentsKit/Sources/ControlUplinkLinux/` (a Linux-only target): `swift-crypto` + `swift-nio-ssl` TLS-PSK against the Network.framework listener, statically linked with musl. Measure the binary growth. Write the result in `specs/058-control-plane/research.md` R8.
+- [x] T043 (S1 passed: BoringSSL agreed suite `ccac` from a musl binary; the two libraries add 51.5 MB, and BoringSSL is linked twice) [US3] Spike S1 (R8) in `Packages/AgentsKit/Sources/ControlUplinkLinux/` (a Linux-only target): `swift-crypto` + `swift-nio-ssl` TLS-PSK against the Network.framework listener, statically linked with musl. Measure the binary growth. Write the result in `specs/058-control-plane/research.md` R8.
   - If S1 fails, ask Alex whether "Mac, with Linux hosts" is acceptable.
 - [ ] T044 [US3] If S1 passes: `agentsd --control` on Linux dials out using the S1 dialer. `hosts/install` then enrols dial-out by default, and ssh-reached remains the fallback.
 - [x] T045 (walks/us3.md; network drop/return not walked) [US3] Walk with test-servers: add the devbox and start a turn there. Drop the container's network and bring it back, and check the agent kept working and the host reconnected. Remove the host, and check it disappears from every client while its agents stay. Record in `specs/058-control-plane/walks/us3.md`.
@@ -192,9 +192,9 @@ or on Alex's paired devices.
 **Independent test**: a fake device lists projects and sees the devbox's project, and starting an agent there works. The Remote is built for the generic simulator only; the phone look is Alex's.
 
 - [x] T053 (one more connection over the same link when `control/status` answers; routed by what a call names; walks/us4.md) [US4] In `Remote/Sources/RemoteModel.swift`, move from one `DaemonClient` to one per host over `ControlLink`, fed by `hosts/list` and `control/hostChanged`. Keep the legacy path for a control plane that answers no `control/status`.
-- [ ] T054 [P] [US4] Add host headers in the Remote's project list in `Shared/UI/`, following frame H's sidebar.
+- [x] T054 (`HostListHeading`; the phone groups projects once a control plane has more than one host, and an offline host stays, greyed) [P] [US4] Add host headers in the Remote's project list in `Shared/UI/`, following frame H's sidebar.
 - [x] T055 (`RelayHostCore.setOpenDevice` → `ControlPlane.attachDevice`; not walked) [US4] Relay (R6): `Control/Sources/RelayHost.swift` attaches a relay session to the router as that device's client session, speaking the client wire.
-- [ ] T056 [US4] Notices (R6): hosts send `attention/need` unsealed over channel 0. `Control/Sources/MailboxTransport.swift` picks the device by presence across hosts and seals with `Envelope.seal`. Wire it in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Attention.swift` for when the daemon runs under `--control`.
+- [x] T056 (a host sends `attention/need` unsealed; the mailbox seals to the device every client's presence chooses) [US4] Notices (R6): hosts send `attention/need` unsealed over channel 0. `Control/Sources/MailboxTransport.swift` picks the device by presence across hosts and seals with `Envelope.seal`. Wire it in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Attention.swift` for when the daemon runs under `--control`.
 - [x] T057 (fake device: `FakeDeviceLiveTests`; Remote built for the generic simulator; the phone look is Alex's) [US4] Build Remote for the generic iOS simulator. Walk with the fake device: projects from every host, an agent started on the devbox, and operator calls refused at the control plane and at the host. Record in `specs/058-control-plane/walks/us4.md`, and ask Alex to look on the phone.
 
 ---
@@ -221,7 +221,7 @@ or on Alex's paired devices.
 
 ## Phase 9: User Story 7 — Another Mac as a host (P3)
 
-- [ ] T062 [US7] Add a "Run only a host here" choice to `ConnectSheet.swift`. It takes a host code and registers only the host launch agent, with `--control <code>`.
+- [x] T062 (Connect’s host code runs only the host launch agent; the walk is T063) [US7] Add a "Run only a host here" choice to `ConnectSheet.swift`. It takes a host code and registers only the host launch agent, with `--control <code>`.
 - [ ] T063 [US7] Walk: a second `agentsd --control` under another scratch root. Its projects are listed under their own host header. Record in `specs/058-control-plane/walks/us7.md`.
 
 ---

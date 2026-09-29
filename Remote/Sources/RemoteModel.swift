@@ -110,6 +110,11 @@ final class RemoteModel {
     /// with no control plane.
     @ObservationIgnored private var otherHosts: [HostID: DaemonClient] = [:]
     @ObservationIgnored private var hostWatch: Task<Void, Never>?
+    /// What `hosts/list` last said, so the project list can name each host (058, frame H).
+    /// Empty when this phone is not a client of a control plane.
+    private(set) var controlHosts: [DaemonAPI.ControlHost] = []
+    /// The host this phone's own connection reaches. Its projects are stamped `.mac`.
+    private(set) var controlHome: HostID?
 
     init(link: any DaemonLink) {
         baseLink = link
@@ -259,6 +264,33 @@ final class RemoteModel {
     // MARK: What the screens read
 
     var projects: [DaemonAPI.ProjectSummary] { work.liveProjects }
+
+    /// One host's heading in the project list. Several hosts, and the list is grouped
+    /// under these; one host, and there is no heading, as on the Mac (058, frame H).
+    struct HostSection: Identifiable {
+        /// The id projects from this host are stamped with. The phone's own Mac is
+        /// `.mac`, whichever id the control plane gave that host.
+        var id: HostID
+        var title: String
+        var offline: Bool
+    }
+
+    var hostSections: [HostSection] {
+        guard controlHosts.count > 1, let home = controlHome else { return [] }
+        let homeRecord = controlHosts.first { $0.id == home }
+        var sections = [HostSection(id: .mac, title: "This Mac",
+                                    offline: homeRecord?.state == "offline")]
+        for host in controlHosts where host.id != home && host.id != .mac {
+            sections.append(HostSection(id: host.id, title: host.name.isEmpty ? host.id.rawValue : host.name,
+                                        offline: host.state == "offline"))
+        }
+        return sections
+    }
+
+    /// Whether `host`'s projects are last known rather than current (frame H greys them).
+    func hostIsOffline(_ host: HostID) -> Bool {
+        hostSections.first { $0.id == host }?.offline ?? false
+    }
     /// Archived ones too, for the spending page. A project put away still cost what it
     /// cost, and a grand total that quietly dropped it would be wrong rather than tidy.
     /// The archived ones are fetched when that page opens (`loadArchivedProjects`).
@@ -702,6 +734,7 @@ final class RemoteModel {
     /// A project's counts from the same grouping its page uses, so the list and the
     /// page cannot disagree about what needs attention.
     func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
+    func counts(in key: ProjectKey) -> [AgentGroup: Int] { work.counts(in: key) }
 
     /// Whether the Mac is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
@@ -971,6 +1004,8 @@ final class RemoteModel {
         guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self),
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
         else { return }
+        controlHosts = listed
+        controlHome = status.homeHost
         let others = listed.filter { $0.id != status.homeHost && $0.state == "online" }
         for host in others {
             let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
@@ -992,11 +1027,14 @@ final class RemoteModel {
                 for await note in notes { _ = self?.work.apply(note.method, note.params, from: id) }
             }
         }
-        // A host gone from the control plane, or offline, leaves the lists.
+        // A host that went offline keeps its projects, greyed under its heading (frame H).
+        // One the control plane no longer lists is gone, and so is what it showed.
         for id in otherHosts.keys where !others.contains(where: { $0.id == id }) {
             await otherHosts.removeValue(forKey: id)?.disconnect()
-            work.replaceProjects([], from: id)
-            work.replaceAgents([], from: id)
+            if !listed.contains(where: { $0.id == id }) {
+                work.replaceProjects([], from: id)
+                work.replaceAgents([], from: id)
+            }
         }
     }
 

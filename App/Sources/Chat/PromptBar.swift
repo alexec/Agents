@@ -215,7 +215,7 @@ struct PromptBar: View {
         BackgroundActions(
             stop: { [model] item in await model.stopBackground(item, of: agent.id) },
             steps: { [chatActions] item in chatActions.subagentSteps?(item.id) },
-            output: { item in BackgroundOutput.open(item) })
+            output: { [model] item in Task { await BackgroundOutput.open(item, of: agent, model: model) } })
     }
 
     private var whereAndWhat: some View {

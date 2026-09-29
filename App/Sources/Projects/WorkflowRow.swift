@@ -71,11 +71,13 @@ struct WorkflowRow: View {
                 }
                 Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
             }
-            Divider()
-            Button("Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([
-                    WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
-                ])
+            if model.isOnThisMac(model.selectedProjectHost) {
+                Divider()
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([
+                        WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
+                    ])
+                }
             }
         }
     }

@@ -152,6 +152,31 @@ struct ControlRouterTests {
         host.stop()
     }
 
+    @Test func presenceFromAnyHostIsFoldedForNotices() async throws {
+        let router = ControlRouter(handler: StubControl(), homeHost: home)
+        let host = await connectHost(router, server)
+        let window = await connectClient(router, client(.operator))
+        let phoneID = UUID()
+        let phone = await connectClient(router, client(.device, id: phoneID))
+        await eventually { host.openChannels.count == 2 }
+
+        let atMac = DaemonAPI.PresenceReport(watching: nil, active: true)
+        let inHand = DaemonAPI.PresenceReport(watching: nil, active: true, mayNotify: true)
+        let macLine = try JSONRPCCodec.encode(.request(id: .number(1), method: DaemonAPI.Method.presenceReport,
+                                                       params: try JSONValue.encoding(atMac)))
+        let phoneLine = try JSONRPCCodec.encode(.request(id: .number(2), method: DaemonAPI.Method.presenceReport,
+                                                         params: try JSONValue.encoding(inHand)))
+        try window.send(ControlWire.wrap(host: server, message: macLine))
+        try phone.send(ControlWire.wrap(host: home, message: phoneLine))
+        await eventually { await router.foldedPresences().count == 2 }
+
+        let folded = await router.foldedPresences()
+        #expect(folded[.mac]?.active == true)
+        #expect(folded[.device(phoneID)]?.active == true)
+        #expect(await router.notifyFlags()[phoneID] == true)
+        host.stop()
+    }
+
     @Test func aDeviceChannelIsOpenedAsThatDeviceAndAnOperatorsAsNone() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)

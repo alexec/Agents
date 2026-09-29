@@ -27,7 +27,10 @@ final class ServerCredentials {
     @ObservationIgnored private let checker: CredentialCheck
 
     init(locations: StoreLocations, checker: CredentialCheck = CredentialCheck()) {
-        store = CredentialStore(locations: locations)
+        WindowFiles.prepare()
+        let files = WindowFiles.support.standardizedFileURL
+        let root = locations.root.standardizedFileURL
+        store = CredentialStore(locations: locations, fileRoot: files.path == root.path ? nil : files)
         self.checker = checker
         // A Claude token from before 056 (or 047's OpenAI key) is lent to nothing now.
         store.forgetKindsNoLongerTaken()

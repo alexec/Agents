@@ -86,7 +86,10 @@ struct ChatView: View {
                 frame.pane = .background
                 if !frame.isOpen { frame.open() }
             },
-            backgroundOutput: { item in BackgroundOutput.open(item) })
+            backgroundOutput: { [model] item in
+                guard let agent = model.selectedAgent else { return }
+                Task { await BackgroundOutput.open(item, of: agent, model: model) }
+            })
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.

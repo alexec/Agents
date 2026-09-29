@@ -163,6 +163,7 @@ public final class Daemon: @unchecked Sendable {
                     FDTransport(socket: try connectUnixSocket(path: socket))
                 }
                 self.uplink = uplink
+                await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
                 uplink.start()
                 DaemonLog.shared.write("uplink: a host of the control plane at \(socket), as \(control.host)")
             } else {
@@ -214,11 +215,14 @@ public final class Daemon: @unchecked Sendable {
             }
             let uplink = ControlUplink(server: server, hello: hello, dial: ControlDialling.hostDial(membership, key: key))
             self.uplink = uplink
+            await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
             uplink.start()
             DaemonLog.shared.write("uplink: a host of \(membership.name) over the network, as \(membership.host?.rawValue ?? "?")")
         } catch {
             DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
         }
+        #elseif os(Linux)
+        await joinWithBoringSSL(control, server: server, hello: hello)
         #else
         DaemonLog.shared.write("uplink: this build cannot reach a control plane over the network")
         #endif

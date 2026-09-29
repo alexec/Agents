@@ -21,15 +21,35 @@ let package = Package(
         .library(name: "AgentsKitCore", targets: ["AgentsKitCore"]),
     ],
     dependencies: [
+        // The Linux dialer (058, T044). Linked into `AgentsKit` only on Linux, and into
+        // the tests here so a Mac can prove the handshake against the real listener.
+        // `swift-crypto` is not a dependency: its BoringSSL would be a second copy.
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.80.0"),
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.29.0"),
         // Tests only. See the target below.
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0"),
     ],
     targets: [
         .target(name: "AgentsKitCore"),
+        .target(
+            name: "LinuxControlDial",
+            dependencies: [
+                "AgentsKitCore",
+                .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "NIOTLS", package: "swift-nio"),
+            ]),
         // Nothing here, deliberately. `agentsd` links this library, and the daemon
         // moves terminal bytes without parsing them. SwiftTerm belongs to the app,
-        // where it is declared against the app target in `project.yml`.
-        .target(name: "AgentsKit", dependencies: ["AgentsKitCore", "CShims"]),
+        // where it is declared against the app target in `project.yml`. On Linux the
+        // same library dials the control plane; the Mac and the phone do not link that.
+        .target(
+            name: "AgentsKit",
+            dependencies: [
+                "AgentsKitCore",
+                "CShims",
+                .target(name: "LinuxControlDial", condition: .when(platforms: [.linux])),
+            ]),
         // Three one-line C wrappers the Linux build of `agentsd` needs, because Swift
         // cannot call a variadic C function there (037). The Mac uses them too, so there
         // is one path rather than two.
@@ -37,10 +57,12 @@ let package = Package(
         // The test target may have it, because a test target is not linked into any
         // product: the daemon is still free of it. The replay test needs a real
         // emulator to prove the property `shell.attach` rests on, which is that the
-        // same bytes in any chunking give the same screen.
+        // same bytes in any chunking give the same screen. `LinuxControlDial` comes
+        // first: listed after `AgentsKit`, swiftbuild takes that Linux-only edge for it
+        // and leaves it out of the Mac link.
         .testTarget(
             name: "AgentsKitTests",
-            dependencies: ["AgentsKit", "AgentsKitCore",
+            dependencies: ["LinuxControlDial", "AgentsKit", "AgentsKitCore",
                            .product(name: "SwiftTerm", package: "SwiftTerm")]),
     ]
 )

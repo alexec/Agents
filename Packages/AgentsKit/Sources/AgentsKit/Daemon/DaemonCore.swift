@@ -456,6 +456,14 @@ public actor DaemonCore {
     /// idle, as a server's does not, but it is still the Mac's: keys are lent as on a
     /// Mac and its own sign-ins are the person's.
     var hostsForControlPlane = false
+    /// Where an unsealed need goes when this daemon is a host of a control plane (058,
+    /// R6). Nil otherwise, and the daemon seals to its own devices as it always has.
+    var tellControl: (@Sendable (JSONValue) -> Void)?
+
+    /// The uplink to hand `attention/need` to. Set once the control-plane connection exists.
+    public func deliverNeeds(by tell: @escaping @Sendable (JSONValue) -> Void) {
+        tellControl = tell
+    }
     /// Whether this is a server's daemon (037, 043): one that stays up with nobody
     /// connected, and was not asked to stay up by a control plane.
     var onServer: Bool { !exitsWhenIdle && !hostsForControlPlane }

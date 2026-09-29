@@ -51,9 +51,11 @@ struct ProjectListView: View {
                 }
             }
 
-            if !model.isConnected {
+            if !model.isConnected, !model.controlPlaneAway {
                 // Said rather than left to look like a quiet afternoon: what is listed
                 // may have moved on, and the window is going back for it by itself.
+                // The control plane being away is the strip's sentence, and the projects
+                // stay listed under it (058, frame H).
                 Text(model.hasLoadedProjects ? "Not connected to the daemon. Trying again…"
                                              : "Connecting…")
                     .foregroundStyle(.secondary)
@@ -110,7 +112,7 @@ struct ProjectListView: View {
                     } else {
                         Menu("This Mac") { newProjectItems(on: .mac) }
                         ForEach(model.hosts.servers, id: \.self) { host in
-                            let offline = model.hosts.isOffline(host)
+                            let offline = model.hostUnreachable(host)
                             let label = model.hosts.label(host)
                             Menu(offline ? "\(label) — Offline" : label) {
                                 newProjectItems(on: host)
@@ -154,7 +156,7 @@ struct ProjectListView: View {
                 .tag(SidebarItem.project(summary.key))
                 .contextMenu { menu(for: summary) }
                 // Last known, not current: the server is not answering (037).
-                .foregroundStyle(model.hosts.isOffline(summary.host) ? .secondary : .primary)
+                .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
         }
     }
 
@@ -162,7 +164,7 @@ struct ProjectListView: View {
     private func newProjectItems(on host: HostID) -> some View {
         Button("Choose Folder…") {
             targetHost = host
-            if host == .mac { isChoosingFolder = true } else { isChoosingServerFolder = true }
+            if model.isOnThisMac(host) { isChoosingFolder = true } else { isChoosingServerFolder = true }
         }
         Button("Clone Git URL…") {
             targetHost = host
@@ -175,9 +177,9 @@ struct ProjectListView: View {
         Button("Archive") {
             Task { await model.archiveProject(summary.key) }
         }
-        .disabled(model.hosts.isOffline(summary.host))
-        // A server's folder is not on this Mac, so there is nothing for Finder to show.
-        if summary.host == .mac {
+        .disabled(model.hostUnreachable(summary.host))
+        // Only this Mac's folder is somewhere Finder can show (058, FR-019).
+        if model.isOnThisMac(summary.host) {
             Button("Show in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([summary.folder])
             }

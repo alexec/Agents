@@ -108,6 +108,33 @@ public extension DaemonAPI {
         }
     }
 
+    /// `attention/need`, unsealed, on a host's channel 0 (058, R6).
+    ///
+    /// A host no longer knows devices, so it cannot seal. It sends the need and whether
+    /// it should buzz; `{withdraw}` is the need being over. The control plane chooses
+    /// the device and seals.
+    struct AttentionNeed: Codable, Sendable, Hashable {
+        public var need: Need?
+        public var headline: Headline?
+        public var buzz: Bool?
+        public var withdraw: NeedID?
+
+        public init(need: Need?, headline: Headline?, buzz: Bool?, withdraw: NeedID?) {
+            self.need = need
+            self.headline = headline
+            self.buzz = buzz
+            self.withdraw = withdraw
+        }
+
+        public static func offer(_ need: Need, buzz: Bool) -> AttentionNeed {
+            AttentionNeed(need: need, headline: need.headline, buzz: buzz, withdraw: nil)
+        }
+
+        public static func withdraw(_ id: NeedID) -> AttentionNeed {
+            AttentionNeed(need: nil, headline: nil, buzz: nil, withdraw: id)
+        }
+    }
+
     /// `clients/setGrant`.
     struct ClientGrantRequest: Codable, Sendable, Hashable {
         public var client: UUID

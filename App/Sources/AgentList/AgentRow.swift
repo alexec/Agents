@@ -31,8 +31,10 @@ struct AgentRow: View {
 
     var body: some View {
         rowContent
-            // Last known, not current: its server is not answering (037).
-            .opacity(model.hosts.isOffline(agent.host) ? 0.55 : 1)
+            // Last known, not current: its host is not answering (037), or the control
+            // plane that would carry the answer is away (058, frame H).
+            .opacity(model.hostUnreachable(agent.host) ? 0.55 : 1)
+            .task(id: worktreeWatch) { await refreshWorktree() }
             .confirmationDialog("Retire this agent?",
                                 isPresented: Binding(get: { retiring != nil }, set: { if !$0 { retiring = nil } }),
                                 presenting: retiring) { preview in
@@ -110,7 +112,7 @@ struct AgentRow: View {
                     // Working in a worktree (030): named, because with two agents in
                     // one project the worktree is how you tell whose changes are whose.
                     if let worktree = agent.worktree {
-                        WorktreeBadge(worktree: worktree, isGone: !worktreeIsThere(worktree))
+                        WorktreeBadge(worktree: worktree, isGone: worktreeGone)
                     }
                 }
 
@@ -237,18 +239,33 @@ struct AgentRow: View {
                 }
                 Button("Archive") { Task { await model.archive(agent.id) } }
             }
-            Divider()
-            Button("Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([agent.cwd])
+            // Finder only sees this Mac's disk (058, FR-019).
+            if model.isOnThisMac(agent.host) {
+                Divider()
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([agent.cwd])
+                }
             }
         }
     }
 
     @State private var retiring: DaemonAPI.RetirePreview?
     @State private var cannotRetire: String?
+    /// Whether the worktree's folder is gone. This Mac's is asked of the disk; another
+    /// host's is `files/browse`, and stays "there" until that answer arrives (058, R11).
+    @State private var worktreeGone = false
 
-    private func worktreeIsThere(_ worktree: AgentWorktree) -> Bool {
-        FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))
+    private var worktreeWatch: String {
+        "\(agent.host.rawValue)|\(agent.worktree?.root.path ?? "")|\(model.controlPlaneAway)"
+    }
+
+    private func refreshWorktree() async {
+        guard let worktree = agent.worktree else { worktreeGone = false; return }
+        if model.isOnThisMac(agent.host) {
+            worktreeGone = !FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))
+        } else {
+            worktreeGone = await !model.pathIsThere(worktree.root, on: agent.host)
+        }
     }
 
     /// The switch that put this chat on the runtime it is on now, if one did.

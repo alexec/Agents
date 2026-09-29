@@ -49,6 +49,6 @@ The fake device is `FakeDeviceLiveTests`, a live test run only when pointed at a
 
 ## Not walked
 
-- The Remote app itself on a phone or iPad, including host headers in its project list (T054, not built). Its lists mix every host's projects without saying which host each is on.
+- The Remote app itself on a phone or iPad. Host headers are in the project list now (T054); the phone look is still Alex's to see.
 - Relay sessions away from home through the control plane.
-- Notices sealed by the control plane across hosts (T056, R6): hosts still seal their own.
+- Notices sealed by the control plane across hosts (T056) are wired and not walked on a phone: a host sends `attention/need` unsealed, and the mailbox seals it.

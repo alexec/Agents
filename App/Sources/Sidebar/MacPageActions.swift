@@ -8,7 +8,7 @@ enum MacPageActions {
     @MainActor
     static func make(model: AppModel, agentID: UUID) -> PageActions {
         // A server agent's page is on the server, and so are its pictures (037).
-        if let host = model.work.agent(agentID)?.host, host != .mac {
+        if let host = model.work.agent(agentID)?.host, !model.isOnThisMac(host) {
             let pictures = model.serverPictures(host)
             return PageActions(
                 save: { path, document in

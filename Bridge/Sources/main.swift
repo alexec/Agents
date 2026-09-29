@@ -250,7 +250,15 @@ let controlPlane: ControlPlane? = ControlPlane.chosenRoot().map { root in
     return ControlPlane(root: root, version: version, port: controlPort,
                         awayFromHome: ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil)
 }
+let mailboxTransport = MailboxTransport()
+let carryMail = ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil
 if let controlPlane {
+    // Hosts send needs unsealed. This seals them, once, from every client's presence.
+    // A walk that wants the LAN alone never seals, and never talks to CloudKit.
+    if carryMail {
+        controlPlane.onNeed = { [mailboxTransport] _, params in await mailboxTransport.heard(params) }
+        mailboxTransport.follow(controlPlane)
+    }
     Task {
         do {
             try await controlPlane.start()
@@ -287,11 +295,11 @@ terminating.resume()
 
 // The mailbox, unless told not to: a Mac with no iCloud account, or a walk that wants
 // the LAN alone, sets AGENTS_BRIDGE_NO_MAILBOX and the bridge is what it was.
-let mailboxTransport = MailboxTransport()
 // And the relay (046), switched off by the same flag: both need iCloud.
 let relayHost = RelayHost()
-if ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil {
-    mailboxTransport.start()
+if carryMail {
+    // A control plane's mailbox hears hosts, not this Mac's daemon socket.
+    if controlPlane == nil { mailboxTransport.start() }
     relayHost.start(controlPlane: controlPlane)
 }
 

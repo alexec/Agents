@@ -297,6 +297,25 @@ walked on Alex's set-up; the old path is removed after that, in a separate chang
 **Rationale**: keeps the whole of US1–US5 on the path already proven in the bridge, and
 isolates the only new dependency to a spike with a clear fallback.
 
+**Spike S1, 2026-09-27. Passed.** BoringSSL speaks the one suite the control plane's
+listener offers, and a statically linked musl binary does it from Linux.
+
+`psk-dial` in `Packages/AgentsKit/Sources/ControlUplinkLinux` is a TLS 1.2 client with
+the cipher string `ECDHE-PSK-CHACHA20-POLY1305` and a PSK identity callback, built on
+`swift-nio-ssl` and `swift-crypto`. `psk-listen` is the listener `LinkTLS` describes:
+TLS 1.2 only, suite `0xCCAC`, one pre-shared key, no resumption. The listener reported
+the negotiated suite as `ccac`, and the client exchanged a line with it.
+
+The same dialer, built with the Swift 6.4 static Linux SDK for aarch64 and stripped,
+was run in a Linux container against that listener on this Mac. It dialed. The binary
+is 59,820,992 bytes. A Swift program that only prints a line, built the same way, is
+5,786,992 bytes, so the two libraries add 51.5 MB. Today's `agentsd-linux-aarch64` is
+62,389,184 bytes, and linking this in would roughly double it. The build compiles
+BoringSSL twice, once inside `swift-crypto` and once inside `swift-nio-ssl`. A dialer
+that ships should keep one of them.
+
+Linux `agentsd --control` can dial out (T044). The ssh path stays for a host that cannot.
+
 ## R9 — Installing a host from the control plane
 
 **Decision**: `hosts/install {name, ssh destination, trust}` (operator) runs on the control

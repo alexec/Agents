@@ -85,6 +85,20 @@ public final class ControlUplink: @unchecked Sendable {
         }
     }
 
+    /// `attention/need` and anything else a host says on channel 0. Dropped when the
+    /// uplink is down; the next decision says it again.
+    public func tell(_ method: String, _ params: JSONValue) {
+        let (transport, id) = lock.withLock { () -> ((any LineTransport)?, Int) in
+            let id = nextHello
+            nextHello += 1
+            return (uplink, id)
+        }
+        guard let transport,
+              let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params))
+        else { return }
+        try? transport.write(line: ControlWire.channel(0, message: line))
+    }
+
     private func sayHello(on transport: any LineTransport) throws {
         let id = lock.withLock { () -> Int in defer { nextHello += 1 }; return nextHello }
         let line = try JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.Method.hostHello,

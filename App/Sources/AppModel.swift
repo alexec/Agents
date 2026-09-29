@@ -398,6 +398,16 @@ final class AppModel {
     /// here, with the ssh on the control plane's side.
     @ObservationIgnored private var controlHosts: [HostID: DaemonClient] = [:]
     @ObservationIgnored private var controlWatch: Task<Void, Never>?
+    /// Every host the control plane last listed, this Mac's included. Nil when the
+    /// window is not its client; empty until the first list arrives (058, R11).
+    private(set) var controlPlaneHosts: [DaemonAPI.ControlHost]? = ControlConfig.endpoint == nil ? nil : []
+    /// The name `control/status` last gave, so the away strip can still say it.
+    private(set) var controlPlaneName: String?
+    /// The control plane's own client has answered. Distinct from `isConnected`, which
+    /// is this Mac's host: a host can be offline while the control plane is up.
+    private(set) var controlPlaneReachable = false
+    /// A try to reach the control plane failed. Stays quiet during the first try.
+    private(set) var controlPlaneMissed = false
     /// No control plane and nothing of the old way: the window asks how to work, and
     /// starts nothing until it is told (058, FR-017).
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
@@ -416,7 +426,103 @@ final class AppModel {
     /// The client for work on a host. A server that is not connected answers with an
     /// error straight away, never with the Mac's daemon.
     func client(for host: HostID) -> DaemonClient {
-        host == .mac ? client : controlHosts[host] ?? hosts.client(for: host) ?? Self.unreachable
+        if host == .mac { return client }
+        if let through = controlHosts[host] { return through }
+        // A control plane's host is never reached by this window's own ssh (T024).
+        if controlLink != nil { return Self.unreachable }
+        return hosts.client(for: host) ?? Self.unreachable
+    }
+
+    /// The host on this Mac, when there is one. `.mac` when the window has no control plane.
+    var thisMacHostID: HostID? {
+        ThisMacHost.resolve(controlPlaneHosts, controlPlaneIsHere: ControlConfig.root != nil)
+    }
+
+    /// Whether this window may read `host`'s folders off this disk (058, R11).
+    func isOnThisMac(_ host: HostID) -> Bool { thisMacHostID == host }
+
+    /// The window cannot ask this host right now: the control plane is away, or the host is.
+    func hostUnreachable(_ host: HostID) -> Bool {
+        controlPlaneAway || hosts.isOffline(host)
+    }
+
+    /// Lend to a host the control plane reaches (058, FR-020). Nil when this window
+    /// still reaches that host over its own ssh, so the caller uses that path.
+    func lendThroughControl(_ id: HostID, runtime: String, secret: Secret, offered: Bool) async -> Bool? {
+        guard controlHosts[id] != nil else { return nil }
+        if !offered {
+            _ = try? await client(for: id).call(DaemonAPI.Method.credentialsOffer, credentialOffer(id))
+        }
+        return (try? await client(for: id).call(
+            DaemonAPI.Method.credentialsLend,
+            DaemonAPI.CredentialsLend(runtime: runtime, secret: secret))) != nil
+    }
+
+    /// The control plane was reached and then was not, or the first try failed (frame H).
+    var controlPlaneAway: Bool { controlLink != nil && controlPlaneMissed && !controlPlaneReachable }
+
+    /// Frame H's sentence, naming where the window expected the control plane.
+    var controlPlaneAwayLine: String? {
+        guard controlPlaneAway else { return nil }
+        switch ControlConfig.endpoint {
+        case .remote(let membership):
+            return HostProblem.controlPlaneUnreachable(name: membership.name,
+                                                       address: membership.addresses.first ?? "no address")
+        case .local(let root):
+            let name = controlPlaneName ?? Foundation.Host.current().localizedName ?? "this Mac"
+            return HostProblem.controlPlaneUnreachable(name: name, address: SharedFiles.tilde(root.path))
+        case nil:
+            return nil
+        }
+    }
+
+    /// The away strip's Try Again: one attempt now, then the usual backoff.
+    func tryControlPlaneAgain() {
+        reconnecting?.cancel()
+        reconnecting = nil
+        controlWatch?.cancel()
+        controlWatch = nil
+        Task {
+            await connect()
+            if !isConnected { await reconnect() }
+        }
+    }
+
+    /// An agent on `host` whose folders include `folder`, so `files/read` can be scoped.
+    func anAgent(in folder: URL, on host: HostID) -> UUID? {
+        let wanted = Project.standardize(folder)
+        return agents.first { $0.host == host && Project.standardize($0.projectFolder) == wanted }?.id
+    }
+
+    /// The text of a file. This Mac's is read here; another host's is `files/read` (R11).
+    func textFile(at url: URL, on host: HostID, agentID: UUID?) async -> String? {
+        if isOnThisMac(host) { return try? String(contentsOf: url, encoding: .utf8) }
+        guard let agentID else { return nil }
+        guard let reading = try? await serverFiles(host).read(agentID: agentID,
+                                                              path: url.path(percentEncoded: false)) else { return nil }
+        if case .text(let text, _, _, _) = reading { return text }
+        return nil
+    }
+
+    /// Whether a path is there. This Mac's is asked of the disk. Another host's is
+    /// `files/browse`, and a host that cannot be asked is left as still there.
+    func pathIsThere(_ url: URL, on host: HostID) async -> Bool {
+        if isOnThisMac(host) {
+            return FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
+        }
+        if controlPlaneAway || hosts.isOffline(host) { return true }
+        do {
+            _ = try await client(for: host).call(DaemonAPI.Method.filesBrowse,
+                                                  DaemonAPI.FilesBrowseRequest(path: url.path(percentEncoded: false)),
+                                                  returning: DirectoryListing.self)
+            return true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.fileGone {
+            return false
+        } catch let error as JSONRPCError where error.message == "That is a file." {
+            return true
+        } catch {
+            return true
+        }
     }
 
     private func client(forAgent id: UUID?) -> DaemonClient {
@@ -1220,6 +1326,9 @@ final class AppModel {
         // Never the old way's daemon while first run is still deciding the new way, or
         // while the move across is handing it to launchd.
         guard !needsFirstRun, !holdingForMove else { return }
+        // The control plane's own client, started whether or not this Mac's host
+        // answers: a host can be down while the control plane is up (frame H).
+        if controlLink != nil { watchControlHosts() }
         do {
             try await client.connect()
             isConnected = true
@@ -1232,11 +1341,14 @@ final class AppModel {
             startPresence()
             presence?.connected()
             await refreshEverything()
-            startHosts()
+            // Servers the control plane reaches are its clients. HostSet is the old
+            // path, and it stays only while this window has no control plane (R7).
+            if controlLink == nil { startHosts() }
             watchControlHosts()
         } catch {
             isConnected = false
-            problem = describe(error)
+            // A control plane that cannot be reached is the strip, not an alert.
+            if controlLink == nil { problem = describe(error) }
         }
     }
 
@@ -1397,14 +1509,29 @@ final class AppModel {
             let control = DaemonClient(link: controlLink.controlLink)
             while !Task.isCancelled {
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(3))) != nil {
+                    await self?.controlPlaneDidAnswer()
                     await self?.syncControlHosts(control)
                     for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
                         await self?.syncControlHosts(control)
                     }
+                    if !Task.isCancelled { await self?.controlPlaneWent() }
+                } else if !Task.isCancelled {
+                    await self?.controlPlaneWent()
                 }
                 try? await Task.sleep(for: .seconds(2))
             }
         }
+    }
+
+    private func controlPlaneDidAnswer() {
+        controlPlaneReachable = true
+        controlPlaneMissed = false
+    }
+
+    private func controlPlaneWent() {
+        guard controlLink != nil else { return }
+        controlPlaneReachable = false
+        controlPlaneMissed = true
     }
 
     private func syncControlHosts(_ control: DaemonClient) async {
@@ -1412,7 +1539,11 @@ final class AppModel {
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self),
               let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
         else { return }
-        let others = listed.filter { $0.id != .mac && $0.id != status.homeHost }
+        controlPlaneHosts = listed
+        controlPlaneName = status.name
+        // `.mac` is `client`, already. Every other host, including another machine's
+        // home host, gets a client of its own on the same link.
+        let others = listed.filter { $0.id != .mac }
         hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.state == "online")) })
         for host in others where host.state == "online" {
             let server = controlHosts[host.id] ?? DaemonClient(link: controlLink.link(for: host.id))
@@ -1420,6 +1551,10 @@ final class AppModel {
             guard await !server.isConnected else { continue }
             guard (try? await server.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
             let id = host.id
+            await server.setCredentialLender { [weak self] wanted in
+                await self?.answerCredentialWanted(wanted, on: id) ?? false
+            }
+            _ = try? await server.call(DaemonAPI.Method.credentialsOffer, credentialOffer(id))
             Task.detached(priority: .userInitiated) { [weak self] in
                 for await note in server.notifications() {
                     await self?.receivedFromServer(id, note.method, note.params)

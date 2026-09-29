@@ -1,4 +1,5 @@
 import Foundation
+import LinuxControlDial
 import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
@@ -130,5 +131,39 @@ struct ControlNetTests {
         #expect(await setup.plane.methods.allClients.count == 1)
         await eventually { await !setup.net.listensFor(ControlKeys.clientIdentity(iPadID)) }
         await #expect(throws: (any Error).self) { _ = try await ControlDialling.clientDial(iPad, key: iPadKey)() }
+    }
+
+    /// The path Linux `agentsd --control` dials with: BoringSSL, and keys derived without CryptoKit.
+    @Test func boringSSLEnrolsAndDialsTheMacListener() async throws {
+        let setup = try await plane()
+        defer { try? FileManager.default.removeItem(at: setup.root) }
+        let shown = try code(await setup.net.startCode(.host, name: "cp"))
+        let privateKey = ControlAgreement.generate().privateKey
+        let publicKey = try ControlAgreement.publicKey(privateKey: privateKey)
+        let transport = try await LinuxControlDial.connect(
+            shown.addresses, identity: ControlAgreement.codeIdentity(secret: shown.secret, host: true),
+            key: ControlAgreement.codeKey(shown.secret))
+        let announce = DaemonAPI.HostAnnounce(publicKey: publicKey, name: "linux", platform: "Linux arm64",
+                                             version: "1", machineID: "linux-1")
+        let request = try JSONRPCCodec.encode(.request(id: .number(1), method: DaemonAPI.Method.hostsAnnounce,
+                                                       params: try JSONValue.encoding(announce)))
+        try transport.write(line: request)
+        var incoming = transport.lines().makeAsyncIterator()
+        let line = try #require(try await incoming.next())
+        guard case .success(_, let result) = try JSONRPCCodec.decode(line: line) else {
+            Issue.record("enrolment was refused: \(line)")
+            return
+        }
+        transport.close()
+        let host = try #require(try result.decode(DaemonAPI.Admitted.self).host)
+        let server = DaemonServer(url: URL(fileURLWithPath: "/tmp/unused-\(UUID()).sock")) { _, _, _ in .success([:]) }
+        let uplink = ControlUplink(server: server, hello: DaemonAPI.HostHello(
+            version: "1", platform: "Linux arm64", machineID: "linux-1", name: "linux")) {
+            let psk = try ControlAgreement.hostKey(privateKey: privateKey, peer: shown.controlKey, host: host)
+            return try await LinuxControlDial.connect(shown.addresses, identity: ControlAgreement.hostIdentity(host), key: psk)
+        }
+        uplink.start()
+        defer { uplink.stop() }
+        await eventually { await setup.plane.router.state(of: host)?.isOnline == true }
     }
 }

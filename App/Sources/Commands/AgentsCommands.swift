@@ -155,9 +155,9 @@ struct AgentsCommands: Commands {
     /// a server's folder is not somewhere Finder can go.
     private var folderForFinder: URL? {
         if let agent = model.selectedAgent {
-            return agent.host == .mac ? agent.cwd : nil
+            return model.isOnThisMac(agent.host) ? agent.cwd : nil
         }
-        guard let summary = model.selectedProjectSummary, summary.host == .mac, summary.exists else { return nil }
+        guard let summary = model.selectedProjectSummary, model.isOnThisMac(summary.host), summary.exists else { return nil }
         return summary.folder
     }
 

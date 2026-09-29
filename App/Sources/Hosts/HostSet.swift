@@ -42,8 +42,9 @@ final class HostSet {
     @ObservationIgnored private var retrying: [HostID: Task<Void, Never>] = [:]
     @ObservationIgnored private let store: HostStore
     @ObservationIgnored private let locations: StoreLocations
-    /// The sign-ins this Mac relays to servers (047).
-    @ObservationIgnored lazy var relays = SignInRelays(locations: locations)
+    /// The sign-ins this Mac relays to servers (047). Certificates live with the
+    /// window, not in a host's root (058, R11).
+    @ObservationIgnored lazy var relays = SignInRelays(locations: StoreLocations(root: WindowFiles.support))
     @ObservationIgnored private var pathMonitor: NWPathMonitor?
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var quitObserver: (any NSObjectProtocol)?
@@ -80,6 +81,8 @@ final class HostSet {
         self.locations = locations
         self.store = HostStore(locations: locations)
         self.hosts = store.load()
+        // Before the first log line or relay, so both are written where the window keeps them.
+        WindowFiles.prepare()
     }
 
     var isEmpty: Bool { hosts.all.isEmpty && controlled.isEmpty }
@@ -229,11 +232,12 @@ final class HostSet {
 
     // MARK: -
 
-    /// `<root>/hosts/hosts.log`: every server's state as it changes, for finding out
-    /// afterwards why one would not come back.
+    /// The window's `hosts.log`: every server's state as it changes, for finding out
+    /// afterwards why one would not come back. Beside the host's root once a control
+    /// plane is set (058, R11).
     private func log(_ line: String) {
-        let file = locations.hostsFolder.appendingPathComponent("hosts.log")
-        try? FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
+        let file = WindowFiles.hostsLog
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         let stamped = "\(ISO8601DateFormatter().string(from: Date())) \(line)\n"
         if let handle = try? FileHandle(forWritingTo: file) {
             handle.seekToEndOfFile(); handle.write(Data(stamped.utf8)); try? handle.close()

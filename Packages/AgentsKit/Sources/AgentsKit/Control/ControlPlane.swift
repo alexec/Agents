@@ -79,6 +79,17 @@ public final class ControlPlane: @unchecked Sendable {
     public private(set) var net: ControlNet?
     #endif
 
+    /// A one-time host code, so `hosts/install` can have the server dial out (T044).
+    /// Nil when this control plane is not listening on the network.
+    func enrolmentCode() async -> String? {
+        #if canImport(Network) && canImport(CryptoKit)
+        guard let net else { return nil }
+        return await net.startCode(.host, name: name).text
+        #else
+        return nil
+        #endif
+    }
+
     /// Going away (launchd's SIGTERM): the ssh master to each server stops with the
     /// control plane rather than outliving it. The servers' daemons carry on.
     public func stop() async {
@@ -95,6 +106,7 @@ public final class ControlPlane: @unchecked Sendable {
             install: { try await servers.install($0) },
             update: { try await servers.checkAgain($0) },
             checkAgain: { try await servers.checkAgain($0) },
+            need: { [onNeed] host, params in await onNeed?(host, params) },
             clientsChanged: { [weak self] now in await self?.clientsChanged(now) },
             hostsChanged: { await servers.sync(await methods.allHosts) })
         #if canImport(Network) && canImport(CryptoKit)
@@ -133,6 +145,25 @@ public final class ControlPlane: @unchecked Sendable {
 
     public func stop() {
         for listener in listeners { listener.stop() }
+    }
+
+    /// A host's unsealed `attention/need`. Set before `start`, which is when the hook is taken.
+    public var onNeed: (@Sendable (HostID, JSONValue?) async -> Void)?
+
+    /// Device clients, with the notify flag they last reported, for sealing a need (R6).
+    public func devicesForNotices() async -> [Device] {
+        let flags = await router.notifyFlags()
+        return await methods.allClients.compactMap { record in
+            guard record.grant == .device, !record.publicKey.isEmpty else { return nil }
+            let kind: Device.Kind = switch record.kind {
+            case .iPhone: .iPhone
+            case .iPad: .iPad
+            case .mac, .unknown: .unknown
+            }
+            return Device(id: record.id, publicKey: record.publicKey, name: record.name, kind: kind,
+                          announcedAt: record.paired, lastSeenAt: record.lastSeen,
+                          mayNotify: flags[record.id] ?? record.mayNotify)
+        }
     }
 
     /// A phone or iPad the bridge let in, on the direct link or through the relay (058,

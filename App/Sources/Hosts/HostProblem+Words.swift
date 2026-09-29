@@ -53,4 +53,10 @@ extension HostProblem {
         if case .hostKeyChanged = self { return false }
         return true
     }
+
+    /// The window cannot reach the control plane at all (058, frame H). One strip for
+    /// every host, naming where the window expected it.
+    static func controlPlaneUnreachable(name: String, address: String) -> String {
+        "Can’t reach the control plane on \(name) (\(address)). Your agents are still working there."
+    }
 }

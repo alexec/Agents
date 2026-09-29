@@ -16,6 +16,15 @@ public struct ServerBinary: Sendable, Equatable {
     }
 }
 
+/// Arguments the next start of a server's daemon is given. A class so the link, which
+/// holds a copy of the installer, sees what `setLaunchArguments` stored.
+final class DaemonLaunch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [String] = []
+    func set(_ values: [String]) { lock.lock(); self.values = values; lock.unlock() }
+    func get() -> [String] { lock.lock(); defer { lock.unlock() }; return values }
+}
+
 /// One server, from nothing to a daemon answering through the forward (037).
 ///
 /// `connect()` is the whole sequence: master up, probe, refuse what cannot be used,
@@ -120,9 +129,28 @@ public actor ServerConnection {
         self.wantsOther = wants
         self.binary = binary
         self.installedBy = installedBy
-        self.client = DaemonClient(link: ServerLink(socket: socket, installer: installer) {
+        self.client = DaemonClient(link: ServerLink(socket: socket, installer: installer, masterIsUp: {
             await master.isRunning
-        })
+        }, launchArguments: { [launch] in
+            launch.get()
+        }))
+    }
+
+    /// Arguments for the server's `agentsd`, after `--serve --detach`. Set before `connect`.
+    private let launch = DaemonLaunch()
+
+    public func setLaunchArguments(_ arguments: [String]) {
+        launch.set(arguments)
+    }
+
+    /// Ask the server's daemon to quit, and wait until its socket is gone. Used when a
+    /// dial-out attempt did not enrol, so the ssh fallback can start a daemon that is
+    /// not still holding a host code.
+    public func stopDaemon() async {
+        guard case .connected = state else { return }
+        _ = try? await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: false))
+        await client.disconnect()
+        try? await installer.waitForDaemonGone()
     }
 
     /// The app is quitting: let the ssh master go. The server's daemon stays up.

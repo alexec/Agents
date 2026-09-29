@@ -1,7 +1,8 @@
-// Not on Linux yet: a Linux host joins over ssh until spike S1 (058, R8).
+// The Mac listener's keys. A Linux host derives the same bytes in `ControlAgreement`
+// and dials with BoringSSL (058, T044); this file stays on CryptoKit.
+import Foundation
 #if canImport(Network) && canImport(CryptoKit)
 import CryptoKit
-import Foundation
 
 /// The keys a control plane's network listener is locked with (058, T019).
 ///
@@ -55,9 +56,12 @@ public enum ControlKeys {
         }
     }
 }
+#endif
 
 /// What a client or a host keeps once it has paired or enrolled: who it is, the control
 /// plane's key, and where to find it. A JSON file beside its own key file.
+///
+/// The same file on a Mac and on Linux (058, T044). Nothing in it needs CryptoKit.
 public struct ControlMembership: Codable, Sendable, Hashable {
     public var client: UUID?
     public var host: HostID?
@@ -84,4 +88,3 @@ public struct ControlMembership: Codable, Sendable, Hashable {
         chmod(file.path, 0o600)
     }
 }
-#endif

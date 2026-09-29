@@ -247,6 +247,9 @@ struct ControlHostsPage: View {
         if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }
         if !host.version.isEmpty { parts.append("Agents \(host.version)") }
         parts.append(host.reach == "ssh" ? "reached over ssh" : "connects out")
+        // The sign-in relay needs a path back to this Mac, which the control plane does
+        // not carry yet (R9). A lent key still works; the relay does not.
+        parts.append("Sign-in relay needs this Mac on the same network")
         return parts.joined(separator: " · ")
     }
 }

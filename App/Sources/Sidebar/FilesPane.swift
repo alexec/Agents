@@ -39,10 +39,11 @@ struct FilesPane: View {
 
     private var folder: URL { state.folder ?? agent.cwd }
 
-    /// A server agent's folder is read through its server (037). Nil for this Mac's,
-    /// which is read straight off the disk as it always was.
-    private var server: RemoteFiles? { agent.host == .mac ? nil : model.serverFiles(agent.host) }
-    private var serverLabel: String? { agent.host == .mac ? nil : model.hosts.label(agent.host) }
+    /// A host's folder is read through that host (037). Nil for the one on this Mac,
+    /// which is read straight off the disk (058, R11).
+    private var onThisMac: Bool { model.isOnThisMac(agent.host) }
+    private var server: RemoteFiles? { onThisMac ? nil : model.serverFiles(agent.host) }
+    private var serverLabel: String? { onThisMac ? nil : model.hosts.label(agent.host) }
     private var serverChanges: Int { server?.changeCount(agentID: agent.id, folder: folder) ?? 0 }
 
     var body: some View {

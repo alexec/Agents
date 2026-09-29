@@ -56,6 +56,18 @@ public actor ControlRouter {
     private var hosts: [HostID: HostSession] = [:]
     private var known: Set<HostID>
     private var states: [HostID: HostState] = [:]
+    /// Where each client last said the person was. One record per client, across every
+    /// host that client has a channel to (058, R6).
+    private var notedPresence: [UUID: NotedPresence] = [:]
+
+    private struct NotedPresence {
+        var surface: Surface
+        var watching: UUID?
+        var active: Bool
+        var heardAt: Date
+        /// The device's own report. Omitted from a later report means unchanged.
+        var mayNotify: Bool?
+    }
 
     public init(handler: any ControlHandling, knownHosts: [HostID] = [], homeHost: HostID? = nil) {
         self.handler = handler
@@ -73,6 +85,39 @@ public actor ControlRouter {
     public var hostStates: [HostID: HostState] { states }
 
     public var sessionCount: Int { clients.count }
+
+    /// Every client's presence, folded the way a daemon folds its own: one record per
+    /// surface, an active one beating a later quiet one (058, R6). An operator is the
+    /// Mac's screen, whichever host it reported through.
+    public func foldedPresences() -> [Surface: Presence] {
+        var folded: [Surface: Presence] = [:]
+        for note in notedPresence.values {
+            let presence = Presence(surface: note.surface, watching: note.watching,
+                                    active: note.active, heardAt: note.heardAt)
+            if let held = folded[note.surface] {
+                let better = presence.active != held.active ? presence.active : presence.heardAt > held.heardAt
+                if !better { continue }
+            }
+            folded[note.surface] = presence
+        }
+        return folded
+    }
+
+    /// What each device last said about showing a notification, where it has said.
+    public func notifyFlags() -> [UUID: Bool] {
+        var flags: [UUID: Bool] = [:]
+        for (id, note) in notedPresence {
+            if let may = note.mayNotify { flags[id] = may }
+        }
+        return flags
+    }
+
+    private func notePresence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport, at: Date = Date()) {
+        let surface: Surface = grant == .device ? .device(client) : .mac
+        let previous = notedPresence[client]
+        notedPresence[client] = NotedPresence(surface: surface, watching: report.watching, active: report.active,
+                                              heardAt: at, mayNotify: report.mayNotify ?? previous?.mayNotify)
+    }
 
     public func sessions(of client: UUID) -> [UUID] {
         clients.filter { $0.value.caller.client == client }.map(\.key)
@@ -194,6 +239,10 @@ public actor ControlRouter {
     /// Ends a session: its channels are closed on every host, then its transport.
     public func detachClient(_ id: UUID) {
         guard let session = clients.removeValue(forKey: id) else { return }
+        let client = session.caller.client
+        if !clients.values.contains(where: { $0.caller.client == client }) {
+            notedPresence.removeValue(forKey: client)
+        }
         for (host, channel) in session.channels {
             hosts[host]?.channels[channel] = nil
             try? hosts[host]?.transport.write(line: ControlWire.close(channel))
@@ -261,7 +310,11 @@ public actor ControlRouter {
         let wrapped = session.wrapped
         let decoded = try? JSONRPCCodec.decode(line: message)
         switch decoded {
-        case .request(let id, let method, _)?:
+        case .request(let id, let method, let params)?:
+            if method == DaemonAPI.Method.presenceReport, let params,
+               let report = try? params.decode(DaemonAPI.PresenceReport.self) {
+                notePresence(client: session.caller.client, grant: session.caller.grant, report: report)
+            }
             guard session.caller.grant.allows(method) else {
                 return reply(to: sessionID, host: host, id: id, wrapped: wrapped,
                              error: JSONRPCError(code: DaemonAPI.Failure.notPermitted,

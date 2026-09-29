@@ -36,10 +36,14 @@ public struct CredentialStore: Sendable {
         self.service = service
     }
 
-    public init(locations: StoreLocations) {
+    /// `fileRoot` is where `credentials.json` is kept. It stays the root unless the
+    /// window has moved the file out of a host's root (058, R11). The keychain service
+    /// stays derived from `locations.root` either way, so a move does not orphan the secrets.
+    public init(locations: StoreLocations, fileRoot: URL? = nil) {
         let path = locations.root.standardizedFileURL.path(percentEncoded: false)
         let id = SHA256.hash(data: Data(path.utf8)).prefix(4).map { String(format: "%02x", $0) }.joined()
-        self.init(file: locations.root.appendingPathComponent("credentials.json"),
+        let folder = fileRoot ?? locations.root
+        self.init(file: folder.appendingPathComponent("credentials.json"),
                   service: "agents.runtime-credential.\(id)")
     }
 

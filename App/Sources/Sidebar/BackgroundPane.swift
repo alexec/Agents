@@ -49,18 +49,37 @@ struct BackgroundPane: View {
         BackgroundActions(
             stop: { [model, agent] item in await model.stopBackground(item, of: agent.id) },
             steps: { [state] item in state.subagent = item.id },
-            output: { item in BackgroundOutput.open(item) })
+            output: { item in Task { await BackgroundOutput.open(item, of: agent, model: model) } })
     }
 }
 
 /// A task's output file, opened in TextEdit: it has no extension anything else claims,
 /// and it is the runtime's file, not inside the agent's folders.
 enum BackgroundOutput {
+    /// This Mac's file opens where it is. Another host's is read through `files/read`
+    /// and opened from what came back (058, R11). A path the host will not give is
+    /// left unopened: it is not on this disk.
     @MainActor
-    static func open(_ item: BackgroundItem) {
+    static func open(_ item: BackgroundItem, of agent: Agent, model: AppModel) async {
         guard let path = item.outputFilePath else { return }
-        NSWorkspace.shared.open([URL(fileURLWithPath: path)],
-                                withApplicationAt: URL(fileURLWithPath: "/System/Applications/TextEdit.app"),
-                                configuration: NSWorkspace.OpenConfiguration())
+        let url = URL(fileURLWithPath: path)
+        let local: URL
+        if model.isOnThisMac(agent.host) {
+            local = url
+        } else if let text = await model.textFile(at: url, on: agent.host, agentID: agent.id) {
+            let ext = url.pathExtension.isEmpty ? "txt" : url.pathExtension
+            let temp = FileManager.default.temporaryDirectory
+                .appendingPathComponent("agents-output-\(item.id)")
+                .appendingPathExtension(ext)
+            guard (try? text.write(to: temp, atomically: true, encoding: .utf8)) != nil else { return }
+            local = temp
+        } else {
+            return
+        }
+        // Async because this function already is: the synchronous open is not the one
+        // a concurrent context is offered.
+        try? await NSWorkspace.shared.open([local],
+                                            withApplicationAt: URL(fileURLWithPath: "/System/Applications/TextEdit.app"),
+                                            configuration: NSWorkspace.OpenConfiguration())
     }
 }

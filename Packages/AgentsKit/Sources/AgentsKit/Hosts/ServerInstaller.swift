@@ -173,9 +173,12 @@ public struct ServerInstaller: Sendable {
 
     /// Start the server's daemon in the background. Returns once it has detached;
     /// readiness is the forward answering, which is `DaemonClient.connect`'s to wait for.
-    public func startDaemon() async throws {
+    /// `extra` is appended after `--detach`: `--control-code` the first time a host
+    /// dials out, `--control-network` when it already has a membership (058, T044).
+    public func startDaemon(extra: [String] = []) async throws {
+        let tail = extra.map { " " + Self.quote($0) }.joined()
         try await check("""
-            "$HOME/.agents-server/bin/current" --root "$HOME/.agents-server/root" --serve --detach
+            "$HOME/.agents-server/bin/current" --root "$HOME/.agents-server/root" --serve --detach\(tail)
             """)
     }
 

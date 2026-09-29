@@ -39,6 +39,11 @@ extension AppModel {
             guard saved else { return false }
         }
         guard let secret = credentials.secretToLend(wanted.runtime) else { return false }
+        // A host the control plane reaches is lent on its channel (058, FR-020). One
+        // this window still reaches over its own ssh is lent the way it always was.
+        if let lent = await lendThroughControl(id, runtime: wanted.runtime, secret: secret, offered: wanted.offered) {
+            return lent
+        }
         // The offer made on connect did not name a runtime there was no credential for.
         if !wanted.offered { await hosts.offerCredentials(id) }
         return await hosts.lend(id, runtime: wanted.runtime, secret)
