@@ -41,14 +41,17 @@ struct ElicitationView: View {
                             if let link = URL(string: url) { NSWorkspace.shared.open(link) }
                         }
                         .buttonStyle(.paperProminent)
+                        .keyboardShortcut(.defaultAction)
                         Button("Done") {
                             Task { await model.answerElicitation(request, action: .accept) }
                         }
                         .buttonStyle(.paper)
+                        .keyboardShortcut("1")
                         Button("Gave up") {
                             Task { await model.answerElicitation(request, action: .decline) }
                         }
                         .buttonStyle(.paper)
+                        .keyboardShortcut("2")
                     }
                 }
             }
@@ -133,6 +136,7 @@ struct ElicitationView: View {
                     Task { await model.answerElicitation(request, action: .accept, content: values) }
                 }
                 .buttonStyle(.paperProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(!schema.problems(with: values).isEmpty)
             }
         }
@@ -191,11 +195,12 @@ struct ElicitationView: View {
         case .string(_, _, _, let choices?):
             asked(property)
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(choices) { choice in
+                ForEach(Array(choices.enumerated()), id: \.element.id) { index, choice in
                     // Clicking answers and turns the page. On the last page there is
                     // nowhere to turn to, so it selects and waits for Submit.
                     option(choice.title, choice.description,
-                           chosen: values[property.name]?.stringValue == choice.value) {
+                           chosen: values[property.name]?.stringValue == choice.value,
+                           index: index) {
                         values[property.name] = .string(choice.value)
                         if page < last { step = page + 1 }
                     }
@@ -204,11 +209,12 @@ struct ElicitationView: View {
         case .multiSelect(let items, _, _):
             asked(property)
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(items) { item in
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     // Several can be picked, so a click cannot mean "and move on":
                     // it adds or removes, and Next appears once anything is on.
                     option(item.title, item.description,
-                           chosen: chosen(property.name).contains(item.value)) {
+                           chosen: chosen(property.name).contains(item.value),
+                           index: index) {
                         var picked = chosen(property.name)
                         if let at = picked.firstIndex(of: item.value) {
                             picked.remove(at: at)
@@ -246,13 +252,15 @@ struct ElicitationView: View {
     /// question on the page now, so there is room to read what each one means.
     @ViewBuilder
     private func option(_ title: String, _ description: String?,
-                        chosen: Bool, choose: @escaping () -> Void) -> some View {
+                        chosen: Bool, index: Int = 0, choose: @escaping () -> Void) -> some View {
         if chosen {
             Button(action: choose) { optionLabel(title, description) }
                 .buttonStyle(.paperProminent)
+                .modifier(ElicitationNumberShortcut(index: index))
         } else {
             Button(action: choose) { optionLabel(title, description) }
                 .buttonStyle(.paper)
+                .modifier(ElicitationNumberShortcut(index: index))
         }
     }
 
@@ -286,22 +294,24 @@ struct ElicitationView: View {
         if let single = schema.singleChoice {
             ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 8) {
-                    ForEach(single.choices) { choice in
+                    ForEach(Array(single.choices.enumerated()), id: \.element.id) { index, choice in
                         answerButton(title: choice.title, description: choice.description,
-                                     prominent: true) {
+                                     prominent: true, index: index) {
                             answer(single.property.name, with: .string(choice.value))
                         }
                     }
                     // Picking nothing is an answer too, where the agent said the
                     // question may go unanswered. Still one click (FR-040).
                     if !single.property.isRequired {
-                        answerButton(title: "No answer", description: nil, prominent: false) {
+                        answerButton(title: "No answer", description: nil, prominent: false,
+                                     index: single.choices.count) {
                             answer(single.property.name, with: .string(""))
                         }
                     }
                     // Not the same thing as answering with nothing, and the daemon
                     // already tells the two apart.
-                    answerButton(title: "No thanks", description: nil, prominent: false) {
+                    answerButton(title: "No thanks", description: nil, prominent: false,
+                                 index: single.choices.count + (single.property.isRequired ? 0 : 1)) {
                         Task { await model.answerElicitation(request, action: .decline) }
                     }
                 }
@@ -314,16 +324,27 @@ struct ElicitationView: View {
 
     /// Prominent for a real answer, plain for the two ways of not giving one — the
     /// same split `PermissionView` makes between an option that allows and one that
-    /// does not.
+    /// does not. Return takes the first prominent answer; ⌘1…n pick by position.
     @ViewBuilder
     private func answerButton(title: String, description: String?,
-                              prominent: Bool, choose: @escaping () -> Void) -> some View {
+                              prominent: Bool, index: Int = 0,
+                              choose: @escaping () -> Void) -> some View {
         if prominent {
             Button(action: choose) { answerLabel(title, description) }
                 .buttonStyle(.paperProminent)
+                .modifier(ElicitationNumberShortcut(index: index))
+                .background {
+                    if index == 0 {
+                        Button("") { choose() }
+                            .keyboardShortcut(.defaultAction)
+                            .opacity(0)
+                            .accessibilityHidden(true)
+                    }
+                }
         } else {
             Button(action: choose) { answerLabel(title, description) }
                 .buttonStyle(.paper)
+                .modifier(ElicitationNumberShortcut(index: index))
         }
     }
 
@@ -451,6 +472,20 @@ struct ElicitationView: View {
         guard case .form(let schema) = request.mode else { return }
         for property in schema.properties where values[property.name] == nil {
             if let value = property.defaultValue { values[property.name] = value }
+        }
+    }
+}
+
+/// ⌘1 through ⌘9 for the first nine answers; later ones are click-only.
+private struct ElicitationNumberShortcut: ViewModifier {
+    let index: Int
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if index < 9 {
+            content.keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
+        } else {
+            content
         }
     }
 }

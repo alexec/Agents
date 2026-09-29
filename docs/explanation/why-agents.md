@@ -27,10 +27,10 @@ They do not all do the same things; [Runtimes](../reference/runtimes.md) lists e
 
 ## It shows which agent needs you
 
-Every agent sits in one group: **Needs attention**, **Blocked**, **Waiting**,
-**Working**, **Complete**, **Stopped** or **Parked**. **Blocked** waits for you to carry
-it on; **Waiting** carries on by itself. When an agent ends its turn, it says in one
-sentence how it went. You can read the list and know what to open without reading any
+Every agent sits in one group: **Needs you**, **Waiting**, **Working**, **Done**,
+**Paused** or **Parked**. **Needs you** includes unread finished turns, questions,
+unresolved blocks and unexpected stops; **Waiting** carries on by itself. When an agent
+ends its turn, it says in one sentence how it went. You can read the list and know what to open without reading any
 conversation. See [Statuses and groups](../reference/statuses.md).
 
 ## You see the work, not just the chat
@@ -49,16 +49,16 @@ coloured down to the word. See [Read an agent's changes](../how-to/read-an-agent
 Agents take turns with what they share, wait for things to happen, and start when
 something happens, without you.
 
-Here is one afternoon. You asked Agents to watch your pull request. Its checks fail, and
-a [workflow](../reference/workflows.md), a Markdown file kept in the repository, starts an
-agent in that pull request's worktree. The agent needs the iOS simulator to reproduce the
-failure, but another agent is using it. So it asks for a [lease](leases.md), gets in line
+Here is one afternoon. An agent finishes a change, and a
+[workflow](../reference/workflows.md), a Markdown file kept in the repository, starts
+another agent to test it. The tester needs the iOS simulator to reproduce a failure, but
+another agent is using it. So it asks for a [lease](leases.md), gets in line
 and ends its turn. It spends nothing while it waits, and it is started again when the
 simulator is free.
 
-It reproduces the failure, fixes it and pushes to the branch. Then it
-[waits for the checks to pass](../how-to/wait-for-something.md). Its turn ends again, and
-nothing polls. When the checks pass, it is woken and told so. It publishes
+It reproduces the failure, fixes it and commits. Then it
+[waits for `main` to move](../how-to/wait-for-something.md) so it can rebase. Its turn
+ends again, and nothing polls. When `main` moves, it is woken and told so. It publishes
 `custom.release_ready`, and a release agent that was waiting for that event wakes up and
 starts on the release notes.
 
@@ -66,21 +66,15 @@ You were not asked for anything. The list shows each step as it happens.
 
 Each part can be used on its own:
 
-- **Pull requests, watched until they merge.** The project page lists your open pull
-  requests on GitHub. With one click, an agent steps in whenever one needs something: it
-  fixes a failing check, answers review comments and resolves conflicts, in the pull
-  request's own worktree, and pushes as you. It never force-pushes.
-  See [Have an agent watch a pull request](../how-to/watch-a-pull-request.md).
 - **Leases.** Agents take turns with anything only one of them should use at a time: a
   simulator, a browser, the screen, or anything an agent names. The Mac's Resources page
   shows who holds what, and you can end a lease.
   See [Leases on shared resources](leases.md).
-- **Events and waiting.** An agent can wait for a pull request's checks, another agent
-  finishing, a branch moving, the Mac waking, you coming back, or an event another agent
-  publishes. The Mac keeps a log of events, and the phone and iPad can read it.
+- **Events and waiting.** An agent can wait for another agent finishing, a branch
+  moving, the Mac waking, you coming back, or an event another agent publishes. The Mac keeps a log of events, and the phone and iPad can read it.
   See [Events](../reference/events.md).
 - **Workflows.** A workflow starts an agent on a schedule, such as every weekday at nine,
-  or on an event, such as an agent finishing or a check failing. It is a file beside your
+  or on an event, such as an agent finishing or a branch moving. It is a file beside your
   code, reviewed like code.
   See [Set up a workflow](../how-to/set-up-a-workflow.md).
 - **Agents that manage agents.** An agent can start up to five others, brief them, wait

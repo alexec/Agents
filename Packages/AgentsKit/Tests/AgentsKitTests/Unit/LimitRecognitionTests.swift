@@ -96,6 +96,33 @@ struct LimitRecognitionTests {
                                           runtimeID: "antigravity") == .none)
     }
 
+    @Test func antigravityUsageLimitInChatIsSpent() {
+        let body = "You have reached your current quota for this period. Your limit will reset in 5 days, 14 hours."
+        let full = "Usage Limit Reached\n\n" + body
+        #expect(LimitRecognition.classify(runtimeError: body, runtimeID: "antigravity") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(runtimeError: full, runtimeID: "antigravity") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(runtimeError: body, runtimeID: "claude") == .none)
+        #expect(RuntimeLaunchCatalog.antigravity.turnError(in: full)?.sentence == body)
+        #expect(RuntimeLaunchCatalog.antigravity.turnError(in: "I saw " + full) == nil)
+    }
+
+    @Test func copilotMonthlyQuotaIsSpentInEitherFailureChannel() {
+        let text = "You have exceeded your monthly quota (Request ID: captured)"
+        #expect(LimitRecognition.classify(runtimeError: text, runtimeID: "copilot") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(error: (-32603, "Error: " + text), runtimeID: "copilot") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(runtimeError: text, runtimeID: "claude") == .none)
+        #expect(LimitRecognition.classify(runtimeError: "An unrelated error", runtimeID: "copilot") == .none)
+        #expect(RuntimeLaunchCatalog.copilot.turnError(in: "I saw Error: " + text) == nil)
+    }
+
+    @Test func groksUsageBalanceExhaustedIsSpent() {
+        let message = "API error (status 402 Payment Required): Grok Build usage balance exhausted"
+        #expect(LimitRecognition.classify(error: (402, message), runtimeID: "grok") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(error: (-32603, message), runtimeID: "grok") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(error: (-32603, message), runtimeID: "claude") == .none)
+        #expect(LimitRecognition.classify(error: (-32603, "Internal error"), runtimeID: "grok") == .none)
+    }
+
     // MARK: Layer 3
 
     @Test func anythingElseIsNothing() {

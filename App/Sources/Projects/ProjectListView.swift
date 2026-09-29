@@ -121,11 +121,11 @@ struct ProjectListView: View {
                         }
                     }
                     Divider()
-                    Button("Add a server…") { isAddingServer = true }
+                    Button("Add Server…") { isAddingServer = true }
                 } label: {
                     Label("New project", systemImage: "plus")
                 }
-                .help("Add a folder, or clone a repository, as a project")
+                .help("Add Folder…, or Clone Git URL…, as a project")
             }
         }
         .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
@@ -135,8 +135,8 @@ struct ProjectListView: View {
         .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isAddingServer) { AddServerSheet().paperSheet() }
-        // File ▸ Add Project Folder…, Clone Repository… and Add Server…: the same
-        // sheets as the + menu, on this Mac.
+        // File ▸ Add Folder…, Clone Git URL… and Add Server…: the same sheets as the +
+        // menu, on this Mac.
         .onChange(of: requests.projectSheet) { _, sheet in
             guard let sheet else { return }
             requests.projectSheet = nil
@@ -162,7 +162,7 @@ struct ProjectListView: View {
 
     @ViewBuilder
     private func newProjectItems(on host: HostID) -> some View {
-        Button("Choose Folder…") {
+        Button("Add Folder…") {
             targetHost = host
             if model.isOnThisMac(host) { isChoosingFolder = true } else { isChoosingServerFolder = true }
         }
@@ -174,6 +174,11 @@ struct ProjectListView: View {
 
     @ViewBuilder
     private func menu(for summary: DaemonAPI.ProjectSummary) -> some View {
+        Button("Project Settings…") {
+            model.showProject(summary.key)
+            requests.projectSettings = .general
+        }
+        Divider()
         Button("Archive") {
             Task { await model.archiveProject(summary.key) }
         }
@@ -204,14 +209,14 @@ private struct ArchivedProjectRow: View {
                 }
             }
             Spacer()
-            Button("Unarchive") {
+            Button("Bring Back") {
                 Task { await model.unarchiveProject(summary.key) }
             }
             .buttonStyle(.link)
             .appText(.fine)
         }
         .contextMenu {
-            Button("Unarchive") {
+            Button("Bring Back") {
                 Task { await model.unarchiveProject(summary.key) }
             }
         }
@@ -241,9 +246,10 @@ private struct EmptyProjectList: View {
                 Text("A project is a folder you work in. Pick one and say what you want done.")
                     .foregroundStyle(.secondary)
                 HStack {
-                    Button("Add a folder") { isChoosingFolder = true }
-                        .buttonStyle(.borderedProminent)
-                    Button("Clone a Git URL") { isCloning = true }
+                    Button("Add Folder…") { isChoosingFolder = true }
+                        .buttonStyle(.paperProminent)
+                    Button("Clone Git URL…") { isCloning = true }
+                        .buttonStyle(.paper)
                 }
             }
         }
@@ -384,10 +390,16 @@ private struct WakefulnessRow: View {
     /// The sidebar already shows which agents are working; this row says only why
     /// the Mac is awake.
     private func detail(_ state: DaemonAPI.WakeState) -> String? {
-        state.isHolding ? nil : state.batteryPercent.map { "\($0)%" }
+        if state.isHolding, let until = state.graceUntil {
+            return WakeWords.untilLine(until)
+        }
+        return state.isHolding ? nil : state.batteryPercent.map { "\($0)%" }
     }
 
     private func help(_ state: DaemonAPI.WakeState) -> String {
+        if state.isHolding, let until = state.graceUntil {
+            return WakeWords.graceHelp(until)
+        }
         if state.isHolding {
             return "This Mac will not sleep while an agent is mid-turn."
         }

@@ -107,12 +107,12 @@ git init -q && git add -A && git commit -qm "First version"
 
 ## 3. Add it to Agents
 
-In the Agents window, click **Add a folder** in the empty project list (once you have
-projects, it is **+** at the top of the list, then **Choose Folder…**), and pick
+In the Agents window, click **Add Folder…** in the empty project list (once you have
+projects, it is **+** at the top of the list, then **Add Folder…**), and pick
 `weather-app` in your `Demo` folder.
 
-You should see `weather-app` in the list on the left, and its page beside it with
-**New session** at the top.
+You should see `weather-app` in the list on the left, and beside it an empty new session:
+the project's name in the middle, and the prompt at the bottom.
 
 ![The project page: New session, with the folder, the runtime (Claude) and the prompt](images/first-agent-02.png)
 
@@ -145,7 +145,7 @@ prompt, naming what it wants to do.
 Click **Yes**. It will ask two or three times: to read the files and run the tests, to
 edit `Forecast.swift`, and to run the tests again. Click **Yes** each time.
 
-While it waits for you, the project in the list says **Needs attention**. That is how
+While it waits for you, the project in the list says **Needs you**. That is how
 you know an agent wants you, even when you are looking at something else.
 
 ## 6. Read what it did
@@ -163,7 +163,7 @@ as *Commit the fix.* You can take it, change it, or ignore it.
 
 Click the back arrow at the top of the conversation.
 
-You should see the agent on the project's page under **Complete**, named for what it
+You should see the agent on the project's page under **Done**, named for what it
 did, with its summary under the name.
 
 ![The project page, with the finished agent under Complete](images/first-agent-05.png)

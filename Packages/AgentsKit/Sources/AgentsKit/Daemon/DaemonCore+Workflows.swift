@@ -25,6 +25,9 @@ extension DaemonCore {
         pruneWorkflowRuns()
         // After adoption, so every file already here is what gets approved as it stands.
         beginWorkflowApprovalsIfNeeded()
+        // And the projects' plugins, on the same terms (security review, S2).
+        beginPluginApprovalsIfNeeded()
+        beginMCPApprovalsIfNeeded()
         startWorkflowTicker()
         workflowsAreStarted = true
         // Whatever happened while this layer could not act, now, and in the order it
@@ -212,15 +215,9 @@ extension DaemonCore {
             awaitingApproval: waiting)
     }
 
-    /// Whether any run of it is in flight: its own, or one for any of its pull requests
-    /// (038 R9), whose keys are its id with `#<number>` after it.
+    /// Whether a run of it is in flight.
     func isRunning(_ workflow: Workflow) -> Bool {
-        workflowRuns.keys.contains { $0 == workflow.id || $0.hasPrefix(workflow.id + "#") }
-    }
-
-    /// What the in-flight table holds a run under.
-    func runKey(for workflow: Workflow, pullRequest: Int?) -> String {
-        pullRequest.map { "\(workflow.id)#\($0)" } ?? workflow.id
+        workflowRuns[workflow.id] != nil
     }
 
     /// Every workflow this daemon will act on, in the order the ceilings are applied:
@@ -345,13 +342,9 @@ extension DaemonCore {
 
         // Allowances whose time to come back has come, and grants past their date (052).
         settlePoolClocks(now: now)
+        checkDueAllowances(now: now)
         // Chats waiting for one of them (US4).
         await resumeAllowanceWaits(now: now)
-
-        // Pull requests that are due a look (038 R3), also above the guard: the first
-        // tick after a start is when a restarted daemon should catch up. It starts a
-        // sweep and returns; the sweep runs beside the clock, not on it.
-        sweepPullRequestsIfDue(now: now)
 
         // The day rolling over, noticed on the heartbeat that is already running
         // rather than on a timer of its own. `now` is the parameter this already
@@ -413,24 +406,9 @@ extension DaemonCore {
     @discardableResult
     func fire(_ workflow: Workflow, on trigger: WorkflowTrigger,
               triggeringAgentID: UUID? = nil, depth: Int = 0,
-              at now: Date = Date(), pullRequest: PullRequestFire? = nil,
+              at now: Date = Date(),
               causingEvent: EventPosition? = nil) async -> WorkflowRefusal? {
-        let key = runKey(for: workflow, pullRequest: pullRequest?.pull.number)
-        var triggeringAgentID = triggeringAgentID
-        if let pullRequest {
-            // Its own checks first, in R9's order: somewhere to work, babysitting not
-            // stopped, nothing uncommitted, nobody else working there.
-            if let refusal = await pullRequestRefusal(for: workflow, pullRequest) {
-                record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
-                notePullRequestOutcome(.refused(refusal, at: now, repeats: 1), workflow: workflow, pullRequest)
-                return refusal
-            }
-            // `triggering` resumes the agent last active in its worktree (FR-017).
-            if workflow.mode == .triggering, let worktree = pullRequest.pull.worktree {
-                triggeringAgentID = agents(in: worktree, folder: pullRequest.folder)
-                    .max { $0.lastActivityAt < $1.lastActivityAt }?.id
-            }
-        }
+        let key = workflow.id
         let records = workflowStore.load()
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
 
@@ -457,15 +435,12 @@ extension DaemonCore {
             folderExists: Self.isDirectory(workflow.folder),
             triggeringAgentIsUsable: triggeringAgentIsUsable) {
             record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
-            if let pullRequest {
-                notePullRequestOutcome(.refused(refusal, at: now, repeats: 1), workflow: workflow, pullRequest)
-            }
             return refusal
         }
 
         var run = WorkflowRun(workflowID: workflow.workflowID, folder: workflow.folder,
                               trigger: trigger, triggeringAgentID: triggeringAgentID,
-                              depth: depth, startedAt: now, pullRequest: pullRequest?.ref)
+                              depth: depth, startedAt: now)
         // Claimed before anything is awaited: starting a runtime is a long await, and
         // without this a second trigger arriving inside it sees no run in flight and
         // starts a second agent. The check above and this line have no await between
@@ -478,14 +453,11 @@ extension DaemonCore {
         broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
 
         do {
-            let agentID = try await runAgent(for: workflow, run: run, pullRequest: pullRequest)
+            let agentID = try await runAgent(for: workflow, run: run)
             run.agentID = agentID
             workflowRuns[key] = run
             persistWorkflowRuns()
             record(.ran(agentID: agentID, at: now), for: workflow, causingEvent: causingEvent, depth: depth)
-            if let pullRequest {
-                notePullRequestRan(agentID: agentID, at: now, workflow: workflow, pullRequest)
-            }
             return nil
         } catch let refused as SettingRefused {
             // Its own refusal, and not `.unreadable`: the file is perfectly readable,
@@ -497,28 +469,19 @@ extension DaemonCore {
             let refusal = WorkflowRefusal.settingRefused(setting: refused.setting,
                                                          detail: refused.detail)
             record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
-            if let pullRequest {
-                notePullRequestOutcome(.refused(refusal, at: now, repeats: 1), workflow: workflow, pullRequest)
-            }
             return refusal
         } catch {
             workflowRuns.removeValue(forKey: key)
             persistWorkflowRuns()
             let message = (error as? JSONRPCError)?.message ?? error.localizedDescription
             record(.refused(.unreadable(message), at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
-            if let pullRequest {
-                notePullRequestOutcome(.refused(.unreadable(message), at: now, repeats: 1),
-                                       workflow: workflow, pullRequest)
-            }
             return .unreadable(message)
         }
     }
 
     /// Which agent gets the prompt, and getting it to them.
-    private func runAgent(for workflow: Workflow, run: WorkflowRun,
-                          pullRequest: PullRequestFire? = nil) async throws -> UUID {
-        var prompt = promptText(for: workflow, run: run)
-        if let pullRequest { prompt += await pullRequestPromptBlock(for: workflow, pullRequest) }
+    private func runAgent(for workflow: Workflow, run: WorkflowRun) async throws -> UUID {
+        let prompt = promptText(for: workflow, run: run)
 
         switch workflow.mode {
         case .triggering:
@@ -532,9 +495,7 @@ extension DaemonCore {
         case .standing:
             var records = workflowStore.load()
             let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
-            // One standing agent for each pull request, living in its worktree (FR-017).
-            let standing = pullRequest.map { state?.standingAgentIDs[$0.pull.number] }
-                ?? state?.standingAgentID
+            let standing = state?.standingAgentID
             // A standing agent that is still here is picked back up. One that has gone
             // is replaced, and the replacement adopted, so a workflow whose agent was
             // archived last week is not dead — it simply starts again.
@@ -542,20 +503,16 @@ extension DaemonCore {
                 try await adoptAndPrompt(agentID: standing, prompt: prompt, workflow: workflow, run: run)
                 return standing
             }
-            let agentID = try await startAgent(for: workflow, run: run, prompt: prompt, pullRequest: pullRequest)
+            let agentID = try await startAgent(for: workflow, run: run, prompt: prompt)
             records = workflowStore.load()
             records.update(folder: workflow.folder, workflowID: workflow.workflowID) {
-                if let pullRequest {
-                    $0.standingAgentIDs[pullRequest.pull.number] = agentID
-                } else {
-                    $0.standingAgentID = agentID
-                }
+                $0.standingAgentID = agentID
             }
             workflowStore.save(records)
             return agentID
 
         case .new:
-            return try await startAgent(for: workflow, run: run, prompt: prompt, pullRequest: pullRequest)
+            return try await startAgent(for: workflow, run: run, prompt: prompt)
         }
     }
 
@@ -624,20 +581,14 @@ extension DaemonCore {
 
     /// Start a new agent for a workflow, as its file says, and mark it as the
     /// workflow's.
-    private func startAgent(for workflow: Workflow, run: WorkflowRun, prompt: String,
-                            pullRequest: PullRequestFire? = nil) async throws -> UUID {
-        var request = try await startRequest(settings: workflow.settings, folder: workflow.folder,
+    private func startAgent(for workflow: Workflow, run: WorkflowRun, prompt: String) async throws -> UUID {
+        let request = try await startRequest(settings: workflow.settings, folder: workflow.folder,
                                              prompt: prompt, managesAgents: true)
-        // A pull request's run works in its worktree, and is filed under the project as
-        // any agent in a worktree is (030). The project folder needs nothing extra.
-        if let worktree = pullRequest?.pull.worktree, !worktree.isProjectFolder {
-            request.worktree = .existing(worktree.checkout)
-        }
         let agentID = try await start(request)
         if var agent = agents[agentID] {
             agent.startedByWorkflow = workflow.workflowID
             agent.startedByRun = run.id
-            agent.title = pullRequest.map { "\(workflow.name) · #\($0.pull.number)" } ?? workflow.name
+            agent.title = workflow.name
             changed(agent)
         }
         return agentID
@@ -760,7 +711,7 @@ extension DaemonCore {
         }
     }
 
-    /// An event as the workflow row says it: "pull_request.merged #41".
+    /// An event as the workflow row says it: "workflow.completed workflow nightly".
     static func eventLabel(_ event: Event) -> String {
         EventPattern.matching(event).label
     }
@@ -854,9 +805,6 @@ extension DaemonCore {
         guard let (key, run) = runInFlight(for: agentID) else { return }
         workflowRuns.removeValue(forKey: key)
         persistWorkflowRuns()
-        // A pull request's run is over: look at it again soon, and fire then on any
-        // change that arrived while it ran (FR-014).
-        if run.pullRequest != nil { pullRequestRunEnded(in: run.folder) }
         if let workflow = workflow(run.workflowID, in: run.folder) {
             broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow))
         }
@@ -892,12 +840,6 @@ extension DaemonCore {
         guard let workflow = workflow(request.workflowID, in: request.folder) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(request.workflowID) in this project.")
-        }
-        // A pull-request workflow's run always has a pull request, and Run now names
-        // none (038 contract).
-        if workflow.onlyRespondsToPullRequests {
-            record(.refused(.noPullRequest, at: Date(), repeats: 1), for: workflow)
-            return summary(for: workflow)
         }
         await fire(workflow, on: .schedule(WorkflowSchedule()))
         return summary(for: workflow)
@@ -975,8 +917,9 @@ extension DaemonCore {
         }
 
         // A save through the app is the person's own change, so it is approved as it is
-        // written — but only if what it changed was approved already. Changing one
-        // setting on a file an agent wrote must not approve the rest of it unseen.
+        // written — but only if what it changed was approved already, and only from a
+        // control connection. A phone rewriting permission-mode on an approved file must
+        // not keep that approval (security review S6); the new text waits for the Mac.
         let before = workflowStore.load()
         let wasApproved = awaitingApproval(existing, state: before.state(folder: existing.folder,
                                                                          workflowID: existing.workflowID),
@@ -988,7 +931,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
                                message: "\(url.lastPathComponent) could not be written: \(error.localizedDescription)")
         }
-        if wasApproved {
+        if wasApproved, RequestConnection.role == .control {
             var records = workflowStore.load()
             approve(existing, digest: ContentDigest.sha256(Data(edited.utf8)), in: &records)
             workflowStore.save(records)
@@ -1028,7 +971,7 @@ extension DaemonCore {
             // Keyed as `Workflow.id` is, from a folder standardised the same way. The
             // record was standardised when it was written, but a file is only text.
             let folder = Project.standardize(run.folder)
-            workflowRuns[folder.path + "/" + run.runKey] = run
+            workflowRuns[folder.path + "/" + run.workflowID] = run
         }
     }
 

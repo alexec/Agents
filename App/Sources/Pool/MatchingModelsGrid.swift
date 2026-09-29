@@ -145,7 +145,7 @@ struct MatchingModelsGrid: View {
         .padding(.vertical, 5)
         .frame(minWidth: 130, alignment: .leading)
         .overlay(RoundedRectangle(cornerRadius: 6)
-            .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: label == nil ? [3, 3] : [])))
+            .strokeBorder(Paper.rule, style: StrokeStyle(lineWidth: 1, dash: label == nil ? [3, 3] : [])))
         .help(isGone ? "\(PoolWords.runtimeName(runtimeID)) no longer offers this model, so a switch treats it as empty" : "")
     }
 

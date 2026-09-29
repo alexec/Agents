@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "zeta": {
+      "source": "someone/zeta",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "00"
+    },
+    "alpha": {
+      "source": "./local/alpha",
+      "sourceType": "local",
+      "computedHash": "11"
+    }
+  },
+  "extra": true
+}

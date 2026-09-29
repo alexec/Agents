@@ -73,8 +73,8 @@ struct ContinueWithSheet: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(request.adjust ? "What “\(agent?.title ?? "this chat")” carried on with on \(to)"
-                                    : "Continue “\(agent?.title ?? "this chat")” with")
+                Text(request.adjust ? "What “\(agent?.title ?? "this session")” carried on with on \(to)"
+                                    : "Continue “\(agent?.title ?? "this session")” with")
                     .appText(.title).fontWeight(.semibold)
                 if !request.adjust {
                     Menu(to) {
@@ -141,7 +141,7 @@ struct ContinueWithSheet: View {
         .fixedSize()
         .appText(.reading)
         .padding(.horizontal, 10).padding(.vertical, 4)
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
+        .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control).strokeBorder(Paper.rule))
     }
 
     private var wontCarry: some View {
@@ -185,8 +185,8 @@ struct ContinueWithSheet: View {
                     }
                 }
             }
-            Text(holdingLevel.map { "Goes in “\($0.name)”, which already has this chat’s model." }
-                 ?? "Puts the model you pick beside this chat’s in a Matching models level.")
+            Text(holdingLevel.map { "Goes in “\($0.name)”, which already has this session’s model." }
+                 ?? "Puts the model you pick beside this session’s in a Matching models level.")
                 .appText(.fine).foregroundStyle(.secondary)
         }
     }

@@ -6,7 +6,7 @@ import SwiftUI
 /// The same reading and the same reach: the prompt as it will be sent, what is
 /// happening to it, what it may do, and the agents it has run. The same things change
 /// here as change there — the runtime, the permission mode, the model, the effort and
-/// the runtime's other options, Run now, and Archive or Restore — and the same things
+/// the runtime's other options, Run now, and Archive or Bring Back — and the same things
 /// do not. The prompt and the triggers are the author's, and are shown, not edited.
 ///
 /// Laid out as a column rather than the Mac's prompt-bar shape: three menus side by
@@ -118,15 +118,15 @@ struct WorkflowPage: View {
         }
     }
 
-    /// Run now, full width under the title where a thumb finds it, or Restore when it
-    /// is put away. Offered even on a workflow that cannot fire on its own: a refusal
+    /// Run now, full width under the title where a thumb finds it, or Bring Back when
+    /// it is put away. Offered even on a workflow that cannot fire on its own: a refusal
     /// says why, which is better than nothing happening.
     @ViewBuilder
     private func runButton(_ summary: WorkflowSummary) -> some View {
         Group {
             if summary.isArchived {
                 Button { Task { await model.setWorkflowArchived(summary, false) } } label: {
-                    Text("Restore").frame(maxWidth: .infinity)
+                    Text("Bring Back").frame(maxWidth: .infinity)
                 }
             } else {
                 Button { Task { await model.runWorkflow(summary) } } label: {

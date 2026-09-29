@@ -11,6 +11,8 @@ import SwiftUI
 struct SharedSettingsView: View {
     let snapshot: DaemonAPI.SharedSnapshot?
     @Binding var page: SharedPage
+    /// Read the snapshot again, after something was added from a catalogue (059).
+    var refresh: () async -> Void = {}
 
     var body: some View {
         Group {
@@ -33,10 +35,10 @@ struct SharedSettingsView: View {
     private func pageView(_ snapshot: DaemonAPI.SharedSnapshot) -> some View {
         switch page {
         case .overview: SharedOverviewPage(snapshot: snapshot, page: $page)
-        case .instructions: SharedInstructionsPage(snapshot: snapshot)
-        case .skills: SharedSkillsPage(snapshot: snapshot)
-        case .mcp: SharedServersPage(snapshot: snapshot)
-        case .plugins: SharedPluginsPage(snapshot: snapshot)
+        case .instructions: AgentsSetupPage { AgentsInstructionsSection(place: .you) }.task { await refresh() }
+        case .skills: AgentsSetupPage { AgentsSkillsSection(place: .you) }.task { await refresh() }
+        case .mcp: AgentsSetupPage { ProjectMCPSection(place: .you) }.task { await refresh() }
+        case .plugins: AgentsSetupPage { AgentsPluginsSection(place: .you) }.task { await refresh() }
         case .other: SharedOtherFilesPage(snapshot: snapshot)
         }
     }
@@ -51,7 +53,7 @@ enum SharedInk {
     static var attention: Color { StateTint.attention.color ?? .secondary }
 }
 
-enum SharedPage: Hashable {
+enum SharedPage: String, Hashable {
     case overview, instructions, skills, mcp, plugins, other
 
     init(_ page: DaemonAPI.Look.Page) {
@@ -204,10 +206,10 @@ struct SharedRow<Content: View>: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Paper.raised, in: RoundedRectangle(cornerRadius: 9))
-                .overlay(RoundedRectangle(cornerRadius: 9)
-                    .strokeBorder(chosen ? SharedInk.reach : Paper.rule, lineWidth: chosen ? 2 : 1))
-                .contentShape(RoundedRectangle(cornerRadius: 9))
+                .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.control))
+                .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control)
+                    .strokeBorder(chosen ? SharedInk.reach : .clear, lineWidth: chosen ? 2 : 0))
+                .contentShape(RoundedRectangle(cornerRadius: Paper.Radius.control))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

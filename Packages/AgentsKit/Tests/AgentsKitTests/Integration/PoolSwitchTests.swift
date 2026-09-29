@@ -10,10 +10,25 @@ struct PoolSwitchTests {
     private let claude = PoolEntry(runtimeID: "claude", payment: .allowance(label: "Max plan"))
     private let codex = PoolEntry(runtimeID: "codex", payment: .allowance(label: "ChatGPT plan"))
     private let copilot = PoolEntry(runtimeID: "copilot", payment: .allowance(label: nil))
+    private let antigravity = PoolEntry(runtimeID: "antigravity", payment: .allowance(label: nil))
+    private let grok = PoolEntry(runtimeID: "grok", payment: .allowance(label: nil))
 
     private func spent() throws -> FakeACPAgent.Script {
         var script = FakeACPAgent.Script()
         script.promptResultMeta = try SessionFailureDecodingTests.fixture("quota-exhausted")
+        return script
+    }
+
+    /// Captured from “hi Grok”, 2026-09-27: top-level Internal error, real refusal under data.
+    private func grokUsageBalanceExhausted() -> FakeACPAgent.Script {
+        var script = FakeACPAgent.Script()
+        script.promptError = JSONRPCError(
+            code: -32603,
+            message: "Internal error",
+            data: .object([
+                "http_status": .int(402),
+                "message": .string("API error (status 402 Payment Required): Grok Build usage balance exhausted"),
+            ]))
         return script
     }
 
@@ -29,6 +44,9 @@ struct PoolSwitchTests {
         let current = locations.tools.appendingPathComponent("codex/current", isDirectory: true)
         try FileManager.default.createDirectory(at: current, withIntermediateDirectories: true)
         try Data().write(to: current.appendingPathComponent("ok"))
+        let antigravityCurrent = locations.tools.appendingPathComponent("antigravity/current", isDirectory: true)
+        try FileManager.default.createDirectory(at: antigravityCurrent, withIntermediateDirectories: true)
+        try Data().write(to: antigravityCurrent.appendingPathComponent("ok"))
         discovery.macToolsHome = locations.tools.path
         let launcher = FakeLauncher(script: FakeACPAgent.Script(), then: scripts)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
@@ -47,6 +65,81 @@ struct PoolSwitchTests {
             (prompt.arrayValue ?? []).compactMap { $0["text"]?.stringValue ?? $0["resource"]?["text"]?.stringValue }
                 .joined(separator: "\n")
         }
+    }
+
+    @Test(.flakyUnderLoad) func copilotMonthlyQuotaInChatMovesToTheNextRuntime() async throws {
+        var script = FakeACPAgent.Script()
+        script.updates = ["Info: Disabled tools: list_agents, read_agent, task, write_agent", "Error: You have exceeded your monthly ", "quota (Request ID: E423:33BD0C:51E9CCB:612237C:6AB86604)"].map {
+            ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string($0)]]
+        }
+        let (core, work, launcher, _) = try await core([script], pool: [copilot, codex])
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "finish the change"))
+        await eventually("Copilot handed over to Codex") { await core.agent(id)?.runtimeID == "codex" }
+        await eventually("Codex answered") { await core.agent(id)?.endedReason == .endTurn }
+        #expect(launcher.launches.prefix(2).map(\.runtime) == ["copilot", "codex"])
+        #expect(await core.allowanceStates().contains { $0.credentialKey == "copilot:sign-in" && $0.isOut })
+        let switches = try await kinds(core, id).compactMap { if case .poolSwitch(let r) = $0 { r } else { nil } }
+        #expect(switches.count == 1)
+        #expect(switches.first?.reason == .allowanceSpent)
+        let next = try #require(launcher.allAgents.dropFirst().first)
+        let prompts = await promptText(next)
+        #expect(prompts.count == 1)
+        #expect(prompts.first?.contains("# Conversation so far") == true)
+        #expect(prompts.first?.contains("finish the change") == true)
+    }
+
+    @Test(.flakyUnderLoad) func antigravityUsageLimitInChatMovesToTheNextRuntime() async throws {
+        // Captured from “hi Antigravity”, 2026-09-27: title + body as one agent message, then end_turn.
+        var script = FakeACPAgent.Script()
+        script.updates = [[
+            "sessionUpdate": "agent_message_chunk",
+            "content": ["type": "text", "text": .string(
+                "Usage Limit Reached\n\nYou have reached your current quota for this period. Your limit will reset in 5 days, 14 hours.")],
+        ]]
+        let (core, work, launcher, _) = try await core([script], pool: [antigravity, codex])
+        let id = try await core.start(.init(runtimeID: "antigravity", cwd: work, prompt: "hi Antigravity"))
+        await eventually("Antigravity handed over to Codex") { await core.agent(id)?.runtimeID == "codex" }
+        await eventually("Codex answered") { await core.agent(id)?.endedReason == .endTurn }
+        #expect(launcher.launches.prefix(2).map(\.runtime) == ["antigravity", "codex"])
+        #expect(await core.allowanceStates().contains { $0.credentialKey == "antigravity:sign-in" && $0.isOut })
+        let switches = try await kinds(core, id).compactMap { if case .poolSwitch(let r) = $0 { r } else { nil } }
+        #expect(switches.count == 1)
+        #expect(switches.first?.reason == .allowanceSpent)
+    }
+
+    @Test(.flakyUnderLoad) func grokUsageBalanceExhaustedMovesToTheNextRuntime() async throws {
+        let (core, work, launcher, _) = try await core([grokUsageBalanceExhausted()], pool: [grok, codex])
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "hi Grok"))
+        await eventually("Grok handed over to Codex") { await core.agent(id)?.runtimeID == "codex" }
+        await eventually("Codex answered") { await core.agent(id)?.endedReason == .endTurn }
+        #expect(launcher.launches.prefix(2).map(\.runtime) == ["grok", "codex"])
+        #expect(await core.allowanceStates().contains { $0.credentialKey == "grok:sign-in" && $0.isOut })
+        let switches = try await kinds(core, id).compactMap { if case .poolSwitch(let r) = $0 { r } else { nil } }
+        #expect(switches.count == 1)
+        #expect(switches.first?.reason == .allowanceSpent)
+        let next = try #require(launcher.allAgents.dropFirst().first)
+        let prompts = await promptText(next)
+        #expect(prompts.count == 1)
+        #expect(prompts.first?.contains("hi Grok") == true)
+    }
+
+    @Test(.flakyUnderLoad) func copilotQuotaWithPoolOffStopsWithoutClaimingSuccess() async throws {
+        var script = FakeACPAgent.Script()
+        // Captured from “hi Copilot”, 2026-09-27: a notice and six refusals,
+        // each a separate chunk with no newline, followed by end_turn.
+        script.updates = (["Info: Disabled tools: list_agents, read_agent, task, write_agent"]
+            + Array(repeating: "Error: You have exceeded your monthly quota (Request ID: captured)", count: 6)).map {
+                ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string($0)]]
+            }
+        let (core, work, launcher, _) = try await core([script], pool: [copilot, codex], isOn: false)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        await eventually("the quota refusal stopped") { await core.agent(id)?.endedReason == .allowanceSpent }
+        #expect(await core.agent(id)?.state != .finished)
+        #expect(launcher.launchCount == 1)
+        #expect(await core.agent(id)?.outcomeAsked == false)
+        let entries = try await kinds(core, id)
+        #expect(!entries.contains { if case .stateChanged(.finished, _) = $0 { true } else { false } })
+        #expect(!entries.contains { if case .userMessage(_, _, .app) = $0 { true } else { false } })
     }
 
     @Test func aSpentAllowanceMovesTheChatWithItsConversation() async throws {
@@ -110,7 +203,7 @@ struct PoolSwitchTests {
         }
     }
 
-    @Test func anotherChatOnTheSpentRuntimeMovesBeforeItsNextTurn() async throws {
+    @Test(.flakyUnderLoad) func anotherChatOnTheSpentRuntimeMovesBeforeItsNextTurn() async throws {
         // The first chat's turn and the ask for its report work; the second finds Claude
         // spent and moves.
         let (core, work, launcher, _) = try await core([FakeACPAgent.Script(), FakeACPAgent.Script(), try spent()])
@@ -154,14 +247,15 @@ struct PoolSwitchTests {
         #expect(switches.map(\.to.runtimeID) == ["codex", "copilot"])
     }
 
-    @Test func everyoneOutStopsWithASentence() async throws {
+    @Test func everyoneOutWaitsWithASentence() async throws {
         let (core, work, _, _) = try await core([try spent(), try spent(), try spent()])
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        await eventually("it gave up") {
+        await eventually("it waits for a check") {
             (try? await kinds(core, id).contains {
-                if case .runtimeNote(let t) = $0 { t.hasPrefix("Every other runtime in the pool is out") } else { false }
+                if case .runtimeNote(let t) = $0 { t.hasPrefix("Every runtime in the pool is out. This chat waits") } else { false }
             }) == true
         }
+        #expect(await core.agent(id)?.allowanceWait != nil)
         #expect(await core.agent(id)?.endedReason == .allowanceSpent)
         #expect(await core.agent(id)?.state != .finished)
     }

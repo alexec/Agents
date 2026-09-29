@@ -23,7 +23,16 @@ final class WindowRequests {
     /// asks before the project page — and its prompt — exists.
     var wantsPromptFocus = false
 
+    /// Set to put the keyboard in the sessions column's search field.
+    var wantsSessionSearchFocus = false
+
+    /// The Project Settings pane showing, or nil while the sheet is shut (066). Set by
+    /// the toolbar, the project's context menu, the menu bar and the project's banner,
+    /// and taken down by the sheet's Done.
+    var projectSettings: ProjectSettingsPane?
+
     func focusPrompt() { wantsPromptFocus = true }
+    func focusSessionSearch() { wantsSessionSearchFocus = true }
 }
 
 /// The menu bar: every action the window offers on a button or a context menu, in
@@ -36,6 +45,9 @@ struct AgentsCommands: Commands {
     let model: AppModel
     let requests: WindowRequests
     let frame: SidebarFrame
+
+    /// Off unless asked for. The session draws thinking only while this is on.
+    @AppStorage(ThinkingDisplay.defaultsKey) private var showsThinking = false
 
     static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
 
@@ -51,15 +63,19 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("n", modifiers: [.command, .option])
                 .disabled(model.selectedProjectSummary == nil || !model.draftWorktrees.canMakeNew)
             Divider()
-            Button("Add Project Folder…") { requests.projectSheet = .chooseFolder }
+            Button("Add Folder…") { requests.projectSheet = .chooseFolder }
                 .keyboardShortcut("o")
-            Button("Clone Repository…") { requests.projectSheet = .clone }
+            Button("Clone Git URL…") { requests.projectSheet = .clone }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Add Server…") { requests.projectSheet = .addServer }
+                .keyboardShortcut("o", modifiers: [.command, .control])
             Divider()
             Button("Show in Finder") { showInFinder() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(folderForFinder == nil)
+            Button("Project Settings…") { requests.projectSettings = .general }
+                .keyboardShortcut(",", modifiers: [.command, .option])
+                .disabled(model.selectedProjectSummary == nil)
         }
 
         CommandGroup(after: .sidebar) {
@@ -70,7 +86,8 @@ struct AgentsCommands: Commands {
             ForEach(Array(SidebarPane.allCases.enumerated()), id: \.element) { index, pane in
                 Button(pane.title) { show(pane) }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
-                    .disabled(model.selectedAgent == nil || !inspectorFits)
+                    // Off while a question card is up: ⌘1…n answer that card instead.
+                    .disabled(model.selectedAgent == nil || !inspectorFits || answeringCard)
             }
             Divider()
             Button("Events") { model.showEvents() }
@@ -80,6 +97,7 @@ struct AgentsCommands: Commands {
             Button("Spending") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
             Button("Pool") { model.showsPool = true }
+                .keyboardShortcut("p", modifiers: [.command, .option])
             Divider()
             // A menu item rather than a shortcut on the button. The button only
             // exists while you are scrolled away from the end, which is precisely
@@ -87,7 +105,12 @@ struct AgentsCommands: Commands {
             Button("Jump to Latest") { model.scrollToEnd() }
                 .keyboardShortcut(.downArrow, modifiers: .command)
                 .disabled(model.selectedAgent == nil)
+            Toggle("Show Thinking", isOn: $showsThinking)
+                .disabled(model.selectedAgent == nil)
             Divider()
+            Button("Find Session") { requests.focusSessionSearch() }
+                .keyboardShortcut("f")
+                .disabled(model.selectedProjectSummary == nil)
         }
 
         CommandMenu("Session") {
@@ -126,6 +149,7 @@ struct AgentsCommands: Commands {
             Button("Next Needing Attention") { nextNeedingAttention() }
                 .keyboardShortcut("j")
                 .disabled(needingAttention.isEmpty)
+                .help("Needs attention or Blocked")
             Divider()
             ForEach(Array(projectsInListOrder.prefix(9).enumerated()), id: \.element.key) { index, summary in
                 Button(summary.name) { model.showProject(summary.key) }
@@ -198,13 +222,16 @@ struct AgentsCommands: Commands {
 
     private func archive() {
         guard let agent = model.selectedAgent, agent.state != .archived else { return }
-        Task {
-            await model.archive(agent.id)
-            if model.selection == agent.id { model.selection = nil }
-        }
+        Task { await model.archive(agent.id, andLeave: true) }
     }
 
     // MARK: Go
+
+    /// A permission or elicitation card is on the open chat: ⌘1…n belong to its
+    /// answers, not to the inspector panes.
+    private var answeringCard: Bool {
+        !model.permissionsForSelection.isEmpty || model.elicitationForSelection != nil
+    }
 
     /// The project list's order: this Mac's projects, then each server's (037).
     private var projectsInListOrder: [DaemonAPI.ProjectSummary] {
@@ -231,9 +258,11 @@ struct AgentsCommands: Commands {
         model.openAgent(ids[next])
     }
 
-    /// Every session waiting on the person, project by project in the list's order.
+    /// Every session needing the person, project by project in the list's order.
     private var needingAttention: [UUID] {
-        projectsInListOrder.flatMap { model.agents(in: $0.key, group: .needsAttention) }.map(\.id)
+        projectsInListOrder.flatMap { summary in
+            model.agents(in: summary.key, group: .needsAttention)
+        }.map(\.id)
     }
 
     /// The one after the chat that is open, round to the first; so pressing it again

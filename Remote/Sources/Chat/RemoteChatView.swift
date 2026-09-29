@@ -132,7 +132,7 @@ struct RemoteChatView: View {
                         Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
                     }
                     .disabled(model.isStale)
-                    .accessibilityHint("Tells it the block has cleared, and lets it carry on")
+                    .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
                 }
             }
             if let agent, model.canStop(agent) {
@@ -157,7 +157,7 @@ struct RemoteChatView: View {
                         Label("Archive", systemImage: "archivebox")
                     }
                     .disabled(model.isStale)
-                    .accessibilityHint("Archives this chat and goes back to the project")
+                    .accessibilityHint("Archives this session and goes back to the project")
                 }
             }
             if let agent {
@@ -188,12 +188,20 @@ struct RemoteChatView: View {
     /// a large text size is a row of truncated words.
     private var form: some View {
         VStack(spacing: 12) {
-            if let request = model.questionForSelection {
-                // A fresh sheet per question, so a tap in flight on the last one is not
-                // carried over to the next.
-                PermissionSheet(request: request)
-                    .id(request.id)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            if !model.questionsForSelection.isEmpty {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(model.questionsForSelection) { request in
+                            // A fresh sheet per question, so a tap in flight on the last one is not
+                            // carried over to the next.
+                            PermissionSheet(request: request)
+                                .id(request.id)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                }
+                .frame(maxHeight: 300)
+                .fixedSize(horizontal: false, vertical: true)
             } else if let form = model.formForSelection {
                 ElicitationSheet(request: form)
                     .id(form.id)
@@ -210,7 +218,7 @@ struct RemoteChatView: View {
     }
 
     private var isQuestionUp: Bool {
-        model.questionForSelection != nil || model.formForSelection != nil
+        !model.questionsForSelection.isEmpty || model.formForSelection != nil
     }
 
     /// What the shared chat rows mean on a phone. A file a tool call touched opens as it
@@ -276,7 +284,7 @@ private struct ChatMenu: View {
             }
             if agent.state == .archived {
                 Divider()
-                Button("Bring back", systemImage: "tray.and.arrow.up") {
+                Button("Bring Back", systemImage: "tray.and.arrow.up") {
                     Task { await model.unarchive(agent.id) }
                 }
                 .disabled(model.isStale)

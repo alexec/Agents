@@ -32,10 +32,11 @@ each of these things: its own.
 ## What the app offers instead
 
 The app gives each agent a small set of tools of its own. With them an agent can say how
-its turn went, show you a file, suggest what you might say next, start and stop other
-agents in the project, set up a workflow, take a turn on a shared resource, and work on a
-pull request. Everything these tools do shows up in the window and on your phone. The
-[Reference](../reference/index.md) lists them all.
+its turn went, show you a file, suggest what you might say next, start, stop and park
+other agents in the project, set up a workflow, take a turn on a shared resource, wait
+for an event or publish one, and move into a worktree and back.
+Everything these tools do shows up in the window and on your phone. The
+[tools reference](../reference/agent-tools.md) lists them all.
 
 Every runtime gets them. Copilot takes no MCP server it would have to start itself, so the
 app runs its own tools for it and hands them to Copilot over a local http address that
@@ -74,11 +75,15 @@ each one has.
   subagents. Two of its tools, `workflow` and `monitor`, cannot be removed this way, so the
   agent is told in its briefing not to use them. Grok keeps its question tool too, but
   that tool has no way to reach the app, so Grok asks by ending its turn with the question
-  as its summary, and waits for your reply.
+  as its summary, and waits for your reply. Grok also hides this app's own tools behind a
+  search, so each Grok session is handed those tools by name, with their arguments, and
+  told to call them directly.
 - **Copilot** takes options when it starts. It loses its subagents and its session store,
   and the app does not attach Copilot's built-in MCP servers to its sessions.
 - **Cursor** has no way to take a tool away. Its three conflicting tools stay, and the
-  agent's briefing names them and says what to use instead.
+  agent's briefing names them and says what to use instead. The first briefing points
+  Cursor directly to the Agents app's MCP tools, whose schemas are available from the
+  server.
 - **Codex** takes feature switches in a variable set only for the sessions the app starts.
   It loses its sleep tool, its long-running goals, its automations, its memories and its
   ChatGPT connectors. Its sub-agents are switched on, and the app shows them as it does
@@ -99,5 +104,8 @@ every tool it always had, with your own settings, schedules and connectors.
 
 ## Related
 
-- [How-to guides](../how-to/index.md), for signing a runtime in and setting up workflows.
-- [Reference](../reference/index.md), for the runtimes and the tools the app gives agents.
+- [Tools the app gives agents](../reference/agent-tools.md), for the full list.
+- [Events](../reference/events.md), for what an agent can wait on and publish.
+- [Sign a runtime in](../how-to/sign-a-runtime-in.md) and
+  [Set up a workflow](../how-to/set-up-a-workflow.md).
+- [Runtimes](../reference/runtimes.md), for what each runtime keeps and loses.

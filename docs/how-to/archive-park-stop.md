@@ -11,8 +11,8 @@ Three ways to put an agent down, each keeping its whole conversation:
 - **Stop** ends what it is doing now. The chat stays where it is, and you can tell it what
   to do next.
 - **Park** puts a chat you have finished with *for now* in its own group, to come back to.
-- **Archive** puts away a chat you are done with. It folds out of sight, and can be
-  brought back.
+- **Archive** puts away a chat you are done with. It folds out of sight under **Archived**.
+  Any of them can be brought back.
 
 ## Before you start
 
@@ -57,8 +57,8 @@ Three ways to put an agent down, each keeping its whole conversation:
 2. If the agent worked in a worktree the app made, and everything there is committed,
    archiving also removes the worktree. See
    [Start an agent in its own worktree](start-in-a-worktree.md).
-3. To bring it back, open **Archived** on the project's page, then right-click the card
-   and choose **Bring back**. On iPhone and iPad, open it and choose **Bring back** from
+3. To bring it back, open **Archived**, then right-click the card and choose **Bring Back**.
+   On iPhone and iPad, open **Archived**, open the chat, and choose **Bring Back** from
    the **Actions** menu.
 
 **What each keeps**
@@ -70,7 +70,7 @@ Three ways to put an agent down, each keeping its whole conversation:
 | Asks for your attention | No | Never | Never |
 | Worktree | Kept | Kept | Removed if everything in it is committed |
 | Afterwards | | | Retired after 30 days, or sooner when archived agents take more than 2 GB |
-| Comes back by | Sending a prompt | Sending a prompt, or **Unpark** | **Bring back** |
+| Comes back by | Sending a prompt | Sending a prompt, or **Unpark** | **Bring Back** |
 
 ## How long archived chats are kept
 
@@ -87,7 +87,7 @@ take up to **2 GB** between them; past that, the ones archived longest ago are r
 - To keep a chat, bring it back, or park it instead of archiving it. Only archived chats are
   ever retired.
 - To retire one now, right-click its card under **Archived** and choose **Retire Now…**.
-- To change how long and how much, or to keep archived chats forever, see **Settings ▸ Agents ▸
+- To change how long and how much, or to keep archived chats forever, see **Settings ▸ Appearance ▸
   Archived agents** in the [settings reference](../reference/settings.md).
 
 Retiring deletes only what Agents keeps. It never touches your files, your commits, or the

@@ -177,8 +177,6 @@ public struct EventState: Codable, Hashable, Sendable {
     public var nextPosition: EventPosition = 1
     /// Project folder path → branch → commit, as last seen.
     public var branchTips: [String: [String: String]] = [:]
-    /// Project folder path → the viewer's open pull requests, as last seen.
-    public var pullRequestsSeen: [String: [SeenPullRequest]] = [:]
     /// Agent id → when it published, over the last hour.
     public var publishes: [String: [Date]] = [:]
     /// Day ("2026-09-25") → the limits already said to be reached that day.
@@ -187,22 +185,3 @@ public struct EventState: Codable, Hashable, Sendable {
     public init() {}
 }
 
-/// A pull request as the last refresh saw it: enough to tell what changed.
-public struct SeenPullRequest: Codable, Hashable, Sendable {
-    public var number: Int
-    public var title: String
-    public var checks: String
-    public var review: String
-    public var conflicts: String
-    public var lastCommentAt: Date?
-
-    public init(number: Int, title: String, checks: String, review: String, conflicts: String,
-                lastCommentAt: Date?) {
-        self.number = number
-        self.title = title
-        self.checks = checks
-        self.review = review
-        self.conflicts = conflicts
-        self.lastCommentAt = lastCommentAt
-    }
-}

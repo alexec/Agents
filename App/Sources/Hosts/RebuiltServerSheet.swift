@@ -37,14 +37,14 @@ struct RebuiltServerSheet: View {
             .appText(.fine)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
             if let problem {
                 Text(problem).appText(.fine).tinted(.failure)
             }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { close() }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(.cancelAction)
                 Button("This server was rebuilt", role: .destructive) { rebuilt() }
                     .disabled(fetched == nil || working)
             }

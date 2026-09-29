@@ -37,10 +37,15 @@ struct AgentsApp: App {
         // A scene rather than a page beside Spending, which Spending itself is not:
         // that one is read-only by construction, and a limit is the one number in
         // this app a person types.
+        // Opens at one size for every pane. The view's minimum is that size, so
+        // the window can be dragged larger and not smaller. The grow box itself
+        // is added in `SettingsGrowBox`: this scene does not put one on.
         Settings {
             SettingsWindow()
                 .paperGround()
                 .environment(model)
         }
+        .defaultSize(width: SettingsWindow.size.width, height: SettingsWindow.size.height)
+        .windowResizability(.contentMinSize)
     }
 }

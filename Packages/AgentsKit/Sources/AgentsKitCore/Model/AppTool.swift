@@ -23,15 +23,25 @@ public enum AppTool {
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
-    // Four more that act on other agents (028): start one in this project, and stop,
-    // archive or list the ones this agent started. Never offered to an agent another
-    // agent started.
+    /// Ask the person a question or a short form and wait for the answer. The
+    /// fallback for runtimes whose own ask tool never reaches the model, and the
+    /// only channel on runtimes that have none. Named `ask_form` rather than
+    /// `ask_question` so it does not collide with Antigravity's own tool.
+    public static let askForm = "ask_form"
+
+    // Four that act on other agents (028): start one in this project, and stop, park
+    // or list the ones this agent started. archive_agent is still a name a transcript
+    // or older conversation may carry, but it is no longer offered — only the person
+    // archives. Never offered to an agent another agent started.
 
     /// Start an agent in the caller's own project.
     public static let startAgent = "start_agent"
 
     /// Stop an agent the caller started.
     public static let stopAgent = "stop_agent"
+
+    /// Park an agent the caller started, to come back to later.
+    public static let parkAgent = "park_agent"
 
     /// Archive an agent the caller started, which gives its place back.
     public static let archiveAgent = "archive_agent"
@@ -66,15 +76,6 @@ public enum AppTool {
     /// Say that something happened, as a `custom.` event.
     public static let publishEvent = "publish_event"
 
-    // Two that act on GitHub for a run a pull-request trigger started (038), and only
-    // on that pull request: the daemon fixes the destination from the run.
-
-    /// Push the worktree's commits to the pull request's own branch. Never forced.
-    public static let pushPullRequest = "push_pull_request"
-
-    /// Reply to a review comment on that pull request, or comment on it.
-    public static let replyOnPullRequest = "reply_on_pull_request"
-
     // Two for moving this agent itself (053), shaped like Claude Code's own worktree
     // tools, which are taken away. Offered to every agent: moving yourself is not
     // managing anyone. Neither name ends with another tool's name.
@@ -102,9 +103,9 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, startAgent, stopAgent, archiveAgent, listMyAgents,
-        leaseResource, releaseResource, listResources, waitForEvent, cancelWait, publishEvent,
-        pushPullRequest, replyOnPullRequest, suggestPrompts, reportOutcome,
+        finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
+        archiveAgent, listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
+        cancelWait, publishEvent, suggestPrompts, reportOutcome,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

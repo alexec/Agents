@@ -193,8 +193,8 @@ struct EventWaitTests {
         #expect(answer.contains("you can end your turn"))
         #expect(await isWaiting(core, a))
         #expect(await core.eventLog.events.contains { $0.name == "agent.blocked" && $0.details["agent"] == a.uuidString })
-        try await eventually("turn over, Waiting") {
-            await core.agents[a]?.group(wantsEyes: false) == .waiting
+        try await eventually("turn over, unread under Needs you") {
+            await core.agents[a]?.group(wantsEyes: false) == .needsAttention
         }
 
         await core.raise(draft("custom.ping", in: work))
@@ -282,11 +282,11 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock())
         let (_, token) = try await agent(core, in: work, "Careless")
-        let unknown = await refusal { _ = try await wait(core, token, ["pull_request.merge"]) }
+        let unknown = await refusal { _ = try await wait(core, token, ["workflow.complete"]) }
         #expect(unknown?.code == DaemonAPI.Failure.eventRefused)
-        #expect(unknown?.message.contains("Did you mean pull_request.merged?") == true)
-        let filter = await refusal { _ = try await wait(core, token, ["pull_request.merged"], where: ["branch": "x"]) }
-        #expect(filter?.message == "pull_request.merged carries number; \"branch\" is not one of its details.")
+        #expect(unknown?.message.contains("Did you mean workflow.completed?") == true)
+        let filter = await refusal { _ = try await wait(core, token, ["branch.moved"], where: ["number": "x"]) }
+        #expect(filter?.message == "branch.moved carries branch, from, to; \"number\" is not one of its details.")
         for minutes in [0, 1441] {
             let deadline = await refusal { _ = try await wait(core, token, ["mac.wake"], until: minutes) }
             #expect(deadline?.message == EventWords.badDeadline())
@@ -385,14 +385,14 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: clock, hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Durable")
-        _ = try await wait(core, token, ["pull_request.merged"], where: ["number": "44"])
+        _ = try await wait(core, token, ["branch.moved"], where: ["branch": "main"])
         let head = await core.eventLog.head
         for _ in 0..<20 {
             let again = try await makeCore(locations, clock: clock)
             _ = await again.recover()
             await again.resumeEventWaitsAfterRestart()
             #expect(await again.agents[a]?.eventWait?.isOpen == true)
-            #expect(await again.agents[a]?.eventWait?.patterns == [EventPattern("pull_request.merged", filters: ["number": "44"])])
+            #expect(await again.agents[a]?.eventWait?.patterns == [EventPattern("branch.moved", filters: ["branch": "main"])])
             #expect(await again.isHoldingAgents, "a wait keeps the daemon up")
         }
         let last = try await makeCore(locations, clock: clock)

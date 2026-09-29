@@ -1,0 +1,95 @@
+{
+  "_comment": "computedHash/order from specs/059-marketplace/walk/golden.mjs (the skills CLI 1.7.0 algorithm); treeSHA/blobs from git write-tree (tasks T003, T004).",
+  "fixtures": {
+    "plain": {
+      "computedHash": "78ef87c7a555cb29115f8f0d30c55dfb2abd7813e7d60753761e3a2ecd234941",
+      "localeOrder": [
+        "notes.md",
+        "SKILL.md"
+      ],
+      "treeSHA": "23d62e67393a5c2fea8e704ecd9d15f6541312c8",
+      "blobs": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha": "080f5c1fbc4d6e7c60c69a6edf98725e1b4b4377"
+        },
+        "notes.md": {
+          "mode": "100644",
+          "sha": "3179e6878308c0ade0b91e4871855756bfb11ed2"
+        }
+      }
+    },
+    "mixed": {
+      "computedHash": "f8db70f9696e8f2ebce45a4d81dbcc06d69da2d1a5706490682ac67008e53df5",
+      "localeOrder": [
+        "a_b.md",
+        "a-b.md",
+        "alpha.md",
+        "README.md",
+        "SKILL.md",
+        "Zeta.md"
+      ],
+      "treeSHA": "1f465f7626044af9e6d9499aa736c67f140c3283",
+      "blobs": {
+        "README.md": {
+          "mode": "100644",
+          "sha": "f228a542d2057b193eb09694c011d3ddf5f34df0"
+        },
+        "SKILL.md": {
+          "mode": "100644",
+          "sha": "84e95cc687b2ee3a29f7da37fa09457b2238f1fa"
+        },
+        "Zeta.md": {
+          "mode": "100644",
+          "sha": "2c5ab93ecbd9988bc3ccb16481f155f8a80cada4"
+        },
+        "a-b.md": {
+          "mode": "100644",
+          "sha": "3da6d4113f06d92608c1f7c89ad6da36fe26d4ff"
+        },
+        "a_b.md": {
+          "mode": "100644",
+          "sha": "1c090f0491c7d2c4ab25135f327b017e1e3d4f35"
+        },
+        "alpha.md": {
+          "mode": "100644",
+          "sha": "a22bab1bf9f9f8e80d1720a998593fba515ebe02"
+        }
+      }
+    },
+    "nested": {
+      "computedHash": "43d79cc2b2a7065d4f3f4cc5ae35447d31c5b22469dcee4c35395c2c09d0ac0e",
+      "localeOrder": [
+        "assets/logo.png",
+        "references/x.md",
+        "scripts/lint.sh",
+        "SKILL.md"
+      ],
+      "treeSHA": "b4146b99df32f406302cf36ff69949f3b394ea01",
+      "blobs": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha": "61bf29e7dc8201d7a1cc4e5d4389d3005e5efd10"
+        },
+        "assets/logo.png": {
+          "mode": "100644",
+          "sha": "f4ed4802f5c80cecfab9a3c7013b3e67175234e9"
+        },
+        "references/x.md": {
+          "mode": "100644",
+          "sha": "c9390fb44289b57bf092ad907513df2d75630dce"
+        },
+        "scripts/lint.sh": {
+          "mode": "100755",
+          "sha": "93041e3e77cf2519692a7b0515ea438f15397d79"
+        }
+      }
+    }
+  },
+  "real": {
+    "repo": "avdlee/swiftui-agent-skill",
+    "commit": "b24e68a965dc4b5bd2cc41dc60c094a26a9379ce",
+    "folder": "skills/swiftui-expert-skill",
+    "treeSHA": "4b58ee6b6270e512f22054e0eb7e0d719b43128d"
+  }
+}

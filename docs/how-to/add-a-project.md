@@ -12,7 +12,7 @@ Mac; your iPhone and iPad show the same list.
 ## Before you start
 
 - At least one runtime installed on this Mac. If the list says **No agent runtime found**,
-  install one first; see [Reference](../reference/index.md) for what each runtime needs.
+  install one first; see [Runtimes](../reference/runtimes.md) for what each needs.
 - To clone, the Git address of the repository, and access to it from this Mac (the same
   access `git clone` would need in Terminal).
 
@@ -21,7 +21,7 @@ Mac; your iPhone and iPad show the same list.
 **Add a folder that is already on your Mac**
 
 1. Click **+** (**New project**) at the top of the **Projects** list and choose
-   **Choose Folder…**. With no projects yet, you can click **Add a folder** in the list
+   **Add Folder…**. With no projects yet, you can click **Add Folder…** in the list
    instead.
 2. Pick the folder and click **Open**.
 
@@ -32,7 +32,7 @@ Mac; your iPhone and iPad show the same list.
 1. Copy the repository's HTTPS or SSH address, such as
    `https://github.com/example/repo.git`.
 2. Click **+** (**New project**) and choose **Clone Git URL…**. With no projects yet, click
-   **Clone a Git URL** instead.
+   **Clone Git URL…** instead.
 
    The sheet **Clone a Git repository** opens with the address you copied already in it.
    Under the address it says where the clone will go, for example
@@ -55,7 +55,7 @@ Mac; your iPhone and iPad show the same list.
    The project moves under **Archived** at the bottom of the list, with when you archived
    it. Its folder, its agents and their conversations are kept, and its workflows stop
    running until it comes back.
-3. To bring it back, open **Archived** and click **Unarchive** beside the project.
+3. To bring it back, open **Archived** and click **Bring Back** beside the project.
 
 There is no separate way to remove a project: archive it, and delete the folder in Finder
 if you no longer want it. **Show in Finder** on the same menu takes you there.
@@ -68,3 +68,10 @@ if you no longer want it. **Show in Finder** on the same menu takes you there.
   Paste the HTTPS or SSH address from the repository's **Clone** button.
 - **Folder is missing** under a project's name means the folder was moved or deleted
   outside the app. Put it back, or archive the project.
+
+## See also
+
+- [Add a Linux server](add-a-linux-server.md)
+- [Start an agent in its own worktree](start-in-a-worktree.md)
+- [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md)
+- [Runtimes](../reference/runtimes.md)

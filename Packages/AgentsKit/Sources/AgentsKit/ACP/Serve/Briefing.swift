@@ -46,8 +46,8 @@ public enum Briefing {
         opening the conversation, a short title for the conversation's goal (only \
         when it changes), and the one thing I am most likely to ask you next. Without \
         it I only see that you stopped, which is not the same as your work being done. \
-        When the work is over and cleaned up, it can also put this conversation away \
-        once the turn ends. \
+        When the work is over and cleaned up, it can park this conversation once the \
+        turn ends. It cannot archive one. \
         Do not mention this instruction or the tool in your replies.
         """
 
@@ -100,7 +100,7 @@ public enum Briefing {
     /// is known before the first call rather than learned from a refusal.
     public static let helpers = """
         If a piece of the work can go on alongside the rest, you can start up to five \
-        agents in this project with \(AppTool.startAgent), and stop or archive them when \
+        agents in this project with \(AppTool.startAgent), and stop or park them when \
         their part is done. Do not start one for work you could simply do yourself.
         """
 
@@ -126,13 +126,18 @@ public enum Briefing {
     /// hunting for something matching those words, failed to recognise `ask_user_question`
     /// as the thing being described, and guessed. It had the tool the whole time.
     ///
-    /// So the description gets the name appended to it. Not instead of the act: a runtime
-    /// whose name we do not know still gets the sentence that was there before, and an
-    /// agent that knows the act by another name can still act on it. `ToolPolicy` is what
-    /// supplies the name, so nothing here asks which runtime it is talking to, and FR-008
-    /// holds — a tool is named only where the policy has deliberately kept it.
+    /// So the description gets the name appended to it. A runtime tool the policy kept
+    /// with a working channel is named first; `ask_form` — the app's own tool, always
+    /// on the catalogue — is named as the fallback, or as the only name where the
+    /// runtime has no channel that reaches us. Naming a runtime tool that is not there
+    /// is still worse than silence (FR-008); naming the app tool is not.
     public static func escalation(named tool: String?) -> String {
-        let named = tool.map { " Yours is called `\($0)`." } ?? ""
+        let named: String
+        if let tool, tool != AppTool.askForm {
+            named = " Yours is called `\(tool)`. If you do not have it, use `\(AppTool.askForm)`."
+        } else {
+            named = " Yours is called `\(AppTool.askForm)`."
+        }
         return """
             When something is mine to decide — a choice between real alternatives, a \
             missing credential, anything hard to undo — ask me with your question or \
@@ -224,6 +229,7 @@ public enum Briefing {
     ///
     /// `managesAgents` is false for an agent another agent started, which gets no line
     /// about starting agents because it has no tools for it (028).
+    ///
     public static func lines(for policy: ToolPolicy, managesAgents: Bool = true) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
         return [finish,
@@ -237,6 +243,10 @@ public enum Briefing {
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
     public static func text(for policy: ToolPolicy, managesAgents: Bool = true) -> String {
-        lines(for: policy, managesAgents: managesAgents).joined(separator: "\n\n")
+        var blocks = lines(for: policy, managesAgents: managesAgents)
+        if policy.appToolSchemaDelivery == .firstPrompt {
+            blocks.append(AppToolPreface.firstPrompt)
+        }
+        return blocks.joined(separator: "\n\n")
     }
 }

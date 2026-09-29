@@ -13,7 +13,8 @@ an agent finishes.
 ## Before you start
 
 - A project with a runtime that works in it. See [Add a project](add-a-project.md).
-- For the full list of triggers and settings, see [Reference](../reference/index.md).
+- For the full list of triggers and settings, see
+  [Workflow triggers and actions](../reference/workflows.md).
 
 ## Steps
 
@@ -46,8 +47,8 @@ an agent finishes.
 
    - `on` is what makes it run. Besides `agent-finished` there are `agent-stopped`,
      `agent-asked-permission`, `agent-asked-form`, `workflow-completed`, a `schedule`
-     (on the hour or half hour, with optional hours and days), and the pull request
-     triggers in [Have an agent watch a pull request](watch-a-pull-request.md).
+     (on the hour or half hour, with optional hours and days), and any name on
+     [Events](../reference/events.md).
    - `agent` is who gets the prompt: `new` starts a fresh agent every time, `standing`
      keeps one agent for this workflow and prompts it again each time, and `triggering`
      prompts the agent that set it off.
@@ -86,7 +87,7 @@ were approved as they stood.
 
 - Archive it: on the Mac, swipe the row left with two fingers, right-click it and choose
   **Archive**, or click **Archive** on its page. It stays listed under **Archived** and
-  does not run until you click **Restore**. The file is kept.
+  does not run until you click **Bring Back**. The file is kept.
 - To remove it for good, delete its file. **Show in Finder** on the row's menu finds it.
 
 ## If it doesn't work
@@ -108,3 +109,9 @@ A workflow that did not run says why on its row and its page, for example:
   know. Check the spelling.
 - A line naming a problem with the file itself, such as **The metadata does not say what
   makes this run**. Fix the file; the page updates as soon as it is saved.
+
+## See also
+
+- [Workflow triggers and actions](../reference/workflows.md)
+- [Events](../reference/events.md)
+- [Have an agent wait for something](wait-for-something.md)

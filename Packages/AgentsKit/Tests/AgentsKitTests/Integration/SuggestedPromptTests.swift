@@ -65,6 +65,12 @@ struct SuggestedPromptTests {
         // transport is unstable and none of the three advertise it.
         #expect(attached.first?["command"]?.stringValue != nil)
         #expect(attached.first?["args"]?.arrayValue?.first?.stringValue == "mcp")
+        // Token is in the environment, not on argv (S7).
+        let args = attached.first?["args"]?.arrayValue?.compactMap(\.stringValue) ?? []
+        #expect(args == ["mcp"])
+        let env = attached.first?["env"]?.arrayValue ?? []
+        let token = env.first { $0["name"]?.stringValue == DaemonCore.mcpTokenVariable }?["value"]?.stringValue
+        #expect(token != nil && !(token?.isEmpty ?? true))
     }
 
     /// The gap this found: servers the user attached were recorded against the agent
@@ -121,8 +127,7 @@ struct SuggestedPromptTests {
     /// The token the runtime was given is minted before the agent exists, and means
     /// something only once the start has made one.
     private func token(_ core: DaemonCore, _ launcher: FakeLauncher) async -> String {
-        let attached = servers(in: await launcher.lastAgent?.newSessionParams)
-        return attached.first?["args"]?.arrayValue?.last?.stringValue ?? ""
+        MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
     }
 
     /// Wait until the runtime has actually been handed its token.

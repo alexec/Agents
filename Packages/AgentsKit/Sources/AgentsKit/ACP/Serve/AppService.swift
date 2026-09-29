@@ -11,7 +11,7 @@ import Foundation
 /// tools of its own: one that ends a turn — what one passes to `finish_turn` becomes
 /// the line under the agent's name and the row of chips above the prompt — and two
 /// that act mid-turn, `show_file` and `manage_workflows`. Four more act on other
-/// agents — `start_agent`, `stop_agent`, `archive_agent` and `list_my_agents` (028) —
+/// agents — `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` (028) —
 /// and are offered only to an agent the person or a workflow started. Two older names
 /// for the halves of the first are still served, for conversations briefed with them.
 ///
@@ -34,18 +34,21 @@ public actor AppService {
     /// And the third: read and write the project's standing arrangements.
     public static let workflowToolName = AppTool.manageWorkflows
 
+    /// Ask the person and wait: the form card every runtime can reach.
+    public static let askFormToolName = AppTool.askForm
+
     /// And the older name for the outcome half: say how the work went, on its own.
     public static let reportOutcomeToolName = AppTool.reportOutcome
 
     /// And four that act on other agents (028), offered only to an agent the person or
-    /// a workflow started: start one in this project, and stop, archive or list the
-    /// ones this agent started.
+    /// a workflow started: start one in this project, and stop, park or list the ones
+    /// this agent started. archive_agent is still recognised so an older conversation
+    /// is refused rather than told the word is unknown.
     public static let startAgentToolName = AppTool.startAgent
     public static let stopAgentToolName = AppTool.stopAgent
+    public static let parkAgentToolName = AppTool.parkAgent
     public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
-    public static let pushPullRequestToolName = AppTool.pushPullRequest
-    public static let replyOnPullRequestToolName = AppTool.replyOnPullRequest
     public static let leaseResourceToolName = AppTool.leaseResource
     public static let waitForEventToolName = AppTool.waitForEvent
     public static let cancelWaitToolName = AppTool.cancelWait
@@ -72,6 +75,9 @@ public actor AppService {
 
     /// Where a file to show goes.
     public typealias FileSink = @Sendable (ShownFile) async -> Outcome
+
+    /// Where an `ask_form` goes. May take as long as the person takes to answer.
+    public typealias AskFormSink = @Sendable (String?, [DaemonAPI.AskFormRequest.Question]) async -> Outcome
 
     /// Where a workflow question goes. Unlike the other two this can take a while:
     /// a write waits on somebody answering.
@@ -109,13 +115,14 @@ public actor AppService {
         public static let none = BlockWords()
     }
 
-    /// One of the four calls that act on other agents (028), as the agent made it.
+    /// One of the calls that act on other agents (028), as the agent made it.
     /// Nothing is decided here beyond whether the words are there at all: the daemon
     /// is what knows whose agent is whose.
     public enum AgentCall: Sendable, Equatable {
         case start(prompt: String, runtime: String?, model: String?, permissionMode: String?,
                    worktree: String? = nil)
         case stop(agentID: String)
+        case park(agentID: String)
         case archive(agentID: String)
         case list
     }
@@ -144,16 +151,6 @@ public actor AppService {
     /// Where those go. A wait may take up to the hold limit to come back.
     public typealias EventsSink = @Sendable (EventCall) async -> Outcome
 
-    /// One of the two pull-request calls (038), as the agent made it. Neither names a
-    /// pull request, a branch or a repository: the daemon takes those from the run.
-    public enum PullRequestCall: Sendable, Equatable {
-        case push
-        case reply(body: String, inReplyTo: Int?)
-    }
-
-    /// Where those go.
-    public typealias PullRequestsSink = @Sendable (PullRequestCall) async -> Outcome
-
     /// `enter_worktree` or `exit_worktree` (053), as the agent made it: one move, which
     /// the daemon checks and keeps for when the turn ends.
     public enum MoveCall: Sendable, Equatable {
@@ -167,14 +164,14 @@ public actor AppService {
     private let finishSink: FinishSink
     private let sink: Sink
     private let fileSink: FileSink
+    private let askFormSink: AskFormSink
     private let workflowSink: WorkflowSink
     private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
     private let leasesSink: LeasesSink
     private let eventsSink: EventsSink
-    private let pullRequestsSink: PullRequestsSink
     private let movesSink: MovesSink
-    /// Whether the four agent tools are offered. False for an agent another agent
+    /// Whether the agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
     /// Whether the two move tools are offered. False for an agent on a runtime that cannot
@@ -190,6 +187,9 @@ public actor AppService {
                 },
                 sink: @escaping Sink,
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
+                askForm: @escaping AskFormSink = { _, _ in
+                    .refused("This app cannot ask the person.")
+                },
                 workflows: @escaping WorkflowSink = { _, _, _ in
                     .refused("This app cannot manage workflows.")
                 },
@@ -198,9 +198,6 @@ public actor AppService {
                 },
                 agents: @escaping AgentsSink = { _ in
                     .refused("This app cannot start or stop agents.")
-                },
-                pullRequests: @escaping PullRequestsSink = { _ in
-                    .refused("Only a run started for a pull request can push or reply; ask the person to do it.")
                 },
                 leases: @escaping LeasesSink = { _ in
                     .refused("This app cannot lease resources.")
@@ -215,12 +212,12 @@ public actor AppService {
         self.finishSink = finishTurn
         self.sink = sink
         self.fileSink = showFile
+        self.askFormSink = askForm
         self.workflowSink = workflows
         self.outcomeSink = reportOutcome
         self.agentsSink = agents
         self.leasesSink = leases
         self.eventsSink = events
-        self.pullRequestsSink = pullRequests
         self.movesSink = moves
         self.managesAgents = managesAgents
         self.movesItself = movesItself
@@ -322,6 +319,15 @@ public actor AppService {
                 return .success(Self.reply(await fileSink(file)))
             }
 
+            if name.hasSuffix(Self.askFormToolName) {
+                switch Self.askFormCall(arguments) {
+                case .failure(let problem):
+                    return .success(Self.reply(problem.message, isError: true))
+                case .success(let call):
+                    return .success(Self.reply(await askFormSink(call.title, call.questions)))
+                }
+            }
+
             if name.hasSuffix(Self.workflowToolName) {
                 guard let raw = arguments?["action"]?.stringValue,
                       let action = DaemonAPI.ManageWorkflowsRequest.Action(rawValue: raw) else {
@@ -333,13 +339,6 @@ public actor AppService {
                 return .success(Self.reply(await workflowSink(action,
                                                               arguments?["id"]?.stringValue,
                                                               arguments?["content"]?.stringValue)))
-            }
-
-            if let call = Self.pullRequestCall(named: name, arguments) {
-                switch call {
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
-                case .success(let call): return .success(Self.reply(await pullRequestsSink(call)))
-                }
             }
 
             if let call = Self.eventCall(named: name, arguments) {
@@ -373,7 +372,7 @@ public actor AppService {
                 guard managesAgents else {
                     return .success(Self.reply("""
                         Nothing was done: an agent that another agent started cannot \
-                        start, stop, archive or list agents of its own.
+                        start, stop, park, archive or list agents of its own.
                         """, isError: true))
                 }
                 switch call {
@@ -411,7 +410,10 @@ public actor AppService {
         }
     }
 
-    /// Which of the four agent calls a tool name is, with its arguments read — or the
+    /// Which of the agent calls a tool name is, with its arguments read — or the
+    /// refusal for a call that is missing what it needs. `archive_agent` is still
+    /// recognised so an older conversation is refused at the daemon rather than
+    /// told the word is unknown.
     /// sentence saying what was missing. `nil` when the name is none of them.
     static func agentCall(named name: String,
                           _ arguments: JSONValue?) -> Result<AgentCall, AgentCallProblem>? {
@@ -427,30 +429,18 @@ public actor AppService {
                                    permissionMode: text("permission_mode"),
                                    worktree: text("worktree")))
         }
-        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(archiveAgentToolName) {
+        if name.hasSuffix(stopAgentToolName)
+            || name.hasSuffix(parkAgentToolName)
+            || name.hasSuffix(archiveAgentToolName) {
             guard let id = text("id") else {
                 return .failure("Nothing changed: `id` has to be the id start_agent or list_my_agents gave.")
             }
-            return .success(name.hasSuffix(stopAgentToolName) ? .stop(agentID: id) : .archive(agentID: id))
+            if name.hasSuffix(stopAgentToolName) { return .success(.stop(agentID: id)) }
+            if name.hasSuffix(parkAgentToolName) { return .success(.park(agentID: id)) }
+            return .success(.archive(agentID: id))
         }
         if name.hasSuffix(listMyAgentsToolName) {
             return .success(.list)
-        }
-        return nil
-    }
-
-    /// Which of the two pull-request calls a tool name is, with its arguments read.
-    static func pullRequestCall(named name: String,
-                                _ arguments: JSONValue?) -> Result<PullRequestCall, AgentCallProblem>? {
-        if name.hasSuffix(pushPullRequestToolName) { return .success(.push) }
-        if name.hasSuffix(replyOnPullRequestToolName) {
-            let body = arguments?["body"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard !body.isEmpty else { return .failure("Nothing was posted: say what to reply, in `body`.") }
-            let inReplyTo = arguments?["in_reply_to"].flatMap { value -> Int? in
-                if let number = value.intValue { return number }
-                return value.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
-            }
-            return .success(.reply(body: body, inReplyTo: inReplyTo))
         }
         return nil
     }
@@ -529,25 +519,52 @@ public actor AppService {
     static func tools(managesAgents: Bool, movesItself: Bool = true) -> [JSONValue] {
         // The one that ends a turn first, the two that act mid-turn, and the two
         // older names last, described as such (023).
-        // The four agent tools after the workflow tool, and only for an agent that
+        // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
+        // archive_agent is no longer offered: only the person archives. An older
+        // conversation that still calls it is refused at the daemon.
         let agentTools = managesAgents
-            ? [Self.startAgentTool, Self.stopAgentTool, Self.archiveAgentTool, Self.listMyAgentsTool]
+            ? [Self.startAgentTool, Self.stopAgentTool, Self.parkAgentTool, Self.listMyAgentsTool]
             : []
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
-        // The two pull-request tools, for every agent (038 R7): the list is fixed
-        // when a session is made, and a standing or triggering run resumes a session
-        // made long before. Outside such a run they refuse, in words.
-        let pullRequestTools = [Self.pushPullRequestTool, Self.replyOnPullRequestTool]
         // The three event tools, for every agent (042).
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
         // The two for moving itself, for every agent (053).
         // Not for a runtime that would forget the conversation on the way.
         let moveTools = movesItself ? [Self.enterWorktreeTool, Self.exitWorktreeTool] : []
-        return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool] + agentTools + leaseTools
-            + eventTools + moveTools + pullRequestTools + [Self.tool, Self.reportOutcomeTool]
+        return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool, Self.askFormTool]
+            + agentTools + leaseTools
+            + eventTools + moveTools + [Self.tool, Self.reportOutcomeTool]
+    }
+
+    /// The questions an `ask_form` call carried, or why it cannot be asked.
+    static func askFormCall(_ arguments: JSONValue?)
+        -> Result<(title: String?, questions: [DaemonAPI.AskFormRequest.Question]), AgentCallProblem> {
+        let title = arguments?["title"]?.stringValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedTitle = (title?.isEmpty == false) ? title : nil
+        guard let raw = arguments?["questions"]?.arrayValue, !raw.isEmpty else {
+            return .failure("Nothing was asked: send at least one question in `questions`.")
+        }
+        var questions: [DaemonAPI.AskFormRequest.Question] = []
+        for item in raw {
+            let id = item["id"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let prompt = item["prompt"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !id.isEmpty, !prompt.isEmpty else {
+                return .failure("Nothing was asked: each question needs an `id` and a `prompt`.")
+            }
+            let options = item["options"]?.arrayValue?.compactMap { option -> DaemonAPI.AskFormRequest.Question.Option? in
+                let optionID = option["id"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !optionID.isEmpty else { return nil }
+                return .init(id: optionID, label: option["label"]?.stringValue)
+            }
+            questions.append(.init(id: id, prompt: prompt,
+                                   options: (options?.isEmpty == false) ? options : nil,
+                                   allowMultiple: item["allow_multiple"]?.boolValue))
+        }
+        return .success((cleanedTitle, questions))
     }
 
     /// Which of the two move calls a tool name is, with its arguments read (053). `nil`
@@ -643,6 +660,10 @@ public actor AppService {
         guard let after = value.stringValue.flatMap(AfterTurn.init(wire:)) else {
             return .failure(AgentCallProblem(stringLiteral: AfterTurn.unknown))
         }
+        // `archive` is a word an older conversation was told it could send. Pass it
+        // through: the daemon keeps the outcome and declines the ask, so the person
+        // still sees whether the session was useful.
+        if after == .archive { return .success(after) }
         guard let ending = WorkOutcome(wire: outcome), after.goes(with: ending) else {
             return .failure(AgentCallProblem(stringLiteral: after.refusal))
         }
@@ -732,11 +753,11 @@ public actor AppService {
             nothing in your reply about having called this.
 
             When you have finished and cleaned up after yourself — merged, removed \
-            what you made — you may ask to be parked (put down, to come back to) or \
-            archived (over, put away) once this turn ends, with afterwards. Archive \
-            goes only with done or nothing_to_do; park also with partly_done. Leave \
-            it out and the conversation stays where its ending puts it. If the person \
-            sends something before the turn is over, the ask is dropped.
+            what you made — you may ask to be parked (put down, to come back to) once \
+            this turn ends, with afterwards set to park. Park goes with done, \
+            nothing_to_do or partly_done. Leave it out and the conversation stays \
+            where its ending puts it. If the person sends something before the turn \
+            is over, the ask is dropped. You cannot archive: only the person can.
 
             If you can carry on once you have an answer, do not use this: ask with your \
             question or form tool, which stops and waits for them. This one does not \
@@ -786,12 +807,12 @@ public actor AppService {
                 ],
                 "afterwards": [
                     "type": "string",
-                    "enum": .array(["park", "archive"]),
+                    "enum": .array(["park"]),
                     "description": """
                         Once this turn ends: park to put the conversation down to come \
-                        back to, archive when it is over and cleaned up. Archive only \
-                        with done or nothing_to_do; park also with partly_done. Leave \
-                        out to stay where the ending puts it.
+                        back to. Goes with done, nothing_to_do or partly_done. Leave \
+                        out to stay where the ending puts it. Only the person can \
+                        archive a session.
                         """,
                 ],
                 // One, since 031. The list this replaced is still read by the
@@ -911,6 +932,74 @@ public actor AppService {
         ],
     ]
 
+    /// Ask the person a question and wait. The channel every runtime can reach.
+    static let askFormTool: JSONValue = [
+        "name": .string(askFormToolName),
+        "title": "Ask the person a question",
+        "description": """
+            Ask me a question or a short form and wait for my answer. Use this when \
+            something is mine to decide — a choice between real alternatives, a missing \
+            credential, anything hard to undo — rather than guessing or ending the turn \
+            with the question in your reply.
+
+            Your question reaches me wherever I am, including on my phone, and the call \
+            waits until I answer, skip or cancel. Prefer your runtime's own question \
+            tool when you have one; use this when you do not, or when that tool is not \
+            in your catalogue.
+
+            Each question may offer options to pick, or leave options out for free \
+            text. Set allow_multiple when more than one option may be chosen.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "title": [
+                    "type": "string",
+                    "description": "Optional heading for the form as a whole.",
+                ],
+                "questions": [
+                    "type": "array",
+                    "minItems": .int(1),
+                    "items": [
+                        "type": "object",
+                        "properties": [
+                            "id": [
+                                "type": "string",
+                                "description": "A short stable id for this question.",
+                            ],
+                            "prompt": [
+                                "type": "string",
+                                "description": "The question in your own words.",
+                            ],
+                            "options": [
+                                "type": "array",
+                                "items": [
+                                    "type": "object",
+                                    "properties": [
+                                        "id": ["type": "string"],
+                                        "label": ["type": "string"],
+                                    ],
+                                    "required": .array(["id"]),
+                                ],
+                                "description": """
+                                    Choices to pick from. Leave out, or pass an empty \
+                                    list, for a free-text answer.
+                                    """,
+                            ],
+                            "allow_multiple": [
+                                "type": "boolean",
+                                "description": "True when more than one option may be chosen.",
+                            ],
+                        ],
+                        "required": .array(["id", "prompt"]),
+                    ],
+                    "description": "One or more questions. Keep it short.",
+                ],
+            ],
+            "required": .array(["questions"]),
+        ],
+    ]
+
     /// Read and write the project's workflows.
     ///
     /// One tool with an action rather than four, because that is how the surface reads
@@ -957,7 +1046,7 @@ public actor AppService {
 
             Under on:, besides schedule and today's hyphenated names (agent-finished and \
             the rest), any event name works, narrowed by its details written under it, \
-            e.g. `- pull_request.merged:` with `number: 41` under it.
+            e.g. `- workflow.completed:` with `workflow: nightly` under it.
             """ + "\n" + EventCatalogue.describe()),
         "inputSchema": [
             "type": "object",
@@ -1005,9 +1094,10 @@ public actor AppService {
     /// Start an agent in this project (028).
     ///
     /// The description carries the limits because the agent needs them before it
-    /// calls, not in a refusal after: this project only, three at once across the
-    /// project, archiving gives a place back. And the restraint, as the workflow tool
-    /// carries its own — an agent told it can start agents will start agents.
+    /// calls, not in a refusal after: this project only, five at once across the
+    /// project, and only the person frees a place by archiving. And the restraint,
+    /// as the workflow tool carries its own — an agent told it can start agents will
+    /// start agents.
     static let startAgentTool: JSONValue = [
         "name": .string(startAgentToolName),
         "title": "Start an agent in this project",
@@ -1016,18 +1106,19 @@ public actor AppService {
             of the work that can run alongside the rest. It starts in this project's \
             folder — there is no way to start one anywhere else — and appears in the \
             person's list of agents, marked as started by you. The person can open it, \
-            talk to it, stop it or archive it at any time.
+            talk to it, stop it, park it or archive it at any time.
 
             At most five agents started by agents can exist in this project at once, \
-            counting every agent here, and stopped or finished ones still count. \
-            Archiving one with archive_agent frees its place. Use list_my_agents to see \
-            yours and how many places are in use.
+            counting every agent here, and stopped, parked or finished ones still count. \
+            Only the person can archive one to free its place. Use list_my_agents to see \
+            yours and how many places are in use. Stop one with stop_agent, or park one \
+            with park_agent, when its part is done; it keeps its place until they archive it.
 
             Start one only when part of the work can genuinely run alongside the rest. \
             Do not start one for work you could simply do yourself. The agent you \
             start cannot start agents of its own.
 
-            Returns the new agent's id, which stop_agent and archive_agent take.
+            Returns the new agent's id, which stop_agent and park_agent take.
             """,
         "inputSchema": [
             "type": "object",
@@ -1070,7 +1161,7 @@ public actor AppService {
         ],
     ]
 
-    /// The id schema stop and archive share.
+    /// The id schema stop, park and archive share.
     private static let agentIDSchema: JSONValue = [
         "type": "object",
         "properties": [
@@ -1090,6 +1181,20 @@ public actor AppService {
             It stays in the list with its conversation, and keeps its place until it is \
             archived. Only agents you started can be stopped this way; not yourself, \
             and not anyone else's.
+            """,
+        "inputSchema": agentIDSchema,
+    ]
+
+    static let parkAgentTool: JSONValue = [
+        "name": .string(parkAgentToolName),
+        "title": "Park an agent you started",
+        "description": """
+            Park an agent you started with start_agent, as the person's own Park would: \
+            put it down to come back to later. If it is still working, the turn finishes \
+            first and it parks when that ends. It stays in the list under Parked, and \
+            keeps its place until it is archived. Only agents you started can be parked \
+            this way; not yourself (set afterwards to park on finish_turn), and not \
+            anyone else's.
             """,
         "inputSchema": agentIDSchema,
     ]
@@ -1117,37 +1222,6 @@ public actor AppService {
         "inputSchema": ["type": "object", "properties": .object([:])],
     ]
 
-    // MARK: Pull requests (038). Words from contracts/pull-requests.md.
-
-    static let pushPullRequestTool: JSONValue = [
-        "name": .string(pushPullRequestToolName),
-        "title": "Push to the pull request",
-        "description": """
-            Push this worktree's commits to the pull request you were started for. Never \
-            force-pushes: if the remote has commits you don't, bring them in first and \
-            push again. Only works in a run started for a pull request.
-            """,
-        "inputSchema": ["type": "object", "properties": .object([:])],
-    ]
-
-    static let replyOnPullRequestTool: JSONValue = [
-        "name": .string(replyOnPullRequestToolName),
-        "title": "Reply on the pull request",
-        "description": """
-            Reply on the pull request you were started for. Give in_reply_to (a comment \
-            id from your prompt) to answer a review comment in its thread; leave it out \
-            to comment on the pull request itself.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "body": ["type": "string"],
-                "in_reply_to": ["type": "integer"],
-            ],
-            "required": .array(["body"]),
-        ],
-    ]
-
     // MARK: Events (042). Words from contracts/event-tools.md.
 
     static let waitForEventTool: JSONValue = [
@@ -1155,7 +1229,7 @@ public actor AppService {
         "title": "Wait for something to happen",
         "description": """
             Wait until something happens: an event in this project or on this Mac, such as \
-            pull_request.checks_passed, agent.finished, mac.wake or custom.build_green. Your \
+            agent.finished, workflow.completed, mac.wake or custom.build_green. Your \
             turn can end while you wait, and it costs nothing: when the event happens you \
             are started again with it. The call itself waits up to 45 seconds; if nothing \
             has happened by then it says you are still waiting and keeps your place. Use \
@@ -1175,13 +1249,13 @@ public actor AppService {
                     "items": ["type": "string"],
                     "description": """
                         What to wait for; any one will do. A name, or a subject with .* such \
-                        as pull_request.*.
+                        as agent.*.
                         """,
                 ],
                 "where": [
                     "type": "object",
                     "description": """
-                        Narrow them by their details, e.g. {"number": "41"} or \
+                        Narrow them by their details, e.g. {"workflow": "nightly"} or \
                         {"agent": "Fix login"}.
                         """,
                 ],

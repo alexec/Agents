@@ -27,17 +27,23 @@ extension DaemonAPI {
         public var batteryPercent: Int?
         /// When the current hold was taken. Nil when not holding.
         public var since: Date?
+        /// When a grace hold will end. Nil while an agent is working, and whenever
+        /// the Mac is not being held. An older window that does not know the field
+        /// still reads the rest.
+        public var graceUntil: Date?
 
         public init(isHolding: Bool,
                     agentsInFlight: Int,
                     heldBackByBattery: Bool,
                     batteryPercent: Int?,
-                    since: Date?) {
+                    since: Date?,
+                    graceUntil: Date? = nil) {
             self.isHolding = isHolding
             self.agentsInFlight = agentsInFlight
             self.heldBackByBattery = heldBackByBattery
             self.batteryPercent = batteryPercent
             self.since = since
+            self.graceUntil = graceUntil
         }
 
         /// Nothing held and nothing working. What a window shows before it has heard

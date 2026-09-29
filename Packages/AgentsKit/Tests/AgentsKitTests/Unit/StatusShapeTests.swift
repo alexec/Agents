@@ -39,20 +39,26 @@ struct StatusShapeTests {
 
     @Test("Stopped and archived are stopped, whatever was last claimed")
     func stopped() {
-        #expect(StatusShape(state: .stopped, outcome: nil, isWaiting: false, isComingBack: false) == .stopped)
+        #expect(StatusShape(state: .stopped, outcome: nil, isWaiting: false, isComingBack: false,
+                            endedReason: .cancelled) == .stopped)
         #expect(StatusShape(state: .archived, outcome: nil, isWaiting: false, isComingBack: false) == .stopped)
         // An outcome from an earlier turn does not dress a stopped agent up as done.
-        #expect(StatusShape(state: .stopped, outcome: .done, isWaiting: false, isComingBack: false) == .stopped)
-        #expect(StatusShape(state: .stopped, outcome: .stuck, isWaiting: false, isComingBack: false) == .stopped)
+        #expect(StatusShape(state: .stopped, outcome: .done, isWaiting: false, isComingBack: false,
+                            endedReason: .cancelled) == .stopped)
+        #expect(StatusShape(state: .stopped, outcome: .stuck, isWaiting: false, isComingBack: false,
+                            endedReason: .cancelled) == .stopped)
+        #expect(StatusShape(state: .stopped, outcome: nil, isWaiting: false, isComingBack: false,
+                            endedReason: .processDied) == .needsYou)
     }
 
     /// Waiting on something that is not a person (039): its own shape, and no colour.
     @Test("A turn that ended blocked is blocked, and wants nobody")
     func blocked() {
         let shape = StatusShape(state: .finished, outcome: .blocked, isWaiting: false, isComingBack: false)
-        #expect(shape == .blocked)
-        #expect(!shape.wantsAPerson)
-        #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: false, isComingBack: false) == .stopped)
+        #expect(shape == .needsYou)
+        #expect(shape.wantsAPerson)
+        #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: false, isComingBack: false,
+                            endedReason: .cancelled) == .stopped)
         #expect(StatusShape(state: .running, outcome: .blocked, isWaiting: false, isComingBack: false) == .working)
     }
 
@@ -63,10 +69,11 @@ struct StatusShapeTests {
         let shape = StatusShape(state: .finished, outcome: .blocked, isWaiting: true, isComingBack: false)
         #expect(shape == .waiting)
         #expect(!shape.wantsAPerson)
-        #expect(shape.symbol != StatusShape.blocked.symbol)
+        #expect(shape.symbol != StatusShape.needsYou.symbol)
         #expect(StatusShape(state: .finished, outcome: .done, isWaiting: true, isComingBack: false) == .waiting)
         #expect(StatusShape(state: .finished, outcome: .stuck, isWaiting: true, isComingBack: false) == .needsYou)
-        #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: true, isComingBack: false) == .stopped)
+        #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: true, isComingBack: false,
+                            endedReason: .cancelled) == .stopped)
     }
 
     @Test("Every state lands on exactly one of the four")
@@ -75,7 +82,7 @@ struct StatusShapeTests {
             StatusShape(state: $0, outcome: nil, isWaiting: false, isComingBack: false)
         })
         #expect(shapes.isSubset(of: [.working, .needsYou, .done, .stopped]))
-        #expect(Set([StatusShape.needsYou, .blocked, .waiting, .done, .stopped].compactMap(\.symbol)).count == 5)
+        #expect(Set([StatusShape.needsYou, .waiting, .done, .stopped].compactMap(\.symbol)).count == 4)
     }
 }
 

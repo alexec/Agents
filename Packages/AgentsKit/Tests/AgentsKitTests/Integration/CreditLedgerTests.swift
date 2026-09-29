@@ -87,7 +87,7 @@ struct CreditLedgerTests {
         await eventually("it moved to Copilot") { await core.agent(id)?.runtimeID == "copilot" }
     }
 
-    @Test func geminisFreeTierComesBackAtMidnightPacific() async throws {
+    @Test func geminisFreeTierShowsMidnightPacificButStaysOutUntilChecked() async throws {
         let clock = TestClock()
         var refused = FakeACPAgent.Script()
         refused.promptError = JSONRPCError(code: 429, message: "You have exhausted your daily quota on this model.")
@@ -103,8 +103,9 @@ struct CreditLedgerTests {
         pacific.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
         #expect(pacific.component(.hour, from: back) == 0 && pacific.component(.minute, from: back) == 0)
 
+        // The reset is shown, not believed: out until a check or a turn works.
         clock.now = back.addingTimeInterval(1)
-        #expect(await row(core, "gemini")?.state.status == .available)
+        #expect(await row(core, "gemini")?.state.isOut == true)
     }
 
     @Test func aRuntimeThatSaysNothingOfCostIsSpendingNotKnown() async throws {

@@ -15,9 +15,10 @@ struct PoolPlanTests {
 
     private var pool: PoolSettings { PoolSettings(isOn: true, entries: [claude, copilot, codex, codexKey]) }
 
-    private func out(_ entry: PoolEntry, until: Date? = nil) -> AllowanceState {
-        var state = AllowanceState(credentialKey: AllowanceState.credentialKey(for: entry), entryID: entry.id, since: now)
-        state.markOut(.allowanceSpent, until: until, payment: entry.payment, now: now, from: .typedFailure)
+    private func out(_ entry: PoolEntry, until: Date? = nil, since: Date? = nil) -> AllowanceState {
+        let since = since ?? now
+        var state = AllowanceState(credentialKey: AllowanceState.credentialKey(for: entry), entryID: entry.id, since: since)
+        state.markOut(.allowanceSpent, until: until, payment: entry.payment, now: since, from: .typedFailure)
         return state
     }
 
@@ -47,11 +48,13 @@ struct PoolPlanTests {
         #expect(next(from: codex, pool: pool) == .switchTo(codexKey))
     }
 
-    @Test func everyoneOutGivesTheEarliestReturn() {
-        let soon = now.addingTimeInterval(600)
-        let later = now.addingTimeInterval(3600)
-        #expect(next(from: claude, states: [out(claude), out(copilot, until: later), out(codex, until: soon),
-                                            out(codexKey)]) == .everyoneOut(earliest: soon))
+    @Test func everyoneOutGivesTheEarliestCheck() {
+        // The next check, not the provider's reset: codex went out first, so is checked first.
+        let reset = now.addingTimeInterval(600)
+        let codexOut = now.addingTimeInterval(-3 * 3600)
+        #expect(next(from: claude, states: [out(claude), out(copilot, until: reset),
+                                            out(codex, since: codexOut), out(codexKey)])
+                == .everyoneOut(earliest: codexOut.addingTimeInterval(4 * 3600)))
     }
 
     @Test func offWhenThePoolOrTheChatSaysSo() {

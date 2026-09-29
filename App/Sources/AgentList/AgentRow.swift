@@ -61,11 +61,13 @@ struct AgentRow: View {
                        isWaiting: agent.isWaiting,
                        isUnaccountedFor: agent.endingIsUnaccountedFor,
                        ending: agent.endedReason?.summary,
+                       endedReason: agent.endedReason,
+                       isUnread: agent.isUnread,
                        isParked: agent.parking?.isParked == true,
                        isWaitingForAllowance: agent.allowanceWait != nil)
                 .padding(.top, 1)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: isCompact ? 4 : 3) {
                 HStack(spacing: 5) {
                     Text(agent.title ?? "Untitled")
                         .appText(isCompact ? .supporting : .reading).fontWeight(.semibold)
@@ -95,7 +97,7 @@ struct AgentRow: View {
                     // line added then is cut in half.
                     if isCompact, let wait = agent.allowanceWait {
                         let words = PoolWords.waitingLine(wait, now: Date())
-                        Image(systemName: "hourglass")
+                        Image(systemName: PoolWords.waitingSymbol)
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .help(words)
@@ -129,6 +131,12 @@ struct AgentRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
+                } else if isCompact {
+                    // List rows keep the height of their first draw; leave room for the
+                    // line under the title so it is not cut in half when a report arrives.
+                    Color.clear
+                        .frame(height: 14)
+                        .accessibilityHidden(true)
                 }
 
                 // Moved to another runtime when its own ran out (052): from which, and
@@ -194,10 +202,10 @@ struct AgentRow: View {
                             .lineLimit(1)
                     }
                     Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.paper)
                         .controlSize(.small)
                         .padding(.top, 3)
-                        .help("Tell it the block has cleared, and let it carry on")
+                        .help(AgentsModel.carryOnHelp(for: agent))
                 }
                 // Parked, and since when; or that it will park when this turn ends
                 // (040). How it ended stays the icon's to say.
@@ -209,6 +217,7 @@ struct AgentRow: View {
             }
             Spacer(minLength: 0)
         }
+        .fixedSize(horizontal: false, vertical: true)
         .contextMenu {
             if model.isBlocked(agent) {
                 Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
@@ -217,7 +226,7 @@ struct AgentRow: View {
                 Button("Stop") { Task { await model.stop(agent.id) } }
             }
             if agent.state == .archived {
-                Button("Bring back") { Task { await model.unarchive(agent.id) } }
+                Button("Bring Back") { Task { await model.unarchive(agent.id) } }
                 // Now rather than when its time comes (051, US7). Asked first: the daemon
                 // says how much goes, or why it cannot yet.
                 Button("Retire Now…") {
@@ -237,7 +246,7 @@ struct AgentRow: View {
                     }
                     .help(ParkWords.help(action))
                 }
-                Button("Archive") { Task { await model.archive(agent.id) } }
+                Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
             }
             // Finder only sees this Mac's disk (058, FR-019).
             if model.isOnThisMac(agent.host) {
@@ -306,6 +315,8 @@ struct StatusIcon: View {
     var isUnaccountedFor = false
     /// Why it stopped, where it did, in `EndedReason`'s words.
     var ending: String?
+    var endedReason: EndedReason?
+    var isUnread = false
     /// Parked (040): the shape still says how it ended, but it is not orange, because
     /// the person has seen it and chosen later.
     var isParked = false
@@ -314,7 +325,10 @@ struct StatusIcon: View {
     var isWaitingForAllowance = false
 
     private var shape: StatusShape {
-        StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack)
+        StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
+                    isUnread: isUnread, endedReason: endedReason,
+                    waitingForAllowance: isWaitingForAllowance,
+                    outcomeUnknown: isUnaccountedFor)
     }
 
     var body: some View {
@@ -326,9 +340,7 @@ struct StatusIcon: View {
                     .foregroundStyle((shape.wantsAPerson && !isParked && !isWaitingForAllowance ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
-                ProgressView()
-                    .controlSize(.small)
-                    .scaleEffect(0.7)
+                SyncedSpinner(diameter: 12)
             }
         }
         .frame(width: 18, height: 18)
@@ -346,6 +358,7 @@ struct StatusIcon: View {
     /// reads too, and a stopped agent says why.
     private var description: String {
         if isComingBack { return AgentsModel.comingBackDescription }
+        if isUnread && state == .finished { return "Unread · \(outcome?.heading ?? "Finished")" }
         if isWaitingForAllowance { return "Waiting for an allowance" }
         if shape == .waiting { return StatusShape.waitingLabel }
         if let settledOutcome { return settledOutcome.heading }

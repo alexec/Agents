@@ -37,6 +37,14 @@ public struct JSONRPCError: Error, Codable, Hashable, Sendable {
     /// Expected after a cancel, so not worth showing anybody.
     public var isCancelled: Bool { code == Self.requestCancelled }
 
+    /// What a spent-allowance check reads (052). Grok puts the real refusal under
+    /// `data.message` with `data.http_status`, while the top-level message is only
+    /// "Internal error"; prefer those when present.
+    public var refusalForLimit: (code: Int, message: String) {
+        (code: data?["http_status"]?.intValue ?? code,
+         message: data?["message"]?.stringValue ?? message)
+    }
+
     public static func methodNotFound(_ method: String) -> JSONRPCError {
         JSONRPCError(code: methodNotFound, message: "Method not found", data: ["method": .string(method)])
     }

@@ -205,6 +205,52 @@ struct ServingTests {
         #expect(FileManager.default.fileExists(atPath: other.path) == false, "nothing yet")
     }
 
+    /// Several permission questions at once stay outstanding until each is answered.
+    /// Answering one must not mark the agent running while others still wait — the bug
+    /// that hid three of Grok's four simultaneous file cards.
+    @Test func concurrentPermissionQuestionsStayUntilEachIsAnswered() async throws {
+        let (locations, work) = try temporary()
+        let options: JSONValue = [
+            ["optionId": "allow_once", "name": "Allow", "kind": "allow_once"],
+            ["optionId": "reject_once", "name": "Deny", "kind": "reject_once"],
+        ]
+        func card(_ id: String, title: String, path: URL) -> (String, JSONValue) {
+            (ACP.ClientMethod.requestPermission, [
+                "toolCall": ["toolCallId": .string(id), "title": .string(title), "kind": "edit",
+                             "status": "pending",
+                             "content": [["type": "diff", "path": .string(path.path), "newText": "x"]],
+                             "locations": [["path": .string(path.path)]]],
+                "options": options])
+        }
+        var script = FakeACPAgent.Script()
+        script.concurrentClientRequests = [
+            card("c1", title: "Edit a.txt", path: work.appending(path: "a.txt")),
+            card("c2", title: "Edit b.txt", path: work.appending(path: "b.txt")),
+            card("c3", title: "Edit c.txt", path: work.appending(path: "c.txt")),
+        ]
+        let launcher = FakeLauncher(script: script, capabilities: serving)
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "edit three"))
+
+        await eventually("all three questions are held") {
+            await core.pendingPermissionRequests().count == 3
+        }
+        #expect(await core.agent(id)?.state == .waitingOnUser)
+
+        let pending = await core.pendingPermissionRequests()
+        try await core.answerPermission(.init(permissionID: pending[0].id, optionID: "allow_once"))
+        #expect(await core.pendingPermissionRequests().count == 2)
+        #expect(await core.agent(id)?.state == .waitingOnUser,
+                "still waiting while other cards remain")
+
+        try await core.answerPermission(.init(permissionID: pending[1].id, optionID: "allow_once"))
+        try await core.answerPermission(.init(permissionID: pending[2].id, optionID: "allow_once"))
+        await eventually("every question is gone") { await core.pendingPermissionRequests().isEmpty }
+        await eventually("the turn ran on after the last answer") {
+            await core.agent(id)?.state == .finished
+        }
+    }
+
     @Test func aRefusedWriteLeavesTheFileAloneAndTellsTheAgent() async throws {
         let (locations, work) = try temporary()
         let target = work.appending(path: "kept.txt")

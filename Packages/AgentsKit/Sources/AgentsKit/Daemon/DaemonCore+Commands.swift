@@ -431,6 +431,7 @@ extension DaemonCore {
 
     /// What a runtime that would not make a session is said to have done.
     private func startFailure(_ error: Error, runtime: Runtime, runtimeID: String) -> Error {
+        runtimeFailed(runtimeID: runtimeID)
         // Not a fault. The runtime is there and needs signing in, which is
         // something the app can show and offer to fix.
         if let why = Self.signInReason(error) {
@@ -883,8 +884,14 @@ extension DaemonCore {
         // Before the runtime starts, since Codex reads its plugins as it does (054, R12).
         await syncCodexPlugins(before: agent.runtimeID)
         linkGeminiProjectPlugins(runtimeID: agent.runtimeID, cwd: agent.cwd)
-        let session = try LentEnvironment.$value.withValue(lent) {
-            try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+        let session: ACPSession
+        do {
+            session = try LentEnvironment.$value.withValue(lent) {
+                try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+            }
+        } catch {
+            runtimeFailed(agentID: agent.id)
+            throw error
         }
         await hearAuthStatus(from: session, runtimeID: runtime.id)
         do {
@@ -894,6 +901,7 @@ extension DaemonCore {
             // left behind here is a runtime nobody will ever end.
             dropAppTokens(for: agent.id)
             await session.end(gracePeriod: .seconds(1))
+            runtimeFailed(agentID: agent.id)
             // The same refusal a new agent gets, with the ways to sign in, so a window
             // shows the sign-in rather than the protocol's error. Said to every window
             // too: a queued prompt or a pick-up has nobody waiting on the answer.
@@ -1158,6 +1166,9 @@ extension DaemonCore {
             await allowanceWorked(agentID: agentID)
         } else {
             retrying = await applyRecognition(recognition, agentID: agentID, reason: &reason)
+            if reason == .runtimeError || reason == .processDied {
+                runtimeFailed(agentID: agentID)
+            }
         }
         _ = retrying
         if crossedItsLimit {
@@ -1179,10 +1190,6 @@ extension DaemonCore {
             }
         }
         await move(agentID, on: .turnEnded(reason))
-        // Taken whatever happens next, so an ask to be archived never outlives the turn
-        // it was made in. `move` has already dropped it for any ending but the asked-for
-        // one.
-        let archiveAsked = takeArchiveAsk(agentID)
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
@@ -1196,14 +1203,6 @@ extension DaemonCore {
         guard stops[agentID, default: 0] == stopsBefore else { pendingCarry[agentID] = nil; return }
         // Its allowance ran out and the pool has somewhere else to go (052).
         if pendingCarry[agentID] != nil, await carryOnIfPending(agentID) { return }
-        // The agent asked to be archived once this turn was over, and it is over as it
-        // said. Not when something was queued while the runtime was let go: the person
-        // has moved the work on, and the ask is dropped.
-        if archiveAsked, agents[agentID]?.state == .finished,
-           agents[agentID]?.queuedPrompts.isEmpty == true {
-            try? await archive(agentID, by: .itself)
-            return
-        }
         // A turn that crossed its limit leaves its queue exactly where it is, whatever
         // the limit says by the time the runtime has gone. Letting the agent go on is
         // the reader's second act (FR-018), and a ceiling raised in the seconds the
@@ -1322,7 +1321,7 @@ extension DaemonCore {
             await record(.runtimeNote(refused.relayed == true
                 ? "\(runtimeName) on this Mac needs signing in again."
                 : refused.lent
-                ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Servers."
+                ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Agent Runtimes."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
             broadcast(DaemonAPI.Notification.credentialRefused, refused)
         } else if let signIn, let runtimeID = agents[agentID]?.runtimeID {
@@ -1343,6 +1342,8 @@ extension DaemonCore {
            await applyRecognition(limit, agentID: agentID, reason: &limitReason) || limitReason != .refusal {
             ending = .turnEnded(limitReason)
         }
+        if case .none = limit { runtimeFailed(agentID: agentID) }
+        if case .otherTyped = limit { runtimeFailed(agentID: agentID) }
         await move(agentID, on: ending)
         await releaseRuntime(for: agentID)
         // Its allowance ran out and the pool has somewhere else to go (052).
@@ -1374,10 +1375,11 @@ extension DaemonCore {
             pendingPermissions.removeValue(forKey: id)
             await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
             broadcast(DaemonAPI.Notification.agentPermission,
-                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
+                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil, requestID: id))
         }
         for (id, pending) in elicitations where pending.agentID == agentID {
             elicitations.removeValue(forKey: id)
+            answerAsk(id, .success("Nobody answered: the agent stopped before they could."))
             await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
             broadcast(DaemonAPI.Notification.agentElicitation,
                       DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
@@ -1455,7 +1457,7 @@ extension DaemonCore {
                 await session.answerPermission(id: pending.request.id, optionID: nil)
             }
             broadcast(DaemonAPI.Notification.agentPermission,
-                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
+                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil, requestID: id))
         }
         for (id, pending) in elicitations where pending.agentID == agentID {
             elicitations.removeValue(forKey: id)
@@ -1556,7 +1558,8 @@ extension DaemonCore {
             await record(.runtimeNote("\(starterName(starter)) archived this agent."), for: agentID)
             await move(agentID, on: .archivedByAgent)
         case .itself:
-            await record(.runtimeNote(Self.archivedItself), for: agentID)
+            // Unreachable. An agent used to archive its own session when its turn
+            // ended; that ask is now dropped, and only the person archives.
             await move(agentID, on: .archivedByAgent)
         }
         await removeWorktreeIfDone(archiving: agentID)
@@ -1565,18 +1568,6 @@ extension DaemonCore {
         lastWhole[agentID] = now()
         dropLiveState(for: agentID)
         checkSoonAfterArchiving()
-    }
-
-    /// The line an agent that archived itself leaves in its transcript.
-    static let archivedItself = "This agent archived itself, as it asked."
-
-    /// Read and clear an agent's ask to be archived once its turn is over. Whether it
-    /// asked, as the ask stood when the turn ended.
-    private func takeArchiveAsk(_ agentID: UUID) -> Bool {
-        guard var agent = agents[agentID], let after = agent.afterTurn else { return false }
-        agent.afterTurn = nil
-        changed(agent)
-        return after == .archive
     }
 
     /// Drop an agent's ask to be put away once its turn is over. The person has sent
@@ -1684,9 +1675,12 @@ extension DaemonCore {
             await session.answerPermission(id: pending.request.id, optionID: request.optionID)
         }
         await record(.permissionAnswered(optionID: request.optionID, optionName: name), for: pending.agentID)
-        await move(pending.agentID, on: .permissionAnswered)
+        if !pendingPermissions.values.contains(where: { $0.agentID == pending.agentID }) {
+            await move(pending.agentID, on: .permissionAnswered)
+        }
         broadcast(DaemonAPI.Notification.agentPermission,
-                  DaemonAPI.PermissionNotification(agentID: pending.agentID, request: nil))
+                  DaemonAPI.PermissionNotification(agentID: pending.agentID, request: nil,
+                                                   requestID: request.permissionID))
         reconsider()
     }
 

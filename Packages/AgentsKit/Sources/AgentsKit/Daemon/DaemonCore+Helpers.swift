@@ -36,7 +36,7 @@ extension DaemonCore {
             throw JSONRPCError(
                 code: DaemonAPI.Failure.notYours,
                 message: "Nothing was started: this project already has \(HelperLimit.perProject) "
-                    + "agents started by agents\(naming). Archive one to free its place.")
+                    + "agents started by agents\(naming). The person archives one to free its place.")
         }
         // A mode it names may be its own or stricter, never looser: otherwise an agent
         // kept on a short lead starts one on none and hands it the work.
@@ -134,7 +134,7 @@ extension DaemonCore {
                                                 : "There are: \(names.joined(separator: ", ")), or say \"new\"."))
     }
 
-    // MARK: Stopping and archiving
+    // MARK: Stopping, parking and archiving
 
     public func stopHelper(_ request: DaemonAPI.HelperRequest) async throws -> String {
         let (caller, target) = try helperTarget(request, doing: "stop")
@@ -152,14 +152,29 @@ extension DaemonCore {
         return "Stopped \u{201C}\(title)\u{201D}. It keeps its place until it is archived."
     }
 
+    public func parkHelper(_ request: DaemonAPI.HelperRequest) throws -> String {
+        let (_, target) = try helperTarget(request, doing: "park")
+        let title = target.title ?? "Untitled"
+        if target.parking?.isParked == true {
+            return "\u{201C}\(title)\u{201D} was already parked; nothing changed."
+        }
+        if case .whenTurnEnds = target.parking {
+            return "\u{201C}\(title)\u{201D} will already park when its turn ends; nothing changed."
+        }
+        let inFlight = target.state.hasTurnInFlight
+        try park(target.id)
+        if inFlight {
+            return "\u{201C}\(title)\u{201D} will park when its turn ends."
+        }
+        return "Parked \u{201C}\(title)\u{201D}. It keeps its place until it is archived."
+    }
+
     public func archiveHelper(_ request: DaemonAPI.HelperRequest) async throws -> String {
-        let (caller, target) = try helperTarget(request, doing: "archive")
-        let folder = caller.projectFolder
-        try await archive(target.id, by: .agent(caller.id))
-        let now = HelperLimit.placesInUse(in: folder, agents: agents.values,
-                                          reserved: reservedStarts[folder, default: 0])
-        return "Archived \u{201C}\(target.title ?? "Untitled")\u{201D}. "
-            + "\(now) of \(HelperLimit.perProject) places in this project are now in use."
+        // An older conversation may still call archive_agent. The outcome of who may
+        // archive did not change with the tool still being known: only the person can.
+        _ = try helperCaller(token: request.token, refusing: "Nothing was archived")
+        throw JSONRPCError(code: DaemonAPI.Failure.notYours,
+                           message: AfterTurn.cannotArchiveAnother)
     }
 
     // MARK: Listing
@@ -183,6 +198,8 @@ extension DaemonCore {
 
     /// What one of an agent's own agents is doing, in a few words the agent can repeat.
     private func helperStatus(_ agent: Agent) -> String {
+        if agent.parking?.isParked == true { return "parked" }
+        if case .whenTurnEnds = agent.parking { return "parking when the turn ends" }
         if resuming.contains(agent.id) || interrupted[agent.id] != nil { return "coming back" }
         let said = agent.report.map { ": \($0.outcome.rawValue) — \($0.message)" } ?? ""
         switch agent.state {
@@ -212,7 +229,7 @@ extension DaemonCore {
         guard caller.startedByAgent == nil else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,
                                message: "\(lead): an agent that another agent started cannot start, "
-                                   + "stop, archive or list agents of its own.")
+                                   + "stop, park, archive or list agents of its own.")
         }
         return caller
     }
@@ -231,11 +248,14 @@ extension DaemonCore {
         }
         guard target.id != caller.id else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                               message: "Nothing changed: an agent cannot \(verb) itself.")
+                               message: verb == "park"
+                                   ? "Nothing changed: an agent cannot park itself this way; "
+                                       + "set afterwards to park on finish_turn."
+                                   : "Nothing changed: an agent cannot \(verb) itself.")
         }
         guard target.startedByAgent == caller.id else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                               message: "Nothing changed: you can only stop or archive agents you started.")
+                               message: "Nothing changed: you can only stop or park agents you started.")
         }
         guard target.state != .archived else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,

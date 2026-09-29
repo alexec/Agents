@@ -5,14 +5,19 @@ import Foundation
 ///
 /// The app hands every session an MCP server of its own. It is not a process we start:
 /// the runtime starts it, the way it starts any stdio MCP server, by running the same
-/// helper binary the daemon is running with `mcp <token>` after it. That helper does
-/// nothing but speak MCP on its stdin and pass what it hears back down the daemon's
-/// socket, which is why the whole of the decision-making is here and testable.
+/// helper binary the daemon is running with `mcp` after it. That helper does nothing
+/// but speak MCP on its stdin and pass what it hears back down the daemon's socket,
+/// which is why the whole of the decision-making is here and testable.
 ///
 /// The token is what makes the call belong to an agent. It is minted per session,
 /// bound when the agent exists, and dropped when the session ends, so a helper left
 /// behind by a dead runtime cannot post into a conversation it is no longer part of.
+/// It rides in the helper's environment (`AGENTS_MCP_TOKEN`), not on its argv, so a
+/// casual `ps` on a shared host does not print it (security review S7).
 extension DaemonCore {
+    /// Environment key for the helper's token. Not on the command line (S7).
+    public static let mcpTokenVariable = "AGENTS_MCP_TOKEN"
+
     /// The MCP server every agent is given, beside whatever the user attached.
     ///
     /// The helper is told where this daemon lives rather than left to work it out. A
@@ -28,9 +33,10 @@ extension DaemonCore {
     func appServer(token: String, managesAgents: Bool = true, movesItself: Bool = true) -> MCPServer {
         MCPServer(name: AppTool.serverName,
                   transport: .stdio(command: Self.helperPath,
-                                    args: ["mcp", token] + (managesAgents ? [] : [Self.noAgentToolsFlag])
+                                    args: ["mcp"] + (managesAgents ? [] : [Self.noAgentToolsFlag])
                                         + (movesItself ? [] : [Self.noMoveToolsFlag]),
-                                    env: [StoreLocations.rootVariable: locations.root.path]))
+                                    env: [StoreLocations.rootVariable: locations.root.path,
+                                          Self.mcpTokenVariable: token]))
     }
 
     /// What tells the helper to leave the agent tools out.
@@ -134,14 +140,22 @@ extension DaemonCore {
         // wrong hears about that first; and before either write, so a refused ask
         // leaves nothing behind (the whole call is refused).
         var afterwards: AfterTurn?
+        // `archive` is a word an older conversation was told it could send. The
+        // outcome still lands — that is how the person knows whether the session was
+        // useful — and the session stays in the list.
+        var declinedArchive = false
         if let written = request.afterwards {
             guard let after = AfterTurn(wire: written) else {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: AfterTurn.unknown)
             }
-            guard after.goes(with: checked.report.outcome) else {
-                throw JSONRPCError(code: JSONRPCError.invalidParams, message: after.refusal)
+            if after == .archive {
+                declinedArchive = true
+            } else {
+                guard after.goes(with: checked.report.outcome) else {
+                    throw JSONRPCError(code: JSONRPCError.invalidParams, message: after.refusal)
+                }
+                afterwards = after
             }
-            afterwards = after
         }
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
         // Cleaned again here, not trusted from the helper: the daemon is what writes
@@ -152,7 +166,8 @@ extension DaemonCore {
                                afterwards: afterwards,
                                on: checked.agent, id: checked.agentID)
         let asked = afterwards.map { " " + Self.afterTurnNote($0) } ?? ""
-        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked
+        let kept = declinedArchive ? " " + AfterTurn.keptVisible : ""
+        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked + kept
     }
 
     /// The refusals a report can meet, in the order it meets them, each a sentence the
@@ -335,6 +350,61 @@ extension DaemonCore {
             """
     }
 
+    /// An agent has asked the person a question via `ask_form`, and is waiting.
+    ///
+    /// The form is held as an ordinary elicitation so the phone and every window can
+    /// answer it the same way they answer a runtime's own question. The call parks
+    /// until that answer arrives, the person skips or cancels, or the agent stops.
+    public func askForm(_ request: DaemonAPI.AskFormRequest) async throws -> String {
+        guard let agentID = appTokens[request.token], agents[agentID] != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
+                               message: "That conversation is not open any more, so nobody was asked.")
+        }
+        guard !request.questions.isEmpty else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: "Nothing was asked: send at least one question.")
+        }
+        var properties: [ElicitationSchema.Property] = []
+        for question in request.questions {
+            let id = question.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            let prompt = question.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !id.isEmpty, !prompt.isEmpty else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams,
+                                   message: "Nothing was asked: each question needs an id and a prompt.")
+            }
+            let choices = (question.options ?? []).compactMap { option -> ElicitationSchema.Property.Choice? in
+                let value = option.id.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !value.isEmpty else { return nil }
+                return .init(value: value, title: option.label)
+            }
+            let kind: ElicitationSchema.Property.Kind
+            if choices.isEmpty {
+                kind = .string(format: nil, minLength: nil, maxLength: nil, choices: nil)
+            } else if question.allowMultiple == true {
+                kind = .multiSelect(items: choices, minItems: nil, maxItems: nil)
+            } else {
+                kind = .string(format: nil, minLength: nil, maxLength: nil, choices: choices)
+            }
+            properties.append(.init(name: id, title: prompt, isRequired: true, kind: kind))
+        }
+        let title = request.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedTitle = (title?.isEmpty == false) ? title : nil
+        let elicitation = ElicitationRequest(
+            agentID: agentID,
+            message: cleanedTitle ?? (properties.count == 1 ? properties[0].title : nil),
+            mode: .form(ElicitationSchema(title: cleanedTitle, properties: properties)))
+        // Parked before anything is awaited, so an answer arriving in the next
+        // instant finds the call to resume rather than starting the agent again.
+        let answer = await withCheckedContinuation { (continuation: CheckedContinuation<Result<String, JSONRPCError>, Never>) in
+            openAsks[elicitation.id] = continuation
+            Task { await self.holdElicitation(elicitation, agentID: agentID) }
+        }
+        switch answer {
+        case .success(let text): return text
+        case .failure(let error): throw error
+        }
+    }
+
     /// The turn they belonged to is over. Anything the user sends is the answer to
     /// what was suggested, whether they tapped a chip or typed past it.
     func clearSuggestions(for agentID: UUID) {
@@ -362,6 +432,16 @@ extension DaemonCore {
     /// older names.
     func autoAllowed(_ request: PermissionRequest) -> PermissionOption? {
         guard request.toolCall.isAutoAllowable else { return nil }
+        return request.options.first { $0.kind == .allowAlways }
+            ?? request.options.first { $0.kind == .allowOnce }
+    }
+
+    /// Cursor and Grok (061): only the tools that end or annotate a turn, never the ones
+    /// that start agents, change workflows, take leases or publish.
+    func autoAllowedTurnTool(_ request: PermissionRequest) -> PermissionOption? {
+        let call = request.toolCall
+        guard call.isFinishingTurn || call.isSuggestingPrompts
+                || call.isShowingFile || call.isReportingOutcome else { return nil }
         return request.options.first { $0.kind == .allowAlways }
             ?? request.options.first { $0.kind == .allowOnce }
     }

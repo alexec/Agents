@@ -17,7 +17,9 @@ extension DaemonCore {
         // Who asked travels with the work, so a runtime started deep inside it is started
         // with what that connection lent (043).
         let answer = await RequestConnection.$current.withValue(connection) {
-            await dispatch(method: method, params: params, from: surface, connection: connection, role: role)
+            await RequestConnection.$role.withValue(role) {
+                await dispatch(method: method, params: params, from: surface, connection: connection, role: role)
+            }
         }
         return retiredInstead(of: answer, params: params)
     }
@@ -41,11 +43,11 @@ extension DaemonCore {
 
     /// A token speaks for its agent only from inside that agent's runtime.
     ///
-    /// The token is on the helper's command line, where every process of this account
-    /// can read it. So a call carrying one has to come from a process the agent's own
-    /// runtime started — the helper, through `npx` or a shell at most — or it is turned
-    /// away as if the token meant nothing. A token nobody holds is left for the method
-    /// to refuse in its own words.
+    /// The token is in the helper's environment, which every process of this account
+    /// can still read on a shared host. So a call carrying one has to come from a
+    /// process the agent's own runtime started — the helper, through `npx` or a shell
+    /// at most — or it is turned away as if the token meant nothing. A token nobody
+    /// holds is left for the method to refuse in its own words.
     ///
     /// For a runtime that takes its stdio servers through the bridge (Copilot, 054), the
     /// helper is this daemon's child, started for the token's route only on a request that
@@ -178,6 +180,15 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
                 return .success(try JSONValue.encoding(try await runWorkflow(request)))
 
+            case DaemonAPI.Method.pluginsList:
+                let request = try require(params, as: DaemonAPI.PluginsListRequest.self)
+                return .success(try JSONValue.encoding(
+                    DaemonAPI.PluginsList(folder: request.folder, plugins: projectPlugins(in: request.folder))))
+
+            case DaemonAPI.Method.pluginsApprove:
+                let request = try require(params, as: DaemonAPI.PluginApproveRequest.self)
+                return .success(try JSONValue.encoding(try approvePlugin(request)))
+
             case DaemonAPI.Method.workflowsApprove:
                 let request = try require(params, as: DaemonAPI.WorkflowApproveRequest.self)
                 return .success(try JSONValue.encoding(try approveWorkflow(request)))
@@ -194,7 +205,72 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 
             case DaemonAPI.Method.personalShared:
+                #if canImport(CryptoKit)
+                return .success(try JSONValue.encoding(withManagedSkills(sharedSnapshot())))
+                #else
                 return .success(try JSONValue.encoding(sharedSnapshot()))
+                #endif
+
+            #if canImport(CryptoKit)
+            case DaemonAPI.Method.catalogSearch:
+                let request = try require(params, as: DaemonAPI.CatalogSearchRequest.self)
+                if request.kind == .mcp {
+                    return .success(try JSONValue.encoding(await mcpSearchResults(request.query)))
+                }
+                return .success(try JSONValue.encoding(await catalogSearch(request)))
+
+            case DaemonAPI.Method.catalogPreview:
+                let request = try require(params, as: DaemonAPI.CatalogPreviewRequest.self)
+                return .success(try JSONValue.encoding(await catalogPreview(request)))
+
+            case DaemonAPI.Method.catalogDestinationState:
+                let request = try require(params, as: DaemonAPI.DestinationStateRequest.self)
+                return .success(try JSONValue.encoding(try await catalogDestinationState(request)))
+
+            case DaemonAPI.Method.skillsAdd:
+                let request = try require(params, as: DaemonAPI.SkillAddRequest.self)
+                return .success(try JSONValue.encoding(try await skillsAdd(request)))
+
+            case DaemonAPI.Method.skillsList:
+                let request = try require(params, as: DaemonAPI.SkillsListRequest.self)
+                return .success(try JSONValue.encoding(try skillsList(request)))
+
+            case DaemonAPI.Method.skillsCheckUpdates:
+                let request = try require(params, as: DaemonAPI.SkillsListRequest.self)
+                return .success(try JSONValue.encoding(try await skillsCheckUpdates(request)))
+
+            case DaemonAPI.Method.skillsUpdatePreview:
+                let request = try require(params, as: DaemonAPI.SkillNameRequest.self)
+                return .success(try JSONValue.encoding(try await skillsUpdatePreview(request)))
+
+            case DaemonAPI.Method.skillsRemove:
+                let request = try require(params, as: DaemonAPI.SkillNameRequest.self)
+                return .success(try JSONValue.encoding(try skillsRemove(request)))
+
+            case DaemonAPI.Method.mcpPreview:
+                let request = try require(params, as: DaemonAPI.MCPPreviewRequest.self)
+                return .success(try JSONValue.encoding(await mcpPreview(request)))
+
+            case DaemonAPI.Method.mcpAdd:
+                let request = try require(params, as: DaemonAPI.MCPAddRequest.self)
+                return .success(try JSONValue.encoding(try await mcpAdd(request)))
+
+            case DaemonAPI.Method.mcpList:
+                let request = try require(params, as: DaemonAPI.MCPListRequest.self)
+                return .success(try JSONValue.encoding(try mcpList(request)))
+
+            case DaemonAPI.Method.mcpApprove:
+                let request = try require(params, as: DaemonAPI.MCPApproveRequest.self)
+                return .success(try JSONValue.encoding(try mcpApprove(request)))
+
+            case DaemonAPI.Method.mcpSetSecret:
+                let request = try require(params, as: DaemonAPI.MCPSetSecretRequest.self)
+                return .success(try JSONValue.encoding(try mcpSetSecret(request)))
+
+            case DaemonAPI.Method.mcpRemove:
+                let request = try require(params, as: DaemonAPI.MCPRemoveRequest.self)
+                return .success(try JSONValue.encoding(try mcpRemove(request)))
+            #endif
 
             case DaemonAPI.Method.runtimesInstall:
                 let request = try require(params, as: DaemonAPI.RuntimeRequest.self)
@@ -397,6 +473,13 @@ extension DaemonCore {
             case DaemonAPI.Method.wakeState:
                 return .success(try JSONValue.encoding(await wakeState()))
 
+            case DaemonAPI.Method.wakeSettings:
+                return .success(try JSONValue.encoding(await readWakeSettings()))
+
+            case DaemonAPI.Method.wakeSet:
+                let settings = try require(params, as: WakeSettings.self)
+                return .success(try JSONValue.encoding(await setWakeSettings(settings)))
+
             // Retiring archived agents (051). The two writes are the person's; the
             // role table keeps devices and agents to the reads.
             case DaemonAPI.Method.retentionState:
@@ -414,8 +497,17 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.RetiredRequest.self)
                 return .success(try JSONValue.encoding(await retiredTombstones(request)))
 
+            case DaemonAPI.Method.clientPermissionsState:
+                return .success(try JSONValue.encoding(clientPermissionState()))
+
+            case DaemonAPI.Method.clientPermissionsSet:
+                let settings = try require(params, as: ClientPermissionSettings.self)
+                return .success(try JSONValue.encoding(try setClientPermissions(settings)))
+
             case DaemonAPI.Method.poolState:
                 let request = (try? require(params, as: DaemonAPI.PoolStateRequest.self)) ?? .init()
+                // Someone is looking at the pool: ask what is left, behind the answer.
+                Task { await self.measureAllowances() }
                 return .success(try JSONValue.encoding(await poolStatus(days: request.days)))
 
             case DaemonAPI.Method.poolSet:
@@ -460,6 +552,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ShowFileRequest.self)
                 return .success(["note": .string(try await showFile(request))])
 
+            case DaemonAPI.Method.agentsAskForm:
+                let request = try require(params, as: DaemonAPI.AskFormRequest.self)
+                return .success(["note": .string(try await askForm(request))])
+
             case DaemonAPI.Method.artifactWrite:
                 let request = try require(params, as: DaemonAPI.ArtifactWriteRequest.self)
                 try await artifactWrite(request)
@@ -468,14 +564,6 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsManageWorkflows:
                 let request = try require(params, as: DaemonAPI.ManageWorkflowsRequest.self)
                 return .success(["note": .string(try await manageWorkflows(request))])
-
-            case DaemonAPI.Method.agentsPushPullRequest:
-                let request = try require(params, as: DaemonAPI.PushPullRequestRequest.self)
-                return .success(["note": .string(try await pushPullRequest(request))])
-
-            case DaemonAPI.Method.agentsReplyOnPullRequest:
-                let request = try require(params, as: DaemonAPI.ReplyOnPullRequestRequest.self)
-                return .success(["note": .string(try await replyOnPullRequest(request))])
 
             case DaemonAPI.Method.leasesLease:
                 let request = try require(params, as: DaemonAPI.LeaseRequest.self)
@@ -546,6 +634,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await stopHelper(request))])
 
+            case DaemonAPI.Method.agentsParkHelper:
+                let request = try require(params, as: DaemonAPI.HelperRequest.self)
+                return .success(["note": .string(try parkHelper(request))])
+
             case DaemonAPI.Method.agentsArchiveHelper:
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await archiveHelper(request))])
@@ -561,27 +653,6 @@ extension DaemonCore {
             case DaemonAPI.Method.worktreesRemove:
                 let request = try require(params, as: DaemonAPI.WorktreeRemovalRequest.self)
                 return .success(try JSONValue.encoding(try await removeWorktree(request)))
-
-            // Pull requests (038). The Mac's only: the phone has no section to ask for.
-            case DaemonAPI.Method.pullRequestsList:
-                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
-                return .success(try JSONValue.encoding(await pullRequestList(for: request.folder)))
-
-            case DaemonAPI.Method.pullRequestsRefresh:
-                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
-                return .success(try JSONValue.encoding(await refreshPullRequests(in: request.folder)))
-
-            case DaemonAPI.Method.pullRequestsResume:
-                let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
-                return .success(try JSONValue.encoding(try await resumePullRequest(request.number, in: request.folder)))
-
-            case DaemonAPI.Method.pullRequestsAddBabysitter:
-                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
-                return .success(try JSONValue.encoding(try addBabysitter(in: request.folder)))
-
-            case DaemonAPI.Method.pullRequestsCheckout:
-                let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
-                return .success(try JSONValue.encoding(try await checkOutPullRequest(request.number, in: request.folder)))
 
             case DaemonAPI.Method.agentsListHelpers:
                 let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)

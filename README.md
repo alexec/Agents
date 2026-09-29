@@ -11,10 +11,10 @@ preview with `scripts/docs.sh serve`). This README is for building and working o
 
 The window is a list of the projects you work in — a project is a folder, named by that
 folder, on this Mac or on a Linux server — with that project's agents beside it, grouped
-by what they need from you: needs attention, blocked, waiting, working, complete, stopped,
-parked. An agent can start up to five helpers of its own, and a project's workflows (Markdown
-files under `.agents/workflows/`) start agents by themselves on a schedule or when
-something happens.
+by what happens next: needs you, waiting, working, done, paused, parked. Unread finished
+sessions need you until you open them. An agent can start up to five helpers of its own,
+and a project's workflows (Markdown files under `.agents/workflows/`) start agents
+by themselves on a schedule or when something happens.
 
 ## Build and run
 
@@ -85,10 +85,10 @@ ordinary one. Keep the path short: a Unix socket may be named with 104 bytes and
 more, and a root nested a few folders deep will say so rather than fail quietly.
 
 That is also how an agent working on this repository tries its own change: the `run-app`
-skill under `.claude/skills` builds, launches a copy on a root of its own, drives it over
-that root's socket — every method the window has — screenshots the window without taking
-the screen off you, and stops the window and its daemon afterwards. Nothing it does
-reaches the agents you are running.
+skill under `.agents/skills` (linked from `.claude/skills`) builds, launches a copy on a
+root of its own, drives it over that root's socket — every method the window has —
+screenshots the window without taking the screen off you, and stops the window and its
+daemon afterwards. Nothing it does reaches the agents you are running.
 
 ## What the app does with a runtime
 
@@ -147,7 +147,7 @@ no way to sign out, so the app shows neither.
   to say, shown as buttons above the prompt. Tapping one fills the prompt and leaves it
   to you to send. ACP has no way to carry a suggestion, so the app serves the agent an
   MCP server with this and `show_file` on it, attached to every session. Offering the tool
-  is not enough on its own — none of the three called it unasked — so the daemon adds a
+  is not enough on its own — runtimes do not call it unasked — so the daemon adds a
   line to each prompt asking for them. That line goes to the runtime and not into the
   transcript, which still records what you said. Copilot has a follow-up feature of its
   own and uses that instead.

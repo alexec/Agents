@@ -354,7 +354,7 @@ final class RemoteModel {
 
     // MARK: Starting an agent (029)
 
-    /// The project a New agent sheet is open on, if one is. On the model rather than in
+    /// The project a New session sheet is open on, if one is. On the model rather than in
     /// the page's `@State` so a launch argument can open it, and so the sheet can close
     /// itself when the agent it started is ready to be looked at.
     var startingIn: URL? {
@@ -653,6 +653,9 @@ final class RemoteModel {
 
     /// The app's worktrees for the project on screen, for its Worktrees section.
     private(set) var projectWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
+    /// The folder `projectWorktrees` answers for, which lags `projectWorktreesFolder`
+    /// while another project's list is on its way.
+    private(set) var projectWorktreesAnswered: URL?
     private var projectWorktreesFolder: URL?
 
     /// Asked when the project page appears and after a removal, never polled.
@@ -664,6 +667,7 @@ final class RemoteModel {
             ?? .notARepository
         guard projectWorktreesFolder == folder else { return }
         projectWorktrees = answer
+        projectWorktreesAnswered = folder
     }
 
     /// What removing one would lose, or nil when the Mac could not say (and the app's
@@ -750,6 +754,7 @@ final class RemoteModel {
     func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }
 
     /// The question the open conversation is blocked on, if it still is.
+    var questionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }
 
     /// The form it is blocked on instead, if it is one of those.
@@ -758,7 +763,7 @@ final class RemoteModel {
     /// exist: it is the one the runtime is most likely to be sitting on, and two
     /// blocking cards at once on a phone is a card nobody can read.
     var formForSelection: ElicitationRequest? {
-        questionForSelection == nil ? work.elicitation(for: selection) : nil
+        questionsForSelection.isEmpty ? work.elicitation(for: selection) : nil
     }
 
     /// A file being read, by path, or nothing.
@@ -1876,7 +1881,7 @@ final class RemoteModel {
         if let name = value("-project"),
            let summary = work.projects.first(where: { $0.name == name }) {
             selectedProject = summary.folder
-            // `-start` opens New agent on that project: the sheet is the one screen in
+            // `-start` opens New session on that project: the sheet is the one screen in
             // this app that cannot be reached by naming what to look at.
             if arguments.contains("-start") {
                 try? await Task.sleep(for: .milliseconds(600))

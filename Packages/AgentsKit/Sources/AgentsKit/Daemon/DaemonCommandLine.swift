@@ -30,10 +30,15 @@ public struct DaemonCommandLine: Sendable {
     public let arguments: [String]
     public let mode: Mode
 
-    public init(_ arguments: [String]) {
+    public init(_ arguments: [String],
+                environment: [String: String] = ProcessInfo.processInfo.environment) {
         self.arguments = arguments
-        if arguments.count >= 3, arguments[1] == "mcp" {
-            mode = .mcp(token: arguments[2])
+        if arguments.count >= 2, arguments[1] == "mcp" {
+            // Prefer the environment (S7); an old argv form still works for a moment.
+            let token = environment[DaemonCore.mcpTokenVariable]
+                ?? (arguments.count >= 3 ? arguments[2] : nil)
+                ?? ""
+            mode = .mcp(token: token)
         } else {
             let rest = arguments.dropFirst()
             mode = .daemon(serve: rest.contains(Self.serveFlag), detach: rest.contains(Self.detachFlag))

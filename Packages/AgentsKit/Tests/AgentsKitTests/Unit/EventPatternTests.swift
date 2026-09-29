@@ -17,19 +17,19 @@ struct EventPatternTests {
     }
 
     @Test func aWholeSubjectMatchesEveryKindInItAndNothingElse() throws {
-        let all = try pattern("pull_request.*")
-        for kind in EventCatalogue.kinds(in: .pullRequest) { #expect(all.matches(event(kind.name))) }
-        #expect(EventCatalogue.kinds(in: .pullRequest).count == 10)
+        let all = try pattern("workflow.*")
+        for kind in EventCatalogue.kinds(in: .workflow) { #expect(all.matches(event(kind.name))) }
+        #expect(EventCatalogue.kinds(in: .workflow).count == 3)
         #expect(!all.matches(event("branch.moved")))
         #expect(!all.matches(event("mac.wake")))
     }
 
     @Test func filtersNarrowByDetailComparedAsStrings() throws {
-        let merged41 = try pattern("pull_request.merged", ["number": "41"])
-        #expect(merged41.matches(event("pull_request.merged", ["number": "41"])))
-        #expect(!merged41.matches(event("pull_request.merged", ["number": "42"])))
-        #expect(!merged41.matches(event("pull_request.merged")))
-        #expect(!merged41.matches(event("pull_request.closed", ["number": "41"])))
+        let nightly = try pattern("workflow.completed", ["workflow": "nightly"])
+        #expect(nightly.matches(event("workflow.completed", ["workflow": "nightly"])))
+        #expect(!nightly.matches(event("workflow.completed", ["workflow": "weekly"])))
+        #expect(!nightly.matches(event("workflow.completed")))
+        #expect(!nightly.matches(event("workflow.ran", ["workflow": "nightly"])))
     }
 
     @Test func aCustomNameMatchesOnlyItself() throws {
@@ -42,8 +42,8 @@ struct EventPatternTests {
     }
 
     @Test func anUnknownNameIsRefusedWithASuggestionAndTheList() {
-        let message = EventPattern.parse("pull_request.merge").failure?.message ?? ""
-        #expect(message.contains("Did you mean pull_request.merged?"))
+        let message = EventPattern.parse("workflow.complete").failure?.message ?? ""
+        #expect(message.contains("Did you mean workflow.completed?"))
         #expect(message.contains("mac.wake"))
         #expect(message.contains("custom.<name>"))
     }
@@ -53,10 +53,10 @@ struct EventPatternTests {
     }
 
     @Test func aFilterTheKindDoesNotCarryIsRefusedNamingWhatItDoes() {
-        let problem = EventPattern.parse("pull_request.merged", filters: ["branch": "x"]).failure
-        #expect(problem?.message == "pull_request.merged carries number; \"branch\" is not one of its details.")
-        #expect(EventPattern.parse("pull_request.*", filters: ["branch": "x"]).failure != nil)
-        #expect(EventPattern.parse("pull_request.*", filters: ["number": "4"]).failure == nil)
+        let problem = EventPattern.parse("branch.moved", filters: ["number": "x"]).failure
+        #expect(problem?.message == "branch.moved carries branch, from, to; \"number\" is not one of its details.")
+        #expect(EventPattern.parse("branch.*", filters: ["number": "x"]).failure != nil)
+        #expect(EventPattern.parse("branch.*", filters: ["branch": "main"]).failure == nil)
     }
 
     @Test func aBadCustomNameIsRefused() {
@@ -68,16 +68,17 @@ struct EventPatternTests {
     }
 
     @Test func copyAsTriggerNarrowsByTheKindsDetailsOnly() {
-        let merged = event("pull_request.merged", ["number": "41"])
-        #expect(EventPattern.matching(merged).asTrigger == "on:\n  - pull_request.merged:\n      number: 41")
+        let moved = event("branch.moved", ["branch": "main", "from": "a1", "to": "b2", "extra": "x"])
+        #expect(EventPattern.matching(moved).asTrigger
+                == "on:\n  - branch.moved:\n      branch: main\n      from: a1\n      to: b2")
         #expect(EventPattern.matching(event("mac.wake")).asTrigger == "on:\n  - mac.wake")
         let custom = event("custom.build_green", ["branch": "feature x"])
         #expect(EventPattern.matching(custom).asTrigger
                 == "on:\n  - custom.build_green:\n      branch: \"feature x\"")
     }
 
-    @Test func theLabelWritesANumberAsAHash() throws {
-        #expect(try pattern("pull_request.merged", ["number": "44"]).label == "pull_request.merged #44")
+    @Test func theLabelWritesEachFilterAfterTheName() throws {
+        #expect(try pattern("branch.moved", ["branch": "main"]).label == "branch.moved branch main")
     }
 }
 

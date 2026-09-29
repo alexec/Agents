@@ -1,10 +1,10 @@
 import Foundation
 
 /// A chat waiting for an allowance to come back (052, US4; research R8): every runtime in
-/// the pool was out, and one said when it returns. At that time the chat carries on with
-/// the words it was refused, sent again once.
+/// the pool was out, and one is due an availability check. Once a check passes the chat
+/// carries on with the words it was refused, sent again once.
 public struct AllowanceWait: Codable, Hashable, Sendable {
-    /// When the first entry is due back.
+    /// When the first entry is due a check; moved on while none has passed.
     public var resumeAt: Date
     /// That entry, and its runtime, for saying which.
     public var entryID: UUID?
@@ -29,9 +29,8 @@ public struct AllowanceWait: Codable, Hashable, Sendable {
 
 extension PoolPlan {
     /// The first entry due back, when every one is out: the chat's own included, which is
-    /// often the first to return. Only entries that can be used, and only times still
-    /// ahead, and only a time the provider gave: the app's own one-hour retry is not a return.
-    /// Nil when none has said when.
+    /// often the first to return. A check is an attempt, so a failed one moves the
+    /// wait to the next check instead of sending the refused prompt unverified.
     public static func earliestReturn(current: PoolEntry, pool: PoolSettings, states: [String: AllowanceState],
                                       unusable: (PoolEntry) -> String?, now: Date) -> (at: Date, entry: PoolEntry)? {
         var entries = pool.entries.filter { unusable($0) == nil }
@@ -39,7 +38,8 @@ extension PoolPlan {
             entries.insert(current, at: 0)
         }
         return entries.compactMap { entry -> (Date, PoolEntry)? in
-            guard let back = states[AllowanceState.credentialKey(for: entry)]?.knownReturn, back > now else { return nil }
+            guard let state = states[AllowanceState.credentialKey(for: entry)],
+                  case .out(_, let back?, _) = state.status, back > now else { return nil }
             return (back, entry)
         }
         .min { $0.0 < $1.0 }

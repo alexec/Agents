@@ -31,13 +31,12 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsSuggestPrompts,
         DaemonAPI.Method.agentsReportOutcome,
         DaemonAPI.Method.agentsShowFile,
+        DaemonAPI.Method.agentsAskForm,
         DaemonAPI.Method.agentsManageWorkflows,
         DaemonAPI.Method.agentsStartHelper,
         DaemonAPI.Method.agentsStopHelper,
         DaemonAPI.Method.agentsArchiveHelper,
         DaemonAPI.Method.agentsListHelpers,
-        DaemonAPI.Method.agentsPushPullRequest,
-        DaemonAPI.Method.agentsReplyOnPullRequest,
         DaemonAPI.Method.leasesLease,
         DaemonAPI.Method.leasesRelease,
         DaemonAPI.Method.leasesList,
@@ -52,8 +51,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// it. Left out on purpose: `credentials/*`, `runtimes/authenticate`, `logout`,
     /// `install`, `setProvider` and `disableProvider`, `files/browse` and `files/write`, `daemon/quit`,
     /// `hosts/*`, `devices/list` and `forget`, `relay/register`, `mailbox/carry`,
-    /// `workflows/approve`, `projects/add` and `clone`, `sessions/*`, and every agent
-    /// tool.
+    /// `workflows/approve`, `plugins/list` and `approve`, `projects/add` and `clone`,
+    /// `sessions/*`, and every agent tool.
     public static let deviceMethods: Set<String> = Set<String>([
         DaemonAPI.Method.projectsList,
         DaemonAPI.Method.agentsList,

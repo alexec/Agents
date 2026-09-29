@@ -6,7 +6,8 @@ import Foundation
 /// written against a later version, or by hand against next year's documentation, is
 /// listed and inert rather than rejected. The triggers this version defers — file and
 /// glob changes, git events, CI — arrive as new cases here and change nothing about a
-/// file already on disk. GitHub pull requests arrived that way (038).
+/// file already on disk. The pull-request triggers 038 added left the same way: a file
+/// that still names one lists it as inert.
 ///
 /// Running a workflow by hand is deliberately not in here. Run now is offered on every
 /// workflow whatever its triggers, including one whose triggers this version cannot
@@ -26,13 +27,6 @@ public enum WorkflowTrigger: Hashable, Sendable {
     case agentStopped
     /// Another workflow's run completed. `nil` means any workflow in this project.
     case workflowCompleted(id: String?)
-    /// A check that was not failing on one of my pull requests now is (038).
-    case pullRequestChecksFailed
-    /// One of my pull requests has review comments, from somebody with write access,
-    /// newer than the last fire for it.
-    case pullRequestReviewComments
-    /// One of my pull requests can no longer merge cleanly into its base.
-    case pullRequestConflicts
     /// Any event in the catalogue, a whole subject, or `custom.<name>`, narrowed by
     /// details (042 FR-021): the same pattern a wait uses, so the two cannot drift.
     case event(EventPattern)
@@ -49,9 +43,6 @@ public enum WorkflowTrigger: Hashable, Sendable {
         case .agentAskedForm: return "agent-asked-form"
         case .agentStopped: return "agent-stopped"
         case .workflowCompleted: return "workflow-completed"
-        case .pullRequestChecksFailed: return "pull-request-checks-failed"
-        case .pullRequestReviewComments: return "pull-request-review-comments"
-        case .pullRequestConflicts: return "pull-request-conflicts"
         case .event(let pattern): return pattern.name
         case .unrecognised(let name, _): return name
         }
@@ -86,18 +77,6 @@ public enum WorkflowTrigger: Hashable, Sendable {
         return true
     }
 
-    /// The three that watch the viewer's own pull requests (038).
-    public static let pullRequestTriggers: [WorkflowTrigger] =
-        [.pullRequestChecksFailed, .pullRequestReviewComments, .pullRequestConflicts]
-
-    /// Whether it watches pull requests, and so fires once for each one.
-    public var isPullRequest: Bool {
-        switch self {
-        case .pullRequestChecksFailed, .pullRequestReviewComments, .pullRequestConflicts: return true
-        default: return false
-        }
-    }
-
     /// The schedule this carries, if it is one.
     public var schedule: WorkflowSchedule? {
         if case .schedule(let schedule) = self { return schedule }
@@ -114,9 +93,6 @@ public enum WorkflowTrigger: Hashable, Sendable {
         case .agentStopped: return "When an agent stops without finishing"
         case .workflowCompleted(let id):
             return id.map { "When \($0) finishes" } ?? "When any workflow finishes"
-        case .pullRequestChecksFailed: return "When checks fail on one of my pull requests"
-        case .pullRequestReviewComments: return "When one of my pull requests gets review comments"
-        case .pullRequestConflicts: return "When one of my pull requests conflicts with its base"
         case .event(let pattern): return "When " + Self.lowercasedFirst(pattern.summary)
         case .unrecognised(let name, _):
             return "Waits for \"\(name)\", which this version does not know about yet"
@@ -151,11 +127,11 @@ extension WorkflowTrigger {
     }
 }
 
-/// Written by hand so that the pull-request triggers go over the wire in the shape
-/// `.unrecognised` has (038 R11). An older Mac or phone then reads a babysitting
-/// workflow as a trigger it does not know yet, and lists it as inert, rather than
-/// failing to read the whole project's workflows. Every other case keeps exactly the
-/// shape the compiler gave it, through `Stored`.
+/// Written by hand so that event triggers go over the wire in the shape `.unrecognised`
+/// has (042 FR-025). An older Mac or phone then reads one as a trigger it does not know
+/// yet, and lists it as inert, rather than failing to read the whole project's
+/// workflows. Every other case keeps exactly the shape the compiler gave it, through
+/// `Stored`.
 extension WorkflowTrigger: Codable {
     private enum Stored: Codable {
         case schedule(WorkflowSchedule)
@@ -176,9 +152,7 @@ extension WorkflowTrigger: Codable {
         case .agentStopped: self = .agentStopped
         case .workflowCompleted(let id): self = .workflowCompleted(id: id)
         case .unrecognised(let name, let keys):
-            if let known = Self.pullRequestTriggers.first(where: { $0.name == name && keys.isEmpty }) {
-                self = known
-            } else if name.contains("."),
+            if name.contains("."),
                       case .success(let pattern) = EventPattern.parse(name, filters: keys.compactMapValues(Self.scalar)) {
                 self = .event(pattern)
             } else {
@@ -196,10 +170,8 @@ extension WorkflowTrigger: Codable {
         case .agentAskedForm: stored = .agentAskedForm
         case .agentStopped: stored = .agentStopped
         case .workflowCompleted(let id): stored = .workflowCompleted(id: id)
-        case .pullRequestChecksFailed, .pullRequestReviewComments, .pullRequestConflicts:
-            stored = .unrecognised(name: name, keys: [:])
-        // As 038's did, and for the same reason (042 FR-025): an older Mac or phone
-        // reads it as a trigger it does not know yet, and lists it as inert.
+        // An older Mac or phone reads it as a trigger it does not know yet, and lists it
+        // as inert (042 FR-025).
         case .event(let pattern):
             stored = .unrecognised(name: pattern.name, keys: pattern.filters.mapValues(JSONValue.string))
         case .unrecognised(let name, let keys): stored = .unrecognised(name: name, keys: keys)

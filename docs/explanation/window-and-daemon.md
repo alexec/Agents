@@ -47,13 +47,16 @@ that agent, so it carries on. It can still ask you a question, and the question 
 you. If you have set up your iPhone, the question reaches it there.
 
 When the agent finishes and nothing else is going on, the daemon exits. When you open
-Agents again, a new daemon starts, reads the records, and the agent is under **Complete**
-with its summary, as if you had watched it finish.
+Agents again, a new daemon starts, reads the records, and the unread agent is under
+**Needs you** with its summary. Once you open it, completed work moves to **Done**.
 
 While any agent has a turn in flight, the daemon keeps the Mac from going to sleep because
-it has been left alone. It lets go as soon as no turn is in flight. An agent waiting for
-your answer does not keep the Mac awake. Closing the lid, or choosing **Sleep** yourself,
-still puts the Mac to sleep, and a turn in flight goes to sleep with it.
+it has been left alone. After the last turn stops, it stays awake for a while longer so
+you can reply — an hour by default, or right away through eight hours in
+**Settings ▸ General ▸ Sleep**. An agent waiting for your answer does not count as a turn
+in flight, so that grace is when you get the time. Closing the lid, or choosing **Sleep**
+yourself, still puts the Mac to sleep, and a turn in flight goes to sleep with it. At
+20% battery or below the hold ends anyway.
 
 ## Restarting the Mac
 
@@ -87,5 +90,5 @@ the conversation and everything around it are still there.
 
 ## Related
 
-- [How-to guides](../how-to/index.md), for starting, stopping and archiving agents.
-- [Reference](../reference/index.md), for what each status and group means.
+- [Stop, park and archive agents](../how-to/archive-park-stop.md).
+- [Statuses and groups](../reference/statuses.md).

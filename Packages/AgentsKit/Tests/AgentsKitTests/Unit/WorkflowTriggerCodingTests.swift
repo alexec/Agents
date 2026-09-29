@@ -3,8 +3,10 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// The three pull-request triggers in a file and on the wire (038 R11).
-@Suite("Pull-request triggers, read and written")
+/// What the pull-request triggers (038) left behind once GitHub support was removed: a
+/// file that still names them is listed and inert, and the app's own records of them
+/// still read.
+@Suite("Pull-request triggers, after GitHub support went")
 struct WorkflowTriggerCodingTests {
     private let project = URL(filePath: "/tmp/a-project")
 
@@ -20,62 +22,38 @@ struct WorkflowTriggerCodingTests {
         Read what changed.
         """
 
-    @Test func theThreeNamesReadFromAFile() {
+    @Test func theOldNamesReadAsTriggersThisVersionDoesNotKnow() {
         let workflow = WorkflowFile.parse(babysitter, workflowID: "babysit-pull-requests", in: project)
-        #expect(workflow.problem == nil)
-        #expect(workflow.triggers == WorkflowTrigger.pullRequestTriggers)
-        #expect(workflow.canFire)
-        #expect(workflow.respondsToPullRequests)
-        #expect(workflow.onlyRespondsToPullRequests)
+        #expect(workflow.triggers == [
+            .unrecognised(name: "pull-request-checks-failed", keys: [:]),
+            .unrecognised(name: "pull-request-review-comments", keys: [:]),
+            .unrecognised(name: "pull-request-conflicts", keys: [:]),
+        ])
+        #expect(workflow.problem == .triggerNotSupported("pull-request-checks-failed"))
+        #expect(!workflow.canFire)
     }
 
-    @Test func allThreeTogetherReadAsOneSentence() {
-        let workflow = WorkflowFile.parse(babysitter, workflowID: "babysit-pull-requests", in: project)
-        #expect(workflow.summary.hasPrefix(
-            "When one of my pull requests fails its checks, gets review comments or conflicts with its base, in a new agent"))
-    }
-
-    @Test func oneOnItsOwnSaysItsOwnWords() {
-        let workflow = Workflow(workflowID: "w", folder: project,
-                                triggers: [.pullRequestConflicts, .agentFinished])
-        #expect(workflow.summary.hasPrefix(
-            "When one of my pull requests conflicts with its base, and When an agent finishes"))
-        #expect(!workflow.onlyRespondsToPullRequests)
-    }
-
-    @Test func aPullRequestTriggerWithSettingsIsUnreadable() {
+    @Test func oneBesideAKnownTriggerLeavesThatOneWorking() {
         let text = """
             ---
             on:
-              - pull-request-checks-failed:
-                  branch: main
+              - pull-request-conflicts
+              - agent-finished
             ---
-            Fix it.
+            Look.
             """
         let workflow = WorkflowFile.parse(text, workflowID: "w", in: project)
-        guard case .unreadable(let detail) = workflow.problem else {
-            Issue.record("expected unreadable, got \(String(describing: workflow.problem))")
-            return
-        }
-        #expect(detail.contains("takes no settings"))
+        #expect(workflow.problem == nil)
+        #expect(workflow.supportedTriggers == [.agentFinished])
     }
 
-    @Test func theyRoundTripThroughJSON() throws {
-        let all = WorkflowTrigger.pullRequestTriggers + [.agentFinished, .workflowCompleted(id: "x")]
-        let data = try JSONEncoder().encode(all)
-        #expect(try JSONDecoder().decode([WorkflowTrigger].self, from: data) == all)
-    }
-
-    /// What an older build sees: the same shape its own `.unrecognised` has, so it
-    /// lists the workflow as inert rather than failing to read the project's workflows.
-    @Test func anOlderReaderSeesATriggerItDoesNotKnow() throws {
-        enum OldTrigger: Codable, Equatable {
-            case agentFinished
-            case unrecognised(name: String, keys: [String: JSONValue])
-        }
-        let data = try JSONEncoder().encode(WorkflowTrigger.pullRequestChecksFailed)
-        #expect(try JSONDecoder().decode(OldTrigger.self, from: data)
-                == .unrecognised(name: "pull-request-checks-failed", keys: [:]))
+    /// What an older build wrote on the wire comes back as the same inert trigger, so
+    /// writing it back does not quietly delete it.
+    @Test func anOldTriggerOnTheWireStaysWhole() throws {
+        let data = Data(#"{"unrecognised":{"name":"pull-request-checks-failed","keys":{}}}"#.utf8)
+        let trigger = try JSONDecoder().decode(WorkflowTrigger.self, from: data)
+        #expect(trigger == .unrecognised(name: "pull-request-checks-failed", keys: [:]))
+        #expect(try JSONDecoder().decode(WorkflowTrigger.self, from: JSONEncoder().encode(trigger)) == trigger)
     }
 
     @Test func existingTriggersKeepTheirShape() throws {
@@ -83,19 +61,16 @@ struct WorkflowTriggerCodingTests {
         #expect(String(decoding: data, as: UTF8.self) == #"{"agentFinished":{}}"#)
     }
 
-    @Test func aStateWrittenBeforeStandingAgentsPerPullRequestStillReads() throws {
-        let json = #"{"folder":"file:///tmp/a-project","workflowID":"w","isArchived":true}"#
+    /// A state written while a pull request's run was refused: the refusal is one this
+    /// version no longer has, so it is forgotten, and the rest of the state is kept.
+    @Test func aStateWithAPullRequestRefusalStillReads() throws {
+        let json = """
+            {"folder":"file:///tmp/a-project","workflowID":"w","isArchived":true,
+             "standingAgentIDs":{"3":"\(UUID().uuidString)"},
+             "lastOutcome":{"refused":{"_0":{"babysittingStopped":{"pr":3,"runs":3}},"at":0,"repeats":1}}}
+            """
         let state = try JSONDecoder().decode(WorkflowState.self, from: Data(json.utf8))
         #expect(state.isArchived)
-        #expect(state.standingAgentIDs.isEmpty)
-    }
-
-    @Test func refusalsCollapseForEachPullRequest() {
-        #expect(WorkflowRefusal.worktreeDirty(pr: 3).isSameReason(as: .worktreeDirty(pr: 3)))
-        #expect(!WorkflowRefusal.worktreeDirty(pr: 3).isSameReason(as: .worktreeDirty(pr: 4)))
-        #expect(WorkflowRefusal.babysittingStopped(pr: 3, runs: 3).needsAPerson)
-        #expect(!WorkflowRefusal.noWorktree(pr: 3).needsAPerson)
-        #expect(WorkflowRefusal.worktreeDirty(pr: 377).rowMessage == "its worktree has uncommitted changes")
-        #expect(WorkflowRefusal.worktreeDirty(pr: 377).message == "#377's worktree has uncommitted changes")
+        #expect(state.lastOutcome == nil)
     }
 }

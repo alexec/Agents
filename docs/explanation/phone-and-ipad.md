@@ -104,6 +104,9 @@ settings or quit the Mac's agents.
 
 ## Related
 
-- [How-to guides](../how-to/index.md), for setting up the phone and answering questions
-  from it.
-- [Reference](../reference/index.md), for what each status means on every device.
+- [Follow an agent from your iPhone](../tutorials/follow-from-iphone.md), for pairing and
+  answering away from the Mac.
+- [Answer a question or a permission request](../how-to/answer-a-question.md), for the
+  card on every device.
+- [Statuses and groups](../reference/statuses.md), for what each line at the top of the
+  phone means.

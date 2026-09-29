@@ -19,7 +19,7 @@ agent, in the project folder.
 
 1. Open the project's page.
 
-   On iPhone or iPad, open the project and tap **New agent**.
+   On iPhone or iPad, open the project and tap **New session**.
 2. Before you send the first prompt, open the **Worktree** choice. On the Mac it sits
    above the prompt, beside the folder, and says **Project folder** until you change it.
    On iPhone and iPad it is the **Worktree** row of the start form.
@@ -82,6 +82,11 @@ tooltip says why. Start a new agent in a worktree instead.
 
    Only worktrees the app made have **Remove…**. Ones you made yourself in Terminal are
    listed but left for you to remove.
+
+On the project's page, **Refresh worktrees** updates the list after changes made outside
+the app. **Clean up worktrees** fills a new agent's prompt with a request to remove
+worktrees and branches for work already merged into the default branch. Review the
+request, then send it when you are ready.
 
 ## If it doesn't work
 

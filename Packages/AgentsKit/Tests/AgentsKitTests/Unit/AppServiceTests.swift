@@ -14,6 +14,7 @@ struct AppServiceTests {
     /// is what a runtime is here.
     private func pair(sink: @escaping AppService.Sink,
                       showFile: @escaping AppService.FileSink = { _ in .refused("not expected") },
+                      askForm: @escaping AppService.AskFormSink = { _, _ in .refused("not expected") },
                       reportOutcome: @escaping AppService.OutcomeSink = { _, _, _ in
                           .refused("not expected")
                       },
@@ -23,7 +24,8 @@ struct AppServiceTests {
         async -> (client: JSONRPCConnection, service: AppService) {
         let (mine, theirs) = PairedTransport.pair()
         let service = AppService(transport: theirs, finishTurn: finishTurn, sink: sink,
-                                 showFile: showFile, reportOutcome: reportOutcome)
+                                 showFile: showFile, askForm: askForm,
+                                 reportOutcome: reportOutcome)
         let client = JSONRPCConnection(transport: mine)
         await client.start()
         return (client, service)
@@ -57,22 +59,21 @@ struct AppServiceTests {
         // The one call that ends a turn first, the two that act mid-turn after it,
         // and the two older names last: listed, so a runtime that checks a name
         // against the list before calling it still finds what it was told (023).
-        // The four agent tools (028) sit after the workflow tool, before the older
-        // names, for an agent that may use them — which is the default. The three lease
-        // tools (036) follow them, for every agent, then the three event tools (042),
-        // and the two pull-request tools (038) after those, also for every agent.
-        // The two move tools (053) sit between the event and pull-request tools.
+        // The four agent tools (028 + park) sit after the workflow tool, before the
+        // older names, for an agent that may use them — which is the default.
+        // archive_agent is no longer offered. The three lease tools (036) follow
+        // them, for every agent, then the three event tools (042), and the two move
+        // tools (053) after those.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
-                AppService.workflowToolName,
+                AppService.workflowToolName, AppService.askFormToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
-                AppService.archiveAgentToolName, AppService.listMyAgentsToolName,
+                AppService.parkAgentToolName, AppService.listMyAgentsToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
                 AppService.publishEventToolName,
                 AppService.enterWorktreeToolName, AppService.exitWorktreeToolName,
-                AppService.pushPullRequestToolName, AppService.replyOnPullRequestToolName,
                 AppService.toolName, AppService.reportOutcomeToolName])
 
         let finish = tools.first?["inputSchema"]
@@ -308,6 +309,71 @@ struct AppServiceTests {
         await service.close()
     }
 
+    // MARK: Asking a form
+
+    @Test func anAskFormReachesTheSinkAndTheAgentIsToldWhatHappened() async throws {
+        let box = AskFormBox()
+        let (client, service) = await pair(sink: neverCalled(), askForm: { title, questions in
+            await box.record(title, questions)
+            return .shown("They answered:\n- Drink?: tea")
+        })
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.askFormToolName),
+            "arguments": [
+                "title": "Quick check",
+                "questions": [
+                    ["id": "drink", "prompt": "Drink?",
+                     "options": [["id": "tea", "label": "Tea"], ["id": "coffee", "label": "Coffee"]]],
+                ],
+            ],
+        ])
+        #expect(await box.title == "Quick check")
+        #expect(await box.questions.map(\.id) == ["drink"])
+        #expect(await box.questions.first?.options?.map(\.id) == ["tea", "coffee"])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
+            .contains("tea") == true)
+        await service.close()
+    }
+
+    @Test func anAskFormWithNoQuestionsIsToldRatherThanGuessedAt() async throws {
+        let (client, service) = await pair(sink: neverCalled(), askForm: { _, _ in
+            .shown("should not happen")
+        })
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.askFormToolName),
+            "arguments": ["questions": .array([])],
+        ])
+        #expect(result["isError"]?.boolValue == true)
+        #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
+            .contains("at least one question") == true)
+        await service.close()
+    }
+
+    @Test func aPrefixedAskFormIsStillOurTool() async throws {
+        let box = AskFormBox()
+        let (client, service) = await pair(sink: neverCalled(), askForm: { title, questions in
+            await box.record(title, questions)
+            return .shown("ok")
+        })
+        _ = try await client.call("tools/call", [
+            "name": "mcp__agents__ask_form",
+            "arguments": ["questions": [["id": "q", "prompt": "Anything?"]]],
+        ])
+        #expect(await box.questions.map(\.prompt) == ["Anything?"])
+        #expect(await box.questions.first?.options == nil)
+        await service.close()
+    }
+
+    private actor AskFormBox {
+        var title: String?
+        var questions: [DaemonAPI.AskFormRequest.Question] = []
+        func record(_ title: String?, _ questions: [DaemonAPI.AskFormRequest.Question]) {
+            self.title = title
+            self.questions = questions
+        }
+    }
+
     /// A relative path is the one mistake an agent will actually make, because that is
     /// what it types in a terminal all day. It is refused here rather than resolved
     /// against a working directory this process does not have.
@@ -513,12 +579,27 @@ struct AppServiceTests {
 
     @Test func afterwardsIsOfferedOnTheOneCallAlone() async throws {
         let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
-        #expect(properties?["afterwards"]?["enum"]?.arrayValue == ["park", "archive"])
+        #expect(properties?["afterwards"]?["enum"]?.arrayValue == ["park"])
         #expect(AppService.reportOutcomeTool["inputSchema"]?["properties"]?["afterwards"] == nil)
         #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("afterwards") == true)
     }
 
     @Test func anAskThatFitsTheOutcomeReachesTheSink() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Merged and cleaned up.",
+                          "afterwards": "park"],
+        ])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.words.afterwards == .park)
+        await service.close()
+    }
+
+    /// An older conversation may still send archive. The call reaches the sink; the
+    /// daemon keeps the outcome and declines the ask.
+    @Test func anArchiveAskStillReachesTheSink() async throws {
         let box = FinishBox()
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
@@ -531,14 +612,13 @@ struct AppServiceTests {
         await service.close()
     }
 
-    /// A word that is neither, and each pairing that would hide or bury something,
+    /// A word that is neither, and each park pairing that would bury something,
     /// refused before the daemon is asked.
     @Test func anAskThatDoesNotFitIsRefusedWhole() async throws {
         let box = FinishBox()
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         let cases: [(JSONValue, String)] = [
             (["outcome": "done", "message": "m", "afterwards": "delete"], AfterTurn.unknown),
-            (["outcome": "partly_done", "message": "m", "afterwards": "archive"], AfterTurn.archive.refusal),
             (["outcome": "needs_answer", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
             (["outcome": "stuck", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
             (["outcome": "blocked", "message": "m", "check_again_in_minutes": 5, "afterwards": "park"],
@@ -787,10 +867,11 @@ struct AppServiceTests {
     /// prefix them), so no tool's name may end with another's. 036's release_resource
     /// once ended with lease_resource, and every release became an extension.
     @Test func noToolNameEndsWithAnother() {
-        let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.startAgent,
-                     AppTool.stopAgent, AppTool.archiveAgent, AppTool.listMyAgents,
+        let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
+                     AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent,
+                     AppTool.listMyAgents,
                      AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
-                     AppTool.listResources, AppTool.pushPullRequest, AppTool.replyOnPullRequest]
+                     AppTool.listResources]
         for name in names {
             for other in names + [AppTool.leaseResource] where other != name {
                 #expect(!name.hasSuffix(other), "\(name) ends with \(other)")

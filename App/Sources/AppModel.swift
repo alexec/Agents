@@ -75,11 +75,16 @@ final class AppModel {
     /// How long archived agents are kept (051). Nil from a daemon before 051.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
     var poolStatus: PoolStatus? { work.poolStatus }
+    /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
+    private(set) var clientPermissions = ClientPermissionSettings()
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
     /// said — and for ever against one too old to know the method, which is drawn the
     /// same way as nothing to say.
     var wakeState: DaemonAPI.WakeState? { work.wakeState }
+    /// The switch and the hours (Settings ▸ General ▸ Sleep). Nil until the daemon has
+    /// said, including a daemon too old to know the method.
+    private(set) var wakeSettings: WakeSettings?
 
     /// Which project this window is looking at.
     ///
@@ -316,6 +321,8 @@ final class AppModel {
             // transcript entry is ours to keep, so the shared model is told first.
             work.watching = selection
             presence?.watching(selection)
+            // A session picked is the session shown, not a workflow left open over it.
+            if selection != nil { openWorkflow = nil }
             Task { await loadTranscript() }
         }
     }
@@ -560,6 +567,7 @@ final class AppModel {
         return LeaseWords.agentName(title).replacingOccurrences(of: "another agent", with: "Another agent")
     }
 
+    var permissionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
     var permissionForSelection: PermissionRequest? { work.permission(for: selection) }
 
     /// What a new agent can be started with, on the machine it would start on: the
@@ -604,6 +612,15 @@ final class AppModel {
     /// This window's own counts for a project, from the grouping its panel uses.
     func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
     func unreadCount(in key: ProjectKey?) -> Int { work.unreadCount(in: key) }
+
+    /// How many sessions across every project need a person: Needs attention and Blocked.
+    /// Drives the Dock badge.
+    var needsPersonCount: Int {
+        liveProjects.reduce(0) { total, summary in
+            let c = counts(in: summary.key)
+            return total + (c[.needsAttention] ?? 0) + (c[.blocked] ?? 0)
+        }
+    }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
@@ -672,105 +689,6 @@ final class AppModel {
         }
     }
 
-    // MARK: Pull requests (038)
-
-    /// Each GitHub project's Pull requests section, by folder. Absent for a project
-    /// that is not on GitHub, which is how the section is absent there (SC-006).
-    private(set) var pullRequestLists: [URL: PullRequestList] = [:]
-    /// Pull requests being checked out now, by folder and number.
-    private(set) var checkingOut: Set<PullRequestKey> = []
-    /// The last check-out that failed, with its reason, until the next list replaces it.
-    private(set) var checkoutFailures: [PullRequestKey: String] = [:]
-
-    struct PullRequestKey: Hashable {
-        var folder: URL
-        var number: Int
-    }
-
-    /// What the daemon has, at once, then a refresh. Asked for when a project page
-    /// opens; never polled. The daemon's own clock keeps it current after that.
-    func loadPullRequests(for folder: URL) async {
-        let folder = Project.standardize(folder)
-        if let list = try? await client.call(DaemonAPI.Method.pullRequestsList,
-                                             DaemonAPI.PullRequestsRequest(folder: folder),
-                                             returning: PullRequestList?.self) {
-            setPullRequests(list, for: folder)
-        } else {
-            pullRequestLists[folder] = nil
-            return
-        }
-        await refreshPullRequests(for: folder)
-    }
-
-    /// The ↻: refresh now, which the daemon holds to once a minute (FR-008).
-    func refreshPullRequests(for folder: URL) async {
-        let folder = Project.standardize(folder)
-        guard let list = try? await client.call(DaemonAPI.Method.pullRequestsRefresh,
-                                                DaemonAPI.PullRequestsRequest(folder: folder),
-                                                returning: PullRequestList?.self) else { return }
-        setPullRequests(list, for: folder)
-    }
-
-    /// Check a pull request's branch out into a worktree of its own (FR-007). A failure
-    /// stays on its row rather than in an alert: each reason says what to do.
-    func checkOut(_ number: Int, in folder: URL) async {
-        let key = PullRequestKey(folder: Project.standardize(folder), number: number)
-        checkingOut.insert(key)
-        checkoutFailures[key] = nil
-        defer { checkingOut.remove(key) }
-        do {
-            let list = try await client.call(DaemonAPI.Method.pullRequestsCheckout,
-                                             DaemonAPI.PullRequestRequest(folder: key.folder, number: number),
-                                             returning: PullRequestList.self)
-            setPullRequests(list, for: key.folder)
-            // The new worktree belongs in the Worktrees section below too.
-            await loadDraftWorktrees()
-        } catch {
-            checkoutFailures[key] = describe(error)
-        }
-    }
-
-    /// Why Babysit my pull requests was refused, by folder, until it is tried again.
-    private(set) var babysitterRefusals: [URL: String] = [:]
-
-    /// Babysit my pull requests: write the starter workflow (FR-026). A ceiling is said
-    /// under the button rather than in an alert (wireframe G).
-    func addBabysitter(in folder: URL) async {
-        let folder = Project.standardize(folder)
-        babysitterRefusals[folder] = nil
-        do {
-            let summary = try await client.call(DaemonAPI.Method.pullRequestsAddBabysitter,
-                                                DaemonAPI.PullRequestsRequest(folder: folder),
-                                                returning: WorkflowSummary.self)
-            work.upsert(summary)
-            if var list = pullRequestLists[folder] {
-                list.babysitterWorkflowID = summary.workflowID
-                pullRequestLists[folder] = list
-            }
-        } catch {
-            babysitterRefusals[folder] = describe(error)
-        }
-    }
-
-    /// Resume: start babysitting a stopped pull request again (FR-024).
-    func resume(_ number: Int, in folder: URL) async {
-        let folder = Project.standardize(folder)
-        do {
-            let list = try await client.call(DaemonAPI.Method.pullRequestsResume,
-                                             DaemonAPI.PullRequestRequest(folder: folder, number: number),
-                                             returning: PullRequestList.self)
-            setPullRequests(list, for: folder)
-        } catch {
-            problem = describe(error)
-        }
-    }
-
-    private func setPullRequests(_ list: PullRequestList?, for folder: URL) {
-        pullRequestLists[folder] = list
-        // A failure is true until the list next changes, and no longer.
-        checkoutFailures = checkoutFailures.filter { $0.key.folder != folder }
-    }
-
     /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
     /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
@@ -786,6 +704,33 @@ final class AppModel {
                                DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
                                                                 workflowID: summary.workflowID,
                                                                 archived: archived))
+    }
+
+    /// A project's plugins, asked for when its page opens; kept current after that by
+    /// `plugins/changed`.
+    func plugins(in folder: URL?) -> [ProjectPlugin] { work.plugins(in: folder) }
+
+    func refreshPlugins(in folder: URL) async {
+        guard let list: DaemonAPI.PluginsList = try? await client.call(
+            DaemonAPI.Method.pluginsList, DaemonAPI.PluginsListRequest(folder: folder),
+            returning: DaemonAPI.PluginsList.self) else { return }
+        work.replacePlugins(list)
+    }
+
+    /// Approve a plugin's folder as the row showed it. Said when it fails: most likely the
+    /// folder changed after the person looked.
+    func approvePlugin(_ plugin: ProjectPlugin) async {
+        guard let waiting = plugin.awaitingApproval else { return }
+        do {
+            let list: DaemonAPI.PluginsList = try await client.call(
+                DaemonAPI.Method.pluginsApprove,
+                DaemonAPI.PluginApproveRequest(plugin: plugin.folder, digest: waiting.digest),
+                returning: DaemonAPI.PluginsList.self)
+            work.replacePlugins(list)
+        } catch {
+            problem = describe(error)
+            await refreshPlugins(in: plugin.project)
+        }
     }
 
     /// Approve a workflow's file as the row showed it. Said when it fails: the likely
@@ -856,6 +801,21 @@ final class AppModel {
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.WakeState.self) else { return }
         work.replaceWakeState(state)
+    }
+
+    /// The switch and the hours. A daemon too old to know the method leaves this nil,
+    /// and Settings ▸ General draws Appearance alone.
+    func refreshWakeSettings() async {
+        wakeSettings = try? await client.call(DaemonAPI.Method.wakeSettings,
+                                              Optional<String>.none,
+                                              returning: WakeSettings.self)
+    }
+
+    /// The person changed Sleep. The daemon clamps the hours and answers with what it kept.
+    func setWakeSettings(_ settings: WakeSettings) async {
+        guard let saved = try? await client.call(DaemonAPI.Method.wakeSet, settings,
+                                                 returning: WakeSettings.self) else { return }
+        wakeSettings = saved
     }
 
     /// Every resource and who holds it (036). A daemon too old to know the method
@@ -1053,6 +1013,28 @@ final class AppModel {
                 DaemonAPI.Method.retentionSet,
                 DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
                 returning: DaemonAPI.RetentionSetResult.self)
+        }
+    }
+
+    func refreshClientPermissions() async {
+        guard let settings = try? await client.call(DaemonAPI.Method.clientPermissionsState,
+                                                    Optional<String>.none,
+                                                    returning: ClientPermissionSettings.self) else { return }
+        clientPermissions = settings
+    }
+
+    /// Save Cursor/Grok permission mode and copy it to every connected server (061).
+    func setClientPermissions(_ settings: ClientPermissionSettings) async {
+        guard let saved = try? await client.call(DaemonAPI.Method.clientPermissionsSet, settings,
+                                                 returning: ClientPermissionSettings.self) else { return }
+        clientPermissions = saved
+        await pushClientPermissionsToServers(saved)
+    }
+
+    func pushClientPermissionsToServers(_ settings: ClientPermissionSettings) async {
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.clientPermissionsSet, settings,
+                                                     returning: ClientPermissionSettings.self)
         }
     }
 
@@ -1421,15 +1403,14 @@ final class AppModel {
                   !signInsPutAway.contains(needed.runtimeID), signInRuntimeID == nil else { return }
             signInRuntimeID = needed.runtimeID
 
-        case DaemonAPI.Notification.pullRequestsChanged:
-            // The Mac's own, like the shells (038 FR-010).
-            guard let list = try? params?.decode(PullRequestList.self) else { return }
-            setPullRequests(list, for: list.folder)
-
         case DaemonAPI.Notification.cloneChanged:
             guard let change = try? params?.decode(DaemonAPI.CloneNotification.self) else { return }
             clones.removeAll { $0.id == change.clone.id }
             if !change.finished { clones.append(change.clone) }
+
+        case DaemonAPI.Notification.clientPermissionsChanged:
+            guard let settings = try? params?.decode(ClientPermissionSettings.self) else { return }
+            clientPermissions = settings
 
         default:
             break
@@ -1652,6 +1633,9 @@ final class AppModel {
                                        DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
                                        returning: DaemonAPI.RetentionSetResult.self)
         }
+        // And Cursor/Grok permission mode (061).
+        _ = try? await server.call(DaemonAPI.Method.clientPermissionsSet, clientPermissions,
+                                   returning: ClientPermissionSettings.self)
         // And the pool, so a server chat carries on as a Mac one does (052, R6), with
         // what the Mac knows of the plans it relays.
         if let status = work.poolStatus {
@@ -1711,6 +1695,7 @@ final class AppModel {
         async let resuming: Void = refreshResuming()
         async let cost: Void = refreshCostState()
         async let retention: Void = refreshRetentionState()
+        async let clientPermissions: Void = refreshClientPermissions()
         async let pool: Void = refreshPoolStatus()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
@@ -1719,7 +1704,7 @@ final class AppModel {
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, retention, cloning, wake, leases, events, modes,
+                   elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, pool)
         #if DEBUG
         openFromLaunchArguments()
@@ -1783,6 +1768,201 @@ final class AppModel {
                                                   returning: DaemonAPI.SharedSnapshot.self)
         }
         return snapshot
+    }
+
+    // MARK: The catalogue (059)
+
+    /// What a catalogue call said, or why it could not: the sheet shows either, so these
+    /// do not go through `attempt`, which would put a failure in the window's banner too.
+    func catalogSearch(_ query: String) async -> DaemonAPI.CatalogSearchAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogSearch, DaemonAPI.CatalogSearchRequest(query: query),
+                                         returning: DaemonAPI.CatalogSearchAnswer.self)
+        } catch {
+            return .init(results: [], error: Self.catalogError(error))
+        }
+    }
+
+    func catalogPreview(_ result: DaemonAPI.CatalogResult,
+                        for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogPreviewAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogPreview,
+                                         DaemonAPI.CatalogPreviewRequest(result: result, destination: destination),
+                                         returning: DaemonAPI.CatalogPreviewAnswer.self)
+        } catch {
+            return .init(preview: nil, error: Self.catalogError(error))
+        }
+    }
+
+    func catalogDestinationState(_ previewID: UUID,
+                                 for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.DestinationState? {
+        try? await client.call(DaemonAPI.Method.catalogDestinationState,
+                               DaemonAPI.DestinationStateRequest(previewID: previewID, destination: destination),
+                               returning: DaemonAPI.DestinationStateAnswer.self).destinationState
+    }
+
+    func addSkill(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
+                  replace: Bool) async -> Result<DaemonAPI.ManagedSkill, DaemonAPI.CatalogError> {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.skillsAdd,
+                                               DaemonAPI.SkillAddRequest(previewID: previewID, destination: destination,
+                                                                         replace: replace),
+                                               returning: DaemonAPI.SkillAddAnswer.self)
+            return .success(answer.skill)
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// A project's (or worktree's) own skills, for its page (frame D). Nil when they could
+    /// not be read, so the section keeps what it last had.
+    func projectSkills(_ folder: URL) async -> [DaemonAPI.ListedSkill]? {
+        await skills(at: .project(folder: folder.path))
+    }
+
+    /// Skills in `~/.agents/skills` or a project's `.agents/skills`.
+    func skills(at destination: DaemonAPI.SkillDestination) async -> [DaemonAPI.ListedSkill]? {
+        try? await client.call(DaemonAPI.Method.skillsList,
+                               DaemonAPI.SkillsListRequest(destination: destination),
+                               returning: DaemonAPI.SkillsListAnswer.self).skills
+    }
+
+    /// Whether each added skill at a destination has an update (FR-018). Nil when it could
+    /// not be asked; the page then shows no marks rather than wrong ones.
+    func skillUpdates(at destination: DaemonAPI.SkillDestination) async -> [String: DaemonAPI.UpdateState]? {
+        try? await client.call(DaemonAPI.Method.skillsCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
+                               returning: DaemonAPI.SkillUpdatesAnswer.self).updates
+    }
+
+    func skillUpdatePreview(_ name: String, at destination: DaemonAPI.SkillDestination)
+        async -> Result<DaemonAPI.SkillUpdatePreviewAnswer, DaemonAPI.CatalogError> {
+        do {
+            return .success(try await client.call(DaemonAPI.Method.skillsUpdatePreview,
+                                                  DaemonAPI.SkillNameRequest(destination: destination, name: name),
+                                                  returning: DaemonAPI.SkillUpdatePreviewAnswer.self))
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// Take out a skill the app or the skills tool added; its folder goes to the Trash.
+    func removeSkill(_ name: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.skillsRemove,
+                                      DaemonAPI.SkillNameRequest(destination: destination, name: name),
+                                      returning: DaemonAPI.SkillRemoveAnswer.self)
+            return nil
+        } catch {
+            return Self.catalogError(error)
+        }
+    }
+
+    /// The daemon's own reason when it gave one, and "can't reach" the daemon otherwise.
+    private static func catalogError(_ error: any Error) -> DaemonAPI.CatalogError {
+        if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.catalogRefused,
+           let reason = try? rpc.data?.decode(DaemonAPI.CatalogError.self) {
+            return reason
+        }
+        return .failed(String(describing: error))
+    }
+
+    // MARK: MCP catalogue (060)
+
+    func mcpSearch(_ query: String) async -> DaemonAPI.MCPSearchAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogSearch,
+                                         DaemonAPI.CatalogSearchRequest(query: query, kind: .mcp),
+                                         returning: DaemonAPI.MCPSearchAnswer.self)
+        } catch {
+            return .init(results: [], error: Self.mcpError(error))
+        }
+    }
+
+    func mcpPreview(_ result: DaemonAPI.MCPCatalogResult,
+                    for destination: DaemonAPI.SkillDestination,
+                    run: DaemonAPI.MCPRunKind?) async -> DaemonAPI.MCPPreviewAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpPreview,
+                                         DaemonAPI.MCPPreviewRequest(result: result, destination: destination, run: run),
+                                         returning: DaemonAPI.MCPPreviewAnswer.self)
+        } catch {
+            return .init(error: Self.mcpError(error))
+        }
+    }
+
+    /// A project's servers, for its page (060, frame D). Nil when they could not be read,
+    /// so the section keeps what it last had.
+    func projectMCPServers(_ folder: URL) async -> DaemonAPI.MCPListAnswer? {
+        try? await client.call(DaemonAPI.Method.mcpList,
+                               DaemonAPI.MCPListRequest(destination: .project(folder: folder.path)),
+                               returning: DaemonAPI.MCPListAnswer.self)
+    }
+
+    func mcpServers(at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPListAnswer? {
+        try? await client.call(DaemonAPI.Method.mcpList,
+                               DaemonAPI.MCPListRequest(destination: destination),
+                               returning: DaemonAPI.MCPListAnswer.self)
+    }
+
+    /// Write one name into `secrets.env`. The value is not kept here.
+    func mcpSetSecret(name: String, value: String) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpSetSecret,
+                                     DaemonAPI.MCPSetSecretRequest(name: name, value: value),
+                                     returning: DaemonAPI.MCPSetSecretAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
+    func mcpRemove(_ name: String, at destination: DaemonAPI.SkillDestination,
+                   forgetSecret: String?) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpRemove,
+                                     DaemonAPI.MCPRemoveRequest(destination: destination, name: name,
+                                                               forgetSecret: forgetSecret),
+                                     returning: DaemonAPI.MCPRemoveAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
+    /// Approve the entry the row showed. A digest that no longer matches comes back as an error.
+    func approveProjectMCP(_ name: String, digest: String, in folder: URL) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpApprove,
+                                      DaemonAPI.MCPApproveRequest(destination: .project(folder: folder.path),
+                                                                  name: name, digest: digest),
+                                      returning: DaemonAPI.MCPListAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
+    func mcpAdd(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
+                secrets: [String: String], plain: [String: String],
+                replace: Bool) async -> Result<DaemonAPI.ManagedMCPServer, DaemonAPI.MCPCatalogError> {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.mcpAdd,
+                                               DaemonAPI.MCPAddRequest(previewID: previewID, destination: destination,
+                                                                       secrets: secrets, plain: plain, replace: replace),
+                                               returning: DaemonAPI.MCPAddAnswer.self)
+            if let server = answer.server { return .success(server) }
+            return .failure(answer.error ?? .failed("no server"))
+        } catch {
+            return .failure(Self.mcpError(error))
+        }
+    }
+
+    private static func mcpError(_ error: any Error) -> DaemonAPI.MCPCatalogError {
+        if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.mcpCatalogRefused,
+           let reason = try? rpc.data?.decode(DaemonAPI.MCPCatalogError.self) {
+            return reason
+        }
+        return .failed(String(describing: error))
     }
 
     func refreshRuntimes() async {
@@ -2256,8 +2436,11 @@ final class AppModel {
         }
     }
 
-    func archive(_ id: UUID) async {
+    func archive(_ id: UUID, andLeave: Bool = false) async {
         await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id)) }
+        // One path for menu, strip, swipe, ⌫ and the row: leave the chat when asked,
+        // so Archive always means the same thing wherever it is pressed.
+        if andLeave, selection == id { selection = nil }
     }
 
     func unarchive(_ id: UUID) async {

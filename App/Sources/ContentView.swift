@@ -1,4 +1,5 @@
 import AgentsKit
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -111,8 +112,8 @@ struct ContentView: View {
                     if let id = model.selection, model.selectedAgent == nil { _ = await model.tombstone(for: id) }
                 }
         } else {
-            // The project on its own: a new session, its pull requests, workflows and
-            // worktrees. Its sessions are the middle column's.
+            // The project on its own: a new session. Its sessions and workflows are the
+            // middle column's, and its settings a sheet.
             ProjectAgentsView(selection: Binding(get: { model.selection },
                                                  set: { model.selection = $0 }))
                 .paperGround()
@@ -175,12 +176,21 @@ struct ContentView: View {
         // and shut means gone: there would be nothing listening.
         .onChange(of: model.filesToShow) { showWhatWasAskedFor() }
         .onChange(of: model.selection) { showWhatWasAskedFor() }
-        .alert("That did not work",
+        .alert("Could not finish that",
                isPresented: Binding(get: { model.problem != nil },
                                     set: { if !$0 { model.dismissProblem() } })) {
             Button("OK") { model.dismissProblem() }
+                .keyboardShortcut(.defaultAction)
         } message: {
             Text(model.problem ?? "")
+        }
+        // One project's settings, over whatever the window is showing (066).
+        .sheet(isPresented: Binding(get: { requests.projectSettings != nil },
+                                    set: { if !$0 { requests.projectSettings = nil } })) {
+            ProjectSettingsSheet(pane: Binding(get: { requests.projectSettings },
+                                               set: { requests.projectSettings = $0 }))
+                .environment(requests)
+                .paperSheet()
         }
         // An agent that needs its runtime signed in gets the sign-in, not an error.
         .sheet(isPresented: Binding(get: { model.signInRuntimeID != nil },
@@ -189,6 +199,10 @@ struct ContentView: View {
                 RuntimeAccountView(runtimeID: runtimeID)
                     .paperSheet()
             }
+        }
+        // How many sessions need a person, on the Dock — Needs attention and Blocked.
+        .onChange(of: model.needsPersonCount, initial: true) { _, count in
+            NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
         }
     }
 }

@@ -3,8 +3,9 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// An agent asking, on the call that ends its turn, to be parked or archived once
-/// that turn is over — driven through the real daemon.
+/// An agent asking, on the call that ends its turn, to be parked once that turn is
+/// over — driven through the real daemon. An ask to be archived is recognised and
+/// declined: the outcome lands, the session stays where the person can open it.
 ///
 /// What these are for is the shape of the promise: the ask takes effect only once the
 /// turn has ended as asked, is refused whole when it contradicts the outcome, and is
@@ -35,8 +36,7 @@ struct AfterTurnTests {
 
     private func mintedToken(_ launcher: FakeLauncher) async -> String {
         await eventuallySome("the runtime was handed its token") {
-            let attached = await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? []
-            let minted = attached.first?["args"]?.arrayValue?.last?.stringValue ?? ""
+            let minted = MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
             return minted.isEmpty ? nil : minted
         } ?? ""
     }
@@ -62,13 +62,6 @@ struct AfterTurnTests {
                                         afterwards: afterwards))
     }
 
-    private func notes(_ core: DaemonCore, _ id: UUID) async throws -> [String] {
-        try await core.transcript(.init(agentID: id)).entries.compactMap { entry in
-            if case .runtimeNote(let note) = entry.kind { return note }
-            return nil
-        }
-    }
-
     // MARK: Park
 
     @Test func parkIsParkedWhenTheTurnEndsWithNoNeedAndNothingUnread() async throws {
@@ -92,29 +85,31 @@ struct AfterTurnTests {
         #expect(await !core.needs().contains { $0.agentID == id })
     }
 
-    // MARK: Archive
+    // MARK: Archive — declined; the outcome still lands
 
-    @Test func archiveIsArchivedWhenTheTurnEndsWithANoteSayingSo() async throws {
+    @Test func archiveIsDeclinedAndTheSessionStaysVisible() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let reply = try await finish(core, launcher, "done", afterwards: "archive")
-        #expect(reply.contains("will be archived"))
-        #expect(await core.agent(id)?.state != .archived, "nothing happens until the turn is over")
+        #expect(reply.contains(AfterTurn.keptVisible))
+        #expect(!reply.contains("will be archived"))
+        #expect(await core.agent(id)?.afterTurn == nil)
+        #expect(await core.agent(id)?.state != .archived)
 
-        await eventually("the agent archived itself") { await core.agent(id)?.state == .archived }
+        try await settle(core, id)
         let agent = try #require(await core.agent(id))
-        #expect(agent.archivedReason == .byAgent)
-        #expect(agent.afterTurn == nil)
+        #expect(agent.state == .finished, "the turn ran to its end")
+        #expect(agent.state != .archived)
         #expect(agent.report?.outcome == .done, "its account of the work is kept")
-        #expect(try await notes(core, id).contains(DaemonCore.archivedItself))
+        #expect(agent.afterTurn == nil)
     }
 
-    /// Something queued while the turn ran is the work moved on: the ask is dropped and
-    /// what was queued goes, as it would have.
-    @Test func aQueuedPromptCancelsTheArchive() async throws {
+    /// Something queued while the turn ran is the work moved on: an archive ask was
+    /// already dropped on the call, and what was queued goes, as it would have.
+    @Test func aQueuedPromptStillRunsAfterADeclinedArchive() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
@@ -128,10 +123,9 @@ struct AfterTurnTests {
         let agent = try #require(await core.agent(id))
         #expect(agent.state != .archived)
         #expect(agent.afterTurn == nil)
-        #expect(try await !notes(core, id).contains(DaemonCore.archivedItself))
     }
 
-    /// The person's prompt drops the ask the moment it is sent.
+    /// The person's prompt drops a park ask the moment it is sent.
     @Test func thePersonsPromptDropsTheAsk() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
@@ -147,13 +141,13 @@ struct AfterTurnTests {
         #expect(await core.agent(id)?.group(wantsEyes: false) != .parked)
     }
 
-    @Test func aStopDropsTheAsk() async throws {
+    @Test func aStopDropsTheParkAsk() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        try await finish(core, launcher, "done", afterwards: "archive")
+        try await finish(core, launcher, "done", afterwards: "park")
         try await core.stop(id)
         try await settle(core, id)
 
@@ -171,7 +165,7 @@ struct AfterTurnTests {
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        try await finish(core, launcher, "done", afterwards: "archive")
+        try await finish(core, launcher, "done", afterwards: "park")
         try await finish(core, launcher, "done", afterwards: nil)
         #expect(await core.agent(id)?.afterTurn == nil)
 
@@ -188,17 +182,18 @@ struct AfterTurnTests {
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        try await finish(core, launcher, "done", afterwards: "archive")
+        try await finish(core, launcher, "done", afterwards: "park")
         _ = try await core.reportOutcome(.init(token: await mintedToken(launcher),
                                                outcome: "stuck", message: "The merge failed."))
         try await settle(core, id)
         #expect(await core.agent(id)?.state == .finished)
+        #expect(await core.agent(id)?.afterTurn == nil)
+        #expect(await core.agent(id)?.parking == nil)
     }
 
     // MARK: Refused whole
 
-    @Test(arguments: [("archive", "partly_done"), ("archive", "needs_answer"), ("archive", "stuck"),
-                      ("archive", "blocked"), ("park", "needs_answer"), ("park", "stuck"),
+    @Test(arguments: [("park", "needs_answer"), ("park", "stuck"),
                       ("park", "blocked"), ("later", "done")])
     func aPairingThatContradictsTheOutcomeRecordsNothing(_ afterwards: String, _ outcome: String) async throws {
         let (locations, work) = try temporary()
@@ -219,6 +214,23 @@ struct AfterTurnTests {
         #expect(agent.report == nil)
         #expect(agent.afterTurn == nil)
         try await settle(core, id)
+    }
+
+    /// Archive with any ending keeps the outcome and declines the ask — even pairings
+    /// that used to refuse the whole call when archive was allowed.
+    @Test(arguments: ["done", "partly_done", "needs_answer", "stuck"])
+    func archiveWithAnyEndingKeepsTheOutcome(_ outcome: String) async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+
+        let reply = try await finish(core, launcher, outcome, afterwards: "archive")
+        #expect(reply.contains(AfterTurn.keptVisible))
+        #expect(await core.agent(id)?.report != nil)
+        #expect(await core.agent(id)?.afterTurn == nil)
+        try await settle(core, id)
+        #expect(await core.agent(id)?.state != .archived)
     }
 
     // MARK: The wire

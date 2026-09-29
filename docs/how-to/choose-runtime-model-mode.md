@@ -19,7 +19,7 @@ running, and reads the meter that says how full its context is.
 
 **For a new agent**
 
-1. Open the project's page, or click **New session**.
+1. Open the project's page, or click **New Session** (the compose button above the sessions).
 2. Click the runtime above the prompt, on the right, and choose one. A runtime that cannot
    be used says why under its name, such as **Needs signing in**.
 3. Under the prompt, the runtime's own choices appear as capsules. Their names and values
@@ -29,6 +29,9 @@ running, and reads the meter that says how full its context is.
    - on the right, the model, and effort where the runtime has it.
 
    Click one and choose. A runtime that offers no choices, such as Cursor, shows none.
+   Cursor and Grok also have no permission-mode capsule under the prompt: set **Default**
+   or **Always-approve** for each in **Settings ▸ Agent Runtimes**. Cursor's **Agent**,
+   **Plan** and **Ask** stay as they are; they are not that permission setting.
 4. Type the prompt and send it. The agent starts with what you chose.
 
    On iPhone and iPad, the start form has **Runtime**, **Mode**, **Model** and **Effort**

@@ -117,6 +117,7 @@ public enum ToolPolicyCatalog {
                    "web_search", "web_fetch", "open_page", "open_page_with_find"],
             extra: ["name": .string("agents-app"),
                     "description": .string("An agent hosted by the Agents app.")]),
+        appToolSchemaDelivery: .sessionRules,
         // Feature switches Grok reads only from a config file. `GROK_CONFIG` with the
         // same TOML inline was measured and ignored, so it has to be a path (R6), and
         // the path has to be ours: `~/.grok/config.toml` is the person's (FR-011).
@@ -186,14 +187,25 @@ public enum ToolPolicyCatalog {
     ///
     /// So everything conflicting is residue, and the briefing is the whole of the
     /// defence. This is the runtime the residue line was written for.
+    ///
+    /// `AskQuestion` is kept and named: Cursor raises it as `cursor/ask_question`,
+    /// which this app draws as a form elicitation the phone can answer. Composer
+    /// sessions sometimes omit it from the tool catalogue; the briefing also names
+    /// `ask_form` as the fallback the app always serves.
     public static let cursor = ToolPolicy(
         runtimeID: RuntimeCatalog.cursor.id,
+        kept: [
+            KeptTool(name: "AskQuestion",
+                     because: "It is the escalation path: the daemon holds what it raises, and the phone can answer it."),
+        ],
         residue: [
             ResidualTool(name: "Task", category: .agents),
             ResidualTool(name: "CreateGoal", category: .standingArrangements),
             ResidualTool(name: "UpdateGoal", category: .standingArrangements),
         ],
-        lever: .words)
+        lever: .words,
+        appToolSchemaDelivery: .firstPrompt,
+        escalationTool: "AskQuestion")
 
     /// Codex: feature switches in `CODEX_CONFIG` (047, research R5).
     ///

@@ -28,7 +28,8 @@ extension DaemonCore {
               let home = locations.personalHome else { return }
         var record = PersonalDotAgents.Record.load(from: locations.personalLayout, home: home)
         let before = record
-        PersonalDotAgents.linkGeminiProjectExtensions(home: home, cwd: cwd, record: &record)
+        PersonalDotAgents.linkGeminiProjectExtensions(home: home, cwd: cwd,
+                                                        approved: approvedPluginFolders(for: cwd), record: &record)
         guard record != before else { return }
         PersonalDotAgents.attempt("save \(locations.personalLayout.lastPathComponent)") {
             try record.save(to: locations.personalLayout)

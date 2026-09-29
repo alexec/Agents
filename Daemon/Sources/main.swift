@@ -5,18 +5,21 @@
 import AgentsKit
 import Foundation
 
-// Run as `agentsd mcp <token>` this is not the daemon at all: it is the MCP server the
+// Run as `agentsd mcp` this is not the daemon at all: it is the MCP server the
 // daemon hands to every agent, started by the runtime the way it starts any stdio MCP
 // server. One binary rather than two, so there is one thing to build, sign and ship.
-if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
-    let token = CommandLine.arguments[2]
+// The agent's token is in AGENTS_MCP_TOKEN (S7), not on the command line.
+if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
+    let token = ProcessInfo.processInfo.environment[DaemonCore.mcpTokenVariable]
+        ?? (CommandLine.arguments.count >= 3 && !CommandLine.arguments[2].hasPrefix("--")
+            ? CommandLine.arguments[2] : "")
     // An agent another agent started is not offered the tools for starting, stopping
     // or archiving agents (028). The daemon says so here, when it hands the runtime
     // this server; it refuses the calls as well, so this only keeps the menu honest.
-    let managesAgents = !CommandLine.arguments.dropFirst(3).contains(DaemonCore.noAgentToolsFlag)
+    let managesAgents = !CommandLine.arguments.contains(DaemonCore.noAgentToolsFlag)
     // Nor, on a runtime that forgets its conversation in another folder, the tools for
     // moving itself (053).
-    let movesItself = !CommandLine.arguments.dropFirst(3).contains(DaemonCore.noMoveToolsFlag)
+    let movesItself = !CommandLine.arguments.contains(DaemonCore.noMoveToolsFlag)
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: .default)
     // Every tool does the same thing with what it is given: hand it to the daemon
@@ -60,6 +63,10 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
         await relay(DaemonAPI.Method.agentsShowFile,
                     DaemonAPI.ShowFileRequest(token: token, file: file),
                     fallback: "Open in the files pane.")
+    } askForm: { title, questions in
+        await relay(DaemonAPI.Method.agentsAskForm,
+                    DaemonAPI.AskFormRequest(token: token, title: title, questions: questions),
+                    fallback: "Asked.")
     } workflows: { action, workflowID, content in
         await relay(DaemonAPI.Method.agentsManageWorkflows,
                     DaemonAPI.ManageWorkflowsRequest(token: token, action: action,
@@ -84,6 +91,10 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
             return await relay(DaemonAPI.Method.agentsStopHelper,
                                DaemonAPI.HelperRequest(token: token, agentID: agentID),
                                fallback: "Stopped.")
+        case .park(let agentID):
+            return await relay(DaemonAPI.Method.agentsParkHelper,
+                               DaemonAPI.HelperRequest(token: token, agentID: agentID),
+                               fallback: "Parked.")
         case .archive(let agentID):
             return await relay(DaemonAPI.Method.agentsArchiveHelper,
                                DaemonAPI.HelperRequest(token: token, agentID: agentID),
@@ -92,20 +103,6 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
             return await relay(DaemonAPI.Method.agentsListHelpers,
                                DaemonAPI.ListHelpersRequest(token: token),
                                fallback: "Nothing to list.")
-        }
-    } pullRequests: { call in
-        // Only ever the caller's own pull request: the daemon takes which one, and
-        // where it goes, from the run the caller was started for (038 R7).
-        switch call {
-        case .push:
-            return await relay(DaemonAPI.Method.agentsPushPullRequest,
-                               DaemonAPI.PushPullRequestRequest(token: token),
-                               fallback: "Pushed.")
-        case .reply(let body, let inReplyTo):
-            return await relay(DaemonAPI.Method.agentsReplyOnPullRequest,
-                               DaemonAPI.ReplyOnPullRequestRequest(token: token, body: body,
-                                                                   inReplyTo: inReplyTo),
-                               fallback: "Replied.")
         }
     } leases: { call in
         // A lease call may wait up to the daemon's limit before it answers (036). The

@@ -1,4 +1,11 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 /// The daemon, assembled: the lock, the record, the core and the socket.
 ///
@@ -35,12 +42,19 @@ public final class Daemon: @unchecked Sendable {
         case alreadyRunning
     }
 
+    /// Every file the daemon creates is private by default (security review S8). Safe
+    /// today because the root is 0700; this keeps scratch roots under `/tmp` the same.
+    public static func applyPrivateUmask() {
+        _ = umask(0o077)
+    }
+
     public init(locations: StoreLocations = .default,
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
                 launcher: (any SessionLauncher)? = nil,
                 serve: Bool = false,
                 control: Control? = nil,
                 toolsetsFolder: URL? = nil) throws {
+        Self.applyPrivateUmask()
         self.locations = locations
         self.control = control
         try locations.createDirectories()
@@ -100,6 +114,10 @@ public final class Daemon: @unchecked Sendable {
         #endif
         // The person's `~/.agents`, laid out before anything is picked up (054).
         await core.reconcileHome()
+        // An add the last daemon died in the middle of is undone before anyone looks (059).
+        #if canImport(CryptoKit)
+        await core.recoverCatalog()
+        #endif
         // Off the start: it runs Codex's own command, which takes a moment (054, R12).
         Task { await core.syncCodexPlugins() }
         let recovered = await core.recover()
@@ -151,7 +169,6 @@ public final class Daemon: @unchecked Sendable {
         // recovery, so a workflow is never fired at an agent the daemon has not yet
         // worked out is dead.
         await core.startWorkflows()
-        await core.watchPullRequests()
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
         if let control {

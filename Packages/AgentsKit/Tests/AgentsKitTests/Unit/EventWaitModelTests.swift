@@ -21,12 +21,12 @@ struct EventWaitModelTests {
     }
 
     @Test func anyOfItsPatternsWillDo() {
-        let wait = EventWait(patterns: [EventPattern("pull_request.checks_passed", filters: ["number": "41"]),
-                                        EventPattern("pull_request.checks_failed", filters: ["number": "41"])],
+        let wait = EventWait(patterns: [EventPattern("workflow.completed", filters: ["workflow": "nightly"]),
+                                        EventPattern("workflow.refused", filters: ["workflow": "nightly"])],
                              from: 0, since: t0)
-        #expect(wait.matches(event("pull_request.checks_failed", position: 1, ["number": "41"])))
-        #expect(!wait.matches(event("pull_request.checks_failed", position: 1, ["number": "40"])))
-        #expect(wait.label == "pull_request.checks_passed #41 or pull_request.checks_failed #41")
+        #expect(wait.matches(event("workflow.refused", position: 1, ["workflow": "nightly"])))
+        #expect(!wait.matches(event("workflow.refused", position: 1, ["workflow": "weekly"])))
+        #expect(wait.label == "workflow.completed workflow nightly or workflow.refused workflow nightly")
     }
 
     @Test func itIsDueOnlyWhileOpenAndPastItsDeadline() {
@@ -42,7 +42,7 @@ struct EventWaitModelTests {
     @Test func itTravelsOnTheAgentsRecordAndAnOldRecordHasNone() throws {
         var agent = Agent(runtimeID: "claude", cwd: dir, state: .finished, endedReason: .endTurn)
         #expect(agent.eventWait == nil)
-        agent.eventWait = EventWait(patterns: [EventPattern("pull_request.merged", filters: ["number": "44"])],
+        agent.eventWait = EventWait(patterns: [EventPattern("branch.moved", filters: ["branch": "main"])],
                                     from: 12, deadline: t0.addingTimeInterval(3600), since: t0,
                                     ending: .matched(position: 13, extraMatches: 1), resumePromptID: UUID())
         let back = try StoreCoding.decoder.decode(Agent.self, from: StoreCoding.encoder.encode(agent))

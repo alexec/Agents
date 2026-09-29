@@ -1,65 +1,67 @@
 import AgentsKit
 import SwiftUI
 
-/// The project itself, with no session picked: its name, somewhere to say what you want
-/// done, and its pull requests, workflows and worktrees. Its sessions are the middle
-/// column's (`SessionsColumn`).
+/// The project itself, with no session picked: an empty new chat (066, look/ frame A).
+///
+/// It is laid out as a chat is, with the prompt at the foot of the pane, so starting a
+/// session and carrying one on happen in the same place, and sending turns this pane
+/// into the session without the bar moving. Above the prompt, the project's name and
+/// where it is, where a chat's transcript would be. The project's sessions and workflows
+/// are the middle column's (`SessionsColumn`); its settings are a sheet
+/// (`ProjectSettingsSheet`). Anything in it waiting for somebody's OK — a plugin, a
+/// workflow — is one banner across the top, since no agent gets it until somebody looks.
 ///
 /// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
-/// options, the folders and servers, attachments, dictation, the lot. On a project page
-/// it is in the same mode it is in for a new chat, with the folder already set to this
-/// project, so saying what you want done starts an agent here and takes you into it.
-///
-/// Everything sits in the same column the transcript and prompt bar use, so the page
-/// and a conversation are the same width at every size of window.
+/// options, the folders and servers, attachments, dictation, the lot — in the mode it is
+/// in for a new chat, with the folder already set to this project.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
     @Binding var selection: UUID?
-
-    static let cardSpacing: CGFloat = 2
 
     private var folder: URL? { model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
 
     var body: some View {
-        if summary == nil {
-            // No project: one that was selected has gone (a rebuilt server, 043) or there
-            // are none yet. A page with a prompt here would start an agent nowhere.
-            VStack(spacing: 6) {
-                Text("No project selected").appText(.reading).foregroundStyle(.secondary)
-                Text("Choose one on the left, or add a folder.").appText(.fine).foregroundStyle(.tertiary)
+        Group {
+            if summary == nil {
+                // No project: one that was selected has gone (a rebuilt server, 043) or there
+                // are none yet. A page with a prompt here would start an agent nowhere.
+                EmptyState.noProject
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("")
+            } else {
+                page
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("")
-        } else {
-            page
         }
     }
 
     private var page: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                heading
-                SectionHeading(title: "New session")
-                    .chatColumn()
-                    .padding(.top, 6)
-                // Its own margins, the same as in a chat, so it is not padded twice.
-                // The folder is this project's and not the bar's to change.
-                PromptBar(folderIsFixed: true)
-                    .padding(.top, -10)
-                agents
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 0) {
+            WaitingForOKBanner(folder: folder)
+            Spacer(minLength: 24)
+            heading
+            Spacer(minLength: 24)
+            // Its own margins, the same as in a chat. The folder is this project's and
+            // not the bar's to change.
+            PromptBar(folderIsFixed: true)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(summary?.name ?? "Project")
+        .toolbar {
+            ToolbarItem {
+                Button { requests.projectSettings = .general } label: {
+                    Label("Project Settings", systemImage: "slider.horizontal.3")
+                }
+                .help("Project Settings (⌥⌘,)")
+            }
+        }
         .onAppear { adopt(folder) }
         .onChange(of: folder) { _, folder in
             adopt(folder)
         }
-        // The pull requests the daemon has, then a refresh, each time a project opens
-        // (038 FR-008). Never polled from here.
         .task(id: folder) {
-            if let folder { await model.loadPullRequests(for: folder) }
+            if let folder { await model.refreshPlugins(in: folder) }
         }
     }
 
@@ -70,110 +72,105 @@ struct ProjectAgentsView: View {
         Task { await model.loadDraftOptions() }
     }
 
-    /// Just the name.
+    /// The name, and where the project is, in the middle of the empty pane.
     ///
-    /// The path used to sit under it. The prompt below carries the folder already, and
-    /// saying where the project is twice on one screen is saying it once too often.
-    /// What is left here is the one case where the folder is news: it has gone.
+    /// What it has cost is on Project Settings ▸ General: it is a report, and nobody acts
+    /// on it from here. The one thing about the folder that is news here is that it has gone.
     private var heading: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(spacing: 6) {
             Text(summary?.name ?? "Project")
                 .appText(.title).fontWeight(.semibold)
                 .lineLimit(1)
-            // Which machine, when it is not this one (037).
-            if let summary, summary.host != .mac {
-                Text("on \(model.hosts.label(summary.host))")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            }
-            if let summary, !summary.exists {
-                Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
+            if let summary {
+                Text(place(summary))
                     .appText(.supporting)
-                    .tinted(.failure)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
                     .help(summary.folder.path)
-            }
-            if let summary, let spent = spent(summary) {
-                Text(spent)
-                    .appText(.supporting)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .help(spentInWords)
-                    .accessibilityLabel(spentInWords)
+                if !summary.exists {
+                    Label("Folder is missing", systemImage: "exclamationmark.triangle")
+                        .appText(.supporting)
+                        .tinted(.failure)
+                        .lineLimit(1)
+                }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .multilineTextAlignment(.center)
         .chatColumn()
-        .padding(.top, 28)
     }
 
-    /// What this project has cost, or nothing at all.
-    ///
-    /// `Cost.total(of:)` returns nil when nothing has been spent, and nothing is what
-    /// is drawn then — a zero would be a claim, and the app has not made one. The
-    /// period is named because the sidebar's money line is about this sitting and this
-    /// one is about the whole life of the work; a bare figure could be mistaken for it.
-    private func spent(_ summary: DaemonAPI.ProjectSummary) -> String? {
-        guard let total = Cost.total(of: summary.costToDate) else { return nil }
-        guard summary.unmeasuredAgents > 0 else { return "\(total) all time" }
-        let chats = summary.unmeasuredAgents == 1 ? "1 chat" : "\(summary.unmeasuredAgents) chats"
-        return "\(total) all time · at least, \(chats) went unpriced"
+    /// `~/Agents · this Mac`, or the path and the server's name.
+    private func place(_ summary: DaemonAPI.ProjectSummary) -> String {
+        let machine = summary.host == .mac ? "this Mac" : model.hosts.label(summary.host)
+        return "\(ProjectPlace.path(summary.folder, on: summary.host)) · \(machine)"
     }
-
-    /// Said in words, because a caption under a name is not something VoiceOver
-    /// announces as being about money at all.
-    private var spentInWords: String {
-        guard let summary, summary.unmeasuredAgents > 0 else {
-            return "What this project has cost in total, across every chat in it including archived ones."
-        }
-        let chats = summary.unmeasuredAgents == 1 ? "chat" : "chats"
-        return """
-            What this project has cost in total, across every chat in it including \
-            archived ones. It is a floor rather than the whole: \
-            \(summary.unmeasuredAgents) \(chats) ran on a runtime that reported no price.
-            """
-    }
-
-    /// Everything working on this project, each one a card you can go into.
-    ///
-    /// One `GlassEffectContainer` around the lot, so the cards blend with each other
-    /// rather than each carrying its own separate render.
-    private var agents: some View {
-        GlassEffectContainer(spacing: Self.cardSpacing) {
-            LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
-                // What the work is on, between what is happening and what will (038).
-                // Absent on a project that is not on GitHub.
-                PullRequestsSection(folder: folder, selection: $selection)
-
-                // Under the agents: what will happen, after what is happening. See
-                // `WorkflowsSection` for why that order.
-                WorkflowsSection(folder: folder, selection: $selection)
-
-                // Worktrees the app made here, which outlive the agents in them (030).
-                WorktreesSection(folder: folder)
-            }
-            .chatColumn()
-            .padding(.bottom, 28)
-        }
-        .animation(.default, value: model.agents.map(\.state))
-        // Parking moves a chat without changing its state (040).
-        .animation(.default, value: model.agents.map(\.parking))
-        // Who is working in which worktree changes when an agent is archived or
-        // brought back, and a worktree's git status as a turn ends, so the list is
-        // asked for again whenever an agent here changes state. Not polled.
-        .onChange(of: states) { Task { await model.loadDraftWorktrees() } }
-    }
-
-    /// Every agent's state on this page, archived ones included.
-    private var states: [AgentState] {
-        AgentGroup.allCases.flatMap { model.agents(in: model.selectedProjectKey, group: $0) }.map(\.state)
-    }
-
 }
 
+/// Everything in the project waiting for somebody's OK, as one banner across the top of
+/// the pane: plugins new or changed since they were approved, which no agent is given
+/// until then, and workflows likewise, which do not run. Review opens the one thing when
+/// there is one, and otherwise the place they are listed.
+private struct WaitingForOKBanner: View {
+    @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
+    let folder: URL?
 
-/// One of the page's three parts — starting a session, the sessions, the workflows —
-/// a step above the `GroupHeading`s inside them.
+    private var plugins: [ProjectPlugin] {
+        model.plugins(in: folder).filter { $0.awaitingApproval != nil }
+    }
+    private var workflows: [WorkflowSummary] {
+        model.workflows(in: folder).filter { $0.awaitingApproval != nil && !$0.isArchived }
+    }
+
+    var body: some View {
+        if !plugins.isEmpty || !workflows.isEmpty {
+            HStack(spacing: 10) {
+                Image(systemName: "hand.raised")
+                    .tinted(.attention)
+                    .accessibilityHidden(true)
+                Text(sentence)
+                    .appText(.supporting)
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                Button("Review…") { review() }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Paper.wash)
+            .overlay(alignment: .bottom) { Rectangle().fill(Paper.rule).frame(height: 1) }
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    private var sentence: String {
+        switch (plugins.count, workflows.count) {
+        case (1, 0): return "Plugin \(plugins[0].name) is waiting for your OK"
+        case (0, 1): return "Workflow \(workflows[0].workflow.name) is waiting for your OK"
+        default:
+            var parts: [String] = []
+            if !plugins.isEmpty { parts.append(plugins.count == 1 ? "1 plugin" : "\(plugins.count) plugins") }
+            if !workflows.isEmpty { parts.append(workflows.count == 1 ? "1 workflow" : "\(workflows.count) workflows") }
+            let total = plugins.count + workflows.count
+            return "\(parts.joined(separator: " and ")) \(total == 1 ? "is" : "are") waiting for your OK"
+        }
+    }
+
+    /// Plugins first: they are approved on Project Settings, and a workflow is approved
+    /// on its own page, which is one click from the middle column anyway.
+    private func review() {
+        if !plugins.isEmpty {
+            requests.projectSettings = .plugins
+        } else if let first = workflows.first {
+            model.openWorkflow = first.id
+        }
+    }
+}
+
+/// A part of a page, a step above the `GroupHeading`s inside it.
 struct SectionHeading: View {
     let title: String
 

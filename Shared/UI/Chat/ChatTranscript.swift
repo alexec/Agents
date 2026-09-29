@@ -60,6 +60,23 @@ struct ChatTranscript: View {
     /// Whether there is more conversation than pane. No point offering a way to the
     /// end of something already wholly on screen.
     @State private var canScroll = false
+    /// The tallest honest content height seen for this conversation.
+    ///
+    /// A lazy stack reports about one screen of height while it is throwing rows
+    /// away. That sample looks like a short page whose end is on screen, and
+    /// acting on it — resume following, go to the foot, ask for the page above
+    /// and go to its top — is the pane jumping up and down under a reader.
+    @State private var trustedContentHeight: CGFloat = 0
+    /// Where an automatic move to the foot last aimed, so a distance that does
+    /// not shrink can be chased once rather than on every geometry tick.
+    @State private var lastPinnedHeight: CGFloat?
+    @State private var lastPinnedDistance: CGFloat?
+    /// The rows at the top when an earlier page was asked for, and whether the
+    /// reader was following the end. The first row's id often does not survive
+    /// the page: what arrives joins onto it, and the row takes the earlier
+    /// entry's id. The next id that is still there is the line they were reading.
+    @State private var restoreIDs: [UUID] = []
+    @State private var restoreFollowing = false
 
     /// Send now is for a turn that is running, on a runtime that said it takes words
     /// mid-turn. Starting is not running: there is no turn yet to send them into.
@@ -123,15 +140,34 @@ struct ChatTranscript: View {
             .contentMargins(.bottom, bottomInset, for: .scrollContent)
             .contentMargins(.bottom, bottomInset, for: .scrollIndicators)
             .onScrollGeometryChange(for: Edges.self) { geometry in
-                Edges(fromTop: geometry.contentOffset.y,
-                      fromBottom: geometry.contentSize.height
-                          - geometry.contentOffset.y
-                          - geometry.containerSize.height,
-                      canScroll: geometry.contentSize.height > geometry.containerSize.height,
-                      height: geometry.containerSize.height)
+                // `visibleRect` is the content actually on screen, insets included.
+                // Measuring from `contentOffset` alone counts the top bar as distance
+                // still below the fold, and the pane then chases that distance: a few
+                // points down, a few points up, for as long as the chat is open.
+                Edges(fromTop: max(0, geometry.visibleRect.minY),
+                      fromBottom: max(0, geometry.contentSize.height - geometry.visibleRect.maxY),
+                      canScroll: geometry.contentSize.height > geometry.containerSize.height + 1,
+                      height: geometry.containerSize.height,
+                      contentHeight: geometry.contentSize.height)
             } action: { _, edges in
-                canScroll = edges.canScroll
                 onHeight?(edges.height)
+                // A lazy stack's content size can collapse to the rows it has made
+                // for the length of a flick. Even when that sample still exceeds the
+                // viewport, treating it as a real shorter page can resume following
+                // or ask for an earlier page. Keep the tallest reliable measurement
+                // and ignore a sample that falls materially below it.
+                let collapsed = trustedContentHeight > edges.height + 80
+                    && edges.contentHeight < trustedContentHeight - 80
+                if collapsed {
+                    // Their hand is on it and the measurement cannot be believed.
+                    // Stop following now; the honest sample arrives as they let go,
+                    // and waiting for it is how a flick ends at the foot.
+                    if isUserScrolling { isFollowing = false }
+                    return
+                }
+                trustedContentHeight = max(trustedContentHeight, edges.contentHeight)
+                canScroll = edges.canScroll
+                guard !isLoadingEarlier else { return }
                 // Geometry moves for two reasons: the reader scrolled, or the
                 // conversation grew. Only the first may end follow mode. Reading the
                 // distance on its own got this wrong — a new line puts the end below the
@@ -139,15 +175,27 @@ struct ChatTranscript: View {
                 // exactly like somebody scrolling away — so the pane decided the reader
                 // had left when they had not, stopped following, and put the way back up
                 // unasked.
-                if isUserScrolling, !isLoadingEarlier, edges.fromBottom > leftTheEnd {
+                if isUserScrolling, edges.fromBottom > leftTheEnd {
+                    isFollowing = false
+                }
+                // A move up the page that is not the page growing. The scroll
+                // phase is not always delivered for it — a wheel tick can land
+                // while the phase is idle — and without this the foot is pinned
+                // again the moment the hand lets go, which is the jump.
+                if let pinned = lastPinnedHeight, let was = lastPinnedDistance,
+                   abs(edges.contentHeight - pinned) < 0.5,
+                   edges.fromBottom > was + leftTheEnd {
                     isFollowing = false
                 }
                 // Back at the foot under their own steam. Generous on the way in and
                 // strict on the way out: following again a moment early is a small
                 // wrong, and being left behind a live conversation is the bug.
-                if edges.fromBottom < atTheEnd {
+                // Not while their hand is still on it: one frame of a flick reads as
+                // the end, and resuming follow then pulls them there as they let go.
+                if !isUserScrolling, edges.fromBottom < atTheEnd {
                     isFollowing = true
                     hasNewBelow = false
+                    lastPinnedDistance = 0
                 }
                 // Following the end, taken from the geometry rather than from new
                 // entries arriving. It used to be an animated scrollTo per entry, and
@@ -165,18 +213,26 @@ struct ChatTranscript: View {
                 // the offset stayed where it was while the conversation ran on below the
                 // pane.
                 //
-                // Not guarded on `isLoadingEarlier`: earlier pages land on top, and
-                // whoever is following wants the foot whatever arrives above them.
-                // Guarding it cost three seconds of falling behind at the start of a
-                // turn, and then the catching-up jump this is all meant to stop.
-                if isFollowing, !isUserScrolling, edges.fromBottom > 0.5 {
-                    scroller.scrollTo(bottom, anchor: .bottom)
+                // Once per content height, and again only when the distance actually
+                // shrinks. A distance that stays put — the top bar, counted as though
+                // it were content below the fold — used to be chased on every tick,
+                // and the pane bounced.
+                if isFollowing, !isUserScrolling, edges.fromBottom > 1 {
+                    let grown = edges.contentHeight != lastPinnedHeight
+                    let closer = lastPinnedDistance.map { edges.fromBottom < $0 - 0.5 } ?? true
+                    if grown || closer {
+                        lastPinnedHeight = edges.contentHeight
+                        lastPinnedDistance = edges.fromBottom
+                        place(scroller, on: bottom, anchor: .bottom)
+                    }
                 }
                 // A page is 200 entries, and a run of tool calls is one line however
                 // many entries it took, so a page can come back shorter than the
                 // pane. Nothing to scroll means nothing would ever ask for the rest,
                 // so a page that does not fill the pane asks for another itself.
-                if edges.fromTop < 400 || !edges.canScroll { loadEarlier(keeping: scroller) }
+                if edges.contentHeight > 1, edges.fromTop < 400 || !edges.canScroll {
+                    askForEarlier()
+                }
             }
             // What counts as the reader moving the pane. `.animating` is this view's own
             // scrollTo and `.idle` is the conversation growing under a still hand;
@@ -188,9 +244,14 @@ struct ChatTranscript: View {
                 }
             }
             .onChange(of: entryCount) { before, after in
-                // Nothing here moves the pane; the geometry does that. This is only the
-                // word to the reader who is not watching. Loading earlier adds to the
-                // top, and that must not read as something new having arrived.
+                // An earlier page has landed. Hold the line they were on — or the
+                // foot, if they were following it. Doing it here rather than in the
+                // load is what makes the rows exist to hold: the load's own view
+                // value still has the page from before.
+                if isLoadingEarlier, after != before { holdPlace(scroller) }
+                // Nothing here moves the pane otherwise; the geometry does that. This
+                // is only the word to the reader who is not watching. Loading earlier
+                // adds to the top, and that must not read as something new having arrived.
                 guard after > before, !isLoadingEarlier, !isFollowing else { return }
                 hasNewBelow = true
             }
@@ -225,15 +286,20 @@ struct ChatTranscript: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if canScroll, !isFollowing {
-                    JumpToEnd(hasNewBelow: hasNewBelow) { goToEnd(scroller) }
-                        // Clear of the floating prompt, whose height the chat has
-                        // already measured for the transcript's own bottom inset.
-                        .padding(.bottom, bottomInset + 12)
-                        .transition(.opacity)
+                // The fade belongs to the button alone. The same animation on the
+                // scroll view eased every correction, so a reader and the pane pulled
+                // against each other for the length of the ease.
+                ZStack(alignment: .bottom) {
+                    if canScroll, !isFollowing {
+                        JumpToEnd(hasNewBelow: hasNewBelow) { goToEnd(scroller) }
+                            // Clear of the floating prompt, whose height the chat has
+                            // already measured for the transcript's own bottom inset.
+                            .padding(.bottom, bottomInset + 12)
+                            .transition(.opacity)
+                    }
                 }
+                .animation(.easeOut(duration: 0.15), value: canScroll && !isFollowing)
             }
-            .animation(.easeOut(duration: 0.15), value: canScroll && !isFollowing)
         }
     }
 
@@ -260,6 +326,16 @@ struct ChatTranscript: View {
         var fromBottom: CGFloat
         var canScroll: Bool
         var height: CGFloat
+        var contentHeight: CGFloat
+    }
+
+    /// Move without animating. An animated move restarts on the next fragment, which
+    /// is the stutter this pane used to have, and it is also how a correction and a
+    /// hand on the pane end up pulling the page in opposite directions.
+    private func place(_ scroller: ScrollViewProxy, on id: some Hashable, anchor: UnitPoint) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { scroller.scrollTo(id, anchor: anchor) }
     }
 
     /// Open at the end, the way every chat does, and only then let reaching the top
@@ -270,6 +346,11 @@ struct ChatTranscript: View {
         isFollowing = true
         isUserScrolling = false
         hasNewBelow = false
+        trustedContentHeight = 0
+        lastPinnedHeight = nil
+        lastPinnedDistance = nil
+        restoreIDs = []
+        restoreFollowing = false
         // The first page arrives a moment after the selection does. Waiting for it
         // rather than guessing at a delay is what keeps a big transcript from
         // opening halfway up itself.
@@ -278,7 +359,7 @@ struct ChatTranscript: View {
             try? await Task.sleep(for: .milliseconds(30))
         }
         guard !Task.isCancelled else { return }
-        scroller.scrollTo(bottom, anchor: .bottom)
+        place(scroller, on: bottom, anchor: .bottom)
         try? await Task.sleep(for: .milliseconds(400))
         guard !Task.isCancelled else { return }
         hasSettled = true
@@ -286,20 +367,35 @@ struct ChatTranscript: View {
 
     /// Another page, and the reader left looking at the same line they were.
     ///
-    /// The anchor is the line that was at the top before the page went in. Scrolling
-    /// back to it afterwards is the difference between reading backwards through a
-    /// conversation and being thrown about by it.
-    private func loadEarlier(keeping scroller: ScrollViewProxy) {
+    /// Someone following the end stays at the foot: the page arrives above them,
+    /// and scrolling the old first line to the top is what used to throw them up
+    /// there and then back down. Someone reading stays on the row they had. The
+    /// move itself happens when the rows land (`entryCount`), because a scroll
+    /// asked for before they exist does not land on them.
+    private func askForEarlier() {
         guard hasSettled, !isLoadingEarlier, hasMore else { return }
         isLoadingEarlier = true
-        let anchor = items.first?.id
+        restoreFollowing = isFollowing
+        restoreIDs = items.prefix(8).map(\.id)
         Task {
             await loadEarlier()
-            if let anchor { scroller.scrollTo(anchor, anchor: .top) }
             // A beat before the next one can start, so one flick does not swallow
             // the whole file.
             try? await Task.sleep(for: .milliseconds(250))
             isLoadingEarlier = false
+        }
+    }
+
+    /// Keep the reader where they were once an earlier page has been drawn.
+    private func holdPlace(_ scroller: ScrollViewProxy) {
+        if restoreFollowing {
+            place(scroller, on: bottom, anchor: .bottom)
+            return
+        }
+        // The first row may have been joined into the page that just arrived, so
+        // its id is gone. The next row that is still there is the same line.
+        if let id = restoreIDs.first(where: { id in items.contains { $0.id == id } }) {
+            place(scroller, on: id, anchor: .top)
         }
     }
 

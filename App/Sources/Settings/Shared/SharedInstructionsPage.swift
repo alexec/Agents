@@ -1,76 +1,6 @@
 import AgentsKit
 import SwiftUI
 
-/// Frame F: the one `AGENTS.md`, as agents read it, and where each runtime reads it from.
-/// A file that was already the person's and was left alone is shown as what that runtime
-/// reads instead.
-struct SharedInstructionsPage: View {
-    let snapshot: DaemonAPI.SharedSnapshot
-    @State private var text = ""
-
-    private var path: String { snapshot.instructions?.path ?? snapshot.home + "/AGENTS.md" }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                SharedPageHeader(title: "Instructions", path: path) {
-                    Button("Edit AGENTS.md") { SharedFiles.open(path) }.buttonStyle(.paper)
-                }
-                Text(text)
-                    .appText(.supporting)
-                    .textSelection(.enabled)
-                    .lineLimit(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.rule, lineWidth: 1))
-                Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 10) {
-                    GridRow {
-                        Text("Runtime"); Text("Reads"); Text("Gets AGENTS.md")
-                    }
-                    .appText(.fine).foregroundStyle(.secondary)
-                    ForEach(snapshot.runtimes) { runtime in
-                        let reach = snapshot.instructions?.reach[runtime.id]
-                        GridRow(alignment: .firstTextBaseline) {
-                            Text(runtime.name)
-                                .accessibilityLabel("\(runtime.name): \(Self.reads(reach)). \(SharedReachList.line(reach ?? .unchecked(nil)))")
-                            Text(Self.reads(reach))
-                                // A path in code type; a sentence about a runtime as prose.
-                                .appText(Self.reads(reach).hasPrefix("~/") || Self.reads(reach).hasPrefix("/") ? .code : .supporting)
-                                .foregroundStyle(.secondary).accessibilityHidden(true)
-                            Text(Self.mark(reach))
-                                .foregroundStyle(reach?.gets == true ? SharedInk.reach : .secondary)
-                                .accessibilityHidden(true)
-                        }
-                    }
-                }
-            }
-            .padding(20)
-        }
-        .task(id: path) {
-            text = (try? String(contentsOf: URL(filePath: path), encoding: .utf8)) ?? "No AGENTS.md yet."
-        }
-    }
-
-    static func reads(_ reach: DaemonAPI.Reach?) -> String {
-        switch reach {
-        case .gets(let note): note
-        case .ownCopy(let path): "\(SharedFiles.tilde(path)), its own file, left alone"
-        case .leftOut(let note), .noWay(let note): note
-        case .unchecked(let note): note ?? "not checked yet"
-        case nil: ""
-        }
-    }
-
-    static func mark(_ reach: DaemonAPI.Reach?) -> String {
-        switch reach {
-        case .gets: "✓"
-        case .unchecked: "?"
-        default: "—"
-        }
-    }
-}
-
 /// Frame G: everything else in `~/.agents`, with what (if anything) uses it. Nothing is
 /// hidden, so the tab is the whole folder.
 struct SharedOtherFilesPage: View {
@@ -101,8 +31,7 @@ struct SharedOtherFilesPage: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Paper.raised, in: RoundedRectangle(cornerRadius: 9))
-                    .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Paper.rule, lineWidth: 1))
+                    .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.control))
                 }
             }
             .padding(20)

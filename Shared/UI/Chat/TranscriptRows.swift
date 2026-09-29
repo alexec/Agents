@@ -345,8 +345,8 @@ private struct ToolCallLine: View {
                 line
             }
             .buttonStyle(.plain)
-            .help(isExpanded ? "Hide what it did" : "Show what it did")
-            .accessibilityHint(isExpanded ? "Hides what it did" : "Shows what it did")
+            .help(isExpanded ? "Hide the argument and the return" : "Show the argument and the return")
+            .accessibilityHint(isExpanded ? "Hides the argument and the return" : "Shows the argument and the return")
         } else {
             line
         }
@@ -403,15 +403,11 @@ private struct ToolCallLine: View {
                 }
             }
 
-            if let raw {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Text(raw)
-                        .appText(.code)
-                        .textSelection(.enabled)
-                        .padding(10)
-                }
-                .frame(maxHeight: 260)
-                .paperWell(in: RoundedRectangle(cornerRadius: 8))
+            if let argument = call.rawInput {
+                exchanged("Argument", Self.pretty(argument))
+            }
+            if let returned = call.rawOutput {
+                exchanged("Return", Self.pretty(returned))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -461,18 +457,57 @@ private struct ToolCallLine: View {
             || call.rawInput != nil || call.rawOutput != nil || call.raw != nil
     }
 
-    /// What the runtime sent, as it sent it. Every runtime describes its tools
-    /// differently and none of that is ours to tidy.
-    private var raw: String? {
-        let interesting = call.rawInput ?? call.rawOutput ?? call.raw
-        guard let interesting else { return nil }
-        if let text = interesting.stringValue { return text }
-        return Self.pretty(interesting)
+    /// The argument or the return, under a word that says which. A runtime's own
+    /// bytes — Grok sends a tool's output as a list of numbers — are read back into
+    /// text here, because a page of integers is not what came back.
+    private func exchanged(_ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).appText(.fine).foregroundStyle(.tertiary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(text)
+                    .appText(.code)
+                    .textSelection(.enabled)
+                    .padding(10)
+            }
+            .frame(maxHeight: 260)
+            .paperWell(in: RoundedRectangle(cornerRadius: 8))
+        }
     }
 
     private static func pretty(_ value: JSONValue) -> String {
-        guard let data = try? JSONEncoder.pretty.encode(value) else { return "" }
+        let readable = value.readingByteArraysAsText()
+        if let text = readable.stringValue { return text }
+        guard let data = try? JSONEncoder.pretty.encode(readable) else { return "" }
         return String(decoding: data, as: UTF8.self)
+    }
+}
+
+private extension JSONValue {
+    /// A list of bytes, the way some runtimes send a tool's output, read as text.
+    /// Anything that is not a list of bytes is left as it arrived.
+    func readingByteArraysAsText() -> JSONValue {
+        switch self {
+        case .array(let values):
+            if let text = Self.text(ofBytes: values) { return .string(text) }
+            return .array(values.map { $0.readingByteArraysAsText() })
+        case .object(let fields):
+            return .object(fields.mapValues { $0.readingByteArraysAsText() })
+        default:
+            return self
+        }
+    }
+
+    private static func text(ofBytes values: [JSONValue]) -> String? {
+        let bytes = values.compactMap(\.intValue)
+        guard bytes.count == values.count, !bytes.isEmpty,
+              bytes.allSatisfy({ (0...255).contains($0) }) else { return nil }
+        let raw = bytes.map { UInt8(truncatingIfNeeded: $0) }
+        guard let text = String(bytes: raw, encoding: .utf8) else { return nil }
+        let printable = text.unicodeScalars.filter {
+            !CharacterSet.controlCharacters.contains($0) || $0 == "\n" || $0 == "\t" || $0 == "\r"
+        }
+        guard printable.count * 10 >= text.unicodeScalars.count * 9 else { return nil }
+        return text
     }
 }
 
@@ -485,13 +520,13 @@ private extension JSONEncoder {
 }
 
 /// The agent is at work and the person is waiting: the same small spinner the
-/// sidebar row shows, at the foot of the conversation, so the chat itself moves while
-/// nothing else on it does. Live rather than recorded — it is there exactly as long
-/// as the wait is, and it rides the end of the transcript as the reply arrives.
+/// sidebar row shows, turning in step with it (`SyncedSpinner`), at the foot of the
+/// conversation, so the chat itself moves while nothing else on it does. Live rather
+/// than recorded — it is there exactly as long as the wait is, and it rides the end of
+/// the transcript as the reply arrives.
 struct WorkingLine: View {
     var body: some View {
-        ProgressView()
-            .controlSize(.small)
+        SyncedSpinner(diameter: 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 2)
             .accessibilityLabel("Working")

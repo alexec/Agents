@@ -37,8 +37,7 @@ struct FinishTurnTests {
 
     private func mintedToken(_ launcher: FakeLauncher) async -> String {
         await eventuallySome("the runtime was handed its token") {
-            let attached = await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? []
-            let minted = attached.first?["args"]?.arrayValue?.last?.stringValue ?? ""
+            let minted = MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
             return minted.isEmpty ? nil : minted
         } ?? ""
     }
@@ -93,7 +92,7 @@ struct FinishTurnTests {
         #expect(agent.report?.outcome == .done)
         #expect(agent.report?.message == "Renamed the call sites; tests pass.")
         #expect(agent.suggestedPrompts.map(\.label) == ["A"])
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group(wantsEyes: false) == .needsAttention)
         // One record of it, at the foot, as a report alone leaves.
         #expect(try await reported(core, id).map(\.outcome) == [.done])
     }

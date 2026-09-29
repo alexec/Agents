@@ -7,6 +7,10 @@ import Foundation
 /// reached. What it must not do is ask — a prompt from the daemon goes to no terminal
 /// and waits for ever — so prompts are switched off and stdin is empty. A clone that
 /// would have asked fails, and says so.
+///
+/// It also must not run commands a repository's own config names (`core.fsmonitor`,
+/// hooks, pager, external diff): every git call gets `-c` overrides and
+/// `GIT_CONFIG_NOSYSTEM=1` (security review S3). `gh` does not.
 public final class GitProcess: @unchecked Sendable {
     public struct Outcome: Sendable {
         public var status: Int32
@@ -36,6 +40,31 @@ public final class GitProcess: @unchecked Sendable {
         return nil
     }
 
+    /// Config overrides prepended to every daemon `git` call so a repository's own
+    /// config cannot run commands as the daemon (security review S3): no fsmonitor, no
+    /// hooks, no pager, no external diff, no `ext::` helpers. Applied only on the git
+    /// convenience initializer — `gh` goes through `init(executable:)` without them.
+    static let configOverrides = [
+        "core.fsmonitor=false",
+        "core.hooksPath=/dev/null",
+        "core.pager=cat",
+        "diff.external=",
+        "protocol.ext.allow=never",
+    ]
+
+    /// Environment for every daemon `git` call. `GIT_CONFIG_NOSYSTEM` drops system
+    /// config; the person's user config stays (remotes, SSH). Callers may still lay
+    /// extras over this (035's `GIT_OPTIONAL_LOCKS=0`).
+    static let hardenedEnvironment: [String: String] = [
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_NOSYSTEM": "1",
+    ]
+
+    /// `-c key=value` pairs for `configOverrides`, then the caller's arguments.
+    static func hardenedArguments(_ arguments: [String]) -> [String] {
+        configOverrides.flatMap { ["-c", $0] } + arguments
+    }
+
     /// `extra` is laid over the environment last: how a caller that must only read
     /// says so (035's `GIT_OPTIONAL_LOCKS=0`).
     public convenience init(_ arguments: [String], in folder: URL? = nil,
@@ -44,14 +73,15 @@ public final class GitProcess: @unchecked Sendable {
         // Never ask. The SSH side cannot ask either: the daemon has no terminal, and
         // `GIT_SSH_COMMAND` is left alone because it would override their own
         // `core.sshCommand`.
-        self.init(executable: git, arguments: arguments, in: folder,
-                  environment: ["GIT_TERMINAL_PROMPT": "0"].merging(extra) { _, new in new },
+        self.init(executable: git, arguments: Self.hardenedArguments(arguments), in: folder,
+                  environment: Self.hardenedEnvironment.merging(extra) { _, new in new },
                   input: input)
     }
 
     /// Any of the person's own tools, run the same way: their PATH, nothing that can
-    /// ask. `gh` goes through here too (038), because everything that makes git safe
-    /// to run unattended is what makes `gh` safe.
+    /// ask. `gh` goes through here too, because everything that makes git safe
+    /// to run unattended is what makes `gh` safe. No git `-c` hardenings here: those
+    /// are only for the git convenience initializer above.
     init(executable: URL, arguments: [String], in folder: URL? = nil,
          environment extra: [String: String] = [:], input: Data? = nil) {
         self.input = input

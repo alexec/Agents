@@ -62,7 +62,7 @@ struct WorkflowRow: View {
             Button("Open") { model.openWorkflow = summary.id }
             Divider()
             if summary.isArchived {
-                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
+                Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
             } else {
                 if summary.awaitingApproval != nil {
                     Button("Approve") { Task { await model.approveWorkflow(summary) } }
@@ -115,8 +115,8 @@ struct WorkflowRow: View {
             } else if let outcome = outcomeText {
                 Text(outcome)
             }
-            // What caused it, when an event did (042 FR-030): "on pull_request.merged #41",
-            // leading to that row on the Events page.
+            // What caused it, when an event did (042 FR-030): "on workflow.completed
+            // workflow nightly", leading to that row on the Events page.
             if let position = summary.causingEvent, let name = summary.causingEventName {
                 Button { model.showEvents(at: .event(position)) } label: {
                     Text("on \(name)")
@@ -161,7 +161,7 @@ struct WorkflowRow: View {
             // else on this row does anything while it is put away, and offering to run
             // a thing that will not run would be offering a lie.
             if summary.isArchived {
-                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
+                Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.paper)
                     .appText(.fine)
             } else if summary.awaitingApproval != nil {
@@ -197,13 +197,6 @@ struct WorkflowRow: View {
         guard !summary.isArchived, summary.overLimit == nil, summary.awaitingApproval == nil else { return nil }
         if let next = summary.nextFireAt {
             return "Next \(next.formatted(.relative(presentation: .named)))"
-        }
-        // A pull-request trigger has no next time. What it has is how many pull requests
-        // it is looking after: checked out here and not stopped (038).
-        if workflow.respondsToPullRequests,
-           let list = model.pullRequestLists[Project.standardize(workflow.folder)] {
-            let watched = list.pullRequests.filter { $0.worktree != nil && !$0.babysitting.isStopped }.count
-            return watched == 1 ? "Watching 1 pull request" : "Watching \(watched) pull requests"
         }
         return nil
     }
@@ -246,7 +239,7 @@ struct WorkflowRow: View {
 ///
 /// Grey, all of it, except the one that wants you — the same rule the agent list
 /// follows, and the reason it holds here is that most refusals resolve themselves.
-private struct WorkflowStatusIcon: View {
+struct WorkflowStatusIcon: View {
     let summary: WorkflowSummary
 
     var body: some View {

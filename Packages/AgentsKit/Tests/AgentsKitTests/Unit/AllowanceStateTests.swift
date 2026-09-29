@@ -11,26 +11,52 @@ struct AllowanceStateTests {
         AllowanceState(credentialKey: "claude:sign-in", entryID: UUID(), since: now)
     }
 
-    @Test func spentWithATimeComesBackAtThatTime() {
+    @Test func aStatedResetIsShownButDoesNotBringItBack() {
         var state = state()
         let back = now.addingTimeInterval(5 * 3600)
         state.markOut(.allowanceSpent, until: back, payment: .allowance(label: nil), now: now, from: .typedFailure)
         #expect(!state.isUsable(now: now))
         #expect(state.returnsAt == back)
-        #expect(state.current(now: back) == .available)
-        let changed = state.settle(now: back)
-        #expect(changed)
+        guard case .out(back, let retry?, .allowanceSpent) = state.status else { Issue.record("\(state.status)"); return }
+        #expect(retry == now.addingTimeInterval(4 * 3600))
+        // Past the provider's time: still out, until a check or a turn works.
+        let later = back.addingTimeInterval(60)
+        #expect(!state.isUsable(now: later))
+        let changed = state.settle(now: later)
+        #expect(!changed)
+        #expect(state.isOut)
+    }
+
+    @Test func spentWithoutATimeIsCheckedEveryFourHours() {
+        var state = state()
+        state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .words)
+        guard case .out(nil, let retry?, _) = state.status else { Issue.record("\(state.status)"); return }
+        #expect(retry == now.addingTimeInterval(4 * 3600))
+        // The check time is permission to ask, never usable by itself.
+        #expect(!state.isUsable(now: retry))
+        let failedAt = retry.addingTimeInterval(30)
+        state.deferCheck(now: failedAt)
+        guard case .out(nil, let next?, .allowanceSpent) = state.status else { Issue.record("\(state.status)"); return }
+        #expect(next == failedAt.addingTimeInterval(4 * 3600))
+        state.worked(now: next)
         #expect(state.status == .available)
     }
 
-    @Test func spentWithoutATimeIsTriedAgainAfterAnHour() {
+    @Test func aFailedRuntimeIsOutUntilItWorks() {
         var state = state()
-        state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .words)
-        #expect(!state.isUsable(now: now.addingTimeInterval(3599)))
-        #expect(state.isUsable(now: now.addingTimeInterval(3600)))
-        // Tried again, not declared back: that is a turn working.
-        #expect(state.isOut)
-        state.worked(now: now.addingTimeInterval(3700))
+        let marked = state.markFailed(now: now)
+        #expect(marked)
+        guard case .out(nil, let retry?, .runtimeFailed) = state.status else { Issue.record("\(state.status)"); return }
+        #expect(retry == now.addingTimeInterval(4 * 3600))
+        #expect(state.learnedFrom == .runtimeFailure)
+        #expect(!state.isUsable(now: retry))
+        // Already out for a more specific reason: that reason stays.
+        var spent = self.state()
+        spent.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .words)
+        let markedAgain = spent.markFailed(now: now)
+        #expect(!markedAgain)
+        guard case .out(_, _, .allowanceSpent) = spent.status else { Issue.record("\(spent.status)"); return }
+        state.worked(now: retry)
         #expect(state.status == .available)
     }
 
@@ -52,7 +78,7 @@ struct AllowanceStateTests {
         let r3 = state.rateLimited(now: now.addingTimeInterval(150), retryAt: now.addingTimeInterval(180), payment: payment)
         #expect(r3)
         guard case .out(nil, let retry?, .rateLimitPersisted) = state.status else { Issue.record("\(state.status)"); return }
-        #expect(retry == now.addingTimeInterval(150 + 3600))
+        #expect(retry == now.addingTimeInterval(150 + 4 * 3600))
     }
 
     @Test func rateLimitsFarApartDoNotAddUp() {
@@ -83,7 +109,7 @@ struct AllowanceStateTests {
         pacific.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
         #expect(pacific.component(.hour, from: back) == 0)
         #expect(back > now && back.timeIntervalSince(now) <= 86400)
-        #expect(state.current(now: back) == .available)
+        #expect(!state.isUsable(now: back))
     }
 
     @Test func theResetFollowsTheClockAcrossDaylightSaving() throws {
@@ -141,5 +167,21 @@ struct AllowanceStateTests {
                               credentialRef: "another-credential")
         #expect(AllowanceState.credentialKey(for: mac) == AllowanceState.credentialKey(for: server))
         #expect(AllowanceState.credentialKey(for: mac) != AllowanceState.credentialKey(for: keyed))
+    }
+
+    @Test func theCheckRunsOnASmallModelOrTheDefault() {
+        func choice(_ value: String, _ name: String, _ description: String? = nil) -> ConfigChoice {
+            ConfigChoice(value: .string(value), name: name, description: description)
+        }
+        let claude = [choice("default", "Default (recommended)"), choice("opus", "Opus"), choice("haiku", "Haiku")]
+        #expect(DaemonCore.probeModel(in: claude)?.name == "Haiku")
+        // Codex names none small; its descriptions do. Never its first, frontier model.
+        let codex = [choice("gpt-6-astra", "6 Astra", "Frontier intelligence for the most demanding work."),
+                     choice("gpt-6-sol", "6 Sol", "Workhorse model for coding and everyday work."),
+                     choice("gpt-6-luna", "6 Luna", "Fast and affordable model for easier tasks."),
+                     choice("gpt-5.6-luna", "5.6 Luna", "Older fast and efficient model.")]
+        #expect(DaemonCore.probeModel(in: codex)?.name == "6 Luna")
+        // Nothing says it is small: keep the runtime's own default.
+        #expect(DaemonCore.probeModel(in: [choice("big", "Big"), choice("bigger", "Bigger")]) == nil)
     }
 }

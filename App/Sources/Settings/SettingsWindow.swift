@@ -3,13 +3,15 @@ import AppKit
 import SwiftUI
 
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
-/// beside it, in one window size for every pane, so choosing another pane never makes the
-/// window jump. Shared's pages are listed in the rail under a heading of their own rather
-/// than in a column of their own, so there is one place to choose from.
+/// beside it. It opens at one size for every pane, so choosing another never makes the
+/// window jump, and it can be resized larger than that. Shared's pages are listed in the
+/// rail under a heading of their own rather than in a column of their own, so there is
+/// one place to choose from.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
-    @State private var pane: SettingsPane = .general
-    @State private var sharedPage: SharedPage = .overview
+    @AppStorage("settingsPane") private var paneRaw = SettingsPane.appearance.rawValue
+    @AppStorage("settingsSharedPage") private var sharedPageRaw = SharedPage.overview.rawValue
+    @AppStorage("settingsRuntimeID") private var runtimeIDRaw = RuntimeCatalog.claude.id
     /// Shared's snapshot lives here, not in its pane, because the rail shows its counts.
     /// Asked for when the window appears, when Shared is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
@@ -19,43 +21,88 @@ struct SettingsWindow: View {
     /// (058). Without one, Devices and Servers are listed as they always were.
     @State private var control: ControlSettingsModel? = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
 
+    /// The size it opens at, and the smallest it will go. A larger window gives the extra
+    /// room to the detail on Shared, and to the empty space beside a form pane, which
+    /// stays one column.
     static let size = CGSize(width: 1_000, height: 640)
+
+    private var pane: Binding<SettingsPane> {
+        Binding(
+            get: { SettingsPane(rawValue: paneRaw) ?? .appearance },
+            set: { paneRaw = $0.rawValue })
+    }
+
+    private var sharedPage: Binding<SharedPage> {
+        Binding(
+            get: { SharedPage(rawValue: sharedPageRaw) ?? .overview },
+            set: { sharedPageRaw = $0.rawValue })
+    }
+
+    private var runtimeID: Binding<String> {
+        Binding(
+            get: {
+                let known = Set(model.runtimes.map(\.id))
+                if known.contains(runtimeIDRaw) { return runtimeIDRaw }
+                return model.runtimes.first?.id ?? RuntimeCatalog.claude.id
+            },
+            set: { runtimeIDRaw = $0 })
+    }
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsRail(pane: $pane, sharedPage: $sharedPage, snapshot: sharedSnapshot,
-                         controlPage: $controlPage, control: control)
+            SettingsRail(pane: pane, sharedPage: sharedPage, runtimeID: runtimeID,
+                         snapshot: sharedSnapshot, controlPage: $controlPage, control: control)
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(width: Self.size.width, height: Self.size.height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: Self.size.width, idealWidth: Self.size.width,
+               maxWidth: .infinity,
+               minHeight: Self.size.height, idealHeight: Self.size.height,
+               maxHeight: .infinity)
         .background(Paper.ground)
-        .navigationTitle(pane.title)
-        .task { await refreshShared() }
+        // The Settings scene draws a window with no grow box, and ignores
+        // windowResizability, so the mask is set on the window itself.
+        .background(SettingsGrowBox())
+        .navigationTitle(pane.wrappedValue.title)
+        .navigationTitle(title)
+        .task {
+            await model.refreshRuntimes()
+            await refreshShared()
+        }
         .task { await control?.start() }
         .onDisappear { control?.stop() }
         // Asked for from elsewhere in the app: the Pool page's "Edit the pool" (052).
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
-            pane = asked
+            pane.wrappedValue = asked
             model.settingsPaneAsked = nil
         }
-        .onChange(of: pane) { _, chosen in
+        .onChange(of: pane.wrappedValue) { _, chosen in
             if chosen == .shared { Task { await refreshShared() } }
+            if chosen == .runtimes { Task { await model.refreshRuntimes() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await refreshShared() }
+            Task {
+                await refreshShared()
+                if pane.wrappedValue == .runtimes { await model.refreshRuntimes() }
+            }
         }
+    }
+
+    private var title: String {
+        guard pane.wrappedValue == .runtimes else { return pane.wrappedValue.title }
+        return model.runtimes.first { $0.id == runtimeID.wrappedValue }?.runtime.name
+            ?? SettingsPane.runtimes.title
     }
 
     @ViewBuilder
     private var content: some View {
-        switch pane {
-        case .general: FormColumn { AppearanceSettingsView() }
-        case .agents: FormColumn { AgentsSettingsView() }
-        case .runtimes: FormColumn { AgentRuntimesSettingsView() }
-        case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: $sharedPage)
+        switch pane.wrappedValue {
+        case .appearance: FormColumn { GeneralSettingsView() }
+        case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
+        case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
         case .pool: FormColumn { PoolSettingsView() }
         case .devices: FormColumn { DevicesPane() }
@@ -70,13 +117,14 @@ struct SettingsWindow: View {
     }
 }
 
-enum SettingsPane: Hashable, CaseIterable {
-    case general, agents, runtimes, shared, spending, pool, devices, servers, controlPlane
+enum SettingsPane: String, Hashable, CaseIterable {
+    // Keep the old persisted raw value so Settings opens on the same pane after upgrade.
+    case appearance = "general"
+    case runtimes, shared, spending, pool, devices, servers, controlPlane
 
     var title: String {
         switch self {
-        case .general: "General"
-        case .agents: "Agents"
+        case .appearance: "Appearance"
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
@@ -89,8 +137,7 @@ enum SettingsPane: Hashable, CaseIterable {
 
     var symbol: String {
         switch self {
-        case .general: "gearshape"
-        case .agents: "person.2"
+        case .appearance: "circle.lefthalf.filled"
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
@@ -101,16 +148,68 @@ enum SettingsPane: Hashable, CaseIterable {
         }
     }
 
-    /// General on its own; the panes about agents; Shared, drawn as a heading over its
+    /// Appearance on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
     ///
     /// With a control plane, Devices and Servers fold into its one group (058, frame D):
     /// its hosts are the servers and its clients the devices.
     static var groups: [[SettingsPane]] {
         let ways: [SettingsPane] = ControlConfig.endpoint == nil ? [.devices, .servers] : [.controlPlane]
-        return [[.general], [.agents, .runtimes, .spending, .pool], [.shared], ways]
+        return [[.appearance], [.runtimes, .spending, .pool], [.shared], ways]
     }
 }
+
+/// The Settings scene's window has no grow box, and `windowResizability` on that
+/// scene does not give it one. SwiftUI also takes the resizable mask off again
+/// after the window appears and whenever it is resized. The mask is put back at
+/// the end of each turn of the run loop, which is after SwiftUI has set it, and
+/// the content is kept from going below the size the window opens at.
+private struct SettingsGrowBox: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { SettingsGrowView() }
+    func updateNSView(_ view: NSView, context: Context) { (view as? SettingsGrowView)?.apply() }
+}
+
+private final class SettingsGrowView: NSView {
+    private var observer: CFRunLoopObserver?
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 0, height: 0) }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else {
+            if let observer {
+                CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes)
+                self.observer = nil
+            }
+            return
+        }
+        apply()
+        guard observer == nil else { return }
+        let created = CFRunLoopObserverCreateWithHandler(
+            nil, CFRunLoopActivity.beforeWaiting.rawValue, true, 0
+        ) { [weak self] _, _ in
+            self?.apply()
+        }
+        guard let created else { return }
+        observer = created
+        CFRunLoopAddObserver(CFRunLoopGetMain(), created, .commonModes)
+    }
+
+    override func layout() {
+        super.layout()
+        apply()
+    }
+
+    func apply() {
+        guard let window else { return }
+        if !window.styleMask.contains(.resizable) { window.styleMask.insert(.resizable) }
+        let floor = SettingsWindow.size
+        if window.contentMinSize.width < floor.width || window.contentMinSize.height < floor.height {
+            window.contentMinSize = floor
+        }
+    }
+}
+
 
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
 /// picker keeps it beside its label in a window sized for Shared's list and detail.
@@ -127,8 +226,10 @@ private struct FormColumn<Content: View>: View {
 // MARK: - The rail
 
 private struct SettingsRail: View {
+    @Environment(AppModel.self) private var model
     @Binding var pane: SettingsPane
     @Binding var sharedPage: SharedPage
+    @Binding var runtimeID: String
     let snapshot: DaemonAPI.SharedSnapshot?
     @Binding var controlPage: ControlPage
     let control: ControlSettingsModel?
@@ -138,18 +239,22 @@ private struct SettingsRail: View {
             ForEach(Array(SettingsPane.groups.enumerated()), id: \.offset) { index, group in
                 if index > 0 { Spacer().frame(height: 10) }
                 ForEach(group, id: \.self) { each in
-                    if each == .shared {
-                        sharedGroup
-                    } else if each == .controlPlane {
-                        controlGroup
-                    } else {
-                        paneItem(each)
+                    switch each {
+                    case .shared: sharedGroup
+                    case .runtimes: runtimesGroup
+                    case .controlPlane: controlGroup
+                    default: paneItem(each)
                     }
                 }
             }
             Spacer()
             if pane == .shared {
-                Text("Your own set, for every project. A project’s own .agents folder is on its project page.")
+                Text("Your own set, for every project. A project’s own .agents folder is in its Project Settings.")
+                    .appText(.fine).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(10)
+            } else if pane == .runtimes {
+                Text("Each runtime on this Mac: where it is, how it signs in, and how it asks permission.")
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(10)
@@ -159,6 +264,70 @@ private struct SettingsRail: View {
         .frame(width: 200)
         .frame(maxHeight: .infinity)
         .background(Paper.sidebar)
+    }
+
+    @ViewBuilder
+    private var runtimesGroup: some View {
+        HStack(spacing: 8) {
+            Image(systemName: SettingsPane.runtimes.symbol)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            Text(SettingsPane.runtimes.title)
+        }
+        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        ForEach(model.runtimes) { status in
+            let chosen = pane == .runtimes && runtimeID == status.id
+            RailButton(lit: chosen, label: status.runtime.name,
+                       selected: chosen,
+                       action: { pane = .runtimes; runtimeID = status.id }) {
+                HStack(spacing: 6) {
+                    Text(status.runtime.name)
+                    Spacer()
+                }
+                .padding(.leading, 28)
+            }
+        }
+    }
+
+    /// The control plane, drawn as Shared is: a heading always open over its pages (058).
+    @ViewBuilder
+    private var controlGroup: some View {
+        heading(.controlPlane)
+        controlItem(.overview, count: nil)
+        controlItem(.hosts, count: control?.hosts.count)
+        controlItem(.clients, count: control.map { $0.clients.count })
+    }
+
+    private func heading(_ each: SettingsPane) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: each.symbol)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            Text(each.title)
+        }
+        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func controlItem(_ target: ControlPage, count: Int?) -> some View {
+        let chosen = pane == .controlPlane && controlPage == target
+        return RailButton(lit: chosen, label: target.title + (count.map { ", \($0)" } ?? ""),
+                          selected: chosen, action: { pane = .controlPlane; controlPage = target }) {
+            HStack(spacing: 6) {
+                Text(target.title)
+                Spacer()
+                if let count { Text("\(count)").monospacedDigit()
+                        .foregroundStyle(chosen ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary)) }
+            }
+            .padding(.leading, 28)
+        }
     }
 
     private func paneItem(_ each: SettingsPane) -> some View {
@@ -203,43 +372,6 @@ private struct SettingsRail: View {
         }
     }
 
-    /// The control plane, drawn as Shared is: a heading always open over its pages (058).
-    @ViewBuilder
-    private var controlGroup: some View {
-        heading(.controlPlane)
-        controlItem(.overview, count: nil)
-        controlItem(.hosts, count: control?.hosts.count)
-        controlItem(.clients, count: control.map { $0.clients.count })
-    }
-
-    private func heading(_ each: SettingsPane) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: each.symbol)
-                .frame(width: 20)
-                .accessibilityHidden(true)
-            Text(each.title)
-        }
-        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-    }
-
-    private func controlItem(_ target: ControlPage, count: Int?) -> some View {
-        let chosen = pane == .controlPlane && controlPage == target
-        return RailButton(lit: chosen, label: target.title + (count.map { ", \($0)" } ?? ""),
-                          selected: chosen, action: { pane = .controlPlane; controlPage = target }) {
-            HStack(spacing: 6) {
-                Text(target.title)
-                Spacer()
-                if let count { Text("\(count)").monospacedDigit()
-                        .foregroundStyle(chosen ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary)) }
-            }
-            .padding(.leading, 28)
-        }
-    }
-
     private func page(_ title: String, _ target: SharedPage, count: Int?, warns: Bool) -> some View {
         let chosen = pane == .shared && sharedPage == target
         return RailButton(lit: chosen,
@@ -262,7 +394,7 @@ private struct SettingsRail: View {
 
 /// One line of the rail. The whole line is the button (memory: a tap on a card never fires),
 /// lit in the accent when chosen, as Shared's own column was.
-private struct RailButton<Content: View>: View {
+struct RailButton<Content: View>: View {
     let lit: Bool
     let label: String
     let selected: Bool
@@ -272,12 +404,12 @@ private struct RailButton<Content: View>: View {
     var body: some View {
         Button(action: action) {
             content
-                .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .foregroundStyle(lit ? AnyShapeStyle(Paper.ground) : AnyShapeStyle(.primary))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(lit ? SharedInk.reach : .clear, in: RoundedRectangle(cornerRadius: 7))
-                .contentShape(RoundedRectangle(cornerRadius: 7))
+                .background(lit ? Paper.ink : .clear, in: RoundedRectangle(cornerRadius: Paper.Radius.control))
+                .contentShape(RoundedRectangle(cornerRadius: Paper.Radius.control))
         }
         .buttonStyle(.plain)
         // A button is already one element: `children: .ignore` would swap it for one

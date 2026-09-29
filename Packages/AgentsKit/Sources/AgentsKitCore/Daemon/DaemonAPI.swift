@@ -159,6 +159,9 @@ public enum DaemonAPI {
         /// Nor this one. Another of that MCP server's tools: the agent asking that a
         /// file be put in front of the user.
         public static let agentsShowFile = "agents/showFile"
+        /// The helper relaying `ask_form`: the agent asking the person a question and
+        /// waiting for the answer. The daemon holds the form as an elicitation.
+        public static let agentsAskForm = "agents/askForm"
         /// A window asking the daemon to write what the person typed on a live page
         /// (022). The daemon writes rather than the window, so that it knows the
         /// person did — that is what lets it tell the agent on its next turn.
@@ -184,6 +187,9 @@ public enum DaemonAPI {
         public static let workflowsArchive = "workflows/archive"
         /// Approve a workflow file as the person was shown it (security review).
         public static let workflowsApprove = "workflows/approve"
+        /// A project's plugins and which are waiting for the person's OK (security review, S2).
+        public static let pluginsList = "plugins/list"
+        public static let pluginsApprove = "plugins/approve"
         /// Change what a workflow is allowed to do, by writing its own file. The daemon
         /// is the writer for the reason it writes every other workflow change: a second
         /// window — or a phone — must not become a second author of the same file.
@@ -191,10 +197,12 @@ public enum DaemonAPI {
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
-        /// `stop_agent`, `archive_agent` or `list_my_agents` (028). The caller is the
-        /// token, and the token alone decides the project and what it may touch.
+        /// `stop_agent`, `park_agent`, `archive_agent` or `list_my_agents` (028). The
+        /// caller is the token, and the token alone decides the project and what it
+        /// may touch.
         public static let agentsStartHelper = "agents/startHelper"
         public static let agentsStopHelper = "agents/stopHelper"
+        public static let agentsParkHelper = "agents/parkHelper"
         public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
         /// What the MCP helper relays for `lease_resource`, `release_resource` and
@@ -224,21 +232,6 @@ public enum DaemonAPI {
         /// What the MCP helper relays when an agent calls `enter_worktree` or
         /// `exit_worktree` (053). The caller is the token.
         public static let agentsMoveSelf = "agents/moveSelf"
-        /// A GitHub project's pull requests, from the daemon's cache (038). Never runs
-        /// `gh`; `null` when the project is not on GitHub.
-        public static let pullRequestsList = "pullRequests/list"
-        /// Refresh them now, unless the last attempt was under a minute ago (FR-008).
-        public static let pullRequestsRefresh = "pullRequests/refresh"
-        /// Start babysitting a stopped pull request again (FR-024).
-        public static let pullRequestsResume = "pullRequests/resume"
-        /// Check a pull request's branch out into a new worktree (FR-007).
-        public static let pullRequestsCheckout = "pullRequests/checkout"
-        /// Write the starter babysitting workflow (FR-026).
-        public static let pullRequestsAddBabysitter = "pullRequests/addBabysitter"
-        /// The helper relaying `push_pull_request` (038 R7).
-        public static let agentsPushPullRequest = "agents/pushPullRequest"
-        /// The helper relaying `reply_on_pull_request` (038 R7).
-        public static let agentsReplyOnPullRequest = "agents/replyOnPullRequest"
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
         /// about whether the work is finished. Since 023 the older door for the
@@ -298,6 +291,9 @@ public enum DaemonAPI {
         // limit is not stopped.
         public static let costState = "cost/state"
         public static let costSetLimits = "cost/setLimits"
+        /// Cursor and Grok permission mode (061). Control only.
+        public static let clientPermissionsState = "clientPermissions/state"
+        public static let clientPermissionsSet = "clientPermissions/set"
         /// The pool of runtimes a chat can carry on with, and each one's state (052).
         public static let poolState = "pool/state"
         public static let poolSet = "pool/set"
@@ -323,6 +319,9 @@ public enum DaemonAPI {
         /// has heard no broadcast, and for a long turn would otherwise show nothing
         /// for half an hour.
         public static let wakeState = "wake/state"
+        /// The switch and the grace. The window's, like retention: a phone does not set it.
+        public static let wakeSettings = "wake/settings"
+        public static let wakeSet = "wake/set"
     }
 
     public enum Notification {
@@ -385,11 +384,9 @@ public enum DaemonAPI {
         /// does: two windows cannot then disagree, and one that missed a notification
         /// is put right by the next rather than drifting.
         public static let workflowChanged = "workflow/changed"
+        /// A project's plugins, sent whole, when one is found waiting or is approved.
+        public static let pluginsChanged = "plugins/changed"
         public static let workflowRemoved = "workflow/removed"
-        /// A project's pull requests changed: a refresh, a fire, a refusal or a run
-        /// ending (038). The whole `PullRequestList`, for the reason `workflow/changed`
-        /// carries the whole summary. Mac windows only (FR-010).
-        public static let pullRequestsChanged = "pullRequests/changed"
         /// The user's shell printed something. Raw bytes, base64. Not the agent's
         /// terminal, which is `agentTerminalOutput` above.
         public static let shellOutput = "shell/output"
@@ -403,6 +400,8 @@ public enum DaemonAPI {
         /// `project/changed` does: two windows cannot then disagree, and one that
         /// missed a notification is put right by the next rather than drifting.
         public static let costChanged = "cost/changed"
+        /// Cursor and Grok permission mode changed (061).
+        public static let clientPermissionsChanged = "clientPermissions/changed"
         /// The pool, its states or its switches changed (052). Debounced to one a second.
         public static let poolChanged = "pool/changed"
         /// The retention settings, or what the archive holds, changed (051). A
@@ -961,6 +960,46 @@ public enum DaemonAPI {
         }
     }
 
+    /// What the MCP helper sends when an agent calls `ask_form`. The token does the
+    /// same work it does for a suggestion, and the questions become a form
+    /// elicitation the daemon holds until the person answers — including on the phone.
+    public struct AskFormRequest: Codable, Sendable {
+        public var token: String
+        public var title: String?
+        public var questions: [Question]
+
+        public struct Question: Codable, Sendable {
+            public var id: String
+            public var prompt: String
+            public var options: [Option]?
+            public var allowMultiple: Bool?
+
+            public struct Option: Codable, Sendable {
+                public var id: String
+                public var label: String?
+
+                public init(id: String, label: String? = nil) {
+                    self.id = id
+                    self.label = label
+                }
+            }
+
+            public init(id: String, prompt: String, options: [Option]? = nil,
+                        allowMultiple: Bool? = nil) {
+                self.id = id
+                self.prompt = prompt
+                self.options = options
+                self.allowMultiple = allowMultiple
+            }
+        }
+
+        public init(token: String, title: String? = nil, questions: [Question]) {
+            self.token = token
+            self.title = title
+            self.questions = questions
+        }
+    }
+
     /// One agent, one file, to every window.
     public struct ShowFileNotification: Codable, Sendable {
         public var agentID: UUID
@@ -1278,8 +1317,12 @@ public enum DaemonAPI {
         public var agentID: UUID
         /// Nil when the question has been answered and is no longer waiting.
         public var request: PermissionRequest?
-        public init(agentID: UUID, request: PermissionRequest?) {
+        /// Identifies a single withdrawn question. Nil supports older daemons
+        /// and an explicit withdrawal of all questions for an agent.
+        public var requestID: UUID?
+        public init(agentID: UUID, request: PermissionRequest?, requestID: UUID? = nil) {
             self.agentID = agentID
+            self.requestID = requestID ?? request?.id
             self.request = request
         }
     }
@@ -1740,18 +1783,6 @@ public enum DaemonAPI {
         /// A lease action on something that is not there to act on: an end on a
         /// resource nobody holds, an empty name, a waiter not in that line (036).
         public static let leaseRefused = -32035
-        // 038's, from -32040 so that lanes being built alongside it can take the
-        // numbers straight after 034's without colliding.
-        /// Checking a pull request out: its worktree folder is already there.
-        public static let worktreeExists = -32040
-        /// Checking a pull request out: its branch is checked out somewhere else, named.
-        public static let branchCheckedOut = -32041
-        /// Checking a pull request out: git could not fetch its branch.
-        public static let fetchFailed = -32042
-        /// The project already has a babysitting workflow; the data is its id.
-        public static let babysitterExists = -32043
-        /// A pull request number that is not in the project's list.
-        public static let noSuchPullRequest = -32044
         /// A method this connection's role may not call: an agent's helper asking for
         /// something only a window may, or a process that is neither (security review).
         public static let notPermitted = -32045
@@ -1804,6 +1835,32 @@ public enum DaemonAPI {
             self.folder = folder
             self.workflowID = workflowID
             self.archived = archived
+        }
+    }
+
+    /// A project's plugins.
+    public struct PluginsListRequest: Codable, Sendable {
+        public var folder: URL
+        public init(folder: URL) { self.folder = folder }
+    }
+
+    /// Every plugin in one project, for `plugins/list` and `plugins/changed`.
+    public struct PluginsList: Codable, Sendable {
+        public var folder: URL
+        public var plugins: [ProjectPlugin]
+        public init(folder: URL, plugins: [ProjectPlugin]) {
+            self.folder = folder
+            self.plugins = plugins
+        }
+    }
+
+    /// Approve a plugin's folder as the row showed it.
+    public struct PluginApproveRequest: Codable, Sendable {
+        public var plugin: URL
+        public var digest: String
+        public init(plugin: URL, digest: String) {
+            self.plugin = plugin
+            self.digest = digest
         }
     }
 
@@ -1905,8 +1962,9 @@ public enum DaemonAPI {
         }
     }
 
-    /// What an agent passes to `stop_agent` or `archive_agent`. The id is a string
-    /// so one that is not a UUID is refused in words rather than failing to decode.
+    /// What an agent passes to `stop_agent`, `park_agent` or `archive_agent`. The id
+    /// is a string so one that is not a UUID is refused in words rather than failing
+    /// to decode.
     public struct HelperRequest: Codable, Sendable {
         public var token: String
         public var agentID: String
@@ -1923,45 +1981,6 @@ public enum DaemonAPI {
 
         public init(token: String) {
             self.token = token
-        }
-    }
-
-    // MARK: Pull requests (038)
-
-    /// `pullRequests/list`, `pullRequests/refresh` and `pullRequests/addBabysitter`.
-    public struct PullRequestsRequest: Codable, Sendable {
-        public var folder: URL
-        public init(folder: URL) { self.folder = folder }
-    }
-
-    /// `agents/pushPullRequest`: nothing but who is asking. The daemon takes the pull
-    /// request, the branch and the repository from the caller's run (R7).
-    public struct PushPullRequestRequest: Codable, Sendable {
-        public var token: String
-        public init(token: String) { self.token = token }
-    }
-
-    /// `agents/replyOnPullRequest`.
-    public struct ReplyOnPullRequestRequest: Codable, Sendable {
-        public var token: String
-        public var body: String
-        /// A review comment to answer in its thread; nil comments on the pull request.
-        public var inReplyTo: Int?
-
-        public init(token: String, body: String, inReplyTo: Int? = nil) {
-            self.token = token
-            self.body = body
-            self.inReplyTo = inReplyTo
-        }
-    }
-
-    /// `pullRequests/resume` and `pullRequests/checkout`.
-    public struct PullRequestRequest: Codable, Sendable {
-        public var folder: URL
-        public var number: Int
-        public init(folder: URL, number: Int) {
-            self.folder = folder
-            self.number = number
         }
     }
 

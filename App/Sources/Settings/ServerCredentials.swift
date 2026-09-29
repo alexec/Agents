@@ -2,8 +2,8 @@ import AgentsKit
 import Foundation
 import Observation
 
-/// The credentials this window lends, as Settings shows them: to servers (043, US2), and
-/// Gemini's to this Mac's own agents too (046, D3).
+/// The credentials this window lends. Settings shows Gemini's under Agent Runtimes
+/// (046); a server is lent the same key only while an agent runs there (043, US2).
 ///
 /// A thin face on `CredentialStore`: the records to draw, the check in flight, and what the
 /// last save found. The secret itself is read from the Keychain only when it is saved,

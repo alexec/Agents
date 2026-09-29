@@ -14,7 +14,7 @@ take them.
 
 - An agent open, or a project's page with the prompt ready for a new one.
 - Which runtimes take pictures and file contents differs; see
-  [Reference](../reference/index.md) for the table.
+  [Runtimes](../reference/runtimes.md) for the table.
 
 ## Steps
 

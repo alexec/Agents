@@ -30,6 +30,10 @@ public final class AgentsModel {
     /// own model because a workflow is about the work, and the phone will want them.
     public private(set) var workflows: [WorkflowSummary] = []
 
+    /// Each project's plugins, by its standardized folder, as the daemon last listed them:
+    /// which are waiting for the person's OK (security review, S2).
+    public private(set) var plugins: [URL: [ProjectPlugin]] = [:]
+
     /// The transcript of the agent being read, and only that one. A client holds one
     /// page of one conversation, because an hour of transcript is not something to
     /// carry around, least of all over a mobile connection.
@@ -218,6 +222,7 @@ public final class AgentsModel {
         case usage(DaemonAPI.UsageNotification)
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
+        case pluginsChanged(DaemonAPI.PluginsList)
         case costChanged(DaemonAPI.CostState)
         case retentionChanged(DaemonAPI.RetentionState)
         case poolChanged(PoolStatus)
@@ -250,6 +255,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.agentUsage: return decode(DaemonAPI.UsageNotification.self, Update.usage)
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
+        case DaemonAPI.Notification.pluginsChanged: return decode(DaemonAPI.PluginsList.self, Update.pluginsChanged)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
         case DaemonAPI.Notification.retentionChanged: return decode(DaemonAPI.RetentionState.self, Update.retentionChanged)
         case DaemonAPI.Notification.poolChanged: return decode(PoolStatus.self, Update.poolChanged)
@@ -326,10 +332,14 @@ public final class AgentsModel {
             }
 
         case .permission(let notification):
-            // One question per agent at a time, so the agent's old one goes whether
-            // this is a new question or the news that it was answered.
-            permissions.removeAll { $0.agentID == notification.agentID }
+            if let id = notification.requestID ?? notification.request?.id {
+                permissions.removeAll { $0.agentID == notification.agentID && $0.id == id }
+            } else {
+                // Legacy withdrawal, without a request identity.
+                permissions.removeAll { $0.agentID == notification.agentID }
+            }
             if let request = notification.request { permissions.append(request) }
+            permissions.sort { $0.askedAt < $1.askedAt }
 
         case .elicitation(let notification):
             elicitations.removeAll { $0.id == notification.requestID }
@@ -357,6 +367,9 @@ public final class AgentsModel {
             workflows.removeAll {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
+
+        case .pluginsChanged(let list):
+            replacePlugins(list)
 
         case .costChanged(let state):
             costState = state
@@ -444,6 +457,18 @@ public final class AgentsModel {
         workflows = summaries.sorted {
             $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending
         }
+    }
+
+    public func replacePlugins(_ list: DaemonAPI.PluginsList) {
+        plugins[Project.standardize(list.folder)] = list.plugins.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    /// The plugins of one project, which is what a project page shows.
+    public func plugins(in folder: URL?) -> [ProjectPlugin] {
+        guard let folder else { return [] }
+        return plugins[Project.standardize(folder)] ?? []
     }
 
     /// The workflows of one project, which is what a project page shows.
@@ -761,6 +786,13 @@ public final class AgentsModel {
     /// The name of the button that ends a block by hand.
     public static let carryOnLabel = "Carry on"
 
+    /// Help for Carry on: Waiting (the app would resume itself) vs Blocked (only the person).
+    public static func carryOnHelp(for agent: Agent) -> String {
+        agent.isWaiting
+            ? "Stop waiting and carry on now"
+            : "Tell it the block has cleared, and let it carry on"
+    }
+
     /// Whether a client should offer Stop for this chat: the daemon holds a runtime for
     /// it, or is about to pick it back up. The window's toolbar, the card's menu and
     /// the phone's menu all ask this, so no two of them can disagree about it.
@@ -831,7 +863,7 @@ public final class AgentsModel {
         guard let key else { return 0 }
         let wanted = Project.standardize(key.folder)
         return agents.filter {
-            $0.host == key.host && projectFolder(of: $0) == wanted && group(of: $0) == .finished && $0.isUnread
+            $0.host == key.host && projectFolder(of: $0) == wanted && $0.state == .finished && $0.isUnread
         }.count
     }
 
@@ -906,10 +938,14 @@ public final class AgentsModel {
     public func unreadCount(in folder: URL?) -> Int {
         guard let folder else { return 0 }
         let wanted = Project.standardize(folder)
-        return agents.filter { projectFolder(of: $0) == wanted && group(of: $0) == .finished && $0.isUnread }.count
+        return agents.filter { projectFolder(of: $0) == wanted && $0.state == .finished && $0.isUnread }.count
     }
 
     /// The question this agent is blocked on, if it still is.
+    public func permissions(for agentID: UUID?) -> [PermissionRequest] {
+        permissions.filter { $0.agentID == agentID }
+    }
+
     public func permission(for agentID: UUID?) -> PermissionRequest? {
         guard let agentID else { return nil }
         return permissions.first { $0.agentID == agentID }

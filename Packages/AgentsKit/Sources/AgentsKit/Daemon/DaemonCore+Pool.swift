@@ -56,7 +56,7 @@ extension DaemonCore {
         guard let agent = agents[agentID] else { return .none }
         if let rateLimit { latestRateLimit[agentID] = rateLimit }
         let entry = poolEntry(for: agent)
-        let rpc = error.flatMap { $0 as? JSONRPCError }.map { (code: $0.code, message: $0.message) }
+        let rpc = error.flatMap { $0 as? JSONRPCError }.map(\.refusalForLimit)
         let recognition = LimitRecognition.classify(failure: failure, error: rpc, runtimeError: runtimeError,
                                                     runtimeID: agent.runtimeID,
                                                     rateLimit: latestRateLimit[agentID], payment: entry.payment)
@@ -151,7 +151,30 @@ extension DaemonCore {
             _ = state.checkExpiry(payment: entry.payment, now: at)
         }
         if state != before { setAllowanceState(state) }
-        if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked") }
+        if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked", after: before) }
+    }
+
+    /// A failed runtime leaves the pool even when the failure was not a quota error.
+    /// A recognised spent allowance already has its more specific out state.
+    func runtimeFailed(agentID: UUID) {
+        guard let agent = agents[agentID] else { return }
+        markRuntimeFailed(poolEntry(for: agent))
+    }
+
+    func runtimeFailed(runtimeID: String) {
+        guard let entry = pool.entries.first(where: { $0.runtimeID == runtimeID }) else { return }
+        markRuntimeFailed(entry)
+    }
+
+    /// Only in a pool that is on: outside one nothing checks it, so it would stay out.
+    private func markRuntimeFailed(_ entry: PoolEntry) {
+        let key = AllowanceState.credentialKey(for: entry)
+        guard pool.isEffective,
+              pool.entries.contains(where: { AllowanceState.credentialKey(for: $0) == key }) else { return }
+        var state = allowanceState(for: entry)
+        guard state.markFailed(now: now()) else { return }
+        setAllowanceState(state)
+        raiseAllowanceOut(entry, state: state, reason: "runtime failed")
     }
 
     /// What this agent spent since its turn began, from what it had banked then.
@@ -218,8 +241,8 @@ extension DaemonCore {
                 await record(.runtimeNote(PoolWords.ranOut(current.runtimeID, state: state, now: at)), for: agentID)
             }
             if case .everyoneOut = decision {
-                // Wait for the first that said when it is back, the chat's own included,
-                // and carry on then (US4). Only with words to send again: a chat that ran
+                // Wait for the first check, the chat's own runtime included, and carry on
+                // once one passes (US4). Only with words to send again: a chat that ran
                 // out without being refused has nothing to wait to say.
                 if pending.resend, let prompt = lastPrompts[agentID],
                    let back = PoolPlan.earliestReturn(current: current, pool: pool, states: states,
@@ -237,6 +260,7 @@ extension DaemonCore {
         case .overage: "it started using paid extra usage"
         case .creditUsedUp: "its credit was used up"
         case .rateLimitPersisted: "it stayed rate limited"
+        case .runtimeFailed: "it failed"
         case .everyoneOutResumed: "every runtime was out, and this one is back"
         default: "its allowance ran out"
         }
@@ -302,7 +326,7 @@ extension DaemonCore {
                                   reason: switchReason, carried: carry.rows, dropped: carry.dropped,
                                   shortened: handoff.leftOut, billing: entry.payment,
                                   fromReturnsAt: switchReason == .byHand ? nil
-                                      : allowances[AllowanceState.credentialKey(for: current)]?.returnsAt)
+                                      : allowances[AllowanceState.credentialKey(for: current)]?.knownReturn)
 
         // Everything awaited first, then the record read fresh and written back with no
         // await between, so a prompt queued meanwhile is not written over.
@@ -356,7 +380,19 @@ extension DaemonCore {
     public func applyAllowances(_ incoming: [AllowanceState]) -> Bool {
         var changed = false
         for var state in incoming where state.isShared {
-            if let mine = allowances[state.credentialKey], mine.since >= state.since { continue }
+            // The later reading wins by its own time: a status can be older than the
+            // reading beside it.
+            let mine = allowances[state.credentialKey]
+            let newerReading = [mine?.reading, state.reading].compactMap { $0 }.max { $0.at < $1.at }
+            if var mine, mine.since >= state.since {
+                if newerReading != mine.reading {
+                    mine.reading = newerReading
+                    allowances[state.credentialKey] = mine
+                    changed = true
+                }
+                continue
+            }
+            state.reading = newerReading
             // The entry id is this daemon's own, for the same credential.
             if let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == state.credentialKey }) {
                 state.entryID = entry.id
@@ -557,6 +593,24 @@ extension DaemonCore {
         let due = agents.values.filter { $0.allowanceWait?.isDue(now: at) == true && $0.state != .archived }
         for agent in due {
             guard let wait = agent.allowanceWait else { continue }
+            let waitedEntry = pool.entry(wait.entryID)
+                ?? (wait.runtimeID == agent.runtimeID ? poolEntry(for: agent) : nil)
+            let waitKey = waitedEntry.map { AllowanceState.credentialKey(for: $0) }
+            if let waitKey, allowanceChecks.contains(waitKey) { continue }
+            let current = poolEntry(for: agent)
+            let states = settledStates(at: at)
+            if states[AllowanceState.credentialKey(for: current)]?.isUsable(now: at) != true,
+               case .everyoneOut = PoolPlan.next(current: current, pool: pool, switchingOff: false,
+                                                  states: states, tried: [],
+                                                  unusable: { self.unusable($0) }, now: at),
+               let next = PoolPlan.earliestReturn(current: current, pool: pool, states: states,
+                                                  unusable: { self.unusable($0) }, now: at) {
+                var waiting = agent
+                waiting.allowanceWait?.resumeAt = next.at
+                changed(waiting)
+                broadcastPool()
+                continue
+            }
             dropAllowanceWait(agent.id)
             // A turn under way, or words already queued: the person has moved on.
             guard turnTasks[agent.id] == nil, agent.queuedPrompts.isEmpty else { continue }
@@ -564,8 +618,6 @@ extension DaemonCore {
                                     costBefore: agent.costToDate)
             lastPrompts[agent.id] = prompt
             carryTried[agent.id] = nil
-            let current = poolEntry(for: agent)
-            let states = settledStates(at: at)
             if states[AllowanceState.credentialKey(for: current)]?.isUsable(now: at) ?? true {
                 await record(.runtimeNote(PoolWords.cameBack(agent.runtimeID)), for: agent.id)
                 await sendAgain(agent.id, prompt: prompt)
@@ -626,6 +678,7 @@ extension DaemonCore {
         case .out(_, _, .overage): .overage
         case .out(_, _, .creditUsedUp), .out(_, _, .creditExpired): .creditUsedUp
         case .out(_, _, .rateLimitPersisted): .rateLimitPersisted
+        case .out(_, _, .runtimeFailed): .runtimeFailed
         default: .allowanceSpent
         }
     }
@@ -643,17 +696,26 @@ extension DaemonCore {
         var details = ["runtime": entry.runtimeID, "reason": reason]
         // "until" only for a time the provider gave; the app's own retry is said as that.
         if let until = state.knownReturn { details["until"] = ISO8601DateFormatter().string(from: until) }
-        if case .out(nil, let retry?, _) = state.status {
+        if case .out(_, let retry?, _) = state.status {
             details["retry_after"] = ISO8601DateFormatter().string(from: retry)
         }
+        let sentence: String
+        if case .out(_, _, .runtimeFailed) = state.status {
+            sentence = "\(PoolWords.runtimeName(entry.runtimeID)) failed and left the pool."
+        } else {
+            sentence = "\(PoolWords.runtimeName(entry.runtimeID))’s allowance ran out."
+        }
         raise(EventDraft(name: "cost.allowance_out", at: now(), scope: .mac,
-                         sentence: "\(PoolWords.runtimeName(entry.runtimeID))’s allowance ran out.", details: details))
+                         sentence: sentence, details: details))
     }
 
     /// An allowance came back: the person said so, or a turn on it worked (042).
-    func raiseAllowanceBack(_ entry: PoolEntry, how: String) {
+    /// `after` is the state it came back from: a runtime that failed did not run out.
+    func raiseAllowanceBack(_ entry: PoolEntry, how: String, after: AllowanceState? = nil) {
+        let name = PoolWords.runtimeName(entry.runtimeID)
+        let failed = if case .out(_, _, .runtimeFailed) = after?.status { true } else { false }
         raise(EventDraft(name: "cost.allowance_back", at: now(), scope: .mac,
-                         sentence: "\(PoolWords.runtimeName(entry.runtimeID))’s allowance came back.",
+                         sentence: failed ? "\(name) is back in the pool." : "\(name)’s allowance came back.",
                          details: ["runtime": entry.runtimeID, "how": how]))
     }
 
@@ -766,10 +828,8 @@ extension DaemonCore {
         broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
     }
 
-    /// The pool's clocks, on the workflow heartbeat (no timer of its own): a return time
-    /// that has passed makes that credential available, and a grant whose date has
-    /// passed is out, each said once, so the Pool page and the sidebar dot change
-    /// without a relaunch (US3-AS4).
+    /// The pool's clocks, on the workflow heartbeat (no timer of its own): short
+    /// rate limits expire, and grants past their date become out.
     func settlePoolClocks(now at: Date) {
         var changed = false
         for key in Array(allowances.keys) {
@@ -798,6 +858,123 @@ extension DaemonCore {
         broadcastPool()
     }
 
+    /// Check out credentials every four hours. The retry date is only permission to
+    /// ask: it never makes an unverified runtime usable by itself.
+    func checkDueAllowances(now at: Date) {
+        guard pool.isEffective else { return }
+        let entries = pool.entries + agents.values.filter { $0.state != .archived }
+            .map { poolEntry(for: $0) }
+        for entry in entries {
+            let key = AllowanceState.credentialKey(for: entry)
+            if !entry.payment.isCredit, var state = allowances[key],
+               case .out(let until, let retry, let why) = state.status {
+                let firstCheck = state.since.addingTimeInterval(AllowanceState.retryWithoutATime)
+                if retry.map({ $0 < firstCheck }) ?? true {
+                    state.status = .out(until: until, retryAfter: firstCheck, why: why)
+                    setAllowanceState(state)
+                }
+            }
+            guard !allowanceChecks.contains(key),
+                  let state = allowances[key],
+                  case .out(_, let retry?, _) = state.status,
+                  retry <= at else { continue }
+            allowanceChecks.insert(key)
+            Task { [weak self] in
+                await self?.checkAllowance(entry, expected: state)
+            }
+        }
+    }
+
+    private func checkAllowance(_ entry: PoolEntry, expected: AllowanceState) async {
+        let key = expected.credentialKey
+        defer { allowanceChecks.remove(key) }
+        let passed = await probeAllowance(runtimeID: entry.runtimeID)
+        guard var state = allowances[key], state.status == expected.status,
+              state.since == expected.since else { return }
+        let at = now()
+        if passed {
+            markSignedIn(runtimeID: entry.runtimeID)
+            state.worked(now: at)
+            setAllowanceState(state)
+            raiseAllowanceBack(entry, how: "check", after: expected)
+        } else {
+            state.deferCheck(now: at)
+            setAllowanceState(state)
+        }
+    }
+
+    /// A separate, short conversation in the daemon's own folder. It has no app tools
+    /// or project content, and a read-only mode wherever the runtime advertises one.
+    private func probeAllowance(runtimeID: String) async -> Bool {
+        var session: ACPSession?
+        var chosen: [String] = []
+        do {
+            let (made, _) = try await handshakeOnly(runtimeID: runtimeID)
+            session = made
+            defer { Task { await made.end(gracePeriod: .seconds(1)) } }
+            try await made.newSession(cwd: locations.root)
+            let options = await made.options
+            if let mode = ModeMemory.modeOption(in: options),
+               let choice = mode.options?.first(where: {
+                   guard let value = $0.value.stringValue else { return false }
+                   return ["plan", "ask", "read-only"].contains(value.split(separator: "#").last.map(String.init) ?? value)
+               }) {
+                try await made.setOption(id: mode.id, value: choice.value)
+                chosen.append("mode \(choice.value.stringValue ?? choice.name)")
+            } else if ModeMemory.modeOption(in: options) != nil {
+                DaemonLog.shared.write("pool check for \(runtimeID): failed, no read-only mode to check in")
+                return false
+            }
+            if let model = WorkflowSettings.modelOption(in: options),
+               let choice = Self.probeModel(in: model.options ?? []) {
+                try await made.setOption(id: model.id, value: choice.value)
+                chosen.append("model \(choice.value.stringValue ?? choice.name)")
+            }
+            let replies = Task { () -> String in
+                var text = ""
+                for await event in made.eventStream() {
+                    if case .entry(.agentMessage(_, let words, _)) = event { text += words }
+                }
+                return text
+            }
+            let timeout = Task {
+                try? await Task.sleep(for: .seconds(45))
+                if !Task.isCancelled { await made.end(gracePeriod: .seconds(1)) }
+            }
+            defer { timeout.cancel() }
+            let answer = try await made.prompt("Reply with OK. Do not use tools or edit files.")
+            await made.end(gracePeriod: .seconds(1))
+            let reply = await replies.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            let recognition = LimitRecognition.classify(failure: answer.failure,
+                                                        runtimeError: answer.runtimeError?.sentence ?? reply,
+                                                        runtimeID: runtimeID, rateLimit: answer.rateLimit)
+            let passed = answer.reason == .endTurn && answer.failure == nil && answer.runtimeError == nil
+                && recognition == .none && answer.rateLimit?.isRejected != true
+                && ["ok", "ok."].contains(reply.lowercased())
+            DaemonLog.shared.write("pool check for \(runtimeID): \(passed ? "passed" : "failed") "
+                                   + "(\(chosen.joined(separator: ", ")); reply \(reply.prefix(80).debugDescription))")
+            return passed
+        } catch {
+            DaemonLog.shared.write("pool check failed for \(runtimeID): \(error)")
+            if let session { await session.end(gracePeriod: .seconds(1)) }
+            return false
+        }
+    }
+
+    /// Runtime options have no prices. The first of the small model families the runtimes
+    /// advertise, by name or in their own description ("Fast and affordable"). Nil when
+    /// none says it is small: the runtime's default then stays, rather than the first
+    /// in its list, which is often its largest.
+    static func probeModel(in choices: [ConfigChoice]) -> ConfigChoice? {
+        let small = ["nano", "flash-lite", "haiku", "mini", "flash", "small", "lite", "fast", "affordable"]
+        func rank(_ choice: ConfigChoice) -> Int? {
+            let words = "\(choice.name) \(choice.value.stringValue ?? "") \(choice.description ?? "")".lowercased()
+            return small.firstIndex { words.contains($0) }
+        }
+        return choices.compactMap { choice in rank(choice).map { (choice, $0) } }
+            .min { $0.1 < $1.1 }?.0
+    }
+
     /// Why an entry cannot be used at all, in the page's words.
     func unusable(_ entry: PoolEntry) -> String? {
         guard let runtime = RuntimeCatalog.runtime(id: entry.runtimeID) else { return "not a runtime this app knows" }
@@ -824,16 +1001,64 @@ extension DaemonCore {
     /// and on the credential for the Pool page.
     func notePlanWindow(_ info: RateLimitInfo, agentID: UUID) {
         latestRateLimit[agentID] = info
-        // Late: a plan window saying when it is back can be read after the refusal it
-        // explains, which was then recorded with no time. Put the time in, so a wait is
-        // made on it rather than on the one-hour guess (R2).
         let at = now()
+        if let agent = agents[agentID], let reading = AllowanceReading.claude(info, at: at) {
+            noteReading(reading, for: poolEntry(for: agent))
+        }
+        // Late: a plan window saying when it is back can be read after the refusal it
+        // explains, which was then recorded with no time. Put the time in, so the page
+        // shows the provider's reset; the four-hour check still decides when it is back (R2).
         guard info.isRejected, let back = info.resetsAt, back > at, let agent = agents[agentID] else { return }
         let entry = poolEntry(for: agent)
         guard var state = allowances[AllowanceState.credentialKey(for: entry)],
-              case .out(nil, _, .allowanceSpent) = state.status,
+              case .out(nil, let retry, .allowanceSpent) = state.status,
               at.timeIntervalSince(state.since) < 60 else { return }
-        state.status = .out(until: back, retryAfter: nil, why: .allowanceSpent)
+        state.status = .out(until: back, retryAfter: retry, why: .allowanceSpent)
         setAllowanceState(state)
+    }
+
+    // MARK: Readings
+
+    /// Keep what a runtime said is left of its plan window, for the Pool page. The
+    /// same reading again is not written until it is five minutes older, since Claude
+    /// repeats it on every `usage_update`.
+    func noteReading(_ reading: AllowanceReading, for entry: PoolEntry) {
+        var state = allowanceState(for: entry)
+        if let before = state.reading, before.sameAs(reading),
+           reading.at.timeIntervalSince(before.at) < Self.readingKeptFor { return }
+        state.reading = reading
+        setAllowanceState(state)
+    }
+
+    /// How long a reading asked for stands before the Pool page asks again.
+    static let readingKeptFor: TimeInterval = 300
+
+    /// Ask each runtime in the pool that can say what is left of its plan, where the
+    /// last answer is older than `readingKeptFor`. Grok is the one that can be asked;
+    /// Claude says it during turns, unasked. Each ask starts the runtime for a moment,
+    /// as signing in does. Runs behind the Pool page: the page draws what is known
+    /// now, and the answer arrives as `pool/changed`.
+    func measureAllowances() async {
+        let at = now()
+        let asked = pool.entries.filter { entry in
+            guard entry.runtimeID == RuntimeCatalog.grok.id, !entry.isKeyed, unusable(entry) == nil else { return false }
+            let key = AllowanceState.credentialKey(for: entry)
+            guard !measuringAllowances.contains(key) else { return false }
+            guard let last = allowances[key]?.reading else { return true }
+            return at.timeIntervalSince(last.at) >= Self.readingKeptFor
+        }
+        for entry in asked {
+            let key = AllowanceState.credentialKey(for: entry)
+            measuringAllowances.insert(key)
+            defer { measuringAllowances.remove(key) }
+            do {
+                let (session, _) = try await handshakeOnly(runtimeID: entry.runtimeID)
+                let reading = try? await session.grokAllowance(at: now())
+                await session.end(gracePeriod: .seconds(2))
+                if let reading { noteReading(reading, for: entry) }
+            } catch {
+                DaemonLog.shared.write("allowance not measured for \(key): \(error)")
+            }
+        }
     }
 }

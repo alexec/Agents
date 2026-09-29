@@ -123,7 +123,7 @@ struct BlockedTests {
         let note = try await finish(core, leadToken, "blocked", "Waiting on both helpers.",
                                     waitingOn: [first.uuidString, "update the tests"])
         #expect(note.contains("under \"Waiting\""))
-        #expect(await core.agent(lead)?.group(wantsEyes: false) == .waiting)
+        #expect(await core.agent(lead)?.group(wantsEyes: false) == .needsAttention)
         try await finish(core, firstToken, "done", "Ported.")
         firstGate.open()
 
@@ -368,7 +368,7 @@ struct BlockedTests {
         await core.tickWorkflows(now: Date().addingTimeInterval(86_400 * 2))
         try await quiet()
         #expect(try await resumes(core, lead).isEmpty)
-        #expect(await core.agent(lead)?.group(wantsEyes: false) == .blocked)
+        #expect(await core.agent(lead)?.group(wantsEyes: false) == .needsAttention)
     }
 
     // MARK: FR-020 — restarts

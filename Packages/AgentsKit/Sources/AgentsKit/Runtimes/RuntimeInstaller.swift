@@ -128,6 +128,11 @@ public struct RuntimeInstaller: RuntimeInstalling {
 
     /// `curl -fsSL <url> | <shell>`, with pipefail so a download that fails is the
     /// failure rather than an empty script that "succeeds".
+    ///
+    /// Control-only, over HTTPS. Server installs pin by SHA-256; Mac vendor scripts are
+    /// not pinned because vendors do not publish a stable hash for the install URL
+    /// (security review S9). Prefer `.npmGlobal` / toolset recipes when the catalog has
+    /// them. A walk can override the URL with `AGENTS_TEST_INSTALL_SCRIPT`.
     private func runScript(_ url: URL, shell: String, for runtime: Runtime) async throws {
         let outcome = try await InstallStep(
             executable: "/bin/bash",

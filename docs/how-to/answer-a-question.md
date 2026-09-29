@@ -8,7 +8,7 @@ description: Answer an agent's permission request or question from the Mac, the 
 
 An agent stops and waits for you in three ways: it asks permission to do something, it
 asks a question with answers to pick from, or it ends its turn with a question in words.
-Whichever it is, the agent and its project say **Needs attention** until you answer.
+Whichever it is, the agent and its project say **Needs you** until you answer.
 
 ## Before you start
 
@@ -19,14 +19,16 @@ Whichever it is, the agent and its project say **Needs attention** until you ans
 
 1. Find the agent that is waiting. Any of these takes you to it:
    - On the Mac, a project with a dot beside it in the list; on its page, the agent under
-     **Needs attention**.
+     **Needs you**.
    - On iPhone or iPad, the same, in the project list and on the project's page.
    - A notification. It names the agent, the project and what is wanted; click or tap it
      to open the conversation with the question in front of you. You get one
      notification, on the device you used last: the Mac if you are at it, otherwise the
      iPhone or iPad you touched most recently. None comes if you are already reading
      that conversation.
-2. Answer the card above the prompt.
+2. Answer the card above the prompt. When the agent asks about several things at once —
+   several file edits, for example — each question stays as its own card, stacked above
+   the prompt, until you answer it. Answering one leaves the others.
    - **Permission.** The card names what the agent wants to do, such as the command it
      wants to run or the file it wants to change. The buttons are the agent's own
      choices, usually **Yes**, **Yes, and don't ask again…** (the rest of the button
@@ -59,7 +61,14 @@ a choice. A question you left empty is left out. A card you declined or closed s
 declined the agent's form** or **The form was closed**.
 
 Cursor's questions come as the same card, one question to a page; any of them can be left
-empty.
+empty. A question with choices shows those choices, and a question without choices has a
+text box.
+
+When Cursor or Grok is set to **Always-approve** in **Settings ▸ Agent Runtimes**, every
+permission request from that runtime is answered for you: no card, no **Needs you**, and
+no notification. Questions that are not permission to act still wait as above, including
+Grok's questions in words. Claude, Codex, Gemini, Antigravity and Copilot keep asking the
+way they always have.
 
 ## If it doesn't work
 

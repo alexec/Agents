@@ -1,0 +1,17 @@
+{
+  "files": [
+    {
+      "path": "SKILL.md",
+      "contents": "---\nname: nested\ndescription: A skill with a script, a binary and references.\n---\n\n# Nested\n\nRun scripts/lint.sh.\n"
+    },
+    {
+      "path": "references/x.md",
+      "contents": "Reference x.\n"
+    },
+    {
+      "path": "scripts/lint.sh",
+      "contents": "#!/bin/sh\necho lint\n"
+    }
+  ],
+  "hash": "not-used-by-the-app"
+}

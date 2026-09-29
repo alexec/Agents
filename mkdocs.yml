@@ -73,9 +73,10 @@ nav:
       - how-to/use-a-shell.md
       - how-to/add-a-linux-server.md
       - how-to/set-up-a-workflow.md
-      - how-to/watch-a-pull-request.md
       - how-to/sign-a-runtime-in.md
       - how-to/share-skills-across-agents.md
+      - how-to/add-a-skill-from-a-catalogue.md
+      - how-to/add-an-mcp-server-from-the-registry.md
       - how-to/keep-going-when-a-runtime-runs-out.md
       - how-to/limit-spending.md
       - how-to/archive-park-stop.md
@@ -99,4 +100,5 @@ nav:
       - explanation/scoped-tools.md
       - explanation/projects-hosts-worktrees.md
       - explanation/leases.md
+      - explanation/runtime-pool.md
       - explanation/phone-and-ipad.md

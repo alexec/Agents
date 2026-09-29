@@ -25,6 +25,10 @@ struct AgentCard: View {
                 StatusIcon(state: agent.state, isComingBack: isComingBack,
                            outcome: agent.report?.outcome,
                            isWaiting: agent.isWaiting,
+                           isUnread: agent.isUnread,
+                           endedReason: agent.endedReason,
+                           outcomeUnknown: agent.endingIsUnaccountedFor,
+                           isWaitingForAllowance: agent.allowanceWait != nil,
                            isParked: agent.parking?.isParked == true)
                     .padding(.top, 1)
 
@@ -118,6 +122,7 @@ struct AgentCard: View {
                 } label: {
                     Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
                 }
+                .help(AgentsModel.carryOnHelp(for: agent))
             }
         }
         .accessibilityElement(children: .combine)
@@ -134,6 +139,7 @@ struct AgentCard: View {
             ? AgentsModel.comingBackDescription
             : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
                                isWaiting: agent.isWaiting,
+                               isUnread: agent.isUnread,
                                isUnaccountedFor: agent.endingIsUnaccountedFor)
         if agent.state == .stopped, let why = agent.endedReason?.summary { words = why }
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
@@ -154,11 +160,18 @@ struct StatusIcon: View {
     var outcome: WorkOutcome?
     /// The app will carry it on by itself (`Agent.isWaiting`): Waiting, not Blocked.
     var isWaiting = false
+    var isUnread = false
+    var endedReason: EndedReason?
+    var outcomeUnknown = false
+    var isWaitingForAllowance = false
     /// Parked (040): the shape, but not orange. See the Mac's `StatusIcon`.
     var isParked = false
 
     private var shape: StatusShape {
-        StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack)
+        StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
+                    isUnread: isUnread, endedReason: endedReason,
+                    waitingForAllowance: isWaitingForAllowance,
+                    outcomeUnknown: outcomeUnknown)
     }
 
     var body: some View {
@@ -170,8 +183,7 @@ struct StatusIcon: View {
                     .foregroundStyle((shape.wantsAPerson && !isParked ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
-                ProgressView()
-                    .controlSize(.small)
+                SyncedSpinner(diameter: 18)
             }
         }
         .frame(width: 20, height: 20)
@@ -181,7 +193,8 @@ struct StatusIcon: View {
     /// The words a screen reader hears. An outcome's come from `WorkOutcome.heading`,
     /// which is the same place the Mac reads them, so the two cannot drift (FR-017).
     static func words(for state: AgentState, outcome: WorkOutcome? = nil, isWaiting: Bool = false,
-                      isUnaccountedFor: Bool = false) -> String {
+                      isUnread: Bool = false, isUnaccountedFor: Bool = false) -> String {
+        if state == .finished && isUnread { return "Unread · \(outcome?.heading ?? "Finished")" }
         if StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: false) == .waiting {
             return StatusShape.waitingLabel
         }

@@ -34,6 +34,13 @@ enum Paper {
     static let rule = Color(light: 0xE2DCCF, dark: 0x3A3733)
     static let ink = Color(light: 0x1F1D1A, dark: 0xECE7DC)
 
+    /// Corner radii: control (chips, rail), card (rows, wells), floating (prompt, sheets).
+    enum Radius {
+        static let control: CGFloat = 7
+        static let card: CGFloat = 10
+        static let floating: CGFloat = 16
+    }
+
     /// The shadow under a raised thing. Soft and short: paper lifted a little off the
     /// desk, not a window hovering over it.
     static let shadow = Color(light: 0x3B2F1E, dark: 0x000000).opacity(0.10)
@@ -163,7 +170,7 @@ extension View {
 
     /// A row in a list you can go into: no fill until the pointer is on it, and a
     /// hairline under it. Replaces the interactive glass card.
-    func paperRow(cornerRadius: CGFloat = 10) -> some View {
+    func paperRow(cornerRadius: CGFloat = Paper.Radius.card) -> some View {
         modifier(PaperRow(cornerRadius: cornerRadius))
     }
 }
@@ -236,4 +243,23 @@ struct PaperProminentButtonStyle: ButtonStyle {
 
 extension ButtonStyle where Self == PaperProminentButtonStyle {
     static var paperProminent: PaperProminentButtonStyle { PaperProminentButtonStyle() }
+}
+
+/// A sheet laid out the same way every time: title, body, then Cancel / primary actions.
+struct PaperSheet<Content: View, Actions: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+    @ViewBuilder var actions: Actions
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).appText(.reading).fontWeight(.semibold)
+            content
+            HStack {
+                Spacer(minLength: 0)
+                actions
+            }
+        }
+        .padding(20)
+    }
 }

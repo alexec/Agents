@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="720" viewBox="0 0 1040 720" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .ink { fill:#1F1D1A; }
+    .sec { fill:#6F6A62; }
+    .fine { fill:#8A8478; }
+    .onpaper { fill:#FBF9F4; }
+    .h { font-size:11px; font-weight:600; letter-spacing:.4px; fill:#6F6A62; }
+    .title { font-size:22px; font-weight:600; fill:#1F1D1A; }
+    .r { font-size:14px; fill:#1F1D1A; }
+    .rb { font-size:14px; font-weight:600; fill:#1F1D1A; }
+    .f { font-size:12px; fill:#6F6A62; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+
+  <rect x="0.5" y="0.5" width="1039" height="639" rx="12" fill="#FBF9F4" stroke="#E2DCCF"/>
+  <rect x="0.5" y="0.5" width="1039" height="40" rx="12" fill="#F3F0E8"/>
+  <rect x="0.5" y="28" width="1039" height="13" fill="#F3F0E8"/>
+  <circle cx="22" cy="20" r="6" fill="#E2DCCF"/>
+  <circle cx="42" cy="20" r="6" fill="#E2DCCF"/>
+  <circle cx="62" cy="20" r="6" fill="#E2DCCF"/>
+  <text x="520" y="25" text-anchor="middle" class="rb">General</text>
+
+  <rect x="0.5" y="40" width="200" height="599" fill="#F3F0E8"/>
+  <line x1="200" y1="40" x2="200" y2="639" stroke="#E2DCCF"/>
+
+  <rect x="10" y="56" width="180" height="32" rx="7" fill="#1F1D1A"/>
+  <text x="38" y="77" class="r onpaper">General</text>
+
+  <text x="38" y="116" class="r ink">Agents</text>
+  <text x="22" y="150" class="h">AGENT RUNTIMES</text>
+  <text x="38" y="184" class="r ink">Spending</text>
+  <text x="38" y="216" class="r ink">Pool</text>
+  <text x="22" y="256" class="h">SHARED</text>
+  <text x="38" y="294" class="r ink">Devices</text>
+  <text x="38" y="326" class="r ink">Servers</text>
+
+  <text x="232" y="84" class="title">General</text>
+
+  <text x="232" y="124" class="h">APPEARANCE</text>
+  <rect x="232" y="136" width="420" height="32" rx="7" fill="#FFFFFF" stroke="#E2DCCF"/>
+  <rect x="234" y="138" width="138" height="28" rx="6" fill="#ECE7DB"/>
+  <line x1="372" y1="142" x2="372" y2="162" stroke="#E2DCCF"/>
+  <line x1="512" y1="142" x2="512" y2="162" stroke="#E2DCCF"/>
+  <text x="303" y="157" text-anchor="middle" class="rb">System</text>
+  <text x="442" y="157" text-anchor="middle" class="r sec">Light</text>
+  <text x="582" y="157" text-anchor="middle" class="r sec">Dark</text>
+  <text x="232" y="188" class="f">System follows your Mac, and changes with it.</text>
+
+  <text x="232" y="232" class="h">SLEEP</text>
+  <text x="232" y="268" class="r ink">Keep this Mac awake while agents are working</text>
+  <rect x="612" y="250" width="44" height="26" rx="13" fill="#34C759"/>
+  <circle cx="643" cy="263" r="10" fill="#FFFFFF"/>
+
+  <text x="232" y="316" class="r ink">After they stop</text>
+  <rect x="500" y="296" width="156" height="30" rx="7" fill="#FFFFFF" stroke="#E2DCCF"/>
+  <text x="514" y="316" class="r ink">1 hour</text>
+  <text x="636" y="316" class="sec">▾</text>
+
+  <text x="232" y="360" class="f">The screen can still sleep. At 20% battery or below, the Mac is allowed to</text>
+  <text x="232" y="378" class="f">sleep anyway. Once the last agent stops, the Mac stays awake for this long</text>
+  <text x="232" y="396" class="f">so you can reply.</text>
+
+  <rect x="720" y="248" width="200" height="292" rx="10" fill="#FFFFFF" stroke="#E2DCCF"/>
+  <text x="736" y="276" class="r ink">Right away</text>
+  <rect x="728" y="290" width="184" height="28" rx="6" fill="#ECE7DB"/>
+  <text x="736" y="309" class="rb">1 hour</text>
+  <text x="896" y="309" class="rb">✓</text>
+  <text x="736" y="342" class="r ink">2 hours</text>
+  <text x="736" y="370" class="r ink">3 hours</text>
+  <text x="736" y="398" class="r ink">4 hours</text>
+  <text x="736" y="426" class="r ink">5 hours</text>
+  <text x="736" y="454" class="r ink">6 hours</text>
+  <text x="736" y="482" class="r ink">7 hours</text>
+  <text x="736" y="510" class="r ink">8 hours</text>
+
+  <text x="16" y="670" class="note">New section, under Appearance. The switch starts on.</text>
+  <text x="16" y="690" class="note">The menu is one hour at a time: Right away is 0 hours, then 1 through 8.</text>
+  <text x="16" y="710" class="note">Drawn with the recommended start: 1 hour.</text>
+</svg>

@@ -29,7 +29,7 @@ struct QuietLinkTests {
         func start() async throws {}
     }
 
-    @Test func aMacThatNeverAnswersIsNotConnectedTo() async throws {
+    @Test(.flakyUnderLoad) func aMacThatNeverAnswersIsNotConnectedTo() async throws {
         let mac = Mac()
         mac.quiet.set()
         let client = DaemonClient(link: mac)

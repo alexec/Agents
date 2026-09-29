@@ -1,0 +1,56 @@
+{
+  "query": "swiftui",
+  "searchType": "fuzzy",
+  "searchVersion": "algolia",
+  "skills": [
+    {
+      "id": "expo/skills/expo-ui-swiftui",
+      "source": "expo/skills",
+      "skillId": "expo-ui-swiftui",
+      "name": "Expo UI SwiftUI",
+      "installs": 13078
+    },
+    {
+      "id": "avdlee/swiftui-agent-skill/swiftui-expert-skill",
+      "source": "avdlee/swiftui-agent-skill",
+      "skillId": "swiftui-expert-skill",
+      "name": "swiftui-expert-skill",
+      "installs": 32978
+    },
+    {
+      "id": "twostraws/swiftui-agent-skill/swiftui-pro",
+      "source": "twostraws/swiftui-agent-skill",
+      "skillId": "swiftui-pro",
+      "name": "swiftui-pro",
+      "installs": 29975
+    },
+    {
+      "id": "rivet-dev/skills/rivetkit-client-swiftui",
+      "source": "rivet-dev/skills",
+      "skillId": "rivetkit-client-swiftui",
+      "name": "rivetkit-client-swiftui",
+      "installs": 7333
+    },
+    {
+      "id": "affaan-m/ecc/swiftui-patterns",
+      "source": "affaan-m/ecc",
+      "skillId": "swiftui-patterns",
+      "name": "swiftui-patterns",
+      "installs": 9188
+    }
+  ],
+  "count": 5,
+  "duration_ms": 494,
+  "timings_ms": {
+    "rate_limit": 21.06302699999651,
+    "flags": 1.1684710000117775,
+    "visibility": 26.906975000005332,
+    "retrieval": 459.16466599999694,
+    "algolia_processing": 267,
+    "repositories": 25.057502999989083,
+    "ranking": 7.874982000008458,
+    "search": 494,
+    "total": 514.9891260000004
+  },
+  "provider_duration_ms": 459.16466599999694
+}

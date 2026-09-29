@@ -41,6 +41,8 @@ public enum WorktreeChoice: Codable, Hashable, Sendable {
     case new
     /// A worktree of the same repository that is already there.
     case existing(URL)
+    /// Make a fresh worktree with a name chosen by the caller, rather than from its prompt.
+    case named(String)
     /// Make a fresh worktree on a branch that is already there: a local one not
     /// checked out anywhere, or one only a remote has, which git then tracks.
     case branch(String)
@@ -69,6 +71,11 @@ public enum WorktreeName {
     ]
 
     public static func branch(for name: String) -> String { branchPrefix + name }
+
+    /// A stable, readable worktree name for an issue assignment.
+    public static func issue(number: Int, title: String, now: Date = Date()) -> String {
+        from(prompt: "issue-\(number)-\(title)", keepingFiller: true, now: now)
+    }
 
     /// The folder a worktree on someone's branch goes in: the branch, less the app's
     /// own prefix, with every `/` a `-`, so `feature/login` is `feature-login`.
@@ -110,24 +117,6 @@ public enum WorktreeName {
         stamp.locale = Locale(identifier: "en_US_POSIX")
         stamp.dateFormat = "MMdd-HHmm"
         return "agent-" + stamp.string(from: now)
-    }
-
-    /// A worktree's name for a branch that already exists, such as a pull request's
-    /// (038): the same rules as a name from a prompt, applied to the branch's last
-    /// part, so `alex/fix-login` checks out as `fix-login`.
-    public static func from(branch: String) -> String {
-        let last = branch.split(separator: "/").last.map(String.init) ?? branch
-        let words = last.lowercased()
-            .split { !($0.isASCII && ($0.isLetter || $0.isNumber)) }
-            .map(String.init)
-        var name = ""
-        for word in words {
-            let longer = name.isEmpty ? word : name + "-" + word
-            if longer.count > maxLength { break }
-            name = longer
-        }
-        if name.isEmpty, let first = words.first { name = String(first.prefix(maxLength)) }
-        return name.isEmpty ? "pull-request" : name
     }
 
     /// The name itself when it is free, otherwise the first free `-2`, `-3`, …

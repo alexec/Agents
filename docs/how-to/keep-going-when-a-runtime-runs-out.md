@@ -16,9 +16,8 @@ that can grow: an API key joins the pool only on free or prepaid credit.
 
 - At least two runtimes installed and signed in, each on its own plan. See
   [Sign a runtime in](sign-a-runtime-in.md).
-- Recognising a spent allowance works for Claude, Codex, Gemini and Antigravity. For Copilot,
-  Cursor and Grok it is not recognised yet: a chat on them stops when its allowance runs out,
-  as before, though they can still be carried on *to*. See [Runtimes](../reference/runtimes.md).
+- Recognising a spent allowance works for Claude, Codex, Gemini, Antigravity, Copilot, Cursor
+  and Grok. See [Runtimes](../reference/runtimes.md).
 
 ## Set up the pool
 
@@ -62,10 +61,12 @@ When a chat's allowance runs out:
 - On the sessions list, the chat has a **⇄** mark: its tooltip says where it came from and
   when.
 
-If every runtime in the pool is out, the chat waits for the first one that said when it is back,
-and carries on by itself then: **Every runtime in the pool is out. This chat waits, and carries
-on with Claude at 07:00.** Its icon stays grey, with an hourglass. If none has said when, it stops
-and says so. Your next message, **Stop**, **Park** or **Archive** ends the wait.
+If every runtime in the pool is out, the chat waits for the next availability check, and
+carries on by itself once one passes: **Every runtime in the pool is out. This chat waits, and
+Claude is checked at 07:00; it carries on once one is back.** Checks come four hours after a
+runtime went out, and every four hours after a check that fails; a provider's reset time is
+shown but never puts a runtime back by itself. Its icon stays grey, with an hourglass. If none is
+due a check — only credit is left, and credit comes back when you say so — it stops and says so. Your next message, **Stop**, **Park** or **Archive** ends the wait.
 
 ## Read the Pool page
 
@@ -73,9 +74,14 @@ and says so. Your next message, **Stop**, **Park** or **Archive** ends the wait.
 line such as **1 out · 3 chats on Codex**. The page shows:
 
 - **Runtimes, in order**: each with how it is paid for and its state in words, such as
-  **Available**, **Out until 07:00**, **Rate limited · trying again at 02:21** or **Credit used
+  **Available**, **Out · reset 07:00 · checking after 09:00**, **Rate limited · trying again at 02:21** or **Credit used
   up**. **Mark available** is on any that is out.
-- **Waiting for an allowance**: chats waiting, with when each carries on, and **Stop waiting**.
+  Under it, where the runtime says so, is what is left of its plan: **28% left this week ·
+  resets Sun 20:39 · as of 14:02**. Grok is asked each time the page opens, at most every five
+  minutes. Claude says it during a turn, usually only once a limit is near or reached. Other
+  runtimes have no way to say it yet. The line is only shown: whether a chat runs is still the
+  state above it.
+- **Waiting for an allowance**: chats waiting, with when each is next checked, and **Stop waiting**.
 - **Matching models**: see below.
 - **Recent switches**: when, which chat, from which runtime to which, and why. **Show the last
   30 days** goes further back.
@@ -129,3 +135,10 @@ On the iPhone and iPad, **Continue with** is on the chat's menu, with the same s
 The pool is the Mac's, and each connected server uses it. A server's Codex signs in through this
 Mac's ChatGPT sign-in, so it spends this Mac's plan. When that plan runs out on either side, the
 other knows at once, while the Agents window is open: a chat there moves before it is refused.
+
+## See also
+
+- [Why chats carry on when a plan runs out](../explanation/runtime-pool.md)
+- [Limit what agents spend](limit-spending.md)
+- [Sign a runtime in](sign-a-runtime-in.md)
+- [Statuses and groups](../reference/statuses.md)

@@ -40,8 +40,7 @@ ssh.
 Gemini takes an API key, kept on this Mac and lent to a server while an agent runs there.
 
 1. Get a key at aistudio.google.com/apikey.
-2. Paste it under **Gemini** in **Settings ▸ Agent Runtimes** or under **Runtime credentials** in
-   **Settings ▸ Servers**: it is the same key. It says **Works** once Google has checked it.
+2. Paste it under **Gemini** in **Settings ▸ Agent Runtimes**. It says **Works** once Google has checked it.
 
 With a key saved, Agents installs Gemini on a server as it connects, and each server's
 entry in **Settings ▸ Servers** says how Gemini stands there. The key is lent to a server
@@ -68,7 +67,7 @@ sign-in only** if you want it used every time.
 ### Add the server
 
 1. In the Mac app, click **+** (**New project**) at the top of the **Projects** list and
-   choose **Add a server…**. (Or open **Settings ▸ Servers** and click **Add a server**.)
+   choose **Add Server…**. (Or open **Settings ▸ Servers** and click **Add Server**.)
 2. Type the name you use with ssh: an alias from `~/.ssh/config`, or `user@host`, such as
    `agents@devbox.example.com`. Click **Connect**.
 3. The first time, Agents shows the server's host key fingerprint. Check it matches the
@@ -87,7 +86,7 @@ sign-in only** if you want it used every time.
 
 ### Put a project on it
 
-1. Click **+** (**New project**), choose the server's name, then **Choose Folder…** or
+1. Click **+** (**New project**), choose the server's name, then **Add Folder…** or
    **Clone Git URL…**.
 2. For a folder, **Choose a folder on devbox.example.com** opens on your home folder
    there. Type a path, such as `~/src/weather-app`, or click into folders, then click

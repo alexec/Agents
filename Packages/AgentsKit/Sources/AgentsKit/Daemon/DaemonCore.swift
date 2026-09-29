@@ -112,6 +112,17 @@ public actor DaemonCore {
     /// When the current hold was taken, for `WakeState.since`. Moved only when a hold
     /// is taken, not on every revise, so it means what it says.
     var holdingSince: Date?
+    /// The switch and the hours, once read. A missing file is on, for one hour.
+    lazy var wakeStore = WakeSettingsStore(locations: locations)
+    var wakeSettings = WakeSettings()
+    var wakeSettingsLoaded = false
+    /// When the last agent stopped, if a grace is running. In memory only: the hold
+    /// dies with this process, and a grace is not resumed by the next one.
+    var graceStartedAt: Date?
+    /// The clock on the hold the windows were last told about. Nil while the hold is
+    /// for work, or while nothing is held. Compared with the verdict so a grace that
+    /// keeps the same verdict still tells the windows its time.
+    var lastGraceUntil: Date?
     /// The last power reading actually taken, so reporting the charge to a window that
     /// has just connected costs nothing. Readings happen rarely by design — see the
     /// guard in `reviseWakefulness`.
@@ -224,6 +235,9 @@ public actor DaemonCore {
     /// Answered when the lease comes, the wait runs out, or the agent is stopped.
     var openWaits: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
     var openWaitStarted: [UUID: Date] = [:]
+    /// `ask_form` calls waiting on the person's answer, by the elicitation's id.
+    /// Answered when they accept, skip or cancel, or when the agent is stopped.
+    var openAsks: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
     /// The one timer, aimed at the book's next deadline. Re-aimed after every change.
     var leaseTimer: Task<Void, Never>?
     /// Tells the windows once a minute while anything is held, so "minutes left"
@@ -305,6 +319,11 @@ public actor DaemonCore {
     /// its limit from filling its own transcript saying so on every drain attempt.
     var held: Set<UUID> = []
 
+    // MARK: Client permission mode (061)
+
+    lazy var clientPermissionStore = ClientPermissionStore(locations: locations)
+    lazy var clientPermissions = clientPermissionStore.load()
+
     // MARK: The pool (052)
 
     lazy var poolStore = PoolStore(locations: locations)
@@ -319,6 +338,9 @@ public actor DaemonCore {
     var rateLimitAttempts: [UUID: Int] = [:]
     /// The latest plan window each agent's runtime reported (R2).
     var latestRateLimit: [UUID: RateLimitInfo] = [:]
+    /// Credentials whose allowance is being asked for now, so opening the Pool page
+    /// twice starts one runtime, not two.
+    var measuringAllowances: Set<String> = []
     /// A chat whose allowance ran out this turn, waiting for its runtime to be let go
     /// before it carries on (052). `resend` is whether the turn failed and its prompt
     /// goes again.
@@ -330,6 +352,8 @@ public actor DaemonCore {
     /// When each runtime was last started just to see its models (US6): at most once in
     /// ten minutes, so an open Pool page never keeps starting runtimes.
     var modelsProbedAt: [String: Date] = [:]
+    /// Checks already running, so a heartbeat cannot start the same one twice.
+    var allowanceChecks: Set<String> = []
     /// Credentials already tried for the prompt a chat is carrying (052): never gone back
     /// to for the same prompt. Cleared by a turn that works.
     var carryTried: [UUID: Set<String>] = [:]
@@ -382,28 +406,26 @@ public actor DaemonCore {
     /// The runs in flight, by `Workflow.id`. This is what a second fire collides with,
     /// and what a fired agent's own events read to work out how deep they are.
     var workflowRuns: [String: WorkflowRun] = [:]
-    // MARK: Pull requests (038)
-
-    /// What the daemon remembers about the person's pull requests.
-    lazy var pullRequestStore = PullRequestStore(locations: locations)
-    /// Each GitHub project's section, by folder. Started from the last good lists on
-    /// disk, so a restarted daemon shows something before its first refresh (R12).
-    lazy var pullRequestLists: [URL: PullRequestList] = Dictionary(
-        pullRequestStore.load().lists.map { ($0.folder, $0) }, uniquingKeysWith: { _, last in last })
-    /// Projects whose refresh is running now, so a tick and a button never run two.
-    var pullRequestRefreshes: Set<URL> = []
-    /// The sweep the ticker started, while it runs. One at a time, projects one after
-    /// another, so a slow GitHub never holds up the clock.
-    var pullRequestSweep: Task<Void, Never>?
-    /// The person's `gh`. A test gives it a fake.
+    /// The person's `gh`, which the skills catalogue reads GitHub through. A test gives
+    /// it a fake.
     var gitHubCLI = GitHubCLI()
-    /// Projects due a look sooner than their five minutes, because a pull request's run
-    /// just ended there (FR-014), and from when.
-    var pullRequestsDueAt: [URL: Date] = [:]
-    /// Whether the ticker refreshes pull requests by itself. Off until the daemon turns
-    /// it on, so the many tests that drive the ticker by hand never run git or `gh` on
-    /// the side; one that wants the sweep turns it on.
-    var watchesPullRequests = false
+    #if canImport(CryptoKit)
+    /// What searching a catalogue and adding a skill talk to (059). A test gives it a
+    /// session that reaches only its stand-in, and endpoints to match.
+    var catalogSession: URLSession = .shared
+    var catalogEndpoints = CatalogEndpoints.from(environment: ProcessInfo.processInfo.environment)
+    /// Previews fetched and not yet added, in `<root>/catalog-staging`.
+    lazy var catalogStaging = SkillStaging(root: locations.root.appending(path: "catalog-staging"))
+    /// When each source was last asked whether it has moved on, and what it said (FR-018).
+    var catalogUpdateChecks: [String: SkillUpdates.Answer] = [:]
+    /// Between an add's rename and its lock write, for the test that an add stopped there
+    /// leaves nothing behind. Nil everywhere else.
+    var catalogAfterRename: (@Sendable () throws -> Void)? = DaemonCore.catalogPause(ProcessInfo.processInfo.environment)
+    /// MCP Registry (060). A test points the session at `MCPRegistryStub`.
+    var mcpRegistrySession: URLSession = .shared
+    var mcpRegistryEndpoints = MCPRegistryEndpoints.from(environment: ProcessInfo.processInfo.environment)
+    lazy var mcpPreviewStore = MCPPreviewStore()
+    #endif
     /// The single ticker. One for the daemon, not one per workflow: see
     /// `tickWorkflows` for why it reads the wall clock rather than sleeping until due.
     var workflowTicker: Task<Void, Never>?
@@ -814,8 +836,9 @@ public actor DaemonCore {
         // An agent's own ask to be parked, made on the call that ended its turn, is the
         // same park at the same moment — but only for the ending it asked about: the
         // turn it made the ask in, ended by its own hand, with nothing the person has
-        // queued since. Any other ending drops the ask. An ask to be archived is left
-        // for `finishTurn`, which archives once the runtime is let go.
+        // queued since. Any other ending drops the ask. An ask to be archived, from a
+        // conversation told it could, is dropped with it: an agent cannot put a session
+        // away.
         switch next {
         case .finished, .stopped:
             let pickingUp = event == .foundDead && agent.mayBePickedUpAfterRestart
@@ -830,7 +853,7 @@ public actor DaemonCore {
                     agent.parking = .parked(at: now())
                     agent.isUnread = false
                 }
-                if !(after == .archive && endedAsAsked) { agent.afterTurn = nil }
+                agent.afterTurn = nil
             }
         case .archived:
             agent.parking = nil
@@ -1153,9 +1176,14 @@ public actor DaemonCore {
 
         case .permissionRequested(var request):
             request.agentID = agentID
+            let runtimeID = agents[agentID]?.runtimeID
+            let reviewsClientSide = runtimeID.map(ClientPermissionSettings.supports) == true
             // Our own tool, answered by us. Nobody is asked whether the app may show
-            // the app's own suggestions.
-            if let option = autoAllowed(request) {
+            // the app's own suggestions. Cursor and Grok keep only the turn-ending
+            // ones automatic (061): workflows, agents, leases and publishing still ask.
+            if let option = reviewsClientSide
+                ? autoAllowedTurnTool(request)
+                : autoAllowed(request) {
                 await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
                 return
             }
@@ -1170,6 +1198,17 @@ public actor DaemonCore {
             if let refusal = autoRefused(request) {
                 await live[agentID]?.answerPermission(id: request.id, optionID: refusal.option.optionID)
                 await record(.runtimeNote(refusal.note), for: agentID)
+                return
+            }
+            // Always-approve for Cursor and Grok (061): answer once, before any card or
+            // attention event. Prefer allow_once so switching back to Default still asks.
+            // Pending cards already on screen are never touched.
+            if reviewsClientSide,
+               let runtimeID,
+               clientPermissions.mode(for: runtimeID) == .alwaysApprove,
+               let option = request.options.first(where: { $0.kind == .allowOnce })
+                   ?? request.options.first(where: { $0.kind == .allowAlways }) {
+                await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
                 return
             }
             pendingPermissions[request.id] = Pending(request: request, agentID: agentID)

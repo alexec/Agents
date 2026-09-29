@@ -20,7 +20,7 @@ struct ContinueWithMenu: View {
     var body: some View {
         SelectCapsule(name: "Runtime", title: PoolWords.runtimeName(agent.runtimeID)) { dismiss in
             SelectChoice(title: "Carry on when \(PoolWords.runtimeName(agent.runtimeID)) runs out",
-                         description: agent.switchingOff ? "Off for this chat: it stops when it runs out" : nil,
+                         description: agent.switchingOff ? "Off for this session: it stops when it runs out" : nil,
                          isChosen: !agent.switchingOff) {
                 dismiss()
                 Task { await model.setSwitching(agent.id, isOn: agent.switchingOff) }
@@ -52,7 +52,7 @@ struct ContinueWithMenu: View {
                 .appText(.fine).foregroundStyle(.secondary)
                 .padding(.horizontal, 10).padding(.top, 4)
         }
-        .help("Carry this chat on with another runtime")
+        .help("Carry this session on with another runtime")
     }
 }
 

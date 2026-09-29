@@ -1,7 +1,7 @@
 import Foundation
 import AgentsKitCore
 
-/// Where events come from besides agents, workflows and pull requests (042 R9–R11).
+/// Where events come from besides agents and workflows (042 R9–R11).
 extension DaemonCore {
     // MARK: branch.moved (R9)
 

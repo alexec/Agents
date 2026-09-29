@@ -29,7 +29,7 @@ struct AddServerSheet: View {
         @Bindable var flow = flow
         switch flow.phase {
         case .name:
-            Text("Add a server").appText(.reading).fontWeight(.semibold)
+            Text("Add Server").appText(.reading).fontWeight(.semibold)
             TextField("devbox", text: $flow.name)
                 .textFieldStyle(.roundedBorder)
                 .focused($isFocused)
@@ -57,7 +57,7 @@ struct AddServerSheet: View {
             .appText(.fine)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
             step("Check the system", .waiting)
             buttons {
                 Button("Trust and continue") { Task { await flow.trust() } }

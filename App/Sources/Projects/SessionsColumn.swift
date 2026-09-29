@@ -15,15 +15,17 @@ struct SessionsColumn: View {
 
     @AppStorage("showsArchivedAgents") private var showsArchived = false
     @State private var query = ""
+    /// What the list has highlighted — one or several (⌘-click). Drives bulk Archive;
+    /// `selection` is still the one chat the right-hand column is reading.
+    @State private var picked: Set<UUID> = []
 
     /// Enough archived chats to find last week's; the rest are on the phone's archive
     /// and in Events. A list of every chat ever is the thing projects replaced.
     private static let archivedShown = 50
 
     var body: some View {
-        List(selection: $selection) {
-            // The same headings the project page drew, Complete split into Unread and
-            // Read and all.
+        List(selection: $picked) {
+            // The same headings the project page draws.
             ForEach(AgentGroup.live, id: \.self) { group in
                 ForEach(group.headings(matching(model.agents(in: model.selectedProjectKey, group: group)))) { part in
                     Section {
@@ -34,6 +36,11 @@ struct SessionsColumn: View {
                         heading(part.title, count: part.agents.count)
                     }
                 }
+            }
+            // Its workflows, above Archived so a long archive never buries them (066).
+            // Not while searching, which is a search of the sessions.
+            if query.isEmpty {
+                ProjectWorkSections(folder: model.selectedProject)
             }
             let archived = matching(model.agents(in: model.selectedProjectKey, group: .archived))
             // What has been retired from here (051), as the section's last line.
@@ -59,9 +66,8 @@ struct SessionsColumn: View {
         .background(Paper.ground)
         .overlay {
             if model.selectedProjectSummary == nil {
-                ContentUnavailableView("No project", systemImage: "folder",
-                                       description: Text("Pick one on the left."))
-            } else if !hasAny {
+                EmptyState.noProject
+            } else if !hasAny, !(query.isEmpty && hasWork) {
                 ContentUnavailableView(query.isEmpty ? "No sessions yet" : "No matches",
                                        systemImage: "bubble.left.and.bubble.right",
                                        description: Text(query.isEmpty
@@ -69,37 +75,37 @@ struct SessionsColumn: View {
                                                          : "Nothing here says “\(query)”."))
             }
         }
-        // ⌫ (Edit ▸ Delete) archives the picked session, as it deletes the picked
-        // message in Mail. Archived is not gone: Bring Back is on its row.
-        .onDeleteCommand {
-            guard let id = selection, let agent = model.agents.first(where: { $0.id == id }),
-                  agent.state != .archived else { return }
-            Task { await model.archive(id) }
-            selection = nil
-        }
-        // The window's title is this column's: whatever the right-hand side is reading.
-        .navigationTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name ?? "Agents")
+        // ⌫ archives every highlighted session that is not already archived (one or many).
+        .onDeleteCommand { archivePicked() }
+        // The window's title is this column's: the worktree this build came from, then
+        // whatever the right-hand side is reading. The primary checkout is "main".
+        .navigationTitle(AppCheckout.windowTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name))
         .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
-        // Over the list it adds to, not in the window's toolbar: up there it sat at the
-        // far right, over the chat, a long way from the sessions it starts.
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if model.selectedProjectSummary != nil {
-                NewSessionRow {
-                    selection = nil
-                    requests.focusPrompt()
-                }
-            }
-        }
         .toolbar {
-            // A search field of our own rather than `.searchable`, which pins its field
-            // to the window's far right edge whatever the order: the chat's sidebar
-            // toggle belongs to the right of the search, beside the sidebar it opens.
             ToolbarSpacer(.fixed)
             ToolbarItem {
-                SessionSearchField(text: $query)
+                SessionSearchField(text: $query, wantsFocus: Binding(
+                    get: { requests.wantsSessionSearchFocus },
+                    set: { if !$0 { requests.wantsSessionSearchFocus = false } }))
                     .frame(width: 240)
             }
-            // Only while a chat is showing: a workflow or project page has no sidebar.
+            ToolbarSpacer(.fixed)
+            // Compose, where Mail and Notes have it (066): the empty project pane is the
+            // new chat, and this is the way back to it from a session.
+            ToolbarItem {
+                Button { newSession() } label: {
+                    Label("New Session", systemImage: "square.and.pencil")
+                }
+                .help("Start a new session in this project (⌘N)")
+                .disabled(model.selectedProjectSummary == nil)
+            }
+            if picked.count > 1 {
+                ToolbarSpacer(.fixed)
+                ToolbarItem {
+                    Button("Archive \(picked.count)") { archivePicked() }
+                        .help("Archive the highlighted sessions")
+                }
+            }
             if model.selection != nil, model.openWorkflow == nil {
                 ToolbarSpacer(.fixed)
                 ToolbarItem {
@@ -107,11 +113,67 @@ struct SessionsColumn: View {
                 }
             }
         }
+        .onChange(of: picked) { _, ids in applyPicked(ids) }
+        // A workflow opened is what the right-hand side reads now, so no session stays
+        // lit or names the window.
+        .onChange(of: model.openWorkflow) { _, id in
+            guard id != nil else { return }
+            picked = []
+            selection = nil
+        }
+        .onChange(of: selection) { _, id in applySelection(id) }
+        .onAppear { applySelection(selection) }
+    }
+
+    private func newSession() {
+        picked = []
+        selection = nil
+        model.openWorkflow = nil
+        requests.focusPrompt()
+    }
+
+    /// One pick opens that chat; several keep the open chat only if it is among them.
+    private func applyPicked(_ ids: Set<UUID>) {
+        switch ids.count {
+        case 0:
+            break
+        case 1:
+            if selection != ids.first { selection = ids.first }
+        default:
+            if let current = selection, !ids.contains(current) { selection = nil }
+        }
+    }
+
+    /// Opening a chat from the menu or Go replaces a multi-pick with that one row.
+    private func applySelection(_ id: UUID?) {
+        if let id {
+            if picked.count <= 1 || !picked.contains(id) { picked = [id] }
+        } else if picked.count == 1 {
+            picked = []
+        }
+    }
+
+    private func archivePicked() {
+        let ids = picked.isEmpty ? Set(selection.map { [$0] } ?? []) : picked
+        let toArchive = ids.filter { id in
+            model.agents.first(where: { $0.id == id })?.state != .archived
+        }
+        guard !toArchive.isEmpty else { return }
+        Task {
+            for id in toArchive {
+                await model.archive(id, andLeave: false)
+            }
+            if let open = selection, toArchive.contains(open) { selection = nil }
+            picked.subtract(toArchive)
+        }
     }
 
     private func row(_ agent: Agent) -> some View {
         AgentRow(agent: agent, isCompact: true)
-            .padding(.vertical, 3)
+            // Title plus the line under it (what it said); list rows that start too short
+            // clip that second line once it arrives.
+            .padding(.vertical, 6)
+            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
             .tag(agent.id)
             // The list's own swipe, in place of the cards' hand-built one.
             .swipeActions(edge: .trailing) {
@@ -119,8 +181,7 @@ struct SessionsColumn: View {
                     Button("Bring Back") { Task { await model.unarchive(agent.id) } }
                 } else {
                     Button("Archive", systemImage: "archivebox") {
-                        Task { await model.archive(agent.id) }
-                        if selection == agent.id { selection = nil }
+                        Task { await model.archive(agent.id, andLeave: true) }
                     }
                     .tint(.gray)
                 }
@@ -143,6 +204,13 @@ struct SessionsColumn: View {
         }
     }
 
+    /// Whether `ProjectWorkSections` has anything to draw, so the empty state does not
+    /// sit over it.
+    private var hasWork: Bool {
+        guard let folder = model.selectedProject.map(Project.standardize) else { return false }
+        return model.workflows(in: folder).contains { !$0.isArchived }
+    }
+
     private var hasAny: Bool {
         AgentGroup.allCases.contains {
             !matching(model.agents(in: model.selectedProjectKey, group: $0)).isEmpty
@@ -150,34 +218,10 @@ struct SessionsColumn: View {
     }
 }
 
-/// The sessions column's first line: start a new session in this project, as ⌘N does.
-/// The whole row is the button, so it can be hit anywhere along it.
-private struct NewSessionRow: View {
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Label("New session", systemImage: "square.and.pencil")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .contentShape(.rect)
-                .background(isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
-                            in: .rect(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .help("Start a new session in this project (⌘N)")
-        .padding(.horizontal, 10)
-        .padding(.top, 6)
-        .background(Paper.ground)
-    }
-}
-
 /// The Mac's own search field, as the toolbar's search item draws it.
 private struct SessionSearchField: NSViewRepresentable {
     @Binding var text: String
+    @Binding var wantsFocus: Bool
 
     func makeNSView(context: Context) -> NSSearchField {
         let field = NSSearchField()
@@ -189,6 +233,10 @@ private struct SessionSearchField: NSViewRepresentable {
 
     func updateNSView(_ field: NSSearchField, context: Context) {
         if field.stringValue != text { field.stringValue = text }
+        if wantsFocus {
+            field.window?.makeFirstResponder(field)
+            DispatchQueue.main.async { wantsFocus = false }
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }

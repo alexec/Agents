@@ -36,22 +36,14 @@ struct AgentToolsServiceTests {
     }
 
     private let agentTools = [AppService.startAgentToolName, AppService.stopAgentToolName,
-                              AppService.archiveAgentToolName, AppService.listMyAgentsToolName]
+                              AppService.parkAgentToolName, AppService.listMyAgentsToolName]
 
     @Test func anAgentThePersonStartedIsOfferedThem() async throws {
         let (client, service) = await pair()
         let listed = try await names(client)
         for tool in agentTools { #expect(listed.contains(tool), "\(tool)") }
-        await service.close()
-    }
-
-    /// Parking is the person's word about their own attention. No tool the app gives
-    /// an agent parks or unparks anything (040, FR-016).
-    @Test func noAgentIsOfferedATooltoPark() async throws {
-        let (client, service) = await pair()
-        let listed = try await names(client)
-        #expect(!listed.isEmpty)
-        #expect(listed.allSatisfy { !$0.lowercased().contains("park") }, "\(listed)")
+        #expect(!listed.contains(AppService.archiveAgentToolName),
+                "only the person archives")
         await service.close()
     }
 
@@ -91,14 +83,29 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
-    @Test func stopArchiveAndListReachTheDaemon() async throws {
+    @Test func stopParkAndListReachTheDaemon() async throws {
         let calls = Calls()
         let (client, service) = await pair(calls: calls)
-        for name in [AppService.stopAgentToolName, AppService.archiveAgentToolName] {
-            _ = try await client.call("tools/call", ["name": .string(name), "arguments": ["id": "abc"]])
-        }
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.stopAgentToolName), "arguments": ["id": "abc"],
+        ])
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.parkAgentToolName), "arguments": ["id": "abc"],
+        ])
         _ = try await client.call("tools/call", ["name": .string(AppService.listMyAgentsToolName)])
-        #expect(await calls.seen == [.stop(agentID: "abc"), .archive(agentID: "abc"), .list])
+        #expect(await calls.seen == [.stop(agentID: "abc"), .park(agentID: "abc"), .list])
+        await service.close()
+    }
+
+    /// An older conversation may still call archive_agent; it still reaches the sink
+    /// so the daemon can refuse with the person's-only line.
+    @Test func anArchiveCallStillReachesTheDaemon() async throws {
+        let calls = Calls()
+        let (client, service) = await pair(calls: calls)
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.archiveAgentToolName), "arguments": ["id": "abc"],
+        ])
+        #expect(await calls.seen == [.archive(agentID: "abc")])
         await service.close()
     }
 
@@ -130,7 +137,7 @@ struct AgentToolsServiceTests {
         let description = AppService.startAgentTool["description"]?.stringValue ?? ""
         #expect(description.contains("this project"))
         #expect(description.contains("five"))
-        #expect(description.contains("frees its place"))
+        #expect(description.contains("Only the person can archive"))
         #expect(description.contains("alongside the rest"))
     }
 }

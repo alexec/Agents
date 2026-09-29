@@ -47,8 +47,7 @@ struct ParkingTests {
 
     private func mintedToken(_ launcher: FakeLauncher) async -> String {
         await eventuallySome("the runtime was handed its token") {
-            let attached = await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? []
-            let minted = attached.first?["args"]?.arrayValue?.last?.stringValue ?? ""
+            let minted = MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
             return minted.isEmpty ? nil : minted
         } ?? ""
     }
@@ -233,7 +232,7 @@ struct ParkingTests {
         try await core.unarchive(seed.id)
         let back = try #require(await core.agent(seed.id))
         #expect(back.parking == nil)
-        #expect(back.group(wantsEyes: false) == .finished)
+        #expect(back.group(wantsEyes: false) == .needsAttention)
     }
 
     @Test func aParkedChatStillHoldsItsProjectsSpending() async throws {

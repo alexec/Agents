@@ -29,6 +29,14 @@ struct AntigravityTurnTests {
         #expect(RuntimeLaunchCatalog.launch(for: "claude").turnError(in: Self.refusedKey) == nil)
     }
 
+    @Test func aUsageLimitReachedMessageIsATurnError() {
+        // Captured from “hi Antigravity”, 2026-09-27: chat text, then end_turn.
+        let body = "You have reached your current quota for this period. Your limit will reset in 5 days, 14 hours."
+        let text = "Usage Limit Reached\n\n" + body
+        #expect(RuntimeLaunchCatalog.antigravity.turnError(in: text)?.sentence == body)
+        #expect(RuntimeLaunchCatalog.antigravity.turnError(in: "Mentioning Usage Limit Reached mid-prose.") == nil)
+    }
+
     // MARK: Through the daemon
 
     private func core(_ script: FakeACPAgent.Script) throws -> (DaemonCore, URL) {

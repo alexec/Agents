@@ -8,7 +8,7 @@ import SwiftUI
 /// headings. The Mac's 144pt gutter is not here: a phone is 390 points wide and a
 /// gutter that size would leave a column of text a hundred points across.
 ///
-/// New agent is in the toolbar, where it is in reach without scrolling however long
+/// New session is in the toolbar, where it is in reach without scrolling however long
 /// the page is, and opens a sheet of its own (029): the choices that go with starting
 /// an agent do not belong over a list of the ones already working.
 struct ProjectPageView: View {
@@ -35,7 +35,7 @@ struct ProjectPageView: View {
                 Button {
                     model.startingIn = model.selectedProject
                 } label: {
-                    Label("New agent", systemImage: "plus")
+                    Label("New session", systemImage: "plus")
                 }
                 .disabled(model.selectedProject == nil)
             }
@@ -86,7 +86,7 @@ struct ProjectPageView: View {
                 }
 
                 if isEmpty {
-                    Text("Nothing here yet. Start an agent with New agent and it appears here.")
+                    Text("Nothing here yet. Start a session with New session and it appears here.")
                         .appText(.reading)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)

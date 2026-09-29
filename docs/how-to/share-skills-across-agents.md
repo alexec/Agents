@@ -28,6 +28,9 @@ A project's own `.agents` folder still applies inside that project, as well as t
 
 ## Add a skill
 
+To find one on skills.sh and add it from the app, see
+[Add a skill from a catalogue](add-a-skill-from-a-catalogue.md). To add one by hand:
+
 1. Make a folder in `~/.agents/skills` named for the skill, with a `SKILL.md` in it, the
    same shape as a Claude Code skill: a front matter with `name` and `description`, then
    the instructions.
@@ -48,7 +51,15 @@ Antigravity reads no instructions file when the app starts it, so neither gets i
 
 ## Add an MCP server
 
-Add it to `~/.agents/mcp.json`, in the same shape Claude Code and Cursor use:
+To find one on the MCP Registry and add it from the app, see
+[Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md). The entry it
+writes names each secret as `${NAME}`, and the value goes in `~/.agents/secrets.env`, which
+is yours alone, readable only by you, and never committed. When an agent starts, the app
+fills each `${NAME}` from that file. A name that is not set means that server is left out
+of the session, and **Settings ▸ Shared** says which name is missing. The value is never
+shown or logged.
+
+To add one by hand, edit `~/.agents/mcp.json`, in the same shape Claude Code and Cursor use:
 
 ```json
 {
@@ -96,6 +107,19 @@ its `.claude-plugin/plugin.json`, and `.mcp.json` if it has servers.
 
 To remove a plugin, delete its folder. The next agent starts without it, and the app takes
 it out of Codex and removes its Gemini link.
+
+## A project's own plugins
+
+A project can also keep plugins in `.agents/plugins` inside the project folder. Those
+apply only in that project. Because a plugin can run hooks and start MCP servers when a
+session begins, a new or changed project plugin does not reach any agent until you approve
+it on the project's page — the same idea as [a workflow waiting for your OK](set-up-a-workflow.md).
+
+On the Mac, open the project. Under **Plugins**, each plugin lists what it carries. One
+that is new or has changed since you approved it says it is waiting; click **Approve**
+(or **Show in Finder** first if you want to look). Plugins that were already there when
+this version began were approved as they stood. Your own plugins in `~/.agents/plugins`
+are never asked about: that folder is yours.
 
 ## What the app moves in the first time
 

@@ -142,6 +142,29 @@ struct MacSignInRelayTests {
         #expect(answer.hasPrefix("HTTP/1.1 400"), "got \(answer.prefix(40))")
     }
 
+    /// Loopback is every local account's to dial: without the stand-in bearer handed to
+    /// the server, the Mac's token is not attached (S4).
+    @Test func aCallerWithoutTheStandInDoesNotGetThisMacsToken() async throws {
+        let folder = try Self.temporary()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let certificates = RelayCertificates(folder: folder.appendingPathComponent("relay"))
+        let standIn = try CodexFileSignIn(file: try Self.signInFile(in: folder)).standIn()
+        let relay = MacSignInRelay(relay: try #require(ToolPolicyCatalog.codex.relay),
+                                   signIn: CodexFileSignIn(file: try Self.signInFile(in: folder)),
+                                   certificates: certificates)
+        relay.expectClientBearer(MacSignInRelay.clientBearer(fromStandIn: standIn))
+        let port = try await relay.start()
+        defer { relay.stop() }
+        let none = try await Self.rawTLS(port: port,
+                                         request: "GET /backend-api/codex/responses HTTP/1.1\r\nHost: x\r\n\r\n")
+        #expect(none.hasPrefix("HTTP/1.1 403"), "got \(none.prefix(40))")
+        let wrong = try await Self.rawTLS(port: port,
+                                          request: "GET /backend-api/codex/responses HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer not-the-stand-in\r\n\r\n")
+        #expect(wrong.hasPrefix("HTTP/1.1 403"), "got \(wrong.prefix(40))")
+        #expect(MacSignInRelay.freshClaudeStandIn() != ClaudeKeychainSignIn.standInToken)
+        #expect(MacSignInRelay.freshClaudeStandIn() != MacSignInRelay.freshClaudeStandIn())
+    }
+
     /// Send `request` as it is over TLS to the relay, trusting whatever it presents (the
     /// point here is the request line, which URLSession would never send), and read the head.
     static func rawTLS(port: UInt16, request: String) async throws -> String {
@@ -189,6 +212,8 @@ struct MacSignInRelayTests {
         let relay = MacSignInRelay(relay: try #require(ToolPolicyCatalog.codex.relay),
                                    signIn: CodexFileSignIn(file: folder.appendingPathComponent("no-sign-in.json")),
                                    certificates: certificates)
+        let standInBearer = MacSignInRelay.freshClaudeStandIn()
+        relay.expectClientBearer(standInBearer)
         let port = try await relay.start()
         defer { relay.stop() }
         #expect(port != 0)
@@ -197,10 +222,13 @@ struct MacSignInRelayTests {
         let session = URLSession(configuration: .ephemeral, delegate: trust, delegateQueue: nil)
         var upgrade = URLRequest(url: URL(string: "https://127.0.0.1:\(port)/backend-api/codex/responses")!)
         upgrade.setValue("websocket", forHTTPHeaderField: "Upgrade")
+        upgrade.setValue("Bearer \(standInBearer)", forHTTPHeaderField: "Authorization")
         let (_, upgraded) = try await session.data(for: upgrade)
         #expect((upgraded as? HTTPURLResponse)?.statusCode == 404)
-        let (_, plain) = try await session.data(from: URL(string: "https://127.0.0.1:\(port)/backend-api/wham/accounts/check")!)
-        #expect((plain as? HTTPURLResponse)?.statusCode == 502)
+        var plain = URLRequest(url: URL(string: "https://127.0.0.1:\(port)/backend-api/wham/accounts/check")!)
+        plain.setValue("Bearer \(standInBearer)", forHTTPHeaderField: "Authorization")
+        let (_, answered) = try await session.data(for: plain)
+        #expect((answered as? HTTPURLResponse)?.statusCode == 502)
     }
 
     /// A URLSession delegate that trusts one CA and nothing else.

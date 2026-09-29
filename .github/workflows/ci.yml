@@ -5,13 +5,14 @@
 # stay off here: AGENTS_LIVE (+ AGENTS_MCP_HELPER) for real runtimes, AGENTS_BARE for
 # the bare ssh container. Tests that only fail under load are marked `.flakyUnderLoad`
 # (Packages/*/Tests/**/FlakyUnderLoad.swift lists each and why); GitHub sets CI, so the
-# main runs skip them and a last step runs them alone, allowed to fail.
+# main runs skip them; they run separately through slow-tests.yml.
 name: ci
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,18 +26,77 @@ jobs:
     # The project targets the macOS and iOS 27 SDKs, which only this image has.
     # A preview image while macOS 27 is new; move to macos-27 when it is GA.
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 10
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The selector compares against the PR base or the previous push.
+          fetch-depth: 0
+
+      - name: Select test suites for changed files
+        id: test-selection
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base="$BASE_SHA"
+          if [[ -z "$base" && -n "$DEFAULT_BRANCH" ]]; then
+            base=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD || true)
+          fi
+          bash scripts/select-test-suites.sh "$base" >> "$GITHUB_OUTPUT"
+
+      # Restore Xcode and SwiftPM products from separate caches. The Xcode cache
+      # can be saved as soon as both app builds finish.
+      - name: Restore Xcode build cache
+        id: xcode-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/DD
+          key: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+
+      - name: Restore SwiftPM build cache
+        id: swiftpm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            Daemon/.build
+            Packages/CodeText/.build
+          key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+
+      - name: Restore AgentsKit build cache
+        id: agentskit-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: Packages/AgentsKit/.build
+          key: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
 
       - name: Tools
         run: |
           xcodebuild -version
-          brew install xcodegen
+          brew install xcodegen &
+          xcodegen_pid=$!
           # The runner's Xcode comes without it, and the app's build compiles Metal.
           xcodebuild -downloadComponent MetalToolchain
+          wait "$xcodegen_pid"
+
+      # SwiftPM's build graph records the random cryptex mount name for MetalToolchain.
+      # Rewrite that mount in a restored graph when the component version matches.
+      - name: Normalize AgentsKit build cache
+        if: steps.test-selection.outputs.agentskit != 'skip'
+        run: python3 scripts/normalize-metaltoolchain-cache.py Packages/AgentsKit/.build
+
+      - name: Build AgentsKit tests
+        if: steps.test-selection.outputs.agentskit != 'skip'
+        run: swift build --build-tests --package-path Packages/AgentsKit
+
+      - name: Save AgentsKit build cache
+        if: ${{ steps.test-selection.outputs.agentskit != 'skip' && steps.agentskit-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: Packages/AgentsKit/.build
+          key: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
 
       - name: Generate the project
         run: xcodegen generate
@@ -60,39 +120,63 @@ jobs:
           -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD
           -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
 
+      - name: Save Xcode build cache
+        if: ${{ steps.xcode-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: build/DD
+          key: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+
       # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
       # a whole Swift build inside the test run, holding a test thread for minutes,
       # which on a shared runner stalls everything else. Built here instead.
       - name: Build agentsd for the tests
+        if: steps.test-selection.outputs.agentskit != 'skip'
         run: swift build --package-path Daemon --product agentsd
 
       # How long the runner's login shell takes to say its PATH. The app reads it
       # once per process, synchronously, the first time anything looks a runtime up.
       - name: Time the login shell
+        if: steps.test-selection.outputs.agentskit != 'skip'
         run: time zsh -lc 'printf %s "$PATH"' > /dev/null
 
+      # Build CodeText tests before execution so the cache can be saved before tests.
+      - name: Build CodeText tests
+        if: steps.test-selection.outputs.codetext != 'skip'
+        run: swift build --build-tests --package-path Packages/CodeText
+
+      - name: Save SwiftPM build cache
+        # This combined cache contains both paths below. Save it only when both
+        # package builds ran, so a skipped package cannot produce a partial cache.
+        if: ${{ steps.test-selection.outputs.agentskit != 'skip' && steps.test-selection.outputs.codetext != 'skip' && steps.swiftpm-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            Daemon/.build
+            Packages/CodeText/.build
+          key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+
       - name: Test CodeText
-        run: swift test --package-path Packages/CodeText
-
-      # Blocking again (2026-09-26): fake turns end on command (`TurnGate`), tests wait
-      # past the question about a silent ending (`settled`), and `eventually` waits
-      # 45 s where CI is set rather than 10, since a test on a three-core runner can
-      # wait that long for its first turn on the pool.
-      - name: Test AgentsKit
-        run: swift test --package-path Packages/AgentsKit
-
-      # The quarantined tests, alone and with the machine quieter than in a full run.
-      # A failure here is reported and does not fail the build.
-      - name: Quarantined tests (allowed to fail)
-        if: ${{ !cancelled() }}
-        continue-on-error: true
+        if: steps.test-selection.outputs.codetext != 'skip'
         env:
-          AGENTS_RUN_FLAKY: "1"
+          TEST_FILTER: ${{ steps.test-selection.outputs.codetext_filter }}
+          TEST_MODE: ${{ steps.test-selection.outputs.codetext }}
         run: |
-          status=0
-          for package in Packages/CodeText Packages/AgentsKit; do
-            filter=$(scripts/flaky-tests.sh "$package")
-            [ -n "$filter" ] || continue
-            swift test --package-path "$package" --filter "$filter" || status=1
-          done
-          exit $status
+          if [ "$TEST_MODE" = filter ]; then
+            swift test --skip-build --package-path Packages/CodeText --filter "$TEST_FILTER"
+          else
+            swift test --skip-build --package-path Packages/CodeText
+          fi
+
+      - name: Test AgentsKit
+        if: steps.test-selection.outputs.agentskit != 'skip'
+        timeout-minutes: 10
+        env:
+          TEST_FILTER: ${{ steps.test-selection.outputs.agentskit_filter }}
+          TEST_MODE: ${{ steps.test-selection.outputs.agentskit }}
+        run: |
+          if [ "$TEST_MODE" = filter ]; then
+            swift test --skip-build --package-path Packages/AgentsKit --filter "$TEST_FILTER"
+          else
+            swift test --skip-build --package-path Packages/AgentsKit
+          fi

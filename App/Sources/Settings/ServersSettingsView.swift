@@ -12,17 +12,6 @@ struct ServersSettingsView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(ServerCredentials.runtimes, id: \.self) { runtimeID in
-                    CredentialRow(runtimeID: runtimeID,
-                                  name: RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID)
-                }
-            } header: {
-                Text("Runtime credentials")
-            } footer: {
-                Text("Claude and Codex on a server use this Mac’s own sign-ins, through this Mac; nothing of them is written on a server. Gemini’s key is used by Gemini agents here and on servers, kept in this Mac’s Keychain and never written on a server — though any program running as you on a server can read it while an agent runs there.")
-            }
-            .paperListRow()
-            Section {
                 if model.hosts.isEmpty {
                     Text("No servers yet. Add one by the name you use with ssh.")
                         .foregroundStyle(.secondary)
@@ -38,14 +27,14 @@ struct ServersSettingsView: View {
                     Button {
                         isAdding = true
                     } label: {
-                        Label("Add a server", systemImage: "plus")
+                        Label("Add Server", systemImage: "plus")
                     }
                     Spacer()
                 }
             } header: {
                 Text("Servers")
             } footer: {
-                Text("Servers are reached with your own ssh setup. Nothing on them listens on a network port.")
+                Text("Servers are reached with your own ssh setup. Nothing on them listens on a network port. Claude and Codex on a server use this Mac’s own sign-ins, through this Mac; nothing of them is written on a server.")
             }
             .paperListRow()
         }

@@ -43,6 +43,11 @@ something particular done.
   or Antigravity in or out from the app, and give Gemini its key.
 - [Share skills, instructions and servers with every agent](share-skills-across-agents.md):
   put them in `~/.agents` once, for every runtime and project.
+- [Add a skill from a catalogue](add-a-skill-from-a-catalogue.md): search skills.sh, look
+  before it goes in, and add it for yourself or to a project.
+- [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md): search the
+  MCP Registry, see what would run, and add it for yourself or to a project. Secrets stay
+  in your own `secrets.env`.
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md): a pool of
   runtimes a chat carries on with when its plan's allowance is spent.
 - [Limit what agents spend](limit-spending.md): the Spending page, and a limit per agent
@@ -56,7 +61,5 @@ something particular done.
 
 - [Set up a workflow](set-up-a-workflow.md): start agents on a schedule, or when another
   agent finishes, stops or asks.
-- [Have an agent watch a pull request](watch-a-pull-request.md): fix failing checks and
-  answer review comments on your GitHub pull requests.
 - [Have an agent wait for something](wait-for-something.md): checks passing, another
   agent finishing or the Mac waking, and agents telling each other.

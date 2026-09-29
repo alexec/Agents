@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "skills": {
+    "alpha": {
+      "source": "./local/alpha",
+      "sourceType": "local",
+      "computedHash": "11"
+    },
+    "nested": {
+      "source": "fixture-owner/fixture-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nested/SKILL.md",
+      "computedHash": "43d79cc2b2a7065d4f3f4cc5ae35447d31c5b22469dcee4c35395c2c09d0ac0e"
+    },
+    "zeta": {
+      "source": "someone/zeta",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "00"
+    }
+  }
+}

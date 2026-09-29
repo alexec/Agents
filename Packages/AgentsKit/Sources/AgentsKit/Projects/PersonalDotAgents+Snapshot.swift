@@ -196,6 +196,7 @@ extension PersonalDotAgents {
                                        }))]
         var seen: Set<String> = [appName]
         var sseLeftOut: [String: [String]] = [:]
+        let secretFile = SecretsEnv.load(from: SecretsEnv.url(home: home))
         for server in mine {
             var reach: [String: Reach] = [:]
             var clash: [String: String] = [:]
@@ -230,6 +231,13 @@ extension PersonalDotAgents {
                 looks.append(.init(kind: .clash, page: .mcp, item: server.name,
                                    text: "Also in \(tilde(file, in: home)). \(what)"))
             }
+            let missing = Self.unsetSecretNames(in: server, secrets: secretFile)
+            if !missing.isEmpty {
+                let why = "\(missing.joined(separator: ", ")) \(missing.count == 1 ? "isn't" : "aren't") set"
+                for rule in present { reach[rule.runtimeID] = .leftOut(why) }
+                looks.append(.init(kind: .leftOut, page: .mcp, item: server.name,
+                                   text: "\(why), so agents start without \(server.name)."))
+            }
             result.servers.append(serverRow(server, clash: clash, reach: reach))
         }
         for (id, left) in sseLeftOut.sorted(by: { $0.key < $1.key }) {
@@ -244,6 +252,12 @@ extension PersonalDotAgents {
             }
         }
         return result
+    }
+
+    /// `${NAME}` in the entry that `secrets.env` does not have. Names only.
+    private static func unsetSecretNames(in server: MCPServer, secrets: SecretsEnv) -> [String] {
+        var seen = Set<String>()
+        return SecretsEnv.referencedNames(in: server).filter { secrets.value(of: $0) == nil && seen.insert($0).inserted }
     }
 
     private static func serverRow(_ server: MCPServer, clash: [String: String], reach: [String: Reach]) -> DaemonAPI.Server {

@@ -138,7 +138,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
         guard !supported.isEmpty else {
             return triggers.first?.summary ?? "Nothing makes this run"
         }
-        let triggerPart = Self.triggerSentences(supported).joined(separator: ", and ")
+        let triggerPart = supported.map(\.summary).joined(separator: ", and ")
         let base = "\(triggerPart), \(mode.summary)"
         // A `triggering` workflow never starts an agent — it resumes the one that set
         // it off — so it never applies a setting, and a row saying "in plan mode" about
@@ -147,34 +147,6 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
         // says the longer version; what must not happen is the row asserting them.
         guard mode != .triggering, let settingsPart = settings.summary else { return base }
         return "\(base), \(settingsPart)"
-    }
-
-    /// Each trigger's words, except that all three pull-request triggers together read as
-    /// one sentence rather than three that each say "one of my pull requests" (038).
-    static func triggerSentences(_ triggers: [WorkflowTrigger]) -> [String] {
-        let all = WorkflowTrigger.pullRequestTriggers
-        guard all.allSatisfy(triggers.contains) else { return triggers.map(\.summary) }
-        var sentences: [String] = []
-        for trigger in triggers {
-            if trigger == all[0] {
-                sentences.append("When one of my pull requests fails its checks, gets review comments or conflicts with its base")
-            } else if !trigger.isPullRequest {
-                sentences.append(trigger.summary)
-            }
-        }
-        return sentences
-    }
-
-    /// Whether it watches the viewer's pull requests (038).
-    public var respondsToPullRequests: Bool {
-        problem == nil && triggers.contains(where: \.isPullRequest)
-    }
-
-    /// Whether it watches pull requests and nothing else, so Run now has no pull request
-    /// to run on.
-    public var onlyRespondsToPullRequests: Bool {
-        let supported = supportedTriggers
-        return !supported.isEmpty && supported.allSatisfy(\.isPullRequest)
     }
 
     /// The next time a clock makes this fire, across all of its schedules.
@@ -222,7 +194,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// fire leaves, which is why it is here rather than derived.
     public var lastOutcome: WorkflowOutcome?
     /// The event that caused `lastOutcome`, when an event did (042 FR-030): what the
-    /// row's "on pull_request.merged #41" links to.
+    /// row's "on workflow.completed workflow nightly" links to.
     public var causingEvent: EventPosition?
     public var causingEventName: String?
     public var isRunning: Bool
