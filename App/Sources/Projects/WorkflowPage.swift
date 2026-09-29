@@ -292,7 +292,7 @@ struct WorkflowPage: View {
         return HStack(spacing: 12) {
             if here {
                 Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([file])
+                    model.reveal(file, on: model.selectedProjectHost)
                 } label: {
                     Label(file.lastPathComponent, systemImage: "doc.text")
                         .lineLimit(1)
@@ -550,8 +550,12 @@ struct WorkflowPage: View {
     private func readRaw(_ workflow: Workflow) async -> String? {
         let file = url(workflow)
         let host = model.selectedProjectHost
-        if model.isOnThisMac(host) { return try? String(contentsOf: file, encoding: .utf8) }
+        if model.readsDisk(of: host) { return try? String(contentsOf: file, encoding: .utf8) }
+        #if AGENTS_STORE
+        return await model.readText(file, on: host)
+        #else
         return await model.textFile(at: file, on: host, agentID: model.anAgent(in: workflow.folder, on: host))
+        #endif
     }
 
     /// When it next runs and what happened last, as one sentence. The row's third line,

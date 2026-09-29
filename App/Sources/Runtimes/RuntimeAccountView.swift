@@ -158,6 +158,6 @@ struct RuntimeAccountView: View {
         // the wrong folder is still one keystroke from working.
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(command, forType: .string)
-        NSWorkspace.shared.open(URL(filePath: "/System/Applications/Utilities/Terminal.app"))
+        model.openTerminal()
     }
 }

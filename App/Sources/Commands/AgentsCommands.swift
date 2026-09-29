@@ -180,17 +180,17 @@ struct AgentsCommands: Commands {
 
     /// The open chat's folder, or else the selected project's. Only on this Mac:
     /// a server's folder is not somewhere Finder can go.
-    private var folderForFinder: URL? {
+    private var folderForFinder: (URL, HostID)? {
         if let agent = model.selectedAgent {
-            return model.isOnThisMac(agent.host) ? agent.cwd : nil
+            return model.isOnThisMac(agent.host) ? (agent.cwd, agent.host) : nil
         }
         guard let summary = model.selectedProjectSummary, model.isOnThisMac(summary.host), summary.exists else { return nil }
-        return summary.folder
+        return (summary.folder, summary.host)
     }
 
     private func showInFinder() {
-        guard let folder = folderForFinder else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([folder])
+        guard let (folder, host) = folderForFinder else { return }
+        model.reveal(folder, on: host)
     }
 
     // MARK: View

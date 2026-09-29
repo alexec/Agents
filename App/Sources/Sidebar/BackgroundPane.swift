@@ -70,7 +70,7 @@ enum BackgroundOutput {
         guard let path = item.outputFilePath else { return }
         let url = URL(fileURLWithPath: path)
         let local: URL
-        if model.isOnThisMac(agent.host) {
+        if model.readsDisk(of: agent.host) {
             local = url
         } else if let text = await model.textFile(at: url, on: agent.host, agentID: agent.id) {
             let ext = url.pathExtension.isEmpty ? "txt" : url.pathExtension

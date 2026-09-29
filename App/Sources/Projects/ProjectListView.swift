@@ -191,7 +191,7 @@ struct ProjectListView: View {
         // Only this Mac's folder is somewhere Finder can show (058, FR-019).
         if model.isOnThisMac(summary.host) {
             Button("Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([summary.folder])
+                model.reveal(summary.folder, on: summary.host)
             }
             .disabled(!summary.exists)
         }

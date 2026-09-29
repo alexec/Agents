@@ -512,7 +512,10 @@ final class AppModel {
 
     /// The text of a file. This Mac's is read here; another host's is `files/read` (R11).
     func textFile(at url: URL, on host: HostID, agentID: UUID?) async -> String? {
-        if isOnThisMac(host) { return try? String(contentsOf: url, encoding: .utf8) }
+        if readsDisk(of: host) { return try? String(contentsOf: url, encoding: .utf8) }
+        #if AGENTS_STORE
+        if agentID == nil { return await readText(url, on: host) }
+        #endif
         guard let agentID else { return nil }
         guard let reading = try? await serverFiles(host).read(agentID: agentID,
                                                               path: url.path(percentEncoded: false)) else { return nil }
@@ -523,7 +526,7 @@ final class AppModel {
     /// Whether a path is there. This Mac's is asked of the disk. Another host's is
     /// `files/browse`, and a host that cannot be asked is left as still there.
     func pathIsThere(_ url: URL, on host: HostID) async -> Bool {
-        if isOnThisMac(host) {
+        if readsDisk(of: host) {
             return FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
         }
         if controlPlaneAway || hosts.isOffline(host) { return true }
@@ -1227,6 +1230,7 @@ final class AppModel {
     /// Connect, and keep trying if that fails, which is what the window does when it
     /// opens.
     func stayConnected() async {
+        routeSharedFiles()
         // Nothing to connect to, and nothing to start: the first run says where.
         guard !needsFirstRun else { return }
         await connect()

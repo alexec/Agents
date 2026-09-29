@@ -196,7 +196,7 @@ private struct ProjectGeneralPane: View {
                                     .tinted(.failure)
                             } else if summary.host == .mac {
                                 Button("Show in Finder") {
-                                    NSWorkspace.shared.activateFileViewerSelecting([summary.folder])
+                                    model.reveal(summary.folder, on: summary.host)
                                 }
                                 .buttonStyle(.paper)
                                 .appText(.fine)

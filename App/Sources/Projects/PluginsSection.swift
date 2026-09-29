@@ -82,7 +82,7 @@ private struct PluginRow: View {
 
             HStack(spacing: 6) {
                 Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([plugin.folder])
+                    model.reveal(plugin.folder, on: model.selectedProjectHost)
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)

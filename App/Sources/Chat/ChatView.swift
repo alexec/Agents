@@ -65,7 +65,7 @@ struct ChatView: View {
     private var chatActions: ChatActions {
         ChatActions(
             // The editor the Mac opens that file with, which is the one the user chose.
-            open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
+            open: { [model] location in model.open(URL(filePath: location.path), on: model.selectedAgent?.host ?? .mac) },
             terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             // A switch note's two links (052).

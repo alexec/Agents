@@ -77,9 +77,8 @@ struct WorkflowRow: View {
             if model.isOnThisMac(model.selectedProjectHost) {
                 Divider()
                 Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([
-                        WorkflowPaths.url(for: workflow.workflowID, in: workflow.folder)
-                    ])
+                    model.reveal(WorkflowPaths.url(for: workflow.workflowID, in: workflow.folder),
+                                 on: model.selectedProjectHost)
                 }
             }
         }
