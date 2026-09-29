@@ -24,6 +24,11 @@ struct ChatView: View {
             if let agent {
                 ZStack(alignment: .bottom) {
                     Transcript(agent: agent, bottomInset: formHeight)
+                        // What was exchanged, a swipe away, as on the phone.
+                        .swipeToShowPane(show: {
+                            frame.pane = .artifacts
+                            if !frame.isOpen, SidebarFrame.fits(inWindowOf: frame.windowWidth) { frame.open() }
+                        }, hide: { frame.isOpen = false })
                         // Over the chat rather than in the toolbar, whose trailing end
                         // is above the sidebar whenever the sidebar is open. The
                         // transcript scrolls on under it, as it does under the prompt.
