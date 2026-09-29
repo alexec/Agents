@@ -121,6 +121,44 @@ struct SessionHistoryTests {
         #expect(text.contains("Redirect fixed and tested."))
     }
 
+    // MARK: As a real runtime writes it
+
+    /// The shape Claude's record had in the 2026-09-29 walk: a reply in chunks sharing a
+    /// message id, and a tool call whose title and file arrive in later updates, then a
+    /// completion that calls it only "Tool call".
+    @Test func chunksAreOneReplyAndUpdatesGiveTheCallItsTitleAndFile() {
+        func chunk(_ text: String) -> TranscriptEntry { .init(kind: .agentMessage(messageID: "msg_1", text: text)) }
+        func update(_ title: String, path: String? = nil, status: String? = nil) -> TranscriptEntry {
+            .init(kind: .toolCallUpdate(ToolCall(toolCallID: "toolu_1", title: title, status: status,
+                                                 locations: path.map { [ToolCallLocation(path: $0)] } ?? [])))
+        }
+        let text = render([
+            person("Create notes.txt"),
+            .init(kind: .toolCall(ToolCall(toolCallID: "toolu_1", title: "Preparing file…", status: "pending"))),
+            update("Write /work/api/notes.txt", path: "/work/api/notes.txt"),
+            update("Tool call", status: "completed"),
+            .init(kind: .toolCall(ToolCall(toolCallID: "toolu_2", title: "mcp__agents__finish_turn",
+                                           name: "mcp__agents__finish_turn"))),
+            .init(kind: .toolCallUpdate(ToolCall(toolCallID: "toolu_2", title: "Tool call", status: "completed"))),
+            chunk("I created `notes.txt"), chunk("` with one line:"), chunk(" `step 1`."),
+        ]).markdown
+        #expect(text.contains("**Claude:** I created `notes.txt` with one line: `step 1`."))
+        #expect(text.components(separatedBy: "**Claude:**").count == 2)
+        #expect(text.contains("- Write /work/api/notes.txt (`/work/api/notes.txt`)"))
+        #expect(!text.contains("Preparing file"))
+        #expect(!text.contains("- Tool call"))
+    }
+
+    @Test func aSubagentsStepsAreLeftToIt() {
+        let text = render([
+            person("Go"),
+            .init(kind: .agentMessage(messageID: "sub", text: "subagent musing"), subagentID: "task-1"),
+            reply("Done."),
+        ]).markdown
+        #expect(!text.contains("subagent musing"))
+        #expect(text.contains("**Claude:** Done."))
+    }
+
     // MARK: Shortened
 
     /// Twenty turns of about 1,000 characters each, against a budget of 8,000.

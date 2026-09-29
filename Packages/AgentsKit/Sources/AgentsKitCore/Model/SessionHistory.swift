@@ -64,8 +64,14 @@ public enum SessionHistory {
         private let budget: Int
         /// The first turn, once the second has begun.
         private var first: String?
-        /// The turn being read.
-        private var current: [String] = []
+        /// The turn being read, as pieces still able to change: a reply arrives a chunk
+        /// at a time, and a tool call learns its file and its real title from updates.
+        private var current: [Piece] = []
+        /// Whether the entry before this one was the reply being built, which the next
+        /// chunk of that reply continues. Anything between them ends it, as in the chat.
+        private var replyOpen = false
+        /// The app's own calls, whose updates are not lines either.
+        private var suppressed: Set<String> = []
         /// The latest complete turns, oldest first, kept within the budget.
         private var kept: [String] = []
         private var keptSize = 0
@@ -78,21 +84,62 @@ public enum SessionHistory {
             self.budget = budget
         }
 
+        private enum Piece: Sendable {
+            case line(String)
+            case reply(TranscriptEntry)
+            case tool(ToolCall)
+        }
+
+        /// The same folding the chat does (`TranscriptDisplayBuilder`): chunks of one
+        /// message joined, and a tool call's updates merged into it.
         public mutating func add(_ entry: TranscriptEntry) {
+            // A subagent's steps are its own; the call that started it is the parent's line.
+            guard entry.subagentID == nil else { return }
+            if replyOpen, case .reply(let prior) = current.last,
+               let joined = TranscriptEntry.join(entry, onto: prior) {
+                current[current.count - 1] = .reply(joined)
+                return
+            }
+            replyOpen = false
             switch entry.kind {
             case .userMessage(let text, _, let from):
                 close()
-                current = ["**\(from == .app ? "The app" : "The person"):** \(text)"]
-            case .agentMessage(_, let text, _) where !text.isEmpty:
-                current.append("**\(runtime):** \(text)")
-            case .toolCall(let call) where !Self.isTheApps(call):
-                current.append("- \(call.line)" + (call.locations.first.map { " (`\($0.path)`)" } ?? ""))
+                current = [.line("**\(from == .app ? "The app" : "The person"):** \(text)")]
+            case .agentMessage:
+                current.append(.reply(entry))
+                replyOpen = true
+            case .toolCall(let call), .toolCallUpdate(let call):
+                if let id = call.toolCallID, suppressed.contains(id) { return }
+                if Self.isTheApps(call) {
+                    if let id = call.toolCallID { suppressed.insert(id) }
+                    return
+                }
+                if let id = call.toolCallID, let at = current.lastIndex(where: {
+                    if case .tool(let earlier) = $0 { return earlier.toolCallID == id }
+                    return false
+                }), case .tool(let earlier) = current[at] {
+                    current[at] = .tool(TranscriptEntry.merge(call, onto: earlier))
+                } else if case .toolCall = entry.kind {
+                    current.append(.tool(call))
+                }
             case .workReported(let report):
-                current.append("*Said how the work went: \(report.outcome.rawValue). \(report.message)*")
+                current.append(.line("*Said how the work went: \(report.outcome.rawValue). \(report.message)*"))
             case .planUpdated(let updated):
                 plan = updated.state == .current ? updated : nil
             default:
                 break
+            }
+        }
+
+        private func render(_ piece: Piece) -> String? {
+            switch piece {
+            case .line(let text):
+                return text
+            case .reply(let entry):
+                guard case .agentMessage(_, let text, _) = entry.kind, !text.isEmpty else { return nil }
+                return "**\(runtime):** \(text)"
+            case .tool(let call):
+                return "- \(call.line)" + (call.locations.first.map { " (`\($0.path)`)" } ?? "")
             }
         }
 
@@ -103,9 +150,10 @@ public enum SessionHistory {
 
         /// The turn being read is over: it becomes the first, or the latest kept.
         private mutating func close() {
-            guard !current.isEmpty else { return }
-            let turn = current.joined(separator: "\n")
+            let lines = current.compactMap(render)
             current = []
+            guard !lines.isEmpty else { return }
+            let turn = lines.joined(separator: "\n")
             guard first != nil else {
                 first = turn
                 return
