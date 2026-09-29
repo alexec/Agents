@@ -26,7 +26,7 @@ extension AppModel {
         }
         do {
             let membership = try await ControlConfig.pair(with: code)
-            FileHandle.standardError.write(Data("walk: paired as \(membership.client?.uuidString ?? "?")\n".utf8))
+            FileHandle.standardError.write(Data("walk: paired as \(membership.client?.uuidString ?? "?"), machine \(MachineID.current)\n".utf8))
             await adopt(.remote(membership))
         } catch {
             FileHandle.standardError.write(Data("walk: could not pair: \(error)\n".utf8))
