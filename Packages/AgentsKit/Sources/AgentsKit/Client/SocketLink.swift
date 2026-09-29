@@ -80,7 +80,7 @@ public func connectUnixSocket(path: String) throws -> Int32 {
     // The daemon notices the window has gone when this end closes. A child holding
     // a copy of it — the helper this same client spawns, and every shell below it —
     // would be a window that never leaves, and a daemon that never shuts down.
-    fcntl(fd, F_SETFD, FD_CLOEXEC)
+    _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
     var address = sockaddr_un()
     address.sun_family = sa_family_t(AF_UNIX)
     _ = withUnsafeMutablePointer(to: &address.sun_path) { pointer in

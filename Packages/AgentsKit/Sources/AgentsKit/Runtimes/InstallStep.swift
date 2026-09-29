@@ -32,7 +32,7 @@ struct InstallStep: Sendable {
     func run() async throws -> Outcome {
         let log = FileManager.default.temporaryDirectory
             .appendingPathComponent("agents-install-\(UUID().uuidString).log")
-        FileManager.default.createFile(atPath: log.path, contents: nil)
+        _ = FileManager.default.createFile(atPath: log.path, contents: nil)
         defer { try? FileManager.default.removeItem(at: log) }
         let handle = try FileHandle(forWritingTo: log)
         defer { try? handle.close() }

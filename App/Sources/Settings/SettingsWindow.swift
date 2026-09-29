@@ -160,7 +160,7 @@ private final class SettingsGrowView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard let window else {
+        guard window != nil else {
             if let observer {
                 CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes)
                 self.observer = nil

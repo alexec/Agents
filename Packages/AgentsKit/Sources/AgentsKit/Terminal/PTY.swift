@@ -177,9 +177,9 @@ public final class PTY: @unchecked Sendable {
         // posix_spawn has no working-directory action on this platform, so the folder
         // is set around the call. The lock keeps two starts from interleaving.
         PTY.spawnLock.lock()
-        FileManager.default.changeCurrentDirectoryPath(cwd.path)
+        _ = FileManager.default.changeCurrentDirectoryPath(cwd.path)
         let result = posix_spawn(&spawned, executable.path, &actions, &attributes, &cArgs, &cEnv)
-        FileManager.default.changeCurrentDirectoryPath(previous)
+        _ = FileManager.default.changeCurrentDirectoryPath(previous)
         PTY.spawnLock.unlock()
 
         guard result == 0 else {

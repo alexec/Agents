@@ -367,7 +367,7 @@ private struct OfferedFileStrip: View {
             Image(systemName: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            (Text("Wants you to see ") + Text(file.name).fontWeight(.semibold))
+            Text("Wants you to see \(Text(file.name).fontWeight(.semibold))")
                 .appText(.supporting)
                 .lineLimit(1)
                 .truncationMode(.middle)

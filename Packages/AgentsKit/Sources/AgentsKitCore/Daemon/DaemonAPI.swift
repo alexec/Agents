@@ -2800,7 +2800,7 @@ public extension DaemonAPI {
     // MARK: Retiring archived agents (051)
 
     /// `retention/state`, and what `retention/changed` carries.
-    public struct RetentionState: Codable, Hashable, Sendable {
+    struct RetentionState: Codable, Hashable, Sendable {
         public var settings: RetentionSettings
         public var archivedCount: Int
         public var archivedBytes: Int
@@ -2818,7 +2818,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct RetentionSetRequest: Codable, Sendable {
+    struct RetentionSetRequest: Codable, Sendable {
         public var settings: RetentionSettings
         /// Without it, a change that would retire agents at once is only described.
         public var confirmed: Bool
@@ -2830,7 +2830,7 @@ public extension DaemonAPI {
     }
 
     /// How much retiring would free.
-    public struct RetirePreview: Codable, Hashable, Sendable {
+    struct RetirePreview: Codable, Hashable, Sendable {
         public var count: Int
         public var bytes: Int
         /// Some of them may turn out to be held when the time comes, which a preview
@@ -2844,7 +2844,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct RetentionSetResult: Codable, Sendable {
+    struct RetentionSetResult: Codable, Sendable {
         public var applied: Bool
         /// When not applied: what it would retire.
         public var wouldRetire: RetirePreview?
@@ -2858,7 +2858,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct RetireRequest: Codable, Sendable {
+    struct RetireRequest: Codable, Sendable {
         public var agentID: UUID
         public var confirmed: Bool
 
@@ -2868,7 +2868,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct RetiredRequest: Codable, Sendable {
+    struct RetiredRequest: Codable, Sendable {
         /// The most one answer carries.
         public static let limitCeiling = 200
 
@@ -2883,7 +2883,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct AgentRemovedNotification: Codable, Sendable {
+    struct AgentRemovedNotification: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
     }

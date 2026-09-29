@@ -228,7 +228,7 @@ extension DaemonCore {
     @discardableResult
     func carryOnIfPending(_ agentID: UUID) async -> Bool {
         guard let pending = pendingCarry.removeValue(forKey: agentID),
-              var agent = agents[agentID], agent.state != .archived else { return false }
+              let agent = agents[agentID], agent.state != .archived else { return false }
         let current = poolEntry(for: agent)
         var tried = carryTried[agentID, default: []]
         tried.insert(AllowanceState.credentialKey(for: current))
@@ -812,7 +812,7 @@ extension DaemonCore {
             let wait = Self.poolBroadcastGap - (clock.now - last)
             Task {
                 try? await Task.sleep(for: wait)
-                await self.sendHeldPoolBroadcast()
+                self.sendHeldPoolBroadcast()
             }
             return
         }

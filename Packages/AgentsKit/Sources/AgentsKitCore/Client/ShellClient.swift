@@ -73,14 +73,14 @@ public final class ShellClient {
     public func detach() async {
         guard isAttached else { return }
         isAttached = false
-        try? await client.call(DaemonAPI.Method.shellDetach, DaemonAPI.ShellRequest(agentID: agentID, shell: shell))
+        _ = try? await client.call(DaemonAPI.Method.shellDetach, DaemonAPI.ShellRequest(agentID: agentID, shell: shell))
     }
 
     /// End this shell for good: its tab was closed (055).
     public func close() async {
         isAttached = false
         onOutput = nil
-        try? await client.call(DaemonAPI.Method.shellClose, DaemonAPI.ShellRequest(agentID: agentID, shell: shell))
+        _ = try? await client.call(DaemonAPI.Method.shellClose, DaemonAPI.ShellRequest(agentID: agentID, shell: shell))
     }
 
     /// The connection went: whatever the daemon knew of this screen went with it. The
@@ -91,7 +91,7 @@ public final class ShellClient {
 
     public func send(_ data: Data) async {
         guard state.isLive else { return }
-        try? await client.call(DaemonAPI.Method.shellInput,
+        _ = try? await client.call(DaemonAPI.Method.shellInput,
                                DaemonAPI.ShellInputRequest(agentID: agentID, shell: shell, bytes: data,
                                                            rows: rows > 0 ? rows : nil,
                                                            cols: cols > 0 ? cols : nil))
@@ -100,7 +100,7 @@ public final class ShellClient {
     public func resize(rows: Int, cols: Int) async {
         guard state.isLive, rows > 0, cols > 0 else { return }
         remember(rows: rows, cols: cols)
-        try? await client.call(DaemonAPI.Method.shellResize,
+        _ = try? await client.call(DaemonAPI.Method.shellResize,
                                DaemonAPI.ShellResizeRequest(agentID: agentID, shell: shell, rows: rows, cols: cols))
     }
 

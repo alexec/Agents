@@ -137,8 +137,7 @@ private struct RemoveServerSheet: View {
             let projects = model.liveProjects.filter { $0.host == host }.count
             Group {
                 if let live, live > 0 {
-                    Text("\(live == 1 ? "1 agent is" : "\(live) agents are") running on \(label) and will be stopped. ")
-                        + Text(projectsLine(projects))
+                    Text("\(live == 1 ? "1 agent is" : "\(live) agents are") running on \(label) and will be stopped. \(projectsLine(projects))")
                 } else {
                     Text(projectsLine(projects))
                 }

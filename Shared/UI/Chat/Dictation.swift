@@ -201,7 +201,8 @@ final class Dictation {
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1_024, format: format, block: tap)
+        // The throwing tap that replaced the old one in 27 reaches Swift only by its refined name.
+        try input.__installTap(onBus: 0, bufferSize: 1_024, format: format, error: (), block: tap)
         engine.prepare()
         try engine.start()
     }

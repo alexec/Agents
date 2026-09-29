@@ -35,6 +35,11 @@ and Xcode will not run one from the command line until it has been trusted. Xcod
 asks once and remembers; `xcodebuild` has nobody to ask, and fails with three unexplained
 build commands instead.
 
+A Swift warning in this repository's own code fails the build: the Xcode targets set
+`SWIFT_TREAT_WARNINGS_AS_ERRORS`, and each package's Swift targets
+`.treatAllWarnings(as: .error)`. Fix the warning rather than silencing it. The generated
+tree-sitter C grammars are the exception, and stay quiet with `-w`.
+
 ## The daemon
 
 The app is a window. The agents belong to a helper, `agentsd`, which lives inside the app
