@@ -226,6 +226,28 @@ struct ControlServiceTests {
         }
     }
 
+    /// The apps' transport, `URLSession`, reaches the same service, by pin (T040, S2).
+    @Test func anAppDialsWithURLSessionByPin() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tls-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let (context, pin) = try SelfSigned.make(in: dir, name: "127.0.0.1")
+        let running = try await start(tls: context, pin: pin)
+        defer { Task { await running.service.stop() } }
+        let (id, _, credentials) = try await pairedClient(
+            at: running.url, code: try await running.service.codes.issue(.client(.operator)).text, pin: pin)
+        let link = ControlLink { [url = running.url] in
+            let socket = try await WebSocketLink.connect(url, pin: pin)
+            return try await ControlAuth.join(socket, origin: ControlAuth.origin(url)!, as: credentials).transport
+        }
+        let control = DaemonClient(link: link.controlLink)
+        try await control.connect(startIfNeeded: false)
+        let status = try await control.call(DaemonAPI.Method.controlStatus)
+        #expect(status["you"]?.stringValue?.lowercased() == id.uuidString.lowercased())
+        link.disconnect()
+        let wrong = ControlCode.base64url(Data(repeating: 1, count: 32))
+        await #expect(throws: (any Error).self) { _ = try await WebSocketLink.connect(running.url, pin: wrong) }
+    }
+
     // MARK: Helpers
 
     func status(_ url: URL) async throws -> Int {

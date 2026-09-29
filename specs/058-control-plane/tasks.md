@@ -150,7 +150,7 @@ transport.
   - it closes after the reply.
 
   Every text message is one wire line.
-- [ ] T040 [P] Write the apps' transport in `Packages/AgentsKit/Sources/AgentsKitCore/Control/WebSocketLink.swift`: `URLSessionWebSocketTask` with a pin-checking delegate, `ControlAuth` as the peer, and one message per line. It is gated on `canImport(Foundation) && !os(Linux)`. `ControlLink` takes it in place of the TLS-PSK dial.
+- [x] T040 (pin from the P-256 header and point, as in S2; tested against the service in `ControlServiceTests`; the Remote builds) [P] Write the apps' transport in `Packages/AgentsKit/Sources/AgentsKitCore/Control/WebSocketLink.swift`: `URLSessionWebSocketTask` with a pin-checking delegate, `ControlAuth` as the peer, and one message per line. It is gated on `canImport(Foundation) && !os(Linux)`. `ControlLink` takes it in place of the TLS-PSK dial.
 - [x] T041 (s3:// waits on T062; smoke-run on /tmp/cpsmoke: serve, pin, /healthz, /readyz, codes, SIGTERM) Write `ControlService` and the `agents-control` CLI in `Packages/ControlPlane/Sources/ControlPlaneKit/ControlService.swift` and `Sources/agents-control/main.swift`:
   - `serve`: store from `AGENTS_STORE`; key from `AGENTS_CONTROL_KEY_FILE`, `AGENTS_CONTROL_KEY` or an inherited descriptor, `--key-fd`; URL from `AGENTS_CONTROL_URL`;
   - `code --client operator|device` and `code --host`;
@@ -162,7 +162,7 @@ transport.
   - remove `ControlNet`, `ControlDialling`, `UnixSocketListener`'s control use and `ControlPlane.swift`'s bridge wiring, once `ControlServiceTests` (T043) passes;
   - keep `daemon.sock` for agent tools (FR-021);
   - check that `ControlNetTests` is replaced by T043.
-- [ ] T043 End-to-end tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/ControlServiceTests.swift`. Using a `FolderStore` in a temporary folder, a self-signed copy on a loopback port, a host dialled with `HostDial`, and a client over `WebSocketLink`, check:
+- [x] T043 (`ControlServiceTests`, 10; walks/foundational.md) End-to-end tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/ControlServiceTests.swift`. Using a `FolderStore` in a temporary folder, a self-signed copy on a loopback port, a host dialled with `HostDial`, and a client over `WebSocketLink`, check:
   - enrolment by code;
   - `agents/list` routed to the host;
   - an operator-only call refused for a device;
