@@ -10,7 +10,12 @@ enum ControlConfig {
         case remote(ControlMembership)
     }
 
-    private static var folder: URL { StoreLocations.default.root }
+    /// The window's own container, whatever `AGENTS_ROOT` says: a sandboxed window never
+    /// keeps anything in a daemon's root, and a walk launched from a shell carries one.
+    private static var folder: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Agents", isDirectory: true)
+    }
     private static var membershipFile: URL { folder.appendingPathComponent("control-client.json") }
     private static var keyFile: URL { folder.appendingPathComponent("control-client-key") }
 

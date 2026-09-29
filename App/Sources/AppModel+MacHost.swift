@@ -15,6 +15,25 @@ extension AppModel {
         #endif
     }
 
+    #if AGENTS_STORE
+    /// For walks: `AGENTS_CONTROL=<code>` pairs without the first run, as T029 did. Started
+    /// with the app, so it runs with no window on screen (a locked Mac, a scratch walk).
+    func pairForWalk() async {
+        guard needsFirstRun, let text = ProcessInfo.processInfo.environment["AGENTS_CONTROL"] else { return }
+        guard let code = ControlCode(text: text) else {
+            FileHandle.standardError.write(Data("walk: AGENTS_CONTROL is not a code\n".utf8))
+            return
+        }
+        do {
+            let membership = try await ControlConfig.pair(with: code)
+            FileHandle.standardError.write(Data("walk: paired as \(membership.client?.uuidString ?? "?")\n".utf8))
+            await adopt(.remote(membership))
+        } catch {
+            FileHandle.standardError.write(Data("walk: could not pair: \(error)\n".utf8))
+        }
+    }
+    #endif
+
     /// The shared-settings helpers' way to this Mac's host, in the App Store window.
     func routeSharedFiles() {
         #if AGENTS_STORE
