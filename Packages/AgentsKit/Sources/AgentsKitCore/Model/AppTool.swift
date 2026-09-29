@@ -23,6 +23,12 @@ public enum AppTool {
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
+    /// Ask the person a question or a short form and wait for the answer. The
+    /// fallback for runtimes whose own ask tool never reaches the model, and the
+    /// only channel on runtimes that have none. Named `ask_form` rather than
+    /// `ask_question` so it does not collide with Antigravity's own tool.
+    public static let askForm = "ask_form"
+
     // Four that act on other agents (028): start one in this project, and stop, park
     // or list the ones this agent started. archive_agent is still a name a transcript
     // or older conversation may carry, but it is no longer offered — only the person
@@ -106,9 +112,9 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, startAgent, stopAgent, parkAgent, archiveAgent,
-        listMyAgents, leaseResource, releaseResource, listResources, waitForEvent, cancelWait,
-        publishEvent, pushPullRequest, replyOnPullRequest, suggestPrompts, reportOutcome,
+        finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
+        archiveAgent, listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
+        cancelWait, publishEvent, pushPullRequest, replyOnPullRequest, suggestPrompts, reportOutcome,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

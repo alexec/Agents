@@ -187,15 +187,25 @@ public enum ToolPolicyCatalog {
     ///
     /// So everything conflicting is residue, and the briefing is the whole of the
     /// defence. This is the runtime the residue line was written for.
+    ///
+    /// `AskQuestion` is kept and named: Cursor raises it as `cursor/ask_question`,
+    /// which this app draws as a form elicitation the phone can answer. Composer
+    /// sessions sometimes omit it from the tool catalogue; the briefing also names
+    /// `ask_form` as the fallback the app always serves.
     public static let cursor = ToolPolicy(
         runtimeID: RuntimeCatalog.cursor.id,
+        kept: [
+            KeptTool(name: "AskQuestion",
+                     because: "It is the escalation path: the daemon holds what it raises, and the phone can answer it."),
+        ],
         residue: [
             ResidualTool(name: "Task", category: .agents),
             ResidualTool(name: "CreateGoal", category: .standingArrangements),
             ResidualTool(name: "UpdateGoal", category: .standingArrangements),
         ],
         lever: .words,
-        appToolSchemaDelivery: .firstPrompt)
+        appToolSchemaDelivery: .firstPrompt,
+        escalationTool: "AskQuestion")
 
     /// Codex: feature switches in `CODEX_CONFIG` (047, research R5).
     ///

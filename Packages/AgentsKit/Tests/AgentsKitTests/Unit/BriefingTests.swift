@@ -74,22 +74,27 @@ struct BriefingTests {
     /// arrives as a held elicitation, so an agent that knows the name can raise one.
     @Test func andNamesTheToolWhereThePolicyKnowsIt() {
         #expect(Briefing.escalation(named: "AskUserQuestion").contains("`AskUserQuestion`"))
+        #expect(Briefing.escalation(named: "AskUserQuestion").contains("`\(AppTool.askForm)`"))
         #expect(Briefing.text(for: ToolPolicyCatalog.claude).contains("`AskUserQuestion`"))
+        #expect(Briefing.text(for: ToolPolicyCatalog.claude).contains("`\(AppTool.askForm)`"))
         // Antigravity's reaches the person as a permission request whose options are the
         // answers (049, R7), so it is named too.
         #expect(Briefing.text(for: ToolPolicyCatalog.antigravity).contains("`ask_question`"))
+        // Cursor's AskQuestion is the primary; ask_form is the fallback Composer needs.
+        #expect(Briefing.text(for: ToolPolicyCatalog.cursor).contains("`AskQuestion`"))
+        #expect(Briefing.text(for: ToolPolicyCatalog.cursor).contains("`\(AppTool.askForm)`"))
     }
 
-    /// And names nothing on a runtime with no tool that can reach the person — which
-    /// includes Grok, whose `ask_user_question` is a terminal-UI card with no ACP
-    /// channel behind it (R13). Naming it was measured: the agent spent the turn
-    /// searching the MCP catalogue for it and guessed anyway. Worse than saying nothing,
-    /// which is what FR-008 is about.
-    @Test func andNamesNothingWhereThereIsNoChannel() {
-        for policy in [ToolPolicyCatalog.grok, ToolPolicyCatalog.copilot, ToolPolicyCatalog.cursor, ToolPolicyCatalog.gemini] {
+    /// And names `ask_form` on a runtime whose own ask tool has no channel that reaches
+    /// the person — Grok's `ask_user_question` is a terminal-UI card with no ACP path
+    /// (R13), Gemini and Copilot likewise. Naming the runtime tool was measured: the
+    /// agent spent the turn searching the MCP catalogue for it and guessed anyway.
+    /// Naming the app's own tool, which is always on that catalogue, is the fix.
+    @Test func andNamesAskFormWhereThereIsNoRuntimeChannel() {
+        for policy in [ToolPolicyCatalog.grok, ToolPolicyCatalog.copilot, ToolPolicyCatalog.gemini] {
             #expect(policy.escalationTool == nil, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy).contains("your question or form tool"))
-            #expect(!Briefing.text(for: policy).contains("Yours is called"))
+            #expect(Briefing.text(for: policy).contains("Yours is called `\(AppTool.askForm)`"))
+            #expect(!Briefing.text(for: policy).contains("If you do not have it"))
         }
         // Kept all the same: taking it out of the allowlist would buy nothing today and
         // cost us the day Grok gives it a way out.
@@ -143,12 +148,16 @@ struct BriefingTests {
     /// line saying the call can also put the conversation away once the turn ends
     /// (104 characters; no new line). Measured then at 2,501 for the longest (Cursor).
     /// Every agent is told it, so both ceilings go up by the same.
+    ///
+    /// Raised with ask_form, to 2,650 and 2,450: every runtime is told the app's own
+    /// ask tool by name, and Cursor names AskQuestion as well (~70 characters on the
+    /// longest line).
     @Test func itStaysShortEnoughToBeRead() {
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy)
-            #expect(text.count < 2_550, "\(policy.runtimeID): \(text.count)")
+            #expect(text.count < 2_650, "\(policy.runtimeID): \(text.count)")
             #expect(Briefing.lines(for: policy).count <= 8, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false).count < 2_350,
+            #expect(Briefing.text(for: policy, managesAgents: false).count < 2_450,
                     "\(policy.runtimeID), for an agent another agent started")
         }
     }

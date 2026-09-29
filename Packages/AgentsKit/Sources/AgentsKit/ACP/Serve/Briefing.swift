@@ -126,13 +126,18 @@ public enum Briefing {
     /// hunting for something matching those words, failed to recognise `ask_user_question`
     /// as the thing being described, and guessed. It had the tool the whole time.
     ///
-    /// So the description gets the name appended to it. Not instead of the act: a runtime
-    /// whose name we do not know still gets the sentence that was there before, and an
-    /// agent that knows the act by another name can still act on it. `ToolPolicy` is what
-    /// supplies the name, so nothing here asks which runtime it is talking to, and FR-008
-    /// holds — a tool is named only where the policy has deliberately kept it.
+    /// So the description gets the name appended to it. A runtime tool the policy kept
+    /// with a working channel is named first; `ask_form` — the app's own tool, always
+    /// on the catalogue — is named as the fallback, or as the only name where the
+    /// runtime has no channel that reaches us. Naming a runtime tool that is not there
+    /// is still worse than silence (FR-008); naming the app tool is not.
     public static func escalation(named tool: String?) -> String {
-        let named = tool.map { " Yours is called `\($0)`." } ?? ""
+        let named: String
+        if let tool, tool != AppTool.askForm {
+            named = " Yours is called `\(tool)`. If you do not have it, use `\(AppTool.askForm)`."
+        } else {
+            named = " Yours is called `\(AppTool.askForm)`."
+        }
         return """
             When something is mine to decide — a choice between real alternatives, a \
             missing credential, anything hard to undo — ask me with your question or \

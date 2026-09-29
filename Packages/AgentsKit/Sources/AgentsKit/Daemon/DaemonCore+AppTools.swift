@@ -350,6 +350,61 @@ extension DaemonCore {
             """
     }
 
+    /// An agent has asked the person a question via `ask_form`, and is waiting.
+    ///
+    /// The form is held as an ordinary elicitation so the phone and every window can
+    /// answer it the same way they answer a runtime's own question. The call parks
+    /// until that answer arrives, the person skips or cancels, or the agent stops.
+    public func askForm(_ request: DaemonAPI.AskFormRequest) async throws -> String {
+        guard let agentID = appTokens[request.token], agents[agentID] != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
+                               message: "That conversation is not open any more, so nobody was asked.")
+        }
+        guard !request.questions.isEmpty else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: "Nothing was asked: send at least one question.")
+        }
+        var properties: [ElicitationSchema.Property] = []
+        for question in request.questions {
+            let id = question.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            let prompt = question.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !id.isEmpty, !prompt.isEmpty else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams,
+                                   message: "Nothing was asked: each question needs an id and a prompt.")
+            }
+            let choices = (question.options ?? []).compactMap { option -> ElicitationSchema.Property.Choice? in
+                let value = option.id.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !value.isEmpty else { return nil }
+                return .init(value: value, title: option.label)
+            }
+            let kind: ElicitationSchema.Property.Kind
+            if choices.isEmpty {
+                kind = .string(format: nil, minLength: nil, maxLength: nil, choices: nil)
+            } else if question.allowMultiple == true {
+                kind = .multiSelect(items: choices, minItems: nil, maxItems: nil)
+            } else {
+                kind = .string(format: nil, minLength: nil, maxLength: nil, choices: choices)
+            }
+            properties.append(.init(name: id, title: prompt, isRequired: true, kind: kind))
+        }
+        let title = request.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedTitle = (title?.isEmpty == false) ? title : nil
+        let elicitation = ElicitationRequest(
+            agentID: agentID,
+            message: cleanedTitle ?? (properties.count == 1 ? properties[0].title : nil),
+            mode: .form(ElicitationSchema(title: cleanedTitle, properties: properties)))
+        // Parked before anything is awaited, so an answer arriving in the next
+        // instant finds the call to resume rather than starting the agent again.
+        let answer = await withCheckedContinuation { (continuation: CheckedContinuation<Result<String, JSONRPCError>, Never>) in
+            openAsks[elicitation.id] = continuation
+            Task { await self.holdElicitation(elicitation, agentID: agentID) }
+        }
+        switch answer {
+        case .success(let text): return text
+        case .failure(let error): throw error
+        }
+    }
+
     /// The turn they belonged to is over. Anything the user sends is the answer to
     /// what was suggested, whether they tapped a chip or typed past it.
     func clearSuggestions(for agentID: UUID) {
