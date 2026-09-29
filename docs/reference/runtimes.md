@@ -160,9 +160,9 @@ newer version starts offering.
 Each table lists what a person might want to change; the long tail of each runtime (proxy,
 debug, provider and terminal-only settings) is grouped into one row. In the last column,
 **Show** means the app offers it, **Set** means the app chooses the value for you, and
-**Leave alone** means the runtime's own default, or your own settings file, decides. These
-are proposals until they are decided. Sandbox options are listed and decided with the
-sandbox setting ([#40](https://github.com/alexec/Agents/issues/40)).
+**Leave alone** means the runtime's own default, or your own settings file, decides. Decided
+on 2026-09-29; what is not built yet says **planned**. Sandbox options are listed here and
+decided with the sandbox setting ([#40](https://github.com/alexec/Agents/issues/40)).
 
 #### Claude
 
@@ -170,20 +170,20 @@ The adapter passes anything in `_meta.claudeCode.options` to Claude Code, includ
 `settings`, which sits above your own settings files for that conversation only. So any
 setting below can be set by the app for one agent without touching `~/.claude`.
 
-| Option | Where | Values (default) | Under ACP | On servers | Proposed |
+| Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
-| Effort | ACP `effort`; `effortLevel` in settings | default, low, medium, high, xhigh, max | Yes, under the prompt | Yes | Show a default for new agents in Settings, beside the one under the prompt |
+| Effort | ACP `effort`; `effortLevel` in settings | default, low, medium, high, xhigh, max | Yes, under the prompt | Yes | Already shown |
 | Fast mode | ACP `fast`; `fastMode` | off | Yes, under the prompt; needs extra usage | Yes | Already shown |
 | Thinking on, off or budget | `alwaysThinkingEnabled`; `MAX_THINKING_TOKENS` | on, adaptive | Yes | Yes | Leave alone: effort covers it |
 | Fallback model | `fallbackModel` | none | Yes | Yes | Leave alone: overlaps the app's own fallback |
-| Cost and turn limits | `_meta…options.maxBudgetUsd`, `maxTurns` | none | Yes | Yes | Set: an agent's cost ceiling, stopped by Claude itself |
-| Web search and fetch | tools `WebSearch`, `WebFetch` | on, asks | Yes | Yes | Show: one web access switch per runtime |
-| Memory | `autoMemoryEnabled` | on | Yes | Server's own | Decide with Codex's, which the app turns off |
-| Transcript retention | `cleanupPeriodDays` | 30 days | Yes: old transcripts deleted at start | Server's own | Set: long enough that an idle agent can still be picked back up |
+| Cost and turn limits | `_meta…options.maxBudgetUsd`, `maxTurns` | none | Yes | Yes | Set, planned: an agent's cost ceiling, stopped by Claude itself |
+| Web search and fetch | tools `WebSearch`, `WebFetch` | on, asks | Yes | Yes | Show, planned: the web access switch |
+| Memory | `autoMemoryEnabled` | on | Yes | Yes, when the app sets it | Show, planned: the memory switch, on by default |
+| Transcript retention | `cleanupPeriodDays` | 30 days | Yes: old transcripts deleted at start | Yes, when the app sets it | Set, planned: long enough that an idle agent can still be picked back up |
 | Commit and PR attribution | `attribution.commit`, `attribution.pr` | on | Yes | Server's own | Leave alone: yours to set in its settings |
-| Usage data | `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | sent | Yes; a `CLAUDE_CODE_*` of your shell is removed | Yes | Show: one usage data switch per runtime |
-| Custom config folder | `CLAUDE_CONFIG_DIR` | `~/.claude` | Removed with every `CLAUDE_*` | — | Set: let it through, so your own folder is used |
-| Keep credentials out of commands | `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` | off | Yes | Yes | Set on servers: the relay's stand-in token stays out of shell commands |
+| Usage data | `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | sent | Yes; a `CLAUDE_CODE_*` of your shell is removed | Yes | Show, planned: the usage data switch |
+| Custom config folder | `CLAUDE_CONFIG_DIR` | `~/.claude` | Removed with every `CLAUDE_*` | — | Set, planned: let it through, so your own folder is used |
+| Keep credentials out of commands | `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` | off | Yes | Yes | Set on servers, planned: the relay's stand-in token stays out of shell commands |
 | Checkpoints | `fileCheckpointingEnabled` | on only when the client reports file changes; the app does not | Off | Off | Leave alone |
 | Compaction, output style, language, system prompt, hooks, MCP loading, subagents | settings, environment | its defaults | Yes | Server's own | Leave alone |
 | Sandbox and network | `sandbox.*` | off | Yes | Server's own | Sandbox (#40) |
@@ -195,15 +195,15 @@ The adapter merges `CODEX_CONFIG` into every conversation, above your `~/.codex/
 so it reaches servers too. It sends approval, sandbox, effort, model and fast mode again on
 every turn, so those in your config file only choose the first value, or nothing.
 
-| Option | Where | Values (default) | Under ACP | On servers | Proposed |
+| Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
-| Reasoning effort | ACP `reasoning_effort`; `model_reasoning_effort` | low … max (medium) | Yes, under the prompt | Yes | Show a default for new agents in Settings |
+| Reasoning effort | ACP `reasoning_effort`; `model_reasoning_effort` | low … max (medium) | Yes, under the prompt | Yes | Already shown |
 | Fast mode | ACP `fast-mode`; `service_tier` | off | Yes, under the prompt | Yes | Already shown |
 | Plan | ACP `collaboration_mode` | default, plan | Yes, under the prompt | Yes | Already shown |
 | Approval policy | `approval_policy`, `approvals_reviewer` | from the mode | No: the mode decides every turn | — | Leave alone |
-| Web search | `web_search` | cached; live under **Full access** | Yes | Only through `CODEX_CONFIG` | Show: one web access switch per runtime |
-| Usage data | `analytics.enabled`, `feedback.enabled` | on | Yes | Only through `CODEX_CONFIG` | Show: one usage data switch per runtime |
-| Memories | `features.memories` | off | Yes | Yes | Set off today |
+| Web search | `web_search` | cached; live under **Full access** | Yes | Only through `CODEX_CONFIG` | Show, planned: the web access switch |
+| Usage data | `analytics.enabled`, `feedback.enabled` | on | Yes | Only through `CODEX_CONFIG` | Show, planned: the usage data switch |
+| Memories | `features.memories` | off | Yes | Yes | Set off today. Show, planned: the memory switch, on by default |
 | Browser, computer use, image generation | `features.browser_use`, `computer_use`, `image_generation` | on | Not yet measured | — | Measure: they may be tools that duplicate the app's |
 | Reasoning summaries | `model_reasoning_summary` | auto | No: the adapter chooses | — | Leave alone |
 | Folder trust | `projects.<path>.trust_level` | asks | The adapter trusts every agent's folder, so a project's own Codex config and hooks load | Yes | Leave alone |
@@ -217,12 +217,12 @@ Gemini offers no options under the prompt beyond model and mode, and reads no `_
 conversation starts. Its settings come from files only: the app's own system defaults file
 is the lowest of them, so yours always win over it.
 
-| Option | Where | Values (default) | Under ACP | On servers | Proposed |
+| Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
 | Thinking level | `modelConfigs` in settings | high | Yes | Through the app's defaults file | Leave alone: no flag, and a file per agent to vary it |
-| Web search and fetch | tools `google_web_search`, `web_fetch` | on | Yes | Through the app's policy file | Show: one web access switch per runtime |
-| Usage statistics | `privacy.usageStatisticsEnabled` | on | Yes | Through the app's defaults file | Show: one usage data switch per runtime; your own file still wins |
-| Session retention | `general.sessionRetention` | 30 days, deleted at every start | Yes | Through the app's defaults file | Set: long enough that an idle agent can still be picked back up |
+| Web search and fetch | tools `google_web_search`, `web_fetch` | on | Yes | Through the app's policy file | Show, planned: the web access switch |
+| Usage statistics | `privacy.usageStatisticsEnabled` | on | Yes | Through the app's defaults file | Show, planned: the usage data switch; your own file still wins |
+| Session retention | `general.sessionRetention` | 30 days, deleted at every start | Yes | Through the app's defaults file | Set, planned: long enough that an idle agent can still be picked back up |
 | Subagents, task tracker | `invoke_agent`, `tracker_*` | on, off | Yes | Yes | Set off today |
 | Folder trust | `--skip-trust` | asks | Yes: loads the project's own hooks and settings | Yes | Set today |
 | Compression, turn limit, loop detection, tool output, shell | settings | its defaults | Yes | Server's own | Leave alone |
@@ -237,14 +237,14 @@ is the lowest of them, so yours always win over it.
 Its one settings file holds only its sign-in choice and a Google Cloud project. Everything
 else is an option under the prompt, the tool list the app sends, or its environment.
 
-| Option | Where | Values (default) | Under ACP | On servers | Proposed |
+| Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
 | Thinking level | part of the model, such as `gemini-3.8-flash-high` | high | Yes, under the prompt | Mac only today | Already shown |
-| Web search and fetch | tools `search_web`, `read_url_content` | on, asks | Yes | Mac only today | Show: one web access switch per runtime |
+| Web search and fetch | tools `search_web`, `read_url_content` | on, asks | Yes | Mac only today | Show, planned: the web access switch |
 | Image generation | tool `generate_image` | on | Yes | Mac only today | Leave alone |
 | Subagents | tool `start_subagent` | on | Yes | Mac only today | Set off today |
 | Starting model | `AGY_ACP_DEFAULT_MODEL` | flash, high | Yes | — | Leave alone: the model is under the prompt |
-| Project hooks | `.agents/hooks.json` in the project | asks, unless the folder is trusted | Run without asking, because the app trusts the folder | — | Decide: keep trusting, or let it ask |
+| Project hooks | `.agents/hooks.json` in the project | asks, unless the folder is trusted | Run without asking, because the app trusts the folder | — | Set, planned: stop trusting, so it asks, once its question is measured to reach you as a card |
 | MCP, skills, rules | its home, the project | — | Yes | — | Leave alone |
 | Usage data, compaction, checkpoints, updates | none | — | — | — | Nothing to set |
 | Sandbox | business accounts only | off | — | — | Sandbox (#40) |
@@ -254,11 +254,11 @@ else is an option under the prompt, the tool list the app sends, or its environm
 The app passes its settings in `OPENCODE_CONFIG_CONTENT`, above your own `opencode.json`,
 which reaches servers too. Settings your Mac's administrator manages win over both.
 
-| Option | Where | Values (default) | Under ACP | On servers | Proposed |
+| Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
 | Effort | ACP `effort`, for models with variants | the model's variants | Yes, under the prompt, when the model has them | Yes | Already shown when offered |
 | Permissions | `permission.*` | allow everything | Yes | Yes | Set today for edits, commands and fetches |
-| Web search | tool `websearch`, `permission.websearch` | on, without asking, through Exa or Parallel | Yes | Yes | Set: ask, as fetching does; and Show with the web access switch |
+| Web search | tool `websearch`, `permission.websearch` | on, without asking, through Exa or Parallel | Yes | Yes | Set, planned: ask, as fetching does. Show, planned: the web access switch |
 | Subagents, sharing, updates, question tool | `tools.task`, `share`, `autoupdate` | on | Yes | Yes | Set off today |
 | MCP timeout | `experimental.mcp_timeout` | 5 seconds | Yes | Yes | Measure: the app's tools that wait may be cut off |
 | Language servers, formatters | `lsp`, `formatter` | off | Yes | Yes | Leave alone |
@@ -271,15 +271,15 @@ which reaches servers too. Settings your Mac's administrator manages win over bo
 On a server the app starts the Grok installed there, with the same flags and `_meta`; its
 settings files there are the server's own.
 
-| Option | Where | Values (default) | Under ACP | On servers | Proposed |
+| Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
-| Reasoning effort | ACP `reasoning_effort`; `models.default_reasoning_effort` | low … xhigh (high) | Yes, under the prompt | Yes | Show a default for new agents in Settings |
-| Web search and fetch | tools `web_search`, `web_fetch`, `open_page` in the app's allowlist | search on; fetch off unless xAI turns it on | Yes | Yes | Show: one web access switch per runtime |
-| Memory | `GROK_MEMORY`; `memory.enabled` | off, unless your config or xAI turns it on | Yes: `/memory`, `/dream`, `/flush` offered | Yes, by the variable | Decide with Claude's and Codex's |
-| Self-update | `GROK_DISABLE_AUTOUPDATER` | updates itself in the background | Yes | Yes | Set: off, so a running agent's Grok is not replaced under it |
-| Shared leader process | `--no-leader`; `cli.use_leader` | from your config | Yes: a leader started with always-approve may approve for the app | Yes | Set `--no-leader`, once measured |
-| Workflows and goals | `GROK_WORKFLOWS`, `GROK_GOAL` | on | Offered as commands | Yes | Set off, once measured: it may close the `workflow` tool the allowlist cannot |
-| Usage data | `GROK_TELEMETRY_ENABLED`, `DISABLE_TELEMETRY` | on | Yes | Yes | Show: one usage data switch per runtime |
+| Reasoning effort | ACP `reasoning_effort`; `models.default_reasoning_effort` | low … xhigh (high) | Yes, under the prompt | Yes | Already shown |
+| Web search and fetch | tools `web_search`, `web_fetch`, `open_page` in the app's allowlist | search on; fetch off unless xAI turns it on | Yes | Yes | Show, planned: the web access switch |
+| Memory | `GROK_MEMORY`; `memory.enabled` | off, unless your config or xAI turns it on | Yes: `/memory`, `/dream`, `/flush` offered | Yes, by the variable | Show, planned: the memory switch, on by default |
+| Self-update | `GROK_DISABLE_AUTOUPDATER` | updates itself in the background | Yes | Yes | Set, planned: off, so a running agent's Grok is not replaced under it |
+| Shared leader process | `--no-leader`; `cli.use_leader` | from your config | Yes: a leader started with always-approve may approve for the app | Yes | Set, planned: `--no-leader`, once measured |
+| Workflows and goals | `GROK_WORKFLOWS`, `GROK_GOAL` | on | Offered as commands | Yes | Set, planned: off, once measured; it may close the `workflow` tool the allowlist cannot |
+| Usage data | `GROK_TELEMETRY_ENABLED`, `DISABLE_TELEMETRY` | on | Yes | Yes | Show, planned: the usage data switch |
 | Auto review | `_meta.autoMode` | off | Not measured with the app | Yes | Leave alone until measured |
 | Folder trust | `x.ai/folder_trust/request` | asks | The app does not answer it; a server's untrusted folder may skip the project's own settings | Yes | Measure on a server |
 | Compaction, subagent limits, MCP, plugins, hooks, skills, tool timeouts | config file | its defaults | Yes | Server's own | Leave alone. It also reads Claude's and Cursor's MCP servers, hooks and rules. |
@@ -294,17 +294,17 @@ Only the tool filters and effort are documented to work at launch under ACP; oth
 read but have not been measured with the app. Its settings files on a server are the
 server's own.
 
-| Option | Where | Values (default) | Under ACP | On servers | Proposed |
+| Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
-| Reasoning effort | ACP `reasoning_effort`; `--reasoning-effort` | low … max (medium) | Yes, under the prompt | Yes | Show a default for new agents in Settings |
+| Reasoning effort | ACP `reasoning_effort`; `--reasoning-effort` | low … max (medium) | Yes, under the prompt | Yes | Already shown |
 | Allow all | ACP `allow_all` | off | Yes, under the prompt | Yes | Already shown |
-| Web addresses | `--allow-url`, `--deny-url`; `allowedUrls` | asks for each | Not measured | Yes | Show: part of the web access switch, once measured |
-| Remote control and export to GitHub | `--no-remote`, `--no-remote-export` | off unless you turned them on | Not measured | Yes | Set off, as OpenCode's sharing is |
+| Web addresses | `--allow-url`, `--deny-url`; `allowedUrls` | asks for each | Not measured | Yes | Show, planned: the web access switch, once measured |
+| Remote control and export to GitHub | `--no-remote`, `--no-remote-export` | off unless you turned them on | Not measured | Yes | Set, planned: off, as OpenCode's sharing is |
 | Context size | `--context` | default, long_context | Not measured | Yes | Leave alone |
 | Credit cap | `--max-ai-credits` | none | Not measured | Yes | Leave alone: the app's cost ceiling is the place |
 | Carry on in Auto when rate-limited | `continueOnAutoMode` | off | Not measured | Server's own | Leave alone. If on, the app never hears of the limit. |
 | Self-update | `--no-auto-update` | on, applied at its next start | Yes | Yes | Leave alone: off would go back to an older copy |
-| Memory | `memory` | on | Offered as a command | Server's own | Decide with Claude's and Codex's |
+| Memory | `memory` | on | Offered as a command | Server's own | Leave alone: no lever under ACP, so the memory switch does not reach it |
 | Instructions, MCP, skills, plugins, hooks, custom agents | files and flags | loaded | Yes | Server's own | Leave alone |
 | Scheduled prompts, fleet, computer use | `/every`, `/after`, `/fleet`, `/computer` | offered | Offered as commands | — | Leave alone: commands you type |
 | Usage data | none documented | — | — | — | Nothing to set |
@@ -317,9 +317,9 @@ It reads no `_meta` when a conversation starts, and ignores most of its own flag
 Its settings file shares a folder with its sign-in, so the app can describe its settings but
 not set them.
 
-| Option | Where | Values (default) | Under ACP | On servers | Proposed |
+| Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
-| Effort, thinking, context, fast | part of each model's value, such as `claude-opus-5[effort=high,fast=false]`; separate options when the client sends `_meta.parameterizedModelPicker` | per model | Yes, under the prompt, as one long list | Yes | Show: ask for them as separate options, as Claude's and Codex's are |
+| Effort, thinking, context, fast | part of each model's value, such as `claude-opus-5[effort=high,fast=false]`; separate options when the client sends `_meta.parameterizedModelPicker` | per model | Yes, under the prompt, as one long list | Yes | Leave alone: already under the prompt, in the model |
 | Always approve | `--force` | off | Yes | Yes | Leave alone: the app's **Always-approve** answers for it |
 | Approval mode | `approvalMode` | allowlist | Not measured | Server's own | Leave alone. **Unrestricted** means it never asks, so the app's **Default** cannot hold it back. |
 | Web search | `autoAcceptWebSearch` | asks | Yes | Server's own | Leave alone: no switch the app can reach |
