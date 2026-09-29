@@ -87,6 +87,11 @@ extension DaemonCore {
                 try lendCredential(request, connection: connection)
                 return .success([:])
 
+            case DaemonAPI.Method.credentialsLendSignIn:
+                let request = try require(params, as: DaemonAPI.SignInLend.self)
+                try lendSignIn(request, connection: connection)
+                return .success([:])
+
             case DaemonAPI.Method.filesWrite:
                 let request = try require(params, as: DaemonAPI.FilesWriteRequest.self)
                 return .success(try JSONValue.encoding(try writeAttachment(request)))

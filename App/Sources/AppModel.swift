@@ -1173,6 +1173,9 @@ final class AppModel {
         }
         hosts.toolsetWanted = { [weak self] id, runtimeID in
             guard let self else { return false }
+            // One that works with no sign-in goes wherever this Mac has it (049: OpenCode's free
+            // models); on an "own sign-in only" server too, since nothing is lent to install it.
+            if RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn != nil { return self.hasOnThisMac(runtimeID) }
             guard !(self.hosts.host(id)?.ownSignInOnly ?? false) else { return false }
             // A key in Settings, or this Mac's own sign-in relayed (047).
             return self.credentials.record(runtimeID) != nil || SignInRelays.canRelay(runtimeID)
@@ -1187,6 +1190,12 @@ final class AppModel {
                                             returning: Event.self)
         }
         hosts.start()
+    }
+
+    /// Whether this Mac's own runtime is installed and can start (049: what puts OpenCode on
+    /// its servers).
+    func hasOnThisMac(_ runtimeID: String) -> Bool {
+        runtimes.first { $0.id == runtimeID }?.availability.isAvailable ?? false
     }
 
     private func receivedFromServer(_ host: HostID, _ method: String, _ params: JSONValue?) async {
@@ -1214,6 +1223,8 @@ final class AppModel {
                 if refused.lent { credentials.markRefused(refused.runtime) }
                 // This Mac's own sign-in was refused through the relay (056): sign in here.
                 if refused.relayed == true { signInRuntimeID = refused.runtime }
+                // A key this Mac's sign-in file lent (049): its sheet names the command.
+                if refused.borrowed == true { signInRuntimeID = refused.runtime }
             }
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,

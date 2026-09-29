@@ -1310,8 +1310,11 @@ extension DaemonCore {
         let limit = refused == nil && signIn == nil ? recognise(agentID: agentID, error: error) : .none
         if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
+            let signInCommand = RuntimeLaunchCatalog.launch(for: refused.runtime).lentSignIn?.signInCommand ?? ""
             await record(.runtimeNote(refused.relayed == true
                 ? "\(runtimeName) on this Mac needs signing in again."
+                : refused.borrowed == true
+                ? "A provider refused the key this Mac lent \(runtimeName). Sign in to it again on the Mac with \(signInCommand), then send again."
                 : refused.lent
                 ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Agent Runtimes."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)

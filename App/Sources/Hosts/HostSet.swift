@@ -31,6 +31,8 @@ final class HostSet {
     @ObservationIgnored var claudeWanted: (HostID) -> Bool = { _ in false }
     /// Every other runtime the app installs, on each server, by runtime id (046: Gemini).
     private(set) var toolsets: [HostID: [String: ServerConnection.Claude]] = [:]
+    /// What an archive install is doing on each server, by runtime id (049), while it runs.
+    private(set) var toolsetProgress: [HostID: [String: String]] = [:]
     /// The same question as `claudeWanted`, for the others (046).
     @ObservationIgnored var toolsetWanted: (HostID, String) -> Bool = { _, _ in false }
     /// What a server may be lent from this window, and who answers when it asks (043).
@@ -232,7 +234,8 @@ final class HostSet {
                          toolset: { ServerBinaries.claudeToolset },
                          wantsClaude: wantsClaude,
                          otherToolsets: { ServerBinaries.otherToolsets },
-                         wants: wants, offer: offer, lender: lender, relay: relay)
+                         wants: wants, archives: { ServerBinaries.archives },
+                         offer: offer, lender: lender, relay: relay)
     }
 
     /// A new connection for a host, asking this set what to offer and who lends (043).
@@ -268,6 +271,11 @@ final class HostSet {
         await connections[id]?.lend(runtime, secret) ?? false
     }
 
+    /// Lend this Mac's file sign-in for a runtime (049), or say there is none.
+    func lendSignIn(_ id: HostID, runtime: String, _ content: LentSignInContent?) async -> Bool {
+        await connections[id]?.lendSignIn(runtime, content) ?? false
+    }
+
     /// For a connection made here or by the Add a server sheet: ask this set, on the main
     /// actor, at the moment the server connects.
     func wantsClaude(_ id: HostID) -> @Sendable () async -> Bool {
@@ -290,6 +298,12 @@ final class HostSet {
             }
             await connection.setOnToolset { [weak self] runtimeID, next in
                 await self?.toolsetMoved(id, runtimeID, to: next)
+            }
+            await connection.setOnProgress { [weak self] runtimeID, step in
+                await MainActor.run {
+                    guard let self, case .installing? = self.toolsets[id]?[runtimeID] else { return }
+                    self.toolsetProgress[id, default: [:]][runtimeID] = step
+                }
             }
             let now = await connection.claude
             claudeMoved(id, to: now)
@@ -319,6 +333,7 @@ final class HostSet {
     private func toolsetMoved(_ id: HostID, _ runtimeID: String, to next: ServerConnection.Claude) {
         guard runtimeID != RuntimeCatalog.claude.id else { return }
         toolsets[id, default: [:]][runtimeID] = next
+        if case .installing = next {} else { toolsetProgress[id]?[runtimeID] = nil }
         if case .updateWaiting = next {
             Task { [weak self] in
                 try? await Task.sleep(for: .seconds(30))
@@ -339,10 +354,15 @@ final class HostSet {
         let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
         guard let host = hosts[id], let facts = host.facts else { return "\(name): not checked yet" }
         switch toolsets[id]?[runtimeID] {
-        case .installing: return "\(name): installing…"
+        case .installing:
+            if let step = toolsetProgress[id]?[runtimeID] { return "\(name): installing… \(step)" }
+            return "\(name): installing…"
         case .updateWaiting: return "\(name): update waiting for a turn to end"
         case .failed(let problem): return problem.sentence(name: host.sshName, label: host.label)
         default: break
+        }
+        if RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn != nil {
+            return lentSignInLine(host, facts, runtimeID: runtimeID, name: name, onThisMac: hasCredential)
         }
         let noun = CredentialKind.noun(for: runtimeID)
         // Codex takes nothing from Settings: this Mac's ChatGPT sign-in is relayed (047).
@@ -360,6 +380,28 @@ final class HostSet {
             ? "\(name): installed when \(host.label) next connects"
             : relayed ? "\(name): installed when this Mac is signed in to it"
             : "\(name): installed when there is a \(noun) for it in Settings"
+    }
+
+    /// A runtime that borrows this Mac's sign-in file and works without one (049: OpenCode).
+    /// It goes on a server once this Mac has it (`onThisMac`), from the vendor's archive, so
+    /// neither curl nor glibc is asked of the server; only a build for its platform.
+    private func lentSignInLine(_ host: ServerHost, _ facts: ServerFacts, runtimeID: String, name: String,
+                                onThisMac: Bool) -> String {
+        let providers = MacFileSignIn(runtimeID: runtimeID)?.read().providers ?? 0
+        let signIn = host.ownSignInOnly ? " · its own sign-in only"
+            : providers == 1 ? " · borrows this Mac’s sign-in (1 provider)"
+            : providers > 1 ? " · borrows this Mac’s sign-in (\(providers) providers)"
+            : facts.hasOwnSignIn(runtimeID) ? " · its own sign-in" : " · free models until this Mac signs in to a provider"
+        if facts.toolsetID(for: runtimeID) != nil { return "\(name): ready (installed by Agents)" + signIn }
+        if let archive = ServerBinaries.archives.first(where: { $0.manifest.runtimeID == runtimeID }),
+           case .failure(let problem) = ServerArchiveInstaller.platform(facts, archive) {
+            if case .unsupportedSystem = problem {
+                return "\(name) can’t be installed here: there is no \(name) for \(facts.architecture.display)\(facts.libc == .musl ? " musl" : "")."
+            }
+            return problem.sentence(name: host.sshName, label: host.label)
+        }
+        return onThisMac ? "\(name): installed when \(host.label) next connects"
+            : "\(name): installed once \(name) is set up on this Mac"
     }
 
     // MARK: A server that comes back empty (043 US3)
@@ -522,11 +564,23 @@ enum ServerBinaries {
     }
 
     /// The runtimes the app installs on a server, in the catalog's order: those that sign
-    /// in there with a credential from Settings (043: Claude, 046: Gemini), or through a
-    /// sign-in this Mac relays (047: Codex).
+    /// in there with a credential from Settings (043: Claude, 046: Gemini), through a
+    /// sign-in this Mac relays (047: Codex), or with this Mac's sign-in file lent, which
+    /// they work without (049: OpenCode).
     nonisolated static let serverRuntimes = RuntimeCatalog.builtIn.map(\.id).filter {
         !CredentialKind.kinds(for: $0).isEmpty || ToolPolicyCatalog.policy(for: $0).relay != nil
+            || RuntimeLaunchCatalog.launch(for: $0).lentSignIn != nil
     }
+
+    /// The vendor archives a server may be given, for `serverRuntimes` (049). This Mac
+    /// downloads them and copies them over.
+    nonisolated static let archives: [ArchiveToolset] = {
+        guard let folder = Bundle.main.url(forResource: "toolsets", withExtension: nil) else { return [] }
+        let installable = Set(ServerBinaries.serverRuntimes)
+        return ArchiveToolset.loadAll(from: folder).values
+            .filter { installable.contains($0.manifest.runtimeID) }
+            .sorted { $0.manifest.runtimeID < $1.manifest.runtimeID }
+    }()
 
     /// Every other pinned toolset a server may be given, for `serverRuntimes`.
     nonisolated static let otherToolsets: [Toolset] = {

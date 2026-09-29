@@ -66,7 +66,47 @@ extension DaemonCore {
         }
         guard let connection else { return }
         credentialOffers[connection] = offer
-        if offer.ownSignInOnly { lentCredentials[connection] = nil }
+        if offer.ownSignInOnly {
+            lentCredentials[connection] = nil
+            lentSignIns[connection] = nil
+        }
+    }
+
+    /// A window lends its Mac's file sign-in for one runtime (049), after a start here asked
+    /// for it. Only on a server, only what the connection offered, and never to one marked
+    /// "own sign-in only".
+    func lendSignIn(_ lend: DaemonAPI.SignInLend, connection: UUID?) throws {
+        guard !exitsWhenIdle else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
+                               message: "This Mac's own agents use this Mac's sign-in; nothing is lent to them.")
+        }
+        guard let connection, let offer = credentialOffers[connection], !offer.ownSignInOnly,
+              offer.signIns?.contains(lend.runtime) == true,
+              RuntimeLaunchCatalog.launch(for: lend.runtime).lentSignIn != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notOffered,
+                               message: "This connection did not offer a sign-in for \(lend.runtime).")
+        }
+        lentSignIns[connection, default: [:]][lend.runtime] =
+            LentSignInContent(lend.content, providers: lend.content.isEmpty ? 0 : max(1, lend.providers))
+    }
+
+    /// What a server run of a runtime with a file sign-in starts with (049): the Mac's lent
+    /// entries over the server's own, in the one variable, and nothing on disk. Throws
+    /// `credentialWanted`, having started nothing, when the window offered one and has not
+    /// lent it yet. With nothing lent the runtime uses the server's own, or its free models.
+    func lentSignInEnvironment(_ runtimeID: String, _ signIn: LentFileSignIn) throws -> [String: String] {
+        let connection = RequestConnection.current
+        let offer = connection.flatMap { credentialOffers[$0] }
+        if offer?.ownSignInOnly == true { return [:] }
+        // Nobody asked (a workflow firing): whatever a connected window lent.
+        let lent = connection.flatMap { lentSignIns[$0]?[runtimeID] }
+            ?? (connection == nil ? lentSignIns.values.lazy.compactMap { $0[runtimeID] }.first : nil)
+        guard let lent else {
+            if offer?.signIns?.contains(runtimeID) == true { throw Self.wanted(runtimeID, offered: true) }
+            return [:]
+        }
+        guard lent.providers > 0 else { return [:] }
+        return [signIn.variable: signIn.merged(lent: lent.reveal(), own: ownSignInFile(signIn))]
     }
 
     func lendCredential(_ lend: DaemonAPI.CredentialsLend, connection: UUID?) throws {
@@ -96,9 +136,15 @@ extension DaemonCore {
         hasOwnSignIn = check
     }
 
+    /// For tests: a server's own sign-in file, or none.
+    func setOwnSignInFile(_ read: @escaping @Sendable (LentFileSignIn) -> Data?) {
+        ownSignInFile = read
+    }
+
     func forgetCredentials(_ connection: UUID) {
         credentialOffers[connection] = nil
         lentCredentials[connection] = nil
+        lentSignIns[connection] = nil
         relayOffers[connection] = nil
     }
 
@@ -168,6 +214,9 @@ extension DaemonCore {
     /// sign-in of its own. The window lends and asks again with the same `sendID`.
     func launchEnvironment(for runtimeID: String) throws -> [String: String] {
         if exitsWhenIdle { return try macLaunchEnvironment(for: runtimeID) }
+        if let signIn = RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn {
+            return try lentSignInEnvironment(runtimeID, signIn)
+        }
         // A sign-in relayed from the Mac comes first on a server (047): the person's own
         // plan, with nothing of theirs on the server. "Own sign-in only" still means own.
         if !(RequestConnection.current.flatMap { credentialOffers[$0] }?.ownSignInOnly ?? false),
@@ -227,6 +276,13 @@ extension DaemonCore {
         // This Mac's own sign-in, relayed and refused even after the relay re-read it (056).
         if ToolPolicyCatalog.policy(for: agent.runtimeID).relay != nil, relayOffer(for: agent.runtimeID) != nil {
             return DaemonAPI.CredentialRefused(agentID: agentID, runtime: agent.runtimeID, lent: false, relayed: true)
+        }
+        // A key this Mac's sign-in file lent (049), refused by its provider. Only a refused
+        // key: a provider nobody signed in to is a sign-in, which the sheet offers.
+        if RuntimeLaunchCatalog.launch(for: agent.runtimeID).lentSignIn != nil {
+            guard Self.unsignedProvider(error) == nil,
+                  lentSignIns.values.contains(where: { ($0[agent.runtimeID]?.providers ?? 0) > 0 }) else { return nil }
+            return DaemonAPI.CredentialRefused(agentID: agentID, runtime: agent.runtimeID, lent: false, borrowed: true)
         }
         guard Self.lendableRuntimes.contains(agent.runtimeID) else { return nil }
         let lent = lentCredentials.values.contains { $0[agent.runtimeID] != nil }

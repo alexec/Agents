@@ -23,8 +23,14 @@ extension AppModel {
                 if let why = SignInRelays.whyNotRelayed(runtimeID) { notRelayed[runtimeID] = why }
             }
         }
+        // This Mac's sign-in files a server run can borrow (049: OpenCode's), named only
+        // when there is something in them to lend. Read again when a start asks.
+        let signIns = ownOnly ? [] : ServerBinaries.serverRuntimes.filter {
+            MacFileSignIn(runtimeID: $0)?.read().lendable != nil
+        }
         return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly,
-                                          notRelayed: notRelayed.isEmpty ? nil : notRelayed)
+                                          notRelayed: notRelayed.isEmpty ? nil : notRelayed,
+                                          signIns: signIns.isEmpty ? nil : signIns)
     }
 
     /// A server's daemon wants a credential to start a runtime (043, R6). Lends the one in
@@ -32,6 +38,11 @@ extension AppModel {
     /// that was refused is then sent again.
     func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: HostID) async -> Bool {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false) else { return false }
+        // This Mac's sign-in file (049): read now, so a provider signed in to since the
+        // server connected is lent too. With nothing in it the start goes on without.
+        if let file = MacFileSignIn(runtimeID: wanted.runtime) {
+            return await hosts.lendSignIn(id, runtime: wanted.runtime, file.read().lendable)
+        }
         if credentials.secretToLend(wanted.runtime) == nil {
             let saved = await withCheckedContinuation { answer in
                 tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: hosts.label(id), answer: answer)

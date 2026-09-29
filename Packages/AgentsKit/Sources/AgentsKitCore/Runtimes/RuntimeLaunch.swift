@@ -34,6 +34,8 @@ public struct RuntimeLaunch: Hashable, Sendable {
     /// sheet names how to sign a provider out — the sign-in command with its last word
     /// swapped for this one — since the runtime has no sign-out over ACP.
     public var providerSignOutWord: String? = nil
+    /// The Mac's sign-in a server run of this runtime borrows (049 D7: OpenCode's `auth.json`).
+    public var lentSignIn: LentFileSignIn? = nil
 
     /// The command that signs a provider out, from the command that signs one in.
     public func providerSignOutCommand(from signIn: String) -> String? {
@@ -60,7 +62,8 @@ public struct RuntimeLaunch: Hashable, Sendable {
     public init(runtimeID: String, environment: [String: String?] = [:], hiddenAuthMethods: [String] = [],
                 turnErrorPrefix: String? = nil, turnErrorPrefixes: [String] = [],
                 turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil,
-                asksForTerminalAuthCommand: Bool = false, providerSignOutWord: String? = nil) {
+                asksForTerminalAuthCommand: Bool = false, providerSignOutWord: String? = nil,
+                lentSignIn: LentFileSignIn? = nil) {
         self.runtimeID = runtimeID
         self.environment = environment
         self.hiddenAuthMethods = hiddenAuthMethods
@@ -70,6 +73,7 @@ public struct RuntimeLaunch: Hashable, Sendable {
         self.signInNotice = signInNotice
         self.asksForTerminalAuthCommand = asksForTerminalAuthCommand
         self.providerSignOutWord = providerSignOutWord
+        self.lentSignIn = lentSignIn
     }
 
     /// What a turn's own words say about how it failed, when they start with one of
@@ -215,7 +219,12 @@ public enum RuntimeLaunchCatalog {
         // Without it OpenCode offers "Login with opencode" and no command (R6).
         asksForTerminalAuthCommand: true,
         // `opencode auth login` adds a provider; `opencode auth logout` takes one away.
-        providerSignOutWord: "logout")
+        providerSignOutWord: "logout",
+        // A server run borrows the Mac's keys (D7). `oauth` entries rotate and stay (R7).
+        lentSignIn: LentFileSignIn(variable: "OPENCODE_AUTH_CONTENT", dataHomeVariable: "XDG_DATA_HOME",
+                                   dataHomePath: "opencode/auth.json",
+                                   defaultPath: ".local/share/opencode/auth.json",
+                                   lendableTypes: ["api", "wellknown"], signInCommand: "opencode auth login"))
 
     public static let builtIn: [RuntimeLaunch] = [antigravity, copilot, cursor, opencode]
 

@@ -467,6 +467,9 @@ public actor DaemonCore {
     var credentialOffers: [UUID: DaemonAPI.CredentialsOffer] = [:]
     /// What each connection has lent, in memory only, dropped when it closes (043, R6).
     var lentCredentials: [UUID: [String: Secret]] = [:]
+    /// The Mac's file sign-ins each connection has lent (049: OpenCode's), in memory only,
+    /// dropped when it closes. No providers means it was asked and had none to lend.
+    var lentSignIns: [UUID: [String: LentSignInContent]] = [:]
     /// Sign-in relays the windows connected here offered (047), by connection.
     var relayOffers: [UUID: [String: DaemonAPI.RelayOffer]] = [:]
     /// One gate per forwarded relay socket, started on the first offer of it.
@@ -478,6 +481,11 @@ public actor DaemonCore {
     var macLent: [String: Secret] = [:]
     /// Whether this server has a sign-in of its own for a runtime. Replaced in tests.
     var hasOwnSignIn: @Sendable (String) -> Bool = { ServerSignIn.exists(runtimeID: $0) }
+    /// This server's own sign-in file for a runtime that borrows the Mac's (049), which a lent
+    /// run keeps the lendable part of. Replaced in tests.
+    var ownSignInFile: @Sendable (LentFileSignIn) -> Data? = { signIn in
+        try? Data(contentsOf: signIn.file(home: ServerSignIn.home, environment: LoginShellPath.environment()))
+    }
     /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
     var quitRequested = false
     /// The last few hundred sends that carried a `sendID`, and what each came to (037).

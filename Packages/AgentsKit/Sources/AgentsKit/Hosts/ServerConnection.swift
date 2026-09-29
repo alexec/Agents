@@ -291,6 +291,13 @@ public actor ServerConnection {
                                 DaemonAPI.CredentialsLend(runtime: runtimeID, secret: secret))) != nil
     }
 
+    /// Lend this Mac's file sign-in for a runtime on this connection (049), or say there is
+    /// none to lend. Only after the daemon asked for it.
+    public func lendSignIn(_ runtimeID: String, _ content: LentSignInContent?) async -> Bool {
+        (try? await client.call(DaemonAPI.Method.credentialsLendSignIn,
+                                DaemonAPI.SignInLend(runtime: runtimeID, content: content))) != nil
+    }
+
     // MARK: The app's toolsets (043 Claude, 046 the rest)
 
     /// A toolset of either kind: Node and a package the server fetches (043, 046), or a

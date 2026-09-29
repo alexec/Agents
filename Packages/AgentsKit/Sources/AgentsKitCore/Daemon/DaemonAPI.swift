@@ -268,6 +268,8 @@ public enum DaemonAPI {
         /// daemon answered `credentialWanted`. Held in memory and dropped when the
         /// connection closes; a daemon without `--serve` refuses it (043, D5).
         public static let credentialsLend = "credentials/lend"
+        /// A window lends this Mac's own file sign-in for one runtime (049: OpenCode's).
+        public static let credentialsLendSignIn = "credentials/lendSignIn"
         /// The folders at a path, before there is any project or agent to scope it to:
         /// what the window browses to choose a server folder as a project (037).
         public static let filesBrowse = "files/browse"
@@ -2537,11 +2539,16 @@ public extension DaemonAPI {
         /// Runtimes whose sign-in this window would relay but cannot now, and why (056), so
         /// a server can say "not signed in" or "couldn't read it". Absent from older windows.
         public var notRelayed: [String: SignInWanted.Reason]?
+        /// Runtimes whose file sign-in this window can lend from its Mac (049: OpenCode), so a
+        /// start there asks for it first. Absent from older windows.
+        public var signIns: [String]?
 
-        public init(runtimes: [String], ownSignInOnly: Bool, notRelayed: [String: SignInWanted.Reason]? = nil) {
+        public init(runtimes: [String], ownSignInOnly: Bool, notRelayed: [String: SignInWanted.Reason]? = nil,
+                    signIns: [String]? = nil) {
             self.runtimes = runtimes
             self.ownSignInOnly = ownSignInOnly
             self.notRelayed = notRelayed
+            self.signIns = signIns
         }
     }
 
@@ -2597,6 +2604,24 @@ public extension DaemonAPI {
         }
     }
 
+    /// `credentials/lendSignIn` (049): the lendable part of this Mac's file sign-in for one
+    /// runtime, as the text of the file. Empty for nothing to lend, so a start that asked goes
+    /// on without. Prints as a provider count only.
+    struct SignInLend: Codable, Hashable, Sendable, CustomStringConvertible, CustomReflectable {
+        public var runtime: String
+        public var content: String
+        public var providers: Int
+
+        public var description: String { "SignInLend(\(runtime), \(providers) providers)" }
+        public var customMirror: Mirror { Mirror(self, children: ["runtime": runtime, "providers": providers]) }
+
+        public init(runtime: String, content: LentSignInContent?) {
+            self.runtime = runtime
+            self.content = content?.reveal() ?? ""
+            self.providers = content?.providers ?? 0
+        }
+    }
+
     /// `credentials/refused` (043): which agent stopped, and whether it was the token this
     /// window lent (`lent`) or the server's own sign-in that was refused.
     struct CredentialRefused: Codable, Hashable, Sendable {
@@ -2606,12 +2631,16 @@ public extension DaemonAPI {
         /// The refused sign-in was this Mac's own, relayed (056): signing in on the Mac is
         /// the remedy, not Settings. Absent from older daemons.
         public var relayed: Bool?
+        /// The refused key was one this Mac's sign-in file lent (049: OpenCode's): replacing
+        /// it on the Mac is the remedy. Absent from older daemons.
+        public var borrowed: Bool?
 
-        public init(agentID: UUID, runtime: String, lent: Bool, relayed: Bool? = nil) {
+        public init(agentID: UUID, runtime: String, lent: Bool, relayed: Bool? = nil, borrowed: Bool? = nil) {
             self.agentID = agentID
             self.runtime = runtime
             self.lent = lent
             self.relayed = relayed
+            self.borrowed = borrowed
         }
     }
 
