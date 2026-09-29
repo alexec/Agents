@@ -341,16 +341,16 @@ hand-started processes, and SC-006 timed.
 
 **Independent test**: quickstart Walk 3.
 
-- [ ] T070 [P] [US4] Write `scripts/host-install.sh`, served by the control plane at `GET /v1/install.sh` and linked from the command. It checks for system CA roots when the control plane's certificate is publicly trusted (S3), downloads the Linux host tarball for the machine (from the release, or from the copy with `--from-control`), installs it for the user with a systemd user unit, and runs `agentsd --control <code>`.
-- [ ] T071 [US4] `hosts/startEnroll` returns `{code, command}` in `ControlMethods.swift`, with the command built from `url`, `pin` and the code.
-- [ ] T072 [US4] Move `hosts/install` into the service, in `Packages/ControlPlane/Sources/ControlPlaneKit/Hosts/HostInstall.swift`, from `SSHHosts`:
+- [x] T070 (HostInstallScript in ControlPlaneKit, served at /v1/install.sh with the host at /v1/servers/…; scripts/host-install.sh is its text (a test keeps them equal); pinned with curl --pinnedpubkey) [P] [US4] Write `scripts/host-install.sh`, served by the control plane at `GET /v1/install.sh` and linked from the command. It checks for system CA roots when the control plane's certificate is publicly trusted (S3), downloads the Linux host tarball for the machine (from the release, or from the copy with `--from-control`), installs it for the user with a systemd user unit, and runs `agentsd --control <code>`.
+- [x] T071 (ControlCodeShown.command, pinned) [US4] `hosts/startEnroll` returns `{code, command}` in `ControlMethods.swift`, with the command built from `url`, `pin` and the code.
+- [x] T072 (Hosts/HostInstall.swift: key 0600 in a folder of its own removed on every way out, host key into a temporary known_hosts, the code left in the host's root, no master or forward) [US4] Move `hosts/install` into the service, in `Packages/ControlPlane/Sources/ControlPlaneKit/Hosts/HostInstall.swift`, from `SSHHosts`:
   - `{name, destination, key, trust?}`;
   - the key is held in memory for the one call, with a private `ssh-agent` or `-i` on a 0600 temporary file deleted in `defer`;
   - the host enrols over its own uplink afterwards;
   - no master or forward is kept (FR-018a);
   - the Linux binaries come from the host app's or container's resources.
-- [ ] T073 [US4] Remove `SSHUplink.swift`, ssh-reached `HostRecord.reach`, and `hosts/checkAgain`'s ssh path. `hosts/update` asks the host to update itself over its uplink.
-- [ ] T074 [US4] Build frame M in `App/Sources/Control/AddServerSheet.swift`, after approval: *Run a command* shows the code and command with a copy button; *Install over ssh* picks a key file, whose contents are sent once and never kept.
+- [x] T073 (SSHUplink and HostReach.ssh gone (old records read as dialOut); SSHHosts only installs and restarts dial-out hosts. hosts/update over the uplink not built: a host updates by running the command again) [US4] Remove `SSHUplink.swift`, ssh-reached `HostRecord.reach`, and `hosts/checkAgain`'s ssh path. `hosts/update` asks the host to update itself over its uplink.
+- [x] T074 (App/Sources/Control/ControlAddServerSheet.swift: Run a command (closes when the server joins) / Install over ssh (key read once from Choose…)) [US4] Build frame M in `App/Sources/Control/AddServerSheet.swift`, after approval: *Run a command* shows the code and command with a copy button; *Install over ssh* picks a key file, whose contents are sent once and never kept.
 - [ ] T075 [US4] Walk quickstart Walk 3 with test-servers on the devbox, both ways:
   - no ssh process and no key file is left afterwards;
   - a network drop and return;
