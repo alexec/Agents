@@ -815,7 +815,25 @@ struct PromptBar: View {
         Task {
             let went: Bool
             if agent == nil {
-                went = await model.startDraft(prompt: outgoing, attachments: going)
+                if let pending = model.pendingGitHubIssueAssignment,
+                   let runtimeID = model.draftRuntimeID {
+                    do {
+                        let result = try await model.assign(pending.issue, in: pending.board,
+                                                            runtimeID: runtimeID, prompt: outgoing)
+                        model.pendingGitHubIssueAssignment = nil
+                        went = true
+                        if result.statusSync == .failed {
+                            model.show(problem: result.statusSyncProblem?.message
+                                       ?? "Agent started, but the GitHub status could not be updated.")
+                            await model.refreshGitHubProjectBoard(for: pending.board.folder)
+                        }
+                    } catch {
+                        model.show(problem: String(describing: error))
+                        went = false
+                    }
+                } else {
+                    went = await model.startDraft(prompt: outgoing, attachments: going)
+                }
             } else {
                 went = await model.send(outgoing, attachments: going)
             }
