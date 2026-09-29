@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The single copy of the control plane (058, T055–T057): registered by Run it here with
+     SMAppService, shown under Login Items as Agents Host, kept running by launchd. It runs
+     the app's own program as the launcher, which hands agents-control its key on a
+     descriptor and becomes it. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.alexecollins.agentshost.control</string>
+    <key>BundleProgram</key>
+    <string>Contents/MacOS/Agents Host</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>Agents Host</string>
+        <string>--launch-control</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

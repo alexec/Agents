@@ -214,7 +214,7 @@ public final class Daemon: @unchecked Sendable {
         // Mac and on Linux alike (058 re-plan). The first build's codes keep their path
         // until it is removed.
         let kept = ControlMembership.load(locations.controlHostMembership)
-        let code = control.code.flatMap(ControlCode.init(text:))
+        let code = (control.code ?? takeLeftCode()).flatMap(ControlCode.init(text:))
         if kept?.url != nil || (kept == nil && code?.url != nil) {
             await joinOverWebSocket(code: kept == nil ? code : nil, server: server, hello: hello)
             return
@@ -251,6 +251,15 @@ public final class Daemon: @unchecked Sendable {
         #else
         DaemonLog.shared.write("uplink: this build cannot reach a control plane over the network")
         #endif
+    }
+
+    /// A code Agents Host left in the root, taken once: it is spent by the first join.
+    private func takeLeftCode() -> String? {
+        let file = locations.controlJoinCode
+        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
+        try? FileManager.default.removeItem(at: file)
+        let code = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return code.isEmpty ? nil : code
     }
 
     /// Enrols with a version 2 host code if there is no membership yet, then dials as this

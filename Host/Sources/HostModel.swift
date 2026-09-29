@@ -1,0 +1,306 @@
+import AgentsKit
+import AgentsKitCore
+import Foundation
+import Observation
+
+/// What frame L shows and does (058, US2): this Mac's host, the single copy of the control
+/// plane when it runs here, where it keeps its store, and the code to pair a window or phone.
+@MainActor
+@Observable
+final class HostModel {
+    let paths = HostPaths.current
+    private(set) var settings: HostSettings
+    private var services: LocalServices { LocalServices(paths: paths) }
+
+    // MARK: What is running
+
+    private(set) var controlRunning = false
+    private(set) var daemonRunning = false
+    private(set) var runningSince: Date?
+    private(set) var clients: Int?
+    private(set) var hosts: Int?
+    private(set) var projects: Int?
+    private(set) var working: Int?
+    /// macOS wants the person to allow Agents Host under Login Items.
+    private(set) var needsApproval = false
+    /// A step under way: "Starting the control plane…".
+    private(set) var busy: String?
+    /// What went wrong last, in words.
+    var problem: String?
+
+    // MARK: The store, being edited
+
+    var storeDraft: StoreChoice
+    var bucketDraft: BucketPlace
+    var accessKeyDraft = ""
+    var secretDraft = ""
+
+    enum Check: Equatable {
+        case checking
+        case works
+        case failed(String)
+    }
+    private(set) var check: Check?
+
+    // MARK: Pairing
+
+    struct PairingCode: Identifiable, Equatable {
+        let id = UUID()
+        var text: String
+        var grant: Grant
+    }
+    var pairing: PairingCode?
+    var pairingGrant: Grant = .operator
+    var showingPairing = false
+
+    init() {
+        let settings = HostSettings.load(HostPaths.current)
+        self.settings = settings
+        storeDraft = settings.store
+        bucketDraft = settings.bucket
+        if let keys = HostSecrets.bucketKeys(HostPaths.current) {
+            accessKeyDraft = keys.accessKey
+            secretDraft = keys.secretKey
+        }
+    }
+
+    /// `https://<this Mac>.local:8791`: what codes carry and clients dial.
+    var controlURL: String {
+        let name = ProcessInfo.processInfo.hostName
+        let host = name.hasSuffix(".local") ? name : (name.split(separator: ".").first.map { "\($0).local" } ?? name)
+        return "https://\(host.lowercased()):\(paths.port)"
+    }
+
+    var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    }
+
+    /// The store as the running copy uses it, as against the one being edited.
+    var storeIsSaved: Bool {
+        storeDraft == settings.store && (storeDraft == .thisMac || (bucketDraft == settings.bucket && keysMatchSaved))
+    }
+
+    private var keysMatchSaved: Bool {
+        HostSecrets.bucketKeys(paths) == HostSecrets.BucketKeys(accessKey: accessKeyDraft, secretKey: secretDraft)
+    }
+
+    // MARK: Looking
+
+    func refresh() async {
+        let services = self.services
+        let control = await services.running(.control)
+        controlRunning = control != nil
+        daemonRunning = await services.running(.daemon) != nil
+        if let control { runningSince = runningSince ?? Self.started(control) } else { runningSince = nil }
+        if controlRunning, settings.role == .runHere {
+            let listed = await ControlTool.run(["clients"], paths: paths, settings: settings, key: false)
+            clients = listed.ok ? listed.output.split(separator: "\n").count : nil
+            let joined = await ControlTool.run(["hosts"], paths: paths, settings: settings, key: false)
+            hosts = joined.ok ? joined.output.split(separator: "\n").count : nil
+        } else {
+            clients = nil
+            hosts = nil
+        }
+        await countWork()
+    }
+
+    /// From this Mac's own host, over its socket: never starting one.
+    private func countWork() async {
+        guard daemonRunning else { projects = nil; working = nil; return }
+        let client = DaemonClient(link: LookingLink(locations: paths.hostLocations))
+        defer { Task { await client.disconnect() } }
+        let listed = try? await client.call(DaemonAPI.Method.projectsList, returning: JSONValue.self)
+        let agents = try? await client.call(DaemonAPI.Method.agentsList, ["includeArchived": false], returning: JSONValue.self)
+        if case .array(let all)? = listed { projects = all.count }
+        if case .array(let all)? = agents {
+            working = all.filter { $0["state"]?.stringValue == AgentState.running.rawValue }.count
+        }
+    }
+
+    private static func started(_ pid: Int32) -> Date? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        guard sysctl(&name, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        let start = info.kp_proc.p_un.__p_starttime
+        return Date(timeIntervalSince1970: TimeInterval(start.tv_sec) + TimeInterval(start.tv_usec) / 1_000_000)
+    }
+
+    // MARK: Run it here
+
+    /// The control plane and this Mac's host, both here, and the host enrolled with it.
+    func runHere() async {
+        guard busy == nil else { return }
+        problem = nil
+        if storeDraft == .bucket {
+            guard await saveBucket() else { return }
+        }
+        settings.role = .runHere
+        settings.store = storeDraft
+        settings.save(paths)
+        busy = "Starting the control plane…"
+        defer { busy = nil }
+        guard await start(.control) else { return }
+        // The copy writes its settings to the store as it starts; a code can be made
+        // once they are there.
+        var code: ControlTool.Result?
+        for _ in 0..<40 {
+            let made = await ControlTool.run(["code", "--host", "--home", paths.controlHome.path], paths: paths, settings: settings)
+            if made.ok { code = made; break }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        guard let code, let text = code.output.split(separator: "\n").last.map(String.init) else {
+            problem = "The control plane did not start. Its log is at \(paths.controlLog.path)."
+            return
+        }
+        busy = "Starting this Mac's host…"
+        if !services.hostJoined {
+            do { try services.leaveCode(text) } catch { problem = "\(error)"; return }
+        }
+        let wasRunning = await services.running(.daemon) != nil
+        guard await start(.daemon) else { return }
+        // A host already running read no code; started again, it does.
+        if wasRunning, !services.hostJoined { _ = await services.restart(.daemon) }
+        await refresh()
+    }
+
+    /// Only this Mac's host, for a control plane elsewhere: a host code from it (US9).
+    func joinElsewhere(code: String) async {
+        let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard ControlCode(text: code)?.purpose == .host else {
+            problem = "That isn't a host code. Ask the other control plane for one: Settings ▸ Control plane ▸ Hosts ▸ Add a Mac."
+            return
+        }
+        busy = "Joining…"
+        defer { busy = nil }
+        settings.role = .joinElsewhere
+        settings.save(paths)
+        await services.unregister(.control)
+        // A membership of this Mac's own control plane would be dialled instead.
+        try? FileManager.default.removeItem(at: paths.hostLocations.controlHostMembership)
+        do { try services.leaveCode(code) } catch { problem = "\(error)"; return }
+        let wasRunning = await services.running(.daemon) != nil
+        guard await start(.daemon) else { return }
+        if wasRunning { _ = await services.restart(.daemon) }
+        await refresh()
+    }
+
+    func restartControl() async {
+        busy = "Restarting…"
+        defer { busy = nil }
+        runningSince = nil
+        _ = await services.restart(.control)
+        try? await Task.sleep(for: .seconds(1))
+        await refresh()
+    }
+
+    private func start(_ job: LocalServices.Job) async -> Bool {
+        switch await services.register(job) {
+        case .enabled:
+            needsApproval = false
+            return true
+        case .needsApproval:
+            needsApproval = true
+            problem = "Allow Agents Host in System Settings ▸ General ▸ Login Items, then try again."
+            return false
+        case .failed(let why):
+            problem = why
+            return false
+        }
+    }
+
+    // MARK: The store
+
+    private var draftKeys: HostSecrets.BucketKeys {
+        HostSecrets.BucketKeys(accessKey: accessKeyDraft.trimmingCharacters(in: .whitespaces),
+                               secretKey: secretDraft.trimmingCharacters(in: .whitespaces))
+    }
+
+    /// The start-up probe against the bucket as typed, before anything is saved (T058a).
+    func checkBucket() async {
+        check = .checking
+        let address = StoreAddress(.bucket, bucket: bucketDraft, paths: paths)
+        let result = await ControlTool.run(["store", "check"], paths: paths, settings: settings, key: false,
+                                           store: address, keys: draftKeys)
+        check = result.ok ? .works : .failed(result.problem)
+    }
+
+    /// The bucket's place in the settings and its keys in the keychain.
+    @discardableResult
+    private func saveBucket() async -> Bool {
+        guard bucketDraft.isComplete, !draftKeys.accessKey.isEmpty, !draftKeys.secretKey.isEmpty else {
+            problem = "Say the bucket and both keys first."
+            return false
+        }
+        do {
+            try HostSecrets.saveBucketKeys(draftKeys, paths)
+        } catch {
+            problem = "The keys could not be kept: \(error)"
+            return false
+        }
+        settings.bucket = bucketDraft
+        settings.save(paths)
+        return true
+    }
+
+    /// Switch Store… (T058b): stop the copy, copy every record across, point the copy at
+    /// the new store and start it. The old store is kept until the person removes it.
+    func switchStore() async {
+        guard busy == nil, settings.role == .runHere else { return }
+        problem = nil
+        let from = StoreAddress(settings.store, bucket: settings.bucket, paths: paths)
+        if storeDraft == .bucket {
+            guard await saveBucket() else { return }
+        }
+        let to = StoreAddress(storeDraft, bucket: bucketDraft, paths: paths)
+        guard from != to else { return }
+        busy = "Switching the store…"
+        defer { busy = nil }
+        await services.unregister(.control)
+        for _ in 0..<20 where await services.running(.control) != nil { try? await Task.sleep(for: .milliseconds(250)) }
+        // A folder store switched away from before is kept aside, so switching back to
+        // this Mac starts from an empty folder rather than a stale one.
+        if to.url == paths.folderStore.absoluteString, FileManager.default.fileExists(atPath: paths.folderStore.path) {
+            let aside = paths.controlHome.appendingPathComponent("store-before-\(Int(Date().timeIntervalSince1970))")
+            try? FileManager.default.moveItem(at: paths.folderStore, to: aside)
+        }
+        let bucket = from.needsKeys ? from : to
+        let copied = await ControlTool.run(["store", "copy", "--from", from.url, "--to", to.url], paths: paths,
+                                           settings: settings, key: false, store: bucket)
+        if copied.ok {
+            settings.store = storeDraft
+            settings.save(paths)
+        } else {
+            problem = copied.problem
+        }
+        // Started again either way: on the new store, or on the old one after a failure.
+        _ = await start(.control)
+        try? await Task.sleep(for: .seconds(1))
+        await refresh()
+    }
+
+    // MARK: Pairing
+
+    /// A code to type into a window or phone. Operator for a window of the person's own,
+    /// device for a phone (FR-014): the code decides what it may do.
+    func makeCode() async {
+        pairing = nil
+        let grant = pairingGrant
+        let made = await ControlTool.run(["code", "--client", grant.rawValue, "--home", paths.controlHome.path],
+                                         paths: paths, settings: settings)
+        guard made.ok, let text = made.output.split(separator: "\n").last.map(String.init) else {
+            problem = made.problem.isEmpty ? "No code could be made." : made.problem
+            return
+        }
+        pairing = PairingCode(text: text, grant: grant)
+    }
+}
+
+/// A way to this Mac's host that only looks: when nothing answers, it starts nothing.
+struct LookingLink: DaemonLink {
+    let locations: StoreLocations
+    func transport() async throws -> any LineTransport {
+        FDTransport(socket: try connectUnixSocket(path: locations.socket.path))
+    }
+    func start() async throws {}
+}

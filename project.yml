@@ -50,6 +50,12 @@ packages:
   # the grammars are seventeen megabytes it has no use for.
   CodeText:
     path: Packages/CodeText
+  # The control plane as a service (058): Agents Host carries its agents-control.
+  ControlPlane:
+    path: Packages/ControlPlane
+  swift-nio-ssl:
+    url: https://github.com/apple/swift-nio-ssl.git
+    from: 2.29.0
 targets:
   Agents:
     type: application
@@ -367,6 +373,94 @@ targets:
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
 
+  # Agents Host (058, US2, T054): the download of its own that runs this Mac's host and,
+  # when chosen, the control plane's single copy, as launch agents. Not sandboxed and not
+  # in the App Store, because it runs programs for the person's agents; Developer ID for
+  # a release. Its window is frame L.
+  AgentsHost:
+    type: application
+    supportedDestinations: [macOS]
+    sources:
+      - path: Host/Sources
+      - path: Host/AgentsHost.entitlements
+        buildPhase: none
+      # The two launch agents Run it here registers (T055). SMAppService reads them from
+      # here and nowhere else.
+      - path: Host/LaunchAgents
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
+      # What this Mac's host gives a server and downloads for a runtime (037, 048), as
+      # the Agents target carries them until the developer window goes (T106).
+      - path: App/Resources/servers
+        type: folder
+        optional: true
+      - path: App/Resources/toolsets
+        type: folder
+    dependencies:
+      - package: AgentsKit
+        product: AgentsKit
+      - package: AgentsKit
+        product: AgentsKitCore
+      - target: agentsd
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      - target: agents-control
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+    info:
+      path: Host/Info.plist
+      properties:
+        CFBundleDisplayName: Agents Host
+        CFBundleName: Agents Host
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: © 2026 Alex Collins
+        # A menu bar item and one window; no Dock tile.
+        LSUIElement: true
+        # agents-host://pair: the App Store window's K2 asks for a code to be shown.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.alexecollins.agents.host
+            CFBundleURLSchemes: [agents-host]
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.host
+        CODE_SIGN_ENTITLEMENTS: Host/AgentsHost.entitlements
+        PRODUCT_NAME: Agents Host
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
+
+  # The control plane's program (058), built here for Agents Host's bundle; Linux builds it
+  # with `swift build` in Packages/ControlPlane.
+  agents-control:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Packages/ControlPlane/Sources/agents-control
+    dependencies:
+      - package: ControlPlane
+        product: ControlPlaneKit
+      - package: AgentsKit
+        product: AgentsKitCore
+      - package: swift-nio-ssl
+        product: NIOSSL
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.control
+        PRODUCT_NAME: agents-control
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+
   agentsd:
     type: tool
     supportedDestinations: [macOS]
@@ -384,6 +478,12 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
 
 schemes:
+  AgentsHost:
+    build:
+      targets:
+        AgentsHost: all
+    run:
+      config: Debug
   AgentsStore:
     build:
       targets:

@@ -1,0 +1,334 @@
+import AgentsKitCore
+import AppKit
+import SwiftUI
+
+/// Frame L (058, T058): the host app's one window. It says what this Mac is doing and
+/// holds the choices only a machine can make: whether the control plane runs here or this
+/// Mac joins one elsewhere, where the control plane keeps its store, relaying for the
+/// person's devices, and the code to pair a window or phone.
+struct HostWindow: View {
+    @Environment(HostModel.self) private var model
+    @State private var joinCode = ""
+    @State private var confirmingSwitch = false
+
+    var body: some View {
+        @Bindable var model = model
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                thisMac
+                if model.settings.role == .none {
+                    firstChoice
+                } else {
+                    Text("CONTROL PLANE").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.leading, 6)
+                    controlPlane
+                    if model.settings.role == .runHere {
+                        Text("The keys stay in this Mac’s keychain. In a bucket, what the control plane remembers outlives this Mac, and a copy elsewhere can share it later.")
+                            .font(.callout).foregroundStyle(.secondary).padding(.horizontal, 6)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    relay
+                }
+                if let problem = model.problem {
+                    Label(problem, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Problem: \(problem)")
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(minWidth: 620, idealWidth: 680, minHeight: 420)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .sheet(isPresented: $model.showingPairing) { PairingSheet().environment(model) }
+        .task {
+            while !Task.isCancelled {
+                await model.refresh()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+        .confirmationDialog("Switch where the control plane keeps its store?", isPresented: $confirmingSwitch) {
+            Button("Switch Store") { Task { await model.switchStore() } }
+        } message: {
+            Text("The control plane stops for a moment while every record is copied across. Windows, phones and hosts reconnect by themselves. The old store is kept.")
+        }
+    }
+
+    // MARK: This Mac
+
+    private var thisMac: some View {
+        card {
+            HStack(alignment: .center, spacing: 12) {
+                Circle().fill(model.daemonRunning ? Color.green : Color.secondary.opacity(0.4)).frame(width: 9, height: 9)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("This Mac").font(.headline)
+                    Text(thisMacLine).font(.callout).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if model.settings.role == .runHere {
+                    Button("Pair a Window or Phone…") { model.showingPairing = true }
+                        .disabled(!model.controlRunning)
+                }
+            }
+            .padding(16)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("This Mac")
+    }
+
+    private var thisMacLine: String {
+        guard model.daemonRunning else {
+            return model.settings.role == .none ? "Not running agents yet · Agents Host \(model.version)" : "Starting… · Agents Host \(model.version)"
+        }
+        var parts = ["Running your agents"]
+        if let working = model.working { parts.append("\(working) working") }
+        if let projects = model.projects { parts.append("\(projects) project\(projects == 1 ? "" : "s")") }
+        parts.append("Agents Host \(model.version)")
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: Nothing chosen yet
+
+    private var firstChoice: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Where should this Mac’s agents report?").font(.title3.weight(.semibold))
+            card {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Run the control plane here").font(.headline)
+                    Text("This Mac runs your agents and the control plane your windows and phones connect to. It keeps running with every window closed.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button("Run It Here") { Task { await model.runHere() } }
+                        .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                        .disabled(model.busy != nil)
+                }
+                .padding(16)
+            }
+            card {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Join one elsewhere").font(.headline)
+                    Text("You already run a control plane on another Mac or a server. Paste a host code from it: this Mac then runs only its own agents for it.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    joinField
+                }
+                .padding(16)
+            }
+            if let busy = model.busy { ProgressView(busy).controlSize(.small) }
+        }
+    }
+
+    private var joinField: some View {
+        HStack {
+            TextField("agents-control:2:h:…", text: $joinCode).textFieldStyle(.roundedBorder)
+                .font(.system(.body, design: .monospaced))
+                .accessibilityLabel("Host code")
+            Button("Join") { Task { await model.joinElsewhere(code: joinCode) } }
+                .disabled(joinCode.isEmpty || model.busy != nil)
+        }
+    }
+
+    // MARK: Control plane
+
+    private var controlPlane: some View {
+        @Bindable var model = model
+        return card {
+            VStack(spacing: 0) {
+                row {
+                    Text("Where")
+                    Spacer()
+                    Picker("Where", selection: Binding(
+                        get: { model.settings.role == .joinElsewhere ? 1 : 0 },
+                        set: { chosen in
+                            if chosen == 0, model.settings.role != .runHere { Task { await model.runHere() } }
+                            if chosen == 1, model.settings.role != .joinElsewhere { joinCode = ""; model.problem = nil; pickingJoin = true }
+                        })) {
+                        Text("Run it here").tag(0)
+                        Text("Join one elsewhere").tag(1)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+                Divider()
+                if model.settings.role == .runHere && !pickingJoin {
+                    running
+                    Divider()
+                    storeRows
+                } else {
+                    row {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(model.settings.role == .joinElsewhere && !pickingJoin
+                                 ? (model.daemonRunning ? "This Mac runs its agents for a control plane elsewhere." : "Joining…")
+                                 : "Paste a host code from the other control plane.")
+                                .font(.callout).foregroundStyle(.secondary)
+                            if pickingJoin || model.settings.role != .joinElsewhere { joinField }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @State private var pickingJoin = false
+
+    private var running: some View {
+        row {
+            Circle().fill(model.controlRunning ? Color.green : Color.orange).frame(width: 9, height: 9)
+            VStack(alignment: .leading, spacing: 2) {
+                if model.controlRunning {
+                    (Text("Running at ") + Text(model.controlURL).font(.system(.body, design: .monospaced)))
+                } else {
+                    Text(model.busy ?? "Not running")
+                }
+                Text(runningLine).font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Restart") { Task { await model.restartControl() } }.disabled(model.busy != nil)
+        }
+    }
+
+    private var runningLine: String {
+        var parts: [String] = []
+        if let since = model.runningSince { parts.append("since \(since.formatted(date: .omitted, time: .shortened))") }
+        if let clients = model.clients { parts.append("\(clients) client\(clients == 1 ? "" : "s")") }
+        if let hosts = model.hosts { parts.append("\(hosts) host\(hosts == 1 ? "" : "s")") }
+        return parts.isEmpty ? " " : parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private var storeRows: some View {
+        @Bindable var model = model
+        row {
+            Text("Keeps its store")
+            Spacer()
+            Picker("Keeps its store", selection: $model.storeDraft) {
+                Text("On this Mac").tag(StoreChoice.thisMac)
+                Text("In a bucket").tag(StoreChoice.bucket)
+            }
+            .pickerStyle(.segmented).labelsHidden().fixedSize()
+        }
+        if model.storeDraft == .bucket {
+            Divider()
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                field("Endpoint", text: $model.bucketDraft.endpoint, prompt: "https://s3.eu-west-2.amazonaws.com")
+                field("Bucket", text: $model.bucketDraft.bucket, prompt: "my-agents")
+                field("Prefix", text: $model.bucketDraft.prefix, prompt: "control")
+                field("Region", text: $model.bucketDraft.region, prompt: "us-east-1")
+                field("Access key", text: $model.accessKeyDraft, prompt: "")
+                GridRow {
+                    Text("Secret").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                    SecureField("", text: $model.secretDraft).textFieldStyle(.roundedBorder).accessibilityLabel("Secret")
+                }
+                GridRow {
+                    Color.clear.frame(width: 1, height: 1)
+                    HStack {
+                        Button("Check") { Task { await model.checkBucket() } }
+                            .disabled(!model.bucketDraft.isComplete || model.check == .checking)
+                        checkLine
+                        Spacer()
+                        switchButton
+                    }
+                }
+            }
+            .padding(16)
+        } else if !model.storeIsSaved {
+            Divider()
+            row { Spacer(); switchButton }
+        }
+    }
+
+    private var switchButton: some View {
+        Button("Switch Store…") { confirmingSwitch = true }
+            .buttonStyle(.link)
+            .disabled(model.storeIsSaved || model.busy != nil || (model.storeDraft == .bucket && model.check != .works))
+    }
+
+    @ViewBuilder
+    private var checkLine: some View {
+        switch model.check {
+        case .checking?: ProgressView().controlSize(.small)
+        case .works?: Label("Works, with safe concurrent writes", systemImage: "checkmark").foregroundStyle(.green)
+        case .failed(let why)?: Text(why).foregroundStyle(.red).lineLimit(2).help(why)
+        case nil: EmptyView()
+        }
+    }
+
+    private func field(_ label: String, text: Binding<String>, prompt: String) -> some View {
+        GridRow {
+            Text(label).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+            TextField(label, text: text, prompt: Text(prompt)).textFieldStyle(.roundedBorder).labelsHidden()
+                .accessibilityLabel(label)
+        }
+    }
+
+    // MARK: Relay
+
+    private var relay: some View {
+        card {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Relay for my devices").font(.headline)
+                    Text("Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you. Not in this build yet.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Toggle("Relay for my devices", isOn: .constant(false)).labelsHidden().toggleStyle(.switch).disabled(true)
+            }
+            .padding(16)
+        }
+    }
+
+    // MARK: Pieces
+
+    private func card(@ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.2)) }
+    }
+
+    private func row(@ViewBuilder _ content: () -> some View) -> some View {
+        HStack(alignment: .center, spacing: 12) { content() }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+    }
+}
+
+/// The code to pair a window or phone (frame L's *Pair a Window or Phone…*, and K2's Pair).
+struct PairingSheet: View {
+    @Environment(HostModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        @Bindable var model = model
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Pair a Window or Phone").font(.title3.weight(.semibold))
+            Picker("For", selection: $model.pairingGrant) {
+                Text("A window on a Mac").tag(Grant.operator)
+                Text("An iPhone or iPad").tag(Grant.device)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: model.pairingGrant) { Task { await model.makeCode() } }
+            if let code = model.pairing {
+                Text(code.text)
+                    .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                    .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                    .accessibilityLabel("Pairing code")
+                Text(code.grant == .operator
+                     ? "Paste it into Agents under Connect to a control plane. It works once, for five minutes, and lets that window do everything."
+                     : "Type it into the Remote on the iPhone or iPad. It works once, for five minutes. A device can answer and watch; it can't change who may do what.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+                ProgressView().controlSize(.small)
+            }
+            HStack {
+                Button("Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(model.pairing?.text ?? "", forType: .string)
+                }
+                .disabled(model.pairing == nil)
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 520)
+        .task { await model.makeCode() }
+    }
+}

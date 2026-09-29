@@ -138,6 +138,9 @@ public struct StoreLocations: Sendable {
     /// Written by the daemon given `--control-code`, or by the window's Run a Host Here.
     public var controlHostMembership: URL { root.appendingPathComponent("control-host.json") }
     public var controlHostKey: URL { root.appendingPathComponent("control-host-key") }
+    /// A host code left for this daemon by Agents Host (058, T055): its launch agent's
+    /// arguments are fixed, so the one-time code comes this way. Read once and removed.
+    public var controlJoinCode: URL { root.appendingPathComponent("control-join-code") }
     /// Each connected server's ssh control socket and forwarded daemon socket,
     /// `<id>.ctl` and `<id>.sock`. Short names, because both count against the same
     /// 104 bytes as `daemon.sock`.

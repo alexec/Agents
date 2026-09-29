@@ -75,7 +75,7 @@ struct FirstRunView: View {
                     Text("Control plane").appText(.supporting).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Pair") { connecting = true }
+                Button("Pair") { pair() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
@@ -109,6 +109,12 @@ struct FirstRunView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
+    }
+
+    /// Agents Host shows a code for this window (T059); the sheet takes it, typed or pasted.
+    private func pair() {
+        if let url = URL(string: "agents-host://pair") { NSWorkspace.shared.open(url) }  // store-ok: an app by its URL, not a path
+        connecting = true
     }
 
     private func getAgentsHost() {
