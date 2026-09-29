@@ -204,11 +204,11 @@ violations.
 
   `agentsd` and the tests keep building, and nothing moved imports `Process` or POSIX file calls.
 - [ ] T044b [US1] Write `scripts/check-store-window.sh`, run by the store build: under `AGENTS_STORE`, fail on `FileManager`, `contentsOf:`, `NSWorkspace` given a path, `dlsym`, `Process` or `posix_spawn` in `App/` and `Shared/UI` outside an allow-list (the container, and `mac/*` results). Linking only Core does not catch these (S5).
-- [ ] T045 [P] [US1] Write the Mac host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/MacHostMethods.swift`:
+- [x] T045 (in `DaemonCore+Mac.swift`, with `/usr/bin/open`; `DaemonAPI+Mac.swift` in Core) [P] [US1] Write the Mac host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/MacHostMethods.swift`:
   - `mac/reveal {path}`, `mac/open {path, app?}` and `mac/terminal {path?, command?}`, operator only, answered only on macOS with `NSWorkspace`;
   - Linux answers `unsupportedHere`;
   - add them to `DaemonAPI.Method` and to the device refusal list, and add grant tests.
-- [ ] T046 [P] [US1] Write the shared-folder host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/SharedMethods.swift`: `shared/list` and `shared/read` for any grant, and `shared/write` and `shared/remove` for operators, over the host's `~/.agents` (054's layout). Add `files/stat {path}` → `{exists, kind, size, modified}`, and add grant tests.
+- [x] T046 (changed: the shared pages already read over RPC, so `shared/*` was not needed; `files/browse` already answers whether a path is there, so no `files/stat`; added `files/readText` and `files/saveText` by full path, operator only, 1 MB) [P] [US1] Write the shared-folder host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/SharedMethods.swift`: `shared/list` and `shared/read` for any grant, and `shared/write` and `shared/remove` for operators, over the host's `~/.agents` (054's layout). Add `files/stat {path}` → `{exists, kind, size, modified}`, and add grant tests.
 - [ ] T047 [US1] Replace every `isOnThisMac` direct read with host calls. The places:
   - in `App/Sources/AppModel.swift`, `textFile` becomes `files/read` and `pathIsThere` becomes `files/stat`;
   - `App/Sources/Projects/WorkflowPage.swift`, `WorkflowRow.swift`, `App/Sources/Sidebar/BackgroundPane.swift`, `FilesPane.swift` and `App/Sources/AgentList/AgentRow.swift`;

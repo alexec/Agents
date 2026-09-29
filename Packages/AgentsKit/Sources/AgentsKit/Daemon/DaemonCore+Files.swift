@@ -180,11 +180,11 @@ extension DaemonCore {
         return (url, root.standardizedFileURL)
     }
 
-    private static func gone(_ url: URL) -> JSONRPCError {
+    static func gone(_ url: URL) -> JSONRPCError {
         JSONRPCError(code: DaemonAPI.Failure.fileGone, message: "\(url.lastPathComponent) is gone.")
     }
 
-    private static func notReadable(_ url: URL) -> JSONRPCError {
+    static func notReadable(_ url: URL) -> JSONRPCError {
         JSONRPCError(code: DaemonAPI.Failure.fileNotReadable,
                      message: "\(url.lastPathComponent) can't be opened.")
     }
