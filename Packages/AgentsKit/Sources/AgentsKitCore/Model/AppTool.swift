@@ -85,15 +85,6 @@ public enum AppTool {
     /// Say that something happened, as a `custom.` event.
     public static let publishEvent = "publish_event"
 
-    // Two that act on GitHub for a run a pull-request trigger started (038), and only
-    // on that pull request: the daemon fixes the destination from the run.
-
-    /// Push the worktree's commits to the pull request's own branch. Never forced.
-    public static let pushPullRequest = "push_pull_request"
-
-    /// Reply to a review comment on that pull request, or comment on it.
-    public static let replyOnPullRequest = "reply_on_pull_request"
-
     // Two for moving this agent itself (053), shaped like Claude Code's own worktree
     // tools, which are taken away. Offered to every agent: moving yourself is not
     // managing anyone. Neither name ends with another tool's name.
@@ -123,7 +114,7 @@ public enum AppTool {
     public static let all: [String] = [
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
         archiveAgent, listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
-        cancelWait, publishEvent, pushPullRequest, replyOnPullRequest, suggestPrompts, reportOutcome,
+        cancelWait, publishEvent, suggestPrompts, reportOutcome,
         listSessions, readSession,
     ]
 

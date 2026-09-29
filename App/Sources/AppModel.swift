@@ -345,7 +345,6 @@ final class AppModel {
             // A worktree belongs to one repository, so a new folder is a new question.
             draftWorktree = nil
             draftWorktrees = .notARepository
-            pendingGitHubIssueAssignment = nil
             Task { await loadDraftWorktrees() }
         }
     }
@@ -378,10 +377,6 @@ final class AppModel {
     /// field and clears this, because the prompt itself is still the bar's own and
     /// sending it is still the person's move.
     var offeredPrompt: String?
-    /// The issue whose Assign filled the project page's bar. Sending from that bar
-    /// assigns it (its own worktree, its board status) rather than starting a plain
-    /// draft. It belongs to one project, so moving the bar's folder forgets it.
-    var pendingGitHubIssueAssignment: (issue: GitHubProjectIssue, board: GitHubProjectBoard)?
     private(set) var isLoadingDraftOptions = false
     /// Why the last fetch of a runtime's options failed, if it did.
     ///
@@ -568,120 +563,6 @@ final class AppModel {
         } catch {
             // Same as the projects above: the next notification brings it back.
         }
-    }
-
-    // MARK: Pull requests (038)
-
-    /// Each GitHub project's Pull requests section, by folder. Absent for a project
-    /// that is not on GitHub, which is how the section is absent there (SC-006).
-    private(set) var pullRequestLists: [URL: PullRequestList] = [:]
-    /// What the daemon has, at once, then a refresh. Asked for when a project page
-    /// opens; never polled. The daemon's own clock keeps it current after that.
-    func loadPullRequests(for folder: URL) async {
-        let folder = Project.standardize(folder)
-        if let list = try? await client.call(DaemonAPI.Method.pullRequestsList,
-                                             DaemonAPI.PullRequestsRequest(folder: folder),
-                                             returning: PullRequestList?.self) {
-            setPullRequests(list, for: folder)
-        } else {
-            pullRequestLists[folder] = nil
-            return
-        }
-        await refreshPullRequests(for: folder)
-    }
-
-    /// The ↻: refresh now, which the daemon holds to once a minute (FR-008).
-    func refreshPullRequests(for folder: URL) async {
-        let folder = Project.standardize(folder)
-        guard let list = try? await client.call(DaemonAPI.Method.pullRequestsRefresh,
-                                                DaemonAPI.PullRequestsRequest(folder: folder),
-                                                returning: PullRequestList?.self) else { return }
-        setPullRequests(list, for: folder)
-    }
-
-    /// Resume: start babysitting a stopped pull request again (FR-024).
-    func resume(_ number: Int, in folder: URL) async {
-        let folder = Project.standardize(folder)
-        do {
-            let list = try await client.call(DaemonAPI.Method.pullRequestsResume,
-                                             DaemonAPI.PullRequestRequest(folder: folder, number: number),
-                                             returning: PullRequestList.self)
-            setPullRequests(list, for: folder)
-        } catch {
-            problem = describe(error)
-        }
-    }
-
-    private func setPullRequests(_ list: PullRequestList?, for folder: URL) {
-        pullRequestLists[folder] = list
-    }
-
-    // MARK: GitHub Project issues (063)
-
-    private(set) var githubProjectBoards: [URL: GitHubProjectBoard] = [:]
-    private(set) var loadingGitHubProjectBoards: Set<URL> = []
-    private(set) var assigningGitHubIssues: Set<String> = []
-
-    func loadGitHubProjectBoard(for folder: URL) async {
-        let folder = Project.standardize(folder)
-        loadingGitHubProjectBoards.insert(folder)
-        defer { loadingGitHubProjectBoards.remove(folder) }
-        if let board = try? await selectedHostClient.call(
-            DaemonAPI.Method.projectIssuesList,
-            GitHubProjectBoardRequest(folder: folder), returning: GitHubProjectBoard?.self) {
-            setGitHubProjectBoard(board, for: folder)
-        } else {
-            githubProjectBoards[folder] = nil
-            return
-        }
-        await refreshGitHubProjectBoard(for: folder)
-    }
-
-    func refreshGitHubProjectBoard(for folder: URL) async {
-        let folder = Project.standardize(folder)
-        loadingGitHubProjectBoards.insert(folder)
-        defer { loadingGitHubProjectBoards.remove(folder) }
-        guard let board = try? await selectedHostClient.call(
-            DaemonAPI.Method.projectIssuesRefresh,
-            GitHubProjectBoardRequest(folder: folder), returning: GitHubProjectBoard?.self) else { return }
-        setGitHubProjectBoard(board, for: folder)
-    }
-
-    func assign(_ issue: GitHubProjectIssue, in board: GitHubProjectBoard,
-                runtimeID: String, prompt: String) async throws -> GitHubIssueAssignmentResult {
-        let key = "\(board.folder.path)|\(board.projectID ?? "")|\(issue.itemID)"
-        assigningGitHubIssues.insert(key)
-        defer { assigningGitHubIssues.remove(key) }
-        let request = GitHubIssueAssignmentRequest(
-            folder: board.folder, projectID: board.projectID ?? "", itemID: issue.itemID,
-            issueNodeID: issue.nodeID, issueNumber: issue.number, runtimeID: runtimeID,
-            prompt: prompt, requestID: UUID())
-        let result = try await selectedHostClient.call(DaemonAPI.Method.projectIssuesAssign,
-                                                       request, returning: GitHubIssueAssignmentResult.self)
-        selection = result.agentID
-        return result
-    }
-
-    func syncGitHubIssueStatus(_ issue: GitHubProjectIssue, in board: GitHubProjectBoard) async throws {
-        guard let projectID = board.projectID else { return }
-        let result = try await selectedHostClient.call(
-            DaemonAPI.Method.projectIssuesSyncStatus,
-            GitHubProjectStatusSyncRequest(folder: board.folder, projectID: projectID,
-                                           itemID: issue.itemID),
-            returning: GitHubIssueAssignmentResult.self)
-        if result.statusSync == .failed, let problem = result.statusSyncProblem {
-            throw GitHubProjectActionError(message: problem.message, fix: problem.fix)
-        }
-    }
-
-    private func setGitHubProjectBoard(_ board: GitHubProjectBoard?, for folder: URL) {
-        githubProjectBoards[Project.standardize(folder)] = board
-    }
-
-    struct GitHubProjectActionError: LocalizedError {
-        var message: String
-        var fix: String?
-        var errorDescription: String? { message }
     }
 
     /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
@@ -1327,15 +1208,6 @@ final class AppModel {
             guard let needed = try? params?.decode(DaemonAPI.SignInNeeded.self),
                   !signInsPutAway.contains(needed.runtimeID), signInRuntimeID == nil else { return }
             signInRuntimeID = needed.runtimeID
-
-        case DaemonAPI.Notification.pullRequestsChanged:
-            // The Mac's own, like the shells (038 FR-010).
-            guard let list = try? params?.decode(PullRequestList.self) else { return }
-            setPullRequests(list, for: list.folder)
-
-        case DaemonAPI.Notification.projectIssuesChanged:
-            guard let board = try? params?.decode(GitHubProjectBoard.self) else { return }
-            setGitHubProjectBoard(board, for: board.folder)
 
         case DaemonAPI.Notification.cloneChanged:
             guard let change = try? params?.decode(DaemonAPI.CloneNotification.self) else { return }

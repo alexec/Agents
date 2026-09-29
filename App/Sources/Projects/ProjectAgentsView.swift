@@ -2,7 +2,7 @@ import AgentsKit
 import SwiftUI
 
 /// The project itself, with no session picked: its name and somewhere to say what you
-/// want done. Nothing else. Its sessions, pull requests, Ready issues and workflows are
+/// want done. Nothing else. Its sessions and workflows are
 /// the middle column's (`SessionsColumn`); its worktrees, skills and plugins are
 /// Configuration's. A plugin waiting for an OK is one line here, since no agent is given
 /// it until somebody looks.

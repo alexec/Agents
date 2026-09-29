@@ -235,29 +235,6 @@ public enum DaemonAPI {
         /// What the MCP helper relays when an agent calls `enter_worktree` or
         /// `exit_worktree` (053). The caller is the token.
         public static let agentsMoveSelf = "agents/moveSelf"
-        /// A GitHub project's pull requests, from the daemon's cache (038). Never runs
-        /// `gh`; `null` when the project is not on GitHub.
-        public static let pullRequestsList = "pullRequests/list"
-        /// Refresh them now, unless the last attempt was under a minute ago (FR-008).
-        public static let pullRequestsRefresh = "pullRequests/refresh"
-        /// Start babysitting a stopped pull request again (FR-024).
-        public static let pullRequestsResume = "pullRequests/resume"
-        /// Check a pull request's branch out into a new worktree (FR-007).
-        public static let pullRequestsCheckout = "pullRequests/checkout"
-        /// Write the starter babysitting workflow (FR-026).
-        public static let pullRequestsAddBabysitter = "pullRequests/addBabysitter"
-        /// The first Projects v2 board linked to a repository, from the daemon cache.
-        public static let projectIssuesList = "projectIssues/list"
-        /// Refresh the linked board from GitHub now.
-        public static let projectIssuesRefresh = "projectIssues/refresh"
-        /// Start a fresh agent for a Ready issue and move the issue to In Progress.
-        public static let projectIssuesAssign = "projectIssues/assign"
-        /// Retry only the Project status update for an existing assignment.
-        public static let projectIssuesSyncStatus = "projectIssues/syncStatus"
-        /// The helper relaying `push_pull_request` (038 R7).
-        public static let agentsPushPullRequest = "agents/pushPullRequest"
-        /// The helper relaying `reply_on_pull_request` (038 R7).
-        public static let agentsReplyOnPullRequest = "agents/replyOnPullRequest"
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
         /// about whether the work is finished. Since 023 the older door for the
@@ -413,12 +390,6 @@ public enum DaemonAPI {
         /// A project's plugins, sent whole, when one is found waiting or is approved.
         public static let pluginsChanged = "plugins/changed"
         public static let workflowRemoved = "workflow/removed"
-        /// A project's pull requests changed: a refresh, a fire, a refusal or a run
-        /// ending (038). The whole `PullRequestList`, for the reason `workflow/changed`
-        /// carries the whole summary. Mac windows only (FR-010).
-        public static let pullRequestsChanged = "pullRequests/changed"
-        /// A linked GitHub Project board changed or refreshed.
-        public static let projectIssuesChanged = "projectIssues/changed"
         /// The user's shell printed something. Raw bytes, base64. Not the agent's
         /// terminal, which is `agentTerminalOutput` above.
         public static let shellOutput = "shell/output"
@@ -1778,9 +1749,6 @@ public enum DaemonAPI {
         /// and there was no relay, the server is not "own sign-in only", and it has no
         /// sign-in of its own. Nothing was started. `data`: `SignInWanted`.
         public static let signInWanted = -32070
-        /// A GitHub Project issue cannot be assigned in its current state, or the item
-        /// already has an agent assignment (063).
-        public static let issueAssignmentRefused = -32080
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.
@@ -1818,18 +1786,6 @@ public enum DaemonAPI {
         /// A lease action on something that is not there to act on: an end on a
         /// resource nobody holds, an empty name, a waiter not in that line (036).
         public static let leaseRefused = -32035
-        // 038's, from -32040 so that lanes being built alongside it can take the
-        // numbers straight after 034's without colliding.
-        /// Checking a pull request out: its worktree folder is already there.
-        public static let worktreeExists = -32040
-        /// Checking a pull request out: its branch is checked out somewhere else, named.
-        public static let branchCheckedOut = -32041
-        /// Checking a pull request out: git could not fetch its branch.
-        public static let fetchFailed = -32042
-        /// The project already has a babysitting workflow; the data is its id.
-        public static let babysitterExists = -32043
-        /// A pull request number that is not in the project's list.
-        public static let noSuchPullRequest = -32044
         /// A method this connection's role may not call: an agent's helper asking for
         /// something only a window may, or a process that is neither (security review).
         public static let notPermitted = -32045
@@ -2041,45 +1997,6 @@ public enum DaemonAPI {
         public init(token: String, session: String) {
             self.token = token
             self.session = session
-        }
-    }
-
-    // MARK: Pull requests (038)
-
-    /// `pullRequests/list`, `pullRequests/refresh` and `pullRequests/addBabysitter`.
-    public struct PullRequestsRequest: Codable, Sendable {
-        public var folder: URL
-        public init(folder: URL) { self.folder = folder }
-    }
-
-    /// `agents/pushPullRequest`: nothing but who is asking. The daemon takes the pull
-    /// request, the branch and the repository from the caller's run (R7).
-    public struct PushPullRequestRequest: Codable, Sendable {
-        public var token: String
-        public init(token: String) { self.token = token }
-    }
-
-    /// `agents/replyOnPullRequest`.
-    public struct ReplyOnPullRequestRequest: Codable, Sendable {
-        public var token: String
-        public var body: String
-        /// A review comment to answer in its thread; nil comments on the pull request.
-        public var inReplyTo: Int?
-
-        public init(token: String, body: String, inReplyTo: Int? = nil) {
-            self.token = token
-            self.body = body
-            self.inReplyTo = inReplyTo
-        }
-    }
-
-    /// `pullRequests/resume` and `pullRequests/checkout`.
-    public struct PullRequestRequest: Codable, Sendable {
-        public var folder: URL
-        public var number: Int
-        public init(folder: URL, number: Int) {
-            self.folder = folder
-            self.number = number
         }
     }
 

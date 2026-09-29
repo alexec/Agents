@@ -15,9 +15,6 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// The agent a `standing` workflow keeps. Adopted on its first fire, and replaced
     /// when the one it had is gone.
     public var standingAgentID: UUID?
-    /// The standing agents a pull-request workflow keeps, one for each pull request
-    /// (038 FR-017), by number.
-    public var standingAgentIDs: [Int: UUID]
     /// What `nextDue` is measured against, so a fire that happened is not offered again.
     public var lastFiredAt: Date?
     /// The only evidence a refused fire leaves.
@@ -38,21 +35,21 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         workflowID = try c.decode(String.self, forKey: .workflowID)
         isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
-        standingAgentIDs = try c.decodeIfPresent([Int: UUID].self, forKey: .standingAgentIDs) ?? [:]
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
-        lastOutcome = try c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)
+        // An outcome this version no longer has — a pull-request refusal from before
+        // GitHub support was removed — is forgotten rather than losing the whole state.
+        lastOutcome = (try? c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)) ?? nil
         lastCausingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .lastCausingEvent)
         approvedDigest = try c.decodeIfPresent(String.self, forKey: .approvedDigest)
     }
 
     public init(folder: URL, workflowID: String, isArchived: Bool = false,
-                standingAgentID: UUID? = nil, standingAgentIDs: [Int: UUID] = [:],
+                standingAgentID: UUID? = nil,
                 lastFiredAt: Date? = nil, lastOutcome: WorkflowOutcome? = nil) {
         self.folder = Project.standardize(folder)
         self.workflowID = workflowID
         self.isArchived = isArchived
         self.standingAgentID = standingAgentID
-        self.standingAgentIDs = standingAgentIDs
         self.lastFiredAt = lastFiredAt
         self.lastOutcome = lastOutcome
     }

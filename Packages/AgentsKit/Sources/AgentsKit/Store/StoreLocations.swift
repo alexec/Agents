@@ -124,11 +124,6 @@ public struct StoreLocations: Sendable {
     /// (security review, S2). Outside the project for the reason `workflows` is: a thing
     /// an agent can write to the project must not be able to approve itself.
     public var pluginApprovals: URL { root.appendingPathComponent("plugin-approvals.json") }
-    /// What the app remembers about the person's pull requests (038): which changes
-    /// have fired, the babysitting counts, and the last good list for each project.
-    public var pullRequests: URL { root.appendingPathComponent("pull-requests.json") }
-    /// Cached GitHub Projects boards and their app-owned issue-to-agent assignments (063).
-    public var githubProjects: URL { root.appendingPathComponent("github-projects.json") }
     /// Every device that has announced itself to this daemon.
     /// One file beside `projects.json`, because a device is a fact about this root
     /// rather than about any project or agent in it.
@@ -194,7 +189,7 @@ public struct StoreLocations: Sendable {
     /// record (051). A cache, rebuilt when it is missing or unreadable.
     public var archiveIndex: URL { root.appendingPathComponent("archive.json") }
     /// The little the event sources remember between runs (042): the next position,
-    /// branch tips, pull requests as last seen, publish counts, cost crossings.
+    /// branch tips, publish counts, cost crossings.
     public var eventState: URL { root.appendingPathComponent("events-state.json") }
     /// What each of the last few local days cost, per currency. One file, so a daemon
     /// restarted part-way through a day comes back having counted the money rather

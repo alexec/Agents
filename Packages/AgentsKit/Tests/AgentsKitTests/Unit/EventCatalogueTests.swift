@@ -5,10 +5,11 @@ import Testing
 /// The one list of what can happen (042 FR-003, FR-022, FR-024).
 @Suite("The event catalogue")
 struct EventCatalogueTests {
-    @Test func thereAreThirtyFourUniqueWellFormedNames() {
+    @Test func thereAreTwentyFourUniqueWellFormedNames() {
         let names = EventCatalogue.all.map(\.name)
-        // 30 from 042, 051's agent.retired, and 052's switch and two allowance kinds.
-        #expect(names.count == 34)
+        // 30 from 042, 051's agent.retired, and 052's switch and two allowance kinds,
+        // less the ten pull-request kinds that went with GitHub support.
+        #expect(names.count == 24)
         for name in ["agent.runtime_switched", "cost.allowance_out", "cost.allowance_back"] {
             #expect(names.contains(name), "\(name)")
         }
@@ -19,8 +20,7 @@ struct EventCatalogueTests {
 
     @Test func everyOldTriggerNameAnswersToAKind() {
         let old = ["agent-finished", "agent-asked-permission", "agent-asked-form", "agent-stopped",
-                   "workflow-completed", "pull-request-checks-failed", "pull-request-review-comments",
-                   "pull-request-conflicts"]
+                   "workflow-completed"]
         for alias in old { #expect(!EventCatalogue.kinds(forAlias: alias).isEmpty, "\(alias)") }
         #expect(EventCatalogue.kinds(forAlias: "schedule").isEmpty)
     }
@@ -34,7 +34,7 @@ struct EventCatalogueTests {
         let text = EventCatalogue.describe()
         for kind in EventCatalogue.all { #expect(text.contains(kind.name)) }
         #expect(text.contains("custom.<name>"))
-        #expect(text.contains("pull_request.*"))
+        #expect(text.contains("agent.*"))
     }
 
     @Test func customNamesAreLowercaseAndShort() {

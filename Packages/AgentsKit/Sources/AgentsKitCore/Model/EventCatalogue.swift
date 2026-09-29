@@ -4,7 +4,6 @@ import Foundation
 public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     case agent
     case workflow
-    case pullRequest = "pull_request"
     case branch
     case lease
     case mac
@@ -23,7 +22,6 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         switch self {
         case .agent: return "●"
         case .workflow: return "⟳"
-        case .pullRequest: return "⑂"
         case .branch: return "⎇"
         case .mac, .person, .lease, .cost, .server: return "⌘"
         case .custom: return "✦"
@@ -35,7 +33,6 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         switch self {
         case .agent: return .agents
         case .workflow: return .workflows
-        case .pullRequest: return .pullRequests
         case .branch: return .branches
         case .mac, .person, .lease, .cost, .server: return .mac
         case .custom: return .custom
@@ -43,12 +40,11 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     }
 }
 
-/// The page's six filter capsules (042 FR-028, wireframes §1). Several subjects about
+/// The page's five filter capsules (042 FR-028, wireframes §1). Several subjects about
 /// the machine and the person share one, because to the person they are all "This Mac".
 public enum EventGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case agents
     case workflows
-    case pullRequests
     case branches
     case mac
     case custom
@@ -57,7 +53,6 @@ public enum EventGroup: String, Codable, Hashable, Sendable, CaseIterable {
         switch self {
         case .agents: return "Agents"
         case .workflows: return "Workflows"
-        case .pullRequests: return "Pull requests"
         case .branches: return "Branches"
         case .mac: return "This Mac"
         case .custom: return "Custom"
@@ -127,21 +122,6 @@ public enum EventCatalogue {
                   "A workflow's run in this project finished.", aliases: ["workflow-completed"]),
         EventKind("workflow.refused", .project, ["workflow", "reason"],
                   "A workflow in this project did not run, and why."),
-        EventKind("pull_request.opened", .project, ["number"], "One of my pull requests was opened."),
-        EventKind("pull_request.checks_failed", .project, ["number"],
-                  "Checks started failing on one of my pull requests.", aliases: ["pull-request-checks-failed"]),
-        EventKind("pull_request.checks_passed", .project, ["number"], "Checks passed on one of my pull requests."),
-        EventKind("pull_request.review_comments", .project, ["number"],
-                  "One of my pull requests got new review comments.", aliases: ["pull-request-review-comments"]),
-        EventKind("pull_request.approved", .project, ["number"], "One of my pull requests was approved."),
-        EventKind("pull_request.changes_requested", .project, ["number"],
-                  "Changes were requested on one of my pull requests."),
-        EventKind("pull_request.conflicts", .project, ["number"],
-                  "One of my pull requests conflicts with its base.", aliases: ["pull-request-conflicts"]),
-        EventKind("pull_request.merged", .project, ["number"], "One of my pull requests was merged."),
-        EventKind("pull_request.closed", .project, ["number"], "One of my pull requests was closed without merging."),
-        EventKind("pull_request.changed", .project, ["number", "what"],
-                  "Anything above happened to one of my pull requests."),
         EventKind("branch.moved", .project, ["branch", "from", "to"],
                   "A branch moved: the default branch, or one an agent works on."),
         EventKind("lease.granted", .mac, ["resource", "agent"], "An agent was given a lease."),
@@ -192,8 +172,8 @@ public enum EventCatalogue {
         }
         lines.append("- custom.<name> [publisher, message, and anything published]: \(customMeaning) "
                      + "<name> is lowercase letters, digits and _, up to 40 characters.")
-        lines.append("A subject with .* matches all of its events, e.g. pull_request.*. "
-                     + "Narrow any of them by their details, e.g. number: 41.")
+        lines.append("A subject with .* matches all of its events, e.g. agent.*. "
+                     + "Narrow any of them by their details, e.g. workflow: nightly.")
         return lines.joined(separator: "\n")
     }
 }

@@ -111,8 +111,8 @@ struct ContentView: View {
                     if let id = model.selection, model.selectedAgent == nil { _ = await model.tombstone(for: id) }
                 }
         } else {
-            // The project on its own: a new session, its pull requests, workflows and
-            // worktrees. Its sessions are the middle column's.
+            // The project on its own: a new session, its workflows and worktrees. Its
+            // sessions are the middle column's.
             ProjectAgentsView(selection: Binding(get: { model.selection },
                                                  set: { model.selection = $0 }))
                 .paperGround()

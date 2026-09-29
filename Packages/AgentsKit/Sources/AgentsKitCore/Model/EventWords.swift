@@ -42,7 +42,7 @@ public enum EventWords {
         "until_minutes has to be from \(EventWait.deadlineMinutes.lowerBound) to \(EventWait.deadlineMinutes.upperBound)."
     }
 
-    public static let nothingNamed = "Say what to wait for in events, e.g. [\"pull_request.checks_passed\"]. "
+    public static let nothingNamed = "Say what to wait for in events, e.g. [\"agent.finished\"]. "
         + "wait_for_event with action \"list\" gives every name."
 
     /// One line of `action: recent`.

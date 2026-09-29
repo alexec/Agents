@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// What the open agent is waiting for, above the prompt bar (042 FR-012; wireframes §2):
-/// "◷ Waiting for pull_request.merged #44 · since 23:30 · until 09:00", and under it the
+/// "◷ Waiting for workflow.completed workflow nightly · since 23:30 · until 09:00", and under it the
 /// one line saying that sending takes the wait's place (FR-013).
 ///
 /// One view for both apps, beside 036's lease row. Nothing is tinted: the chat is

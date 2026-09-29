@@ -26,7 +26,7 @@ struct EventsListView: View {
         List {
             if events.isEmpty {
                 Text(model.work.eventsLoaded
-                     ? "Nothing has happened yet. Events appear here as agents, workflows, pull requests and the Mac do things."
+                     ? "Nothing has happened yet. Events appear here as agents, workflows and the Mac do things."
                      : "Loading…")
                     .appText(.supporting)
                     .foregroundStyle(.secondary)

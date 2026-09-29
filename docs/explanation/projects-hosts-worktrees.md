@@ -89,11 +89,6 @@ has checked out, and it lives inside the repository, under `.agents/worktrees`. 
 in a worktree is still listed in the same project, with the worktree's name on its row.
 An agent that starts helpers of its own can put each one in a worktree too.
 
-When you assign a GitHub Project issue to an agent, the app makes a fresh worktree on a
-branch named from the issue number and title. The project page's **GitHub Project** section
-links that issue to the agent and branch, so **In progress** shows work started from the
-board. See [Assign a GitHub issue to an agent](../how-to/assign-a-github-issue.md).
-
 ## An agent can change where it works
 
 Where an agent works is not fixed when it starts. An agent that finds its task has grown

@@ -62,10 +62,9 @@ struct AppServiceTests {
         // The four agent tools (028 + park) sit after the workflow tool, before the
         // older names, for an agent that may use them — which is the default.
         // archive_agent is no longer offered. The three lease tools (036) follow
-        // them, for every agent, then the three event tools (042), and the two
-        // pull-request tools (038) after those, also for every agent. The two move
-        // tools (053) sit between the event and pull-request tools. The two session
-        // tools (065) sit after the agent tools, for every agent.
+        // them, for every agent, then the three event tools (042), and the two move
+        // tools (053) after those. The two session tools (065) sit after the agent
+        // tools, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
@@ -77,7 +76,6 @@ struct AppServiceTests {
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
                 AppService.publishEventToolName,
                 AppService.enterWorktreeToolName, AppService.exitWorktreeToolName,
-                AppService.pushPullRequestToolName, AppService.replyOnPullRequestToolName,
                 AppService.toolName, AppService.reportOutcomeToolName])
 
         let finish = tools.first?["inputSchema"]
@@ -875,7 +873,7 @@ struct AppServiceTests {
                      AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent,
                      AppTool.listMyAgents,
                      AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
-                     AppTool.listResources, AppTool.pushPullRequest, AppTool.replyOnPullRequest]
+                     AppTool.listResources]
         for name in names {
             for other in names + [AppTool.leaseResource] where other != name {
                 #expect(!name.hasSuffix(other), "\(name) ends with \(other)")

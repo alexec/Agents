@@ -47,8 +47,8 @@ an agent finishes.
 
    - `on` is what makes it run. Besides `agent-finished` there are `agent-stopped`,
      `agent-asked-permission`, `agent-asked-form`, `workflow-completed`, a `schedule`
-     (on the hour or half hour, with optional hours and days), and the pull request
-     triggers in [Have an agent watch a pull request](watch-a-pull-request.md).
+     (on the hour or half hour, with optional hours and days), and any name on
+     [Events](../reference/events.md).
    - `agent` is who gets the prompt: `new` starts a fresh agent every time, `standing`
      keeps one agent for this workflow and prompts it again each time, and `triggering`
      prompts the agent that set it off.
@@ -115,4 +115,3 @@ A workflow that did not run says why on its row and its page, for example:
 - [Workflow triggers and actions](../reference/workflows.md)
 - [Events](../reference/events.md)
 - [Have an agent wait for something](wait-for-something.md)
-- [Have an agent watch a pull request](watch-a-pull-request.md)

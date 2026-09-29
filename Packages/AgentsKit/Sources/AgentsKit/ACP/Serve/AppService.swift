@@ -51,8 +51,6 @@ public actor AppService {
     public static let listMyAgentsToolName = AppTool.listMyAgents
     public static let listSessionsToolName = AppTool.listSessions
     public static let readSessionToolName = AppTool.readSession
-    public static let pushPullRequestToolName = AppTool.pushPullRequest
-    public static let replyOnPullRequestToolName = AppTool.replyOnPullRequest
     public static let leaseResourceToolName = AppTool.leaseResource
     public static let waitForEventToolName = AppTool.waitForEvent
     public static let cancelWaitToolName = AppTool.cancelWait
@@ -155,16 +153,6 @@ public actor AppService {
     /// Where those go. A wait may take up to the hold limit to come back.
     public typealias EventsSink = @Sendable (EventCall) async -> Outcome
 
-    /// One of the two pull-request calls (038), as the agent made it. Neither names a
-    /// pull request, a branch or a repository: the daemon takes those from the run.
-    public enum PullRequestCall: Sendable, Equatable {
-        case push
-        case reply(body: String, inReplyTo: Int?)
-    }
-
-    /// Where those go.
-    public typealias PullRequestsSink = @Sendable (PullRequestCall) async -> Outcome
-
     /// `enter_worktree` or `exit_worktree` (053), as the agent made it: one move, which
     /// the daemon checks and keeps for when the turn ends.
     public enum MoveCall: Sendable, Equatable {
@@ -194,7 +182,6 @@ public actor AppService {
     private let agentsSink: AgentsSink
     private let leasesSink: LeasesSink
     private let eventsSink: EventsSink
-    private let pullRequestsSink: PullRequestsSink
     private let movesSink: MovesSink
     private let sessionsSink: SessionsSink
     /// Whether the agent tools are offered. False for an agent another agent
@@ -225,9 +212,6 @@ public actor AppService {
                 agents: @escaping AgentsSink = { _ in
                     .refused("This app cannot start or stop agents.")
                 },
-                pullRequests: @escaping PullRequestsSink = { _ in
-                    .refused("Only a run started for a pull request can push or reply; ask the person to do it.")
-                },
                 leases: @escaping LeasesSink = { _ in
                     .refused("This app cannot lease resources.")
                 },
@@ -250,7 +234,6 @@ public actor AppService {
         self.agentsSink = agents
         self.leasesSink = leases
         self.eventsSink = events
-        self.pullRequestsSink = pullRequests
         self.movesSink = moves
         self.sessionsSink = sessions
         self.managesAgents = managesAgents
@@ -375,13 +358,6 @@ public actor AppService {
                                                               arguments?["content"]?.stringValue)))
             }
 
-            if let call = Self.pullRequestCall(named: name, arguments) {
-                switch call {
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
-                case .success(let call): return .success(Self.reply(await pullRequestsSink(call)))
-                }
-            }
-
             if let call = Self.eventCall(named: name, arguments) {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
@@ -493,22 +469,6 @@ public actor AppService {
         return nil
     }
 
-    /// Which of the two pull-request calls a tool name is, with its arguments read.
-    static func pullRequestCall(named name: String,
-                                _ arguments: JSONValue?) -> Result<PullRequestCall, AgentCallProblem>? {
-        if name.hasSuffix(pushPullRequestToolName) { return .success(.push) }
-        if name.hasSuffix(replyOnPullRequestToolName) {
-            let body = arguments?["body"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard !body.isEmpty else { return .failure("Nothing was posted: say what to reply, in `body`.") }
-            let inReplyTo = arguments?["in_reply_to"].flatMap { value -> Int? in
-                if let number = value.intValue { return number }
-                return value.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
-            }
-            return .success(.reply(body: body, inReplyTo: inReplyTo))
-        }
-        return nil
-    }
-
     /// Which of the two session calls a tool name is, with its arguments read (065).
     /// `nil` when the name is neither.
     static func sessionCall(named name: String,
@@ -606,10 +566,6 @@ public actor AppService {
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
-        // The two pull-request tools, for every agent (038 R7): the list is fixed
-        // when a session is made, and a standing or triggering run resumes a session
-        // made long before. Outside such a run they refuse, in words.
-        let pullRequestTools = [Self.pushPullRequestTool, Self.replyOnPullRequestTool]
         // The three event tools, for every agent (042).
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
         // The two for moving itself, for every agent (053).
@@ -619,7 +575,7 @@ public actor AppService {
         let sessionTools = [Self.listSessionsTool, Self.readSessionTool]
         return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool, Self.askFormTool]
             + agentTools + sessionTools + leaseTools
-            + eventTools + moveTools + pullRequestTools + [Self.tool, Self.reportOutcomeTool]
+            + eventTools + moveTools + [Self.tool, Self.reportOutcomeTool]
     }
 
     /// The questions an `ask_form` call carried, or why it cannot be asked.
@@ -1129,7 +1085,7 @@ public actor AppService {
 
             Under on:, besides schedule and today's hyphenated names (agent-finished and \
             the rest), any event name works, narrowed by its details written under it, \
-            e.g. `- pull_request.merged:` with `number: 41` under it.
+            e.g. `- workflow.completed:` with `workflow: nightly` under it.
             """ + "\n" + EventCatalogue.describe()),
         "inputSchema": [
             "type": "object",
@@ -1340,37 +1296,6 @@ public actor AppService {
         ],
     ]
 
-    // MARK: Pull requests (038). Words from contracts/pull-requests.md.
-
-    static let pushPullRequestTool: JSONValue = [
-        "name": .string(pushPullRequestToolName),
-        "title": "Push to the pull request",
-        "description": """
-            Push this worktree's commits to the pull request you were started for. Never \
-            force-pushes: if the remote has commits you don't, bring them in first and \
-            push again. Only works in a run started for a pull request.
-            """,
-        "inputSchema": ["type": "object", "properties": .object([:])],
-    ]
-
-    static let replyOnPullRequestTool: JSONValue = [
-        "name": .string(replyOnPullRequestToolName),
-        "title": "Reply on the pull request",
-        "description": """
-            Reply on the pull request you were started for. Give in_reply_to (a comment \
-            id from your prompt) to answer a review comment in its thread; leave it out \
-            to comment on the pull request itself.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "body": ["type": "string"],
-                "in_reply_to": ["type": "integer"],
-            ],
-            "required": .array(["body"]),
-        ],
-    ]
-
     // MARK: Events (042). Words from contracts/event-tools.md.
 
     static let waitForEventTool: JSONValue = [
@@ -1378,7 +1303,7 @@ public actor AppService {
         "title": "Wait for something to happen",
         "description": """
             Wait until something happens: an event in this project or on this Mac, such as \
-            pull_request.checks_passed, agent.finished, mac.wake or custom.build_green. Your \
+            agent.finished, workflow.completed, mac.wake or custom.build_green. Your \
             turn can end while you wait, and it costs nothing: when the event happens you \
             are started again with it. The call itself waits up to 45 seconds; if nothing \
             has happened by then it says you are still waiting and keeps your place. Use \
@@ -1398,13 +1323,13 @@ public actor AppService {
                     "items": ["type": "string"],
                     "description": """
                         What to wait for; any one will do. A name, or a subject with .* such \
-                        as pull_request.*.
+                        as agent.*.
                         """,
                 ],
                 "where": [
                     "type": "object",
                     "description": """
-                        Narrow them by their details, e.g. {"number": "41"} or \
+                        Narrow them by their details, e.g. {"workflow": "nightly"} or \
                         {"agent": "Fix login"}.
                         """,
                 ],

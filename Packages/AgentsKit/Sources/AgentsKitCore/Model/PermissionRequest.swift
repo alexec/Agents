@@ -199,23 +199,13 @@ public struct ToolCall: Codable, Hashable, Sendable {
     /// one — and, under a runtime that asks before every call, would stop the writing
     /// dead whenever nobody was looking.
     ///
-    /// And the two that act on a pull request (038): they can only push to the pull
-    /// request a run was started for, never forced, or reply on it, and an unattended
-    /// run stopped at a question nobody is there to answer is no babysitting at all.
-    ///
     /// And any other tool of the app's own MCP server, named with that server in front
     /// (049): leases, waits, events and agents. A runtime that asks before every MCP call
     /// — Antigravity does, and Copilot asks before every call of any kind — would otherwise
     /// stop an agent on a card each time it reached for the app, which is the one thing
     /// the app has already agreed to by handing it the tool.
     public var isAutoAllowable: Bool {
-        isTheApps || isActingOnPullRequest || AppTool.isServedByTheApp(name ?? title)
-    }
-
-    /// Whether this is one of the two pull-request tools (038).
-    public var isActingOnPullRequest: Bool {
-        let called = name ?? title
-        return called.hasSuffix(AppTool.pushPullRequest) || called.hasSuffix(AppTool.replyOnPullRequest)
+        isTheApps || AppTool.isServedByTheApp(name ?? title)
     }
 
     /// Whether this is a runtime asking to leave plan mode: "here is the plan, may I

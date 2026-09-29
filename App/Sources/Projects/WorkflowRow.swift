@@ -113,8 +113,8 @@ struct WorkflowRow: View {
             } else if let outcome = outcomeText {
                 Text(outcome)
             }
-            // What caused it, when an event did (042 FR-030): "on pull_request.merged #41",
-            // leading to that row on the Events page.
+            // What caused it, when an event did (042 FR-030): "on workflow.completed
+            // workflow nightly", leading to that row on the Events page.
             if let position = summary.causingEvent, let name = summary.causingEventName {
                 Button { model.showEvents(at: .event(position)) } label: {
                     Text("on \(name)")
@@ -195,13 +195,6 @@ struct WorkflowRow: View {
         guard !summary.isArchived, summary.overLimit == nil, summary.awaitingApproval == nil else { return nil }
         if let next = summary.nextFireAt {
             return "Next \(next.formatted(.relative(presentation: .named)))"
-        }
-        // A pull-request trigger has no next time. What it has is how many pull requests
-        // it is looking after: checked out here and not stopped (038).
-        if workflow.respondsToPullRequests,
-           let list = model.pullRequestLists[Project.standardize(workflow.folder)] {
-            let watched = list.pullRequests.filter { $0.worktree != nil && !$0.babysitting.isStopped }.count
-            return watched == 1 ? "Watching 1 pull request" : "Watching \(watched) pull requests"
         }
         return nil
     }

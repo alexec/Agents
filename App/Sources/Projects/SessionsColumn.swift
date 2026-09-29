@@ -55,8 +55,8 @@ struct SessionsColumn: View {
                     heading("Archived", count: archived.count)
                 }
             }
-            // What else the project is working on: pull requests, Ready issues and
-            // workflows. Not while searching, which is a search of the sessions.
+            // What else the project is working on: its workflows. Not while searching,
+            // which is a search of the sessions.
             if query.isEmpty {
                 ProjectWorkSections(folder: model.selectedProject)
             }
@@ -110,14 +110,6 @@ struct SessionsColumn: View {
                 ToolbarItem {
                     SidebarToggle(windowWidth: frame.windowWidth)
                 }
-            }
-        }
-        // The pull requests and issues the daemon has, then a refresh, each time a
-        // project opens (038 FR-008). Never polled from here.
-        .task(id: model.selectedProject) {
-            if let folder = model.selectedProject {
-                await model.loadPullRequests(for: folder)
-                await model.loadGitHubProjectBoard(for: folder)
             }
         }
         .onChange(of: picked) { _, ids in applyPicked(ids) }
@@ -201,9 +193,6 @@ struct SessionsColumn: View {
     /// sit over it.
     private var hasWork: Bool {
         guard let folder = model.selectedProject.map(Project.standardize) else { return false }
-        if let list = model.pullRequestLists[folder], !list.pullRequests.isEmpty || list.problem != nil { return true }
-        if let board = model.githubProjectBoards[folder],
-           board.problem != nil || board.issues.contains(where: { $0.status == .ready }) { return true }
         return model.workflows(in: folder).contains { !$0.isArchived }
     }
 
