@@ -70,4 +70,28 @@ Stop scratch processes by pid, then remove the scratch roots and fixtures copied
 
 ## Results
 
-_Not run yet._
+**2026-09-29, branch `agents/work-github-issue-40`.**
+
+Automated:
+- `swift test --filter Sandbox`: 30 tests in 5 suites pass (settings, catalog, detector against
+  every fixture, launch, recovery), three runs in a row.
+- Full suite (2,865 tests) under load: 27 failures, 26 of which pass when rerun alone; the one
+  left, `noCallSiteNamesAStateColourItself`, names `App/Sources/Projects/ProjectSettingsSheet.swift:113`,
+  which this branch does not touch (main's, from 909b1004).
+- Both Xcode schemes (Agents for macOS, Remote for the generic iOS simulator) build; the Linux
+  gate (`scripts/build-linux-agentsd.sh --check`) passes; `scripts/docs.sh check` is clean.
+
+Live, on scratch roots (the app itself run inside an outer `sandbox-exec`, so every runtime's
+own Seatbelt fails to nest, as in research R11), built from 0a22385c/d8b892c0:
+- **Claude, On**: the command failed with `sandbox_apply: Operation not permitted`; the turn ran
+  to its end; the agent stopped `sandboxFailed` with the card (recovery offered, 0 commands
+  counted); nothing was written outside. **Continue without sandbox**: override Off, the prompt
+  sent again, the same command wrote outside the project, the state reads Sandbox off.
+- **Codex, as configured (its mode)**: the failure showed only in its reply, and was recognised
+  there; **Continue without sandbox** set Full access and the command wrote outside.
+- **Grok, On**: the start was refused with `sandboxWillNotStart` and Grok's own words ("Refusing
+  to start with its protections missing"), `offOffered: true`; the start with the sandbox Off
+  went ahead (and then stopped on Grok's spent balance, which is Grok's).
+- Found and fixed on the way: ToolSearch and the app's own `finish_turn` counted as work done;
+  a Gemini whose sandbox is on had no deadline at all and would have waited for ever.
+
