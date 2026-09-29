@@ -159,7 +159,7 @@ extension DaemonCore {
         if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked", after: before) }
     }
 
-    /// A failed runtime leaves the pool even when the failure was not a quota error.
+    /// A failed runtime is marked out even when the failure was not a quota error.
     /// A recognised spent allowance already has its more specific out state.
     func runtimeFailed(agentID: UUID) {
         guard let agent = agents[agentID] else { return }
@@ -170,7 +170,7 @@ extension DaemonCore {
         markRuntimeFailed(Self.ownEntry(runtimeID: runtimeID))
     }
 
-    /// Any runtime, pool or none (065): the four-hour check brings it back.
+    /// Any runtime (065): the four-hour check brings it back.
     private func markRuntimeFailed(_ entry: PoolEntry) {
         var state = allowanceState(for: entry)
         guard state.markFailed(now: now()) else { return }
@@ -364,7 +364,7 @@ extension DaemonCore {
 
     /// The allowances' clocks, on the workflow heartbeat (no timer of its own): short
     /// rate limits expire.
-    func settlePoolClocks(now at: Date) {
+    func settleAllowanceClocks(now at: Date) {
         var changed = false
         for key in Array(allowances.keys) {
             guard var state = allowances[key], state.isOut || state.status != .available else { continue }
@@ -386,7 +386,7 @@ extension DaemonCore {
     /// Check out credentials every four hours. The retry date is only permission to
     /// ask: it never makes an unverified runtime usable by itself.
     func checkDueAllowances(now at: Date) {
-        // Every credential with a state, pool or none (065), each once.
+        // Every credential with a state, each once.
         var seen: Set<String> = []
         let entries = allowances.keys.sorted().map { entry(forKey: $0) }
             .filter { seen.insert(AllowanceState.credentialKey(for: $0)).inserted }
@@ -448,7 +448,7 @@ extension DaemonCore {
                 try await made.setOption(id: mode.id, value: choice.value)
                 chosen.append("mode \(choice.value.stringValue ?? choice.name)")
             } else if ModeMemory.modeOption(in: options) != nil {
-                DaemonLog.shared.write("pool check for \(runtimeID): failed, no read-only mode to check in")
+                DaemonLog.shared.write("availability check for \(runtimeID): failed, no read-only mode to check in")
                 return false
             }
             if let model = WorkflowSettings.modelOption(in: options),
@@ -477,11 +477,11 @@ extension DaemonCore {
             let passed = answer.reason == .endTurn && answer.failure == nil && answer.runtimeError == nil
                 && recognition == .none && answer.rateLimit?.isRejected != true
                 && ["ok", "ok."].contains(reply.lowercased())
-            DaemonLog.shared.write("pool check for \(runtimeID): \(passed ? "passed" : "failed") "
+            DaemonLog.shared.write("availability check for \(runtimeID): \(passed ? "passed" : "failed") "
                                    + "(\(chosen.joined(separator: ", ")); reply \(reply.prefix(80).debugDescription))")
             return passed
         } catch {
-            DaemonLog.shared.write("pool check failed for \(runtimeID): \(error)")
+            DaemonLog.shared.write("availability check failed for \(runtimeID): \(error)")
             if let session { await session.end(gracePeriod: .seconds(1)) }
             return false
         }
@@ -513,7 +513,7 @@ extension DaemonCore {
         return nil
     }
 
-    /// Every credential's state, for the Pool page and for tests.
+    /// Every credential's state, for the Agent Runtimes page and for tests.
     public func allowanceStates() -> [AllowanceState] {
         allowances.values.sorted { $0.credentialKey < $1.credentialKey }
     }
@@ -524,7 +524,7 @@ extension DaemonCore {
     }
 
     /// The plan window a runtime reported during a turn (R2): kept for the turn's end,
-    /// and on the credential for the Pool page.
+    /// and on the credential for the Agent Runtimes page.
     func notePlanWindow(_ info: RateLimitInfo, agentID: UUID) {
         latestRateLimit[agentID] = info
         let at = now()
@@ -545,7 +545,7 @@ extension DaemonCore {
 
     // MARK: Readings
 
-    /// Keep what a runtime said is left of its plan window, for the Pool page. The
+    /// Keep what a runtime said is left of its plan window, for the Agent Runtimes page. The
     /// same reading again is not written until it is five minutes older, since Claude
     /// repeats it on every `usage_update`.
     func noteReading(_ reading: AllowanceReading, for entry: PoolEntry) {

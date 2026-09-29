@@ -1,6 +1,8 @@
 # Quickstart: Read Another Session's History
 
-Use a scratch root and fake runtimes; do not use a real account or spend provider credit.
+Use a scratch root. Steps that need a runtime to refuse are run by the tests named with them,
+against the fake runtime; the rest are walked on a scratch app. A real Claude turn on a small
+model is fine; do not spend credit on purpose.
 
 ## Session history
 
@@ -22,6 +24,9 @@ Use a scratch root and fake runtimes; do not use a real account or spend provide
 
 ## Allowance ending
 
+By `AllowanceEndingTests`, `RateLimitStreakTests` and `InChatRefusalTests`; the status and
+stop mark by `SpentAllowanceGroupTests`, and on screen with a planted record.
+
 1. Have a fake runtime return a recognized spent-allowance result during a turn.
 2. Check the chat stays on the same runtime, receives the allowance note and **Its allowance
    ran out** status, and has no pending carry or allowance wait.
@@ -33,12 +38,12 @@ Use a scratch root and fake runtimes; do not use a real account or spend provide
 
 ## Runtime state without a pool
 
-Seed as in the `keep-pool-known` walk: `pool/applyAllowances` with `since` at least four hours
+Steps 3 and 4 by `RuntimeStateTests` and `GeminiFreeTierTests`; the rest walked. Seed as in the `keep-pool-known` walk: `pool/applyAllowances` with `since` at least four hours
 ago, since a later one is moved forward. No pool is set up.
 
 1. Open **Settings ▸ Agent Runtimes**. The seeded runtime's card says **Out · checking after
    ‹time›**, with **Mark available**.
-2. Wait for the heartbeat. `daemon.log` has `check for ‹runtime›: passed (mode …, model …)`, and
+2. Wait for the heartbeat. `daemon.log` has `availability check for ‹runtime›: passed (mode …, model …)`, and
    the card says **Available**.
 3. Fail a fake runtime with an unrecognised error. Its card says it failed, with its next check.
 4. Have a fake Gemini refuse with Google's credit-used-up words. Its card says **Credit used

@@ -11,7 +11,7 @@ by pane, the **Resources** page (not in that window), and the system settings th
 iPhone and iPad depends on.
 
 The Mac's Settings window has panes chosen from one rail down its left side:
-**General**; then **Agent Runtimes**, **Spending** and **Pool**; then **Shared**; then
+**General**; then **Agent Runtimes** and **Spending**; then **Shared**; then
 **Devices** and **Servers**. **Agent Runtimes** and **Shared** are headings: each runtime
 has its own page under **Agent Runtimes**, and Shared's pages (Overview, Instructions,
 Skills, and the rest) sit under **Shared**, each with a count and a warning sign on any

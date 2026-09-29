@@ -15,7 +15,7 @@ public enum Recognition: Hashable, Sendable {
     /// Nothing recognised. Never switched on (FR-006).
     case none
 
-    /// Whether this moves a chat, given a pool to move to.
+    /// Whether this ends the chat and marks its runtime out (065), or starts a rate-limit streak.
     public var moves: Bool {
         switch self {
         case .spent, .creditGone, .overage: true

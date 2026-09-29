@@ -150,8 +150,8 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         rateLimitStreak = []
     }
 
-    /// A runtime failed without a recognised allowance refusal. Keep it out of the
-    /// pool until it passes a check or finishes a later turn, even when it uses credit.
+    /// A runtime failed without a recognised allowance refusal. It stays out
+    /// until it passes a check or finishes a later turn, even when it uses credit.
     @discardableResult
     public mutating func markFailed(now: Date) -> Bool {
         guard !isOut else { return false }

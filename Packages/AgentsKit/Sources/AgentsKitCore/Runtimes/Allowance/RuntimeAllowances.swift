@@ -1,6 +1,6 @@
 import Foundation
 
-/// Every runtime's state, pool or none (065, US4): a row for each runtime the app finds,
+/// Every runtime's state (065, US4): a row for each runtime the app finds,
 /// and one for each other credential it has a state for. What Settings ▸ Agent Runtimes
 /// and the phone draw, and what the prompt bar reads to warn. Never what decides whether
 /// a prompt is sent.

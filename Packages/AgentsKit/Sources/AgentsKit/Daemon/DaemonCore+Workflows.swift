@@ -341,7 +341,7 @@ extension DaemonCore {
         await resumeDueBlocks(now: now)
 
         // Allowances whose time to come back has come, and grants past their date (052).
-        settlePoolClocks(now: now)
+        settleAllowanceClocks(now: now)
         checkDueAllowances(now: now)
 
         // The day rolling over, noticed on the heartbeat that is already running

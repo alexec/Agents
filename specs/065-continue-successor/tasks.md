@@ -100,8 +100,8 @@ transcript rendering and the standalone blocked-chat Carry on action.
 - [x] T032 Remove pool-specific tests that assert switching, waiting, Continue with or Matching models (`PoolSwitchTests`, `AllowanceWaitTests`, `PoolPlanTests`, `StartingOnOutTests`' "instead" cases, and the like); keep and re-seat without a pool the tests for allowance state, recognition, checks, readings, server sharing, same-chat rate retries, blocked-chat Carry on and old transcript decoding.
 - [x] T033 [P] Replace `docs/how-to/keep-going-when-a-runtime-runs-out.md`, remove `docs/explanation/runtime-pool.md`, and update `docs/how-to/index.md` and `docs/explanation/index.md`.
 - [x] T034 [P] Update `docs/reference/settings.md` (Pool pane out, runtime state on Agent Runtimes in), `statuses.md`, `events.md`, `agent-tools.md`, `runtimes.md` (the check table without "in the pool"), `keyboard-shortcuts.md` and `docs/how-to/limit-spending.md`.
-- [ ] T035 Update `specs/065-continue-successor/quickstart.md` to the final behaviour and run it.
-- [ ] T036 Reconcile all remaining pool references in `App/`, `Remote/`, `Packages/AgentsKit/`, `Daemon/` and `docs/` against `spec.md`, keeping compatibility fields and historical transcript display called out by `data-model.md`. Build both schemes and the Linux gate.
+- [x] T035 Update `specs/065-continue-successor/quickstart.md` to the final behaviour and run it.
+- [x] T036 Reconcile all remaining pool references in `App/`, `Remote/`, `Packages/AgentsKit/`, `Daemon/` and `docs/` against `spec.md`, keeping compatibility fields and historical transcript display called out by `data-model.md`. Build both schemes and the Linux gate.
 
 ## Dependencies & Execution Order
 
