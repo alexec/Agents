@@ -48,6 +48,11 @@ struct SandboxFailureDetectorTests {
         }
     }
 
+    @Test func aReplyRunIntoTheErrorIsTrimmedToIt() throws {
+        let detail = SandboxFailureDetector.match(runtimeID: "codex", text: try fixture("codex-macos-nested-seatbelt-reply"))
+        #expect(detail == "sandbox-exec: sandbox_apply: Operation not permitted")
+    }
+
     @Test func aRuntimeWithoutARouteRecognisesNothing() throws {
         #expect(SandboxFailureDetector.match(runtimeID: "cursor", text: try fixture("claude-macos-nested-seatbelt")) == nil)
         #expect(SandboxFailureDetector.match(runtimeID: "opencode", text: try fixture("grok-macos-nested-seatbelt")) == nil)

@@ -14,12 +14,23 @@ public enum SandboxFailureDetector {
         let plain = stripped(text)
         let lines = plain.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
         var hits: [String] = []
-        for line in lines where patterns.contains(where: { line.localizedCaseInsensitiveContains($0) }) && !hits.contains(line) {
-            hits.append(line)
+        for line in lines {
+            guard let pattern = patterns.first(where: { line.localizedCaseInsensitiveContains($0) }) else { continue }
+            let hit = trimmed(line, to: pattern)
+            if !hits.contains(hit) { hits.append(hit) }
         }
         guard !hits.isEmpty else { return nil }
         let detail = hits.joined(separator: "\n")
         return detail.count > 1200 ? String(detail.prefix(1200)) + "…" : detail
+    }
+
+    /// A line from an agent's reply can run its own words into the error, since chunks are
+    /// joined without a break (Codex: "…the shell output.sandbox-exec: sandbox_apply…").
+    /// What comes before the last full stop ahead of the match is dropped.
+    static func trimmed(_ line: String, to pattern: String) -> String {
+        guard let match = line.range(of: pattern, options: .caseInsensitive),
+              let stop = line[..<match.lowerBound].lastIndex(of: ".") else { return line }
+        return String(line[line.index(after: stop)...]).trimmingCharacters(in: .whitespaces)
     }
 
     /// Text without ANSI colour codes, as Gemini prints its error in red.
