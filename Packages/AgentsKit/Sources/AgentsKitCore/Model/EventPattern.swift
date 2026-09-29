@@ -109,11 +109,11 @@ public struct EventPattern: Codable, Hashable, Sendable {
     // MARK: Words
 
     /// The kind's meaning, narrowed by what it is filtered on, for the project page:
-    /// "One of my pull requests was merged (number 41)".
+    /// "A workflow's run in this project finished (workflow nightly)".
     public var summary: String {
         let meaning: String
         if let subject = wholeSubject {
-            meaning = "Anything about \(subject == .pullRequest ? "my pull requests" : "\(subject.rawValue)s")"
+            meaning = "Anything about \(subject.rawValue)s"
         } else if EventCatalogue.isCustom(name) {
             meaning = "An agent here publishes \(name)"
         } else {
@@ -124,11 +124,11 @@ public struct EventPattern: Codable, Hashable, Sendable {
         return "\(meaning) (\(narrowed))"
     }
 
-    /// The name with its filters, as the status line writes it: "pull_request.merged #41".
+    /// The name with its filters, as the status line writes it: "workflow.completed workflow nightly".
     public var label: String {
         var parts = [name]
         for (key, value) in filters.sorted(by: { $0.key < $1.key }) {
-            parts.append(key == "number" ? "#\(value)" : "\(key) \(value)")
+            parts.append("\(key) \(value)")
         }
         return parts.joined(separator: " ")
     }
@@ -146,7 +146,7 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
             let guess = Self.closest(to: name).map { " Did you mean \($0)?" } ?? ""
             let names = EventCatalogue.all.map(\.name).joined(separator: ", ")
             return "\"\(name)\" is not an event.\(guess) Events you can wait on: \(names), custom.<name>, "
-                + "or a subject with .* such as pull_request.*."
+                + "or a subject with .* such as agent.*."
         case .badCustomName(let name):
             return "\"\(name)\" is not a custom event name: after custom. it is lowercase letters, digits "
                 + "and _, up to 40 characters."

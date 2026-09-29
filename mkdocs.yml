@@ -72,9 +72,7 @@ nav:
       - how-to/watch-background-work.md
       - how-to/use-a-shell.md
       - how-to/add-a-linux-server.md
-      - how-to/assign-a-github-issue.md
       - how-to/set-up-a-workflow.md
-      - how-to/watch-a-pull-request.md
       - how-to/sign-a-runtime-in.md
       - how-to/share-skills-across-agents.md
       - how-to/add-a-skill-from-a-catalogue.md

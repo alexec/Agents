@@ -61,7 +61,5 @@ something particular done.
 
 - [Set up a workflow](set-up-a-workflow.md): start agents on a schedule, or when another
   agent finishes, stops or asks.
-- [Have an agent watch a pull request](watch-a-pull-request.md): fix failing checks and
-  answer review comments on your GitHub pull requests.
 - [Have an agent wait for something](wait-for-something.md): checks passing, another
   agent finishing or the Mac waking, and agents telling each other.

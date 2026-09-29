@@ -60,7 +60,7 @@ struct MoveToolParsingTests {
         let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.startAgent,
                      AppTool.stopAgent, AppTool.archiveAgent, AppTool.listMyAgents, AppTool.leaseResource,
                      AppTool.listResources, AppTool.waitForEvent, AppTool.cancelWait,
-                     AppTool.publishEvent, AppTool.pushPullRequest, AppTool.replyOnPullRequest,
+                     AppTool.publishEvent,
                      AppTool.suggestPrompts, AppTool.reportOutcome]
         for move in [AppTool.enterWorktree, AppTool.exitWorktree] {
             for other in names + [AppTool.enterWorktree, AppTool.exitWorktree] where other != move {

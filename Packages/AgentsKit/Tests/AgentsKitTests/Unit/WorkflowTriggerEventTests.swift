@@ -19,37 +19,33 @@ struct WorkflowTriggerEventTests {
               - agent-asked-form
               - agent-stopped
               - workflow-completed
-              - pull-request-checks-failed
-              - pull-request-review-comments
-              - pull-request-conflicts
             """)
         #expect(workflow.problem == nil)
         #expect(workflow.triggers == [.agentFinished, .agentAskedPermission, .agentAskedForm, .agentStopped,
-                                      .workflowCompleted(id: nil), .pullRequestChecksFailed,
-                                      .pullRequestReviewComments, .pullRequestConflicts])
+                                      .workflowCompleted(id: nil)])
     }
 
     @Test func dottedNamesAreEvents() {
         let workflow = triggers("""
               - mac.wake
               - custom.build_green
-              - pull_request.*
-              - pull_request.merged:
-                  number: 41
+              - branch.*
+              - branch.moved:
+                  branch: main
             """)
         #expect(workflow.problem == nil)
         #expect(workflow.triggers == [.event(EventPattern("mac.wake")), .event(EventPattern("custom.build_green")),
-                                      .event(EventPattern("pull_request.*")),
-                                      .event(EventPattern("pull_request.merged", filters: ["number": "41"]))])
+                                      .event(EventPattern("branch.*")),
+                                      .event(EventPattern("branch.moved", filters: ["branch": "main"]))])
     }
 
     @Test func aDetailTheKindDoesNotCarryIsAFileError() {
         let workflow = triggers("""
-              - pull_request.merged:
+              - workflow.completed:
                   branch: main
             """)
         guard case .unreadable(let detail)? = workflow.problem else { Issue.record("not refused"); return }
-        #expect(detail.contains("\"pull_request.merged\" takes number, not branch"))
+        #expect(detail.contains("\"workflow.completed\" takes workflow, agent, not branch"))
     }
 
     @Test func aDottedNameThisVersionDoesNotKnowStaysInert() {
@@ -59,8 +55,8 @@ struct WorkflowTriggerEventTests {
     }
 
     @Test func anEventTriggerTravelsAsOneAnOlderDeviceDoesNotKnow() throws {
-        let event = WorkflowTrigger.event(EventPattern("pull_request.merged", filters: ["number": "41"]))
-        let unknown = WorkflowTrigger.unrecognised(name: "pull_request.merged", keys: ["number": .string("41")])
+        let event = WorkflowTrigger.event(EventPattern("branch.moved", filters: ["branch": "main"]))
+        let unknown = WorkflowTrigger.unrecognised(name: "branch.moved", keys: ["branch": .string("main")])
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         #expect(try encoder.encode(event) == encoder.encode(unknown),

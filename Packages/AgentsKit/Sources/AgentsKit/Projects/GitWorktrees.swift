@@ -126,23 +126,6 @@ public enum GitWorktrees {
             .split(separator: "\n").count
     }
 
-    /// Uncommitted changes outside the app's own `.agents` folder (038). A workflow just
-    /// written there, the babysitter included, is not somebody's work in progress, and
-    /// counting it would refuse every pull request checked out in the project folder.
-    ///
-    /// The rest of the dotagents layout (`DotAgents`) is left out the same way while it is
-    /// untracked, one file at a time so a real file beside it in `.claude` still counts.
-    /// Once committed, an edit to it is work like any other. `--short` rather than
-    /// `--porcelain` because only it gives paths from `folder`, where the layout is.
-    public static func workInProgressCount(in folder: URL) async throws -> Int {
-        let layout = Set(DotAgents.untrackedLayout.map { "?? \($0)" })
-        return try await git(["-c", "color.status=false", "status", "--short", "--untracked-files=all",
-                              "--", ".", ":(exclude).agents"], in: folder)
-            .split(separator: "\n")
-            .filter { !layout.contains(String($0)) }
-            .count
-    }
-
     /// Whether every commit on `branch` is already in `base`.
     public static func isAncestor(_ branch: String, of base: String, in folder: URL) async -> Bool {
         (try? await git(["merge-base", "--is-ancestor", branch, base], in: folder)) != nil
@@ -154,17 +137,8 @@ public enum GitWorktrees {
         try? await git(["config", "--get", "remote.\(remote).url"], in: folder)
     }
 
-    /// The URL of the remote a local branch tracks, or nil when it tracks none (038 R4).
-    public static func upstreamURL(of branch: String, in folder: URL) async -> String? {
-        guard let remote = try? await git(["config", "--get", "branch.\(branch).remote"], in: folder),
-              !remote.isEmpty else { return nil }
-        // A branch may track a URL directly rather than a named remote.
-        if remote.contains("/") || remote.contains(":") { return remote }
-        return await remoteURL(remote, in: folder)
-    }
-
     /// How far the branch checked out in `folder` is ahead of and behind what it tracks,
-    /// or nil when it tracks nothing (038 R10).
+    /// or nil when it tracks nothing.
     public static func aheadBehind(in folder: URL) async -> (ahead: Int, behind: Int)? {
         guard let counts = try? await git(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], in: folder)
         else { return nil }
@@ -181,24 +155,6 @@ public enum GitWorktrees {
     }
 
     // MARK: Writing
-
-    /// Fetch `refspec` from `remote`, which is a remote's name or a URL (038 R5).
-    public static func fetch(remote: String, refspec: String, in folder: URL) async throws {
-        _ = try await git(["fetch", "--no-tags", remote, refspec], in: folder)
-    }
-
-    /// A new worktree at `path` on a branch that already exists and is not checked out
-    /// anywhere (038 R5): a pull request's own branch, never a new `agents/` one.
-    public static func add(existingBranch branch: String, path: URL, in folder: URL) async throws {
-        _ = try await git(["worktree", "add", path.path(percentEncoded: false), branch], in: folder)
-    }
-
-    /// A new worktree at `path` on a new local branch that tracks `upstream`.
-    public static func add(trackingBranch branch: String, upstream: String, path: URL,
-                           in folder: URL) async throws {
-        _ = try await git(["worktree", "add", "--track", "-b", branch, path.path(percentEncoded: false), upstream],
-                          in: folder)
-    }
 
     /// A new worktree at `path` on a new branch from what `folder` has checked out.
     /// Git refuses an existing branch itself, which is the last word on a clash.

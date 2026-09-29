@@ -17,11 +17,11 @@ struct WaitStatusTests {
 
     @Test func anEventWaitSaysWhatSinceAndUntil() {
         var waiting = agent()
-        waiting.eventWait = EventWait(patterns: [EventPattern("pull_request.merged", filters: ["number": "44"])],
+        waiting.eventWait = EventWait(patterns: [EventPattern("branch.moved", filters: ["branch": "main"])],
                                       from: 0, deadline: until, since: since)
         let status = WaitStatus.of(waiting, names: { _ in nil })
-        #expect(status?.line == "◷ Waiting for pull_request.merged #44 · since 23:30 · until 09:00")
-        #expect(status?.mark == "◷ Waiting for pull_request.merged #44")
+        #expect(status?.line == "◷ Waiting for branch.moved branch main · since 23:30 · until 09:00")
+        #expect(status?.mark == "◷ Waiting for branch.moved branch main")
         #expect(status?.cancellable == true)
     }
 

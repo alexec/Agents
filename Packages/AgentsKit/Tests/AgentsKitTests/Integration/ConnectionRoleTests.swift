@@ -274,7 +274,7 @@ struct ConnectionRoleTests {
     }
 
     @Test func aHelperMayCallEveryToolItRelaysAndOnlyThose() {
-        #expect(ConnectionRole.agentMethods.count == 21)
+        #expect(ConnectionRole.agentMethods.count == 19)
         #expect(ConnectionRole.agent.allows(DaemonAPI.Method.agentsAskForm))
         #expect(ConnectionRole.stranger.allows(DaemonAPI.Method.daemonStatus))
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.filesBrowse))

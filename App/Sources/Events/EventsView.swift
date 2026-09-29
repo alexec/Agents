@@ -135,7 +135,7 @@ struct EventsView: View {
 
     private var emptyWords: String {
         scope == nil && groups.isEmpty
-            ? "Nothing has happened yet. Events appear here as agents, workflows, pull requests and this Mac do things."
+            ? "Nothing has happened yet. Events appear here as agents, workflows and this Mac do things."
             : "Nothing like that has happened."
     }
 

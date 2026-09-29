@@ -34,7 +34,7 @@ each of these things: its own.
 The app gives each agent a small set of tools of its own. With them an agent can say how
 its turn went, show you a file, suggest what you might say next, start, stop and park
 other agents in the project, set up a workflow, take a turn on a shared resource, wait
-for an event or publish one, move into a worktree and back, and work on a pull request.
+for an event or publish one, and move into a worktree and back.
 Everything these tools do shows up in the window and on your phone. The
 [tools reference](../reference/agent-tools.md) lists them all.
 

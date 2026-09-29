@@ -6,8 +6,7 @@ description: Every event the app records, what it carries, and where you can see
 
 # Events
 
-An event is something that happened: an agent finished, a pull request's checks passed,
-the Mac woke up. The app records each one. This page lists them all.
+An event is something that happened: an agent finished, a branch moved, the Mac woke up. The app records each one. This page lists them all.
 
 The same names work in three places:
 
@@ -19,12 +18,12 @@ The same names work in three places:
 
 ## Names and filters
 
-A name is a subject, a dot, and what happened: `pull_request.merged`. A subject followed
-by `.*`, such as `pull_request.*`, matches every event of that subject.
+A name is a subject, a dot, and what happened: `workflow.completed`. A subject followed
+by `.*`, such as `agent.*`, matches every event of that subject.
 
 Each event carries details, listed in the tables below. A wait or a trigger can narrow an
-event by its details, for example `number: 41` for one pull request. A detail the event
-does not carry is an error: `pull_request.merged` takes `number`, not `branch`.
+event by its details, for example `branch: main` for one branch. A detail the event
+does not carry is an error: `branch.moved` takes `branch`, `from` and `to`, not `number`.
 
 An agent can wait for its own project's events and for this Mac's. It cannot wait for
 another project's events.
@@ -52,27 +51,6 @@ All are about agents in the same project. Each carries `agent`, the agent's id.
 | `workflow.ran` | workflow, agent | A workflow started an agent. |
 | `workflow.completed` | workflow, agent | A workflow's run finished. |
 | `workflow.refused` | workflow, reason | A workflow did not run, and why. |
-
-## Pull requests
-
-All are about your open pull requests in the project's GitHub repository, and carry
-`number`. The app learns of them when it refreshes the project's pull requests, so they
-arrive a little after they happen on GitHub. See
-[Have an agent watch a pull request](../how-to/watch-a-pull-request.md) for what the app
-needs to see them.
-
-| Event | Details | What it means |
-| --- | --- | --- |
-| `pull_request.opened` | number | One of your pull requests was opened. |
-| `pull_request.checks_failed` | number | Checks started failing. |
-| `pull_request.checks_passed` | number | Checks passed. |
-| `pull_request.review_comments` | number | It got new review comments. |
-| `pull_request.approved` | number | It was approved. |
-| `pull_request.changes_requested` | number | Changes were requested. |
-| `pull_request.conflicts` | number | It conflicts with its base branch. |
-| `pull_request.merged` | number | It was merged. |
-| `pull_request.closed` | number | It was closed without merging. |
-| `pull_request.changed` | number, what | Any of the above happened to it. |
 
 ## Branches
 
@@ -124,9 +102,6 @@ Workflows written before events keep working. Each older name answers to these e
 | `agent-asked-form` | `agent.asked_form` |
 | `agent-stopped` | `agent.stopped`, `agent.failed` |
 | `workflow-completed` | `workflow.completed` |
-| `pull-request-checks-failed` | `pull_request.checks_failed` |
-| `pull-request-review-comments` | `pull_request.review_comments` |
-| `pull-request-conflicts` | `pull_request.conflicts` |
 
 ## The Events page
 
@@ -134,7 +109,7 @@ On the Mac, **Events** is a row at the foot of the sidebar, above **Resources** 
 **Spending**. It shows every event, newest first, grouped by day.
 
 - **Filters**: a menu for all projects, this Mac or one project, and a capsule for each
-  subject: **Agents**, **Workflows**, **Pull requests**, **Branches**, **This Mac** and
+  subject: **Agents**, **Workflows**, **Branches**, **This Mac** and
   **Custom**.
 - **Each row** shows the time, what happened, and the event's name. Under it, what it led
   to: **Woke** an agent, **Fired** a workflow, **Refused by** a workflow with the reason,

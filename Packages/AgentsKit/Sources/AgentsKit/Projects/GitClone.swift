@@ -79,7 +79,7 @@ public final class GitProcess: @unchecked Sendable {
     }
 
     /// Any of the person's own tools, run the same way: their PATH, nothing that can
-    /// ask. `gh` goes through here too (038), because everything that makes git safe
+    /// ask. `gh` goes through here too, because everything that makes git safe
     /// to run unattended is what makes `gh` safe. No git `-c` hardenings here: those
     /// are only for the git convenience initializer above.
     init(executable: URL, arguments: [String], in folder: URL? = nil,

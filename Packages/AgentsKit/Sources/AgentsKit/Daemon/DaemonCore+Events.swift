@@ -83,8 +83,8 @@ extension DaemonCore {
 
     /// Fire every workflow with a new-style trigger this event matches (042 FR-021).
     ///
-    /// Today's nine trigger names keep firing from where they always have — the
-    /// lifecycle funnel, 038's pull-request sweep, the run that finished — and are not
+    /// Today's six trigger names keep firing from where they always have — the
+    /// lifecycle funnel, the clock, the run that finished — and are not
     /// matched here, so nothing fires twice (research R7, as built). A project event
     /// reaches that project's workflows; a Mac event reaches every project's. A workflow
     /// is never fired by news of itself, which with the chain-depth limit is what stops

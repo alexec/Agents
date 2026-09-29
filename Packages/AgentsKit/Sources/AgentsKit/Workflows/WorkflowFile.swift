@@ -194,20 +194,11 @@ public enum WorkflowFile {
         case "agent-asked-form": return .agentAskedForm
         case "agent-stopped": return .agentStopped
         case "workflow-completed": return .workflowCompleted(id: keys["id"]?.scalar)
-        case "pull-request-checks-failed", "pull-request-review-comments", "pull-request-conflicts":
-            // They take no settings (038). One given something to say is a file that
-            // expects a behaviour this version does not have, and saying so beats
-            // quietly ignoring half of what was asked for.
-            guard keys.isEmpty else {
-                throw YAMLNode.Failure("\"\(name)\" takes no settings")
-            }
-            return WorkflowTrigger.pullRequestTriggers.first { $0.name == name }!
         default:
             // An event (042): a catalogue name, a subject with .*, or custom.<name>,
             // narrowed by details written under it. A name the catalogue knows with a
-            // detail it does not carry is a mistake worth saying, as a pull-request
-            // trigger given settings is; a dotted name it does not know is from a later
-            // version, and is kept whole like any other.
+            // detail it does not carry is a mistake worth saying; a dotted name it does
+            // not know is from a later version, and is kept whole like any other.
             if name.contains(".") {
                 var filters: [String: String] = [:]
                 for (key, value) in keys {

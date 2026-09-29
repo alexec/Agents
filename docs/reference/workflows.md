@@ -38,28 +38,25 @@ Check the build and say whether it is green.
 | `on:` `agent-asked-form` | No settings | Runs when an agent in this project asks you to fill in a form. |
 | `on:` `agent-stopped` | No settings | Runs when an agent in this project stops without finishing. |
 | `on:` `workflow-completed` | Optionally `id:`, a workflow's id | Runs when that workflow's run finishes, or when any workflow's run finishes if there is no `id:`. |
-| `on:` `pull-request-checks-failed` | No settings | Runs when checks fail on one of your open pull requests in this project's GitHub repository. |
-| `on:` `pull-request-review-comments` | No settings | Runs when one of your open pull requests gets review comments from someone with write access to the repository. |
-| `on:` `pull-request-conflicts` | No settings | Runs when one of your open pull requests conflicts with its base branch. |
-| `on:` an event name, such as `pull_request.merged` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `pull_request.*`, for all of its events. Under the name, list details to narrow it, such as `number: 41`; a detail the event does not carry is an error in the file. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
+| `on:` an event name, such as `branch.moved` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list details to narrow it, such as `branch: main`; a detail the event does not carry is an error in the file. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
 | `agent:` `new` | The default | Each run starts a new agent. |
 | `agent:` `standing` | | Each run goes to the workflow's own agent, which keeps its conversation from run to run. |
-| `agent:` `triggering` | | Each run goes to the agent that set it off. For a pull-request trigger, that is the agent last active in the pull request's worktree. For an event, it is the agent the event is about, or the agent that published a `custom.` event. A schedule, or an event with no agent, has no such agent, so it does not run. |
+| `agent:` `triggering` | | Each run goes to the agent that set it off. For an event, it is the agent the event is about, or the agent that published a `custom.` event. A schedule, or an event with no agent, has no such agent, so it does not run. |
 | `permission-mode:` | One of the runtime's own modes, such as a read-only or plan mode | The mode the agent runs in. A workflow runs with nobody watching, so this is how to say it must not change anything. |
 | `runtime:` | `claude`, `codex`, `gemini`, `antigravity`, `grok`, `copilot`, `cursor` | The runtime the agent runs on. Without it, Claude. A name this version does not know stops the workflow running, and its page names the runtimes it knows. See [Runtimes](runtimes.md). |
 | `model:` | One of the runtime's models | The model the agent uses. Without it, the runtime's own default. |
 | `effort:` | One of the runtime's levels, such as `low` or `high` | How hard the agent thinks. Without it, the runtime's own default. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
 
-For example, to start a new agent whenever pull request 41 is merged, or another agent
-publishes `custom.build_green`:
+For example, to start a new agent whenever `main` moves, or another agent publishes
+`custom.build_green`:
 
 ```markdown
 ---
 name: After the build
 on:
-  - pull_request.merged:
-      number: 41
+  - branch.moved:
+      branch: main
   - custom.build_green
 agent: new
 ---
@@ -68,7 +65,10 @@ Deploy the docs, then say what you deployed.
 ```
 
 The older hyphenated names still work, and each answers to the events listed under
-[Older trigger names](events.md#older-trigger-names). On a workflow's page, its latest run
+[Older trigger names](events.md#older-trigger-names). The pull-request triggers
+(`pull-request-checks-failed`, `pull-request-review-comments` and
+`pull-request-conflicts`) have been removed: a workflow that names one shows it on its
+page and never runs on it. On a workflow's page, its latest run
 shows the event that caused it, with a link to it on the Events page.
 
 A setting the runtime does not offer stops the workflow running, rather than falling back
@@ -92,13 +92,8 @@ A workflow does not run, and its page says why, when:
 - the project folder is not there;
 - its `agent:` is `triggering` and the agent it would have resumed is gone, or nothing
   set it off;
-- for a pull request: it has no local worktree, its worktree has uncommitted changes, an
-  agent is already working there, or it has already run three times in a row for that
-  pull request;
 - the file cannot be read, or names a trigger or `agent:` value this version does not
   know. The page says what is wrong with the file.
-
-Pull requests are checked every five minutes.
 
 On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve**
 while it is waiting for your OK), **Archive** (**Bring Back** once archived) and **Show in
@@ -107,7 +102,6 @@ Finder**.
 ## See also
 
 - [Set up a workflow](../how-to/set-up-a-workflow.md)
-- [Have an agent watch a pull request](../how-to/watch-a-pull-request.md)
 - [Have an agent wait for something](../how-to/wait-for-something.md)
 - [Events](events.md)
 - [Tools the app gives agents](agent-tools.md)
