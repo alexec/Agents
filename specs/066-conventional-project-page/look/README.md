@@ -47,9 +47,10 @@ bottom. **Project Settings** is a sheet with a sidebar.
 ![Frame A](a.png)
 
 - **Sessions, then Workflows, then Archived.** Workflows come before the collapsed Archived group
-  so that 407 archived sessions never sit above them. The Workflows section is left out when the
-  project has none, as it is today. Search is a search of the sessions, so the Workflows section
-  hides while you type.
+  so that 407 archived sessions never sit above them. The Workflows section is always there
+  (Alex, 2026-09-28): with none it says what a workflow is and offers "Ask an agent to write one",
+  which fills the prompt; archived workflows fold away under it. Search is a search of the
+  sessions, so the Workflows section hides while you type.
 - **New session** moves to a compose button (`square.and.pencil`) on the middle column's toolbar,
   where Mail and Notes put it. ⌘N still works, and the "New session" row goes.
 - **The right pane is a new chat.** Its title is "New session". In the middle of the pane is the

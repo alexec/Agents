@@ -37,6 +37,16 @@ struct SessionsColumn: View {
                     }
                 }
             }
+            // A project with no sessions yet says so where they would be, rather than
+            // over the whole column: its workflows are still below.
+            if query.isEmpty, model.selectedProjectSummary != nil, !hasLive {
+                Text("No sessions yet. Say what you want done on the right.")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 6)
+            }
             // Its workflows, above Archived so a long archive never buries them (066).
             // Not while searching, which is a search of the sessions.
             if query.isEmpty {
@@ -67,12 +77,10 @@ struct SessionsColumn: View {
         .overlay {
             if model.selectedProjectSummary == nil {
                 EmptyState.noProject
-            } else if !hasAny, !(query.isEmpty && hasWork) {
-                ContentUnavailableView(query.isEmpty ? "No sessions yet" : "No matches",
+            } else if !hasAny, !query.isEmpty {
+                ContentUnavailableView("No matches",
                                        systemImage: "bubble.left.and.bubble.right",
-                                       description: Text(query.isEmpty
-                                                         ? "Say what you want done on the right."
-                                                         : "Nothing here says “\(query)”."))
+                                       description: Text("Nothing here says “\(query)”."))
             }
         }
         // ⌫ archives every highlighted session that is not already archived (one or many).
@@ -204,11 +212,9 @@ struct SessionsColumn: View {
         }
     }
 
-    /// Whether `ProjectWorkSections` has anything to draw, so the empty state does not
-    /// sit over it.
-    private var hasWork: Bool {
-        guard let folder = model.selectedProject.map(Project.standardize) else { return false }
-        return model.workflows(in: folder).contains { !$0.isArchived }
+    /// Whether the project has a session that is not archived.
+    private var hasLive: Bool {
+        AgentGroup.live.contains { !model.agents(in: model.selectedProjectKey, group: $0).isEmpty }
     }
 
     private var hasAny: Bool {
