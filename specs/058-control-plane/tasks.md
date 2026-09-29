@@ -367,10 +367,10 @@ told when it is needed.
 
 **Independent test**: quickstart Walk 5 with the fake device.
 
-- [ ] T076 [US5] Move `Remote/Sources/RemoteModel.swift` onto `WebSocketLink` and `ControlLink`, with `url` and `pin` from the pairing code. Remove the Remote's TLS-PSK `NetworkLink` path for the control plane, keeping it only for a not-yet-moved Mac (until T112).
-- [ ] T077 [US5] Relay fallback in `Remote/Sources/`: when the control plane's URL cannot be reached, use the CloudKit relay. The device runs `ControlAuth` end to end through `agents-relay` (T096).
-- [ ] T078 [P] [US5] Update `FakeDeviceLiveTests` in `Packages/AgentsKit/Tests/AgentsKitTests/` to dial over `WebSocketLink`, and with `AGENTS_FAKE_DEVICE_RELAY=1` to go through a scratch `agents-relay`.
-- [ ] T079 [US5] Build the Remote for the generic iOS simulator. Walk quickstart Walk 5, steps 1–2, with the fake device. Record it in `specs/058-control-plane/walks/us5-phones.md`, and ask Alex about looking on the phone.
+- [x] T076 (Remote/Sources/Link/ControlPlaneLink.swift, RemoteApp picks it once paired, pair(scanned:) takes v2 device codes; AwayLink kept for an unmoved Mac) [US5] Move `Remote/Sources/RemoteModel.swift` onto `WebSocketLink` and `ControlLink`, with `url` and `pin` from the pairing code. Remove the Remote's TLS-PSK `NetworkLink` path for the control plane, keeping it only for a not-yet-moved Mac (until T112).
+- [ ] T077 (waits on agents-relay, T096) [US5] Relay fallback in `Remote/Sources/`: when the control plane's URL cannot be reached, use the CloudKit relay. The device runs `ControlAuth` end to end through `agents-relay` (T096).
+- [x] T078 (pairs with a v2 device code and dials over WebSocketLink; the relay variant waits on T096) [P] [US5] Update `FakeDeviceLiveTests` in `Packages/AgentsKit/Tests/AgentsKitTests/` to dial over `WebSocketLink`, and with `AGENTS_FAKE_DEVICE_RELAY=1` to go through a scratch `agents-relay`.
+- [x] T079 (walks/us5-phones.md: direct path walked with the fake device; relay and CloudKit notice wait on T096–T097; the phone look is Alex's) [US5] Build the Remote for the generic iOS simulator. Walk quickstart Walk 5, steps 1–2, with the fake device. Record it in `specs/058-control-plane/walks/us5-phones.md`, and ask Alex about looking on the phone.
 
 ---
 

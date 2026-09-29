@@ -146,7 +146,10 @@ final class RemoteModel {
     /// Nothing to reach the Mac with, near or far: never paired, or forgotten by the
     /// Mac (FR-009). Since the security review's Phase 3 the direct link is locked with
     /// the Mac's key too, so this is true at home as well as away.
-    var needsPairing: Bool { away != nil && !hasMacKey && !isConnected }
+    var needsPairing: Bool { (away != nil && !hasMacKey && !isConnected) || forgottenByControlPlane }
+
+    /// The control plane refused this device's key: forgotten, or never known (058, US5).
+    private(set) var forgottenByControlPlane = false
 
     /// Where a pairing started from the scanner has got to.
     enum Pairing: Equatable {
@@ -164,7 +167,31 @@ final class RemoteModel {
     /// connection that may do one thing, announce this device, and the Mac's key is kept
     /// from the code, never from the reply: a Mac that cannot finish the handshake was
     /// not the one on the screen.
+    /// Set once this phone has paired with a control plane: the app makes a new model on
+    /// that link (058, US5).
+    private(set) var pairedWithControlPlane = false
+
     func pair(scanned text: String) async {
+        // A control plane's device code (058, US5): announced over its WebSocket.
+        if let control = ControlCode(text: text) {
+            guard case .client = control.purpose else {
+                pairing = .failed("That code is for adding a host, not a phone.")
+                return
+            }
+            pairing = .pairing
+            do {
+                try await RemoteControl.pair(with: control, id: deviceID)
+                pairing = .paired
+                note("pairing: paired with the control plane \(control.name)")
+                pairedWithControlPlane = true
+            } catch let error as JSONRPCError {
+                pairing = .failed(error.message)
+            } catch {
+                note("pairing: failed: \(error)")
+                pairing = .failed("The control plane didn't take that code. It may have run out: show a new one and try again.")
+            }
+            return
+        }
         guard let code = DaemonAPI.PairingCode(text: text) else {
             pairing = .failed("That isn't a pairing code from Agents on your Mac.")
             return
@@ -907,6 +934,14 @@ final class RemoteModel {
             watchOtherHosts()
             return true
         } catch {
+            if let reason = ControlPlaneLink.refused.take(), reason == .forgotten || reason == .unknown {
+                // Forgotten from a window: this device asks for a new code, and stops dialling.
+                RemoteControl.forget()
+                forgottenByControlPlane = true
+                isConnected = false
+                reconnecting?.cancel()
+                return false
+            }
             isConnected = false
             return false
         }
