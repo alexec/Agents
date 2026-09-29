@@ -1,0 +1,6 @@
+Run sandbox probe command
+```console
+touch: /fixture/claude-on/outside/written-608e3413: Operation not permitted
+touch_exit=1
+curl_exit=0
+```

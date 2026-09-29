@@ -1,0 +1,2 @@
+Exit code 71
+sandbox-exec: sandbox_apply: Operation not permitted
