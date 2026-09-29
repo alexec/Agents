@@ -24,9 +24,10 @@ let package = Package(
         .library(name: "ControlDial", targets: ["ControlDial"]),
     ],
     dependencies: [
-        // The Linux dialer (058, T044). Linked into `AgentsKit` only on Linux, and into
-        // the tests here so a Mac can prove the handshake against the real listener.
-        // `swift-crypto` is not a dependency: its BoringSSL would be a second copy.
+        // The control plane's WebSocket (058): `ControlDial`, linked by `agentsd` on the Mac
+        // and on Linux, and `LinuxControlDial`, the first build's TLS-PSK dialler, kept for
+        // one test until the first build's listener goes (T042). `swift-crypto` is not a
+        // dependency: its BoringSSL would be a second copy.
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.80.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.29.0"),
         // Tests only. See the target below.
@@ -54,15 +55,14 @@ let package = Package(
             ]),
         // Nothing here, deliberately. `agentsd` links this library, and the daemon
         // moves terminal bytes without parsing them. SwiftTerm belongs to the app,
-        // where it is declared against the app target in `project.yml`. On Linux the
-        // same library dials the control plane; the Mac and the phone do not link that.
+        // where it is declared against the app target in `project.yml`. It dials the
+        // control plane with `ControlDial`; the phone links only `AgentsKitCore`.
         .target(
             name: "AgentsKit",
             dependencies: [
                 "AgentsKitCore",
                 "CShims",
                 "ControlDial",
-                .target(name: "LinuxControlDial", condition: .when(platforms: [.linux])),
             ]),
         // Three one-line C wrappers the Linux build of `agentsd` needs, because Swift
         // cannot call a variadic C function there (037). The Mac uses them too, so there

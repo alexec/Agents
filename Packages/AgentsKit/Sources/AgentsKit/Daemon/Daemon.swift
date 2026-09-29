@@ -248,8 +248,6 @@ public final class Daemon: @unchecked Sendable {
         } catch {
             DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
         }
-        #elseif os(Linux)
-        await joinWithBoringSSL(control, server: server, hello: hello)
         #else
         DaemonLog.shared.write("uplink: this build cannot reach a control plane over the network")
         #endif
