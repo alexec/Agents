@@ -32,6 +32,9 @@ struct ChatActions {
     var subagentSteps: (@MainActor (String) -> Void)? = nil
     /// Open what a background task printed, from its output file (057).
     var backgroundOutput: (@MainActor (BackgroundItem) -> Void)? = nil
+    /// Every entry of a finished turn, by where it sits in the transcript, for a turn
+    /// the chat opens from its summary.
+    var turnEntries: @MainActor (UUID, Range<Int>) async -> [TranscriptEntry] = { _, _ in [] }
 }
 
 extension EnvironmentValues {

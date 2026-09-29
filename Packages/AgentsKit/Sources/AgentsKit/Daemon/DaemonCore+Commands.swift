@@ -1692,6 +1692,21 @@ extension DaemonCore {
         }
         // Somebody is reading it: whole while they do (051).
         if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
-        return try await store.transcript(for: request.agentID, before: request.before, limit: request.limit)
+        var limit = request.limit
+        if let from = request.from {
+            let end = min(request.before ?? Int.max, try await store.transcriptCount(for: request.agentID))
+            limit = max(0, min(limit, end - from))
+        }
+        return try await store.transcript(for: request.agentID, before: request.before, limit: limit)
+    }
+
+    /// The finished turns, as the chat shows them until one is opened.
+    public func turns(_ request: DaemonAPI.TurnsRequest) async throws -> TurnsPage {
+        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
+            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
+                               message: RetirementWords.retiredSentence(tombstone))
+        }
+        if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
+        return try await store.turns(for: request.agentID, before: request.before, limit: request.limit)
     }
 }

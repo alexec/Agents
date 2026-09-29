@@ -85,7 +85,8 @@ struct ChatView: View {
                 frame.pane = .background
                 if !frame.isOpen { frame.open() }
             },
-            backgroundOutput: { item in BackgroundOutput.open(item) })
+            backgroundOutput: { item in BackgroundOutput.open(item) },
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.

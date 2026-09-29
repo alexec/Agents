@@ -13,7 +13,10 @@ import SwiftUI
 struct ChatTranscript: View {
     @Environment(\.chatActions) private var actions
     let agent: Agent
+    /// The turn in progress and any since, folded.
     let items: [TranscriptItem]
+    /// The finished turns before `items`, as stored: drawn concise until opened.
+    var stored: [TurnSummary] = []
     /// Whether there is more of the conversation before the first page in hand.
     let hasMore: Bool
     /// How many entries are in hand. Growth is what "something new" means.
@@ -37,7 +40,10 @@ struct ChatTranscript: View {
     /// go only while it is, so nothing leaves from above somebody reading back.
     var onFollowing: (Bool) -> Void = { _ in }
 
-    @State private var expandedRuns: Set<UUID> = []
+    /// The turns drawn normal rather than concise, by id.
+    @State private var expandedTurns: Set<UUID> = []
+    /// Every entry of a stored turn once it has been opened, folded.
+    @State private var fetchedTurns: [UUID: [TranscriptItem]] = [:]
     /// Set once the pane is sitting at the foot of the conversation. Until then the
     /// top of the list is on screen only because nothing has moved yet, and taking
     /// that for "the reader scrolled up" would pull the whole transcript in at once.
@@ -84,8 +90,8 @@ struct ChatTranscript: View {
         (agent.state == .running || agent.state == .waitingOnUser) && actions.canSendNow(agent.runtimeID)
     }
 
-    /// What is drawn: each ask and the last block of its turn.
-    private var rows: [TranscriptItem] { items.outcomes() }
+    /// The conversation as turns: the stored ones, then those in hand.
+    private var rows: [ChatTurn] { stored.map(ChatTurn.init) + items.turns() }
 
     var body: some View {
         ScrollViewReader { scroller in
@@ -99,12 +105,14 @@ struct ChatTranscript: View {
                     }
                     // Folded once by the model as each entry lands, not here on every
                     // redraw: a reply arrives several chunks a second.
-                    // Each ask and the last block of what came of it.
-                    ForEach(rows) { item in
-                        TranscriptRow(item: item,
-                                      isExpanded: expandedRuns.contains(item.id),
-                                      toggle: { toggle(item.id) })
-                            .id(item.id)
+                    // Each turn concise — the ask and its last block — until its block
+                    // is clicked, and then every block of it.
+                    ForEach(rows) { turn in
+                        TurnView(turn: turn,
+                                 isExpanded: expandedTurns.contains(turn.id),
+                                 fetched: fetchedTurns[turn.id],
+                                 toggle: { toggle(turn) })
+                            .id(turn.id)
                     }
                     .environment(\.backgroundWork, agent.background)
                     ForEach(agent.queuedPrompts) { queued in
@@ -264,6 +272,9 @@ struct ChatTranscript: View {
             // this lands on it.
             .onChange(of: focusedEntry) {
                 guard let focusedEntry else { return }
+                if let turn = rows.first(where: { $0.blocks.contains { $0.id == focusedEntry } }) {
+                    expandedTurns.insert(turn.id)
+                }
                 // Being sent to a line in the middle is being sent away from the end,
                 // and it was asked for. Following on from here would take the reader
                 // straight back off the line they were sent to.
@@ -307,8 +318,16 @@ struct ChatTranscript: View {
         }
     }
 
-    private func toggle(_ id: UUID) {
-        if expandedRuns.contains(id) { expandedRuns.remove(id) } else { expandedRuns.insert(id) }
+    /// Open a turn, fetching its entries if all that is in hand is its summary; or
+    /// close it again.
+    private func toggle(_ turn: ChatTurn) {
+        if expandedTurns.remove(turn.id) != nil { return }
+        expandedTurns.insert(turn.id)
+        guard turn.blocks.isEmpty, let range = turn.range, fetchedTurns[turn.id] == nil else { return }
+        Task {
+            let entries = await actions.turnEntries(agent.id, range)
+            fetchedTurns[turn.id] = TranscriptEntry.display(entries)
+        }
     }
 
     private func goToEnd(_ scroller: ScrollViewProxy) {
@@ -345,7 +364,8 @@ struct ChatTranscript: View {
     /// Open at the end, the way every chat does, and only then let reaching the top
     /// mean something.
     private func settle(_ scroller: ScrollViewProxy) async {
-        expandedRuns = []
+        expandedTurns = []
+        fetchedTurns = [:]
         hasSettled = false
         isFollowing = true
         isUserScrolling = false

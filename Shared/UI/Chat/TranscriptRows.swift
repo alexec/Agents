@@ -26,6 +26,83 @@ struct TranscriptRow: View {
     }
 }
 
+/// One turn: the ask, and then its last block — or, once that is clicked, every block.
+///
+/// A block is a tool call, drawn as the description the agent gave it, or something the
+/// agent said. Clicking any block of a turn switches it between the two.
+struct TurnView: View {
+    let turn: ChatTurn
+    let isExpanded: Bool
+    /// A stored turn's own entries, once fetched.
+    let fetched: [TranscriptItem]?
+    let toggle: () -> Void
+
+    private var blocks: [TranscriptItem] {
+        turn.blocks.isEmpty ? (fetched ?? []).filter(\.isBlock) : turn.blocks
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let ask = turn.ask {
+                TranscriptRow(item: ask)
+            }
+            if isExpanded {
+                if blocks.isEmpty, fetched == nil, turn.range != nil {
+                    ProgressView().controlSize(.small)
+                }
+                ForEach(blocks) { block in
+                    BlockRow(item: block, isConcise: false)
+                        .contentShape(.rect)
+                        .onTapGesture(perform: toggle)
+                        .accessibilityAction(.default, toggle)
+                        .help("Show only the last step")
+                }
+            } else if let last = turn.last {
+                BlockRow(item: last, isConcise: true)
+                    .contentShape(.rect)
+                    .onTapGesture(perform: toggle)
+                    .help("Show every step of this turn")
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction(.default, toggle)
+                    .accessibilityHint("Shows every step of this turn")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A tool call or something the agent said, as a turn draws it.
+private struct BlockRow: View {
+    let item: TranscriptItem
+    /// Only the last call of a run.
+    let isConcise: Bool
+
+    var body: some View {
+        switch item {
+        case .toolRun(_, let calls):
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array((isConcise ? Array(calls.suffix(1)) : calls).enumerated()), id: \.offset) { _, call in
+                    line(call.turnLine)
+                }
+            }
+        case .entry(let entry):
+            if case .toolCall(let call) = entry.kind {
+                line(call.turnLine)
+            } else {
+                EntryRow(entry: entry)
+            }
+        }
+    }
+
+    private func line(_ text: String) -> some View {
+        Text(text)
+            .appText(.reading)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct EntryRow: View {
     let entry: TranscriptEntry
 

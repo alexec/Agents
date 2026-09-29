@@ -35,8 +35,9 @@ struct RemoteChatView: View {
             if let agent {
                 ChatTranscript(agent: agent,
                                items: model.transcriptItems,
-                               hasMore: model.hasMoreBefore,
-                               entryCount: model.entries.count,
+                               stored: model.work.turns,
+                               hasMore: model.work.hasMoreOfTheConversation,
+                               entryCount: model.entries.count + model.work.turns.count,
                                isComingBack: model.isComingBack(agent),
                                settleKey: model.selection,
                                loadEarlier: { await model.loadEarlier() },
@@ -217,7 +218,8 @@ struct RemoteChatView: View {
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
-            subagentSteps: { id in subagentOnScreen = id })
+            subagentSteps: { id in subagentOnScreen = id },
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
     }
 }
 
