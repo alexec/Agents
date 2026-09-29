@@ -1,263 +1,471 @@
-# Tasks: A Control Plane, and the Mac Window as One More Remote
+---
+description: "Tasks for 058, re-planned 2026-09-28: apps that are only clients, and a control plane that runs as copies"
+---
 
-**Input**: `specs/058-control-plane/` — plan.md, spec.md, research.md (R1–R11), data-model.md,
-contracts/wire.md, contracts/control-api.md, quickstart.md, look/ (approved 2026-09-26: D/E/F,
-the name "Control plane", This Mac's host has no buttons).
+# Tasks: A Control Plane, and Apps That Are Only Clients
 
-**Tests**: included. SC-001 and SC-005 require them: the full suite stays green, and every
-operator-only call is refused for a device, both at the control plane and at the host.
+**Input**: the design documents in `specs/058-control-plane/`. They were re-specified and
+re-planned on 2026-09-28: spec.md, plan.md, research.md (R1–R14, S2–S5), data-model.md,
+`contracts/` (wire, store, control-api) and quickstart.md.
 
-**Walks**: every story ends with a run-app walk on a scratch root (quickstart.md). A story that
-touches hosts is also walked against the devbox with test-servers. Never walk on the real root
-or on Alex's paired devices.
+**Tests**: the plan asks for them where the design is new: the store, the key exchange, leases,
+peer links and grants across copies. Walks follow quickstart.md, and each is recorded in
+`walks/`. Scratch roots only, never Alex's devices or real home (plan, Constitution Check).
+
+**The first build**: tasks done under the first plan (at `117f858f`) whose code research R2 keeps
+are listed as done in the section below, with their old numbers. Its other done tasks are
+replaced, and removing what they left is a task in this list.
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: can run in parallel (different files, no dependency on an unfinished task).
-- **[Story]**: US1–US7 from spec.md.
+- **[P]**: can run in parallel (different files, no dependency on an unfinished task)
+- **[Story]**: US1–US9, as in spec.md
+
+## Carried over from the first build (done; research R2 "Keep")
+
+- [x] T001 The wire, in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlWire.swift`. Unchanged inside the WebSocket (was T004).
+- [x] T002 Records and grants in `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift`. `owner`, `rev` and the new code text are added in T030 (was T005).
+- [x] T003 The `ControlRouter` actor in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlRouter.swift`: channels per client and host, grant check, generations. Proxied host sessions are added in T061 (was T007).
+- [x] T004 `ControlMethods` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlMethods.swift`. It is made store-backed in T032 (was T008).
+- [x] T005 `ControlLink` and `HostLink` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlLink.swift`. They get a WebSocket transport in T040 (was T009).
+- [x] T006 Router and grant tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlRouterTests.swift` and `ControlGrantTests.swift` (was T010, T011).
+- [x] T007 Virtual connections on the host, `acceptVirtual`, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonServer.swift` (was T014).
+- [x] T008 `ControlUplink` (backoff, redial on a network change, channel demux) and its tests, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ControlUplink.swift`. It gets a WebSocket dialer in T038 (was T015, T016).
+- [x] T009 `ThisMacHost` in `App/Sources/Control/ThisMacHost.swift` (was T025).
+- [x] T010 Credential lending on a host's channel, operator only (was T027).
+- [x] T011 The away strip, `App/Sources/Sidebar/ControlAwayStrip.swift` (frame H) (was T028).
+- [x] T012 Settings ▸ Control plane: Overview, Hosts, Clients and the pair sheet (frames D–G), in `App/Sources/Control/ControlSettingsView.swift` and its panes. Grant changes reopen channels (was T046–T051).
+- [x] T013 `hosts/install` over ssh with trust asked back, in `Packages/AgentsKit/Sources/AgentsKit/Control/SSHHosts.swift`, and `hosts/remove`. They move into the service in T072 (was T039, T041).
+- [x] T014 Add a Server in Settings, pointed at `hosts/install` (was T042).
+- [x] T015 Host headings in the Remote's project list, `Shared/UI/HostListHeading.swift` (was T054).
+- [x] T016 A host sends `attention/need` unsealed on channel 0, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Attention.swift`. The host side is kept, and the sealing moves in T097 (was T056).
+- [x] T017 `ControlMove` and its tests, in `Packages/AgentsKit/Sources/AgentsKit/Control/ControlMove.swift`. It writes the store in T084 and is run by the host app in T086 (was T058, T060).
+- [x] T018 `ControlAgreement`, pure-Swift P-256, HKDF and HMAC matching CryptoKit, in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/ControlAgreement.swift`, with `ControlAgreementTests` (was part of T044).
+- [x] T019 Spike S1: BoringSSL speaks the listener's suite from a musl binary, and the libraries add 51.5 MB (was T043).
+- [x] T020 `ConnectSheet` with Bonjour browsing, and `FirstRunView` (frame A), in `App/Sources/Control/`. Both are reworked by frame K in T051 (was T034, T036).
 
 ---
 
-## Phase 1: Setup
+## Phase 1: Setup and spikes (plan Phase 0)
 
-- [ ] T001 Rename the `agents-bridge` target to `agents-control` in `project.yml`. Keep its bundle, CloudKit entitlement and `Contents/Helpers` embedding in `Agents.app`. Move `Bridge/` to `Control/`. Then run `xcodegen` and build both schemes one after the other, with plugin validation skipped.
-- [x] T002 [P] Create the empty module folder `Packages/AgentsKit/Sources/AgentsKitCore/Control/` and the test folder `Packages/AgentsKit/Tests/AgentsKitTests/Control/`. Check `swift build` still passes on the Linux gate. Nothing in `Control/` may import Network, CryptoKit or CloudKit.
-- [x] T003 [P] Add the failures `hostOffline` (-32070), `noSuchHost` (-32071) and `lastOperator` (-32072) (-32040 to -32042 are taken) to `DaemonAPI.Failure` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, with messages in the style of the existing ones.
+**Purpose**: prove the risky parts before any code rests on them. Record each result in
+`research.md` under its spike. If S2 or S4 fails, stop and ask Alex.
 
----
+- [ ] T021 Merge `main` into `agents/control-plane`. It is 99 or more commits ahead. Check with `git merge-base` afterwards that the merge landed on this branch (memory: a branch can move under a merge). Build both schemes one after the other with plugin validation skipped, and pass `swift build` in `Packages/AgentsKit`.
+- [ ] T022 [P] Spike S2, the sandboxed window's WebSocket, in `specs/058-control-plane/spikes/s2-sandbox-ws/`. Make a throwaway macOS app target with only `com.apple.security.app-sandbox` and `com.apple.security.network.client`, and `NSBonjourServices` = `_agents-control._tcp`. Using `URLSessionWebSocketTask` with a delegate that checks a SHA-256 SPKI pin, it must:
+  - dial `wss://127.0.0.1:<port>` and `wss://<this Mac>.local:<port>`, served by a throwaway NIO WebSocket server with a self-signed certificate;
+  - exchange a line each way;
+  - browse Bonjour with `NWBrowser`.
 
-## Phase 2: Foundational (the router core; blocks every story)
+  Record pass or fail for each in research.md S2.
+- [ ] T023 [P] Spike S3, the host dialer on Linux, in `specs/058-control-plane/spikes/s3-linux-ws/`. Build a static musl aarch64 program with `NIOWebSocket` and NIOSSL that dials `wss://` in two ways:
+  - through Caddy terminating TLS, with a publicly trusted-style local CA;
+  - to a self-signed server by pin.
 
-- [x] T004 [P] Write `ControlWire` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlWire.swift` (contracts/wire.md):
-  - Client frames `{h?, m}`. Host frames `{c, m}`, `{c, open:{grant, client, device?}}` and `{c, close:true}`.
-  - `isLegacy(line)` is true for an object with `jsonrpc` at top level.
-  - Read only `m.method` for grant checks.
-  - Keep `m`'s bytes as they arrived, never re-encoded, so a message passes through untouched.
-- [x] T005 [P] Write `Grant`, `ClientRecord`, `HostRecord`, `HostReach`, `HostState` and `PairingCode` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift`, as in data-model.md:
-  - `ClientRecord.kind` is `mac | iphone | ipad`. `grant` is `operator | device`.
-  - `HostRecord.id` is `mac` for the migrated home host, and 8 random chars otherwise.
-  - `reach` is `dialOut | ssh(destination, hostKeyFingerprint)`.
-  - `HostState` is `online · offline(since) · connecting · needsUpdate(from,to) · failed(reason)`.
-- [x] T006 Write `GrantStore` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/GrantStore.swift`. It reads and writes `clients.json`, `hosts.json` and `control.json` atomically under the control root.
-  - `setGrant` and `forget` refuse to leave no operator (`lastOperator`, FR-009).
-  - It reads a legacy `devices.json` as `device` clients.
-- [x] T007 Write the `ControlRouter` actor in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlRouter.swift` (R3, R4):
-  - It keeps `ClientSession`s and `HostSession`s. Channel numbers are per uplink and never reused.
-  - Opening a client opens a channel to every online host, and a host coming online opens channels to every client.
-  - It checks each request's grant against `ConnectionRole.control` / `.device` `.allows` and answers `notPermitted` itself, with `h` set.
-  - A request for an offline host gets `hostOffline` at once, and an unknown `h` gets `noSuchHost`.
-  - Replies and notifications get `h` added on the way to the client.
-  - A legacy line with no `h` goes to the control plane's own handler for its methods, and to `homeHost` otherwise. Replies to it go back unwrapped.
-  - It emits `control/hostChanged` when a host's state changes.
-- [x] T008 Write the control plane's own handler in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlMethods.swift` for every row of contracts/control-api.md except `hosts/install`, `hosts/update` and `hosts/checkAgain`, which are pluggable closures supplied by the executable (US3):
-  - The `devices/*` aliases.
-  - `clients/forget`, which closes the client's session and its channels at once.
-  - The `control/clientChanged` and `control/pairingChanged` notifications, sent to operators only.
-- [x] T009 Write `ControlLink` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlLink.swift`. It is a `DaemonLink` that owns one physical `LineTransport` and hands out a `HostLink(host)` per `HostID`.
-  - Each `HostLink` is a `LineTransport` that wraps outgoing lines with `h` and yields only lines for its host.
-  - Control-plane messages with no `h` go to a `controlClient: DaemonClient`.
-  - A host's link ends when `control/hostChanged` says it is offline, so `DaemonClient`'s reconnect runs as today.
-- [x] T010 [P] Router tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlRouterTests.swift` over `PairedTransport.pair()`:
-  - request and reply pass through unchanged, byte for byte
-  - notifications reach each client once, tagged with `h`
-  - `credentialWanted`, lend and retry stay on one channel
-  - `hostOffline` and `noSuchHost`
-  - the legacy line goes to the home host
-  - forget closes the client's channels
-  - channel numbers are never reused
-- [x] T011 [P] Grant tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlGrantTests.swift` (SC-005): for **every** `DaemonAPI.Method` that `ConnectionRole.device` refuses, a device client's request is refused by the router and never reaches the host transport. Also: the last operator cannot be demoted or forgotten.
-- [x] T012 [P] `GrantStore` tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/GrantStoreTests.swift`: round trip, atomic write, `devices.json` read as `device` clients, and the `lastOperator` refusals.
-- [x] T013 (Not needed: the uplink dials out and never reaches `DaemonServer`'s dispatch, so it needs no role. Only its channels do, and they are `control` or `device`.) Host side: add the `.controlPlane` role to `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/ConnectionRole.swift`. It allows channel frames and channel-0 methods only (`host/hello`, `hosts/announce`, `attention/need`, `control/ping`), no `hearsNotifications`, and can never be raised.
-- [x] T014 Virtual connections: in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonServer.swift`, add `acceptVirtual(transport:role:device:)`. It builds a connection exactly like an accepted socket connection (identity, role, lent credentials, surface, broadcast subscription), with `device` channels bound as `connection/bindDevice` does. `open` is the only thing that sets its role, and only to `control` or `device`.
-- [x] T015 Write `ControlUplink` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ControlUplink.swift`:
-  - It demuxes `{c,…}` frames from one `LineTransport`. `open` calls `acceptVirtual`, and `close` or the uplink ending closes that channel's connection.
-  - It answers channel 0.
-  - It redials with backoff 1 s → 30 s, and at once on a network change.
-  - Agents keep running while it is down (FR-011).
-  - The dial function is injected, so tests use `PairedTransport` and macOS uses TLS-PSK.
-- [x] T016 [P] Uplink tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlUplinkTests.swift`:
-  - an operator channel may call `credentials/lend`, and a device channel is refused **at the host** (defence in depth)
-  - two channels each get their own notifications
-  - a lent credential dies with its channel
-  - redial after the transport ends
-  - an `agent` role can never be reached through `open`
-- [~] T017 (2,720 tests: 21, then 16 issues under load, all in known-flaky suites; `ConnectionRoleTests` passes alone 14/14. The six-run comparison against main is still owed) Run the full `swift test` in `Packages/AgentsKit` and both schemes. Record the pass count against main's, using the six-run comparison if anything flakes.
+  Run it in the devbox container against servers on this Mac. Measure the stripped size against the 5.8 MB baseline from S1, and record it in research.md S3.
+- [ ] T024 [P] Spike S4, conditional writes, in `specs/058-control-plane/spikes/s4-conditional/`. Run MinIO in Colima beside `agents-devbox`. Against MinIO, and against one real S3 bucket if Alex provides one (ask; otherwise MinIO and R2's documented behaviour only), test:
+  - `PUT` with `If-None-Match: *` twice (the second gets 412);
+  - `PUT` with `If-Match: <etag>` (a stale ETag gets 412);
+  - two writers racing one lease key 100 times (exactly one wins each round).
 
-**Checkpoint**: the router, the grants and the host side all work in memory. No UI yet.
+  Record the results in research.md S4.
+- [ ] T025 [P] Spike S5, a sandboxed archive. On a throwaway branch in a scratch worktree (never this tree), turn on `com.apple.security.app-sandbox` in `App/Agents.entitlements` and link only `AgentsKitCore` for the Agents target in `project.yml`. Run `xcodegen`, then build. List every file that fails and why. Record the list in research.md S5; it sizes US1's tasks T043–T053. Delete the scratch worktree afterwards.
+- [ ] T026 Create the package skeleton `Packages/ControlPlane/Package.swift`:
+  - platforms macOS 27, and Linux via the static SDK;
+  - targets `ControlPlaneKit`, `agents-control` and `ControlPlaneKitTests`;
+  - dependencies: `AgentsKitCore` (path `../AgentsKit`), swift-nio (`NIOCore`, `NIOPosix`, `NIOHTTP1`, `NIOWebSocket`), swift-nio-ssl and async-http-client.
+
+  Check `swift build` on macOS and a Linux build with `scripts/build-linux-agentsd.sh`'s SDK.
 
 ---
 
-## Phase 3: User Story 1
+## Phase 2: Look gate (plan Phase 1)
 
-**MVP as built:** this Mac's window and host reach the control plane over two same-user Unix sockets in the control root (`control.sock` and `hosts.sock`), with roles by code signature (`RolePolicy.forControl`). The control plane runs inside the bridge process when it is given `--control-root` or `AGENTS_CONTROL_ROOT`. The window's clients all come from that one control link, and `HostSet` stays only for a window with no control plane. Disk reads and Finder stay on this Mac's host. The window's own files live under `window/` once a control plane is set. — The Mac window works through the control plane (P1) 🎯 MVP
+**Purpose**: settle the new and changed screens before any UI code. Alex approves them.
 
-**Goal**: a scratch window paired as operator does everything it does today, through `agents-control` to an `agentsd --control` on this Mac.
-
-**Independent test**: quickstart.md steps 1–6 with a real Claude turn: start, question, answer, files, terminal, stop, control plane down and back.
-
-- [x] T018 (the listener lives in `ControlNet`, in the bridge process; its own port, `AGENTS_CONTROL_PORT`, 8791 by default, and Bonjour type `_agents-control._tcp`) [US1] Put `ControlRouter` in place of the line pipe in `Control/Sources/main.swift`:
-  - The `--root` flag, defaulting to `~/Library/Application Support/Agents Control`.
-  - The `AGENTS_CONTROL_PORT` env var (default 8790), plus `AGENTS_CONTROL_NO_BONJOUR` and `AGENTS_CONTROL_NO_MAILBOX` for walks.
-  - Clients are keyed by `clients.json`.
-  - A `code --client <grant>` / `code --host` subcommand prints a pairing code, for walks and scripts.
-- [x] T019 (`ControlKeys`: identities c:/h:/p:/e:, salts of their own; keys in 0600 files, not the keychain) [US1] In `Control/Sources/DirectLink.swift`, add host PSKs: identity `h:<id>`, derived with HKDF(ECDH, "agents-host-v1", id), plus the enrolment identity `e:`. Client PSKs `d:` and `p:` stay as they are, so today's devices' keys still work.
-- [x] T020 [US1] Add a host listener path in `Control/Sources/main.swift`. An `h:` connection becomes a `HostSession`. An `e:` connection may call only `hosts/announce`, which issues a key, writes `hosts.json`, and replies `{host}`.
-- [x] T021 [US1] (MVP: `--control <socket>` and `--host-id`, over the control plane's local socket; codes and the keychain come with TLS) Add `--control <code>` and `--control-home` to `Daemon/Sources/main.swift` and `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCommandLine.swift`.
-  - `<code>` enrols once and stores the host key: in the keychain on a Mac, or in a `0600` file on Linux.
-  - `--control-home` dials the control plane on loopback with the stored key.
-  - Both imply `--serve`.
-- [x] T022 (`ControlDialling`) [US1] Write a macOS TLS-PSK dialer for `ControlUplink` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ControlUplink+Network.swift`, reusing `LinkTLS` from `AgentsKitCore/Remote/LinkTLS.swift`. Keep it behind `canImport(Network)`.
-- [x] T023 (and a remote endpoint, a membership and key in the window’s root) [US1] Write `ControlConfig` for the window in `App/Sources/Control/ControlConfig.swift`. It holds the control-plane address and the window's client id, in defaults scoped by root (the scratch-defaults lesson). The window's key goes in the keychain.
-- [x] T024 (one `ControlLink`; `HostSet` starts only when there is no control plane) [US1] In `App/Sources/AppModel.swift`, when `ControlConfig` exists, build clients from one `ControlLink`: one `DaemonClient` per host from `hosts/list` and `control/hostChanged`, instead of `SocketLink` + `HostSet`. Without it, keep today's path untouched (R7 Transition).
-- [x] T025 (`ThisMacHost`; Finder and disk reads stay on this Mac, `files/*` for the rest) [US1] Write `ThisMacHost` in `App/Sources/Control/ThisMacHost.swift` (R11): the `HostID` whose `machineID` matches this Mac. Replace the `host == .mac` gates with it in:
-  - `App/Sources/Sidebar/FilesPane.swift`, plus pictures and `OpenElsewhere.swift`
-  - `BackgroundPane`, `AgentRow` (Show in Finder, `worktreeIsThere`), `WorkflowPage` and `WorkflowRow`, with the `files/*` RPC path for other hosts
-- [x] T026 (`WindowFiles` moves them under `window/` once, and the keychain service stays the root's) [US1] Move the window's own files (`credentials.json`, relay certificates, `hosts.log`) out of the host root and into the window's support folder when `ControlConfig` exists, in `App/Sources/Hosts/Lending.swift` and the files that write them.
-- [x] T027 (lent on the host's channel; the hosts page says the relay needs this Mac on the same network) [US1] Credentials: lend through each host's `DaemonClient` over its channel, operator only (FR-020). Check `App/Sources/Hosts/Lending.swift` needs nothing beyond its new client source.
-  - Show `SignInRelays` for servers as "needs this Mac on the same network" (the regression R9 states).
-- [x] T028 (`ControlAwayStrip`; projects stay listed and grey while it is up) [US1] Show the away state in the sidebar (frame H): every host's projects stay listed but greyed, under one strip, **Can't reach the control plane**, that names the expected address. The strip goes in `App/Sources/Sidebar/` next to today's offline-server strip, reusing `HostProblem+Words.swift`.
-- [x] T029 (Connect… pairs with a code; walks/network.md) [US1] Pairing the window: the window's pairing client (`clients/announce` with kind `mac`) goes in `App/Sources/Control/WindowPairing.swift`, reusing `DeviceKey` and `NetworkLink` from AgentsKitCore. Check the keychain access group builds for macOS.
-  - For walks, the env var `AGENTS_CONTROL=<code>` pairs without UI.
-- [x] T030 [US1] (walks/us1.md) Walk: quickstart steps 1–6 on `/tmp/cp-walk` with a real Claude turn. Screenshot each step. Record the result in `specs/058-control-plane/walks/us1.md`.
-
-**Checkpoint**: MVP. The window works through the control plane on a scratch root, and the old path is untouched.
+- [ ] T027 [P] Draw frames K–N in `specs/058-control-plane/look/wireframes.html`, the same style as A–J, and export `k.png`–`n.png`. The frames:
+  - **K**: the window's first run, in two states: the host app is absent, which gives *Connect to a control plane* and *Set one up on this Mac*, pointing to the download; and the host app is found by Bonjour, which gives *Pair with “Alex's Mac”*.
+  - **L**: the host app's window: this host's state, the code to pair a window or phone, *Run the control plane here*, *Join one elsewhere*, *Relay for my devices*, and the move.
+  - **M**: Add a Server, with two tabs: *Run a command*, showing a host code and the one-line command; and *Install over ssh*, with the destination and a key used once.
+  - **N**: Clients, with a relayed device and its away marker, and the "reached through <Mac>" line.
+- [ ] T028 Update `specs/058-control-plane/look/README.md` with what each of K–N shows and why. Ask Alex to approve with AskUserQuestion. Record his decisions in the README and stop UI work until he answers.
 
 ---
 
-## Phase 4: User Story 2 — First run: connect to one, or run one here (P1)
+## Phase 3: Foundational (plan Phase 2; blocks every story)
 
-**Goal**: frames A, B and C. Without `ControlConfig`, the window shows only the two choices, and **Run one on this Mac** leaves a working, empty window in under a minute (SC-003).
+**Purpose**: `agents-control` as a single-copy service over the store, the key exchange and
+WebSockets, with hosts and clients able to dial it. There is no UI change here beyond the
+transport.
 
-**Independent test**: a scratch root with no control plane: choose Run one here, see This Mac as a host, restart the window, and see it connect at once.
+- [ ] T029 [P] Write `ControlStore` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/ControlStore.swift`, as contracts/store.md gives it: `get`, `put(when: .absent | .matching(etag) | .always)`, `delete` and `list(prefix:)`. Also write the errors `StoreError.conflict` and `.unavailable`, and a `MemoryStore` for tests.
+- [ ] T030 [P] In `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift` and `ControlCode.swift`:
+  - Add `owner: PersonID` and `rev: Int` to `ClientRecord` and `HostRecord`. Add `relay: Bool`, `machineID` and `installedBy: command | ssh(destination)` to `HostRecord`, and remove `reach`.
+  - Add `PersonID`, `Lease`, `CopyRecord` and `ControlEvent` as in data-model.md.
+  - Change the code text to `agents-control:2:<c|h>:<grant|->:<url>:<pin|->:<secret>:<name>`, keeping a reader for version 1.
+- [ ] T031 [P] In `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
+  - move `noSuchHost` to -32074;
+  - add `changedElsewhere` (-32071) and `storeUnavailable` (-32073), as contracts/control-api.md gives them;
+  - update every use and test.
+- [ ] T032 Make `ControlMethods` read and write through `ControlStore` instead of `GrantStore`, in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlMethods.swift`:
+  - a record cache with ETags;
+  - store first, then change;
+  - `lastSeen` written at most hourly;
+  - `lastOperator` checked with `.matching`;
+  - a conflict answered with `changedElsewhere`.
 
-- [x] T031 [P] [US2] Add the two launch-agent plists to `App/LaunchAgents/` and copy them to `Contents/Library/LaunchAgents` in `project.yml`:
-  - `com.alexecollins.agents.control.plist` runs `agents-control` with `KeepAlive` and `RunAtLoad`.
-  - `com.alexecollins.agents.host.plist` runs `agentsd --serve --control-home`.
-- [x] T032 (scratch roots: labelled launchd jobs from plists in `<root>/control`, booted out by `remove`) [US2] Write `LocalServices` in `App/Sources/Control/LocalServices.swift` using `SMAppService.agent(plistName:)`: register, status and unregister (R5).
-  - Before registering, check for leftover jobs with `launchctl print gui/<uid>/<label>`.
-  - A scratch root uses labels suffixed with the root's hash, so it never touches the real labels.
-  - If the service is already registered, don't install it twice; just pair (US2.4).
-- [x] T033 (in its place: the local socket is the pairing, operator by code signature; a code comes with pairing another Mac) [US2] Loopback pairing: `agents-control` issues an operator code to a caller with the same uid on a loopback-only Unix socket `<control root>/pair.sock`. `LocalServices` uses it to pair the window.
-- [x] T034 [P] [US2] Build frame A in `App/Sources/Control/FirstRunView.swift`: two cards, with Run one on this Mac marked as the usual choice and the sleep caveat. There is no sidebar or toolbar until one is chosen.
-- [x] T035 [P] [US2] Build frame B in `App/Sources/Control/RunHereSheet.swift`: the steps, and the Login Items note when macOS asks.
-- [x] T036 (the Bonjour list and code field are real; Connect says pairing is not built yet) [P] [US2] Build frame C in `App/Sources/Control/ConnectSheet.swift`: control planes found by Bonjour, listed by name, plus a code field. The window is an operator only if the code is an operator code.
-- [x] T037 [US2] Show `FirstRunView` from `App/Sources/ContentView.swift` when there is neither a `ControlConfig` nor a legacy root with data. Keep the modifier chain on `ContentView()` in `AgentsApp` identical (the scratch-app-opens-no-window lesson).
-- [x] T038 (walks/us2.md) [US2] Walk: a scratch root with no data. Run one here, then check the host is listed, a restart reconnects, and logout survival (`launchctl print` shows both jobs). Unregister afterwards. Record in `specs/058-control-plane/walks/us2.md`.
+  The store protocol moves to AgentsKitCore if `ControlMethods` needs it; otherwise it takes an injected store. Delete `GrantStore.swift` and its tests.
+- [ ] T033 [P] Write `FolderStore` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/FolderStore.swift`:
+  - the ETag is SHA-256 of the contents;
+  - `put` takes `flock` on `<key>.lock`, compares, writes a temporary file, `fsync`s it and renames it into place;
+  - `list` walks the prefix.
+- [ ] T034 [P] Store conformance tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/StoreConformanceTests.swift`. Run them against `MemoryStore` and `FolderStore`, and against `S3Store` when `AGENTS_TEST_S3` is set:
+  - create-only conflicts;
+  - a stale `matching` conflicts;
+  - `list` sees new keys;
+  - a spent code is written once when 20 tasks race;
+  - the start-up probe fails on a store that ignores conditions (a test double).
+- [ ] T035 [P] Write `ControlAuth` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlAuth.swift`. It covers both sides of the three messages in contracts/wire.md (hello, auth, ok or refused):
+  - the transcript `"agents-auth-v1" | sn | pn | id | origin`;
+  - the MACs tagged `c` and `s`;
+  - K for `c:`, `h:`, `p:`, `e:` and `x:` using `ControlAgreement`;
+  - `origin` normalised to lowercase scheme, host and port.
+- [ ] T036 [P] Key exchange tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlAuthTests.swift`:
+  - each identity kind round-trips;
+  - a wrong key, a replay to another origin, a flipped nonce, an expired code and a spent code are each refused with the contracts' reason;
+  - the server's MAC is checked by the client;
+  - a device key made by today's `DeviceKey` proves itself as `c:` under the Mac's relay key (FR-038).
+- [ ] T037 Write the HTTP and WebSocket server in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/HTTPServer.swift`:
+  - `GET /v1/connect` upgrades;
+  - `GET /healthz` gives 200;
+  - `GET /readyz` gives 200 after a store read and 503 otherwise;
+  - optional NIOSSL termination from `AGENTS_CONTROL_TLS_CERT` and `_KEY`, or `--self-signed <dir>`, which makes the certificate and prints the pin;
+  - pings every 20 s, closing after two missed;
+  - a 64 MB message cap.
+- [ ] T038 [P] Rework `Packages/AgentsKit/Sources/LinuxControlDial/LinuxControlDial.swift` into `HostDial`, a `NIOWebSocket` client over NIOSSL. It checks either a publicly trusted certificate or a pin, runs `ControlAuth` as the peer, and returns a `LineTransport`. It is linked into `AgentsKit` on macOS and Linux both (drop the Linux-only condition in `Packages/AgentsKit/Package.swift`), and `ControlUplink` uses it.
+- [ ] T039 Write `Session` in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/Session.swift`. After `ControlAuth`, a WebSocket becomes a router client session, a host uplink, or a code session:
+  - a code session may send only `clients/announce` or `hosts/announce`;
+  - it creates `codes/<hash>.spent` with `.absent` before admitting;
+  - it closes after the reply.
 
----
+  Every text message is one wire line.
+- [ ] T040 [P] Write the apps' transport in `Packages/AgentsKit/Sources/AgentsKitCore/Control/WebSocketLink.swift`: `URLSessionWebSocketTask` with a pin-checking delegate, `ControlAuth` as the peer, and one message per line. It is gated on `canImport(Foundation) && !os(Linux)`. `ControlLink` takes it in place of the TLS-PSK dial.
+- [ ] T041 Write `ControlService` and the `agents-control` CLI in `Packages/ControlPlane/Sources/ControlPlaneKit/ControlService.swift` and `Sources/agents-control/main.swift`:
+  - `serve`: store from `AGENTS_STORE`; key from `AGENTS_CONTROL_KEY_FILE`, `AGENTS_CONTROL_KEY` or an inherited descriptor, `--key-fd`; URL from `AGENTS_CONTROL_URL`;
+  - `code --client operator|device` and `code --host`;
+  - `hosts` and `clients` (list);
+  - `--store` for `code`, `hosts` and `clients`.
 
-## Phase 5: User Story 3 — A server joins (P2)
+  On first start it writes `control.json` and `people/<id>.json` with `.absent`. It refuses to start if the key does not match `control.json`'s `controlKey`.
+- [ ] T042 Point `agentsd --control <url|code>` at `HostDial`. The membership stores `url` and `pin` instead of addresses, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/Daemon.swift` and `LinuxControlJoin.swift`. Then:
+  - remove `ControlNet`, `ControlDialling`, `UnixSocketListener`'s control use and `ControlPlane.swift`'s bridge wiring, once `ControlServiceTests` (T043) passes;
+  - keep `daemon.sock` for agent tools (FR-021);
+  - check that `ControlNetTests` is replaced by T043.
+- [ ] T043 End-to-end tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/ControlServiceTests.swift`. Using a `FolderStore` in a temporary folder, a self-signed copy on a loopback port, a host dialled with `HostDial`, and a client over `WebSocketLink`, check:
+  - enrolment by code;
+  - `agents/list` routed to the host;
+  - an operator-only call refused for a device;
+  - a code used twice is refused;
+  - a forgotten client is cut off;
+  - the copy restarting and both sides redialling.
 
-**Goal**: add the devbox from the window. It becomes a host every client sees. The ssh-reached path comes first (R8), and dial-out follows spike S1.
-
-**Independent test**: add the devbox, start a turn there, and see its project from a second client.
-
-- [x] T039 (`SSHHosts`, in the kit; the binaries are found in the app bundle the control plane is in) [US3] Move `SSHMaster`, `ServerInstaller` and `ToolsetInstaller` into use by `Control/Sources/HostInstall.swift` for `hosts/install`, `hosts/update` and `hosts/checkAgain` (R9):
-  - `needsTrust {fingerprint}`, then a second call with `trust`.
-  - Progress goes out as `control/installProgress {name, step, of, detail}`.
-  - Binaries come from the control plane's bundle `Resources/servers`.
-- [x] T040 (`SSHUplink`) [US3] Write `Control/Sources/SSHHost.swift` (FR-012): a `HostSession` whose channels are separate socket connections over the `ssh -M -L` forward.
-  - `device` channels are bound with `connection/bindDevice`.
-  - Channel 0 is a `control` connection that carries `mailbox/carry`.
-  - `HostRecord.reach` is `ssh(…)`.
-- [x] T041 [US3] `hosts/remove {host, purge?}` revokes the key and closes the uplink at once. It never stops or deletes the host's agents (FR-014).
-- [x] T042 (Settings ▸ Control plane ▸ Hosts ▸ Add a Server; the window keeps a client per control-plane host) [US3] Point `App/Sources/Hosts/AddServerFlow.swift` and `AddServerSheet.swift` at `hosts/install` when `ControlConfig` exists. Render the progress notifications and the trust step. Today's path stays when it doesn't.
-- [x] T043 (S1 passed: BoringSSL agreed suite `ccac` from a musl binary; the two libraries add 51.5 MB, and BoringSSL is linked twice) [US3] Spike S1 (R8) in `Packages/AgentsKit/Sources/ControlUplinkLinux/` (a Linux-only target): `swift-crypto` + `swift-nio-ssl` TLS-PSK against the Network.framework listener, statically linked with musl. Measure the binary growth. Write the result in `specs/058-control-plane/research.md` R8.
-  - If S1 fails, ask Alex whether "Mac, with Linux hosts" is acceptable.
-- [ ] T044 [US3] If S1 passes: `agentsd --control` on Linux dials out using the S1 dialer. `hosts/install` then enrols dial-out by default, and ssh-reached remains the fallback.
-- [x] T045 (walks/us3.md; network drop/return not walked) [US3] Walk with test-servers: add the devbox and start a turn there. Drop the container's network and bring it back, and check the agent kept working and the host reconnected. Remove the host, and check it disappears from every client while its agents stay. Record in `specs/058-control-plane/walks/us3.md`.
-
----
-
-## Phase 6: User Story 5 — The person decides what each client may do (P2)
-
-**Goal**: frames D, E, F and G. Settings ▸ Control plane is one group (Overview, Hosts, Clients) opening like Shared (055).
-
-**Independent test**: pair a fake device, promote it and see an operator call succeed; forget it and see it cut off and refused.
-
-- [x] T046 [P] [US5] Add a **Control plane** rail group that opens like Shared, in `App/Sources/Settings/SettingsRail.swift` (or wherever 055's rail lives). It replaces the Devices and Servers entries when `ControlConfig` exists.
-- [x] T047 [P] [US5] Build frame D in `App/Sources/Control/ControlOverviewPane.swift`: where the control plane runs, its version, uptime and port, Restart, Reachable away from home, the sleep caveat, and summary cards for Hosts and Clients.
-- [x] T048 (Add a Server… and Add by Code… disabled until US3 and pairing) [P] [US5] Build frame E in `App/Sources/Control/ControlHostsPane.swift`: today's Servers pane plus This Mac, which has no buttons (the look-gate decision). Each host shows its state and "connects out" or "reached over ssh". Add a server… uses T042.
-- [x] T049 (phones paired to the host listed with a fixed Device grant until US4) [P] [US5] Build frame F in `App/Sources/Control/ControlClientsPane.swift`: today's Devices pane plus the window. Each client gets a grant menu (`clients/setGrant`) and Forget (`clients/forget`), and `lastOperator` shows as a plain sentence.
-- [x] T050 (Pair a Mac: grant first; the code waits for network pairing and the sheet says so; Pair a Device is today’s sheet) [US5] Build frame G in `App/Sources/Control/PairClientSheet.swift`: choose the grant first, then show the QR code for a device or the code as text for a Mac.
-- [x] T051 [US5] (tested in ControlRouterTests.changingAGrantReopensTheChannelsWithTheNewOne; seen live in walks/us5.md) Grant changes apply to the next call. The router reopens that client's channels with the new grant (data-model rule). Test it in `ControlRouterTests.swift`.
-- [x] T052 (walks/us5.md) [US5] Walk: a fake device client over TLS-PSK (the test-servers helper). Promote it, call an operator method, forget it, and see its connection close and its reconnect refused. Screenshot D, E, F and G against the frames. Record in `specs/058-control-plane/walks/us5.md`.
-
----
-
-## Phase 7: User Story 4 — The iPhone and iPad see every host (P2)
-
-**Goal**: the Remote uses `ControlLink` and shows every host's projects grouped by host. A device grant is refused operator calls twice.
-
-**Independent test**: a fake device lists projects and sees the devbox's project, and starting an agent there works. The Remote is built for the generic simulator only; the phone look is Alex's.
-
-- [x] T053 (one more connection over the same link when `control/status` answers; routed by what a call names; walks/us4.md) [US4] In `Remote/Sources/RemoteModel.swift`, move from one `DaemonClient` to one per host over `ControlLink`, fed by `hosts/list` and `control/hostChanged`. Keep the legacy path for a control plane that answers no `control/status`.
-- [x] T054 (`HostListHeading`; the phone groups projects once a control plane has more than one host, and an offline host stays, greyed) [P] [US4] Add host headers in the Remote's project list in `Shared/UI/`, following frame H's sidebar.
-- [x] T055 (`RelayHostCore.setOpenDevice` → `ControlPlane.attachDevice`; not walked) [US4] Relay (R6): `Control/Sources/RelayHost.swift` attaches a relay session to the router as that device's client session, speaking the client wire.
-- [x] T056 (a host sends `attention/need` unsealed; the mailbox seals to the device every client's presence chooses) [US4] Notices (R6): hosts send `attention/need` unsealed over channel 0. `Control/Sources/MailboxTransport.swift` picks the device by presence across hosts and seals with `Envelope.seal`. Wire it in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Attention.swift` for when the daemon runs under `--control`.
-- [x] T057 (fake device: `FakeDeviceLiveTests`; Remote built for the generic simulator; the phone look is Alex's) [US4] Build Remote for the generic iOS simulator. Walk with the fake device: projects from every host, an agent started on the devbox, and operator calls refused at the control plane and at the host. Record in `specs/058-control-plane/walks/us4.md`, and ask Alex to look on the phone.
-
----
-
-## Phase 8: User Story 6 — Moving an existing set-up across, once (P2)
-
-**Goal**: frame I and `agents-control migrate --from <root>` (R7), which is never run on launch.
-
-**Independent test**: a scratch root seeded with agents, a paired fake device and the devbox added the old way. Move it; everything is present, the device connects with its old key, and the devbox is a host.
-
-- [x] T058 (built as `ControlMove` in `Packages/AgentsKit/Sources/AgentsKit/Control/ControlMove.swift`, run by the window rather than an `agents-control migrate` command) [US6] Write `Control/Sources/Migrate.swift`, following R7 steps 1–7:
-  - Refuse a control root that already has clients or hosts.
-  - `devices.json` becomes `clients.json` with `grant: device`, keeping `relay-mac-key`.
-  - The old root becomes the home host `mac`, and no files move.
-  - Each server in `hosts.json` goes through `hosts/install`, with failures listed with their reasons. `hosts.json` is renamed `hosts.json.moved`.
-  - On any failure before the launch agents are registered, nothing in the old root changes.
-- [x] T059 (built as `App/Sources/Control/MoveAcross.swift`: strip above the columns, sheet on the window) [US6] Build frame I in `App/Sources/Control/MoveSheet.swift`. It is offered from a banner when a legacy root has data and there is no `ControlConfig`. It says what is kept, runs the migrate, registers `LocalServices`, pairs, then switches `AppModel` to `ControlLink`.
-- [x] T060 (`ControlMoveTests`, 4; the move lives in AgentsKit beside `GrantStore`) [P] [US6] Migrate tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/MigrateTests.swift` (with the core of the move in AgentsKitCore): device keys unchanged, idempotent refusal, and a failure part-way leaves the old root intact.
-- [x] T061 (walked on `/tmp/run-mw` with an old-way window, devbox and fake iPhone; `walks/us6.md`) [US6] Walk the move on the seeded scratch root. Record in `specs/058-control-plane/walks/us6.md`.
-
-**Alex's live set-up is moved only on his go-ahead, once, deliberately. There is no task for it here.**
+**Checkpoint**: one copy serves a host and a client over WebSockets with state in a folder.
+Walk quickstart Walk 1, steps 1–2, with `agentsd` and a scripted client.
 
 ---
 
-## Phase 9: User Story 7 — Another Mac as a host (P3)
+## Phase 4: User Story 1 — The Mac window works through the control plane, sandboxed (P1) 🎯 MVP
 
-- [x] T062 (Connect’s host code runs only the host launch agent; the walk is T063) [US7] Add a "Run only a host here" choice to `ConnectSheet.swift`. It takes a host code and registers only the host launch agent, with `--control <code>`.
-- [ ] T063 [US7] Walk: a second `agentsd --control` under another scratch root. Its projects are listed under their own host header. Record in `specs/058-control-plane/walks/us7.md`.
+**Goal**: the window, built with `AGENTS_STORE`, is sandboxed, links only `AgentsKitCore` and
+`Shared`, and does everything through the control plane.
+
+**Independent test**: quickstart Walk 1, steps 3–7, with no child processes and no sandbox
+violations.
+
+- [ ] T044 [US1] Add the `AGENTS_STORE` configuration to the Agents target in `project.yml`:
+  - `App/Agents-Store.entitlements` with `com.apple.security.app-sandbox`, `network.client`, `device.audio-input` and `files.user-selected.read-only`;
+  - `NSBonjourServices` = `_agents-control._tcp`, and `NSLocalNetworkUsageDescription`;
+  - link `AgentsKitCore` only;
+  - no `Contents/Helpers`, `Resources/servers` or `Resources/toolsets` in that configuration.
+
+  The developer configuration stays as it is until T112.
+- [ ] T045 [P] [US1] Write the Mac host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/MacHostMethods.swift`:
+  - `mac/reveal {path}`, `mac/open {path, app?}` and `mac/terminal {path?, command?}`, operator only, answered only on macOS with `NSWorkspace`;
+  - Linux answers `unsupportedHere`;
+  - add them to `DaemonAPI.Method` and to the device refusal list, and add grant tests.
+- [ ] T046 [P] [US1] Write the shared-folder host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/SharedMethods.swift`: `shared/list` and `shared/read` for any grant, and `shared/write` and `shared/remove` for operators, over the host's `~/.agents` (054's layout). Add `files/stat {path}` → `{exists, kind, size, modified}`, and add grant tests.
+- [ ] T047 [US1] Replace every `isOnThisMac` direct read with host calls. The places:
+  - in `App/Sources/AppModel.swift`, `textFile` becomes `files/read` and `pathIsThere` becomes `files/stat`;
+  - `App/Sources/Projects/WorkflowPage.swift`, `WorkflowRow.swift`, `App/Sources/Sidebar/BackgroundPane.swift`, `FilesPane.swift` and `App/Sources/AgentList/AgentRow.swift`;
+  - `App/Sources/Settings/SharedSkillsPage.swift` and `SharedInstructionsPage.swift`, which use `shared/*`.
+
+  Keep `ThisMacHost` only to decide whether Reveal and Open are offered.
+- [ ] T048 [US1] Send Reveal in Finder, Open in another app and open Terminal through `mac/*` on this Mac's host. The places are `App/Sources/Sidebar/OpenElsewhere.swift`, `App/Sources/Commands/AgentsCommands.swift`, `AgentRow.swift`, `BackgroundPane.swift` and `RuntimeAccountView.swift`.
+- [ ] T049 [US1] Remove from the window, under `AGENTS_STORE`:
+  - `SocketLink` use and `DaemonLock`;
+  - `LocalServices`, which moves in T055;
+  - `HostSet`, `ServerConnection`, `SSHCommand`, `SSHMaster` and `ServerBinaries`;
+  - `ClaudeKeychainSignIn`, `MacSignInRelay` and `SignInRelays`, which move in T091;
+  - `WindowFiles`.
+
+  Use the S5 list (T025) as the checklist, and make the store configuration build.
+- [ ] T050 [US1] In `App/Sources/Control/ControlConfig.swift`, the config holds `url`, `pin` and the client id in the container's defaults, with the key in the window's keychain. `AppModel` builds every client from one `ControlLink` over `WebSocketLink`. It has no path without a control plane under `AGENTS_STORE` (FR-028).
+- [ ] T051 [US1] Build frame K in `App/Sources/Control/FirstRunView.swift` and `ConnectSheet.swift`, after Alex approves it (T028). It has the two states. *Set one up on this Mac* opens the host app's download page URL, taken from `Info.plist` `AgentsHostDownloadURL`, and Bonjour finds an installed host app.
+- [ ] T052 [US1] Presence under the sandbox: in `App/Sources/Presence/PresenceReporter.swift`, drop the `CGSSessionScreenIsLocked` probe. The window reports only its own activity, and the Mac host reports the lock state. Check with 043's presence tests.
+- [ ] T053 [US1] Walk quickstart Walk 1, steps 1–7, with the store configuration on a scratch root and a real Claude turn:
+  - screenshot each step;
+  - check the window has no child processes and there is no sandbox violation in `/usr/bin/log`;
+  - check Reveal and the shared skills page reach the host.
+
+  Record it in `specs/058-control-plane/walks/us1-store.md`.
+
+**Checkpoint**: the sandboxed window works end to end against one copy (SC-001).
 
 ---
 
-## Phase 10: Polish & cross-cutting
+## Phase 5: User Story 2 — First run: connect to one, or set one up here (P1)
 
-- [ ] T064 [P] Write the new `docs/explanation/control-plane.md`: what the control plane, hosts and clients are, where to run it, what happens when it's down, and why (R1).
-- [ ] T065 [P] Update `docs/explanation/window-and-daemon.md`, `phone-and-ipad.md` and `projects-hosts-worktrees.md` as the spec's Docs section says. Also update README set-up.
-- [ ] T066 [P] Add `docs/how-to/` pages: run a control plane on this Mac, connect to one elsewhere, add a server, move an existing set-up across. Add them to `mkdocs.yml`.
-- [ ] T067 SC-004 measurement (R10): shell echo round trip for the direct socket, the loopback channel and the devbox on both paths. Write it in `specs/058-control-plane/walks/latency.md`. If it fails, stop and ask Alex about a stream channel.
-- [ ] T068 Run `security-review` on the branch. The network-reachable operator role, host PSKs, the loopback pairing socket and `open` role-setting are the focus.
-- [ ] T069 Compare six full `swift test` runs on this branch and on main. Build both schemes and pass the Linux gate.
-- [ ] T070 Remove the old window path (`SocketLink` spawning, `HostSet`) in a **separate** change, only after the move has been walked on Alex's set-up (R7 Transition).
+**Goal**: Agents Host.app installs outside the store, runs a host and, if chosen, a
+single-copy control plane, and the window pairs with it.
+
+**Independent test**: quickstart Walk 1 with the host app's scratch build instead of
+hand-started processes, and SC-006 timed.
+
+- [ ] T054 [US2] Add the `Agents Host` target to `project.yml`:
+  - Developer ID signing, bundle `com.alexecollins.agents.host`, `LSUIElement`;
+  - `Host/Sources`;
+  - embedded helpers in `Contents/Helpers`: `agentsd`, `agents-control` (macOS build of `Packages/ControlPlane`) and `agents-relay` (T096);
+  - `Contents/Resources/servers` and `toolsets` moved here from the Agents target;
+  - `Host/LaunchAgents/*.plist` in `Contents/Library/LaunchAgents`.
+- [ ] T055 [US2] Move `LocalServices` from `App/Sources/Control/LocalServices.swift` to `Host/Sources/LocalServices.swift`:
+  - `SMAppService.agent` for `agentsd`, always;
+  - `agents-control` only when *Run the control plane here* is on;
+  - `agents-relay` only when relaying (T097).
+
+  Keep the scratch-root labelled jobs.
+- [ ] T056 [US2] The control plane's key in the host app, in `Host/Sources/ControlKey.swift`: made once and kept in the keychain. On a Mac with today's set-up, it is the existing `relay-mac-key`. It is handed to `agents-control` through an inherited descriptor (`--key-fd`) by a small launcher, `Host/Sources/ControlLauncher.swift`, that the launch agent runs. The key is never written to disk (FR-010).
+- [ ] T057 [US2] On first start, the single copy makes a self-signed certificate in its folder and a store in `~/Library/Application Support/Agents Control/store`. It advertises `_agents-control._tcp` with the pin in its TXT record, and listens on 8791 with URL `https://<.local name>:8791`.
+- [ ] T058 [US2] Build frame L in `Host/Sources/HostWindow.swift`, after approval (T028): state, the code to pair, *Run the control plane here*, *Join one elsewhere* (a host code, which gives only the host), *Relay for my devices*, and the move entry (T086).
+- [ ] T059 [US2] The window pairs with a host app it found (frame K, second state): a code handed over through the host app's window, or typed. Installing twice registers nothing twice (US2-4).
+- [ ] T060 [US2] Walk US2 on a scratch root:
+  - install the host app's scratch build and choose *Run the control plane here*;
+  - pair the store-configured window and time it (SC-006);
+  - log out and in (or `launchctl print` shows the jobs);
+  - unregister the jobs afterwards.
+
+  Record it in `specs/058-control-plane/walks/us2-host-app.md`.
+
+---
+
+## Phase 6: User Story 3 — The control plane keeps going when one copy stops (P1)
+
+**Goal**: several copies over S3 or a folder, any copy serving anyone, with failover.
+
+**Independent test**: quickstart Walk 2 in full.
+
+- [ ] T061 [US3] Proxied host sessions in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlRouter.swift`. A `HostSession` is either local or proxied, and a proxied one is a stream on a peer link with this copy's own channel numbers. Add router tests for:
+  - a client on B reaching a host on A;
+  - a `gone` closing B's channels;
+  - a grant check at B.
+- [ ] T062 [P] [US3] Write `S3Store` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/S3Store.swift` over async-http-client, following contracts/store.md:
+  - SigV4 signed with `ControlAgreement`'s HMAC-SHA256;
+  - `If-None-Match`, `If-Match` and ETags;
+  - path-style when `AGENTS_STORE_PATH_STYLE=1`;
+  - `AGENTS_STORE_ENDPOINT`;
+  - credentials from the environment or `~/.aws`.
+
+  Run T034's conformance against MinIO.
+- [ ] T063 [US3] Write leases in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/Leases.swift`, following data-model.md's Lease states:
+  - create or take over on an authenticated uplink (epoch + 1);
+  - renew every 10 s with `.matching`;
+  - on a lost renewal, close the uplink and broadcast `hostMoved`;
+  - on an expired lease, mark the host offline.
+- [ ] T064 [US3] Write the copy registry and peer links in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/PeerLinks.swift`:
+  - `copies/<id>.json` with a heartbeat every 10 s, and gone after 30 s;
+  - one WebSocket for each pair of copies, with `ControlAuth` identity `x:`;
+  - the `{p, c, open|m|close|gone}` streams;
+  - `event`, `presence` and `host` messages;
+  - redial while both copies are registered.
+- [ ] T065 [US3] Channel mapping at the holding copy, in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/ProxyUplink.swift`: `(peer, c)` maps to a fresh uplink channel and back. A peer dropping closes its channels on the host.
+- [ ] T066 [US3] Changes across copies:
+  - store first, then broadcast `event` on every peer link, then write `events/<day>/<ulid>.json`;
+  - apply received events (close forgotten clients, reopen channels on a grant change, mark hosts);
+  - catch up from `events/` when joining;
+  - re-list every 15 s.
+- [ ] T067 [P] [US3] Copies tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/CopiesTests.swift`, with three in-process copies over one `MemoryStore`:
+  - a client on each copy sees every host;
+  - killing the holder moves the lease and the host redials;
+  - a code shown at one copy is used at another, once;
+  - a forget reaches every copy within 2 s;
+  - two grant changes race and one gets `changedElsewhere`;
+  - with the store down, live calls carry on and pairing gets `storeUnavailable`.
+- [ ] T068 [P] [US3] Write `deploy/Containerfile` for `agents-control`, with a static musl build and a non-root user. Write `deploy/compose.yaml` with MinIO (bucket `agents-walk`), three copies, and Caddy terminating TLS with a local CA whose pin goes in the codes. Add `deploy/README.md`.
+- [ ] T069 [US3] Walk quickstart Walk 2, steps 1–10, in Colima with the devbox, a scratch host, the store-configured window and the fake device. Screenshot and time the failovers (SC-003). Record it in `specs/058-control-plane/walks/us3-copies.md`.
+
+---
+
+## Phase 7: User Story 4 — A server joins by connecting out (P2)
+
+**Goal**: servers join by a shown command, or by an ssh install that keeps nothing.
+
+**Independent test**: quickstart Walk 3.
+
+- [ ] T070 [P] [US4] Write `scripts/host-install.sh`, served by the control plane at `GET /v1/install.sh` and linked from the command. It downloads the Linux host tarball for the machine (from the release, or from the copy with `--from-control`), installs it for the user with a systemd user unit, and runs `agentsd --control <code>`.
+- [ ] T071 [US4] `hosts/startEnroll` returns `{code, command}` in `ControlMethods.swift`, with the command built from `url`, `pin` and the code.
+- [ ] T072 [US4] Move `hosts/install` into the service, in `Packages/ControlPlane/Sources/ControlPlaneKit/Hosts/HostInstall.swift`, from `SSHHosts`:
+  - `{name, destination, key, trust?}`;
+  - the key is held in memory for the one call, with a private `ssh-agent` or `-i` on a 0600 temporary file deleted in `defer`;
+  - the host enrols over its own uplink afterwards;
+  - no master or forward is kept (FR-018a);
+  - the Linux binaries come from the host app's or container's resources.
+- [ ] T073 [US4] Remove `SSHUplink.swift`, ssh-reached `HostRecord.reach`, and `hosts/checkAgain`'s ssh path. `hosts/update` asks the host to update itself over its uplink.
+- [ ] T074 [US4] Build frame M in `App/Sources/Control/AddServerSheet.swift`, after approval: *Run a command* shows the code and command with a copy button; *Install over ssh* picks a key file, whose contents are sent once and never kept.
+- [ ] T075 [US4] Walk quickstart Walk 3 with test-servers on the devbox, both ways:
+  - no ssh process and no key file is left afterwards;
+  - a network drop and return;
+  - remove.
+
+  Record it in `specs/058-control-plane/walks/us4-servers.md`.
+
+---
+
+## Phase 8: User Story 5 — The iPhone and iPad see every host, at home and away (P2)
+
+**Goal**: the Remote dials the control plane over WebSockets, falls back to the relay, and is
+told when it is needed.
+
+**Independent test**: quickstart Walk 5 with the fake device.
+
+- [ ] T076 [US5] Move `Remote/Sources/RemoteModel.swift` onto `WebSocketLink` and `ControlLink`, with `url` and `pin` from the pairing code. Remove the Remote's TLS-PSK `NetworkLink` path for the control plane, keeping it only for a not-yet-moved Mac (until T112).
+- [ ] T077 [US5] Relay fallback in `Remote/Sources/`: when the control plane's URL cannot be reached, use the CloudKit relay. The device runs `ControlAuth` end to end through `agents-relay` (T096).
+- [ ] T078 [P] [US5] Update `FakeDeviceLiveTests` in `Packages/AgentsKit/Tests/AgentsKitTests/` to dial over `WebSocketLink`, and with `AGENTS_FAKE_DEVICE_RELAY=1` to go through a scratch `agents-relay`.
+- [ ] T079 [US5] Build the Remote for the generic iOS simulator. Walk quickstart Walk 5, steps 1–2, with the fake device. Record it in `specs/058-control-plane/walks/us5-phones.md`, and ask Alex about looking on the phone.
+
+---
+
+## Phase 9: User Story 6 — The person decides what each client may do (P2)
+
+**Goal**: frames D–G, done under the first build (T012), hold across copies, and relayed
+clients show as such.
+
+**Independent test**: US6 scenarios over two copies, as part of Walk 2 steps 8–9.
+
+- [ ] T080 [US6] Build frame N in `App/Sources/Control/ControlClientsPane.swift`, after approval: a relayed client's marker, and "reached through <Mac>".
+- [ ] T081 [US6] The Settings panes read `changedElsewhere` and `storeUnavailable` and say so in words in `App/Sources/Hosts/HostProblem+Words.swift`. The last-operator refusal holds across copies, as tested in T067.
+- [ ] T082 [US6] Walk: promote, forget and race over two copies, with screenshots of frames D–G and N. Record it in `specs/058-control-plane/walks/us6-grants.md`.
+
+---
+
+## Phase 10: User Story 7 — Moving an existing set-up across, once (P2)
+
+**Goal**: the host app takes over today's root in place, and devices move without pairing
+again.
+
+**Independent test**: quickstart Walk 4, steps 1–3.
+
+- [ ] T083 [US7] In the host app, point `agentsd` at the existing root `~/Library/Application Support/Agents` when it has data, copying nothing (FR-025). On a scratch root, this is `AGENTS_ROOT`.
+- [ ] T084 [US7] Write the store from `ControlMove` in `Packages/AgentsKit/Sources/AgentsKit/Control/ControlMove.swift`:
+  - `devices.json` entries become `clients/<id>.json` with grant `device` and their existing key;
+  - `hosts.json` servers are enrolled over ssh (T072), or listed with their command;
+  - the Mac's own host becomes `mac`.
+- [ ] T085 [US7] Tell moved devices the new URL and pin over the old bridge link and the relay (`control/moved {url, pin}`, a new notification to devices). Keep the old bridge's `DirectLink` running until every moved device has connected over WebSockets, or the person ends it from frame L.
+- [ ] T086 [US7] Run the move from frame L in `Host/Sources/MoveView.swift`, reusing frame I's content, instead of `App/Sources/Control/MoveAcross.swift`, which is removed under `AGENTS_STORE`.
+- [ ] T087 [P] [US7] Extend `ControlMoveTests` to cover the store output, a device key proving itself as `c:` afterwards, and a failed move leaving the old root working (FR-039).
+- [ ] T088 [US7] Walk quickstart Walk 4, steps 1–3, on a scratch root seeded the old way, with `FakeDeviceMoveLiveTests` (`pair`, then `again` over WebSockets). Record it in `specs/058-control-plane/walks/us7-move.md`.
+
+---
+
+## Phase 11: User Story 8 — The apps pass App Store review (P2)
+
+**Goal**: all three apps pass App Store Connect validation, and a demo is ready for App Review.
+
+**Independent test**: quickstart Walk 6.
+
+- [ ] T089 [US8] Add an App Store archive scheme and configuration for Agents (store configuration) and the Remote in `project.yml`, with production `aps-environment` from the distribution profile. Signing credentials are Alex's: ask before any upload.
+- [ ] T090 [US8] Write `scripts/check-store-archive.sh`. It lists every Mach-O in an `.xcarchive` and fails on anything but the app's own executable and its frameworks. It also checks the Mac archive's entitlements match T044's list.
+- [ ] T091 [US8] Move the Claude sign-in reading and the sign-in relay to the Mac host: `ClaudeKeychainSignIn` (`/usr/bin/security`) and `MacSignInRelay` (`openssl`, listener) go to `Packages/AgentsKit/Sources/AgentsKit/Daemon/`. Lending to a server goes host to host through the control plane, after an operator client approves the request in the window (a question card).
+- [ ] T092 [US8] Write the demo control plane in `deploy/demo/`: a compose file with one copy, one demo host with a canned runtime (`AGENTS_TEST_RUNTIME=echo`), and a long-lived device code. Also write `deploy/demo/REVIEW-NOTES.md`.
+- [ ] T093 [US8] Validate both archives with `xcrun altool --validate-app`. Walk quickstart Walk 6 from a fresh scratch window against the demo. Record it in `specs/058-control-plane/walks/us8-store.md`. Uploading or submitting is Alex's call.
+
+---
+
+## Phase 12: User Story 9 — Another Mac as a host (P3)
+
+**Goal**: the host app on a second Mac joins as a host only.
+
+**Independent test**: quickstart Walk 4, step 4.
+
+- [ ] T094 [US9] *Join one elsewhere* in frame L takes a host code and registers only `agentsd` with `--control <code>`. This replaces T062's choice in the window's `ConnectSheet`, which is removed under `AGENTS_STORE`.
+- [ ] T095 [US9] Walk: a second host app under another scratch root joins, and its projects show under their own heading. Record it in `specs/058-control-plane/walks/us9-second-mac.md` (was T063).
+
+---
+
+## Cross-cutting: relay and notices (US5 and US2 both need them)
+
+- [ ] T096 Cut `agents-relay` out of `Bridge/` into `Host/Relay/`: `RelayHost.swift` and `MailboxTransport.swift`. Remove `DirectLink` and the control plane from it. Add a background-only app bundle target with the CloudKit entitlement and a Developer ID provisioning profile. A relayed device gets a WebSocket to the control plane (`kind: relay`, `for: <device>`), with the key exchange passed through untouched.
+- [ ] T097 Notices: a copy forwards `attention/need`, with folded presence, to a relay host as `relay/deliver` on channel 0. `agents-relay` seals the need and posts it to the CloudKit mailbox, as `MailboxTransport` does today. Add `hosts/setRelay`. With no relay host, needs go only to connected clients. Add tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/NoticesTests.swift`.
+
+---
+
+## Phase 13: Polish and close (plan Phase 9)
+
+- [ ] T098 [P] Write `docs/explanation/control-plane.md` as the spec's Docs section gives it: copies, the store, hosts and clients, where to run it, what happens when it or the store is down, and why.
+- [ ] T099 [P] Update `docs/explanation/window-and-daemon.md`, `phone-and-ipad.md`, `projects-hosts-worktrees.md` and the `README.md` set-up, following the spec's Docs section.
+- [ ] T100 [P] Add `docs/how-to/` pages and put them in `mkdocs.yml`:
+  - set one up on this Mac;
+  - run the control plane as several copies with a bucket;
+  - connect a window or phone;
+  - add a server;
+  - move an existing set-up across.
+- [ ] T101 Measure R14: terminal echo and question delivery, median of 200, each compared with `daemon.sock`, through one copy, through two copies and through Caddy. Write the results in `specs/058-control-plane/walks/latency.md`. If SC-004 fails, stop and ask Alex.
+- [ ] T102 Run `security-review` on the branch. Focus on:
+  - the operator role reachable from the network;
+  - the key exchange and its lack of TLS binding;
+  - the shared control key across copies and its delivery;
+  - the store layout and its secrets;
+  - the ssh key given for an install;
+  - the relay passing the exchange through.
+- [ ] T103 Compare six full runs of `swift test` in `Packages/AgentsKit` and `Packages/ControlPlane` on this branch and on main. Build both schemes and the store configuration, and pass the Linux gate.
+- [ ] T104 Merge `main` again before closing, and re-run T103's builds.
+- [ ] T105 Alex's own move: only with his go-ahead (AskUserQuestion), and with the hand-started bridge on 8790 stopped first.
+- [ ] T106 In a **separate** change, after T105 is walked, remove:
+  - the developer window path (`SocketLink` spawning, `HostSet`, `LocalServices` in the window);
+  - the bridge's `DirectLink` and `Bridge/`;
+  - the `AGENTS_STORE` switch, so the store configuration is the only one;
+  - the Remote's old TLS-PSK path.
 
 ---
 
 ## Dependencies
 
-- Setup (T001–T003), then Foundational (T004–T017), then US1 (T018–T030), which is the MVP.
-- US2 needs US1 (the window must work as a client before first run can hand over to it).
-- US3, US5 and US4 each need US1. They are independent of each other, apart from US4's relay/notice tasks, which need T018.
-- US6 needs US2 (LocalServices, pairing) and US3 (`hosts/install`).
-- US7 needs US2.
-- T070 comes last, after Alex's own move.
+- **Setup and spikes** (T021–T026) come first. T025 (S5) sizes Phase 4. A failed S2 or S4 stops
+  the work for Alex.
+- **The look gate** (T027–T028) blocks every UI task: T051, T058, T074 and T080.
+- **Foundational** (T029–T043) blocks every story.
+- **US1** (P1) and **US3** (P1) can proceed in parallel after Foundational. They share only
+  `ControlRouter` (T061 touches it) and the MVP walk.
+- **US2** depends on T096 for the relay helper's target, but not on its behaviour. Its walk
+  needs US1's window.
+- **US4** needs Foundational, and T072 needs `HostInstall`'s resources from T054.
+- **US5** needs T096–T097.
+- **US6** needs US3.
+- **US7** needs US2 and T072.
+- **US8** needs US1 and T091.
+- **US9** needs US2.
+- **Polish** comes last, and T106 only after T105.
 
 ## Parallel opportunities
 
-- Foundational: T004, T005 and T013 together. Then T010, T011, T012 and T016 once their subjects exist.
-- US2: T031, T034, T035 and T036 together.
-- US5: T046–T049 together (separate panes).
-- Once US1 is in: US3, US4 and US5 can go to separate agents in their own worktrees off this branch. At most three.
-- Docs T064–T066 in parallel with anything.
+- **Spikes:** T022, T023, T024 and T025 are independent. So are T027 and the spikes.
+- **Foundational:** T029, T030, T031, T033, T035, T036, T038 and T040 touch different files.
+- **US1 and US3:** T045 and T046 (host methods) run alongside T062 (S3Store) and T068 (deploy).
+- **Docs:** T098, T099 and T100.
 
 ## Implementation strategy
 
-1. **MVP = Phases 1–3.** The window works through a control plane on a scratch root, and the old path still works. Stop, walk it, and show Alex.
-2. Next, US2, so a fresh window has somewhere to go.
-3. Then US3, US5 and US4, the reason the hub exists. Spike S1 decides whether Linux dials out.
-4. US6, the move, is last among the P2 stories, because it touches real data. It is walked on scratch and run on Alex's set-up only when he says so.
+1. **The MVP.** Spikes, the look gate, Foundational, then US1. A sandboxed window works
+   against one copy on this Mac, which is the App Store goal's heart, proven early.
+2. **Then US3,** the scaling goal, proven with three copies, MinIO and Caddy.
+3. **Then US2 and US7:** the host app and the move, which unblock Alex's own set-up.
+4. **Then US4, US5, US6, US8 and US9,** each walked on its own.
+5. **Close.** Nothing merges to main until Polish, and Alex decides when.
