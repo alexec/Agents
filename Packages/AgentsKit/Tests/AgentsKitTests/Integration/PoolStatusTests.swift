@@ -53,7 +53,7 @@ struct PoolStatusTests {
         #expect(status.anyOut)
         #expect(line(status, "claude")?.hasPrefix("Out · reset ") == true)
         #expect(line(status, "codex")?.hasPrefix("Out since ") == true)
-        #expect(line(status, "codex")?.contains("trying again after") == true)
+        #expect(line(status, "codex")?.contains("checking after") == true)
         #expect(line(status, "copilot")?.hasPrefix("Rate limited · trying again at ") == true)
         #expect(status.countLine != nil)
     }

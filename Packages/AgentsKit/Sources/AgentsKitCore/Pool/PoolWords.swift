@@ -33,7 +33,7 @@ public enum PoolWords {
             return "Out · reset \(time(until, now: now))"
                 + (why == .overage ? " · paid extra usage began" : "")
         case .out(nil, let retry?, _):
-            return "Out since \(time(state.since, now: now)) · trying again after \(time(retry, now: now))"
+            return "Out since \(time(state.since, now: now)) · checking after \(time(retry, now: now))"
         case .out(nil, nil, .creditExpired):
             return "Free credit expired"
         case .out(nil, nil, _):
