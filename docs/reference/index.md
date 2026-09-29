@@ -10,7 +10,7 @@ something up, not for reading through.
 
 - [Statuses and groups](statuses.md): every status an agent can show, the group it sits
   under, and what you can do from there.
-- [Runtimes](runtimes.md): the seven coding agents the app can start, and what each can do
+- [Runtimes](runtimes.md): the eight coding agents the app can start, and what each can do
   in the app.
 - [Tools the app gives agents](agent-tools.md): every tool an agent gets from the app, and
   whether you are asked before it runs.
