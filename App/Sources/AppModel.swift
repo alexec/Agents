@@ -345,6 +345,7 @@ final class AppModel {
             // A worktree belongs to one repository, so a new folder is a new question.
             draftWorktree = nil
             draftWorktrees = .notARepository
+            pendingGitHubIssueAssignment = nil
             Task { await loadDraftWorktrees() }
         }
     }
@@ -377,6 +378,10 @@ final class AppModel {
     /// field and clears this, because the prompt itself is still the bar's own and
     /// sending it is still the person's move.
     var offeredPrompt: String?
+    /// The issue whose Assign filled the project page's bar. Sending from that bar
+    /// assigns it (its own worktree, its board status) rather than starting a plain
+    /// draft. It belongs to one project, so moving the bar's folder forgets it.
+    var pendingGitHubIssueAssignment: (issue: GitHubProjectIssue, board: GitHubProjectBoard)?
     private(set) var isLoadingDraftOptions = false
     /// Why the last fetch of a runtime's options failed, if it did.
     ///

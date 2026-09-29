@@ -53,6 +53,9 @@ public enum ACP {
         /// the turn that is running rather than queued behind it. Advertised by
         /// `initialize`'s root `_meta.steering.supported`, and only used where it is.
         public static let steering = "_session/steering"
+        /// Grok's own: how much of the plan's included credit is used, and the period
+        /// it counts over. Not advertised; a runtime without it answers `-32601`.
+        public static let grokBilling = "_x.ai/billing"
     }
 
     /// Named so that "we chose not to" and "we forgot" stay different things. Each of

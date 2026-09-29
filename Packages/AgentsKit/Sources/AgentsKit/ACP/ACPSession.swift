@@ -408,6 +408,15 @@ public actor ACPSession {
         _ = try await connection.call(ACP.Method.disableProvider, ["providerId": .string(id)])
     }
 
+    // MARK: The allowance
+
+    /// Grok's plan usage (`_x.ai/billing`), read as a reading. Nil from a runtime
+    /// that answered but said nothing we can use; a runtime without it throws.
+    public func grokAllowance(at: Date) async throws -> AllowanceReading? {
+        let result = try await connection.call(ACP.Method.grokBilling, .object([:]))
+        return AllowanceReading.grokBilling(result, at: at)
+    }
+
     // MARK: The sessions a runtime is holding
 
     /// Every conversation this runtime has in this folder, including ones this app did
@@ -876,8 +885,8 @@ public actor ACPSession {
     }
 
     /// Cursor's questions, on the same card as a form elicitation, answered in Cursor's
-    /// own shape. A set we cannot draw is refused, so Cursor falls back to its own
-    /// permission prompts as it did before.
+    /// own shape. Empty options become free text; only a payload with no questions at
+    /// all is refused.
     private func askQuestions(_ params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
         guard let request = CursorQuestion.request(from: params, agentID: UUID()) else {
             eventsContinuation.yield(.unknownRequest(ACP.ExtensionMethod.askQuestion))

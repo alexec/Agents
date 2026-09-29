@@ -6,9 +6,9 @@ import SwiftUI
 ///
 /// All of them are listed, because an agent working in one made in a terminal, or by a
 /// runtime, is still working on this project. Only the app's own can be removed: the
-/// others are somebody else's. Hidden when there are none, because an empty heading is
-/// a question nobody asked. One goes with its last agent's archive only when everything
-/// in it is committed, so this is where the rest go when you are finished with them.
+/// others are somebody else's. Shown for any git folder, even with none, for Refresh and
+/// Clean up. One goes with its last agent's archive only when everything in it is
+/// committed, so this is where the rest go when you are finished with them.
 struct WorktreesSection: View {
     @Environment(AppModel.self) private var model
     let folder: URL?
@@ -19,8 +19,31 @@ struct WorktreesSection: View {
     }
 
     var body: some View {
-        if !worktrees.isEmpty {
-            SectionHeading(title: "Worktrees")
+        if folder != nil, model.draftCwd == folder, model.draftWorktrees.isRepository {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Worktrees")
+                    .appText(.reading).fontWeight(.semibold)
+                    .accessibilityAddTraits(.isHeader)
+                Button {
+                    Task { await model.loadDraftWorktrees() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .help("Refresh worktrees")
+                .accessibilityLabel("Refresh worktrees")
+                Spacer()
+                Button("Clean up worktrees") {
+                    model.offeredPrompt = "Remove worktrees and delete branches for any work that has been merged to the default branch."
+                }
+                .buttonStyle(.paper)
+                .appText(.fine)
+            }
+            .padding(.top, 22)
+            .padding(.bottom, 2)
+            .padding(.leading, 2)
             ForEach(worktrees) { worktree in
                 WorktreeRow(worktree: worktree)
             }

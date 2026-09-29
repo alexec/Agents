@@ -63,6 +63,10 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
         await relay(DaemonAPI.Method.agentsShowFile,
                     DaemonAPI.ShowFileRequest(token: token, file: file),
                     fallback: "Open in the files pane.")
+    } askForm: { title, questions in
+        await relay(DaemonAPI.Method.agentsAskForm,
+                    DaemonAPI.AskFormRequest(token: token, title: title, questions: questions),
+                    fallback: "Asked.")
     } workflows: { action, workflowID, content in
         await relay(DaemonAPI.Method.agentsManageWorkflows,
                     DaemonAPI.ManageWorkflowsRequest(token: token, action: action,

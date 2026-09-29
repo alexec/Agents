@@ -356,7 +356,19 @@ extension DaemonCore {
     public func applyAllowances(_ incoming: [AllowanceState]) -> Bool {
         var changed = false
         for var state in incoming where state.isShared {
-            if let mine = allowances[state.credentialKey], mine.since >= state.since { continue }
+            // The later reading wins by its own time: a status can be older than the
+            // reading beside it.
+            let mine = allowances[state.credentialKey]
+            let newerReading = [mine?.reading, state.reading].compactMap { $0 }.max { $0.at < $1.at }
+            if var mine, mine.since >= state.since {
+                if newerReading != mine.reading {
+                    mine.reading = newerReading
+                    allowances[state.credentialKey] = mine
+                    changed = true
+                }
+                continue
+            }
+            state.reading = newerReading
             // The entry id is this daemon's own, for the same credential.
             if let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == state.credentialKey }) {
                 state.entryID = entry.id
@@ -824,10 +836,13 @@ extension DaemonCore {
     /// and on the credential for the Pool page.
     func notePlanWindow(_ info: RateLimitInfo, agentID: UUID) {
         latestRateLimit[agentID] = info
+        let at = now()
+        if let agent = agents[agentID], let reading = AllowanceReading.claude(info, at: at) {
+            noteReading(reading, for: poolEntry(for: agent))
+        }
         // Late: a plan window saying when it is back can be read after the refusal it
         // explains, which was then recorded with no time. Put the time in, so a wait is
         // made on it rather than on the one-hour guess (R2).
-        let at = now()
         guard info.isRejected, let back = info.resetsAt, back > at, let agent = agents[agentID] else { return }
         let entry = poolEntry(for: agent)
         guard var state = allowances[AllowanceState.credentialKey(for: entry)],
@@ -835,5 +850,50 @@ extension DaemonCore {
               at.timeIntervalSince(state.since) < 60 else { return }
         state.status = .out(until: back, retryAfter: nil, why: .allowanceSpent)
         setAllowanceState(state)
+    }
+
+    // MARK: Readings
+
+    /// Keep what a runtime said is left of its plan window, for the Pool page. The
+    /// same reading again is not written until it is five minutes older, since Claude
+    /// repeats it on every `usage_update`.
+    func noteReading(_ reading: AllowanceReading, for entry: PoolEntry) {
+        var state = allowanceState(for: entry)
+        if let before = state.reading, before.sameAs(reading),
+           reading.at.timeIntervalSince(before.at) < Self.readingKeptFor { return }
+        state.reading = reading
+        setAllowanceState(state)
+    }
+
+    /// How long a reading asked for stands before the Pool page asks again.
+    static let readingKeptFor: TimeInterval = 300
+
+    /// Ask each runtime in the pool that can say what is left of its plan, where the
+    /// last answer is older than `readingKeptFor`. Grok is the one that can be asked;
+    /// Claude says it during turns, unasked. Each ask starts the runtime for a moment,
+    /// as signing in does. Runs behind the Pool page: the page draws what is known
+    /// now, and the answer arrives as `pool/changed`.
+    func measureAllowances() async {
+        let at = now()
+        let asked = pool.entries.filter { entry in
+            guard entry.runtimeID == RuntimeCatalog.grok.id, !entry.isKeyed, unusable(entry) == nil else { return false }
+            let key = AllowanceState.credentialKey(for: entry)
+            guard !measuringAllowances.contains(key) else { return false }
+            guard let last = allowances[key]?.reading else { return true }
+            return at.timeIntervalSince(last.at) >= Self.readingKeptFor
+        }
+        for entry in asked {
+            let key = AllowanceState.credentialKey(for: entry)
+            measuringAllowances.insert(key)
+            defer { measuringAllowances.remove(key) }
+            do {
+                let (session, _) = try await handshakeOnly(runtimeID: entry.runtimeID)
+                let reading = try? await session.grokAllowance(at: now())
+                await session.end(gracePeriod: .seconds(2))
+                if let reading { noteReading(reading, for: entry) }
+            } catch {
+                DaemonLog.shared.write("allowance not measured for \(key): \(error)")
+            }
+        }
     }
 }
