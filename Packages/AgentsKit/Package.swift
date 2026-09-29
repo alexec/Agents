@@ -19,6 +19,9 @@ let package = Package(
         .library(name: "AgentsKit", targets: ["AgentsKit"]),
         // The phone links this one. It is the only product that builds for iOS.
         .library(name: "AgentsKitCore", targets: ["AgentsKitCore"]),
+        // The control plane's WebSocket, both ends (058): hosts dial with it and the
+        // service in Packages/ControlPlane serves with it. Never linked by the apps.
+        .library(name: "ControlDial", targets: ["ControlDial"]),
     ],
     dependencies: [
         // The Linux dialer (058, T044). Linked into `AgentsKit` only on Linux, and into
@@ -31,6 +34,16 @@ let package = Package(
     ],
     targets: [
         .target(name: "AgentsKitCore"),
+        .target(
+            name: "ControlDial",
+            dependencies: [
+                "AgentsKitCore",
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOWebSocket", package: "swift-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+            ]),
         .target(
             name: "LinuxControlDial",
             dependencies: [
@@ -48,6 +61,7 @@ let package = Package(
             dependencies: [
                 "AgentsKitCore",
                 "CShims",
+                "ControlDial",
                 .target(name: "LinuxControlDial", condition: .when(platforms: [.linux])),
             ]),
         // Three one-line C wrappers the Linux build of `agentsd` needs, because Swift
@@ -62,7 +76,7 @@ let package = Package(
         // and leaves it out of the Mac link.
         .testTarget(
             name: "AgentsKitTests",
-            dependencies: ["LinuxControlDial", "AgentsKit", "AgentsKitCore",
+            dependencies: ["LinuxControlDial", "ControlDial", "AgentsKit", "AgentsKitCore",
                            .product(name: "SwiftTerm", package: "SwiftTerm")]),
     ]
 )

@@ -26,6 +26,7 @@ let package = Package(
             name: "ControlPlaneKit",
             dependencies: [
                 .product(name: "AgentsKitCore", package: "AgentsKit"),
+                .product(name: "ControlDial", package: "AgentsKit"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
@@ -34,6 +35,12 @@ let package = Package(
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
             ]),
         .executableTarget(name: "agents-control", dependencies: ["ControlPlaneKit"]),
-        .testTarget(name: "ControlPlaneKitTests", dependencies: ["ControlPlaneKit"]),
+        .testTarget(name: "ControlPlaneKitTests", dependencies: [
+            "ControlPlaneKit",
+            .product(name: "ControlDial", package: "AgentsKit"),
+            .product(name: "AgentsKitCore", package: "AgentsKit"),
+            // A real host behind a real uplink: DaemonServer and ControlUplink.
+            .product(name: "AgentsKit", package: "AgentsKit"),
+        ]),
     ]
 )

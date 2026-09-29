@@ -80,7 +80,10 @@ public struct ControlCode: Sendable, Hashable {
               let name = parts[version2 ? 8 : 7].removingPercentEncoding
         else { return nil }
         if version2 {
-            guard let url = URL(string: where_), ["https", "wss"].contains(url.scheme), url.host != nil else { return nil }
+            // https only, except on this machine: a walk or a test on loopback.
+            guard let url = URL(string: where_), let host = url.host,
+                  ["https", "wss"].contains(url.scheme) || (url.scheme == "http" && ["127.0.0.1", "localhost", "::1"].contains(host))
+            else { return nil }
             let pin = parts[7]
             guard pin == "-" || Self.data(base64url: pin)?.count == 32 else { return nil }
             self.url = where_
