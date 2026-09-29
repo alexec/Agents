@@ -31,8 +31,11 @@ final class ControlSettingsModel {
         self.link = link
         client = DaemonClient(link: link.controlLink)
         switch endpoint {
+        #if !AGENTS_STORE
         case .local(let root): whereItIs = SharedFiles.tilde(root.path)
-        case .remote(let membership): whereItIs = "\(membership.name) (\(membership.addresses.first ?? "no address"))"
+        #endif
+        case .remote(let membership):
+            whereItIs = "\(membership.name) (\(membership.url ?? membership.addresses.first ?? "no address"))"
         }
     }
 
@@ -155,11 +158,17 @@ final class ControlSettingsModel {
     }
 
     func restart() async {
+        #if AGENTS_STORE
+        // The control plane on this Mac is Agents Host's to restart.
+        problem = "Restart the control plane from Agents Host."
+        return
+        #else
         guard await LocalServices.forThisWindow.restartControlPlane() else {
             problem = "The control plane on this Mac could not be restarted."
             return
         }
         isReachable = false
+        #endif
     }
 
     private func perform(_ method: String, _ params: some Encodable & Sendable) async {

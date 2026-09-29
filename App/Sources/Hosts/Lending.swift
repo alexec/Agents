@@ -21,11 +21,14 @@ extension AppModel {
         let runtimes = ownOnly ? [] : ServerCredentials.runtimes.filter { credentials.record($0) != nil }
         // What this Mac would relay and cannot now, so the server can say why (056).
         var notRelayed: [String: DaemonAPI.SignInWanted.Reason] = [:]
+        #if !AGENTS_STORE
+        // The store window relays no sign-in: Agents Host does, on its Mac (T091).
         if !ownOnly {
             for runtimeID in SignInRelays.relayed {
                 if let why = SignInRelays.whyNotRelayed(runtimeID) { notRelayed[runtimeID] = why }
             }
         }
+        #endif
         return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly,
                                           notRelayed: notRelayed.isEmpty ? nil : notRelayed)
     }
@@ -47,9 +50,13 @@ extension AppModel {
         if let lent = await lendThroughControl(id, runtime: wanted.runtime, secret: secret, offered: wanted.offered) {
             return lent
         }
+        #if AGENTS_STORE
+        return false
+        #else
         // The offer made on connect did not name a runtime there was no credential for.
         if !wanted.offered { await hosts.offerCredentials(id) }
         return await hosts.lend(id, runtime: wanted.runtime, secret)
+        #endif
     }
 
     /// What this Mac's own agents are lent (046, D3): Gemini's key, which is the only way

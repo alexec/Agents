@@ -8,6 +8,7 @@ import Observation
 /// server list always empty, and every other host named and judged online by what the
 /// control plane last said (`controlled`). It goes, with `HostSet`, when the developer
 /// window's own servers go (T106).
+@MainActor
 @Observable
 final class HostSet {
     private(set) var hosts = HostList()

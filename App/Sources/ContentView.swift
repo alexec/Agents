@@ -75,10 +75,12 @@ struct ContentView: View {
                     adjust: true)).paperSheet()
             }
             // A known server with a new key: rebuilt, or not what it says (043).
+            #if !AGENTS_STORE
             .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
                                  set: { model.hosts.rebuiltAsk = $0 })) { host in
                 RebuiltServerSheet(host: host).paperSheet()
             }
+            #endif
             // Agents missing at start-up, offered once each (048). Closed any way at
             // all, what was missing counts as offered.
             .sheet(isPresented: $model.isOfferingInstall,
@@ -133,7 +135,9 @@ struct ContentView: View {
         // (058, frame I). Above the columns, not an inset: a split view's columns run
         // under an inset and hide their first rows behind it.
         VStack(spacing: 0) {
+        #if !AGENTS_STORE
         if model.offersMoveAcross { MoveAcrossStrip(offering: $offeringMove) }
+        #endif
         if model.controlPlaneAway { ControlAwayStrip() }
         Group {
             if model.needsFirstRun {
@@ -165,7 +169,9 @@ struct ContentView: View {
             }
         }
         }
+        #if !AGENTS_STORE
         .sheet(isPresented: $offeringMove) { MoveAcrossSheet().paperSheet() }
+        #endif
         .environment(frame)
         .environment(requests)
         .environment(sidebarStates)

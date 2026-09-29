@@ -481,10 +481,12 @@ final class AppModel {
         switch ControlConfig.endpoint {
         case .remote(let membership):
             return HostProblem.controlPlaneUnreachable(name: membership.name,
-                                                       address: membership.addresses.first ?? "no address")
+                                                       address: membership.url ?? membership.addresses.first ?? "no address")
+        #if !AGENTS_STORE
         case .local(let root):
             let name = controlPlaneName ?? Foundation.Host.current().localizedName ?? "this Mac"
             return HostProblem.controlPlaneUnreachable(name: name, address: SharedFiles.tilde(root.path))
+        #endif
         case nil:
             return nil
         }

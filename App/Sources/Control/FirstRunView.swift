@@ -1,6 +1,5 @@
 #if !AGENTS_STORE
 import AgentsKit
-#endif
 import AgentsKitCore
 import ServiceManagement
 import SwiftUI
@@ -276,3 +275,4 @@ struct RunHereProgress: View {
         }
     }
 }
+#endif

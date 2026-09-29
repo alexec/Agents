@@ -109,7 +109,11 @@ struct SettingsWindow: View {
         case .spending: FormColumn { CostSettingsView() }
         case .pool: FormColumn { PoolSettingsView() }
         case .devices: FormColumn { DevicesPane() }
+        #if AGENTS_STORE
+        case .servers: EmptyView()
+        #else
         case .servers: FormColumn { ServersSettingsView() }
+        #endif
         case .controlPlane:
             if let control { ControlSettingsView(control: control, page: $controlPage) }
         }

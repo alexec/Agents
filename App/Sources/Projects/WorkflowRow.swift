@@ -78,7 +78,7 @@ struct WorkflowRow: View {
                 Divider()
                 Button("Show in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([
-                        WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
+                        WorkflowPaths.url(for: workflow.workflowID, in: workflow.folder)
                     ])
                 }
             }

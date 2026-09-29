@@ -542,7 +542,7 @@ struct WorkflowPage: View {
     }
 
     private func url(_ workflow: Workflow) -> URL {
-        WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
+        WorkflowPaths.url(for: workflow.workflowID, in: workflow.folder)
     }
 
     /// This Mac's file is read here. Another host's is `files/read`, scoped to an agent

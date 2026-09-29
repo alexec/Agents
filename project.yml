@@ -159,6 +159,7 @@ targets:
           - Hosts/WindowFiles.swift
           - Control/LocalServices.swift
           - Control/MoveAcross.swift
+          - Settings/ServersSettingsView.swift
       - path: App/Resources
         excludes:
           - servers

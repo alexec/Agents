@@ -137,7 +137,9 @@ struct ProjectListView: View {
         }
         .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }
+        #if !AGENTS_STORE
         .sheet(isPresented: $isAddingServer) { AddServerSheet().paperSheet() }
+        #endif
         // File ▸ Add Folder…, Clone Git URL… and Add Server…: the same sheets as the +
         // menu, on this Mac.
         .onChange(of: requests.projectSheet) { _, sheet in

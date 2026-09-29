@@ -25,6 +25,14 @@ struct ConnectSheet: View {
     private var parsed: ControlCode? { ControlCode(text: code.trimmingCharacters(in: .whitespacesAndNewlines)) }
     private var isHostCode: Bool { if case .host = parsed?.purpose { true } else { false } }
 
+    private var hostCodeWords: String {
+        #if AGENTS_STORE
+        "This is a code for a host. Give it to Agents Host on the Mac or server that should run the agents. To connect this window, use a code from Pair a Mac."
+        #else
+        "This is a code for a host. This Mac will run agents for \(parsed?.name ?? "that control plane"), and keep running them with this window closed. This window won’t be connected to it; for that, use a code from Pair a Mac."
+        #endif
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Connect to a control plane").appText(.reading).fontWeight(.semibold)
@@ -59,7 +67,7 @@ struct ConnectSheet: View {
             Text("Paste the code, or its link. It works once, for five minutes.")
                 .appText(.supporting).foregroundStyle(.secondary)
             if isHostCode, joined == nil {
-                Text("This is a code for a host. This Mac will run agents for \(parsed?.name ?? "that control plane"), and keep running them with this window closed. This window won’t be connected to it; for that, use a code from Pair a Mac.")
+                Text(hostCodeWords)
                     .appText(.supporting)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -79,9 +87,15 @@ struct ConnectSheet: View {
                 } else {
                     Button("Cancel") { dismiss() }
                     if connecting { ProgressView().controlSize(.small) }
+                    #if AGENTS_STORE
+                    Button("Connect") { connect() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || connecting || isHostCode)
+                    #else
                     Button(isHostCode ? "Run a Host Here" : "Connect") { connect() }
                         .keyboardShortcut(.defaultAction)
                         .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || connecting)
+                    #endif
                 }
             }
         }
@@ -97,7 +111,9 @@ struct ConnectSheet: View {
             return
         }
         if case .host = parsed.purpose {
+            #if !AGENTS_STORE
             runHostHere(parsed)
+            #endif
             return
         }
         connecting = true
@@ -115,6 +131,7 @@ struct ConnectSheet: View {
     }
 }
 
+#if !AGENTS_STORE
 extension ConnectSheet {
     private func runHostHere(_ parsed: ControlCode) {
         connecting = true
@@ -131,6 +148,7 @@ extension ConnectSheet {
         }
     }
 }
+#endif
 
 /// Control planes advertising themselves on this network, by name.
 @MainActor
@@ -141,7 +159,7 @@ final class ControlPlaneBrowser {
 
     func start() {
         guard browser == nil else { return }
-        let browser = NWBrowser(for: .bonjour(type: ControlNet.serviceType, domain: nil), using: .tcp)
+        let browser = NWBrowser(for: .bonjour(type: ControlBonjour.serviceType, domain: nil), using: .tcp)
         browser.browseResultsChangedHandler = { [weak self] results, _ in
             let names = results.compactMap { result -> String? in
                 if case .service(let name, _, _, _) = result.endpoint { return name }
