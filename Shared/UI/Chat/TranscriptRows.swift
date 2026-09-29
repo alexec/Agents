@@ -37,18 +37,21 @@ private struct EntryRow: View {
             // never typed must not be shown as though they had (FR-022).
             if from == .app {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Agents asked").appText(.fine).foregroundStyle(.tertiary)
+                    Text("Agents asked").appText(.reading).foregroundStyle(.tertiary)
                     BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
-                        .appText(.supporting)
+                        .appText(.reading)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
+                // Theirs, so at the right, as wide as its words and no wider.
                 BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                    .environment(\.textFillsWidth, false)
                     .appText(.reading)
                     .padding(12)
                     .paperWell(in: RoundedRectangle(cornerRadius: 12))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 60)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
         case .agentMessage(_, let text, let blocks):
@@ -57,13 +60,13 @@ private struct EntryRow: View {
 
         case .agentThought(_, let text):
             Text(text)
-                .appText(.supporting)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
 
         case .toolCall(let call), .toolCallUpdate(let call):
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
-            Text(call.line).appText(.supporting).foregroundStyle(.secondary)
+            Text(call.line).appText(.reading).foregroundStyle(.secondary)
 
         case .plan(let raw):
             // The shape 001 stored. Read into entries where it can be.
@@ -84,18 +87,18 @@ private struct EntryRow: View {
             ServedRequestLine(request: request)
 
         case .elicitationAsked(let request):
-            Text("Asked: \(request.title)").appText(.supporting).foregroundStyle(.secondary)
+            Text("Asked: \(request.title)").appText(.reading).foregroundStyle(.secondary)
 
         case .elicitationAnswered(_, let summary, let answers):
             if answers.isEmpty {
-                Text(summary).appText(.supporting).foregroundStyle(.secondary)
+                Text(summary).appText(.reading).foregroundStyle(.secondary)
             } else {
                 // What they said is theirs, so it sits in their bubble, each answer
                 // under the question it answers: the card that asked is gone.
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(answers.enumerated()), id: \.offset) { _, answer in
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(answer.question).appText(.supporting).foregroundStyle(.secondary)
+                            Text(answer.question).appText(.reading).foregroundStyle(.secondary)
                             Text(answer.answer).appText(.reading).textSelection(.enabled)
                         }
                     }
@@ -109,7 +112,7 @@ private struct EntryRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(status == "completed" ? "Made room by summarising the conversation so far"
                                            : "Summarising the conversation so far…")
-                    .appText(.supporting)
+                    .appText(.reading)
                     .foregroundStyle(.secondary)
                 if !summary.isEmpty {
                     BlocksView(blocks: summary).foregroundStyle(.secondary)
@@ -121,12 +124,12 @@ private struct EntryRow: View {
 
         case .permissionAsked(let request):
             Text("Asked: \(request.toolCall.title)")
-                .appText(.supporting)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
 
         case .permissionAnswered(let optionID, let name):
             Text("You chose \(name ?? optionID)")
-                .appText(.supporting)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
 
         case .optionChanged:
@@ -143,7 +146,7 @@ private struct EntryRow: View {
             WorkReportLine(report: report)
 
         case .runtimeNote(let text):
-            Text(text).appText(.fine).foregroundStyle(.secondary)
+            Text(text).appText(.reading).foregroundStyle(.secondary)
 
         case .poolSwitch(let record):
             SwitchNote(record: record)
@@ -151,7 +154,7 @@ private struct EntryRow: View {
         case .settingsChanged(let record):
             Text("Changed what it carried on with: "
                  + record.carried.compactMap { s in s.to?.stringValue.map { "\(s.name) \($0)" } }.joined(separator: ", "))
-                .appText(.fine).foregroundStyle(.secondary)
+                .appText(.reading).foregroundStyle(.secondary)
 
         case .handoff(let markdown, let characters):
             HandoffLine(markdown: markdown, characters: characters)
@@ -174,12 +177,12 @@ private struct NoticeLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(notice.title)
-                .appText(.supporting)
+                .appText(.reading)
                 .fontWeight(notice.isError || notice.isWarning ? .medium : .regular)
                 .foregroundStyle((notice.isError ? StateTint.failure : .none).style(or: .secondary))
             if let detail = notice.detail {
                 Text(detail)
-                    .appText(.supporting)
+                    .appText(.reading)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }
@@ -200,11 +203,11 @@ private struct WorkReportLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(report.outcome.heading)
-                .appText(.supporting).fontWeight(.medium)
+                .appText(.reading).fontWeight(.medium)
                 .foregroundStyle((report.outcome.needsAPerson ? StateTint.attention : .none)
                                     .style(or: .secondary))
             Text(report.message)
-                .appText(.supporting)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
@@ -230,7 +233,7 @@ struct QueuedPromptRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Waiting its turn")
-                        .appText(.fine)
+                        .appText(.reading)
                         .foregroundStyle(.tertiary)
                     Spacer(minLength: 8)
                     if canSendNow {
@@ -238,7 +241,7 @@ struct QueuedPromptRow: View {
                             Task { await actions.sendNow(prompt, agentID) }
                         } label: {
                             Label("Send now", systemImage: "arrow.up")
-                                .appText(.fine)
+                                .appText(.reading)
                                 #if os(iOS)
                                 .frame(minHeight: 44)
                                 .contentShape(.rect)
@@ -264,7 +267,7 @@ struct QueuedPromptRow: View {
                 Task { await actions.unqueue(prompt, agentID) }
             } label: {
                 Image(systemName: "xmark")
-                    .appText(.fine)
+                    .appText(.reading)
                     .frame(width: 18, height: 18)
                     #if os(iOS)
                     // A finger, not a pointer: the glyph stays small and the target does not.
@@ -359,7 +362,7 @@ private struct ToolCallLine: View {
     /// the whole of it is a click away in the detail, where the raw input is.
     private var line: some View {
         Text(call.line + runsOn)
-            .appText(.supporting)
+            .appText(.reading)
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .truncationMode(.tail)
@@ -393,7 +396,7 @@ private struct ToolCallLine: View {
                             actions.open(location)
                         } label: {
                             Text(location.line.map { "\(location.fileName):\($0)" } ?? location.fileName)
-                                .appText(.fine)
+                                .appText(.reading)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
@@ -427,13 +430,13 @@ private struct ToolCallLine: View {
                 if let showEdit = actions.showEdit {
                     Button("Show in Changes") { showEdit(diff, call.toolCallID) }
                         .linkStyle()
-                        .appText(.fine)
+                        .appText(.reading)
                         .help("See this edit among everything the agent changed")
                 }
             }
         case .content(let block):
             BlocksView(blocks: [block])
-                .appText(.supporting)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
         case .terminal(let id):
             TerminalOutputView(text: actions.terminalOutput(id))
@@ -462,7 +465,7 @@ private struct ToolCallLine: View {
     /// text here, because a page of integers is not what came back.
     private func exchanged(_ title: String, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title).appText(.fine).foregroundStyle(.tertiary)
+            Text(title).appText(.reading).foregroundStyle(.tertiary)
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(text)
                     .appText(.code)
@@ -537,7 +540,7 @@ struct WorkingLine: View {
 struct ComingBackLine: View {
     var body: some View {
         Label(AgentsModel.comingBackDescription, systemImage: AgentsModel.comingBackSymbol)
-            .appText(.fine)
+            .appText(.reading)
             .foregroundStyle(.secondary)
     }
 }
@@ -548,7 +551,7 @@ private struct StateLine: View {
 
     var body: some View {
         Text(text)
-            .appText(.fine)
+            .appText(.reading)
             // The one place in the transcript a colour earns itself: something went wrong.
             .foregroundStyle((isFailure ? StateTint.failure : .none).style(or: .secondary))
     }

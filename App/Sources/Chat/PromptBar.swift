@@ -223,7 +223,6 @@ struct PromptBar: View {
             if let agent {
                 // The phone's row too (033).
                 PromptHeader(agent: agent,
-                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder],
                              leaseStatus: model.work.leaseStatus(of: agent.id),
                              openLease: { model.showResources(at: $0) },
                              waitStatus: agent.eventWait?.isOpen == true ? model.work.waitStatus(of: agent) : nil,
@@ -231,14 +230,8 @@ struct PromptBar: View {
                              openWait: { model.showEvents(at: .waitingNow) },
                              cancelWait: { Task { await model.cancelWait(of: agent.id) } },
                              background: agent.background,
-                             backgroundActions: backgroundActions(agent),
-                             place: agentPlace(agent)) {
-                    ContextMeter(agent: agent)
-                }
-                .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
-                .task(id: "\(agent.id)-\(agent.cwd.path)") { await model.loadAgentWorktrees(of: agent) }
-                Spacer(minLength: 8)
-                ContinueWithMenu(agent: agent)
+                             backgroundActions: backgroundActions(agent))
+                Spacer(minLength: 0)
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {
@@ -407,18 +400,34 @@ struct PromptBar: View {
             .help(dictation.isListening ? "Stop dictating" : "Dictate")
             .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
 
-            Button(action: send) {
-                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
+            // While it works and nothing is typed, send is stop. Type and it is send
+            // again, queueing what is typed for when the turn ends.
+            if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    Task { await model.stop(agent.id) }
+                } label: {
+                    Image(systemName: PromptWords.stopSymbol)
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.paperProminent)
+                .buttonBorderShape(.circle)
+                .help(PromptWords.stopHelp)
+                .accessibilityLabel("Stop")
+            } else {
+                Button(action: send) {
+                    Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.paperProminent)
+                .buttonBorderShape(.circle)
+                .disabled(!canSend)
+                .keyboardShortcut(.return, modifiers: .command)
+                .help(targetOffline ? "\(model.hosts.label(targetHost)) is offline"
+                                    : PromptWords.sendHelp(willQueue: willQueue))
+                .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
             }
-            .buttonStyle(.paperProminent)
-            .buttonBorderShape(.circle)
-            .disabled(!canSend)
-            .keyboardShortcut(.return, modifiers: .command)
-            .help(targetOffline ? "\(model.hosts.label(targetHost)) is offline"
-                                : PromptWords.sendHelp(willQueue: willQueue))
-            .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
@@ -626,7 +635,7 @@ struct PromptBar: View {
         // one text style and one origin, and this way the words sit in it exactly as
         // the typed ones will.
         if let suggestion { return suggestion.prompt }
-        guard let agent else { return "Say what's next" }
+        guard let agent else { return "What do you want to do?" }
         return PromptWords.placeholder(for: agent)
     }
 
@@ -726,17 +735,27 @@ struct PromptBar: View {
         }
     }
 
+    /// The permission mode, as its value alone: it is the leftmost pill, and that is
+    /// what it is.
     @ViewBuilder
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
         ForEach(shown.filter(\.isAboutPermission)) { option in
-            OptionMenu(option: option, chosen: binding(for: option), labelled: true)
+            OptionMenu(option: option, chosen: binding(for: option))
         }
     }
 
+    /// Everything else as one pill: the model, its effort, fast mode, and for a chat
+    /// that exists the runtime it could carry on with.
     @ViewBuilder
     private func otherOptions(_ shown: [ConfigOption]) -> some View {
-        ForEach(shown.filter { !$0.isAboutPermission }) { option in
-            OptionMenu(option: option, chosen: binding(for: option), labelled: true)
+        let others = shown.filter { !$0.isAboutPermission }
+        if !others.isEmpty {
+            ModelPill(options: others, binding: binding(for:)) {
+                if let agent {
+                    Divider()
+                    ContinueWithItems(agent: agent)
+                }
+            }
         }
     }
 

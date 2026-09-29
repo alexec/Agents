@@ -119,10 +119,8 @@ struct RemoteChatView: View {
             if wanted != nil { model.openFileTheAgentWants() }
         }
         .toolbar {
-            // The Mac's two verbs, where the Mac has them (033). Stop keeps the chat
-            // on screen, because someone who stops a chat that has gone the wrong way
-            // wants to keep reading it and say what next. Archive goes back to the
-            // project, because the thing being read has been put away.
+            // Stop is the prompt's own button while the agent works, as on the Mac;
+            // Archive is on the session's row.
             // Blocked (039): the card's Carry on, where the chat's own controls are.
             if let agent, model.isBlocked(agent) {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -133,31 +131,6 @@ struct RemoteChatView: View {
                     }
                     .disabled(model.isStale)
                     .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
-                }
-            }
-            if let agent, model.canStop(agent) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await model.stop(agent.id) }
-                    } label: {
-                        Label("Stop", systemImage: "stop.circle")
-                    }
-                    .disabled(model.isStale)
-                    .accessibilityHint("Stops this agent and stays on the chat")
-                }
-            }
-            if let agent, agent.state != .archived {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task {
-                            await model.archive(agent.id)
-                            model.selection = nil
-                        }
-                    } label: {
-                        Label("Archive", systemImage: "archivebox")
-                    }
-                    .disabled(model.isStale)
-                    .accessibilityHint("Archives this session and goes back to the project")
                 }
             }
             if let agent {

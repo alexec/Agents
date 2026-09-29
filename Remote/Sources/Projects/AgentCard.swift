@@ -124,6 +124,15 @@ struct AgentCard: View {
                 }
                 .help(AgentsModel.carryOnHelp(for: agent))
             }
+            // Here rather than over the chat, as on the Mac: the chat is for reading.
+            if agent.state != .archived {
+                Button {
+                    Task { await model.archive(agent.id) }
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+                .disabled(model.isStale)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
