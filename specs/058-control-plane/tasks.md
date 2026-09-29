@@ -88,7 +88,7 @@ replaced, and removing what they left is a task in this list.
   - **L**: the host app's window: this host's state, the code to pair a window or phone, *Run the control plane here*, *Join one elsewhere*, *Relay for my devices*, and the move. Also where the control plane keeps its store: *This Mac* (the default) or *A bucket* (endpoint, bucket, prefix, access key, secret, and a Check button), plus *Switch store…* once it is running.
   - **M**: Add a Server, with two tabs: *Run a command*, showing a host code and the one-line command; and *Install over ssh*, with the destination and a key used once.
   - **N**: Clients, with a relayed device and its away marker, and the "reached through <Mac>" line.
-- [ ] T028 Update `specs/058-control-plane/look/README.md` with what each of K–N shows and why. Ask Alex to approve with AskUserQuestion. Record his decisions in the README and stop UI work until he answers.
+- [x] T028 (approved by Alex 2026-09-28: all of K–N, and the name Agents Host) Update `specs/058-control-plane/look/README.md` with what each of K–N shows and why. Ask Alex to approve with AskUserQuestion. Record his decisions in the README and stop UI work until he answers.
 
 ---
 

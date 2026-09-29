@@ -85,7 +85,7 @@ there is nowhere to say where the control plane runs.
 
 # Re-plan, 2026-09-28: frames K–N
 
-**Awaiting Alex's approval.** These frames cover what changes once the Mac window is an App Store
+**Approved by Alex 2026-09-28**, all of K–N as drawn, and the name **Agents Host**. These frames cover what changes once the Mac window is an App Store
 app and the agents run in **Agents Host**, a separate app from outside the Store. Open
 [wireframes.html](wireframes.html) with `#k`, `#k2`, `#l`, `#m`, `#m2` or `#n`.
 
