@@ -1484,25 +1484,52 @@ final class RemoteModel {
 
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
+        // The finished turns as summaries, then the turn in progress. A Mac too old to
+        // keep turns gives the lot.
+        let turns = (try? await client.call(DaemonAPI.Method.agentsTurns,
+                                            DaemonAPI.TurnsRequest(agentID: selection),
+                                            returning: TurnsPage.self))
+            ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
         guard let page = try? await client.call(DaemonAPI.Method.agentsTranscript,
-                                                DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize),
+                                                DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize,
+                                                                            from: turns.openStart),
                                                 returning: TranscriptPage.self) else { return }
         // A chat left before its page arrived does not get that page shown under the
         // next one's name.
         guard self.selection == selection else { return }
+        work.replaceTurns(with: turns)
         work.replaceTranscript(with: page)
+    }
+
+    /// Every entry of a finished turn, for the chat to open it.
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
+        let page = try? await client.call(
+            DaemonAPI.Method.agentsTranscript,
+            DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
+                                        limit: range.count, from: range.lowerBound),
+            returning: TranscriptPage.self)
+        return page?.entries ?? []
     }
 
     /// Another page, backwards. Never the whole history: that is the difference
     /// between a conversation opening in a second and one opening on a train.
     func loadEarlier() async {
-        guard let selection, work.hasMoreBefore, !isLoadingEarlier else { return }
+        guard let selection, work.hasMoreOfTheConversation, !isLoadingEarlier else { return }
         isLoadingEarlier = true
         defer { isLoadingEarlier = false }
+        // Past the start of the turn in progress, the turns before it.
+        if !work.hasMoreBefore {
+            guard let turns = try? await client.call(
+                DaemonAPI.Method.agentsTurns,
+                DaemonAPI.TurnsRequest(agentID: selection, before: work.firstTurn),
+                returning: TurnsPage.self), self.selection == selection else { return }
+            work.prependTurns(turns)
+            return
+        }
         guard let page = try? await client.call(
             DaemonAPI.Method.agentsTranscript,
             DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex,
-                                        limit: firstPageSize),
+                                        limit: firstPageSize, from: work.openTurnStart),
             returning: TranscriptPage.self) else { return }
         guard self.selection == selection else { return }
         work.prepend(page)

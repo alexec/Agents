@@ -35,8 +35,9 @@ struct RemoteChatView: View {
             if let agent {
                 ChatTranscript(agent: agent,
                                items: model.transcriptItems,
-                               hasMore: model.hasMoreBefore,
-                               entryCount: model.entries.count,
+                               stored: model.work.turns,
+                               hasMore: model.work.hasMoreOfTheConversation,
+                               entryCount: model.entries.count + model.work.turns.count,
                                isComingBack: model.isComingBack(agent),
                                settleKey: model.selection,
                                loadEarlier: { await model.loadEarlier() },
@@ -119,10 +120,8 @@ struct RemoteChatView: View {
             if wanted != nil { model.openFileTheAgentWants() }
         }
         .toolbar {
-            // The Mac's two verbs, where the Mac has them (033). Stop keeps the chat
-            // on screen, because someone who stops a chat that has gone the wrong way
-            // wants to keep reading it and say what next. Archive goes back to the
-            // project, because the thing being read has been put away.
+            // Stop is the prompt's own button while the agent works, as on the Mac;
+            // Archive is on the session's row.
             // Blocked (039): the card's Carry on, where the chat's own controls are.
             if let agent, model.isBlocked(agent) {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -133,31 +132,6 @@ struct RemoteChatView: View {
                     }
                     .disabled(model.isStale)
                     .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
-                }
-            }
-            if let agent, model.canStop(agent) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await model.stop(agent.id) }
-                    } label: {
-                        Label("Stop", systemImage: "stop.circle")
-                    }
-                    .disabled(model.isStale)
-                    .accessibilityHint("Stops this agent and stays on the chat")
-                }
-            }
-            if let agent, agent.state != .archived {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task {
-                            await model.archive(agent.id)
-                            model.selection = nil
-                        }
-                    } label: {
-                        Label("Archive", systemImage: "archivebox")
-                    }
-                    .disabled(model.isStale)
-                    .accessibilityHint("Archives this session and goes back to the project")
                 }
             }
             if let agent {
@@ -244,7 +218,8 @@ struct RemoteChatView: View {
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
-            subagentSteps: { id in subagentOnScreen = id })
+            subagentSteps: { id in subagentOnScreen = id },
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
     }
 }
 

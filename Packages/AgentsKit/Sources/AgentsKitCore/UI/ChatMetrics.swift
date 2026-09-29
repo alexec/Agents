@@ -20,19 +20,18 @@ import Foundation
 ///   must yield far more text than margin. It gets 357 of text inside 22 a side —
 ///   fewer characters than before, which is what opening a document pane costs.
 /// - sidebar shut: the pane is 860 points. The old gutter gave 572 of text there, and
-///   that is the look the app has been read at, so the cap is set beside it: 580.
+///   the cap sat beside it at 580 until the chat became asks and outcomes, which read
+///   better wider: the cap is now half as wide again, 870, and this pane is all text
+///   inside the padding.
 ///
 /// Those widths are arithmetic on the three stored defaults rather than a ruler held
 /// to the screen. The project list is a `NavigationSplitView` column and can be
 /// dragged, so the numbers are typical rather than exact; the invariants below hold at
 /// every width regardless.
 ///
-/// The cap is a property of text, not of this app: ninety characters is where a line
-/// becomes one the eye loses its place on between the end of it and the start of the
-/// next. 580 points was ninety at the old body face and is eighty-five at the
-/// `reading` step the transcript moved to, so it still sits inside the bound and is
-/// left where it is rather than chased upwards — `PageMetrics` had to move because a
-/// test holds its floor; this one did not.
+/// The cap used to be held to ninety characters, where a line is said to lose the
+/// eye between its end and the start of the next. It is past that now, on purpose:
+/// see `measureCap`.
 public struct ChatMetrics: Hashable, Sendable {
     /// The widest the text may run, in points. Past this the column centres and the
     /// surplus becomes margin either side (FR-017, FR-020).
@@ -45,10 +44,9 @@ public struct ChatMetrics: Hashable, Sendable {
         self.padding = padding
     }
 
-    /// Eighty-five characters at the reading face, and within a few points of what the
-    /// old gutter gave at the default window with the sidebar shut, so the default view
-    /// barely changes. Only the narrow and the very wide cases do.
-    public static let measureCap: Double = 580
+    /// Half as wide again as the eighty-five characters it was, at Alex's ask: a page
+    /// of asks and outcomes is mostly answers, and they read better with the room.
+    public static let measureCap: Double = 870
 
     /// What the padding is when there is room for it, and the floor it falls to when
     /// there is not. FR-018 says the margin gives way before the text does.

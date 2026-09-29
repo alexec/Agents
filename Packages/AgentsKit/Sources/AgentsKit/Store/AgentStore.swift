@@ -14,6 +14,8 @@ public actor AgentStore {
     /// transcript used to have the daemon read the whole file for every page, with
     /// every append to every transcript waiting behind it.
     private var lineIndexes: [UUID: TranscriptReader.Index] = [:]
+    /// Each read conversation's finished turns, as `turns.jsonl` holds them.
+    private var turnCache: [UUID: [TurnSummary]] = [:]
     /// How many transcripts are indexed at once. Eight bytes a line, so an index is
     /// small, but the daemon lives for weeks and this is a memo, not a record.
     private static let indexedTranscripts = 16
@@ -308,6 +310,7 @@ public actor AgentStore {
         try removeIfThere(locations.record(id))
         try check(.deleteRecord)
         try removeIfThere(locations.transcript(id))
+        turnCache[id] = nil
         try check(.deleteTranscript)
         try removeIfThere(locations.agent(id))
         try check(.removeFolder)
@@ -332,6 +335,73 @@ public actor AgentStore {
         let reader = TranscriptReader(url: locations.transcript(agentID))
         let index = try lineIndex(for: agentID, with: reader)
         return try reader.page(index, before: before, limit: limit)
+    }
+
+    /// Finished turns, oldest first, from `turns.jsonl`, brought up to the end of the
+    /// transcript first.
+    ///
+    /// Built lazily: the file holds every turn up to the one still going, and asking
+    /// reads only the transcript after it — the turn in progress, and any that finished
+    /// since. A transcript with no file yet is read once, a chunk at a time, to make it.
+    public func turns(for agentID: UUID, before: Int? = nil, limit: Int = 50) throws -> TurnsPage {
+        let reader = TranscriptReader(url: locations.transcript(agentID))
+        let index = try lineIndex(for: agentID, with: reader)
+        let total = index.count
+        var known = try turnCache[agentID] ?? readTurns(agentID)
+        // Built from some other transcript than this one: start again.
+        if (known.last?.end ?? 0) > total {
+            known = []
+            try? FileManager.default.removeItem(at: locations.turns(agentID))
+        }
+        var openStart = known.last?.end ?? 0
+        var pending: [TranscriptEntry] = []
+        var cursor = openStart
+        while cursor < total {
+            let end = min(total, cursor + Self.turnChunk)
+            let page = try reader.page(index, before: end, limit: end - cursor)
+            pending += page.entries
+            cursor = end
+            let (closed, next) = TurnSummary.split(pending, start: openStart)
+            if !closed.isEmpty {
+                try appendTurns(closed, for: agentID)
+                known += closed
+                pending.removeFirst(next - openStart)
+                openStart = next
+            }
+        }
+        if turnCache[agentID] == nil, turnCache.count >= Self.indexedTranscripts {
+            turnCache.removeAll(keepingCapacity: true)
+        }
+        turnCache[agentID] = known
+        let end = min(before ?? known.count, known.count)
+        let start = max(0, end - limit)
+        return TurnsPage(turns: Array(known[start..<end]), firstTurn: start, openStart: openStart)
+    }
+
+    /// How much transcript is read at once while turns are being made from it.
+    private static let turnChunk = 2_000
+
+    private func readTurns(_ agentID: UUID) throws -> [TurnSummary] {
+        guard let data = FileManager.default.contents(atPath: locations.turns(agentID).path) else { return [] }
+        return data.split(separator: 0x0A).compactMap {
+            try? StoreCoding.decoder.decode(TurnSummary.self, from: Data($0))
+        }
+    }
+
+    private func appendTurns(_ turns: [TurnSummary], for agentID: UUID) throws {
+        let url = locations.turns(agentID)
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+        }
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        var data = Data()
+        for turn in turns {
+            data.append(try StoreCoding.encoder.encode(turn))
+            data.append(0x0A)
+        }
+        try handle.write(contentsOf: data)
     }
 
     public func transcriptCount(for agentID: UUID) throws -> Int {

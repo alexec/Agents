@@ -85,7 +85,8 @@ struct ChatView: View {
                 frame.pane = .background
                 if !frame.isOpen { frame.open() }
             },
-            backgroundOutput: { item in BackgroundOutput.open(item) })
+            backgroundOutput: { item in BackgroundOutput.open(item) },
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.
@@ -107,7 +108,10 @@ struct ChatView: View {
             }
             .chatColumn()
             .padding(.vertical, 8)
-        } else {
+        } else if ParkWords.line(agent.parking) != nil || model.isBlocked(agent) {
+            // Stop is the prompt's own button while the agent works; Park and Archive
+            // are on the session's row. What is left here is only what the page has to
+            // say: why a parked chat is parked, and the way on for a blocked one.
             HStack(spacing: 8) {
                 // Said on the page, so a chat opened from Parked says why it is there
                 // and when (040, FR-011).
@@ -117,10 +121,7 @@ struct ChatView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                // Beside Archive, and unlike it the page stays: someone who stops a chat
-                // that has gone the wrong way wants to keep reading it and say what next.
-                // A blocked chat (039): what the card's Carry on does, where the chat's
-                // own controls are.
+                // A blocked chat (039): what the card's Carry on does.
                 if model.isBlocked(agent) {
                     Button {
                         Task { await model.carryOn(agent.id) }
@@ -131,46 +132,6 @@ struct ChatView: View {
                     .appText(.fine)
                     .help(AgentsModel.carryOnHelp(for: agent))
                 }
-                if model.canStop(agent) {
-                    Button {
-                        Task { await model.stop(agent.id) }
-                    } label: {
-                        Label("Stop", systemImage: "stop.circle")
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    // ⌘. is Session ▸ Stop, in the menu bar, so it works whether or not
-                    // this button is on screen.
-                    .help("Stop this agent and stay on the chat (⌘.)")
-                }
-                // Between Stop and Archive (040). Park goes back to the project, as
-                // Archive does: the person has said they are done with it for now.
-                // Unpark stays, because they have just come back to it.
-                if let action = agent.parkAction {
-                    Button {
-                        Task {
-                            await model.perform(action, on: agent.id)
-                            if action == .park { model.selection = nil }
-                        }
-                    } label: {
-                        Label(ParkWords.label(action), systemImage: ParkWords.symbol(action))
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .help(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
-                    .accessibilityLabel(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
-                }
-                // One click, and back to the project. The context menu on the card has
-                // the same word; this is for when you are already reading the thing you
-                // are putting away.
-                Button {
-                    Task { await model.archive(agent.id, andLeave: true) }
-                } label: {
-                    Label("Archive", systemImage: "archivebox")
-                }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                .help("Archive this session and go back to the project")
             }
             .chatColumn()
             .padding(.vertical, 8)

@@ -1,10 +1,10 @@
 import AgentsKit
 import SwiftUI
 
-/// The runtime control on a chat's prompt bar (052, wireframes §2): the per-chat
-/// switch, the pool's runtimes with their states, and every other runtime under a rule.
-/// Picking one opens the Continue with sheet; nothing moves until that is confirmed.
-struct ContinueWithMenu: View {
+/// The runtime a chat could carry on with (052), as a submenu of the model pill: the
+/// per-chat switch, the pool's runtimes with their states, and every other runtime under
+/// a rule. Picking one opens the Continue with sheet; nothing moves until that is confirmed.
+struct ContinueWithItems: View {
     @Environment(AppModel.self) private var model
     let agent: Agent
 
@@ -18,41 +18,35 @@ struct ContinueWithMenu: View {
     }
 
     var body: some View {
-        SelectCapsule(name: "Runtime", title: PoolWords.runtimeName(agent.runtimeID)) { dismiss in
-            SelectChoice(title: "Carry on when \(PoolWords.runtimeName(agent.runtimeID)) runs out",
-                         description: agent.switchingOff ? "Off for this session: it stops when it runs out" : nil,
-                         isChosen: !agent.switchingOff) {
-                dismiss()
-                Task { await model.setSwitching(agent.id, isOn: agent.switchingOff) }
-            }
-            Divider().padding(.vertical, 4)
-            Text("CONTINUE WITH").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
+        Menu("Continue with") {
+            Toggle("Carry on when \(PoolWords.runtimeName(agent.runtimeID)) runs out", isOn: Binding(
+                get: { !agent.switchingOff },
+                set: { isOn in Task { await model.setSwitching(agent.id, isOn: isOn) } }))
+            Divider()
             ForEach(rows) { row in
-                SelectChoice(title: PoolWords.runtimeName(row.entry.runtimeID),
-                             description: row.state.isOut || row.unusable != nil
-                                ? row.line(now: model.poolStatus?.at ?? .now) : nil,
-                             isChosen: false) {
-                    dismiss()
+                Button {
                     model.continuingWith = ContinueWith(agentID: agent.id, entry: row.entry)
-                }
-            }
-            if !others.isEmpty {
-                Divider().padding(.vertical, 4)
-                ForEach(others) { status in
-                    SelectChoice(title: status.runtime.name, description: "not in the pool", isChosen: false) {
-                        dismiss()
-                        model.continuingWith = ContinueWith(
-                            agentID: agent.id,
-                            entry: PoolEntry(runtimeID: status.runtime.id, payment: .allowance(label: nil)))
+                } label: {
+                    if row.state.isOut || row.unusable != nil {
+                        Text(PoolWords.runtimeName(row.entry.runtimeID))
+                        Text(row.line(now: model.poolStatus?.at ?? .now))
+                    } else {
+                        Text(PoolWords.runtimeName(row.entry.runtimeID))
                     }
                 }
             }
-            Text("Runtimes that are out can still be picked.")
-                .appText(.fine).foregroundStyle(.secondary)
-                .padding(.horizontal, 10).padding(.top, 4)
+            if !others.isEmpty {
+                Section("Not in the pool") {
+                    ForEach(others) { status in
+                        Button(status.runtime.name) {
+                            model.continuingWith = ContinueWith(
+                                agentID: agent.id,
+                                entry: PoolEntry(runtimeID: status.runtime.id, payment: .allowance(label: nil)))
+                        }
+                    }
+                }
+            }
         }
-        .help("Carry this session on with another runtime")
     }
 }
 
