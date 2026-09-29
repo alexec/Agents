@@ -124,19 +124,15 @@ struct PullRequestRow: View {
     }
 
     /// Fill the page's prompt bar to babysit this one pull request: where to work, and
-    /// what to say. Nothing starts until the person sends it.
+    /// what to say. Nothing starts until the person sends it. What babysitting means is
+    /// the repository's to say (its instructions or a skill), so the prompt is just that.
     ///
     /// Where is the worktree it is already checked out in, else a new worktree on its
     /// branch when that branch is here, else a new worktree the agent checks it out into.
     /// The branches are asked for again first, since a fetch since the page opened is
     /// what puts the branch here.
     private func babysit() {
-        model.offeredPrompt = """
-            Babysit pull request #\(pull.number), "\(pull.title)" (\(pull.url.absoluteString)). \
-            If its branch \(pull.headBranch) is not checked out here, run `gh pr checkout \(pull.number)` first. \
-            Then fix failing checks, address or answer review comments, resolve conflicts with \
-            the base branch, and push. Stop when the checks pass and nothing is waiting on the author.
-            """
+        model.offeredPrompt = "Babysit PR#\(pull.number)"
         Task {
             await model.loadDraftWorktrees()
             let listed = model.draftWorktrees
