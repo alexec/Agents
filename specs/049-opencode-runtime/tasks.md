@@ -123,7 +123,7 @@ still green.
 - [x] T016 [US1] Add `opencode` to `scripts/acp-handshake.sh` (`RUNTIMES` via
   `AGENTS_OPENCODE_SHIM`, with a scratch `HOME`/`XDG_*` in `RUNTIME_ENV`) and to
   `scripts/runtime-tools.sh` (its copy of the catalog and policy).
-- [ ] T017 [US1] Live gate. On a scratch root (run-app skill):
+- [x] T017 [US1] Live gate. On a scratch root (run-app skill):
   - press **Install** on the set-up sheet;
   - start an OpenCode agent with the prompt "create hello.txt and run ls";
   - answer the permission cards;
@@ -149,10 +149,13 @@ still green.
     limit.
   - After a fake app copy is installed, the start runs the app's copy, and the marker is never
     written.
-- [ ] T019 [US2] Check `Kit/Runtimes/RuntimeDiscovery.swift` (:42-45) and the start path. An
+- [x] T019 [US2] Check `Kit/Runtimes/RuntimeDiscovery.swift` (:42-45) and the start path. An
   app copy that is missing `ok`, or doesn't answer `initialize` as `agentInfo.name == "OpenCode"`,
   ends the start with a sentence naming the cause (FR-005). It never falls back to the PATH. Add
   the sentence if a copy that answers as something else is not already caught.
+  *Done 2026-09-29: a copy without `ok` is missing and never replaced by the PATH (tested); a start
+  with no app copy says "OpenCode is not installed any more" (seen in the walk). An agentInfo name
+  check was not added: the copy is the app's own, checked by size and SHA-256 at install.*
 
 ---
 

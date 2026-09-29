@@ -138,3 +138,16 @@ From a survey of the code on 2026-09-28 (main `b076124f`):
   Grok. The daemon answers a request itself under `alwaysApprove`.
 - **Cost of zero.** A `usage_update` cost of 0 shows as **"$0"** on the meter (Mac and Remote),
   and a turn's zero cost adds a `costToDate[USD] = 0` entry.
+
+## R11. A turn waits 40 s on a crowded temporary folder (walk, 2026-09-29)
+
+The first walk on a scratch app took 43–55 s to a first word on every turn, against 2 s for the
+bare probe with the same model. OpenCode's log went quiet for ~40 s between `shell tool using
+shell` and `watcher backend`. Replaying the exact environment the app gave it, one variable at a
+time, found **`TMPDIR`**: the per-user `/var/folders/…/T/` on this Mac holds 909,125 entries, and
+OpenCode walks it at the start of a turn. With an empty folder of its own the same prompt
+answered in 1.8–3.7 s. Not PATH, HOME, the XDG folders, the inline config, the app's MCP server
+or the git folder, each measured.
+
+So `RuntimeLaunchCatalog.opencode` gives it `TMPDIR=<root>/runtimes/opencode/tmp`, made (0700)
+before launch like a `*_HOME`.

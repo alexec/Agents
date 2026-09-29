@@ -107,11 +107,12 @@ public struct RuntimeLaunch: Hashable, Sendable {
     }
 
     /// The folders `environment` names under `<root>`, which the daemon makes (0700)
-    /// before launch: a runtime whose home is missing may refuse to start or make it
-    /// world-readable.
+    /// before launch: a runtime whose home or temporary folder is missing may refuse to
+    /// start or make it world-readable.
     public func folders(root: String) -> [String] {
         environment.compactMap { name, value in
-            guard name.hasSuffix("_HOME"), let value, value.hasPrefix(Self.rootPlaceholder) else { return nil }
+            guard name.hasSuffix("_HOME") || name == "TMPDIR", let value,
+                  value.hasPrefix(Self.rootPlaceholder) else { return nil }
             return value.replacingOccurrences(of: Self.rootPlaceholder, with: root)
         }
         .sorted()
@@ -181,9 +182,14 @@ public enum RuntimeLaunchCatalog {
     ///   person's home (D3). A server run is lent the Mac's through this variable, set after
     ///   this by the lending (D7), never from a stray one in the daemon's environment.
     /// - `OPENCODE_ENABLE_QUESTION_TOOL` removed: questions go through the app's `ask_form`.
+    /// - `TMPDIR` of its own: at the start of every turn OpenCode walks its temporary folder,
+    ///   and a Mac's per-user one can hold close to a million entries. Measured on this Mac on
+    ///   2026-09-29: 40 s before the first word with `/var/folders/…/T/`, 2 s with an empty
+    ///   folder, the same model and prompt otherwise (research R11).
     public static let opencode = RuntimeLaunch(
         runtimeID: "opencode",
         environment: [
+            "TMPDIR": "<root>/runtimes/opencode/tmp",
             "OPENCODE_DISABLE_AUTOUPDATE": "1",
             "OPENCODE_DISABLE_SHARE": "1",
             "OPENCODE_AUTH_CONTENT": nil,
