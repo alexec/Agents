@@ -71,7 +71,7 @@ struct PoolStatusTests {
     @Test func switchesFromTheLastDayUnlessThirtyAreAskedFor() async throws {
         let clock = TestClock()
         let (core, _, locations) = try core(clock: clock)
-        let store = PoolStore(locations: locations)
+        let store = AllowanceStore(locations: locations)
         for hoursAgo: Double in [1, 50, 24 * 40] {
             try store.append(SwitchRecord(at: clock.now.addingTimeInterval(-hoursAgo * 3600), agentID: UUID(),
                                           from: .init(runtimeID: "claude"), to: .init(runtimeID: "codex"),

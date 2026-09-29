@@ -6,11 +6,11 @@ import Testing
 /// `pool.json`, `allowances.json` and `switches.jsonl` (052, R6).
 @Suite("Where the pool is kept")
 struct PoolStoreTests {
-    private func store() -> (PoolStore, StoreLocations) {
+    private func store() -> (AllowanceStore, StoreLocations) {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("PoolStore-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("AllowanceStore-\(UUID().uuidString)", isDirectory: true)
         let locations = StoreLocations(root: root)
-        return (PoolStore(locations: locations), locations)
+        return (AllowanceStore(locations: locations), locations)
     }
 
     @Test func nothingWrittenIsAnEmptyPool() {

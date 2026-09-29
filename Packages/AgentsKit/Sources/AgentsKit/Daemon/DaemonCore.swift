@@ -326,12 +326,12 @@ public actor DaemonCore {
 
     // MARK: The pool (052)
 
-    lazy var poolStore = PoolStore(locations: locations)
+    lazy var allowanceStore = AllowanceStore(locations: locations)
     /// The person's pool, read once and kept in step with `pool.json`.
-    lazy var pool: PoolSettings = poolStore.load()
+    lazy var pool: PoolSettings = allowanceStore.load()
     /// Each credential's state, keyed by `AllowanceState.credentialKey`.
     lazy var allowances: [String: AllowanceState] = Dictionary(
-        poolStore.loadAllowances().map { ($0.credentialKey, $0) }, uniquingKeysWith: { _, later in later })
+        allowanceStore.loadAllowances().map { ($0.credentialKey, $0) }, uniquingKeysWith: { _, later in later })
     /// The prompt each agent's current turn was sent, for a retry or a carry-on.
     var lastPrompts: [UUID: SentPrompt] = [:]
     /// Rate-limit retries so far for each agent's current prompt (R7).

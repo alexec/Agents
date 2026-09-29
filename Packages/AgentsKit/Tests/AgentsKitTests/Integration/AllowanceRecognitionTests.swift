@@ -52,7 +52,7 @@ struct AllowanceRecognitionTests {
         #expect(state.returnsAt == Date(timeIntervalSince1970: 1_790_000_000))
         #expect(try await notes(core, id).contains { $0.hasPrefix("Claude’s allowance ran out. Its provider says it resets at") })
         // Written where the daemon keeps it, so a restart remembers.
-        #expect(PoolStore(locations: locations).loadAllowances().contains { $0.isOut })
+        #expect(AllowanceStore(locations: locations).loadAllowances().contains { $0.isOut })
     }
 
     @Test func geminisSpentFreeTierIsOutUntilMidnightPacific() async throws {

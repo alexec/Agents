@@ -57,7 +57,7 @@ extension DaemonCore {
     func setAllowanceState(_ state: AllowanceState) {
         allowances[state.credentialKey] = state
         do {
-            try poolStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
+            try allowanceStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
             broadcastPool()
         } catch {
             DaemonLog.shared.write("allowances could not be written: \(error)")
@@ -303,7 +303,7 @@ extension DaemonCore {
 
         await self.record(.poolSwitch(record), for: agentID)
         await self.record(.handoff(markdown: handoff.markdown, characters: handoff.markdown.count), for: agentID)
-        do { try poolStore.append(record) } catch { DaemonLog.shared.write("switch not written: \(error)") }
+        do { try allowanceStore.append(record) } catch { DaemonLog.shared.write("switch not written: \(error)") }
         raise(EventDraft(name: "agent.runtime_switched", at: at, scope: .project(folder: agent.projectFolder),
                          sentence: "\(LeaseWords.agentName(agent.title)) carried on with \(PoolWords.runtimeName(entry.runtimeID)).",
                          details: ["from": current.runtimeID, "to": entry.runtimeID, "reason": switchReason.rawValue]
@@ -359,7 +359,7 @@ extension DaemonCore {
         }
         guard changed else { return false }
         do {
-            try poolStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
+            try allowanceStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
         } catch {
             DaemonLog.shared.write("allowances could not be written: \(error)")
         }
@@ -492,7 +492,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.stopTheTurnFirst, message: "Stop the turn first.")
         }
         // The limit is the mode the chat had before it moved, which the switch record keeps.
-        let before = poolStore.switches(since: .distantPast).last { $0.agentID == agent.id }
+        let before = allowanceStore.switches(since: .distantPast).last { $0.agentID == agent.id }
         let limit = before?.carried.first { $0.optionID == ModeMemory.modeOption(in: options)?.id }?.from
             ?? currentMode(of: agent)
         if let refusal = SettingsCarry.refusal(of: request.choices, options: options, currentMode: limit,
@@ -603,7 +603,7 @@ extension DaemonCore {
             return PoolStatus.Row(entry: entry, state: state, chats: chats, unusable: unusable(entry))
         }
         let since = at.addingTimeInterval(-Double(min(max(days ?? 1, 1), 30)) * 86400)
-        let switches = poolStore.switches(since: since).sorted { $0.at > $1.at }
+        let switches = allowanceStore.switches(since: since).sorted { $0.at > $1.at }
         let titles = Dictionary(switches.compactMap { record in
             agents[record.agentID].map { (record.agentID, $0.title ?? "Untitled") }
         }, uniquingKeysWith: { first, _ in first })
@@ -627,7 +627,7 @@ extension DaemonCore {
             throw JSONRPCError(code: -32602, message: error.sentence)
         }
         pool = next
-        try poolStore.save(next)
+        try allowanceStore.save(next)
         // A changed amount or date counts now, not at the next turn (US2-AS7, AS8).
         let at = now()
         for entry in next.entries where entry.payment.isCredit {
@@ -754,7 +754,7 @@ extension DaemonCore {
         }
         guard changed else { return }
         do {
-            try poolStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
+            try allowanceStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
         } catch {
             DaemonLog.shared.write("allowances could not be written: \(error)")
         }

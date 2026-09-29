@@ -5,7 +5,7 @@ import AgentsKitCore
 /// them (052, R6). On `LimitStore`'s pattern: a missing or unreadable file is the empty
 /// value, so a daemon that cannot read its pool carries nothing anywhere rather than
 /// refusing to work.
-public struct PoolStore: Sendable {
+public struct AllowanceStore: Sendable {
     private let locations: StoreLocations
 
     public init(locations: StoreLocations) {
