@@ -17,6 +17,7 @@ final class HostModel {
     private(set) var controlRunning = false
     private(set) var daemonRunning = false
     private(set) var runningSince: Date?
+    private var controlPID: Int32?
     private(set) var clients: Int?
     private(set) var hosts: Int?
     private(set) var projects: Int?
@@ -91,7 +92,10 @@ final class HostModel {
         let control = await services.running(.control)
         controlRunning = control != nil
         daemonRunning = await services.running(.daemon) != nil
-        if let control { runningSince = runningSince ?? Self.started(control) } else { runningSince = nil }
+        // Read again whenever the process is another one: a restart or a store switch.
+        if let control, control != controlPID { runningSince = Self.started(control) }
+        if control == nil { runningSince = nil }
+        controlPID = control
         if controlRunning, settings.role == .runHere {
             let listed = await ControlTool.run(["clients"], paths: paths, settings: settings, key: false)
             clients = listed.ok ? listed.output.split(separator: "\n").count : nil
@@ -104,13 +108,29 @@ final class HostModel {
         await countWork()
     }
 
+    /// One connection to this Mac's host, kept while it answers: a socket opened every few
+    /// seconds is how a daemon's descriptors ran out once.
+    private var hostClient: DaemonClient?
+
     /// From this Mac's own host, over its socket: never starting one.
     private func countWork() async {
         guard daemonRunning else { projects = nil; working = nil; return }
-        let client = DaemonClient(link: LookingLink(locations: paths.hostLocations))
-        defer { Task { await client.disconnect() } }
-        let listed = try? await client.call(DaemonAPI.Method.projectsList, returning: JSONValue.self)
+        let client: DaemonClient
+        if let kept = hostClient {
+            client = kept
+        } else {
+            client = DaemonClient(link: LookingLink(locations: paths.hostLocations))
+            do { try await client.connect(startIfNeeded: false, timeout: .seconds(2)) } catch { return }
+            hostClient = client
+        }
+        let listed = try? await client.call(DaemonAPI.Method.projectsList, [String: String](), returning: JSONValue.self)
         let agents = try? await client.call(DaemonAPI.Method.agentsList, ["includeArchived": false], returning: JSONValue.self)
+        if listed == nil, agents == nil {
+            // Gone away: connect afresh next time.
+            await client.disconnect()
+            hostClient = nil
+            return
+        }
         if case .array(let all)? = listed { projects = all.count }
         if case .array(let all)? = agents {
             working = all.filter { $0["state"]?.stringValue == AgentState.running.rawValue }.count
@@ -140,6 +160,8 @@ final class HostModel {
         settings.save(paths)
         busy = "Starting the control plane…"
         defer { busy = nil }
+        // Made before the launcher starts, so there is one key to begin with.
+        do { _ = try HostSecrets.controlKey(paths) } catch { problem = "The control plane's key: \(error)"; return }
         guard await start(.control) else { return }
         // The copy writes its settings to the store as it starts; a code can be made
         // once they are there.
@@ -188,7 +210,6 @@ final class HostModel {
     func restartControl() async {
         busy = "Restarting…"
         defer { busy = nil }
-        runningSince = nil
         _ = await services.restart(.control)
         try? await Task.sleep(for: .seconds(1))
         await refresh()

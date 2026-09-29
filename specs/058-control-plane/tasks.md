@@ -118,7 +118,7 @@ transport.
   - the ETag is SHA-256 of the contents;
   - `put` takes `flock` on `<key>.lock`, compares, writes a temporary file, `fsync`s it and renames it into place;
   - `list` walks the prefix.
-- [ ] T034 (memory and folder done in `ControlStoreTests` and `ControlRecordsTests`; the bucket's run waits on T062) [P] Store conformance tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/StoreConformanceTests.swift`. Run them against `MemoryStore` and `FolderStore`, and against `S3Store` when `AGENTS_TEST_S3` is set:
+- [x] T034 (StoreConformanceTests on memory, folder and MinIO with AGENTS_TEST_S3) [P] Store conformance tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/StoreConformanceTests.swift`. Run them against `MemoryStore` and `FolderStore`, and against `S3Store` when `AGENTS_TEST_S3` is set:
   - create-only conflicts;
   - a stale `matching` conflicts;
   - `list` sees new keys;
@@ -249,34 +249,34 @@ single-copy control plane, and the window pairs with it.
 **Independent test**: quickstart Walk 1 with the host app's scratch build instead of
 hand-started processes, and SC-006 timed.
 
-- [ ] T054 [US2] Add the `Agents Host` target to `project.yml`:
+- [x] T054 (built: Helpers agentsd + agents-control, LaunchAgents, servers/toolsets copied (the Agents target keeps its own until T106); agents-relay waits on T096; signed Apple Development locally, Developer ID with T089) [US2] Add the `Agents Host` target to `project.yml`:
   - Developer ID signing, bundle `com.alexecollins.agents.host`, `LSUIElement`;
   - `Host/Sources`;
   - embedded helpers in `Contents/Helpers`: `agentsd`, `agents-control` (macOS build of `Packages/ControlPlane`) and `agents-relay` (T096);
   - `Contents/Resources/servers` and `toolsets` moved here from the Agents target;
   - `Host/LaunchAgents/*.plist` in `Contents/Library/LaunchAgents`.
-- [ ] T055 [US2] Move `LocalServices` from `App/Sources/Control/LocalServices.swift` to `Host/Sources/LocalServices.swift`:
+- [x] T055 (Host/Sources/LocalServices.swift; scratch roots bootstrap their own labelled jobs; the window's copy stays for the developer build until T106) [US2] Move `LocalServices` from `App/Sources/Control/LocalServices.swift` to `Host/Sources/LocalServices.swift`:
   - `SMAppService.agent` for `agentsd`, always;
   - `agents-control` only when *Run the control plane here* is on;
   - `agents-relay` only when relaying (T097).
 
   Keep the scratch-root labelled jobs.
-- [ ] T056 [US2] The control plane's key in the host app, in `Host/Sources/ControlKey.swift`: made once and kept in the keychain. On a Mac with today's set-up, it is the existing `relay-mac-key`. It is handed to `agents-control` through an inherited descriptor (`--key-fd`) by a small launcher, `Host/Sources/ControlLauncher.swift`, that the launch agent runs. The key is never written to disk (FR-010).
-- [ ] T057 [US2] On first start, the single copy makes a self-signed certificate in its folder and a store in `~/Library/Application Support/Agents Control/store`. It advertises `_agents-control._tcp` with the pin in its TXT record, and listens on 8791 with URL `https://<.local name>:8791`.
-- [ ] T058 [US2] Build frame L in `Host/Sources/HostWindow.swift`, after approval (T028): state, the code to pair, *Run the control plane here*, *Join one elsewhere* (a host code, which gives only the host), *Relay for my devices*, and the move entry (T086).
-- [ ] T058a [US2] Store choice in the host app, in `Host/Sources/StoreChoice.swift` (FR-024a, research R9):
+- [x] T056 (keychain, handed over on fd 3 by the app's own program as launcher; scratch roots use a 0600 file; reusing relay-mac-key waits on the move (US7)) [US2] The control plane's key in the host app, in `Host/Sources/ControlKey.swift`: made once and kept in the keychain. On a Mac with today's set-up, it is the existing `relay-mac-key`. It is handed to `agents-control` through an inherited descriptor (`--key-fd`) by a small launcher, `Host/Sources/ControlLauncher.swift`, that the launch agent runs. The key is never written to disk (FR-010).
+- [x] T057 (agents-control serve --home: TLS and store in the folder, 8791, the .local URL, Bonjour with the pin in TXT) [US2] On first start, the single copy makes a self-signed certificate in its folder and a store in `~/Library/Application Support/Agents Control/store`. It advertises `_agents-control._tcp` with the pin in its TXT record, and listens on 8791 with URL `https://<.local name>:8791`.
+- [x] T058 (walked; the relay row greyed until T096, the move strip with T086) [US2] Build frame L in `Host/Sources/HostWindow.swift`, after approval (T028): state, the code to pair, *Run the control plane here*, *Join one elsewhere* (a host code, which gives only the host), *Relay for my devices*, and the move entry (T086).
+- [x] T058a (walked against MinIO: Check, keys on fd 4) [US2] Store choice in the host app, in `Host/Sources/StoreChoice.swift` (FR-024a, research R9):
   - *This Mac* (the default), a folder, or *A bucket*: endpoint, bucket, prefix, access key and secret;
   - *Check* runs the start-up probe (contracts/store.md rule 4) before saving;
   - the keys are kept in the host app's keychain and handed to `agents-control` through `--store-credentials-fd`, never in a plist, file or environment variable;
   - `agents-control serve` reads that descriptor in `Packages/ControlPlane/Sources/agents-control/main.swift`.
-- [ ] T058b [US2] Write `agents-control store copy --from --to` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/StoreCopy.swift`, following contracts/store.md "Copying a store":
+- [x] T058b (walked folder→MinIO→folder; 3 StoreCopyTests) [US2] Write `agents-control store copy --from --to` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/StoreCopy.swift`, following contracts/store.md "Copying a store":
   - refuse a destination that has `control.json`;
   - skip `leases/` and `copies/`;
   - verify the count and SHA-256 of each object.
 
   Add *Switch store…* in the host app: stop the copy, copy, point the copy at the new store, and start it. The old store is kept until removed. Add tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/StoreCopyTests.swift`: folder to memory and back, a non-empty destination refused, and every record intact.
-- [ ] T059 [US2] The window pairs with a host app it found (frame K, second state): a code handed over through the host app's window, or typed. Installing twice registers nothing twice (US2-4).
-- [ ] T060 [US2] Walk US2 on a scratch root:
+- [x] T059 (K2's Pair opens agents-host://pair and Agents Host shows the code; typed or pasted into the sheet) [US2] The window pairs with a host app it found (frame K, second state): a code handed over through the host app's window, or typed. Installing twice registers nothing twice (US2-4).
+- [x] T060 (walks/us2-host-app.md; log out/in replaced by launchctl print; a bucket chosen after first run, then switched) [US2] Walk US2 on a scratch root:
   - install the host app's scratch build and choose *Run the control plane here*;
   - pair the store-configured window and time it (SC-006);
   - log out and in (or `launchctl print` shows the jobs);
@@ -298,7 +298,7 @@ hand-started processes, and SC-006 timed.
   - a client on B reaching a host on A;
   - a `gone` closing B's channels;
   - a grant check at B.
-- [ ] T062 [P] [US3] Write `S3Store` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/S3Store.swift` over async-http-client, following contracts/store.md:
+- [x] T062 (pulled forward for US2: S3Store, SigV4 against AWS's example, conformance on MinIO) [P] [US3] Write `S3Store` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/S3Store.swift` over async-http-client, following contracts/store.md:
   - SigV4 signed with `ControlAgreement`'s HMAC-SHA256;
   - `If-None-Match`, `If-Match` and ETags;
   - path-style when `AGENTS_STORE_PATH_STYLE=1`;

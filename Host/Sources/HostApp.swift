@@ -14,7 +14,18 @@ enum HostEntry {
     }
 }
 
+/// agents-host://pair, from the App Store window's K2: show a code. A `Window` scene is
+/// never handed a URL by `onOpenURL`, so the app delegate takes it.
+final class HostDelegate: NSObject, NSApplicationDelegate {
+    @MainActor static var opened: ((URL) -> Void)?
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated { urls.forEach { Self.opened?($0) } }
+    }
+}
+
 struct AgentsHostApp: App {
+    @NSApplicationDelegateAdaptor(HostDelegate.self) private var delegate
     @State private var model = HostModel()
     @Environment(\.openWindow) private var openWindow
 
@@ -22,9 +33,10 @@ struct AgentsHostApp: App {
         Window("Agents Host", id: "host") {
             HostWindow()
                 .environment(model)
-                // agents-host://pair, from the App Store window's K2: show a code.
-                .onOpenURL { url in
-                    if url.host == "pair" { model.showingPairing = true }
+                .onAppear {
+                    HostDelegate.opened = { [model] url in
+                        if url.host == "pair", model.settings.role == .runHere { model.showingPairing = true }
+                    }
                 }
         }
         .defaultSize(width: 680, height: 640)

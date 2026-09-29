@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(Glibc)
+import Glibc
+#endif
 
 /// The P-256 agreement and HKDF a Linux host uses to dial a control plane (058, T044).
 ///
@@ -29,11 +32,22 @@ public enum ControlAgreement {
         let made = generate().privateKey
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
-        FileManager.default.createFile(atPath: file.path, contents: made, attributes: [.posixPermissions: 0o600])
-        guard (try? Data(contentsOf: file)) == made else {
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: file.path])
+        // Created only if absent: two processes making the key at once (Agents Host and
+        // the launcher it just started) must end up with one key, the first one written.
+        let fd = open(file.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+        if fd >= 0 {
+            let written = made.withUnsafeBytes { write(fd, $0.baseAddress, made.count) }
+            fsync(fd)
+            close(fd)
+            guard written == made.count else { throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: file.path]) }
+            return made
         }
-        return made
+        // Another got there first: theirs is the key, once it is all written.
+        for _ in 0..<50 {
+            if let stored = try? Data(contentsOf: file), let key = valid(stored) { return key }
+            usleep(20_000)
+        }
+        throw CocoaError(.fileReadCorruptFile, userInfo: [NSFilePathErrorKey: file.path])
     }
 
     public static func publicKey(privateKey: Data) throws -> Data {

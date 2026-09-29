@@ -184,6 +184,12 @@ func checkStore() async {
     do {
         try await store().probe(copy: "check")
         print("works, with safe concurrent writes")
+    } catch let error as StoreError {
+        // In words, for Agents Host's Check to show as it is.
+        switch error {
+        case .unavailable(let why): fail("It can't be used: \(why).")
+        case .conflict: fail("It can't be used: another writer changed the probe while it ran. Check again.")
+        }
     } catch {
         fail("\(error)")
     }
