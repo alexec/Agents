@@ -467,6 +467,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.SetOptionRequest.self)
                 return .success(try JSONValue.encoding(try await setOption(request)))
 
+            case DaemonAPI.Method.agentsSetSandbox:
+                let request = try require(params, as: DaemonAPI.SetSandboxRequest.self)
+                return .success(try JSONValue.encoding(try await setSandbox(request)))
+
             case DaemonAPI.Method.agentsSetCeiling:
                 let request = try require(params, as: DaemonAPI.SetCeilingRequest.self)
                 return .success(try JSONValue.encoding(try await setCeiling(request)))
@@ -512,6 +516,13 @@ extension DaemonCore {
             case DaemonAPI.Method.clientPermissionsSet:
                 let settings = try require(params, as: ClientPermissionSettings.self)
                 return .success(try JSONValue.encoding(try setClientPermissions(settings)))
+
+            case DaemonAPI.Method.sandboxState:
+                return .success(try JSONValue.encoding(sandboxSettings))
+
+            case DaemonAPI.Method.sandboxSet:
+                let settings = try require(params, as: SandboxSettings.self)
+                return .success(try JSONValue.encoding(try setSandboxSettings(settings)))
 
             case DaemonAPI.Method.runtimesAllowances:
                 // Someone is looking at the runtimes: ask what is left, behind the answer.

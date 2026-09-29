@@ -196,6 +196,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// What its row says about being retired, set by the daemon's check (051). Only
     /// ever on an archived agent.
     public var retirement: Retirement?
+
+    /// This agent's own command sandbox choice (064, FR-003b). Nil follows its runtime's
+    /// default; set only by the person, or by **Continue without sandbox**.
+    public var sandboxOverride: SandboxChoice?
+    /// The sandbox its latest turn started with (FR-010), written at every spawn.
+    public var effectiveSandbox: EffectiveSandbox?
     /// The three lists that are nearly all of a record — the options and commands the
     /// runtime advertised, and the plans — are empty here and still on disk (051). An
     /// archived agent nobody is reading is held this way: 1.4 KB rather than 24.
@@ -345,6 +351,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New in 051. Absent on everything written before it.
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
         retirement = (try? c.decodeIfPresent(Retirement.self, forKey: .retirement)) ?? nil
+        // New in 064. Absent on everything written before it: the runtime's default.
+        sandboxOverride = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandboxOverride)
+        effectiveSandbox = (try? c.decodeIfPresent(EffectiveSandbox.self, forKey: .effectiveSandbox)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -410,6 +419,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
         try c.encodeIfPresent(retirement, forKey: .retirement)
+        try c.encodeIfPresent(sandboxOverride, forKey: .sandboxOverride)
+        try c.encodeIfPresent(effectiveSandbox, forKey: .effectiveSandbox)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -437,6 +448,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case afterTurn
         case background
         case archivedAt, retirement
+        case sandboxOverride, effectiveSandbox
     }
 
     struct AnyKey: CodingKey {

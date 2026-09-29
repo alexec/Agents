@@ -301,6 +301,13 @@ public enum DaemonAPI {
         /// Cursor and Grok permission mode (061). Control only.
         public static let clientPermissionsState = "clientPermissions/state"
         public static let clientPermissionsSet = "clientPermissions/set"
+        /// Each runtime's command sandbox default (064). Reading is also the phone's, for
+        /// "Use runtime default (Off)"; setting is the Mac's alone.
+        public static let sandboxState = "sandbox/state"
+        public static let sandboxSet = "sandbox/set"
+        /// One agent's override (nil clears it), and the card's recovery (064).
+        public static let agentsSetSandbox = "agents/setSandbox"
+        public static let agentsAnswerSandbox = "agents/answerSandbox"
         /// Every runtime's state (065, US4), and the person saying one is back.
         public static let runtimesAllowances = "runtimes/allowances"
         public static let runtimesMarkAvailable = "runtimes/markAvailable"
@@ -400,6 +407,8 @@ public enum DaemonAPI {
         public static let costChanged = "cost/changed"
         /// Cursor and Grok permission mode changed (061).
         public static let clientPermissionsChanged = "clientPermissions/changed"
+        /// A runtime's sandbox default changed (064).
+        public static let sandboxChanged = "sandbox/changed"
         /// `RuntimeAllowances`, whenever a runtime's state changes (065). Debounced to
         /// one a second.
         public static let runtimesAllowancesChanged = "runtimes/allowancesChanged"
@@ -653,12 +662,16 @@ public enum DaemonAPI {
         /// on the way back try again without starting the work twice. `nil` from
         /// callers that do not retry.
         public var requestID: UUID?
+        /// The new agent's own sandbox choice (064). Nil follows the runtime's default.
+        public var sandbox: SandboxChoice?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
                     startOptions: StartOptions = .none, draftID: UUID? = nil,
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
-                    worktree: WorktreeChoice? = nil, requestID: UUID? = nil) {
+                    worktree: WorktreeChoice? = nil, requestID: UUID? = nil,
+                    sandbox: SandboxChoice? = nil) {
+            self.sandbox = sandbox
             self.worktree = worktree
             self.runtimeID = runtimeID
             self.cwd = cwd
@@ -686,6 +699,7 @@ public enum DaemonAPI {
             mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
             worktree = try c.decodeIfPresent(WorktreeChoice.self, forKey: .worktree)
             requestID = try c.decodeIfPresent(UUID.self, forKey: .requestID)
+            sandbox = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandbox)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.
@@ -1164,6 +1178,26 @@ public enum DaemonAPI {
         public init(agentID: UUID, ceiling: Cost?) {
             self.agentID = agentID
             self.ceiling = ceiling
+        }
+    }
+
+    /// One agent's sandbox override (064). `choice: nil` clears it (FR-003b).
+    public struct SetSandboxRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var choice: SandboxChoice?
+        public init(agentID: UUID, choice: SandboxChoice?) {
+            self.agentID = agentID
+            self.choice = choice
+        }
+    }
+
+    /// The sandbox card's answer (064): carry on without the sandbox, or keep stopped.
+    public struct AnswerSandboxRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var carryOn: Bool
+        public init(agentID: UUID, carryOn: Bool) {
+            self.agentID = agentID
+            self.carryOn = carryOn
         }
     }
 

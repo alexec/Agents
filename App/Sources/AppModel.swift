@@ -77,6 +77,8 @@ final class AppModel {
     var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
     /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
     private(set) var clientPermissions = ClientPermissionSettings()
+    /// Each runtime's command sandbox default (064).
+    private(set) var sandboxSettings = SandboxSettings()
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
     /// said — and for ever against one too old to know the method, which is drawn the
@@ -345,6 +347,8 @@ final class AppModel {
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
+    /// The next agent's own sandbox choice (064). Nil follows its runtime's default.
+    var draftSandbox: SandboxChoice?
     /// Folders beyond the working one, and MCP servers, for the agent about to start.
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
@@ -815,6 +819,43 @@ final class AppModel {
         }
     }
 
+    /// One agent's own sandbox choice, nil to follow its runtime's default (064).
+    /// The agent comes back by `agent/changed`, as for any other change to it.
+    func setAgentSandbox(_ agentID: UUID, _ choice: SandboxChoice?) async {
+        _ = await attempt {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsSetSandbox,
+                                                           DaemonAPI.SetSandboxRequest(agentID: agentID, choice: choice))
+        }
+    }
+
+    /// The sandbox card's answer (064, FR-007a): only this agent is changed.
+    func answerSandbox(_ agentID: UUID, carryOn: Bool) async {
+        _ = await attempt {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsAnswerSandbox,
+                                                           DaemonAPI.AnswerSandboxRequest(agentID: agentID, carryOn: carryOn))
+        }
+    }
+
+    func refreshSandboxSettings() async {
+        guard let settings = try? await client.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
+                                                    returning: SandboxSettings.self) else { return }
+        sandboxSettings = settings
+    }
+
+    /// Save a runtime's sandbox default and copy it to every connected server (064): each
+    /// server applies it to the runtimes installed there, as the Mac does.
+    func setSandboxDefault(_ choice: SandboxChoice, for runtimeID: String) async {
+        let wanted = sandboxSettings.setting(choice, for: runtimeID)
+        sandboxSettings = wanted
+        guard let saved = try? await client.call(DaemonAPI.Method.sandboxSet, wanted,
+                                                 returning: SandboxSettings.self) else { return }
+        sandboxSettings = saved
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.sandboxSet, saved,
+                                                     returning: SandboxSettings.self)
+        }
+    }
+
     /// Retire one archived agent now (051, US7). Unconfirmed, the size it frees, or why it
     /// cannot go yet; confirmed, it is retired and leaves the list by `agent/removed`.
     func retireNow(_ agentID: UUID, confirmed: Bool) async -> Result<DaemonAPI.RetirePreview, JSONRPCError> {
@@ -1119,6 +1160,10 @@ final class AppModel {
             guard let settings = try? params?.decode(ClientPermissionSettings.self) else { return }
             clientPermissions = settings
 
+        case DaemonAPI.Notification.sandboxChanged:
+            guard let settings = try? params?.decode(SandboxSettings.self) else { return }
+            sandboxSettings = settings
+
         default:
             break
         }
@@ -1282,6 +1327,9 @@ final class AppModel {
         // And Cursor/Grok permission mode (061).
         _ = try? await server.call(DaemonAPI.Method.clientPermissionsSet, clientPermissions,
                                    returning: ClientPermissionSettings.self)
+        // And each runtime's sandbox default (064).
+        _ = try? await server.call(DaemonAPI.Method.sandboxSet, sandboxSettings,
+                                   returning: SandboxSettings.self)
         // And what the Mac knows of the plans it relays (052, R6): a server's Codex
         // spends the Mac's ChatGPT plan, so the Mac's word that it is out is the server's.
         if let allowances = work.runtimeAllowances {
@@ -1341,6 +1389,7 @@ final class AppModel {
         async let cost: Void = refreshCostState()
         async let retention: Void = refreshRetentionState()
         async let clientPermissions: Void = refreshClientPermissions()
+        async let sandbox: Void = refreshSandboxSettings()
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
@@ -1350,7 +1399,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates)
+                   transcript, runtimeStates, sandbox)
         #if DEBUG
         openFromLaunchArguments()
         #endif
@@ -1993,7 +2042,8 @@ final class AppModel {
                                              draftID: draftID,
                                              additionalDirectories: draftFolders,
                                              mcpServers: draftServers,
-                                             worktree: draftWorktree)
+                                             worktree: draftWorktree,
+                                             sandbox: draftSandbox)
         do {
             _ = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil

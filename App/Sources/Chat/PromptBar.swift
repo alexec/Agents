@@ -695,6 +695,7 @@ struct PromptBar: View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 permissionOptions(shown)
+                sandboxCapsule(shown)
                 Spacer(minLength: 16)
                 otherOptions(shown)
                 // What it has used, beside how it thinks.
@@ -751,6 +752,33 @@ struct PromptBar: View {
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
         ForEach(shown.filter(\.isAboutPermission)) { option in
             OptionMenu(option: option, chosen: binding(for: option))
+        }
+    }
+
+    /// The command sandbox, beside the mode it is so often mistaken for (064, FR-004).
+    @ViewBuilder
+    private func sandboxCapsule(_ shown: [ConfigOption]) -> some View {
+        if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
+            let mode = shown.first { $0.id == "mode" }.flatMap { binding(for: $0).wrappedValue?.stringValue }
+            SandboxCapsule(runtimeID: runtimeID,
+                           override: agent == nil ? model.draftSandbox : agent?.sandboxOverride,
+                           runtimeDefault: model.sandboxSettings.choice(for: runtimeID),
+                           codexMode: mode,
+                           isWorking: agent?.state == .running) { choice in
+                if let agent {
+                    Task { await model.setAgentSandbox(agent.id, choice) }
+                } else {
+                    model.draftSandbox = choice
+                    // Codex's sandbox is its mode (FR-005a): the draft's mode follows.
+                    if runtimeID == RuntimeCatalog.codex.id, let option = shown.first(where: { $0.id == "mode" }) {
+                        switch choice {
+                        case .off: model.draftChosen[option.id] = .string("agent-full-access")
+                        case .on where mode == "agent-full-access": model.draftChosen[option.id] = .string("read-only")
+                        default: break
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -212,3 +212,17 @@ Failures arrive in three shapes (fixtures in
   during the failed turn, it sends a short continuation instead.
 - **Rationale**: the in-memory `lastPrompts` does not survive a daemon restart; the transcript does.
   Re-sending a prompt after actions have run could repeat them without the person knowing.
+
+## Decisions (Alex, 2026-09-29)
+
+On the redone research, Alex chose:
+
+1. **Measured routes only.** Claude, Codex and Grok get **As configured by runtime / On / Off**;
+   Gemini gets **As configured by runtime / Off**. Cursor, Copilot, Antigravity and OpenCode show
+   their state and one line of why, with no control. Copilot gains On and Off in a follow-up once
+   its quota resets and the probe passes.
+2. **No in-app probe** (R9).
+3. **A sandbox that fails mid-turn shows its card when the turn ends**, and the agent stops there;
+   the turn is not cut off (R11).
+4. **Gemini keeps As configured by runtime**; a start that never answers is recognised as its
+   sandbox hanging, and **Continue without sandbox** sets that agent to Off (R6).

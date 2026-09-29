@@ -98,6 +98,11 @@ public enum ConnectionRole: String, Sendable, Hashable {
         // The phone reads each runtime's state and may say one is back (065).
         DaemonAPI.Method.runtimesAllowances,
         DaemonAPI.Method.runtimesMarkAvailable,
+        // The phone reads the runtime defaults and sets one agent's sandbox (064); the
+        // defaults themselves are the Mac's.
+        DaemonAPI.Method.sandboxState,
+        DaemonAPI.Method.agentsSetSandbox,
+        DaemonAPI.Method.agentsAnswerSandbox,
         DaemonAPI.Method.worktreesList,
         DaemonAPI.Method.worktreesCheck,
         DaemonAPI.Method.worktreesRemove,

@@ -28,6 +28,12 @@ struct AgentRuntimesSettingsView: View {
                     if let note = footer(for: status) { Text(note) }
                 }
                 .paperListRow()
+                // Its command sandbox (064): a default every agent on it follows, or why
+                // the app has no say.
+                Section("Command sandbox") {
+                    SandboxDefaultRow(runtimeID: status.id, name: status.runtime.name)
+                }
+                .paperListRow()
                 // Where it stands (065, US4): out, since when, when it is next checked, and
                 // what is left of its plan. Shown here because this is where a runtime is
                 // chosen from; never what decides whether a prompt is sent.
@@ -43,6 +49,7 @@ struct AgentRuntimesSettingsView: View {
         .task {
             await model.refreshRuntimes()
             await model.refreshClientPermissions()
+            await model.refreshSandboxSettings()
             await model.refreshRuntimeAllowances()
         }
     }
@@ -128,5 +135,52 @@ private struct ClientPermissionModeRow: View {
         case .alwaysApprove:
             return "Answers every permission request for you. Questions that are not permission still wait."
         }
+    }
+}
+
+/// A runtime's command sandbox default (064, FR-001, FR-014). A runtime the app cannot reach
+/// shows its state and the reason instead of a control.
+private struct SandboxDefaultRow: View {
+    @Environment(AppModel.self) private var model
+    let runtimeID: String
+    let name: String
+
+    var body: some View {
+        let choices = SandboxCatalog.choices(for: runtimeID)
+        let entry = SandboxCatalog.entry(for: runtimeID)
+        if choices.isEmpty {
+            LabeledContent("Default", value: stateWords(entry))
+            if let why = entry?.why { supporting(why) }
+        } else {
+            Picker("Default", selection: binding) {
+                ForEach(choices, id: \.self) { choice in
+                    Text(SandboxWords.choice(choice, runtimeID: runtimeID)).tag(choice)
+                }
+            }
+            supporting(SandboxWords.explanation(model.sandboxSettings.choice(for: runtimeID),
+                                                runtimeID: runtimeID, name: name))
+            if let why = entry?.why { supporting(why) }
+            supporting("New \(name) agents follow this unless one is set otherwise; a change applies from each one’s next turn.")
+        }
+    }
+
+    private func stateWords(_ entry: SandboxCatalog.Entry?) -> String {
+        if case .fixed(let state) = entry?.route {
+            return state == .none ? "No sandbox" : "Runtime controlled"
+        }
+        return "Runtime controlled"
+    }
+
+    private func supporting(_ text: String) -> some View {
+        Text(text)
+            .appText(.supporting)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var binding: Binding<SandboxChoice> {
+        Binding(
+            get: { model.sandboxSettings.choice(for: runtimeID) },
+            set: { choice in Task { await model.setSandboxDefault(choice, for: runtimeID) } })
     }
 }

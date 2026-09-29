@@ -109,13 +109,17 @@ extension TranscriptItem {
         return false
     }
 
-    /// A tool call or something the agent said: all a turn draws besides the ask.
+    /// A tool call or something the agent said: all a turn draws besides the ask. And a
+    /// sandbox that could not start (064), which ends its turn and must be seen to be
+    /// answered, so it is the block a concise turn shows.
     public var isBlock: Bool {
         switch self {
         case .toolRun: return true
         case .entry(let entry):
-            if case .agentMessage = entry.kind { return true }
-            return false
+            switch entry.kind {
+            case .agentMessage, .sandboxFailure: return true
+            default: return false
+            }
         }
     }
 

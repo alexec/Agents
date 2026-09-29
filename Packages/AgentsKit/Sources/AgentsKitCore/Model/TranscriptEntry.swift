@@ -79,6 +79,8 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// A chat carried on with another runtime (052): drawn as the tinted note, with
         /// what it carried and what it did not. An older build reads it as unrecognised.
         case poolSwitch(SwitchRecord)
+        /// A runtime's sandbox could not be set up (064). The card, until answered.
+        case sandboxFailure(SandboxFailureRecord)
 
         /// What the new runtime was handed, built from this record (052, R4). Drawn
         /// folded under the switch note, never as the person's words.

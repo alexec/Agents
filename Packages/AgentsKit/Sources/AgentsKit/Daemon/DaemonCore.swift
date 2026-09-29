@@ -323,6 +323,8 @@ public actor DaemonCore {
 
     lazy var clientPermissionStore = ClientPermissionStore(locations: locations)
     lazy var clientPermissions = clientPermissionStore.load()
+    lazy var sandboxStore = SandboxSettingsStore(locations: locations)
+    lazy var sandboxSettings = sandboxStore.load()
 
     // MARK: Each runtime's allowance (052, 065)
 

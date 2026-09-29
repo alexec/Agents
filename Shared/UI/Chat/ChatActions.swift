@@ -31,6 +31,9 @@ struct ChatActions {
     /// Every entry of a finished turn, by where it sits in the transcript, for a turn
     /// the chat opens from its summary.
     var turnEntries: @MainActor (UUID, Range<Int>) async -> [TranscriptEntry] = { _, _ in [] }
+    /// The sandbox card's two answers (064), for the open agent. Nil offers neither.
+    var continueWithoutSandbox: (@MainActor () async -> Void)? = nil
+    var keepStopped: (@MainActor () async -> Void)? = nil
 }
 
 extension EnvironmentValues {

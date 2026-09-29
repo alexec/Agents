@@ -250,6 +250,9 @@ private struct EntryRow: View {
         case .poolSwitch(let record):
             SwitchNote(record: record)
 
+        case .sandboxFailure(let record):
+            SandboxFailureCard(record: record)
+
         case .settingsChanged(let record):
             Text("Changed what it carried on with: "
                  + record.carried.compactMap { s in s.to?.stringValue.map { "\(s.name) \($0)" } }.joined(separator: ", "))

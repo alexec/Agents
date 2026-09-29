@@ -1654,7 +1654,13 @@ extension DaemonCore {
         changed(agent)
     }
 
-    public func setOption(_ request: DaemonAPI.SetOptionRequest) async throws -> [ConfigOption] {
+    public func setOption(_ request: DaemonAPI.SetOptionRequest,
+                          fromSandbox: Bool = false) async throws -> [ConfigOption] {
+        // Codex's mode is its sandbox (064, FR-005c): a mode picked by hand is that agent's
+        // sandbox choice as well. One picked by the sandbox menu already set it.
+        if request.optionID == "mode", !fromSandbox {
+            followCodexMode(request.value, agentID: request.agentID)
+        }
         guard let session = live[request.agentID] else {
             // Nothing is running, so the choice is remembered and applied when the
             // agent is next picked up.

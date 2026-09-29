@@ -88,7 +88,16 @@ struct ChatView: View {
                 if !frame.isOpen { frame.open() }
             },
             backgroundOutput: { item in BackgroundOutput.open(item) },
-            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
+            continueWithoutSandbox: sandboxAnswer(carryOn: true),
+            keepStopped: sandboxAnswer(carryOn: false))
+    }
+
+    /// The sandbox card's answer for the open agent (064).
+    private func sandboxAnswer(carryOn: Bool) -> (@MainActor () async -> Void)? {
+        guard let id = agent?.id else { return nil }
+        let model = model
+        return { await model.answerSandbox(id, carryOn: carryOn) }
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.
