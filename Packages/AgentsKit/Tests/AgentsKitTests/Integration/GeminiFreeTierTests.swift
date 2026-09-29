@@ -46,8 +46,8 @@ struct GeminiFreeTierTests {
         return (core, work)
     }
 
-    private func row(_ core: DaemonCore, _ runtimeID: String) async -> PoolStatus.Row? {
-        await core.poolStatus().rows.first { $0.entry.runtimeID == runtimeID }
+    private func row(_ core: DaemonCore, _ runtimeID: String) async -> RuntimeAllowances.Row? {
+        await core.runtimeAllowances().rows.first { $0.runtimeID == runtimeID }
     }
 
     @Test func geminisFreeTierShowsMidnightPacificButStaysOutUntilChecked() async throws {
@@ -55,9 +55,6 @@ struct GeminiFreeTierTests {
         var refused = FakeACPAgent.Script()
         refused.promptError = JSONRPCError(code: 429, message: "You have exhausted your daily quota on this model.")
         let (core, work) = try await core(then: [refused], clock: clock)
-        let gemini = PoolEntry(runtimeID: "gemini", payment: .freeTier(reset: .gemini),
-                               credentialRef: CredentialKind.geminiAPIKey.rawValue)
-        _ = try await core.setPool(PoolSettings(isOn: false, entries: [gemini]))
         let id = try await core.start(.init(runtimeID: "gemini", cwd: work, prompt: "go"))
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         let out = try #require(await row(core, "gemini"))

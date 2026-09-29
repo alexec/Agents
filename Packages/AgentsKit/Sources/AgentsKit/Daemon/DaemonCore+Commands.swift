@@ -1040,12 +1040,6 @@ extension DaemonCore {
         // above is the user's words alone either way: the transcript says what was
         // said, not what we added to it.
         var outgoing = blocks
-        // A chat moved to this runtime with nothing re-sent carries its handoff on the
-        // first prompt it sends here (052, R4).
-        if let handoff = pendingHandoff.removeValue(forKey: agentID) {
-            outgoing.insert(Self.handoffBlock(handoff, agentID: agentID,
-                                              embedded: await session.initializeResult?.accepts.embeddedContext == true), at: 0)
-        }
         // What the app owes the agent about this prompt, and only the agent (042).
         if let preface { outgoing.insert(.text(preface), at: 0) }
         // Where it now works, when it has just been moved (053): first of all, so what

@@ -7,10 +7,16 @@ import Foundation
 public struct RuntimeAllowances: Codable, Hashable, Sendable {
     public var rows: [Row]
     public var at: Date
+    /// The shared allowances (a plan's sign-in) as this daemon has recorded them: what
+    /// the Mac's window carries between it and its servers (052, R6). Not the rows,
+    /// which show a runtime nothing has happened to as available. Nil from a daemon
+    /// that does not say.
+    public var shared: [AllowanceState]?
 
-    public init(rows: [Row], at: Date) {
+    public init(rows: [Row], at: Date, shared: [AllowanceState]? = nil) {
         self.rows = rows
         self.at = at
+        self.shared = shared
     }
 
     public var anyOut: Bool { rows.contains { $0.state.isOut } }

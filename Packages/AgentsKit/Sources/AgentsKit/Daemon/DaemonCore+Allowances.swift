@@ -19,13 +19,10 @@ extension DaemonCore {
 
     // MARK: Entries and states
 
-    /// The pool entry an agent's runtime is on. An agent that started outside the pool,
-    /// or before there was one, is judged as its runtime's own sign-in: an allowance,
+    /// The credential an agent's runtime runs on: its own sign-in, on an allowance,
     /// except Gemini, which only ever runs on a key (046).
     func poolEntry(for agent: Agent) -> PoolEntry {
-        if let entry = pool.entry(agent.poolEntryID), entry.runtimeID == agent.runtimeID { return entry }
-        if let entry = pool.entries.first(where: { $0.runtimeID == agent.runtimeID }) { return entry }
-        return Self.ownEntry(runtimeID: agent.runtimeID)
+        Self.ownEntry(runtimeID: agent.runtimeID)
     }
 
     /// A runtime as it runs with no pool: its own sign-in, on an allowance, except
@@ -38,10 +35,8 @@ extension DaemonCore {
         return PoolEntry(runtimeID: runtimeID, payment: .allowance(label: nil))
     }
 
-    /// The entry a credential key is for: the pool's, where a pool still names it, or
-    /// the runtime's own (065: every runtime is tracked, pool or none).
+    /// The credential a key is for (065: every runtime is tracked).
     func entry(forKey key: String) -> PoolEntry {
-        if let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == key }) { return entry }
         let own = Self.ownEntry(runtimeID: AllowanceState.runtimeID(of: key))
         return AllowanceState.credentialKey(for: own) == key
             ? own : PoolEntry(runtimeID: own.runtimeID, payment: .allowance(label: nil),
@@ -58,7 +53,7 @@ extension DaemonCore {
         allowances[state.credentialKey] = state
         do {
             try allowanceStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
-            broadcastPool()
+            broadcastAllowances()
         } catch {
             DaemonLog.shared.write("allowances could not be written: \(error)")
         }
@@ -172,7 +167,7 @@ extension DaemonCore {
     }
 
     func runtimeFailed(runtimeID: String) {
-        markRuntimeFailed(pool.entries.first(where: { $0.runtimeID == runtimeID }) ?? Self.ownEntry(runtimeID: runtimeID))
+        markRuntimeFailed(Self.ownEntry(runtimeID: runtimeID))
     }
 
     /// Any runtime, pool or none (065): the four-hour check brings it back.
@@ -208,103 +203,6 @@ extension DaemonCore {
         }
     }
 
-    /// Move a chat to another runtime: the pool's switch and the person's alike (T040,
-    /// US5). The new session is made first, so nothing is lost if it cannot start, and
-    /// the person's `choices` are checked against what it really offers before anything
-    /// about the chat changes. Then the old runtime is let go, the record takes the new
-    /// runtime, and the handoff is either sent with the refused words (`resend`) or kept
-    /// for the next prompt. True when a turn was started.
-    func switchRuntime(_ agentID: UUID, to entry: PoolEntry, reason switchReason: SwitchRecord.Reason, why: String,
-                       choices: [String: JSONValue] = [:], resend: Bool) async throws -> Bool {
-        guard var agent = agents[agentID] else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
-        }
-        let current = poolEntry(for: agent)
-        let at = now()
-        let made = try await freshSession(runtimeID: entry.runtimeID, cwd: agent.cwd, mcpServers: agent.mcpServers,
-                                          managesAgents: agent.startedByAgent == nil)
-        let options = await made.session.options
-        if let refusal = SettingsCarry.refusal(of: choices, options: options, currentMode: currentMode(of: agent),
-                                               runtimeName: PoolWords.runtimeName(entry.runtimeID)) {
-            await made.session.end(gracePeriod: .seconds(1))
-            throw JSONRPCError(code: -32602, message: refusal)
-        }
-
-        // What the old runtime was asking can no longer be answered there (T040).
-        await closeQuestionsOfAGoneRuntime(agentID)
-        await releaseRuntime(for: agentID)
-        // Its plan window was the old runtime's: left, it would mark the new one out
-        // until the old one's reset. Cleared after the release, which drains the old
-        // runtime's last updates, so a late one cannot put it back.
-        latestRateLimit[agentID] = nil
-
-        let page = try? await store.transcript(for: agentID, before: nil, limit: 10_000)
-        let size = agent.usage?.size ?? 0
-        let budget = size > 0 ? min(Handoff.defaultBudget, size * 2) : Handoff.defaultBudget
-        let handoff = Handoff.document(entries: page?.entries ?? [], fromRuntime: PoolWords.runtimeName(current.runtimeID),
-                                       why: why, budget: budget)
-
-        let carry = SettingsCarry.choosing(choices, over: SettingsCarry.plan(
-            from: .init(runtimeID: agent.runtimeID, options: agent.advertisedOptions, values: agent.startOptions.values),
-            to: .init(runtimeID: entry.runtimeID, options: options),
-            levels: pool.levels, entryModel: entry.fallbackModel,
-            extraArguments: agent.startOptions.extraArguments,
-            queuedCommands: agent.queuedPrompts.compactMap { prompt in
-                prompt.text.hasPrefix("/") ? String(prompt.text.split(separator: " ").first ?? "") : nil
-            }))
-
-        let record = SwitchRecord(at: at, agentID: agentID,
-                                  from: .init(entryID: agent.poolEntryID, runtimeID: agent.runtimeID,
-                                              model: SettingsCarry.model(in: agent.advertisedOptions).flatMap { agent.startOptions.values[$0.id] ?? $0.currentValue }),
-                                  to: .init(entryID: pool.entry(entry.id) == nil ? nil : entry.id, runtimeID: entry.runtimeID,
-                                            model: carry.values["model"], mode: carry.values["mode"]),
-                                  reason: switchReason, carried: carry.rows, dropped: carry.dropped,
-                                  shortened: handoff.leftOut, billing: entry.payment,
-                                  fromReturnsAt: switchReason == .byHand ? nil
-                                      : allowances[AllowanceState.credentialKey(for: current)]?.knownReturn)
-
-        // Everything awaited first, then the record read fresh and written back with no
-        // await between, so a prompt queued meanwhile is not written over.
-        let commands = await made.session.commands
-        agent = agents[agentID] ?? agent
-        agent.runtimeID = entry.runtimeID
-        agent.runtimeSessionID = made.sessionID
-        agent.poolEntryID = pool.entry(entry.id) == nil ? nil : entry.id
-        agent.startOptions = StartOptions(values: carry.values, extraArguments: [])
-        agent.advertisedOptions = options
-        agent.availableCommands = commands
-        remember(OptionCache.Entry(options: options, commands: commands),
-                 for: OptionCache.key(runtimeID: entry.runtimeID, cwd: agent.cwd, mcpServers: agent.mcpServers))
-        changed(agent)
-        live[agentID] = made.session
-        bindAppToken(made.appToken, to: agentID)
-        needsBriefing.insert(agentID)
-        listen(to: made.session, agentID: agentID)
-        await prepareServing(made.session, agentID: agentID)
-        await made.session.apply(agent.startOptions)
-        changed(agents[agentID] ?? agent)
-
-        await self.record(.poolSwitch(record), for: agentID)
-        await self.record(.handoff(markdown: handoff.markdown, characters: handoff.markdown.count), for: agentID)
-        do { try allowanceStore.append(record) } catch { DaemonLog.shared.write("switch not written: \(error)") }
-        raise(EventDraft(name: "agent.runtime_switched", at: at, scope: .project(folder: agent.projectFolder),
-                         sentence: "\(LeaseWords.agentName(agent.title)) carried on with \(PoolWords.runtimeName(entry.runtimeID)).",
-                         details: ["from": current.runtimeID, "to": entry.runtimeID, "reason": switchReason.rawValue]
-                            .merging(agentDetails(agent)) { $1 }))
-        broadcastPool()
-
-        let block = Self.handoffBlock(handoff.markdown, agentID: agentID,
-                                      embedded: await made.session.initializeResult?.accepts.embeddedContext == true)
-        if resend, let prompt = lastPrompts[agentID] {
-            await beginTurn(agentID: agentID, text: prompt.text, blocks: [block] + prompt.blocks, from: prompt.from,
-                            session: made.session, preface: prompt.preface, recorded: false)
-            lastPrompts[agentID] = prompt
-            return true
-        }
-        pendingHandoff[agentID] = handoff.markdown
-        return false
-    }
-
     // MARK: Servers (R6, T069)
 
     /// What another daemon learned about a shared allowance: a plan's sign-in, which a
@@ -328,17 +226,12 @@ extension DaemonCore {
                 continue
             }
             state.reading = newerReading
-            // The entry id is this daemon's own, for the same credential.
-            if let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == state.credentialKey }) {
-                state.entryID = entry.id
-            }
             let wasOut = allowances[state.credentialKey]?.isOut ?? false
             allowances[state.credentialKey] = state
             changed = true
-            if let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == state.credentialKey }) {
-                if !wasOut, state.isOut { raiseAllowanceOut(entry, state: state, reason: "learned from another host") }
-                if wasOut, !state.isOut { raiseAllowanceBack(entry, how: "another host") }
-            }
+            let entry = entry(forKey: state.credentialKey)
+            if !wasOut, state.isOut { raiseAllowanceOut(entry, state: state, reason: "learned from another host") }
+            if wasOut, !state.isOut { raiseAllowanceBack(entry, how: "another host") }
         }
         guard changed else { return false }
         do {
@@ -346,154 +239,13 @@ extension DaemonCore {
         } catch {
             DaemonLog.shared.write("allowances could not be written: \(error)")
         }
-        broadcastPool()
+        broadcastAllowances()
         return true
     }
 
     /// The shared allowances as this daemon knows them, for carrying to another.
     public func sharedAllowances() -> [AllowanceState] {
         allowances.values.filter(\.isShared).sorted { $0.credentialKey < $1.credentialKey }
-    }
-
-    // MARK: Matching models (US6)
-
-    /// The model and effort options each runtime offers: what it last said in any folder,
-    /// newest first; for one never seen, a session started and ended again, which costs no
-    /// prompt, at most once in ten minutes.
-    public func poolModels(_ runtimeIDs: [String]) async -> [String: [ConfigOption]] {
-        if rememberedOptions == nil { rememberedOptions = optionCache.load() }
-        var found: [String: [ConfigOption]] = [:]
-        for runtimeID in Set(runtimeIDs) {
-            let newest = (rememberedOptions ?? [:])
-                .filter { $0.key.hasPrefix("\(runtimeID)\t") && !$0.value.options.isEmpty }
-                .max { $0.value.savedAt < $1.value.savedAt }?.value.options
-            if let newest {
-                found[runtimeID] = Self.modelAndEffort(newest)
-                continue
-            }
-            let at = now()
-            if let last = modelsProbedAt[runtimeID], at.timeIntervalSince(last) < 600 { continue }
-            modelsProbedAt[runtimeID] = at
-            let folder = locations.root
-            guard let made = try? await freshSession(runtimeID: runtimeID, cwd: folder, mcpServers: [],
-                                                      managesAgents: false) else { continue }
-            let options = await made.session.options
-            await made.session.end(gracePeriod: .seconds(1))
-            remember(OptionCache.Entry(options: options, commands: []),
-                     for: OptionCache.key(runtimeID: runtimeID, cwd: folder, mcpServers: []))
-            found[runtimeID] = Self.modelAndEffort(options)
-        }
-        return found
-    }
-
-    static func modelAndEffort(_ options: [ConfigOption]) -> [ConfigOption] {
-        options.filter { SettingsCarry.isModel($0) || $0.category == "thought_level" }
-    }
-
-    /// The chat's mode now: what it set, else what its runtime says it is on.
-    func currentMode(of agent: Agent) -> JSONValue? {
-        guard let option = ModeMemory.modeOption(in: agent.advertisedOptions) else { return nil }
-        return agent.startOptions.values[option.id] ?? option.currentValue
-    }
-
-    // MARK: Continue with (US5)
-
-    /// `agents/continueWith`: a preview unless confirmed, then the move by hand with
-    /// nothing sent until the next prompt; or, with `adjust`, the settings of the runtime
-    /// the chat is already on after an automatic switch, from the next turn (FR-029).
-    public func continueWith(_ request: DaemonAPI.ContinueWithRequest) async throws -> DaemonAPI.ContinueWithResult {
-        guard let agent = agents[request.agentID], agent.state != .archived else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
-        }
-        if request.adjust { return try await adjustCarry(agent, request) }
-
-        let entry: PoolEntry
-        if let id = request.entryID, let found = pool.entry(id) {
-            entry = found
-        } else if let runtimeID = request.runtimeID, RuntimeCatalog.runtime(id: runtimeID) != nil {
-            entry = pool.entries.first { $0.runtimeID == runtimeID && !$0.isKeyed }
-                ?? PoolEntry(runtimeID: runtimeID, payment: .allowance(label: nil))
-        } else {
-            throw JSONRPCError(code: -32602, message: "Say which runtime to continue with.")
-        }
-        guard entry.runtimeID != agent.runtimeID || entry.id != agent.poolEntryID else {
-            throw JSONRPCError(code: -32602, message: "This chat is already on \(PoolWords.runtimeName(entry.runtimeID)).")
-        }
-        if let why = unusable(entry) {
-            throw JSONRPCError(code: -32602, message: "\(PoolWords.runtimeName(entry.runtimeID)) cannot be used: \(why).")
-        }
-
-        guard request.confirmed else {
-            // What it last offered in this folder: enough to show the plan without
-            // starting it. A runtime never run here shows nothing to choose yet.
-            let options = rememberedOptions(for: OptionCache.key(runtimeID: entry.runtimeID, cwd: agent.cwd,
-                                                                 mcpServers: agent.mcpServers))?.options
-                ?? rememberedOptions(.init(runtimeID: entry.runtimeID, cwd: agent.cwd))
-            let plan = SettingsCarry.plan(
-                from: .init(runtimeID: agent.runtimeID, options: agent.advertisedOptions, values: agent.startOptions.values),
-                to: .init(runtimeID: entry.runtimeID, options: options),
-                levels: pool.levels, entryModel: entry.fallbackModel,
-                extraArguments: agent.startOptions.extraArguments)
-            return .init(runtimeID: entry.runtimeID, plan: SettingsCarry.choosing(request.choices, over: plan), options: options)
-        }
-        guard !agent.state.hasTurnInFlight, turnTasks[agent.id] == nil else {
-            throw JSONRPCError(code: DaemonAPI.Failure.stopTheTurnFirst, message: "Stop the turn first.")
-        }
-        dropAllowanceWait(agent.id)
-        let fromModel = SettingsCarry.model(in: agent.advertisedOptions).flatMap {
-            agent.startOptions.values[$0.id] ?? $0.currentValue
-        }
-        _ = try await switchRuntime(agent.id, to: entry, reason: .byHand, why: "you asked to continue with it",
-                                    choices: request.choices, resend: false)
-        let moved = agents[agent.id]
-        // Remember the pair the person chose (US6), never breaking FR-032.
-        if let remember = request.remember, let fromModel, let moved,
-           let toModel = SettingsCarry.model(in: moved.advertisedOptions).flatMap({ moved.startOptions.values[$0.id] ?? $0.currentValue }) {
-            let next = pool.remembering(from: (agent.runtimeID, Cell(model: fromModel)),
-                                        to: (entry.runtimeID, Cell(model: toModel)),
-                                        levelID: remember.levelID, newLevelName: remember.newLevelName)
-            do { _ = try setPool(next) } catch {
-                DaemonLog.shared.write("remembering a pair was refused: \(error)")
-            }
-        }
-        return .init(runtimeID: entry.runtimeID,
-                     plan: CarryPlan(values: moved?.startOptions.values ?? [:]),
-                     options: moved?.advertisedOptions ?? [], agent: moved)
-    }
-
-    /// After an automatic switch: the same runtime, other settings, from the next turn.
-    /// No new session, and nothing sent again (FR-029).
-    private func adjustCarry(_ agent: Agent, _ request: DaemonAPI.ContinueWithRequest) async throws -> DaemonAPI.ContinueWithResult {
-        let options = agent.advertisedOptions
-        var plan = CarryPlan(values: agent.startOptions.values, rows: options.filter(\.isRenderable).map { option in
-            let now = agent.startOptions.values[option.id] ?? option.currentValue
-            return CarriedSetting(optionID: option.id, name: option.name, from: now, to: now, source: .sameValue)
-        })
-        plan = SettingsCarry.choosing(request.choices, over: plan)
-        guard request.confirmed else { return .init(runtimeID: agent.runtimeID, plan: plan, options: options) }
-        guard !agent.state.hasTurnInFlight, turnTasks[agent.id] == nil else {
-            throw JSONRPCError(code: DaemonAPI.Failure.stopTheTurnFirst, message: "Stop the turn first.")
-        }
-        // The limit is the mode the chat had before it moved, which the switch record keeps.
-        let before = allowanceStore.switches(since: .distantPast).last { $0.agentID == agent.id }
-        let limit = before?.carried.first { $0.optionID == ModeMemory.modeOption(in: options)?.id }?.from
-            ?? currentMode(of: agent)
-        if let refusal = SettingsCarry.refusal(of: request.choices, options: options, currentMode: limit,
-                                               runtimeName: PoolWords.runtimeName(agent.runtimeID)) {
-            throw JSONRPCError(code: -32602, message: refusal)
-        }
-        var changed = agent
-        for (id, value) in request.choices { changed.startOptions.values[id] = value }
-        self.changed(changed)
-        if let session = live[agent.id] { await session.apply(changed.startOptions) }
-        let record = SwitchRecord(at: now(), agentID: agent.id,
-                                  from: .init(entryID: agent.poolEntryID, runtimeID: agent.runtimeID),
-                                  to: .init(entryID: agent.poolEntryID, runtimeID: agent.runtimeID,
-                                            model: changed.startOptions.values["model"], mode: changed.startOptions.values["mode"]),
-                                  reason: .byHand, carried: plan.rows.filter { request.choices[$0.optionID] != nil },
-                                  billing: poolEntry(for: agent).payment)
-        await self.record(.settingsChanged(record), for: agent.id)
-        return .init(runtimeID: agent.runtimeID, plan: plan, options: options, agent: changed)
     }
 
     // MARK: Waits left from 052 (US4)
@@ -516,30 +268,7 @@ extension DaemonCore {
         guard var agent = agents[agentID], agent.allowanceWait != nil else { return }
         agent.allowanceWait = nil
         changed(agent)
-        broadcastPool()
-    }
-
-    /// Stop waiting, from the Pool page or the phone (US4).
-    public func stopWaitingForAllowance(_ agentID: UUID) async {
-        guard agents[agentID]?.allowanceWait != nil else { return }
-        dropAllowanceWait(agentID)
-        await record(.runtimeNote(PoolWords.stoppedWaiting), for: agentID)
-    }
-
-    /// This chat's own switch (FR-011a): off keeps it on its runtime whatever the pool
-    /// says. The window's control for it is US5's `agents/setSwitching`.
-    func setSwitching(agentID: UUID, off: Bool) async {
-        guard var agent = agents[agentID], agent.switchingOff != off else { return }
-        agent.switchingOff = off
-        changed(agent)
-    }
-
-    /// The handoff as the new runtime takes it: embedded, where it says it can hold
-    /// embedded context, and as plain text where it cannot.
-    static func handoffBlock(_ markdown: String, agentID: UUID, embedded: Bool) -> ContentBlock {
-        embedded ? .resource(uri: "agents://handoff/\(agentID.uuidString).md", text: markdown, blob: nil,
-                             mimeType: "text/markdown")
-                 : .text(markdown)
+        broadcastAllowances()
     }
 
     /// An allowance just went out, on the Mac's event log (042).
@@ -572,62 +301,9 @@ extension DaemonCore {
                          details: ["runtime": entry.runtimeID, "how": how]))
     }
 
-    // MARK: The Pool page
+    // MARK: Every runtime's state (065)
 
-    /// What the Pool page draws (US3). An entry nobody has used yet is available.
-    public func poolStatus(days: Int? = nil) -> PoolStatus {
-        let at = now()
-        let states = settledStates(at: at)
-        let live = agents.values.filter { $0.state != .archived }
-        let rows = pool.entries.map { entry -> PoolStatus.Row in
-            let key = AllowanceState.credentialKey(for: entry)
-            let state = states[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
-            let chats = live.filter { AllowanceState.credentialKey(for: poolEntry(for: $0)) == key }.count
-            return PoolStatus.Row(entry: entry, state: state, chats: chats, unusable: unusable(entry))
-        }
-        let since = at.addingTimeInterval(-Double(min(max(days ?? 1, 1), 30)) * 86400)
-        let switches = allowanceStore.switches(since: since).sorted { $0.at > $1.at }
-        let titles = Dictionary(switches.compactMap { record in
-            agents[record.agentID].map { (record.agentID, $0.title ?? "Untitled") }
-        }, uniquingKeysWith: { first, _ in first })
-        let waiting = live.compactMap { agent in
-            agent.allowanceWait.map { PoolStatus.Waiting(agentID: agent.id, runtimeID: $0.runtimeID, resumeAt: $0.resumeAt) }
-        }.sorted { $0.resumeAt < $1.resumeAt }
-        var named = titles
-        for wait in waiting { named[wait.agentID] = agents[wait.agentID]?.title ?? "Untitled" }
-        var status = PoolStatus(settings: pool, rows: rows, waiting: waiting, switches: switches, titles: named, at: at)
-        status.shared = sharedAllowances()
-        return status
-    }
-
-    /// Keep a new pool, whole (contracts/daemon-api.md). Refused, with the sentence the
-    /// Settings page shows, when it breaks a rule: a key as an allowance, an amount of
-    /// nothing, a model in two levels.
-    public func setPool(_ next: PoolSettings) throws -> PoolStatus {
-        do {
-            try next.validate()
-        } catch {
-            throw JSONRPCError(code: -32602, message: error.sentence)
-        }
-        pool = next
-        try allowanceStore.save(next)
-        broadcastPool()
-        return poolStatus()
-    }
-
-    /// Every credential's state as of `at`, for showing: return times that have passed
-    /// are over. An entry nobody has used yet is in it too. Nothing is written.
-    func settledStates(at: Date) -> [String: AllowanceState] {
-        var states = allowances
-        for key in states.keys { states[key]?.settle(now: at) }
-        for entry in pool.entries {
-            let key = AllowanceState.credentialKey(for: entry)
-            states[key] = states[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
-        }
-        return states
-    }
-
-    /// Every runtime's state, pool or none (065, US4): a row for each runtime this Mac
+    /// Every runtime's state (065, US4): a row for each runtime this Mac
     /// finds, and one for any other credential with a state. A runtime nothing has
     /// happened to is available.
     public func runtimeAllowances() -> RuntimeAllowances {
@@ -644,7 +320,7 @@ extension DaemonCore {
             state.settle(now: at)
             return RuntimeAllowances.Row(credentialKey: key, state: state, unusable: unusable(entry))
         }
-        return RuntimeAllowances(rows: rows, at: at)
+        return RuntimeAllowances(rows: rows, at: at, shared: sharedAllowances())
     }
 
     /// The person says a runtime is back, by its credential (065). Idempotent.
@@ -658,51 +334,36 @@ extension DaemonCore {
         return runtimeAllowances()
     }
 
-    /// The person says a credential is back (FR-023). Idempotent; open to paired devices.
-    public func markPoolEntryAvailable(_ entryID: UUID) -> PoolStatus {
-        if let entry = pool.entry(entryID) {
-            var state = allowanceState(for: entry)
-            let wasOut = state.isOut
-            state.markAvailable(now: now())
-            setAllowanceState(state)
-            if wasOut { raiseAllowanceBack(entry, how: "person") }
-            broadcastPool()
-        }
-        return poolStatus()
-    }
-
-    /// Tell every window the pool changed.
+    /// Tell every window a runtime's state changed (065).
     ///
     /// At most once a second: a change inside the second after the last one is held,
     /// and the one broadcast at the end of it carries the state as it is then.
-    func broadcastPool() {
+    func broadcastAllowances() {
         let clock = ContinuousClock()
-        if let last = poolBroadcastAt, clock.now - last < Self.poolBroadcastGap {
-            guard !poolBroadcastHeld else { return }
-            poolBroadcastHeld = true
-            let wait = Self.poolBroadcastGap - (clock.now - last)
+        if let last = allowanceBroadcastAt, clock.now - last < Self.allowanceBroadcastGap {
+            guard !allowanceBroadcastHeld else { return }
+            allowanceBroadcastHeld = true
+            let wait = Self.allowanceBroadcastGap - (clock.now - last)
             Task {
                 try? await Task.sleep(for: wait)
-                await self.sendHeldPoolBroadcast()
+                await self.sendHeldAllowanceBroadcast()
             }
             return
         }
-        poolBroadcastAt = clock.now
-        broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
+        allowanceBroadcastAt = clock.now
         broadcast(DaemonAPI.Notification.runtimesAllowancesChanged, runtimeAllowances())
     }
 
-    static let poolBroadcastGap: Duration = .seconds(1)
+    static let allowanceBroadcastGap: Duration = .seconds(1)
 
-    private func sendHeldPoolBroadcast() {
-        poolBroadcastHeld = false
-        poolBroadcastAt = ContinuousClock().now
-        broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
+    private func sendHeldAllowanceBroadcast() {
+        allowanceBroadcastHeld = false
+        allowanceBroadcastAt = ContinuousClock().now
         broadcast(DaemonAPI.Notification.runtimesAllowancesChanged, runtimeAllowances())
     }
 
-    /// The pool's clocks, on the workflow heartbeat (no timer of its own): short
-    /// rate limits expire, and grants past their date become out.
+    /// The allowances' clocks, on the workflow heartbeat (no timer of its own): short
+    /// rate limits expire.
     func settlePoolClocks(now at: Date) {
         var changed = false
         for key in Array(allowances.keys) {
@@ -711,9 +372,7 @@ extension DaemonCore {
             guard state.settle(now: at) else { continue }
             allowances[key] = state
             changed = true
-            if wasOut, !state.isOut, let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == key }) {
-                raiseAllowanceBack(entry, how: "time")
-            }
+            if wasOut, !state.isOut { raiseAllowanceBack(entry(forKey: key), how: "time") }
         }
         guard changed else { return }
         do {
@@ -721,7 +380,7 @@ extension DaemonCore {
         } catch {
             DaemonLog.shared.write("allowances could not be written: \(error)")
         }
-        broadcastPool()
+        broadcastAllowances()
     }
 
     /// Check out credentials every four hours. The retry date is only permission to
@@ -897,20 +556,17 @@ extension DaemonCore {
         setAllowanceState(state)
     }
 
-    /// How long a reading asked for stands before the Pool page asks again.
+    /// How long a reading asked for stands before it is asked for again.
     static let readingKeptFor: TimeInterval = 300
 
     /// Ask each runtime that can say what is left of its plan, where the last answer is
-    /// older than `readingKeptFor`. Grok, whether or not a pool names it (065). Grok is the one that can be asked;
-    /// Claude says it during turns, unasked. Each ask starts the runtime for a moment,
-    /// as signing in does. Runs behind the Pool page: the page draws what is known
-    /// now, and the answer arrives as `pool/changed`.
+    /// older than `readingKeptFor`. Grok is the one that can be asked; Claude says it
+    /// during turns, unasked. Each ask starts the runtime for a moment, as signing in
+    /// does. Runs behind Agent Runtimes: the pane draws what is known now, and the
+    /// answer arrives as `runtimes/allowancesChanged`.
     func measureAllowances() async {
         let at = now()
-        var seen: Set<String> = []
-        let candidates = (pool.entries + [Self.ownEntry(runtimeID: RuntimeCatalog.grok.id)])
-            .filter { seen.insert(AllowanceState.credentialKey(for: $0)).inserted }
-        let asked = candidates.filter { entry in
+        let asked = [Self.ownEntry(runtimeID: RuntimeCatalog.grok.id)].filter { entry in
             guard entry.runtimeID == RuntimeCatalog.grok.id, !entry.isKeyed, unusable(entry) == nil else { return false }
             let key = AllowanceState.credentialKey(for: entry)
             guard !measuringAllowances.contains(key) else { return false }

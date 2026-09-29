@@ -74,7 +74,6 @@ final class AppModel {
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     /// How long archived agents are kept (051). Nil from a daemon before 051.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
-    var poolStatus: PoolStatus? { work.poolStatus }
     var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
     /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
     private(set) var clientPermissions = ClientPermissionSettings()
@@ -752,16 +751,9 @@ final class AppModel {
         work.replaceRuntimeAllowances(allowances)
     }
 
-    /// The pool and each credential's state (052).
-    func refreshPoolStatus(days: Int? = nil) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
-    }
-
     /// The Mac's word on the plans it relays, to every connected server (052, R6).
-    private func sendSharedAllowances(_ status: PoolStatus) async {
-        let shared = status.shared ?? []
+    private func sendSharedAllowances(_ allowances: RuntimeAllowances) async {
+        let shared = allowances.shared ?? []
         guard !shared.isEmpty else { return }
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
             _ = try? await client(for: host.id).call(DaemonAPI.Method.poolApplyAllowances,
@@ -1075,7 +1067,7 @@ final class AppModel {
             if case .projectChanged = update { settleProjectSelection() }
             // And the other way: every server hears what the Mac learned about a plan it
             // relays (052, R6). Only a newer word changes anything there.
-            if case .poolChanged(let status) = update { await sendSharedAllowances(status) }
+            if case .runtimeAllowancesChanged(let allowances) = update { await sendSharedAllowances(allowances) }
             if case .attention(let change) = update { await notifier.apply(change) }
             return
         }
@@ -1201,8 +1193,14 @@ final class AppModel {
         // modes and notices have no place in this window (037).
         switch method {
         case DaemonAPI.Notification.runtimesAllowancesChanged:
-            // A server's runtimes are its own; this window shows the Mac's (065). What a
-            // server learns about a plan the Mac relays still arrives as `pool/changed`.
+            // A server's runtimes are its own; this window shows the Mac's (065). What it
+            // learned about a plan the Mac relays is the Mac's to know too (052, R6): its
+            // Codex spends the Mac's ChatGPT plan, so a refusal there is the Mac's plan out.
+            let shared = (try? params?.decode(RuntimeAllowances.self))?.shared ?? []
+            if !shared.isEmpty {
+                _ = try? await client.call(DaemonAPI.Method.poolApplyAllowances,
+                                           DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
+            }
             return
         case DaemonAPI.Notification.costChanged:
             serverCosts[host] = try? params?.decode(DaemonAPI.CostState.self)
@@ -1218,18 +1216,6 @@ final class AppModel {
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged:
-            return
-        case DaemonAPI.Notification.poolChanged:
-            // A server's pool page is not this window's. What it learned about a plan the
-            // Mac relays to it is the Mac's to know too (052, R6): its Codex spends the
-            // Mac's ChatGPT plan, so a refusal there is the Mac's plan out.
-            if let status = try? params?.decode(PoolStatus.self) {
-                let shared = status.shared ?? []
-                if !shared.isEmpty {
-                    _ = try? await client.call(DaemonAPI.Method.poolApplyAllowances,
-                                               DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
-                }
-            }
             return
         default:
             break
@@ -1285,8 +1271,8 @@ final class AppModel {
                                    returning: ClientPermissionSettings.self)
         // And what the Mac knows of the plans it relays (052, R6): a server's Codex
         // spends the Mac's ChatGPT plan, so the Mac's word that it is out is the server's.
-        if let status = work.poolStatus {
-            let shared = status.shared ?? []
+        if let allowances = work.runtimeAllowances {
+            let shared = allowances.shared ?? []
             if !shared.isEmpty {
                 _ = try? await server.call(DaemonAPI.Method.poolApplyAllowances,
                                            DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
@@ -1342,7 +1328,6 @@ final class AppModel {
         async let cost: Void = refreshCostState()
         async let retention: Void = refreshRetentionState()
         async let clientPermissions: Void = refreshClientPermissions()
-        async let pool: Void = refreshPoolStatus()
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
@@ -1352,7 +1337,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, pool, runtimeStates)
+                   transcript, runtimeStates)
         #if DEBUG
         openFromLaunchArguments()
         #endif

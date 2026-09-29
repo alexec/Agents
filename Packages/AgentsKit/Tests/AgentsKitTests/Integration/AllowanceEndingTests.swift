@@ -4,9 +4,8 @@ import Testing
 @testable import AgentsKitCore
 
 /// A spent allowance ends the chat that was refused, on its runtime, and marks that
-/// runtime out; nothing carries the chat on (065, US2). A pool that is still switched
-/// on, from before, changes none of that. Another chat on the same runtime is not held
-/// back by the mark, and its turn working brings the runtime back.
+/// runtime out; nothing carries the chat on (065, US2). Another chat on the same runtime
+/// is not held back by the mark, and its turn working brings the runtime back.
 @Suite("A spent allowance ends that chat", .timeLimit(.minutes(1)))
 struct AllowanceEndingTests {
     private func core(_ script: FakeACPAgent.Script, then: [FakeACPAgent.Script] = []) throws -> (DaemonCore, URL, StoreLocations, FakeLauncher) {
@@ -28,14 +27,6 @@ struct AllowanceEndingTests {
         return (core, work, locations, launcher)
     }
 
-    /// The pool as it may still be on disk from 052: on, with somewhere to go.
-    private func poolOn(_ core: DaemonCore) async throws {
-        _ = try await core.setPool(PoolSettings(isOn: true, entries: [
-            PoolEntry(runtimeID: "claude", payment: .allowance(label: nil)),
-            PoolEntry(runtimeID: "codex", payment: .allowance(label: nil)),
-        ]))
-    }
-
     private func spent() throws -> FakeACPAgent.Script {
         var script = FakeACPAgent.Script()
         script.promptResultMeta = try SessionFailureDecodingTests.fixture("quota-exhausted")
@@ -52,9 +43,8 @@ struct AllowanceEndingTests {
         await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" }
     }
 
-    @Test func aSpentAllowanceStaysOnItsRuntimeWithThePoolOn() async throws {
+    @Test func aSpentAllowanceStaysOnItsRuntime() async throws {
         let (core, work, _, launcher) = try core(try spent())
-        try await poolOn(core)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         // Long enough for a carry-on to have started, had there been one.
@@ -75,7 +65,6 @@ struct AllowanceEndingTests {
         var script = FakeACPAgent.Script()
         script.promptError = JSONRPCError(code: -32603, message: "Your credit balance is too low to access the Anthropic API.")
         let (core, work, _, launcher) = try core(script)
-        try await poolOn(core)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         try await Task.sleep(for: .milliseconds(300))
@@ -91,7 +80,6 @@ struct AllowanceEndingTests {
         var script = FakeACPAgent.Script()
         script.usageMeta = try SessionFailureDecodingTests.fixture("claude-rate-limit-overage")
         let (core, work, _, launcher) = try core(script)
-        try await poolOn(core)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the plan is out") { await claudeState(core)?.isOut == true }
         await eventually("the turn ended") { await core.agent(id)?.state.hasTurnInFlight == false }
@@ -105,7 +93,6 @@ struct AllowanceEndingTests {
 
     @Test func anotherChatOnTheSameRuntimeIsPromptedAndBringsItBack() async throws {
         let (core, work, _, _) = try core(try spent(), then: [FakeACPAgent.Script()])
-        try await poolOn(core)
         let first = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the first ran out") { await core.agent(first)?.endedReason == .allowanceSpent }
         #expect(await claudeState(core)?.isOut == true)
@@ -119,11 +106,10 @@ struct AllowanceEndingTests {
         await eventually("the runtime is back") { await claudeState(core)?.isOut == false }
     }
 
-    @Test func aRateLimitIsRetriedOnTheSameChatWithThePoolOn() async throws {
+    @Test func aRateLimitIsRetriedOnTheSameChat() async throws {
         var script = FakeACPAgent.Script()
         script.promptResultMeta = try SessionFailureDecodingTests.fixture("rate-limited")
         let (core, work, _, launcher) = try core(script, then: [FakeACPAgent.Script()])
-        try await poolOn(core)
         await core.useRateLimitPolicy(RateLimitPolicy(delays: [0.05], window: 600, persistsAfter: 3))
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the retry worked") { await core.agent(id)?.endedReason == .endTurn }

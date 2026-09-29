@@ -1028,7 +1028,6 @@ final class RemoteModel {
         await refreshAttention()
         await refreshResuming()
         await refreshCostState()
-        await refreshPoolStatus()
         await refreshRuntimeAllowances()
         await refreshLeases()
         await refreshEvents()
@@ -1277,7 +1276,6 @@ final class RemoteModel {
 
     // MARK: The pool (052)
 
-    var poolStatus: PoolStatus? { work.poolStatus }
     func agent(_ id: UUID) -> Agent? { work.agent(id) }
 
 
@@ -1296,12 +1294,6 @@ final class RemoteModel {
                                                       DaemonAPI.MarkRuntimeAvailable(credentialKey: credentialKey),
                                                       returning: RuntimeAllowances.self) else { return }
         work.replaceRuntimeAllowances(allowances)
-    }
-
-    func refreshPoolStatus(days: Int? = nil) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
     }
 
     /// What each agent holds and waits for (036). The phone only reads it: the

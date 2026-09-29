@@ -90,7 +90,6 @@ struct AllowanceReadingTests {
 
     @Test func claudesWindowIsKeptOnItsCredentialAndChangesNothingElse() async throws {
         let (core, work) = try core()
-        _ = try await core.setPool(PoolSettings(isOn: true, entries: [claude]))
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         let back = Date().addingTimeInterval(3600)
         await core.notePlanWindow(RateLimitInfo(status: "allowed", resetsAt: back, rateLimitType: "five_hour",
@@ -100,13 +99,12 @@ struct AllowanceReadingTests {
         #expect(state.reading?.used == 0.97)
         // Nearly spent is still available: a reading never decides.
         #expect(state.status == .available)
-        let row = try #require(await core.poolStatus().rows.first)
+        let row = try #require(await core.runtimeAllowances().rows.first { $0.credentialKey == "claude:sign-in" })
         #expect(row.state.reading == state.reading)
     }
 
-    @Test func grokIsAskedWhenThePoolIsLookedAt() async throws {
+    @Test func grokIsAskedWhenItsStateIsLookedAt() async throws {
         let (core, _) = try core(script: .init(billing: grokAnswer))
-        _ = try await core.setPool(PoolSettings(isOn: true, entries: [grok, claude]))
         await core.measureAllowances()
         let grokState = try #require(await core.allowanceStates().first { $0.credentialKey == "grok:sign-in" })
         #expect(grokState.reading?.window == "weekly")
@@ -122,7 +120,6 @@ struct AllowanceReadingTests {
         let locations = StoreLocations(root: root)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: launcher)
-        _ = try await core.setPool(PoolSettings(isOn: true, entries: [grok]))
         await core.measureAllowances()
         await core.measureAllowances()
         #expect(launcher.launchCount == 1)
@@ -130,7 +127,6 @@ struct AllowanceReadingTests {
 
     @Test func aGrokWithoutBillingLeavesNoReading() async throws {
         let (core, _) = try core()
-        _ = try await core.setPool(PoolSettings(isOn: true, entries: [grok]))
         await core.measureAllowances()
         #expect(await core.allowanceStates().allSatisfy { $0.reading == nil })
     }

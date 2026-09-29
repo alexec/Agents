@@ -132,20 +132,16 @@ struct AllowanceRecognitionTests {
         guard case .out(_, _?, .runtimeFailed) = state.status else { Issue.record("\(state.status)"); return }
     }
 
-    @Test func anUnrecognisedRefusalStopsTheTurnAndTakesItOutOfThePool() async throws {
+    @Test func anUnrecognisedRefusalStopsTheTurnAndMarksTheRuntimeOut() async throws {
         var script = FakeACPAgent.Script()
         script.promptError = JSONRPCError(code: -32603, message: "Internal error")
         let (core, work, _) = try core(script)
-        _ = try await core.setPool(PoolSettings(isOn: true, entries: [
-            PoolEntry(runtimeID: "claude", payment: .allowance(label: nil)),
-            PoolEntry(runtimeID: "codex", payment: .allowance(label: nil)),
-        ]))
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         #expect(await core.agent(id)?.endedReason == .processDied)
         #expect(try await notes(core, id).contains("Claude stopped answering."))
         // Not a spent allowance, but out all the same until a check or a turn works.
-        await eventually("it left the pool") {
+        await eventually("it is out") {
             await core.allowanceStates().contains { $0.credentialKey == "claude:sign-in" && $0.isOut }
         }
         let state = try #require(await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" })

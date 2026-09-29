@@ -5,14 +5,9 @@ import Testing
 
 /// Once 052's carry-on (US1); since 065, the opposite: whatever each runtime says when
 /// its allowance runs out, in its own words, the chat ends there and the runtime is
-/// marked out. A pool still switched on moves nothing.
-@Suite("A spent allowance moves nothing", .timeLimit(.minutes(1)))
-struct PoolSwitchTests {
-    private let claude = PoolEntry(runtimeID: "claude", payment: .allowance(label: "Max plan"))
-    private let codex = PoolEntry(runtimeID: "codex", payment: .allowance(label: "ChatGPT plan"))
-    private let copilot = PoolEntry(runtimeID: "copilot", payment: .allowance(label: nil))
-    private let antigravity = PoolEntry(runtimeID: "antigravity", payment: .allowance(label: nil))
-    private let grok = PoolEntry(runtimeID: "grok", payment: .allowance(label: nil))
+/// marked out. Nothing moves the chat.
+@Suite("A runtime's own words that its allowance is spent", .timeLimit(.minutes(1)))
+struct InChatRefusalTests {
 
     private func spent() throws -> FakeACPAgent.Script {
         var script = FakeACPAgent.Script()
@@ -34,10 +29,10 @@ struct PoolSwitchTests {
     }
 
     /// A daemon whose launches play `scripts` in order, then plain working turns.
-    private func core(_ scripts: [FakeACPAgent.Script], pool: [PoolEntry]? = nil, isOn: Bool = true)
+    private func core(_ scripts: [FakeACPAgent.Script])
         async throws -> (DaemonCore, URL, FakeLauncher, StoreLocations) {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("PoolSwitch-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("InChatRefusal-\(UUID().uuidString)", isDirectory: true)
         let work = root.appendingPathComponent("work", isDirectory: true)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         let locations = StoreLocations(root: root)
@@ -52,7 +47,6 @@ struct PoolSwitchTests {
         let launcher = FakeLauncher(script: FakeACPAgent.Script(), then: scripts)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: discovery, launcher: launcher)
-        _ = try await core.setPool(PoolSettings(isOn: isOn, entries: pool ?? [claude, codex, copilot]))
         return (core, work, launcher, locations)
     }
 
@@ -65,7 +59,7 @@ struct PoolSwitchTests {
         script.updates = ["Info: Disabled tools: list_agents, read_agent, task, write_agent", "Error: You have exceeded your monthly ", "quota (Request ID: E423:33BD0C:51E9CCB:612237C:6AB86604)"].map {
             ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string($0)]]
         }
-        let (core, work, launcher, _) = try await core([script], pool: [copilot, codex])
+        let (core, work, launcher, _) = try await core([script])
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "finish the change"))
         await eventually("the chat ran out") { await core.agent(id)?.endedReason == .allowanceSpent }
         try await Task.sleep(for: .milliseconds(300))
@@ -83,7 +77,7 @@ struct PoolSwitchTests {
             "content": ["type": "text", "text": .string(
                 "Usage Limit Reached\n\nYou have reached your current quota for this period. Your limit will reset in 5 days, 14 hours.")],
         ]]
-        let (core, work, launcher, _) = try await core([script], pool: [antigravity, codex])
+        let (core, work, launcher, _) = try await core([script])
         let id = try await core.start(.init(runtimeID: "antigravity", cwd: work, prompt: "hi Antigravity"))
         await eventually("the chat ran out") { await core.agent(id)?.endedReason == .allowanceSpent }
         try await Task.sleep(for: .milliseconds(300))
@@ -93,7 +87,7 @@ struct PoolSwitchTests {
     }
 
     @Test(.flakyUnderLoad) func grokUsageBalanceExhaustedEndsTheChatOnGrok() async throws {
-        let (core, work, launcher, _) = try await core([grokUsageBalanceExhausted()], pool: [grok, codex])
+        let (core, work, launcher, _) = try await core([grokUsageBalanceExhausted()])
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "hi Grok"))
         await eventually("the chat ran out") { await core.agent(id)?.endedReason == .allowanceSpent }
         try await Task.sleep(for: .milliseconds(300))
@@ -110,7 +104,7 @@ struct PoolSwitchTests {
             + Array(repeating: "Error: You have exceeded your monthly quota (Request ID: captured)", count: 6)).map {
                 ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string($0)]]
             }
-        let (core, work, launcher, _) = try await core([script], pool: [copilot, codex], isOn: false)
+        let (core, work, launcher, _) = try await core([script])
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
         await eventually("the quota refusal stopped") { await core.agent(id)?.endedReason == .allowanceSpent }
         #expect(await core.agent(id)?.state != .finished)
@@ -135,18 +129,6 @@ struct PoolSwitchTests {
         }
     }
 
-    @Test func nothingMovesWhenThePoolIsOff() async throws {
-        let (core, work, launcher, _) = try await core([try spent()], isOn: false)
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
-        #expect(await core.agent(id)?.runtimeID == "claude")
-        #expect(await core.agent(id)?.endedReason == .allowanceSpent)
-        #expect(launcher.launchCount == 1)
-        #expect(try await kinds(core, id).contains {
-            if case .runtimeNote(let t) = $0 { t.hasPrefix("Claude’s allowance ran out") } else { false }
-        })
-    }
-
     @Test(arguments: ["budget-exhausted", "auth-required", "overloaded"])
     func otherFailuresNeverMove(fixture: String) async throws {
         var script = FakeACPAgent.Script()
@@ -165,29 +147,6 @@ struct PoolSwitchTests {
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         #expect(await core.agent(id)?.endedReason == .processDied)
-        #expect(await core.agent(id)?.runtimeID == "claude")
-        #expect(launcher.launchCount == 1)
-    }
-
-    @Test func aChatsOwnSwitchOffKeepsItWhereItIs() async throws {
-        let (core, work, launcher, _) = try await core([FakeACPAgent.Script(), FakeACPAgent.Script(), try spent()])
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "one"))
-        await quiet(core, id, launcher, launches: 2)
-        await core.setSwitching(agentID: id, off: true)
-        try await core.prompt(.init(agentID: id, text: "two"))
-        await eventually("the turn ended spent") { await core.agent(id)?.endedReason == .allowanceSpent }
-        #expect(await core.agent(id)?.runtimeID == "claude")
-        #expect(launcher.launchCount == 3)
-        #expect(try await kinds(core, id).contains {
-            if case .runtimeNote(let t) = $0 { t.hasPrefix("Claude’s allowance ran out") } else { false }
-        })
-    }
-
-    @Test func aPoolOfOneMovesNothing() async throws {
-        let (core, work, launcher, _) = try await core([try spent()], pool: [claude])
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
-        #expect(await core.agent(id)?.endedReason == .allowanceSpent)
         #expect(await core.agent(id)?.runtimeID == "claude")
         #expect(launcher.launchCount == 1)
     }

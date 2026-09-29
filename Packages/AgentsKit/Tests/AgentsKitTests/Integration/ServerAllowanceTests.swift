@@ -4,7 +4,7 @@ import Testing
 @testable import AgentsKitCore
 
 /// T069 of 052: a server spends the Mac's plan through the relay, so what one learns
-/// about that plan the other must know. The Mac's window carries `PoolStatus.shared`
+/// about that plan the other must know. The Mac's window carries `RuntimeAllowances.shared`
 /// from one daemon to `pool/applyAllowances` on the other; two daemons stand in for the
 /// Mac and a server here.
 @Suite("Allowances shared with a server", .timeLimit(.minutes(1)))
@@ -28,7 +28,6 @@ struct ServerAllowanceTests {
         let launcher = FakeLauncher(script: FakeACPAgent.Script(), then: scripts)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: discovery, launcher: launcher)
-        _ = try await core.setPool(PoolSettings(isOn: true, entries: [codex, claude]))
         return (core, work, launcher)
     }
 
@@ -56,10 +55,10 @@ struct ServerAllowanceTests {
         }
 
         // The window carries the server's word to the Mac.
-        let shared = try #require(await server.poolStatus().shared)
+        let shared = try #require(await server.runtimeAllowances().shared)
         #expect(await mac.applyAllowances(shared))
         #expect(await mac.allowanceStates().contains { $0.credentialKey == "codex:sign-in" && $0.isOut })
-        #expect(await mac.poolStatus().anyOut)
+        #expect(await mac.runtimeAllowances().anyOut)
         #expect(await mac.eventLog.events.contains { $0.name == "cost.allowance_out" })
         // The Mac's chat is not moved by it (065): it stays on Codex.
         #expect(await mac.agent(id)?.runtimeID == "codex")
@@ -91,16 +90,14 @@ struct ServerAllowanceTests {
         back.markAvailable(now: now.addingTimeInterval(60))
         #expect(await mac.applyAllowances([back]))
         #expect(await mac.allowanceStates().first?.isOut == false)
-        // Taken as this daemon's own entry.
-        #expect(await mac.allowanceStates().first?.entryID == codex.id)
     }
 
     /// An entry nobody has used shows as available on the page, but that is not a word
     /// about the plan, and must never be carried over one that is.
     @Test func whatIsCarriedIsWhatWasRecordedNotTheRows() async throws {
         let (fresh, _, _) = try await daemon()
-        let status = await fresh.poolStatus()
-        #expect(status.rows.count == 2)
+        let status = await fresh.runtimeAllowances()
+        #expect(!status.rows.isEmpty)
         #expect(status.shared == [])
     }
 
