@@ -1,76 +1,145 @@
-# Data Model: 058 Control Plane
+# Data Model: 058 Control Plane (re-plan)
 
-All records are JSON under the **control root** (`~/Library/Application Support/Agents Control`
-on a Mac, `--root` otherwise), written atomically, as the daemon's stores are. The host's own
-root is today's root and is unchanged.
+Records live in the `ControlStore` (a folder or an S3-compatible bucket). The layout and write
+rules are in [contracts/store.md](contracts/store.md). Every record is one JSON object. Every
+record a person owns carries `owner` (FR-012) and `rev`, a revision the store bumps on each write
+and checks through the ETag. Host roots are unchanged.
 
-## ControlConfig (`control.json`)
-
-| Field | Type | Notes |
-|---|---|---|
-| `name` | String | Shown to clients ("Alex's Mac mini"). |
-| `port` | Int | Client and host listener, default 8790 (today's bridge port, so paired devices find it). |
-| `publicKey` | Data (x963, 65 B) | The control plane's key; private half in the keychain (`relay-mac-key`) or `control-key` `0600`. |
-| `homeHost` | HostID? | The host on the same machine; legacy clients with no `h` go there. |
-| `machineID` | String | Lets a window know a host is on its own Mac (R11). |
-
-## ClientRecord (`clients.json`, was `devices.json`)
+## ControlSettings (`control.json`, written once)
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | UUID | PSK identity `d:<id>`, as today. |
+| `name` | String | Shown to clients ("Alex's control plane"). |
+| `url` | String | The one address (R8), e.g. `https://agents.example.com` or `https://mini.local:8791`. |
+| `pin` | String? | SHA-256 of the certificate's public key, base64url. Absent when the certificate is publicly trusted. |
+| `controlKey` | Data (X9.63, 65 B) | The public half. The private half is never in the store (FR-010). |
+| `owner` | PersonID | The one person, for now. |
+| `created` | Date | |
+
+## Person (`people/<id>.json`)
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | PersonID | Random. |
 | `name` | String | |
-| `kind` | `mac` \| `iphone` \| `ipad` | `mac` is new. |
-| `publicKey` | Data | PSK = HKDF(ECDH(control, client), "agents-lan-v1", id). |
-| `grant` | `operator` \| `device` | New. Migrated devices get `device`. |
+
+Only one exists now. The model is here so records can name their owner (FR-012).
+
+## ClientRecord (`clients/<uuid>.json`)
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | Identity `c:<id>`. |
+| `owner` | PersonID | |
+| `name` | String | |
+| `kind` | `mac` \| `iphone` \| `ipad` | |
+| `publicKey` | Data | K = HKDF(ECDH(control, client), `agents-lan-v1`, id), as today. |
+| `grant` | `operator` \| `device` | |
 | `paired` | Date | |
-| `lastSeen` | Date? | Updated on connect; shown in Settings. |
+| `lastSeen` | Date? | Written at most hourly (R4). |
+| `rev` | Int | |
 
-Rules: at least one `operator` always (FR-009). Changing `grant` applies to the next call; open
-channels are reopened with the new grant.
+Rules:
+- At least one `operator` must exist for each owner (FR-016). This is checked on the version
+  that was read, and a concurrent change gets `changedElsewhere`.
+- Forgetting deletes the record, then broadcasts `clientForgotten`.
 
-## HostRecord (`hosts.json`)
+## HostRecord (`hosts/<id>.json`)
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | HostID | `mac` for the migrated home host (R11); else 8 random chars, as today. |
+| `id` | HostID | `mac` for a migrated home host, otherwise 8 random characters. |
+| `owner` | PersonID | |
 | `name` | String | |
-| `publicKey` | Data? | Present for dial-out hosts; PSK = HKDF(ECDH, "agents-host-v1", id). |
-| `reach` | `dialOut` \| `ssh(destination, hostKeyFingerprint)` | `ssh` for hosts the control plane reaches (FR-012, R8). |
-| `platform` | String | `macOS arm64`, `Linux arm64`, … |
-| `version` | String | From `hosts/announce` / probe. |
-| `installed` | Bool | True when installed by `hosts/install` (so remove can offer to purge). |
+| `publicKey` | Data | K = HKDF(ECDH(control, host), `agents-host-v1`, id). |
+| `platform` | String | `macOS arm64`, `Linux x86_64`, … |
+| `version` | String | From `host/hello`. |
+| `machineID` | String? | Lets a window know a host is on its own Mac (`ThisMacHost`). |
+| `relay` | Bool | This Mac host runs `agents-relay` for the owner's devices (R10). |
+| `installedBy` | `command` \| `ssh(destination)` | ssh is kept only to show how the host was installed. No key or session is kept (FR-018a). |
+| `rev` | Int | |
 
-## HostState (in memory, sent as `control/hostChanged`)
+`reach` (`dialOut` or `ssh`) from the first build is gone: every host dials out.
 
-`online` · `offline(since)` · `connecting` · `needsUpdate(from,to)` · `failed(reason)`.
-
-## PairingCode (in memory, one at a time per purpose)
+## Code (`codes/<sha256(secret)>.json`, and `.spent`)
 
 | Field | Type | Notes |
 |---|---|---|
-| `purpose` | `client(grant)` \| `host` | Identity prefix `p:` for clients, `e:` for hosts. |
-| `secret` | 32 B | |
-| `expires` | Date | 5 minutes. |
-| `addresses` | [String] | Where to reach the control plane (Bonjour name, host:port). |
-| `controlKey` | Data | So the new party can derive its PSK afterwards. |
+| `purpose` | `client(grant)` \| `host` | Identity `p:` or `e:` plus the hash. |
+| `owner` | PersonID | |
+| `expires` | Date | Five minutes, or longer for the App Review demo code (R13). |
+| `issuedBy` | ClientID | Who asked for it (shown in Settings). |
 
-## Session state in the router (in memory)
+- **The secret itself** is never stored. The code text a person sees is
+  `agents-control:2:<c|h>:<grant|->:<url>:<pin|->:<secret>:<name>`.
+- **Using a code** creates `<hash>.spent` with `If-None-Match: *`, so it works once, at any
+  copy.
+- **Expired codes** are deleted by any copy that lists them.
 
-- **ClientSession**: client id, grant, one `LineTransport`, `channels: [HostID: Int]`.
-- **HostSession**: host id, one uplink `LineTransport` (or an ssh-forward factory for `ssh` hosts),
-  `channels: [Int: ClientID]`, `nextChannel`.
-- **Channel**: `(client, host, number)`; opened with `{grant, client, device?}`; on the host it is
-  one virtual connection with role `control` (operator) or `device` (bound to the device id).
+## Lease (`leases/<host-id>.json`)
 
-## Host side (in memory)
+| Field | Type | Notes |
+|---|---|---|
+| `host` | HostID | |
+| `copy` | CopyID | The holder of the uplink. |
+| `epoch` | Int | Bumped on every takeover. |
+| `expires` | Date | 30 s ahead, renewed every 10 s. |
 
-- The uplink connection has role `controlPlane`: it may send channel frames and nothing else.
-- Each virtual connection is a `DaemonServer` connection in every respect (identity, role,
-  lent credentials, surface, broadcast subscription), with a line transport backed by the uplink.
+State:
+- **None → held.** A host's uplink is authenticated at copy X. X creates the lease
+  (`If-None-Match`), or takes over an existing one with `If-Match` (epoch + 1).
+- **Held → held, renewed.** X renews every 10 s (`If-Match`).
+- **Held → lost.** X's renewal is refused (someone took over). X closes its uplink and
+  broadcasts `hostMoved`.
+- **Held → expired.** No renewal for 30 s. Any copy may mark the host offline.
+
+## Copy (`copies/<copy-id>.json`)
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | CopyID | Random at each start. |
+| `peerURL` | String | Where other copies dial it. |
+| `started` | Date | |
+| `heartbeat` | Date | Renewed every 10 s. The copy is gone after 30 s. |
+
+## Event (`events/<yyyy-mm-dd>/<ulid>.json`)
+
+`{kind, subject, at, by}`, where `kind` is one of:
+- `clientForgotten`, `grantChanged`, `clientPaired`;
+- `hostEnrolled`, `hostRemoved`, `hostMoved`.
+
+Broadcast on peer links first, and written here for a copy that missed it. Events are kept
+seven days.
+
+## In memory, per copy
+
+- **ClientSession**: client id, grant, owner, whether it is relayed, the WebSocket,
+  `channels: [HostID: Int]`.
+- **HostSession**, one of two kinds:
+  - **local**: the host's uplink WebSocket, `channels: [Int: session]`, `nextChannel`, the
+    lease epoch;
+  - **proxied**: a stream on the peer link to the holding copy. Channel numbers are this
+    copy's own, and the holder maps them onto the real uplink.
+- **PeerLink**: copy id, WebSocket, proxied streams, and the events it has sent and received.
+- **Folded presence**: from its own clients, plus presence broadcast by peers (R5, R10).
+- **Record cache**: clients and hosts with their ETags, refreshed from events and every 15 s.
+
+## Host side
+
+- **The uplink.** It has role `controlPlane` and may carry channel frames only (kept). Each
+  channel is a virtual `DaemonServer` connection with role `control` (operator) or `device`
+  (kept).
+- **New host methods**, answered on channels:
+  - `mac/reveal`, `mac/open`, `mac/terminal`: operator only, macOS hosts only;
+  - `shared/*`: operator; device is read-only.
+- **Enrolment state** (kept from T044): `controlHostKey` (0600) and `controlHostMembership`,
+  which now carries `url` and `pin` instead of addresses.
 
 ## Window side
 
-- `ControlConfig` (window's own defaults, scoped by root per the scratch-defaults lesson):
-  control-plane address, the window's client id; the window's key in the keychain.
-- One `DaemonClient` per `HostID`, each over a `HostLink` from one `ControlLink`.
+- **`ControlConfig`**, in the sandbox container's defaults:
+  - the control plane's `url` and `pin`;
+  - the window's client id;
+  - the window's key, in its own keychain.
+- **One `DaemonClient` per `HostID`,** each over a `HostLink` from one `ControlLink`, over one
+  `URLSessionWebSocketTask`.

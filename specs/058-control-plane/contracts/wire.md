@@ -1,60 +1,116 @@
-# Contract: the wire
+# Contract: the wire (re-plan)
 
-One JSON object per line, UTF-8, `\n`-terminated, on every hop (TLS-PSK at home, sealed frames
-through the relay, a Unix socket on loopback). `LineSplitter`'s 64 MB cap applies.
+## Transport
 
-## Client ⇄ control plane
+- **One endpoint:** `wss://<url>/v1/connect`, an HTTP/1.1 upgrade to a WebSocket. Every client,
+  host, relayed device and peer copy uses it.
+- **One line per message.** Every WebSocket text message is one JSON object, which is one line
+  of the first build's wire. No binary messages.
+- **Other endpoints:**
+  - `GET /healthz` answers 200 while the process runs;
+  - `GET /readyz` answers 200 once the store has answered a read, and 503 otherwise, so a load
+    balancer stops sending new connections to a copy that cannot reach its store.
+- **TLS.** Either the copy terminates TLS itself with NIOSSL (the host app's single copy, with
+  a self-signed certificate), or the load balancer terminates it. Clients check a publicly
+  trusted certificate normally, or the `pin` from their code or config (research R6). A pin is
+  mandatory when the certificate is not publicly trusted.
+- **Keep-alive.** WebSocket ping every 20 s. Two missed pongs close the socket.
+- **Size.** A message is at most 64 MB (`LineSplitter`'s cap).
 
-```jsonc
-// to a host: m is a JSON-RPC 2.0 message, byte-for-byte what a daemon.sock client sends today
-{"h":"mac","m":{"jsonrpc":"2.0","id":7,"method":"agents/list","params":{}}}
-// to the control plane itself
-{"m":{"jsonrpc":"2.0","id":8,"method":"hosts/list"}}
-// from a host: reply or notification, with the host it came from
-{"h":"k3v9x0qa","m":{"jsonrpc":"2.0","method":"agent/updated","params":{…}}}
-// from the control plane itself
-{"m":{"jsonrpc":"2.0","method":"control/hostChanged","params":{"host":"k3v9x0qa","state":"online"}}}
-```
+## The key exchange (research R6)
 
-**Legacy line** (no wrapper, i.e. the object has `jsonrpc`): treated as `{"h":<homeHost>,"m":line}`
-when the method is not one the control plane answers, and replies go back unwrapped. This is
-how an unchanged Remote keeps working (R7). A client that has sent one wrapped line is wrapped
-from then on.
-
-Rules:
-1. The control plane reads `m.method` (and nothing else in `m`) to check the grant. A refused
-   request is answered by the control plane with `Failure.notPermitted` and `h` set.
-2. A request for a host that is not online is answered by the control plane with
-   `Failure.hostOffline` (new, -32070) at once.
-3. Request ids are the client's; the control plane never rewrites them. Ids need only be unique
-   per (client connection, host), as they are per `DaemonClient` today.
-4. Replies and notifications from a host carry `h`. The client's `ControlLink` strips it and
-   hands `m` to that host's `HostLink`.
-
-## Control plane ⇄ host (the uplink)
+Three messages open every socket. Nothing else is accepted until the server's `ok`.
 
 ```jsonc
-{"c":3,"open":{"grant":"operator","client":"6f1c…"}}           // control → host
-{"c":4,"open":{"grant":"device","client":"a2e0…","device":"a2e0…"}}
-{"c":3,"m":{…JSON-RPC…}}                                        // both ways
-{"c":3,"close":true}                                            // either way
-{"c":0,"m":{…}}                                                 // channel 0: the uplink itself
+// 1. server
+{"hello":{"v":1,"name":"Alex's control plane","control":"<base64url X9.63>","nonce":"<32 B b64url>","copy":"<copy-id>"}}
+// 2. peer
+{"auth":{"id":"c:<uuid>","nonce":"<32 B>","mac":"<b64url HMAC-SHA256>","kind":"mac|iphone|ipad|host|relay|copy","for":"<device uuid, relay only>"}}
+// 3. server
+{"ok":{"mac":"<b64url>","grant":"operator|device","host":"<host id, hosts only>","relayed":false}}
+{"refused":{"reason":"unknown|forgotten|expired|spent|bad-proof|wrong-control-plane"}}
 ```
 
-- Channel numbers are chosen by the control plane, never reused within an uplink's life.
-- On the host, `open` makes a virtual `DaemonServer` connection: role `control` for
-  `operator`, `device` bound to `device` for `device`. It is never `agent`, `pairing` or
-  `stranger`, and nothing but `open` can set a role.
-- The host checks each request against the channel's role (defence in depth, FR-007).
-- Channel 0 carries the host's own conversation with the control plane: `hosts/announce` on
-  enrolment, `host/hello {version, platform, machineID}` on every connect, `attention/need`
-  (unsealed needs, R6), and `control/ping`.
-- Losing the uplink closes every channel; the host keeps running (FR-011) and redials with
-  backoff 1 s → 30 s, plus at once on network change.
+- **Transcript.** `T = "agents-auth-v1" | sn | pn | id | origin`, where:
+  - `sn` and `pn` are the raw nonces;
+  - `id` is the identity string;
+  - `origin` is the dialled URL's scheme, host and port, lowercased.
+- **The two MACs.** Each side proves itself with an HMAC over `T` under the key K below, with a
+  different tag first:
+  - the peer's is `HMAC(K, "c" | T)`;
+  - the server's is `HMAC(K, "s" | T)`.
 
-## ssh-reached hosts (FR-012)
+| Identity | K |
+|---|---|
+| `c:<uuid>`, a client | `clientKey`: HKDF(ECDH(control, client), `agents-lan-v1`, uuid), as today |
+| `h:<id>`, a host | `hostKey`: HKDF(ECDH(control, host), `agents-host-v1`, id), as today |
+| `p:<hash>`, a client code | `codeKey(secret)`. `hash` = SHA-256(secret), base64url |
+| `e:<hash>`, a host code | the same, for a host |
+| `x:<copy-id>`, a peer copy | HKDF(control private key, `agents-copy-v1`, "") |
 
-The control plane holds today's `ssh -M` master with the `-L` forward to the host's `daemon.sock`.
-Each channel is a separate socket connection over the forward, bound with
-`connection/bindDevice` for `device` grants, exactly as the bridge binds devices today. Channel
-0 is a `control` connection used for `mailbox/carry` so needs still reach the control plane.
+**After `ok` with a code identity**, the new party sends one line:
+```jsonc
+{"m":{"jsonrpc":"2.0","id":1,"method":"clients/announce","params":{"id":"<uuid>","publicKey":"…","name":"…","kind":"iphone"}}}
+```
+or `hosts/announce`. The reply carries the record. The socket then closes, and the party
+reconnects with its own identity. Using the code creates `codes/<hash>.spent` first (store.md),
+so a second use is `refused: spent`.
+
+**A relayed device.** `agents-relay` opens the socket with `kind: relay` and `for: <device>`,
+and passes messages 1–3 between the device and the control plane through CloudKit unchanged.
+The device computes the MAC. The session is marked `relayed`, and today's away limits apply.
+
+## Client ⇄ control plane (unchanged from the first build)
+
+```jsonc
+{"h":"mac","m":{"jsonrpc":"2.0","id":7,"method":"agents/list","params":{}}}   // to a host
+{"m":{"jsonrpc":"2.0","id":8,"method":"hosts/list"}}                          // to the control plane
+{"h":"k3v9x0qa","m":{…reply or notification…}}                                // from a host
+{"m":{"jsonrpc":"2.0","method":"control/hostChanged","params":{…}}}           // from the control plane
+```
+
+These rules are kept as they are:
+- grant check on `m.method` only;
+- `hostOffline` at once;
+- the client's request ids, never rewritten;
+- `h` on everything from a host.
+
+The legacy bare line goes to the home host only while a moved set-up still has old clients
+(research R11).
+
+## Control plane ⇄ host (unchanged from the first build)
+
+```jsonc
+{"c":3,"open":{"grant":"operator","client":"6f1c…"}}
+{"c":4,"open":{"grant":"device","client":"a2e0…","device":"a2e0…","relayed":true}}
+{"c":3,"m":{…}}
+{"c":3,"close":true}
+{"c":0,"m":{…}}          // host/hello, attention/need, control/ping
+```
+
+`relayed` is new: the host applies today's away limits on that channel. Channel numbers are
+unique for one uplink's life. Losing the uplink closes every channel, and the host redials any
+copy.
+
+## Copy ⇄ copy (the peer link)
+
+After the key exchange with identity `x:<copy-id>`:
+
+```jsonc
+// a proxied uplink: B asks A (the holder) to carry B's channels to host H
+{"p":"H","c":12,"open":{"grant":"device","client":"…","device":"…"}}   // B → A
+{"p":"H","c":12,"m":{…}}                                                // both ways
+{"p":"H","c":12,"close":true}                                           // either way
+{"p":"H","gone":{"epoch":8}}          // A → B: A no longer holds H (lease lost or uplink closed)
+// changes and presence
+{"event":{"kind":"clientForgotten","subject":"6f1c…","at":"…","by":"…"}}
+{"presence":{"client":"…","state":"active|away","at":"…"}}
+{"host":{"id":"H","state":"online","epoch":8}}                          // holder → everyone
+```
+
+- **B's channel numbers** (`c`) are B's own. A maps each `(B, c)` pair to a fresh channel on
+  H's real uplink, and back.
+- **When B receives `gone`,** it marks its proxied session for H closed, and re-reads the lease
+  to find the new holder. Clients see `hostChanged` only if no copy holds H within 5 s.
+- **A peer link dropping** closes every stream on it. Each copy redials the other while both are
+  registered (`copies/`).
