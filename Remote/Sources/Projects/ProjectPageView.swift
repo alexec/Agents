@@ -80,11 +80,6 @@ struct ProjectPageView: View {
 
                 WorkflowsSection()
 
-                // Worktrees the Mac made here, which outlive the agents in them (030).
-                if let folder = model.selectedProject {
-                    WorktreesSection(folder: folder)
-                }
-
                 if isEmpty {
                     Text("Nothing here yet. Start a session with New session and it appears here.")
                         .appText(.reading)
@@ -98,15 +93,6 @@ struct ProjectPageView: View {
             .readableWidth()
         }
         .markedStale(model.isStale)
-        // Asked when the page opens and when any agent here changes state (who is working
-        // in a worktree moves as the archive does, its git status as a turn ends), never
-        // polled. Not the archived ones, which arrive only when that section is opened;
-        // an agent being archived still leaves the live groups, and that is a change.
-        .task(id: WorktreesAsk(project: model.selectedProject,
-                               states: AgentGroup.allCases.filter { $0 != .archived }
-                                   .flatMap { model.agents(group: $0) }.map(\.state))) {
-            if let folder = model.selectedProject { await model.loadProjectWorktrees(in: folder) }
-        }
         // The archived page wanted, once it is open, and again when the count moves.
         .task(id: ArchivedAsk(project: model.selectedProject, isOpen: showsArchived,
                               shown: archivedShown, count: archivedCount)) {
@@ -234,12 +220,6 @@ struct GroupHeading: View {
         .padding(.leading, 2)
         .accessibilityAddTraits(.isHeader)
     }
-}
-
-/// What the Worktrees section is asked again for.
-private struct WorktreesAsk: Equatable {
-    var project: URL?
-    var states: [AgentState]
 }
 
 /// When the Archived section fetches: opened, paged, or its count moved.

@@ -609,52 +609,6 @@ final class RemoteModel {
         projectFolderBranches[folder] = answer?.projectFolderBranch
     }
 
-    /// The app's worktrees for the project on screen, for its Worktrees section.
-    private(set) var projectWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
-    /// The folder `projectWorktrees` answers for, which lags `projectWorktreesFolder`
-    /// while another project's list is on its way.
-    private(set) var projectWorktreesAnswered: URL?
-    private var projectWorktreesFolder: URL?
-
-    /// Asked when the project page appears and after a removal, never polled.
-    func loadProjectWorktrees(in folder: URL) async {
-        projectWorktreesFolder = folder
-        let answer = (try? await client.call(DaemonAPI.Method.worktreesList,
-                                             DaemonAPI.WorktreesListRequest(folder: folder),
-                                             returning: DaemonAPI.WorktreesListResponse.self))
-            ?? .notARepository
-        guard projectWorktreesFolder == folder else { return }
-        projectWorktrees = answer
-        projectWorktreesAnswered = folder
-    }
-
-    /// What removing one would lose, or nil when the Mac could not say (and the app's
-    /// alert says why).
-    func checkWorktreeRemoval(_ root: URL, in folder: URL) async -> DaemonAPI.RemovalCheck? {
-        do {
-            return try await client.call(DaemonAPI.Method.worktreesCheck,
-                                         DaemonAPI.WorktreeRemovalRequest(project: folder, root: root),
-                                         returning: DaemonAPI.RemovalCheck.self)
-        } catch {
-            problem = sentence(for: error)
-            return nil
-        }
-    }
-
-    /// Remove one. `confirmed` is the person having seen what would be lost; the Mac
-    /// checks again either way.
-    func removeWorktree(_ root: URL, in folder: URL, confirmed: Bool) async {
-        do {
-            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
-                                      DaemonAPI.WorktreeRemovalRequest(project: folder, root: root,
-                                                                       confirmed: confirmed),
-                                      returning: DaemonAPI.WorktreeRemoved.self)
-        } catch {
-            problem = sentence(for: error)
-        }
-        await loadProjectWorktrees(in: folder)
-    }
-
     private func startRefusalBeforeSending(in folder: URL) -> String? {
         if isStale { return "Your Mac is not answering, so nothing was started." }
         guard let summary = work.project(folder) else { return nil }
@@ -1713,10 +1667,6 @@ final class RemoteModel {
     func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
     func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
-    /// Park or unpark, whichever `Agent.parkAction` offers (040).
-    func perform(_ action: ParkAction, on agentID: UUID) async {
-        await act(action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark, agentID)
-    }
 
     private func act(_ method: String, _ agentID: UUID) async {
         guard !isStale else {
