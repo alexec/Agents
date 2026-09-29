@@ -74,7 +74,11 @@ public enum SandboxWords {
         return "\(access) \(resend) \(foldersStillApply)"
     }
 
+    public static func continuedNote(_ name: String) -> String { "Carried on without \(name)’s sandbox." }
+    public static func keptStoppedNote(_ name: String) -> String { "Kept stopped rather than run without \(name)’s sandbox." }
+
     public static let continueWithout = "Continue without sandbox"
+    public static let startWithout = "Start without sandbox"
     public static let keepStopped = "Keep stopped"
     public static let noRecovery = "The app cannot turn this runtime’s sandbox off."
 }

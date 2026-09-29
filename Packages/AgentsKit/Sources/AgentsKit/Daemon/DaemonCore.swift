@@ -325,6 +325,8 @@ public actor DaemonCore {
     lazy var clientPermissions = clientPermissionStore.load()
     lazy var sandboxStore = SandboxSettingsStore(locations: locations)
     lazy var sandboxSettings = sandboxStore.load()
+    /// How long Gemini may take to answer its handshake while its sandbox may be on (R6).
+    var sandboxHangDeadline: Duration = .seconds(90)
 
     // MARK: Each runtime's allowance (052, 065)
 
@@ -762,6 +764,7 @@ public actor DaemonCore {
     /// reason a daemon killed mid-turn still leaves something true behind.
     func record(_ kind: TranscriptEntry.Kind, for agentID: UUID, subagentID: String? = nil) async {
         let entry = TranscriptEntry(kind: kind, subagentID: subagentID)
+        if case .userMessage(_, _, .person) = kind { clearWaitingSandbox(agentID: agentID) }
         try? await store.append(entry, for: agentID)
         if var agent = agents[agentID] {
             agent.lastActivityAt = entry.at

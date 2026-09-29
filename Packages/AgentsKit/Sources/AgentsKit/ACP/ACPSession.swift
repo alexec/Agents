@@ -59,6 +59,9 @@ public struct TurnResult: Sendable {
     /// the result because the update that brought it and the turn's answer arrive by two
     /// different roads, and the answer can get there first.
     public var rateLimit: RateLimitInfo?
+    /// What the turn's commands printed and what it said (064, R11), for a sandbox that
+    /// could not be set up part way through it.
+    public var evidence = TurnEvidence()
 
     public init(reason: EndedReason?, rawStopReason: String?, usage: TurnUsage? = nil,
                 runtimeError: RuntimeLaunch.TurnError? = nil, failure: SessionFailure? = nil,
@@ -90,6 +93,9 @@ public enum ACPSessionError: Error, Sendable {
 /// Works over any line transport, so the tests drive it with a fake agent in the same
 /// process and never need a network, a credential or a real CLI.
 public actor ACPSession {
+    /// The last `standardErrorKept` characters of the runtime's stderr (064).
+    private(set) var recentStandardError = ""
+
     private let connection: JSONRPCConnection
     private let process: RuntimeProcess?
     private let box = SessionBox()
@@ -132,6 +138,8 @@ public actor ACPSession {
     /// The agent's words in the turn under way, only while `launch` has a
     /// `turnErrorPrefix` to look for in them, and only the start of them.
     private var turnText = ""
+    /// This turn's finished tool calls and words, bounded (064).
+    private(set) var turnEvidence = TurnEvidence()
     /// Whether a `session/prompt` is out, so a failure reported alongside it belongs to
     /// the turn rather than to the session at large (052).
     private var turnInFlight = false
@@ -492,6 +500,7 @@ public actor ACPSession {
             "prompt": blocks.wire,
         ]
         turnText = ""
+        turnEvidence = TurnEvidence()
         turnFailure = nil
         turnRateLimit = nil
         turnInFlight = true
@@ -509,12 +518,14 @@ public actor ACPSession {
         if let answered = SessionFailure.from(meta: result["_meta"]) {
             failure = failure?.superseded(by: answered) ?? answered
         }
-        return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
-                          rawStopReason: raw,
-                          usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]),
-                          runtimeError: launch?.turnError(in: turnText),
-                          failure: failure,
-                          rateLimit: turnRateLimit)
+        var turn = TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
+                              rawStopReason: raw,
+                              usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]),
+                              runtimeError: launch?.turnError(in: turnText),
+                              failure: failure,
+                              rateLimit: turnRateLimit)
+        turn.evidence = turnEvidence
+        return turn
     }
 
     /// What the turn consumed, where the runtime said. Read from the raw value rather
@@ -836,6 +847,7 @@ public actor ACPSession {
                case .agentMessage(_, let text, _) = kind {
                 turnText += text
             }
+            if !isReplaying, turnInFlight { turnEvidence.take(kind) }
             eventsContinuation.yield(.entry(kind))
         case .options(let options):
             self.options = options
@@ -1115,7 +1127,20 @@ public actor ACPSession {
     }
 
     func note(standardError: String) {
+        recentStandardError = String((recentStandardError + standardError).suffix(Self.standardErrorKept))
         eventsContinuation.yield(.standardError(standardError))
+    }
+
+    /// How much of what the runtime printed to stderr is kept (064): enough for the lines a
+    /// runtime says before it exits, such as Grok refusing to start without its sandbox.
+    static let standardErrorKept = 8 * 1024
+
+    /// The last of the runtime's stderr, after giving a process that has just failed a
+    /// moment to finish saying why: its words arrive on their own pipe, and can land just
+    /// after the failure they explain.
+    public func standardErrorTail(settling: Duration = .milliseconds(300)) async -> String {
+        if settling > .zero { try? await Task.sleep(for: settling) }
+        return recentStandardError
     }
 
     func noteExit(status: Int32) {
@@ -1156,5 +1181,34 @@ final class SessionBox: @unchecked Sendable {
 
     func note(standardError: String) async {
         await current?.note(standardError: standardError)
+    }
+}
+
+/// What one turn's commands printed and what it said, kept while it runs (064, R11): where
+/// a sandbox that could not be set up shows up, since the runtime carries on after it.
+public struct TurnEvidence: Sendable, Hashable {
+    /// Each finished tool call's output, and whether it completed rather than failed.
+    public var outputs: [(completed: Bool, text: String)] = []
+    public var reply = ""
+    private var seen: Set<String> = []
+
+    public init() {}
+
+    public static func == (a: TurnEvidence, b: TurnEvidence) -> Bool {
+        a.reply == b.reply && a.outputs.map(\.text) == b.outputs.map(\.text)
+    }
+    public func hash(into hasher: inout Hasher) { hasher.combine(reply) }
+
+    mutating func take(_ kind: TranscriptEntry.Kind) {
+        switch kind {
+        case .toolCall(let call), .toolCallUpdate(let call):
+            guard call.status == "completed" || call.status == "failed",
+                  let id = call.toolCallID, seen.insert(id).inserted, outputs.count < 200 else { return }
+            outputs.append((call.status == "completed", String(call.printedText.suffix(8 * 1024))))
+        case .agentMessage(_, let text, _):
+            reply = String((reply + text).suffix(8 * 1024))
+        default:
+            break
+        }
     }
 }

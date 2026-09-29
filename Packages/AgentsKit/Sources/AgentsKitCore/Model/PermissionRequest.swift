@@ -249,3 +249,21 @@ public struct ToolCall: Codable, Hashable, Sendable {
         content.compactMap { if case .diff(let diff) = $0 { return diff } else { return nil } }
     }
 }
+
+extension ToolCall {
+    /// Everything this call printed, as text: its text content, then its raw output.
+    public var printedText: String {
+        var parts: [String] = []
+        for item in content {
+            if case .content(.text(let text)) = item { parts.append(text) }
+        }
+        if let raw = rawOutput {
+            if let text = raw.stringValue {
+                parts.append(text)
+            } else if let data = try? JSONEncoder().encode(raw) {
+                parts.append(String(decoding: data, as: UTF8.self))
+            }
+        }
+        return parts.joined(separator: "\n")
+    }
+}

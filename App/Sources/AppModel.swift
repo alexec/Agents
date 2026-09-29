@@ -348,7 +348,10 @@ final class AppModel {
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
     /// The next agent's own sandbox choice (064). Nil follows its runtime's default.
-    var draftSandbox: SandboxChoice?
+    var draftSandbox: SandboxChoice? { didSet { draftSandboxRefusal = nil } }
+    /// Why the last start of a new agent did not happen, when its sandbox is why (064):
+    /// shown over the prompt with **Start without sandbox**.
+    var draftSandboxRefusal: DaemonAPI.SandboxWillNotStart?
     /// Folders beyond the working one, and MCP servers, for the agent about to start.
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
@@ -2057,7 +2060,13 @@ final class AppModel {
             // asking to watch it: the agent appears in the project's list and you stay
             // where you were, free to say the next thing. Starting three pieces of work
             // in a row should not mean coming back twice.
+            draftSandboxRefusal = nil
             return true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.sandboxWillNotStart {
+            // Said over the prompt, which keeps what was typed, with the way on (064).
+            draftSandboxRefusal = try? error.data?.decode(DaemonAPI.SandboxWillNotStart.self)
+            if draftSandboxRefusal == nil { fail(error, on: selectedProjectHost) }
+            return false
         } catch {
             fail(error, on: selectedProjectHost)
             return false

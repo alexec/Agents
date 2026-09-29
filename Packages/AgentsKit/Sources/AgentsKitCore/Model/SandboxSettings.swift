@@ -74,17 +74,9 @@ public struct SandboxSettings: Codable, Sendable, Hashable {
 }
 
 /// A runtime's sandbox that could not be set up (064, FR-006, FR-007): the card in the
-/// conversation, and, once the person has answered it, the note it becomes.
+/// conversation. It waits for an answer while the agent's `pendingSandboxFailure` is set;
+/// the answer is a note after it.
 public struct SandboxFailureRecord: Codable, Sendable, Hashable {
-    public enum Resolution: String, Codable, Sendable, Hashable {
-        case pending, keptStopped, continued
-
-        public init(from decoder: any Decoder) throws {
-            let raw = try decoder.singleValueContainer().decode(String.self)
-            self = Resolution(rawValue: raw) ?? .keptStopped
-        }
-    }
-
     public var runtimeID: String
     /// The runtime's own words that were recognised, trimmed, for "Show details".
     public var detail: String
@@ -95,15 +87,13 @@ public struct SandboxFailureRecord: Codable, Sendable, Hashable {
     /// Tool calls that finished in the failed turn. Nonzero means recovery asks the agent
     /// to carry on rather than sending the prompt again (R12).
     public var completedToolCalls: Int
-    public var resolution: Resolution
 
     public init(runtimeID: String, detail: String, hang: Bool = false, recoveryOffered: Bool,
-                completedToolCalls: Int = 0, resolution: Resolution = .pending) {
+                completedToolCalls: Int = 0) {
         self.runtimeID = runtimeID
         self.detail = detail
         self.hang = hang
         self.recoveryOffered = recoveryOffered
         self.completedToolCalls = completedToolCalls
-        self.resolution = resolution
     }
 }

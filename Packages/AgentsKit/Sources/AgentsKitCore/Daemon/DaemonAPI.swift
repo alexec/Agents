@@ -1181,6 +1181,18 @@ public enum DaemonAPI {
         }
     }
 
+    /// What comes with `sandboxWillNotStart` (064).
+    public struct SandboxWillNotStart: Codable, Sendable, Hashable {
+        public var runtimeID: String
+        public var detail: String
+        public var offOffered: Bool
+        public init(runtimeID: String, detail: String, offOffered: Bool) {
+            self.runtimeID = runtimeID
+            self.detail = detail
+            self.offOffered = offOffered
+        }
+    }
+
     /// One agent's sandbox override (064). `choice: nil` clears it (FR-003b).
     public struct SetSandboxRequest: Codable, Sendable {
         public var agentID: UUID
@@ -1629,6 +1641,10 @@ public enum DaemonAPI {
     public enum Failure {
         public static let runtimeNotFound = -32001
         public static let runtimeWillNotStart = -32002
+        /// The runtime would not start because its command sandbox could not be set up
+        /// (064). Its data is `SandboxWillNotStart`: the form keeps the prompt and offers
+        /// **Start without sandbox** when `offOffered`.
+        public static let sandboxWillNotStart = -32061
         public static let sessionGone = -32003
         public static let folderGone = -32004
         public static let noSuchAgent = -32005

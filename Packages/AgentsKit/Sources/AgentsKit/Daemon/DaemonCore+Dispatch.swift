@@ -471,6 +471,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.SetSandboxRequest.self)
                 return .success(try JSONValue.encoding(try await setSandbox(request)))
 
+            case DaemonAPI.Method.agentsAnswerSandbox:
+                let request = try require(params, as: DaemonAPI.AnswerSandboxRequest.self)
+                return .success(try JSONValue.encoding(try await answerSandbox(request)))
+
             case DaemonAPI.Method.agentsSetCeiling:
                 let request = try require(params, as: DaemonAPI.SetCeilingRequest.self)
                 return .success(try JSONValue.encoding(try await setCeiling(request)))

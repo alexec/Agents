@@ -138,3 +138,156 @@ extension DaemonCore {
         changed(agent)
     }
 }
+
+extension DaemonCore {
+    /// A new prompt answers a waiting card by moving past it (064).
+    func clearWaitingSandbox(agentID: UUID) {
+        guard var agent = agents[agentID], agent.pendingSandboxFailure != nil else { return }
+        agent.pendingSandboxFailure = nil
+        changed(agent)
+    }
+
+    /// The setup failure a turn showed, if any (FR-006a): in a finished command's output,
+    /// or, for a runtime that says it only there, in its reply (Codex). A command whose
+    /// sandbox failed did not run, so it is not counted as work done.
+    func sandboxFailure(in evidence: TurnEvidence, runtimeID: String) -> (detail: String, completedToolCalls: Int)? {
+        guard let entry = SandboxCatalog.entry(for: runtimeID), !entry.failurePatterns.isEmpty else { return nil }
+        var detail: String?
+        var completed = 0
+        for output in evidence.outputs {
+            if let match = SandboxFailureDetector.match(runtimeID: runtimeID, text: output.text) {
+                detail = detail ?? match
+            } else if output.completed {
+                completed += 1
+            }
+        }
+        if detail == nil, entry.readsReply {
+            detail = SandboxFailureDetector.match(runtimeID: runtimeID, text: evidence.reply)
+        }
+        return detail.map { ($0, completed) }
+    }
+
+    /// Why a runtime would not start, when the reason is its sandbox: its error or the last
+    /// of its stderr (R11). Nil for anything else, which is then handled as before.
+    func sandboxStartFailure(runtimeID: String, error: any Error, session: ACPSession?) async -> String? {
+        guard !(SandboxCatalog.entry(for: runtimeID)?.failurePatterns ?? []).isEmpty else { return nil }
+        let words = (error as? JSONRPCError).map { "\($0.message)\n\($0.data.map { "\($0)" } ?? "")" }
+            ?? "\(error)"
+        if let detail = SandboxFailureDetector.match(runtimeID: runtimeID, text: words) { return detail }
+        guard let session else { return nil }
+        return SandboxFailureDetector.match(runtimeID: runtimeID, text: await session.standardErrorTail())
+    }
+
+    /// Whether a runtime that never answered is Gemini with its sandbox on (R6): the one
+    /// known cause of that hang, and Off is harmless if it was something else.
+    func isSandboxHang(_ error: any Error) -> Bool { error is SandboxHang }
+
+    /// The handshake, given a deadline where a sandbox that is on would hang it (R6): Gemini
+    /// unless it is Off. Every other runtime waits as long as it takes, as before.
+    func initializeWatchingForHang(_ session: ACPSession, runtimeID: String,
+                                   choice: SandboxChoice) async throws -> ACP.InitializeResult {
+        guard SandboxCatalog.entry(for: runtimeID)?.hangsWhenOn == true, choice != .off else {
+            return try await session.initialize()
+        }
+        let deadline = sandboxHangDeadline
+        // A race that returns at the deadline without waiting for the handshake: a hung
+        // one answers nothing, ever, until its process is ended, which the caller does.
+        return try await withCheckedThrowingContinuation { continuation in
+            let once = ResumeOnce(continuation)
+            Task {
+                do { once.resume(with: .success(try await session.initialize())) } catch { once.resume(with: .failure(error)) }
+            }
+            Task {
+                try? await Task.sleep(for: deadline)
+                once.resume(with: .failure(SandboxHang()))
+            }
+        }
+    }
+
+    /// The card, in the conversation, waiting on the agent for an answer (FR-007).
+    /// **Continue without sandbox** is offered only where Off is a route.
+    func recordSandboxFailure(agentID: UUID, detail: String, hang: Bool = false, completedToolCalls: Int = 0) async {
+        guard var agent = agents[agentID] else { return }
+        let record = SandboxFailureRecord(runtimeID: agent.runtimeID, detail: detail, hang: hang,
+                                          recoveryOffered: SandboxCatalog.canTurnOff(agent.runtimeID),
+                                          completedToolCalls: completedToolCalls)
+        agent.pendingSandboxFailure = record
+        changed(agent)
+        await self.record(.sandboxFailure(record), for: agentID)
+        DaemonLog.shared.write("agent \(agentID): \(agent.runtimeID)'s sandbox could not start: \(detail)")
+    }
+
+    /// The card's answer (FR-007a): only while it waits, and only this agent changes.
+    public func answerSandbox(_ request: DaemonAPI.AnswerSandboxRequest) async throws -> Agent {
+        guard var agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        guard let pending = agent.pendingSandboxFailure else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: "That has been answered already.")
+        }
+        guard !request.carryOn || pending.recoveryOffered else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: SandboxWords.noRecovery)
+        }
+        agent.pendingSandboxFailure = nil
+        changed(agent)
+        let name = RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID
+        guard request.carryOn else {
+            await record(.runtimeNote(SandboxWords.keptStoppedNote(name)), for: agent.id)
+            return agents[agent.id] ?? agent
+        }
+        _ = try await setSandbox(.init(agentID: agent.id, choice: .off))
+        await record(.runtimeNote(SandboxWords.continuedNote(name)), for: agent.id)
+        if agents[agent.id]?.queuedPrompts.isEmpty == false {
+            // A pick-up that failed left the prompt on the queue: it goes now.
+            try await sendNextQueued(to: agent.id)
+        } else if pending.completedToolCalls > 0 {
+            try await enqueue(DaemonAPI.PromptRequest(agentID: agent.id, text: Self.carryOnWithoutSandbox,
+                                                      from: .app), first: true)
+        } else if let prompt = lastPrompts[agent.id] {
+            // Sent again as it went, and not written down twice (R12, like Pool's retry).
+            let session = try await liveSession(for: agents[agent.id] ?? agent)
+            await beginTurn(agentID: agent.id, text: prompt.text, blocks: prompt.blocks, from: prompt.from,
+                            session: session, preface: prompt.preface, recorded: false)
+        } else if let text = await lastPersonsPrompt(agentID: agent.id) {
+            try await enqueue(DaemonAPI.PromptRequest(agentID: agent.id, text: text, from: .app), first: true)
+        }
+        return agents[agent.id] ?? agent
+    }
+
+    /// What recovery sends when commands already ran in the failed turn (R12): the prompt
+    /// again could repeat them.
+    static let carryOnWithoutSandbox = "The command sandbox is now off. Carry on with the task."
+
+    /// The person's last words, from the record, for a daemon that has restarted since.
+    func lastPersonsPrompt(agentID: UUID) async -> String? {
+        guard let page = try? await store.transcript(for: agentID, limit: 400) else { return nil }
+        for entry in page.entries.reversed() {
+            if case .userMessage(let text, _, .person) = entry.kind { return text }
+        }
+        return nil
+    }
+}
+
+/// A runtime that never answered its handshake where a sandbox that is on hangs it (R6).
+struct SandboxHang: Error {}
+
+extension DaemonCore {
+    /// For tests: how long a hang is waited on.
+    func setSandboxHangDeadline(_ deadline: Duration) { sandboxHangDeadline = deadline }
+}
+
+/// A continuation resumed by whichever of two tasks finishes first, and only once.
+final class ResumeOnce<T: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, any Error>?
+
+    init(_ continuation: CheckedContinuation<T, any Error>) { self.continuation = continuation }
+
+    func resume(with result: Result<T, any Error>) {
+        lock.lock()
+        let waiting = continuation
+        continuation = nil
+        lock.unlock()
+        waiting?.resume(with: result)
+    }
+}

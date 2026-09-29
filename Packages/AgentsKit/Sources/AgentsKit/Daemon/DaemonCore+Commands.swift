@@ -421,7 +421,7 @@ extension DaemonCore {
             }
             launched = session
             await hearAuthStatus(from: session, runtimeID: runtimeID)
-            let handshake = try await session.initialize()
+            let handshake = try await initializeWatchingForHang(session, runtimeID: runtimeID, choice: sandbox)
             // Recorded here rather than after the session is made, because the reason
             // to have it is the case where making the session fails: what comes back
             // then is "needs signing in", and the ways to sign in are in the handshake.
@@ -437,10 +437,28 @@ extension DaemonCore {
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
         } catch {
+            // Its sandbox first (064): read before the process is ended, while its last
+            // words are still to hand.
+            let sandboxFailure = isSandboxHang(error)
+                ? SandboxWords.cardBody(runtimeID: runtimeID, name: runtime.name, hang: true)
+                : await sandboxStartFailure(runtimeID: runtimeID, error: error, session: launched)
             // A runtime that would not make a session is still a running process.
             await launched?.end(gracePeriod: .seconds(1))
+            if let sandboxFailure {
+                throw Self.sandboxWillNotStart(runtime: runtime, detail: sandboxFailure)
+            }
             throw startFailure(error, runtime: runtime, runtimeID: runtimeID)
         }
+    }
+
+    /// A runtime that would not start because of its sandbox (064), said so the form can
+    /// keep the prompt and offer **Start without sandbox**.
+    static func sandboxWillNotStart(runtime: Runtime, detail: String) -> JSONRPCError {
+        let data = DaemonAPI.SandboxWillNotStart(runtimeID: runtime.id, detail: detail,
+                                                 offOffered: SandboxCatalog.canTurnOff(runtime.id))
+        return JSONRPCError(code: DaemonAPI.Failure.sandboxWillNotStart,
+                            message: SandboxWords.cardTitle(runtime.name) + ".",
+                            data: try? JSONValue.encoding(data))
     }
 
     /// What a runtime that would not make a session is said to have done.
@@ -527,7 +545,7 @@ extension DaemonCore {
         try await enqueue(request, first: true)
     }
 
-    private func enqueue(_ request: DaemonAPI.PromptRequest, first: Bool) async throws {
+    func enqueue(_ request: DaemonAPI.PromptRequest, first: Bool) async throws {
         guard var agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
@@ -916,10 +934,20 @@ extension DaemonCore {
         do {
             return try await connect(session, runtime: runtime, for: agent, sandbox: sandbox)
         } catch {
+            // Its sandbox first (064), read while the process's last words are to hand.
+            let sandboxFailure = isSandboxHang(error)
+                ? SandboxWords.cardBody(runtimeID: runtime.id, name: runtime.name, hang: true)
+                : await sandboxStartFailure(runtimeID: runtime.id, error: error, session: session)
             // Nothing holds a session that never made it into `live`, and a process
             // left behind here is a runtime nobody will ever end.
             dropAppTokens(for: agent.id)
             await session.end(gracePeriod: .seconds(1))
+            if let sandboxFailure {
+                // Stopped with the card; what was queued stays queued (FR-007a).
+                await recordSandboxFailure(agentID: agent.id, detail: sandboxFailure, hang: isSandboxHang(error))
+                await move(agent.id, on: .sandboxWouldNotStart)
+                throw Self.sandboxWillNotStart(runtime: runtime, detail: sandboxFailure)
+            }
             runtimeFailed(agentID: agent.id)
             // The same refusal a new agent gets, with the ways to sign in, so a window
             // shows the sign-in rather than the protocol's error. Said to every window
@@ -935,7 +963,7 @@ extension DaemonCore {
 
     private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent,
                          sandbox: (choice: SandboxChoice, reason: String?)) async throws -> ACPSession {
-        let handshake = try await session.initialize()
+        let handshake = try await initializeWatchingForHang(session, runtimeID: agent.runtimeID, choice: sandbox.choice)
         // Picked back up with what `~/.agents` holds now, not what it held at the start (054).
         reconcileHome()
 
@@ -1188,6 +1216,14 @@ extension DaemonCore {
             }
         }
         _ = retrying
+        // A command whose sandbox could not be set up (064, FR-006a): the turn ran to its
+        // end, and the agent stops there with the card.
+        if let runtimeID = agents[agentID]?.runtimeID,
+           let failed = sandboxFailure(in: result.evidence, runtimeID: runtimeID) {
+            await recordSandboxFailure(agentID: agentID, detail: failed.detail,
+                                       completedToolCalls: failed.completedToolCalls)
+            reason = .sandboxFailed
+        }
         if crossedItsLimit {
             // The limit is what this agent stopped for, whatever the turn's own
             // reason was. Said in the app's voice and with the figure it actually
@@ -1328,6 +1364,17 @@ extension DaemonCore {
         // transport threw is for whoever is debugging the runtime, not for the
         // person reading the conversation.
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
+        // Its sandbox first (064): a runtime that fell over because it could not set one up.
+        let evidence = await live[agentID]?.turnEvidence ?? TurnEvidence()
+        if let runtimeID = agents[agentID]?.runtimeID,
+           let detail = await sandboxStartFailure(runtimeID: runtimeID, error: error, session: live[agentID])
+                ?? sandboxFailure(in: evidence, runtimeID: runtimeID)?.detail {
+            await recordSandboxFailure(agentID: agentID, detail: detail)
+            await move(agentID, on: .turnEnded(.sandboxFailed))
+            await releaseRuntime(for: agentID)
+            await applyPendingMove(agentID)
+            return
+        }
         let refused = credentialRefusal(agentID: agentID, error: error)
         let signIn = refused == nil ? Self.signInReason(error) : nil
         let limit = refused == nil && signIn == nil ? recognise(agentID: agentID, error: error) : .none

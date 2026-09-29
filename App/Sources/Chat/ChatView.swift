@@ -90,12 +90,13 @@ struct ChatView: View {
             backgroundOutput: { item in BackgroundOutput.open(item) },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
-            keepStopped: sandboxAnswer(carryOn: false))
+            keepStopped: sandboxAnswer(carryOn: false),
+            waitingSandbox: agent?.pendingSandboxFailure)
     }
 
     /// The sandbox card's answer for the open agent (064).
     private func sandboxAnswer(carryOn: Bool) -> (@MainActor () async -> Void)? {
-        guard let id = agent?.id else { return nil }
+        guard let id = agent?.id, agent?.pendingSandboxFailure != nil else { return nil }
         let model = model
         return { await model.answerSandbox(id, carryOn: carryOn) }
     }

@@ -109,6 +109,9 @@ struct PromptBar: View {
                     MentionList(mentions: mentions, selected: selectedMention, choose: accept)
                         .transition(.opacity)
                 }
+                if agent == nil, let refusal = model.draftSandboxRefusal {
+                    sandboxRefusal(refusal)
+                }
                 field
                 options
             }
@@ -839,6 +842,32 @@ struct PromptBar: View {
     private var willQueue: Bool {
         guard let agent else { return false }
         return PromptWords.willQueue(agent)
+    }
+
+    /// A new agent's runtime would not start because of its sandbox (064): what it said,
+    /// and **Start without sandbox**, which sends what is typed again with this agent Off.
+    private func sandboxRefusal(_ refusal: DaemonAPI.SandboxWillNotStart) -> some View {
+        let name = RuntimeCatalog.runtime(id: refusal.runtimeID)?.name ?? refusal.runtimeID
+        return HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(SandboxWords.cardTitle(name)).appText(.fine).fontWeight(.semibold)
+                Text(refusal.detail.split(separator: "\n").first.map(String.init) ?? "")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .help(refusal.detail)
+            }
+            Spacer()
+            if refusal.offOffered {
+                Button(SandboxWords.startWithout) {
+                    model.draftSandbox = .off
+                    send()
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func send() {

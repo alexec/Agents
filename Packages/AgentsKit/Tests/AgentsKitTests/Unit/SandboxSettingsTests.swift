@@ -20,9 +20,6 @@ struct SandboxSettingsTests {
         #expect(settings.choice(for: "claude") == .off)
         let state = try JSONDecoder().decode(SandboxState.self, from: Data(#""vm""#.utf8))
         #expect(state == .runtimeControlled)
-        let record = try JSONDecoder().decode(SandboxFailureRecord.self, from: Data(
-            #"{"runtimeID":"codex","detail":"x","hang":false,"recoveryOffered":true,"completedToolCalls":0,"resolution":"later"}"#.utf8))
-        #expect(record.resolution == .keptStopped)
     }
 
     @Test func theStoreSetsAnUnreadableFileAside() throws {

@@ -55,6 +55,10 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// The runtime kept saying "too many requests just now" after the retries (052, R7).
     case rateLimited
 
+    /// Its runtime's command sandbox could not be set up (064). Stopped for the person
+    /// to decide, with the card in the conversation; the app never retries on its own.
+    case sandboxFailed
+
     /// Stopped short, and why. Never a reason dressed up as a finish, and `nil` for a
     /// turn that simply ended — there is nothing to say about that.
     ///
@@ -76,6 +80,7 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         case .runtimeError: return "The runtime reported an error"
         case .allowanceSpent: return "Its allowance ran out"
         case .rateLimited: return "Rate limited, and still limited after retrying"
+        case .sandboxFailed: return "Its sandbox could not start"
         }
     }
 
