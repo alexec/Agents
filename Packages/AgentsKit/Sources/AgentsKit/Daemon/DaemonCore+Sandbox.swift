@@ -157,7 +157,7 @@ extension DaemonCore {
         for output in evidence.outputs {
             if let match = SandboxFailureDetector.match(runtimeID: runtimeID, text: output.text) {
                 detail = detail ?? match
-            } else if output.completed {
+            } else if output.didWork {
                 completed += 1
             }
         }

@@ -1187,8 +1187,9 @@ final class SessionBox: @unchecked Sendable {
 /// What one turn's commands printed and what it said, kept while it runs (064, R11): where
 /// a sandbox that could not be set up shows up, since the runtime carries on after it.
 public struct TurnEvidence: Sendable, Hashable {
-    /// Each finished tool call's output, and whether it completed rather than failed.
-    public var outputs: [(completed: Bool, text: String)] = []
+    /// Each finished tool call's output, and whether it completed doing work: a command
+    /// or an edit, not a search or the app's own tools, which change nothing to repeat.
+    public var outputs: [(didWork: Bool, text: String)] = []
     public var reply = ""
     private var seen: Set<String> = []
 
@@ -1204,7 +1205,8 @@ public struct TurnEvidence: Sendable, Hashable {
         case .toolCall(let call), .toolCallUpdate(let call):
             guard call.status == "completed" || call.status == "failed",
                   let id = call.toolCallID, seen.insert(id).inserted, outputs.count < 200 else { return }
-            outputs.append((call.status == "completed", String(call.printedText.suffix(8 * 1024))))
+            let changes = ["execute", "edit", "delete", "move"].contains(call.kind ?? "")
+            outputs.append((call.status == "completed" && changes, String(call.printedText.suffix(8 * 1024))))
         case .agentMessage(_, let text, _):
             reply = String((reply + text).suffix(8 * 1024))
         default:

@@ -92,12 +92,14 @@ struct SandboxLaunchTests {
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "first", sandbox: .on))
         await letGo(core, id)
+        await settled(core, id)
+        await letGo(core, id)
         #expect(await core.agent(id)?.sandboxOverride == .on)
         #expect(await core.agent(id)?.effectiveSandbox?.state == .on)
 
         _ = try await core.setSandbox(.init(agentID: id, choice: nil))
         try await core.prompt(.init(agentID: id, text: "second"))
-        await eventually("the runtime was started again") { launcher.launchCount == 2 }
+        await eventually("the runtime was started again") { launcher.sandboxes.last == .off }
         await letGo(core, id)
         #expect(launcher.sandboxes.first == .on)
         #expect(launcher.sandboxes.last == .off, "the default from the next turn")
@@ -112,9 +114,13 @@ struct SandboxLaunchTests {
         let core = try await makeCore(locations, launcher)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "first"))
         await letGo(core, id)
+        // The app's own question after a silent turn launches too; it goes first.
+        await settled(core, id)
+        await letGo(core, id)
         _ = try await core.setSandbox(.init(agentID: id, choice: .on))
+        let before = launcher.launchCount
         try await core.prompt(.init(agentID: id, text: "second"))
-        await eventually("the runtime was started again") { launcher.launchCount == 2 }
+        await eventually("the runtime was started again") { launcher.launchCount > before }
         await letGo(core, id)
         #expect(claudeSandbox(await launcher.lastAgent?.continuedSessionParams) == .bool(true))
     }

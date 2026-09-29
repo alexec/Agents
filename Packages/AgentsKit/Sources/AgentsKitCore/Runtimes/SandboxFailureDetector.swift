@@ -13,7 +13,10 @@ public enum SandboxFailureDetector {
               !text.isEmpty else { return nil }
         let plain = stripped(text)
         let lines = plain.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
-        let hits = lines.filter { line in patterns.contains { line.localizedCaseInsensitiveContains($0) } }
+        var hits: [String] = []
+        for line in lines where patterns.contains(where: { line.localizedCaseInsensitiveContains($0) }) && !hits.contains(line) {
+            hits.append(line)
+        }
         guard !hits.isEmpty else { return nil }
         let detail = hits.joined(separator: "\n")
         return detail.count > 1200 ? String(detail.prefix(1200)) + "…" : detail

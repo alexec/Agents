@@ -32,7 +32,7 @@ struct SandboxRecoveryTests {
     private func command(_ id: String, printing output: String) -> [JSONValue] {
         [["sessionUpdate": "tool_call", "toolCallId": .string(id), "title": "Run a command",
           "kind": "execute", "status": "in_progress", "content": []],
-         ["sessionUpdate": "tool_call_update", "toolCallId": .string(id), "status": "completed",
+         ["sessionUpdate": "tool_call_update", "toolCallId": .string(id), "status": "completed", "kind": "execute",
           "content": [["type": "content", "content": ["type": "text", "text": .string(output)]]]]]
     }
 
