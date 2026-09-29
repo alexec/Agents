@@ -239,8 +239,10 @@ struct WorkflowPage: View {
                 case .new:
                     EmptyView()
                 }
-                HStack(alignment: .top, spacing: 10) {
-                    if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
+                // The prompt's two pills: the permission mode on the left, and the
+                // model, its effort and the rest behind one pill on the right.
+                if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
+                    HStack(alignment: .top, spacing: 10) {
                         settingControl(summary, name: "Permission mode",
                                        setting: WorkflowSettings.Setting.permissionMode,
                                        value: workflow.settings.permissionMode,
@@ -248,27 +250,10 @@ struct WorkflowPage: View {
                                        runtime: runtime,
                                        chosen: binding(summary, \.permissionMode) { $0.permissionMode = $1 })
                         Spacer(minLength: 16)
-                        settingControl(summary, name: "Model",
-                                       setting: WorkflowSettings.Setting.model,
-                                       value: workflow.settings.model,
-                                       option: remembered.flatMap(WorkflowSettings.modelOption(in:)),
-                                       runtime: runtime,
-                                       chosen: binding(summary, \.model) { $0.model = $1 })
-                        Spacer(minLength: 16)
-                        settingControl(summary, name: "Effort",
-                                       setting: WorkflowSettings.Setting.effort,
-                                       value: workflow.settings.effort,
-                                       option: remembered.flatMap(WorkflowSettings.effortOption(in:)),
-                                       runtime: runtime,
-                                       chosen: binding(summary, \.effort) { $0.effort = $1 })
-                    } else {
-                        Spacer(minLength: 0)
+                        modelPill(summary, runtime: runtime)
                     }
-                }
-                .disabled(workflow.mode == .triggering)
-                if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
-                    otherOptions(summary, runtime: runtime)
-                        .disabled(workflow.mode == .triggering)
+                    .disabled(workflow.mode == .triggering)
+                    refusals(summary, runtime: runtime)
                 }
             }
         }
@@ -358,34 +343,64 @@ struct WorkflowPage: View {
         }
     }
 
-    /// Every option the runtime advertised that is not the mode, the model or the
-    /// effort, one control each, written under `options:` by the option's own id. A
-    /// value the file names that the runtime did not advertise is drawn too, marked,
+    /// The model, the effort and every other option the runtime advertised, behind one
+    /// pill, each written where the file keeps it: the model and effort under their own
+    /// keys, the rest under `options:` by the option's own id.
+    @ViewBuilder
+    private func modelPill(_ summary: WorkflowSummary, runtime: Runtime) -> some View {
+        let workflow = summary.workflow
+        let model = remembered.flatMap(WorkflowSettings.modelOption(in:))
+        let effort = remembered.flatMap(WorkflowSettings.effortOption(in:))
+        let options = [model.map { withDefault($0, named: "Model") },
+                       effort.map { withDefault($0, named: "Effort") }].compactMap { $0 }
+            + others.map { withDefault(selectable($0), named: $0.name) }
+        if options.isEmpty {
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("Model: \(workflow.settings.model ?? "runtime default")")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                if remembered != nil {
+                    note("The choices are not known until \(runtime.name) has been used in this project.")
+                }
+            }
+        } else {
+            ModelPill(options: options) { option in
+                switch option.id {
+                case model?.id: return binding(summary, \.model) { $0.model = $1 }
+                case effort?.id: return binding(summary, \.effort) { $0.effort = $1 }
+                default: return optionBinding(summary, id: option.id)
+                }
+            }
+        }
+    }
+
+    /// What the runtime advertised besides the mode, the model and the effort.
+    private var others: [ConfigOption] {
+        let advertised = remembered ?? []
+        return advertised.filter { $0.isRenderable && !WorkflowSettings.isNamedOnItsOwn($0, in: advertised) }
+    }
+
+    /// Each value the file names that the runtime does not offer, said under the pills,
     /// because that workflow is refusing every fire on it.
     @ViewBuilder
-    private func otherOptions(_ summary: WorkflowSummary, runtime: Runtime) -> some View {
-        let advertised = remembered ?? []
-        let others = advertised.filter {
-            $0.isRenderable && !WorkflowSettings.isNamedOnItsOwn($0, in: advertised)
+    private func refusals(_ summary: WorkflowSummary, runtime: Runtime) -> some View {
+        let settings = summary.workflow.settings
+        let named: [(String, String?, ConfigOption?)] =
+            [(WorkflowSettings.Setting.model, settings.model, remembered.flatMap(WorkflowSettings.modelOption(in:))),
+             (WorkflowSettings.Setting.effort, settings.effort, remembered.flatMap(WorkflowSettings.effortOption(in:)))]
+            + others.map { ($0.id, shown(settings.options[$0.id], for: $0), selectable($0)) }
+        let unknown = settings.options.keys.filter { id in !others.contains { $0.id == id } }.sorted()
+        ForEach(named.filter { _, value, option in
+            guard let value, let option else { return false }
+            return !(option.options ?? []).contains { $0.value.stringValue == value }
+        }, id: \.0) { setting, value, option in
+            marked(WorkflowSettings.refusalDetail(
+                setting: setting, value: value ?? "",
+                offered: (option?.options ?? []).map { $0.value.stringValue ?? $0.name },
+                runtime: runtime.name))
         }
-        let unknown = summary.workflow.settings.options.keys
-            .filter { id in !others.contains { $0.id == id } }.sorted()
-        if !others.isEmpty || !unknown.isEmpty {
-            HStack(alignment: .top, spacing: 16) {
-                ForEach(others) { option in
-                    settingControl(summary, name: option.name, setting: option.id,
-                                   value: shown(summary.workflow.settings.options[option.id], for: option),
-                                   option: selectable(option), runtime: runtime,
-                                   chosen: optionBinding(summary, id: option.id))
-                }
-                ForEach(unknown, id: \.self) { id in
-                    settingControl(summary, name: id, setting: id,
-                                   value: summary.workflow.settings.options[id],
-                                   option: nil, runtime: runtime,
-                                   chosen: optionBinding(summary, id: id))
-                }
-                Spacer(minLength: 0)
-            }
+        ForEach(unknown, id: \.self) { id in
+            marked("\(id): \(settings.options[id] ?? "") — \(runtime.name) does not offer this option here")
         }
     }
 

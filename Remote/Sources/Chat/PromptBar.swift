@@ -459,6 +459,11 @@ struct PromptBar: View {
                 if !others.isEmpty {
                     ModelPill(options: others, binding: binding(for:))
                 }
+                // What it has used, beside how it thinks.
+                ContextMeter(agent: agent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .paperRaised(in: Capsule())
             }
             .padding(.vertical, 1)
             .frame(minWidth: optionsWidth, alignment: .leading)

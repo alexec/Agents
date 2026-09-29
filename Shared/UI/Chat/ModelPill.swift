@@ -61,15 +61,25 @@ struct ModelPill<Extra: View>: View {
         .help(options.map(\.name).joined(separator: ", "))
     }
 
-    /// The model, its effort, and the name of each switch that is on.
+    /// The model and its effort where either is not the default — "Default" where
+    /// neither is — and the name of each switch that is on.
     private var title: String {
         var words: [String] = []
-        if let model { words.append(Self.bare(model.closedTitle(for: binding(model).wrappedValue))) }
-        if let effort { words.append(effort.closedTitle(for: binding(effort).wrappedValue)) }
+        if let model, !isDefault(model) { words.append(Self.bare(model.closedTitle(for: binding(model).wrappedValue))) }
+        if let effort, !isDefault(effort) { words.append(effort.closedTitle(for: binding(effort).wrappedValue)) }
+        if words.isEmpty { words.append("Default") }
         for option in rest where option.isBoolean && isOn(option).wrappedValue {
             words.append(Self.short(option.name))
         }
         return words.joined(separator: " ")
+    }
+
+    /// Nothing chosen, or a choice the runtime calls its default.
+    private func isDefault(_ option: ConfigOption) -> Bool {
+        guard let value = binding(option).wrappedValue ?? option.currentValue, value != .null else { return true }
+        if value.stringValue?.lowercased() == "default" { return true }
+        let name = option.closedTitle(for: value).lowercased()
+        return name.hasPrefix("default") || name.hasSuffix("runtime default")
     }
 
     /// "Default (recommended)" says "Default": the aside is for the menu, not the pill.

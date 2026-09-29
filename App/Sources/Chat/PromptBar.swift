@@ -221,7 +221,11 @@ struct PromptBar: View {
     private var whereAndWhat: some View {
         HStack(spacing: 12) {
             if let agent {
-                // The phone's row too (033).
+                VStack(alignment: .leading, spacing: 8) {
+                    // Where it works, and the way to move it (053).
+                    if let place = agentPlace(agent) {
+                        place
+                }
                 PromptHeader(agent: agent,
                              leaseStatus: model.work.leaseStatus(of: agent.id),
                              openLease: { model.showResources(at: $0) },
@@ -231,28 +235,31 @@ struct PromptBar: View {
                              cancelWait: { Task { await model.cancelWait(of: agent.id) } },
                              background: agent.background,
                              backgroundActions: backgroundActions(agent))
+                }
+                .task(id: "\(agent.id)-\(agent.cwd.path)") { await model.loadAgentWorktrees(of: agent) }
                 Spacer(minLength: 0)
             } else {
-                Button(action: chooseFolder) {
-                    HStack(spacing: 5) {
-                        Image(systemName: folderIsFixed ? "folder.fill" : "folder")
-                        // The folder's own name. The path it sits under is rarely the
-                        // thing you are checking, and it is in the tooltip when it is.
-                        Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
-                            .lineLimit(1)
+                // On a project page the folder is the project, named in the middle of
+                // the page; only a session with no project yet chooses one.
+                if !folderIsFixed {
+                    Button(action: chooseFolder) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "folder")
+                            // The folder's own name. The path it sits under is rarely the
+                            // thing you are checking, and it is in the tooltip when it is.
+                            Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
+                                .lineLimit(1)
+                        }
                     }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+                    .help(folderHelp)
                 }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                // On a project page the folder is the project. Changing it there would
-                // start the agent somewhere else and file it under a different project,
-                // which is not something a prompt on this page should be able to do.
-                .disabled(folderIsFixed)
-                .help(folderHelp)
 
                 if model.draftWorktrees.isRepository {
                     worktreeChooser
                 }
+                reachButton
 
                 Spacer(minLength: 8)
 
@@ -635,7 +642,7 @@ struct PromptBar: View {
         // one text style and one origin, and this way the words sit in it exactly as
         // the typed ones will.
         if let suggestion { return suggestion.prompt }
-        guard let agent else { return "What do you want to do?" }
+        guard let agent else { return PromptWords.askPlaceholder }
         return PromptWords.placeholder(for: agent)
     }
 
@@ -694,29 +701,15 @@ struct PromptBar: View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 permissionOptions(shown)
-                if isNew {
-                    Button {
-                        isShowingReach = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(reachTitle)
-                            Image(systemName: "chevron.down")
-                                // Decorative: a glyph in a capsule, not text (FR-015).
-                                .font(.system(size: 8, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .appText(.fine)
-                    .fixedSize()
-                    .paperRaised(in: .capsule)
-                    .help("Folders and MCP servers this agent may reach")
-                }
                 Spacer(minLength: 16)
                 otherOptions(shown)
+                // What it has used, beside how it thinks.
+                if let agent {
+                    ContextMeter(agent: agent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .paperRaised(in: Capsule())
+                }
             }
             // The raised capsules are drawn to their own edge, and a scroll view clips
             // at its bounds. A point either side keeps their edge and shadow from being shaved.
@@ -737,6 +730,29 @@ struct PromptBar: View {
 
     /// The permission mode, as its value alone: it is the leftmost pill, and that is
     /// what it is.
+    /// Folders and MCP servers a new agent may reach, beside where it starts.
+    private var reachButton: some View {
+        Button {
+            isShowingReach = true
+        } label: {
+            HStack(spacing: 4) {
+                Text(reachTitle)
+                Image(systemName: "chevron.down")
+                    // Decorative: a glyph in a capsule, not text (FR-015).
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .appText(.fine)
+        .fixedSize()
+        .paperRaised(in: .capsule)
+        .help("Folders and MCP servers this agent may reach")
+    }
+
     @ViewBuilder
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
         ForEach(shown.filter(\.isAboutPermission)) { option in

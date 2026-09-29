@@ -26,13 +26,34 @@ struct TranscriptRow: View {
     }
 }
 
-/// One turn: the ask, and then its last block — or, once that is clicked, every block.
+/// One turn: the ask, and then its last block — or every block, or every block with
+/// what each tool call was given and gave back.
 ///
 /// A block is a tool call, drawn as the description the agent gave it, or something the
-/// agent said. Clicking any block of a turn switches it between the two.
+/// agent said. Clicking any block of a turn moves it on to the next of the three.
 struct TurnView: View {
+    enum Detail: Hashable {
+        case concise, normal, verbose
+
+        var next: Detail {
+            switch self {
+            case .concise: return .normal
+            case .normal: return .verbose
+            case .verbose: return .concise
+            }
+        }
+
+        var help: String {
+            switch next {
+            case .concise: return "Show only the last step"
+            case .normal: return "Show every step of this turn"
+            case .verbose: return "Show what each tool was given and gave back"
+            }
+        }
+    }
+
     let turn: ChatTurn
-    let isExpanded: Bool
+    let detail: Detail
     /// A stored turn's own entries, once fetched.
     let fetched: [TranscriptItem]?
     let toggle: () -> Void
@@ -46,60 +67,61 @@ struct TurnView: View {
             if let ask = turn.ask {
                 TranscriptRow(item: ask)
             }
-            if isExpanded {
+            if detail == .concise {
+                if let last = turn.last { block(last) }
+            } else {
                 if blocks.isEmpty, fetched == nil, turn.range != nil {
                     ProgressView().controlSize(.small)
                 }
-                ForEach(blocks) { block in
-                    BlockRow(item: block, isConcise: false)
-                        .contentShape(.rect)
-                        .onTapGesture(perform: toggle)
-                        .accessibilityAction(.default, toggle)
-                        .help("Show only the last step")
-                }
-            } else if let last = turn.last {
-                BlockRow(item: last, isConcise: true)
-                    .contentShape(.rect)
-                    .onTapGesture(perform: toggle)
-                    .help("Show every step of this turn")
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction(.default, toggle)
-                    .accessibilityHint("Shows every step of this turn")
+                ForEach(blocks) { block($0) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func block(_ item: TranscriptItem) -> some View {
+        BlockRow(item: item, detail: detail)
+            .contentShape(.rect)
+            .onTapGesture(perform: toggle)
+            .help(detail.help)
+            .accessibilityAction(.default, toggle)
+            .accessibilityHint(detail.help)
     }
 }
 
 /// A tool call or something the agent said, as a turn draws it.
 private struct BlockRow: View {
     let item: TranscriptItem
-    /// Only the last call of a run.
-    let isConcise: Bool
+    let detail: TurnView.Detail
 
     var body: some View {
         switch item {
         case .toolRun(_, let calls):
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array((isConcise ? Array(calls.suffix(1)) : calls).enumerated()), id: \.offset) { _, call in
-                    line(call.turnLine)
+            VStack(alignment: .leading, spacing: detail == .verbose ? 12 : 4) {
+                ForEach(Array((detail == .concise ? Array(calls.suffix(1)) : calls).enumerated()),
+                        id: \.offset) { _, call in
+                    tool(call)
                 }
             }
         case .entry(let entry):
             if case .toolCall(let call) = entry.kind {
-                line(call.turnLine)
+                tool(call)
             } else {
                 EntryRow(entry: entry)
             }
         }
     }
 
-    private func line(_ text: String) -> some View {
-        Text(text)
-            .appText(.reading)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    @ViewBuilder
+    private func tool(_ call: ToolCall) -> some View {
+        if detail == .verbose {
+            ToolCallLine(call: call, lineText: call.turnLine, isOpen: true)
+        } else {
+            Text(call.turnLine)
+                .appText(.reading)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 
@@ -397,6 +419,11 @@ private struct ToolCallLine: View {
     @Environment(\.chatActions) private var actions
     @Environment(\.backgroundWork) private var background
     let call: ToolCall
+    /// What the line says, where not the runtime's own line: a turn's description.
+    var lineText: String? = nil
+    /// Open from the start and for good: a verbose turn, where the click belongs to
+    /// the turn.
+    var isOpen = false
     /// What a click does instead of opening the call, where the line is standing in
     /// for a whole folded run.
     var onClick: (() -> Void)? = nil
@@ -404,8 +431,8 @@ private struct ToolCallLine: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            summary
-            if isExpanded { detail }
+            if isOpen { line } else { summary }
+            if isExpanded || isOpen { detail }
         }
     }
 
@@ -438,7 +465,7 @@ private struct ToolCallLine: View {
     /// wraps to three lines is three lines of a run that reads as one call per line;
     /// the whole of it is a click away in the detail, where the raw input is.
     private var line: some View {
-        Text(call.line + runsOn)
+        Text((lineText ?? call.line) + runsOn)
             .appText(.reading)
             .foregroundStyle(.secondary)
             .lineLimit(1)

@@ -40,8 +40,8 @@ struct ChatTranscript: View {
     /// go only while it is, so nothing leaves from above somebody reading back.
     var onFollowing: (Bool) -> Void = { _ in }
 
-    /// The turns drawn normal rather than concise, by id.
-    @State private var expandedTurns: Set<UUID> = []
+    /// The turns drawn other than concise, by id.
+    @State private var turnViews: [UUID: TurnView.Detail] = [:]
     /// Every entry of a stored turn once it has been opened, folded.
     @State private var fetchedTurns: [UUID: [TranscriptItem]] = [:]
     /// Set once the pane is sitting at the foot of the conversation. Until then the
@@ -109,10 +109,14 @@ struct ChatTranscript: View {
                     // is clicked, and then every block of it.
                     ForEach(rows) { turn in
                         TurnView(turn: turn,
-                                 isExpanded: expandedTurns.contains(turn.id),
+                                 detail: turnViews[turn.id] ?? .concise,
                                  fetched: fetchedTurns[turn.id],
                                  toggle: { toggle(turn) })
                             .id(turn.id)
+                    }
+                    // A new turn puts the one before it back to concise.
+                    .onChange(of: rows.last?.id) { before, _ in
+                        if let before { turnViews[before] = nil }
                     }
                     .environment(\.backgroundWork, agent.background)
                     ForEach(agent.queuedPrompts) { queued in
@@ -273,7 +277,7 @@ struct ChatTranscript: View {
             .onChange(of: focusedEntry) {
                 guard let focusedEntry else { return }
                 if let turn = rows.first(where: { $0.blocks.contains { $0.id == focusedEntry } }) {
-                    expandedTurns.insert(turn.id)
+                    turnViews[turn.id] = .normal
                 }
                 // Being sent to a line in the middle is being sent away from the end,
                 // and it was asked for. Following on from here would take the reader
@@ -318,11 +322,12 @@ struct ChatTranscript: View {
         }
     }
 
-    /// Open a turn, fetching its entries if all that is in hand is its summary; or
-    /// close it again.
+    /// Concise, then normal, then verbose, then concise again; fetching a stored turn's
+    /// entries the first time it is opened.
     private func toggle(_ turn: ChatTurn) {
-        if expandedTurns.remove(turn.id) != nil { return }
-        expandedTurns.insert(turn.id)
+        let next = (turnViews[turn.id] ?? .concise).next
+        turnViews[turn.id] = next == .concise ? nil : next
+        guard next != .concise else { return }
         guard turn.blocks.isEmpty, let range = turn.range, fetchedTurns[turn.id] == nil else { return }
         Task {
             let entries = await actions.turnEntries(agent.id, range)
@@ -364,7 +369,7 @@ struct ChatTranscript: View {
     /// Open at the end, the way every chat does, and only then let reaching the top
     /// mean something.
     private func settle(_ scroller: ScrollViewProxy) async {
-        expandedTurns = []
+        turnViews = [:]
         fetchedTurns = [:]
         hasSettled = false
         isFollowing = true

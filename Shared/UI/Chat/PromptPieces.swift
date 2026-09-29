@@ -12,13 +12,13 @@ enum PromptWords {
     /// While it works, the field says what happens to what you type rather than what the
     /// agent is doing. The state line in the transcript says that.
     static func placeholder(for agent: Agent) -> String {
-        if agent.state.hasTurnInFlight { return "Say what next, and it goes when this turn ends" }
+        if agent.state.hasTurnInFlight { return "What do you want to do next?" }
         switch agent.state {
         // `.starting` cannot reach here — it answers true to `hasTurnInFlight`, so the
         // guard above has already returned. Named anyway, because the compiler asks and
         // because a silent `default:` is how the next new state gets the wrong words.
-        case .starting, .running, .waitingOnUser: return "What do you want to do?"
-        case .finished, .stopped: return "What do you want to do?"
+        case .starting, .running, .waitingOnUser: return askPlaceholder
+        case .finished, .stopped: return askPlaceholder
         case .archived: return "Say what next, and this comes back"
         }
     }
@@ -28,6 +28,8 @@ enum PromptWords {
         agent.state.hasTurnInFlight || !agent.queuedPrompts.isEmpty
     }
 
+    /// The prompt's own words when nothing better is on offer.
+    static let askPlaceholder = "What do you want to do?"
     static func sendSymbol(willQueue: Bool) -> String { willQueue ? "arrow.up.to.line" : "arrow.up" }
     /// Where send is while the agent works and nothing is typed: the one way to stop it.
     static let stopSymbol = "stop.fill"
