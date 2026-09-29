@@ -1,0 +1,12 @@
+{
+ "jsonrpc": "2.0",
+ "id": 3,
+ "error": {
+  "code": -32602,
+  "message": "Invalid params: model not found: anthropic/claude-haiku-4-5",
+  "data": {
+   "providerId": "anthropic",
+   "modelId": "anthropic/claude-haiku-4-5"
+  }
+ }
+}

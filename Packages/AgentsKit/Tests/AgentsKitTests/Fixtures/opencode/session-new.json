@@ -1,0 +1,69 @@
+{
+ "jsonrpc": "2.0",
+ "id": 2,
+ "result": {
+  "sessionId": "ses_f11d4ad13ffeLl8Su9lEkLc28t",
+  "configOptions": [
+   {
+    "id": "model",
+    "name": "Model",
+    "category": "model",
+    "type": "select",
+    "currentValue": "opencode/big-pickle",
+    "options": [
+     {
+      "value": "opencode/big-pickle",
+      "name": "OpenCode Zen/Big Pickle"
+     },
+     {
+      "value": "opencode/ling-3.0-flash-fin-free",
+      "name": "OpenCode Zen/Ling 3.0 Flash Fin Free"
+     },
+     {
+      "value": "opencode/longcat-2.5-preview-free",
+      "name": "OpenCode Zen/LongCat 2.5 Preview Free"
+     },
+     {
+      "value": "opencode/mimo-v2.6-flash-free",
+      "name": "OpenCode Zen/MiMo-V2.6-Flash Free"
+     },
+     {
+      "value": "opencode/muse-spark-1.3-contributor-free",
+      "name": "OpenCode Zen/Muse Spark 1.3 Free"
+     },
+     {
+      "value": "opencode/nemotron-3-ultra-free",
+      "name": "OpenCode Zen/Nemotron 3 Ultra Free"
+     },
+     {
+      "value": "opencode/nemotron-3.5-lightning-free",
+      "name": "OpenCode Zen/Nemotron 3.5 Lightning Free"
+     },
+     {
+      "value": "opencode/space-bunny-free",
+      "name": "OpenCode Zen/Space Bunny Free"
+     }
+    ]
+   },
+   {
+    "id": "mode",
+    "name": "Session Mode",
+    "category": "mode",
+    "type": "select",
+    "currentValue": "build",
+    "options": [
+     {
+      "value": "build",
+      "name": "build",
+      "description": "The default agent. Executes tools based on configured permissions."
+     },
+     {
+      "value": "plan",
+      "name": "plan",
+      "description": "Plan mode. Disallows all edit tools."
+     }
+    ]
+   }
+  ]
+ }
+}
