@@ -28,7 +28,6 @@ struct AgentCard: View {
                            isUnread: agent.isUnread,
                            endedReason: agent.endedReason,
                            outcomeUnknown: agent.endingIsUnaccountedFor,
-                           isWaitingForAllowance: agent.allowanceWait != nil,
                            isParked: agent.parking?.isParked == true)
                     .padding(.top, 1)
 
@@ -123,6 +122,15 @@ struct AgentCard: View {
                     Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
                 }
                 .help(AgentsModel.carryOnHelp(for: agent))
+            }
+            // Here rather than over the chat, as on the Mac: the chat is for reading.
+            if agent.state != .archived {
+                Button {
+                    Task { await model.archive(agent.id) }
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+                .disabled(model.isStale)
             }
         }
         .accessibilityElement(children: .combine)

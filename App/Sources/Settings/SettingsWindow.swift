@@ -12,7 +12,7 @@ import SwiftUI
 /// one place to choose from.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("settingsPane") private var paneRaw = SettingsPane.appearance.rawValue
+    @AppStorage("settingsPane") private var paneRaw = SettingsPane.general.rawValue
     @AppStorage("settingsSharedPage") private var sharedPageRaw = SharedPage.overview.rawValue
     @AppStorage("settingsRuntimeID") private var runtimeIDRaw = RuntimeCatalog.claude.id
     /// Shared's snapshot lives here, not in its pane, because the rail shows its counts.
@@ -31,7 +31,7 @@ struct SettingsWindow: View {
 
     private var pane: Binding<SettingsPane> {
         Binding(
-            get: { SettingsPane(rawValue: paneRaw) ?? .appearance },
+            get: { SettingsPane(rawValue: paneRaw) ?? .general },
             set: { paneRaw = $0.rawValue })
     }
 
@@ -76,7 +76,7 @@ struct SettingsWindow: View {
         }
         .task { await control?.start() }
         .onDisappear { control?.stop() }
-        // Asked for from elsewhere in the app: the Pool page's "Edit the pool" (052).
+        // Asked for from elsewhere in the app: a link that names a Settings pane.
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
             pane.wrappedValue = asked
@@ -103,11 +103,10 @@ struct SettingsWindow: View {
     @ViewBuilder
     private var content: some View {
         switch pane.wrappedValue {
-        case .appearance: FormColumn { GeneralSettingsView() }
+        case .general: FormColumn { GeneralSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
-        case .pool: FormColumn { PoolSettingsView() }
         case .devices: FormColumn { DevicesPane() }
         #if AGENTS_STORE
         case .servers: EmptyView()
@@ -125,17 +124,14 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: String, Hashable, CaseIterable {
-    // Keep the old persisted raw value so Settings opens on the same pane after upgrade.
-    case appearance = "general"
-    case runtimes, shared, spending, pool, devices, servers, controlPlane
+    case general, runtimes, shared, spending, devices, servers, controlPlane
 
     var title: String {
         switch self {
-        case .appearance: "Appearance"
+        case .general: "General"
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
-        case .pool: "Pool"
         case .devices: "Devices"
         case .servers: "Servers"
         case .controlPlane: "Control plane"
@@ -144,25 +140,24 @@ enum SettingsPane: String, Hashable, CaseIterable {
 
     var symbol: String {
         switch self {
-        case .appearance: "circle.lefthalf.filled"
+        case .general: "gearshape"
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
-        case .pool: "arrow.triangle.swap"
         case .devices: "iphone"
         case .servers: "server.rack"
         case .controlPlane: "point.3.connected.trianglepath.dotted"
         }
     }
 
-    /// Appearance on its own; the panes about agents; Shared, drawn as a heading over its
+    /// General on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
     ///
     /// With a control plane, Devices and Servers fold into its one group (058, frame D):
     /// its hosts are the servers and its clients the devices.
     static var groups: [[SettingsPane]] {
         let ways: [SettingsPane] = ControlConfig.endpoint == nil ? [.devices, .servers] : [.controlPlane]
-        return [[.appearance], [.runtimes, .spending, .pool], [.shared], ways]
+        return [[.general], [.runtimes, .spending], [.shared], ways]
     }
 }
 

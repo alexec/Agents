@@ -56,7 +56,7 @@ public struct StoreLocations: Sendable {
     public static func personalHome(root: URL, environment: [String: String]) -> URL? {
         if let named = environment[personalHomeVariable], !named.isEmpty { return expand(named) }
         guard root.standardizedFileURL.path == standardRoot.standardizedFileURL.path else { return nil }
-        return FileManager.default.homeDirectoryForCurrentUser
+        return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)  // iOS has no homeDirectoryForCurrentUser
     }
     public static let rootArgument = "--root"
 
@@ -209,6 +209,9 @@ public struct StoreLocations: Sendable {
 
     public func record(_ id: UUID) -> URL { agent(id).appendingPathComponent("agent.json") }
     public func transcript(_ id: UUID) -> URL { agent(id).appendingPathComponent("transcript.jsonl") }
+    /// Each finished turn of the transcript, as the chat shows it by default. Derived,
+    /// so it may be deleted at any time and is built again from the transcript.
+    public func turns(_ id: UUID) -> URL { agent(id).appendingPathComponent("turns.jsonl") }
 
     public func createDirectories() throws {
         try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)

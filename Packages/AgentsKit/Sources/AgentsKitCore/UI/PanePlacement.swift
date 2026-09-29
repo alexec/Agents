@@ -18,9 +18,14 @@ public enum PanePlacement: Equatable, Sendable {
     /// The rule between the two columns.
     public static let divider = 1.0
 
+    /// What the conversation keeps beside a column: the chat's old comfortable
+    /// width, held here when the chat's cap widened, so an iPad still takes a pane
+    /// beside the chat at the window it did.
+    public static let conversationWidth = 660.0
+
     /// The narrowest window that takes a column: 660 + 360 + 1.
     public static var columnThreshold: Double {
-        ChatMetrics.comfortablePane + minimumPaneWidth + divider
+        conversationWidth + minimumPaneWidth + divider
     }
 
     /// - Parameter preferredPaneWidth: what the person last dragged the column to,

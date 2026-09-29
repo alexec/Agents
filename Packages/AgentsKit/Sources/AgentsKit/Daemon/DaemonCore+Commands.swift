@@ -701,8 +701,6 @@ extension DaemonCore {
     private func sendClaimed(_ next: QueuedPrompt, to agent: Agent) async throws {
         let agentID = agent.id
         let stopsBefore = stops[agentID, default: 0]
-        // On a runtime already known to be out, it moves first (052, FR-012).
-        await moveFirstIfOut(agentID)
         let session = try await liveSession(for: agents[agentID] ?? agent)
         // Stopped or archived while the runtime was starting. `stop` found nothing
         // to cancel then — no runtime yet, no turn — so this is where it is heard:
@@ -1042,12 +1040,6 @@ extension DaemonCore {
         // above is the user's words alone either way: the transcript says what was
         // said, not what we added to it.
         var outgoing = blocks
-        // A chat moved to this runtime with nothing re-sent carries its handoff on the
-        // first prompt it sends here (052, R4).
-        if let handoff = pendingHandoff.removeValue(forKey: agentID) {
-            outgoing.insert(Self.handoffBlock(handoff, agentID: agentID,
-                                              embedded: await session.initializeResult?.accepts.embeddedContext == true), at: 0)
-        }
         // What the app owes the agent about this prompt, and only the agent (042).
         if let preface { outgoing.insert(.text(preface), at: 0) }
         // Where it now works, when it has just been moved (053): first of all, so what
@@ -1200,9 +1192,7 @@ extension DaemonCore {
         // Stopped since this turn ended, while its runtime was being let go. `stop`
         // found nothing running and moved nothing, so this is where it is heard: no
         // question of the app's own, and what is queued stays queued, as stop promises.
-        guard stops[agentID, default: 0] == stopsBefore else { pendingCarry[agentID] = nil; return }
-        // Its allowance ran out and the pool has somewhere else to go (052).
-        if pendingCarry[agentID] != nil, await carryOnIfPending(agentID) { return }
+        guard stops[agentID, default: 0] == stopsBefore else { return }
         // A turn that crossed its limit leaves its queue exactly where it is, whatever
         // the limit says by the time the runtime has gone. Letting the agent go on is
         // the reader's second act (FR-018), and a ceiling raised in the seconds the
@@ -1346,8 +1336,6 @@ extension DaemonCore {
         if case .otherTyped = limit { runtimeFailed(agentID: agentID) }
         await move(agentID, on: ending)
         await releaseRuntime(for: agentID)
-        // Its allowance ran out and the pool has somewhere else to go (052).
-        if pendingCarry[agentID] != nil, await carryOnIfPending(agentID) { return }
         // A move asked for before the runtime fell over is still made, but nothing starts
         // by itself: the runtime failing is for the person to see first (053).
         await applyPendingMove(agentID)
@@ -1692,6 +1680,21 @@ extension DaemonCore {
         }
         // Somebody is reading it: whole while they do (051).
         if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
-        return try await store.transcript(for: request.agentID, before: request.before, limit: request.limit)
+        var limit = request.limit
+        if let from = request.from {
+            let end = min(request.before ?? Int.max, try await store.transcriptCount(for: request.agentID))
+            limit = max(0, min(limit, end - from))
+        }
+        return try await store.transcript(for: request.agentID, before: request.before, limit: limit)
+    }
+
+    /// The finished turns, as the chat shows them until one is opened.
+    public func turns(_ request: DaemonAPI.TurnsRequest) async throws -> TurnsPage {
+        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
+            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
+                               message: RetirementWords.retiredSentence(tombstone))
+        }
+        if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
+        return try await store.turns(for: request.agentID, before: request.before, limit: request.limit)
     }
 }

@@ -99,8 +99,6 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("l", modifiers: [.command, .option])
             Button("Spending") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
-            Button("Pool") { model.showsPool = true }
-                .keyboardShortcut("p", modifiers: [.command, .option])
             Divider()
             // A menu item rather than a shortcut on the button. The button only
             // exists while you are scrolled away from the end, which is precisely

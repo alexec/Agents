@@ -15,10 +15,6 @@ struct ChatActions {
     var open: @MainActor (ToolCallLocation) -> Void = { _ in }
     var terminalOutput: @MainActor (String) -> String = { _ in "" }
     var unqueue: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
-    /// Open the sheet that changes what a switch carried on with (052, FR-029).
-    var adjustSwitch: @MainActor (SwitchRecord) -> Void = { _ in }
-    /// Go to the Pool page (052).
-    var showPool: @MainActor () -> Void = {}
     /// Send a queued prompt into the running turn, and whether this runtime can take one
     /// there at all: what it advertised, by runtime id.
     var sendNow: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
@@ -32,6 +28,9 @@ struct ChatActions {
     var subagentSteps: (@MainActor (String) -> Void)? = nil
     /// Open what a background task printed, from its output file (057).
     var backgroundOutput: (@MainActor (BackgroundItem) -> Void)? = nil
+    /// Every entry of a finished turn, by where it sits in the transcript, for a turn
+    /// the chat opens from its summary.
+    var turnEntries: @MainActor (UUID, Range<Int>) async -> [TranscriptEntry] = { _, _ in [] }
 }
 
 extension EnvironmentValues {

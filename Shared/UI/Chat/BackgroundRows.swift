@@ -232,18 +232,18 @@ struct BackgroundEntryLine: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(line)
-                .appText(.supporting)
+                .appText(.reading)
                 .foregroundStyle((item.state == .failed ? StateTint.failure : .none).style(or: .secondary))
             if item.kind == .subagent, let steps = actions.subagentSteps {
                 Button("Steps") { steps(item.id) }
                     .linkStyle()
-                    .appText(.fine)
+                    .appText(.reading)
                     .help("See what this subagent did")
             }
             if item.outputFilePath != nil, !item.isRunning, let output = actions.backgroundOutput {
                 Button("Output") { output(item) }
                     .linkStyle()
-                    .appText(.fine)
+                    .appText(.reading)
                     .help("Open what it printed")
             }
         }

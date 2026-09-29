@@ -55,7 +55,7 @@ struct ContentView: View {
     }
 
     private var isShowingActivity: Bool {
-        model.showsEvents || model.showsResources || model.showsSpending || model.showsPool
+        model.showsEvents || model.showsResources || model.showsSpending
     }
 
     /// The projects column, the same in both layouts.
@@ -65,15 +65,6 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
             // A server asked for a credential there is none of (043).
             .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
-            // Moving a chat to another runtime by hand, or changing what a switch chose (052).
-            .sheet(item: $model.continuingWith) { request in ContinueWithSheet(request: request).paperSheet() }
-            .sheet(item: $model.adjustingSwitch) { record in
-                ContinueWithSheet(request: ContinueWith(
-                    agentID: record.agentID,
-                    entry: PoolEntry(id: record.to.entryID ?? UUID(), runtimeID: record.to.runtimeID,
-                                     payment: record.billing),
-                    adjust: true)).paperSheet()
-            }
             // A known server with a new key: rebuilt, or not what it says (043).
             #if !AGENTS_STORE
             .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
@@ -93,9 +84,7 @@ struct ContentView: View {
     /// chat picked in the middle column, or — with nothing picked — the project itself.
     @ViewBuilder
     private func detail(inPaneOf width: CGFloat) -> some View {
-        if model.showsPool {
-            PoolPage().paperGround()
-        } else if model.showsEvents {
+        if model.showsEvents {
             EventsView().paperGround()
         } else if model.showsResources {
             ResourcesView().paperGround()

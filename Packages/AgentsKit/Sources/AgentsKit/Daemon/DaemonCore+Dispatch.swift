@@ -465,6 +465,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.TranscriptRequest.self)
                 return .success(try JSONValue.encoding(try await transcript(request)))
 
+            case DaemonAPI.Method.agentsTurns:
+                let request = try require(params, as: DaemonAPI.TurnsRequest.self)
+                return .success(try JSONValue.encoding(try await turns(request)))
+
             case DaemonAPI.Method.changesList:
                 let request = try require(params, as: DaemonAPI.ChangesListRequest.self)
                 return .success(try JSONValue.encoding(try await changesList(request)))
@@ -523,41 +527,18 @@ extension DaemonCore {
                 let settings = try require(params, as: ClientPermissionSettings.self)
                 return .success(try JSONValue.encoding(try setClientPermissions(settings)))
 
-            case DaemonAPI.Method.poolState:
-                let request = (try? require(params, as: DaemonAPI.PoolStateRequest.self)) ?? .init()
-                // Someone is looking at the pool: ask what is left, behind the answer.
+            case DaemonAPI.Method.runtimesAllowances:
+                // Someone is looking at the runtimes: ask what is left, behind the answer.
                 Task { await self.measureAllowances() }
-                return .success(try JSONValue.encoding(await poolStatus(days: request.days)))
+                return .success(try JSONValue.encoding(runtimeAllowances()))
 
-            case DaemonAPI.Method.poolSet:
-                let pool = try require(params, as: PoolSettings.self)
-                return .success(try JSONValue.encoding(try await setPool(pool)))
-
-            case DaemonAPI.Method.poolMarkAvailable:
-                let request = try require(params, as: DaemonAPI.PoolMarkAvailable.self)
-                return .success(try JSONValue.encoding(await markPoolEntryAvailable(request.entryID)))
-
-            case DaemonAPI.Method.agentsContinueWith:
-                let request = try require(params, as: DaemonAPI.ContinueWithRequest.self)
-                return .success(try JSONValue.encoding(try await continueWith(request)))
+            case DaemonAPI.Method.runtimesMarkAvailable:
+                let request = try require(params, as: DaemonAPI.MarkRuntimeAvailable.self)
+                return .success(try JSONValue.encoding(markRuntimeAvailable(credentialKey: request.credentialKey)))
 
             case DaemonAPI.Method.poolApplyAllowances:
                 let request = try require(params, as: DaemonAPI.ApplyAllowances.self)
                 return .success(try JSONValue.encoding(applyAllowances(request.states)))
-
-            case DaemonAPI.Method.poolModels:
-                let request = try require(params, as: DaemonAPI.PoolModelsRequest.self)
-                return .success(try JSONValue.encoding(await poolModels(request.runtimeIDs)))
-
-            case DaemonAPI.Method.agentsSetSwitching:
-                let request = try require(params, as: DaemonAPI.SetSwitchingRequest.self)
-                await setSwitching(agentID: request.agentID, off: !request.isOn)
-                return .success(try JSONValue.encoding(agents[request.agentID]))
-
-            case DaemonAPI.Method.poolStopWaiting:
-                let request = try require(params, as: DaemonAPI.PoolStopWaiting.self)
-                await stopWaitingForAllowance(request.agentID)
-                return .success(try JSONValue.encoding(await poolStatus()))
 
             case DaemonAPI.Method.costSetLimits:
                 let request = try require(params, as: DaemonAPI.SetLimitsRequest.self)
@@ -676,6 +657,14 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsListHelpers:
                 let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)
                 return .success(["note": .string(try listHelpers(request))])
+
+            case DaemonAPI.Method.agentsListSessions:
+                let request = try require(params, as: DaemonAPI.ListSessionsRequest.self)
+                return .success(["note": .string(try listSessions(request))])
+
+            case DaemonAPI.Method.agentsReadSession:
+                let request = try require(params, as: DaemonAPI.ReadSessionRequest.self)
+                return .success(["note": .string(try await readSession(request))])
 
             case DaemonAPI.Method.agentsReportOutcome:
                 let request = try require(params, as: DaemonAPI.ReportOutcomeRequest.self)

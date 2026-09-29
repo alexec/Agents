@@ -59,29 +59,29 @@ Each of these is offered to every runtime, and shown for those that say they can
 
 ## When an allowance runs out
 
-With a pool set up, a chat whose runtime's allowance runs out carries on with the next runtime
-in it (see [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)).
-That needs the app to recognise the refusal, which it does per runtime:
+A chat whose runtime's allowance runs out stops there, with a note saying so, and the runtime
+is marked out for every chat to see in **Settings ▸ Agent Runtimes**. Nothing carries the chat
+on: to go on, start a new chat on another runtime and ask it to continue this one (see
+[Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)). A
+runtime that is out can still be sent a message; if that turn works, it is back.
+
+The app recognises the refusal per runtime:
 
 | Runtime | Spent allowance | Rate limit | When it is back |
 | --- | --- | --- | --- |
-| **Claude** | Recognised: Claude says so in a form the app reads. Paid extra usage starting counts as spent. | Recognised, and tried again on the same runtime: after 30 seconds, then 2 minutes. Three in ten minutes counts as spent. | Checked every four hours; its plan window is shown when known. |
+| **Claude** | Recognised: Claude says so in a form the app reads. Paid extra usage starting counts as spent. | Recognised, and tried again on the same chat: after 30 seconds, then 2 minutes. Three in ten minutes on one chat counts as spent. | Checked every four hours; its plan window is shown when known. |
 | **Codex** | Recognised, as for Claude, on this Mac and on a server that signs in through this Mac. | Recognised, as for Claude. | Checked every four hours; its plan window is shown when known. |
-| **Gemini** | Recognised from Google's sentence about the daily quota. On free or prepaid credit, also when the app's count of what it cost reaches the amount, or the credit's date passes. | Recognised from Google's 429. | Free tier: checked every four hours; its daily reset is shown. Credit: when you mark it available or raise the amount. |
-| **Antigravity** | Treated as a rate limit, since Google uses the same words for both: three in ten minutes counts as spent. | Recognised from "Resource has been exhausted". | Checked after four hours. |
-| **Copilot** | Recognised from "You have exceeded your monthly quota". | Not yet recognised. | Checked after four hours when spent without a window. |
-| **Grok** | Recognised from Grok's 402 "usage balance exhausted" (Build / SuperGrok). | Not yet recognised. | Checked after four hours when spent without a window. |
-| **Cursor** | Recognised from "Upgrade your plan to continue". | Not yet recognised. | Checked after four hours when spent without a window. |
+| **Gemini** | Recognised from Google's sentence about the daily quota, and from Google saying the key's credit is used up. | Recognised from Google's 429. | Checked every four hours; the free tier's daily reset is shown. |
+| **Antigravity** | Treated as a rate limit, since Google uses the same words for both: three in ten minutes counts as spent. | Recognised from "Resource has been exhausted". | Checked every four hours. |
+| **Copilot** | Recognised from "You have exceeded your monthly quota". | Not yet recognised. | Checked every four hours. |
+| **Grok** | Recognised from Grok's 402 "usage balance exhausted" (Build / SuperGrok). | Not yet recognised. | Checked every four hours; what is left of its plan is shown. |
+| **Cursor** | Recognised from "Upgrade your plan to continue". | Not yet recognised. | Checked every four hours. |
 
-An ordinary runtime error or crash also takes that runtime out of the pool. A later
-successful turn puts it back. Each availability check asks for a short reply on a small
-model in a read-only mode where the runtime offers one. A successful reply puts it back
-in the pool, even if the provider's stated reset time has not arrived. A failed check
-leaves it out and schedules another four hours later. The stated reset time alone never
-restores availability.
-
-An error the app does not recognise stops that turn. The runtime leaves the pool, so the
-next prompt can use another available runtime.
+A crash or an error the app does not recognise also marks the runtime out, and stops that
+turn. Each check asks for a short reply on a small model in a read-only mode where the runtime
+offers one. A reply puts the runtime back, even if the provider's stated reset time has not
+arrived; a failed check leaves it out and schedules another four hours later. The stated reset
+time alone never brings it back. **Mark available** does, at once.
 
 ## What each gets from `~/.agents`
 
@@ -110,4 +110,3 @@ has everything it always had.
 - [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
 - [Why agents' own tools are taken away](../explanation/scoped-tools.md)
 - [Tools the app gives agents](agent-tools.md)
-- [Why chats carry on when a plan runs out](../explanation/runtime-pool.md)

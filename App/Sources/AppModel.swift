@@ -67,7 +67,7 @@ final class AppModel {
     var elicitations: [ElicitationRequest] { work.elicitations }
     var entries: [TranscriptEntry] { work.entries }
     var transcriptItems: [TranscriptItem] { work.transcriptItems }
-    var transcriptHasMore: Bool { work.hasMoreBefore }
+    var transcriptHasMore: Bool { work.hasMoreOfTheConversation }
     var filesToShow: [UUID: ShownFile] { work.filesToShow }
     /// What the reader will allow and what today has cost. Nil until the daemon has
     /// said, which is how every surface knows to show nothing rather than a zero.
@@ -77,7 +77,7 @@ final class AppModel {
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     /// How long archived agents are kept (051). Nil from a daemon before 051.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
-    var poolStatus: PoolStatus? { work.poolStatus }
+    var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
     /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
     private(set) var clientPermissions = ClientPermissionSettings()
 
@@ -128,7 +128,6 @@ final class AppModel {
             guard showsSpending, showsSpending != oldValue else { return }
             showsResources = false
             showsEvents = false
-            showsPool = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -146,7 +145,6 @@ final class AppModel {
             guard showsResources, showsResources != oldValue else { return }
             showsSpending = false
             showsEvents = false
-            showsPool = false
             selection = nil
             openWorkflow = nil
         }
@@ -159,25 +157,6 @@ final class AppModel {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
             showsResources = false
-            showsPool = false
-            selection = nil
-            openWorkflow = nil
-        }
-    }
-
-    /// The switch whose settings the person is changing from its note (052, FR-029).
-    var adjustingSwitch: SwitchRecord?
-    /// A chat the person is moving to another runtime by hand (052, US5).
-    var continuingWith: ContinueWith?
-
-    /// Whether the window is showing the Pool page (052). A page like Resources, and not
-    /// persisted for the same reason.
-    var showsPool = false {
-        didSet {
-            guard showsPool, showsPool != oldValue else { return }
-            showsSpending = false
-            showsResources = false
-            showsEvents = false
             selection = nil
             openWorkflow = nil
         }
@@ -219,7 +198,6 @@ final class AppModel {
         showsSpending = false
         showsResources = false
         showsEvents = false
-        showsPool = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         } else if let gone = work.tombstones[agentID] {
@@ -245,7 +223,7 @@ final class AppModel {
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
         get {
-            showsPool ? .pool : showsEvents ? .events : showsResources ? .resources
+            showsEvents ? .events : showsResources ? .resources
                 : showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project)
         }
         set {
@@ -256,14 +234,11 @@ final class AppModel {
                 showResources()
             case .events:
                 showEvents()
-            case .pool:
-                showsPool = true
             case .project(let key):
                 showsSpending = false
                 showsResources = false
                 showsEvents = false
-                showsPool = false
-                showProject(key)
+                    showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
                 // come and go — must not empty the detail column. Nothing is picked
@@ -292,7 +267,6 @@ final class AppModel {
         showsSpending = false
         showsResources = false
         showsEvents = false
-        showsPool = false
         select(key)
         selection = nil
         openWorkflow = nil
@@ -898,104 +872,29 @@ final class AppModel {
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
 
-    /// The pool and each credential's state (052).
-    func refreshPoolStatus(days: Int? = nil) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
+    /// Every runtime's state on this Mac (065, US4). Asking also asks Grok what is left.
+    func refreshRuntimeAllowances() async {
+        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesAllowances, Optional<String>.none,
+                                                      returning: RuntimeAllowances.self) else { return }
+        work.replaceRuntimeAllowances(allowances)
     }
 
-    /// Keep a new pool. Returns the daemon's sentence when it will not (FR-001a, FR-032).
-    func setPool(_ pool: PoolSettings) async -> String? {
-        do {
-            let status = try await client.call(DaemonAPI.Method.poolSet, pool, returning: PoolStatus.self)
-            work.replacePoolStatus(status)
-            // Every connected server carries its chats on by the same pool (052, R6).
-            for host in hosts.hosts.all where !hosts.isOffline(host.id) {
-                _ = try? await client(for: host.id).call(DaemonAPI.Method.poolSet, status.settings,
-                                                         returning: PoolStatus.self)
-            }
-            return nil
-        } catch let error as JSONRPCError {
-            return error.message
-        } catch {
-            return "\(error)"
-        }
-    }
-
-    /// What moving a chat would carry, or what an automatic switch carried (052, US5).
-    /// Nothing changes.
-    func previewContinue(_ request: ContinueWith, choices: [String: JSONValue] = [:])
-        async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
-        await continueWith(request, choices: choices, confirmed: false)
-    }
-
-    /// Move the chat, or change what it carried on with. The daemon's sentence when it
-    /// will not.
-    func applyContinue(_ request: ContinueWith, choices: [String: JSONValue],
-                       remember: DaemonAPI.ContinueWithRequest.Remember? = nil) async -> String? {
-        switch await continueWith(request, choices: choices, confirmed: true, remember: remember) {
-        case .success: return nil
-        case .failure(let error): return error.message
-        }
-    }
-
-    private func continueWith(_ request: ContinueWith, choices: [String: JSONValue], confirmed: Bool,
-                              remember: DaemonAPI.ContinueWithRequest.Remember? = nil)
-        async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
-        let call = DaemonAPI.ContinueWithRequest(
-            agentID: request.agentID,
-            entryID: request.adjust ? nil : request.entry.id,
-            runtimeID: request.adjust ? nil : request.entry.runtimeID,
-            adjust: request.adjust, choices: choices, confirmed: confirmed, remember: remember)
-        do {
-            let result = try await client.call(DaemonAPI.Method.agentsContinueWith, call,
-                                               returning: DaemonAPI.ContinueWithResult.self)
-            return .success(result)
-        } catch let error as JSONRPCError {
-            return .failure(error)
-        } catch {
-            return .failure(JSONRPCError(code: -32603, message: "\(error)"))
-        }
-    }
-
-    /// The model options each runtime offers, for Matching models' menus (052, US6).
-    func poolModels(_ runtimeIDs: [String]) async -> [String: [ConfigOption]] {
-        (try? await client.call(DaemonAPI.Method.poolModels, DaemonAPI.PoolModelsRequest(runtimeIDs: runtimeIDs),
-                                returning: [String: [ConfigOption]].self)) ?? [:]
-    }
-
-    /// A chat's own "carry on when this runs out" (052, FR-003).
-    func setSwitching(_ agentID: UUID, isOn: Bool) async {
-        _ = try? await client.call(DaemonAPI.Method.agentsSetSwitching,
-                                   DaemonAPI.SetSwitchingRequest(agentID: agentID, isOn: isOn),
-                                   returning: Agent?.self)
+    /// The person says a runtime is back, by its credential (065).
+    func markRuntimeAvailable(_ credentialKey: String) async {
+        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesMarkAvailable,
+                                                      DaemonAPI.MarkRuntimeAvailable(credentialKey: credentialKey),
+                                                      returning: RuntimeAllowances.self) else { return }
+        work.replaceRuntimeAllowances(allowances)
     }
 
     /// The Mac's word on the plans it relays, to every connected server (052, R6).
-    private func sendSharedAllowances(_ status: PoolStatus) async {
-        let shared = status.shared ?? []
+    private func sendSharedAllowances(_ allowances: RuntimeAllowances) async {
+        let shared = allowances.shared ?? []
         guard !shared.isEmpty else { return }
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
             _ = try? await client(for: host.id).call(DaemonAPI.Method.poolApplyAllowances,
                                                      DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
         }
-    }
-
-    /// A chat stops waiting for an allowance (052, US4).
-    func stopWaiting(_ agentID: UUID) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolStopWaiting,
-                                                  DaemonAPI.PoolStopWaiting(agentID: agentID),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
-    }
-
-    /// The person says a runtime is back: bought more credit, a new month began (FR-023).
-    func markPoolEntryAvailable(_ entryID: UUID) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolMarkAvailable,
-                                                  DaemonAPI.PoolMarkAvailable(entryID: entryID),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
     }
 
     func refreshRetentionState() async {
@@ -1379,7 +1278,7 @@ final class AppModel {
             if case .projectChanged = update { settleProjectSelection() }
             // And the other way: every server hears what the Mac learned about a plan it
             // relays (052, R6). Only a newer word changes anything there.
-            if case .poolChanged(let status) = update { await sendSharedAllowances(status) }
+            if case .runtimeAllowancesChanged(let allowances) = update { await sendSharedAllowances(allowances) }
             if case .attention(let change) = update { await notifier.apply(change) }
             return
         }
@@ -1582,6 +1481,16 @@ final class AppModel {
         // the model: a server's spending is kept beside it, and a server's wakefulness,
         // modes and notices have no place in this window (037).
         switch method {
+        case DaemonAPI.Notification.runtimesAllowancesChanged:
+            // A server's runtimes are its own; this window shows the Mac's (065). What it
+            // learned about a plan the Mac relays is the Mac's to know too (052, R6): its
+            // Codex spends the Mac's ChatGPT plan, so a refusal there is the Mac's plan out.
+            let shared = (try? params?.decode(RuntimeAllowances.self))?.shared ?? []
+            if !shared.isEmpty {
+                _ = try? await client.call(DaemonAPI.Method.poolApplyAllowances,
+                                           DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
+            }
+            return
         case DaemonAPI.Notification.costChanged:
             serverCosts[host] = try? params?.decode(DaemonAPI.CostState.self)
             noteServerSpent(host)
@@ -1596,18 +1505,6 @@ final class AppModel {
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged:
-            return
-        case DaemonAPI.Notification.poolChanged:
-            // A server's pool page is not this window's. What it learned about a plan the
-            // Mac relays to it is the Mac's to know too (052, R6): its Codex spends the
-            // Mac's ChatGPT plan, so a refusal there is the Mac's plan out.
-            if let status = try? params?.decode(PoolStatus.self) {
-                let shared = status.shared ?? []
-                if !shared.isEmpty {
-                    _ = try? await client.call(DaemonAPI.Method.poolApplyAllowances,
-                                               DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
-                }
-            }
             return
         default:
             break
@@ -1661,11 +1558,10 @@ final class AppModel {
         // And Cursor/Grok permission mode (061).
         _ = try? await server.call(DaemonAPI.Method.clientPermissionsSet, clientPermissions,
                                    returning: ClientPermissionSettings.self)
-        // And the pool, so a server chat carries on as a Mac one does (052, R6), with
-        // what the Mac knows of the plans it relays.
-        if let status = work.poolStatus {
-            _ = try? await server.call(DaemonAPI.Method.poolSet, status.settings, returning: PoolStatus.self)
-            let shared = status.shared ?? []
+        // And what the Mac knows of the plans it relays (052, R6): a server's Codex
+        // spends the Mac's ChatGPT plan, so the Mac's word that it is out is the server's.
+        if let allowances = work.runtimeAllowances {
+            let shared = allowances.shared ?? []
             if !shared.isEmpty {
                 _ = try? await server.call(DaemonAPI.Method.poolApplyAllowances,
                                            DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
@@ -1721,7 +1617,7 @@ final class AppModel {
         async let cost: Void = refreshCostState()
         async let retention: Void = refreshRetentionState()
         async let clientPermissions: Void = refreshClientPermissions()
-        async let pool: Void = refreshPoolStatus()
+        async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let leases: Void = refreshLeases()
@@ -1730,7 +1626,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, pool)
+                   transcript, runtimeStates)
         #if DEBUG
         openFromLaunchArguments()
         #endif
@@ -2093,25 +1989,56 @@ final class AppModel {
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
         await attempt {
-            let page = try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsTranscript,
-                                                  DaemonAPI.TranscriptRequest(agentID: selection),
-                                                  returning: TranscriptPage.self)
+            let client = self.client(forAgent: selection)
+            // The finished turns first, as summaries; then the transcript from where the
+            // turn in progress starts. A daemon too old to keep turns gives the lot.
+            let turns = (try? await client.call(DaemonAPI.Method.agentsTurns,
+                                                DaemonAPI.TurnsRequest(agentID: selection),
+                                                returning: TurnsPage.self))
+                ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
+            let page = try await client.call(DaemonAPI.Method.agentsTranscript,
+                                             DaemonAPI.TranscriptRequest(agentID: selection, from: turns.openStart),
+                                             returning: TranscriptPage.self)
             // Clicking through chats quickly can have the answer for the last one
             // arrive after the next was picked. It is dropped, not shown under the
             // wrong name.
             guard self.selection == selection else { return }
+            self.work.replaceTurns(with: turns)
             self.work.replaceTranscript(with: page)
         }
+    }
+
+    /// Every entry of a finished turn, for the chat to open it.
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
+        let page = try? await client(forAgent: agentID).call(
+            DaemonAPI.Method.agentsTranscript,
+            DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
+                                        limit: range.count, from: range.lowerBound),
+            returning: TranscriptPage.self)
+        return page?.entries ?? []
     }
 
     /// The window only ever asks for a page. A transcript that has been going for hours
     /// is not something to load whole.
     func loadEarlier() async {
-        guard let selection, work.hasMoreBefore else { return }
+        guard let selection, work.hasMoreOfTheConversation else { return }
+        // Past the start of the turn in progress, the turns before it.
+        if !work.hasMoreBefore {
+            await attempt {
+                let turns = try await self.client(forAgent: selection).call(
+                    DaemonAPI.Method.agentsTurns,
+                    DaemonAPI.TurnsRequest(agentID: selection, before: self.work.firstTurn),
+                    returning: TurnsPage.self)
+                guard self.selection == selection else { return }
+                self.work.prependTurns(turns)
+            }
+            return
+        }
         await attempt {
             let page = try await self.client(forAgent: selection).call(
                 DaemonAPI.Method.agentsTranscript,
-                DaemonAPI.TranscriptRequest(agentID: selection, before: self.work.firstEntryIndex),
+                DaemonAPI.TranscriptRequest(agentID: selection, before: self.work.firstEntryIndex,
+                                            from: self.work.openTurnStart),
                 returning: TranscriptPage.self)
             // The same as `loadTranscript`: an earlier page of a chat no longer open
             // does not belong on top of the one that is.

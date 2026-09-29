@@ -62,39 +62,21 @@ struct AllowanceStateTests {
 
     @Test func aRateLimitIsNotOut() {
         var state = state()
-        let persisted = state.rateLimited(now: now, retryAt: now.addingTimeInterval(30), payment: .allowance(label: nil))
-        #expect(!persisted)
+        state.rateLimited(now: now, retryAt: now.addingTimeInterval(30))
         #expect(!state.isOut)
         #expect(state.isUsable(now: now))
     }
 
-    @Test func threeRateLimitsInTenMinutesAreOut() {
-        var state = state()
-        let payment = Payment.allowance(label: nil)
-        let r1 = state.rateLimited(now: now, retryAt: now.addingTimeInterval(30), payment: payment)
-        #expect(!r1)
-        let r2 = state.rateLimited(now: now.addingTimeInterval(30), retryAt: now.addingTimeInterval(150), payment: payment)
-        #expect(!r2)
-        let r3 = state.rateLimited(now: now.addingTimeInterval(150), retryAt: now.addingTimeInterval(180), payment: payment)
-        #expect(r3)
-        guard case .out(nil, let retry?, .rateLimitPersisted) = state.status else { Issue.record("\(state.status)"); return }
-        #expect(retry == now.addingTimeInterval(150 + 4 * 3600))
-    }
-
-    @Test func rateLimitsFarApartDoNotAddUp() {
-        var state = state()
-        let payment = Payment.allowance(label: nil)
-        _ = state.rateLimited(now: now, retryAt: now, payment: payment)
-        _ = state.rateLimited(now: now.addingTimeInterval(700), retryAt: now, payment: payment)
-        let r4 = state.rateLimited(now: now.addingTimeInterval(1400), retryAt: now, payment: payment)
-        #expect(!r4)
-    }
-
-    @Test func usedUpCreditNeverComesBackOnATimer() {
+    /// The provider said the key's credit is used up. There is no ledger to wait on
+    /// (065): it is checked every four hours like any other runtime, and never simply
+    /// comes back with time.
+    @Test func usedUpCreditIsCheckedLikeAnyOtherAndNeverComesBackOnATimer() {
         var state = state()
         let payment = Payment.prepaid(amount: Cost(amount: 10, currency: "USD"), expires: nil)
         state.markOut(.creditUsedUp, until: nil, payment: payment, now: now, from: .words)
-        #expect(state.returnsAt == nil)
+        guard case .out(nil, let retry?, .creditUsedUp) = state.status else { Issue.record("\(state.status)"); return }
+        #expect(retry == now.addingTimeInterval(AllowanceState.retryWithoutATime))
+        #expect(PoolWords.state(state, now: now).hasPrefix("Credit used up · checking after "))
         #expect(!state.isUsable(now: now.addingTimeInterval(365 * 86400)))
         let changed = state.settle(now: now.addingTimeInterval(365 * 86400))
         #expect(!changed)
@@ -129,35 +111,6 @@ struct AllowanceStateTests {
         #expect(state.learnedFrom == .person)
     }
 
-    @Test func creditIsUsedUpByTheLedgerBeforeTheProviderSaysSo() {
-        var state = state()
-        let payment = Payment.prepaid(amount: Cost(amount: Decimal(string: "0.05")!, currency: "USD"), expires: nil)
-        let turn = Cost(amount: Decimal(string: "0.03")!, currency: "USD")
-        let r5 = state.add(cost: turn, payment: payment, now: now)
-        #expect(!r5)
-        let r6 = state.add(cost: turn, payment: payment, now: now)
-        #expect(r6)
-        guard case .out(nil, nil, .creditUsedUp) = state.status else { Issue.record("\(state.status)"); return }
-    }
-
-    @Test func aRuntimeThatNeverSaysWhatItCostIsUnknownNotZero() {
-        var state = state()
-        let payment = Payment.freeCredit(amount: Cost(amount: 1, currency: "USD"), expires: nil)
-        let r7 = state.add(cost: nil, payment: payment, now: now)
-        #expect(!r7)
-        #expect(state.spent == .unknown)
-        let r8 = state.add(cost: Cost(amount: 5, currency: "USD"), payment: payment, now: now)
-        #expect(!r8)
-    }
-
-    @Test func anExpiredGrantIsOut() {
-        var state = state()
-        let payment = Payment.freeCredit(amount: nil, expires: now.addingTimeInterval(-60))
-        let r9 = state.checkExpiry(payment: payment, now: now)
-        #expect(r9)
-        guard case .out(nil, nil, .creditExpired) = state.status else { Issue.record("\(state.status)"); return }
-    }
-
     @Test func aRelayedPlanIsTheSamePlan() {
         let mac = PoolEntry(runtimeID: "codex", payment: .allowance(label: "ChatGPT plan"))
         let server = PoolEntry(runtimeID: "codex", payment: .allowance(label: "ChatGPT plan"))
@@ -183,5 +136,33 @@ struct AllowanceStateTests {
         #expect(DaemonCore.probeModel(in: codex)?.name == "6 Luna")
         // Nothing says it is small: keep the runtime's own default.
         #expect(DaemonCore.probeModel(in: [choice("big", "Big"), choice("bigger", "Bigger")]) == nil)
+    }
+}
+
+/// Three rate limits within ten minutes, on one chat, is a limit that persists (065,
+/// T013). The streak is the chat's, kept by the daemon per agent; this is its arithmetic.
+@Suite("A chat's rate-limit streak")
+struct RateLimitStreakTests {
+    private let policy = RateLimitPolicy.standard
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+
+    @Test func theThirdWithinTheWindowPersists() {
+        var streak: [Date] = []
+        var persists = false
+        for minute in [0.0, 2, 4] {
+            (streak, persists) = policy.streak(streak, adding: start.addingTimeInterval(minute * 60))
+        }
+        #expect(persists)
+    }
+
+    @Test func refusalsOutsideTheWindowDoNotCount() {
+        let old = [start, start.addingTimeInterval(60)]
+        let (streak, persists) = policy.streak(old, adding: start.addingTimeInterval(630))
+        #expect(!persists)
+        #expect(streak.count == 2, "the first fell out of the window")
+    }
+
+    @Test func twoAreNotYetAStreak() {
+        #expect(!policy.streak([start], adding: start.addingTimeInterval(30)).persists)
     }
 }

@@ -58,13 +58,12 @@ struct ChatMetricsTests {
         #expect(metrics.measure > metrics.padding * 4)
     }
 
-    @Test func theDefaultWindowWithTheSidebarShutBarelyChanges() {
-        // 860 is the pane with the sidebar shut, where the old gutter gave 572 of
-        // text. The cap is set beside that so the look at the default size holds.
+    @Test func theDefaultWindowWithTheSidebarShutIsAllText() {
+        // 860 is the pane with the sidebar shut. Under the wider cap it is short of
+        // the cap, so the whole pane is text inside the padding.
         let metrics = ChatMetrics.forPane(width: 860)
-        #expect(metrics.measure == ChatMetrics.measureCap)
-        #expect(abs(metrics.measure - 572) <= 12)
-        #expect(metrics.padding == ChatMetrics.widePadding)
+        #expect(metrics.measure < ChatMetrics.measureCap)
+        #expect(metrics.measure == 860 - metrics.padding * 2)
     }
 
     @Test func aWidePaneCentresTheSurplus() {

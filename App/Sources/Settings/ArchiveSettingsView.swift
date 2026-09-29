@@ -4,7 +4,7 @@ import AgentsKit
 #endif
 import SwiftUI
 
-/// Settings ▸ Appearance ▸ Archived agents (051): how long archived agents are kept, and how
+/// Settings ▸ General ▸ Archived agents (051): how long archived agents are kept, and how
 /// much space they may take, before the oldest are retired.
 ///
 /// The pickers show what the daemon holds, not what was last clicked. A change that

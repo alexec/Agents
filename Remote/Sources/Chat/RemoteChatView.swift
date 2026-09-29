@@ -35,8 +35,9 @@ struct RemoteChatView: View {
             if let agent {
                 ChatTranscript(agent: agent,
                                items: model.transcriptItems,
-                               hasMore: model.hasMoreBefore,
-                               entryCount: model.entries.count,
+                               stored: model.work.turns,
+                               hasMore: model.work.hasMoreOfTheConversation,
+                               entryCount: model.entries.count + model.work.turns.count,
                                isComingBack: model.isComingBack(agent),
                                settleKey: model.selection,
                                loadEarlier: { await model.loadEarlier() },
@@ -70,16 +71,6 @@ struct RemoteChatView: View {
                 // The agent asked to be looked at while something was being typed: said
                 // here, to be opened when the person chooses (034 FR-005).
                 if let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }
-            }
-        }
-        // Moving this chat by hand, or changing what a switch chose, and the Pool (052).
-        .sheet(item: Binding(get: { model.continuing }, set: { model.continuing = $0 })) { request in
-            ContinueWithList(request: request)
-        }
-        .sheet(isPresented: Binding(get: { model.isShowingPool }, set: { model.isShowingPool = $0 })) {
-            NavigationStack {
-                PoolPageView()
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { model.isShowingPool = false } } }
             }
         }
         .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
@@ -119,10 +110,8 @@ struct RemoteChatView: View {
             if wanted != nil { model.openFileTheAgentWants() }
         }
         .toolbar {
-            // The Mac's two verbs, where the Mac has them (033). Stop keeps the chat
-            // on screen, because someone who stops a chat that has gone the wrong way
-            // wants to keep reading it and say what next. Archive goes back to the
-            // project, because the thing being read has been put away.
+            // Stop is the prompt's own button while the agent works, as on the Mac;
+            // Archive is on the session's row.
             // Blocked (039): the card's Carry on, where the chat's own controls are.
             if let agent, model.isBlocked(agent) {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -133,31 +122,6 @@ struct RemoteChatView: View {
                     }
                     .disabled(model.isStale)
                     .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
-                }
-            }
-            if let agent, model.canStop(agent) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await model.stop(agent.id) }
-                    } label: {
-                        Label("Stop", systemImage: "stop.circle")
-                    }
-                    .disabled(model.isStale)
-                    .accessibilityHint("Stops this agent and stays on the chat")
-                }
-            }
-            if let agent, agent.state != .archived {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task {
-                            await model.archive(agent.id)
-                            model.selection = nil
-                        }
-                    } label: {
-                        Label("Archive", systemImage: "archivebox")
-                    }
-                    .disabled(model.isStale)
-                    .accessibilityHint("Archives this session and goes back to the project")
                 }
             }
             if let agent {
@@ -236,15 +200,12 @@ struct RemoteChatView: View {
             },
             terminalOutput: { [model] id in model.terminalOutput(id) },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
-            adjustSwitch: { [model] record in
-                model.continuing = RemoteContinue(agentID: record.agentID, runtimeID: record.to.runtimeID, adjust: true)
-            },
-            showPool: { [model] in model.isShowingPool = true },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
-            subagentSteps: { id in subagentOnScreen = id })
+            subagentSteps: { id in subagentOnScreen = id },
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
     }
 }
 
@@ -257,31 +218,6 @@ private struct ChatMenu: View {
     var body: some View {
         Menu {
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
-            // Another runtime, by hand, and this chat's own "carry on" switch (052).
-            Menu("Continue with", systemImage: "arrow.triangle.swap") {
-                Toggle("Carry on when \(PoolWords.runtimeName(agent.runtimeID)) runs out",
-                       isOn: Binding(get: { !agent.switchingOff },
-                                     set: { on in Task { await model.setSwitching(agent.id, isOn: on) } }))
-                ForEach((model.poolStatus?.rows ?? []).filter { $0.entry.runtimeID != agent.runtimeID }) { row in
-                    Button(PoolWords.runtimeName(row.entry.runtimeID)) {
-                        model.continuing = RemoteContinue(agentID: agent.id, runtimeID: row.entry.runtimeID,
-                                                          entryID: row.entry.id)
-                    }
-                }
-            }
-            .disabled(model.isStale)
-            // Park goes back to the project, as on the Mac: the person is done with it
-            // for now (040).
-            if let action = agent.parkAction {
-                Button(ParkWords.label(action), systemImage: ParkWords.symbol(action)) {
-                    Task {
-                        await model.perform(action, on: agent.id)
-                        if action == .park { model.selection = nil }
-                    }
-                }
-                .disabled(model.isStale)
-                .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
-            }
             if agent.state == .archived {
                 Divider()
                 Button("Bring Back", systemImage: "tray.and.arrow.up") {
