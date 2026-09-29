@@ -57,3 +57,32 @@ start now leaves a note and is forgotten (48961b13), for every runtime.
   the "To sign a provider out, run … auth logout" line while it reads ready.
 - Settings ▸ Agent Runtimes: OpenCode's Ask / Always approve row.
 - The set-up sheet's row, the chat, the menus and the meter (from the first walk).
+
+# Walk: US5 servers (T034), 2026-09-29
+
+Scratch root `/tmp/run-oc7`, built from `75f47b9c` with the Linux helpers rebuilt, the scratch
+app's `XDG_*` under `/tmp/run-oc7home`, whose `auth.json` held a **fake** Anthropic key (`api`)
+and a fake OpenAI browser sign-in (`oauth`). The server was `agents-devbox` (Linux aarch64, glibc
+2.36, no AVX2), seeded with a fake Groq key of its own in `~/.local/share/opencode/auth.json`.
+Turns went over the window's forward on a connection of the walk's own, which offered and lent the
+way the window does (the window's reading of `auth.json` is `OpenCodeFileSignInTests`).
+
+| Step | Result |
+|---|---|
+| OpenCode installed on the scratch Mac, window connects | `opencode installing` → `ready("c6fda4c6c21060d9")` in 8 s: the Mac downloaded, checked and streamed it; `ok`, `manifest.json`, `bin/opencode`, `current` swapped; `opencode --version` on the box: 1.18.33 |
+| A Zen turn ("run uname -sm") | asked before `uname -sm`; "Linux aarch64"; answered and called `finish_turn`, 12 s |
+| A start with the sign-in offered | refused first with `credentialWanted` (offered), started nothing; after `credentials/lendSignIn`, started once |
+| That run's model menu | anthropic 19 (lent), groq 16 (the server's own, kept under it), opencode 8; **no openai**: the browser sign-in stayed on the Mac |
+| A turn on `anthropic/claude-haiku-4-5` | "A provider refused the key this Mac lent OpenCode. Sign in to it again on the Mac with opencode auth login, then send again." ended `signInRefused`, not "stopped answering" |
+| `grep -r` for the lent key in `~`, `/tmp`, `/var/tmp` on the box | **0 files**; nor the kept sign-in; the only `auth.json` is the server's own, unchanged |
+| An "own sign-in only" connection | `credentials/lendSignIn` refused (notOffered); the run had groq 16 + opencode 8 only |
+| The scratch Mac root | the lent key in no file |
+
+Measured on the way (research R12): `OPENCODE_AUTH_CONTENT` **replaces** `auth.json`, it does
+not add to it. Hence the merge of the server's own non-rotating entries under the lent ones.
+
+Seen and not this branch's: the devbox has no `xz`, so Codex's Node toolset fails there with
+tar's own words; `ToolsetInstaller.refusal` does not check for `xz`.
+
+Not walked: a turn that a lent provider answers (no real key on this Mac), a musl server, and the
+install progress line in Settings ▸ Servers on screen.

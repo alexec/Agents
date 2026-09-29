@@ -223,10 +223,10 @@ sign-ins per run.
 
 **Independent test**: quickstart §9 (test-servers skill, `agents-devbox`).
 
-- [ ] T028 [US5] Report the facts the chooser needs in the server's platform probe
+- [x] T028 [US5] Report the facts the chooser needs in the server's platform probe
   (`Kit/Hosts/`, the code that fills `Architecture`): `musl` if `/lib/ld-musl-*` exists, and
   `avx2` from `/proc/cpuinfo`. Carry them to `platformKey(for:)`.
-- [ ] T029 [US5] Build the new `Kit/Hosts/ServerArchiveInstaller.swift`:
+- [x] T029 [US5] Build the new `Kit/Hosts/ServerArchiveInstaller.swift`:
   1. The Mac side downloads the asset for the server's key and checks its size and SHA-256.
   2. It streams the unpacked folder over the existing ssh with `tar -cz` into
      `<server root>/tools/<id>/.part-<id>`.
@@ -236,9 +236,9 @@ sign-ins per run.
   A failure leaves nothing half-installed. Wire it where `Kit/Hosts/ToolsetInstaller.swift`
   dispatches Node toolsets. It must serve any archive manifest, so Antigravity's T036 can reuse
   it.
-- [ ] T030 [P] [US5] Add a test in `Tests/Integration/ServerArchiveInstallerTests.swift` with the
+- [x] T030 [P] [US5] Add a test in `Tests/Integration/ServerArchiveInstallerTests.swift` with the
   fake ssh: a failure mid-stream leaves no `current` change, and a success writes `ok` last.
-- [ ] T031 [US5] Add the new `App/Sources/Hosts/OpenCodeFileSignIn.swift`:
+- [x] T031 [US5] Add the new `App/Sources/Hosts/OpenCodeFileSignIn.swift`:
   - read `$XDG_DATA_HOME/opencode/auth.json`, or else `~/.local/share/opencode/auth.json`;
   - keep only entries whose `type` is `"api"` or `"wellknown"`, and count the others by name;
   - produce compact JSON for `OPENCODE_AUTH_CONTENT`;
@@ -246,7 +246,7 @@ sign-ins per run.
 
   Test it in `Tests/Unit/OpenCodeFileSignInTests.swift`, including an `oauth` entry that is
   dropped and named.
-- [ ] T032 [US5] Lend it through `credentials/lend`, for OpenCode runs on that server only:
+- [x] T032 [US5] Lend it through `credentials/lend`, for OpenCode runs on that server only:
   - `App/Sources/Hosts/SignInRelays.swift` / `HostSet.swift` (`serverRuntimes` :527 offers
     OpenCode even with nothing to lend, since the Zen models need nothing);
   - `Kit/Daemon/DaemonCore+Credentials.swift` (`launchEnvironment(for:)` →
@@ -254,10 +254,10 @@ sign-ins per run.
 
   An "own sign-in only" server is lent nothing. Test that the variable never reaches another
   runtime's process or a Mac-side OpenCode process.
-- [ ] T033 [US5] Refused-key wording on a server: T025's refused sign-in on a server run says
+- [x] T033 [US5] Refused-key wording on a server: T025's refused sign-in on a server run says
   the provider refused the Mac's sign-in, and names `opencode auth login` on the Mac. The sheet
   lists the sign-ins that were not lent, and why.
-- [ ] T034 [US5] Walk on `agents-devbox` (test-servers skill; quickstart §9), from a scratch Mac
+- [x] T034 [US5] Walk on `agents-devbox` (test-servers skill; quickstart §9), from a scratch Mac
   home whose `auth.json` holds a test key:
   - the install progress shows;
   - a Zen turn works;

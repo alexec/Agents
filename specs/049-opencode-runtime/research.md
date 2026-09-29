@@ -151,3 +151,12 @@ or the git folder, each measured.
 
 So `RuntimeLaunchCatalog.opencode` gives it `TMPDIR=<root>/runtimes/opencode/tmp`, made (0700)
 before launch like a `*_HOME`.
+
+## R12. `OPENCODE_AUTH_CONTENT` replaces the file (measured 2026-09-29)
+
+On 1.18.33, with a scratch `auth.json` holding Groq and the variable holding Anthropic, `opencode
+auth list` and `opencode models` showed Anthropic only. The variable is read *instead of* the file.
+So a server run is given the Mac's lendable entries over the server's own lendable ones (a
+provider in both takes the Mac's). The server's own `oauth` entries are left out of a lent run:
+refreshing one, OpenCode writes the whole set back to the file, which would put the Mac's keys on
+the server's disk.
