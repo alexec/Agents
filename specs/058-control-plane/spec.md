@@ -186,7 +186,10 @@ there. Start a turn in a project on it, and list projects from a second client a
    reconnects by itself, and its agents kept working the whole time.
 3. **Given** a host is removed, **Then** its key stops working at once, it disappears from every
    client, and its agents are left as they are.
-4. **Given** a host older than the control plane, **Then** it is shown as needing an update,
+4. **Given** an operator gives an ssh destination instead, **When** the control plane has
+   installed the host there, **Then** the host enrols and connects out, and the control plane
+   holds no ssh session or key for it.
+5. **Given** a host older than the control plane, **Then** it is shown as needing an update,
    and calls it does not know are refused with that reason.
 
 ---
@@ -395,6 +398,10 @@ Mac, and see its projects under their own heading.
   enrolled with a host code. The control plane MUST NOT need to reach a host.
 - **FR-018**: Adding a server MUST mean running one command on it, shown with a host code by an
   operator client. The command installs the host and enrols it.
+- **FR-018a**: An operator MAY instead have the control plane install the host over ssh. The
+  person gives the destination, and a key the control plane may use for that install only. The
+  control plane MUST keep neither the key nor the session afterwards. The host MUST then enrol
+  and connect out like any other.
 - **FR-019**: A host MUST reconnect by itself after the connection drops, to any copy, and MUST
   keep its agents working while disconnected.
 - **FR-020**: Removing a host MUST revoke its key at once and MUST NOT stop or delete its agents.
@@ -536,11 +543,10 @@ Mac, and see its projects under their own heading.
   There is no new kind of cryptography.
 - **Addresses.** The control plane has one stable address (a name, not a list of IP addresses).
   Codes, clients and hosts carry that address.
-- **Servers over ssh.** A server that cannot reach the control plane over HTTPS is out of scope.
-  So is a control plane installing hosts over ssh.
-  - Both were in the first spec and were built.
-  - They go, because a control plane running as several copies in rented hosting should hold no
-    one person's ssh keys or live ssh sessions.
+- **Servers over ssh.** ssh is used only to install a host (FR-018a), then let go. A server that
+  cannot reach the control plane over HTTPS is out of scope: hosts reached over ssh were in the
+  first spec and are dropped. A control plane running as several copies in rented hosting holds
+  no live ssh sessions.
 - **Relay and notifications.** These stay Apple-only (iCloud) and need a Mac host. A set-up with
   no Mac host has neither: its devices reach the control plane only at its address and get no
   pushes.

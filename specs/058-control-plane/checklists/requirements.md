@@ -40,6 +40,5 @@
   - who it serves: one person now, a team later;
   - away from home: keep the iCloud relay;
   - notifications: the iCloud mailbox.
-- **For Alex to confirm.** One choice was made without him: dropping ssh-reached servers and
-  installs driven over ssh from the control plane (Assumptions). The first spec had both, and
-  both were built and walked.
+- **ssh, decided by Alex on 2026-09-28.** ssh stays for installing a host only (FR-018a).
+  Hosts reached over ssh are dropped.
