@@ -1,7 +1,7 @@
-# Specification Quality Checklist: A Control Plane, and the Mac Window as One More Remote
+# Specification Quality Checklist: A Control Plane, and Apps That Are Only Clients
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-09-26
+**Created**: 2026-09-26. **Re-checked**: 2026-09-28, after the re-spec.
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,8 +31,15 @@
 
 ## Notes
 
-- The shape (hub, self-run, routes every call, per-client grants, window as a pure client) was
-  decided with Alex before the spec, so no clarification markers were needed.
-- "ssh", "iCloud" and "TLS with a pre-shared key" appear as the person-visible means they already
-  know from 037/046, not as design choices; SC-004's milliseconds are a user-perceived latency.
-- The relay from a Linux control plane is assumed out of scope (Assumptions); research R6 checks it.
+- **Named technologies.** A few requirements name technologies: HTTPS (FR-011), an
+  S3-compatible bucket (FR-007), iCloud (FR-026, FR-033, FR-034) and App Store Connect
+  validation (FR-035, SC-002). Alex chose each of these on 2026-09-28, and each is the thing
+  being asked for, so they are kept as constraints rather than design.
+- **Answered before writing.** The three questions this spec would otherwise have marked were
+  asked first:
+  - who it serves: one person now, a team later;
+  - away from home: keep the iCloud relay;
+  - notifications: the iCloud mailbox.
+- **For Alex to confirm.** One choice was made without him: dropping ssh-reached servers and
+  installs driven over ssh from the control plane (Assumptions). The first spec had both, and
+  both were built and walked.
