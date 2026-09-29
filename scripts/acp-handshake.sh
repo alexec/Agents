@@ -5,11 +5,24 @@
 # matching action in the app. Worth running whenever a runtime updates, because the
 # answer is a claim about somebody else's software rather than about ours.
 #
-#   ./scripts/acp-handshake.sh
+# It also opens one conversation per runtime, in an empty folder of its own, and reads
+# the options the runtime offers there (#41): every option and every choice other than
+# a model is written down in OPTIONS below, and one that is not is reported as NEW, as a
+# capability is. So is a `_meta` key the runtime starts sending. The conversation is
+# deleted again where the runtime can delete one, and closed where it can close one.
+# A runtime that will not open one signed out says so, and is not a failure.
+#
+#   ./scripts/acp-handshake.sh                  the runtimes as the person signed them in
+#   ./scripts/acp-handshake.sh --scratch-home   each with an empty HOME of its own, so
+#                                               nothing of the person's is read or written
+#   ./scripts/acp-handshake.sh --no-sessions    capabilities only, no conversation opened
 set -u
 
 python3 - "$@" <<'PY'
-import json, os, queue, subprocess, sys, threading, time
+import json, os, queue, subprocess, sys, tempfile, threading, time
+
+SCRATCH_HOME = "--scratch-home" in sys.argv[1:]
+SESSIONS = "--no-sessions" not in sys.argv[1:]
 
 RUNTIMES = {
     "claude": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
@@ -80,43 +93,166 @@ HANDLED = {
     "positionEncoding": "OUT OF SCOPE (goes with nes)",
 }
 
+# Every option a runtime offers in a conversation, against what the app does with it
+# (#41; docs/reference/runtimes.md, "Options beyond model and mode"). The app draws every
+# option a runtime sends under the prompt, so a new one reaches people unannounced: this
+# is where it gets noticed and written down. The choices are listed for every option but
+# the model, whose list changes every week and means nothing new for the app.
+UNDER_PROMPT = "under the prompt, per agent"
+OPTIONS = {
+    "claude": {
+        "mode": (["default", "acceptEdits", "plan", "auto", "bypassPermissions"], UNDER_PROMPT),
+        "model": (None, UNDER_PROMPT),
+        "effort": (["default", "low", "medium", "high", "xhigh", "max"], UNDER_PROMPT),
+        "fast": ("boolean", UNDER_PROMPT + "; needs extra usage on the Claude plan"),
+    },
+    "codex": {
+        "mode": (["read-only", "agent", "agent-full-access"], UNDER_PROMPT + "; its sandbox too (064, #40)"),
+        "collaboration_mode": (["default", "plan"], UNDER_PROMPT),
+        "model": (None, UNDER_PROMPT),
+        "reasoning_effort": (["low", "medium", "high", "xhigh", "max"], UNDER_PROMPT),
+        "fast-mode": ("boolean", UNDER_PROMPT),
+    },
+    "copilot": {
+        "mode": (["https://agentclientprotocol.com/protocol/session-modes#agent",
+                  "https://agentclientprotocol.com/protocol/session-modes#plan",
+                  "https://agentclientprotocol.com/protocol/session-modes#autopilot"], UNDER_PROMPT),
+        "model": (None, UNDER_PROMPT),
+        "reasoning_effort": (["low", "medium", "high", "xhigh", "max"], UNDER_PROMPT),
+        "allow_all": (["on", "off"], UNDER_PROMPT),
+    },
+    "cursor": {
+        "mode": (["agent", "plan", "ask"], UNDER_PROMPT),
+        # Each model's value carries its own settings, e.g. [effort=high,fast=false].
+        "model": (None, UNDER_PROMPT),
+    },
+    "grok": {
+        "model": (None, UNDER_PROMPT),
+        "reasoning_effort": (["xhigh", "high", "medium", "low"], UNDER_PROMPT),
+    },
+    "gemini": {
+        "mode": (["default", "autoEdit", "yolo", "plan"], UNDER_PROMPT),
+        "model": (None, UNDER_PROMPT),
+    },
+    "antigravity": {
+        "mode": (["default", "auto_edit", "yolo"], UNDER_PROMPT),
+        # Thinking level is part of the model's name, e.g. gemini-3.8-flash-high.
+        "model": (None, UNDER_PROMPT),
+    },
+    "opencode": {
+        "mode": (["build", "plan"], UNDER_PROMPT),
+        "model": (None, UNDER_PROMPT),
+    },
+}
+
+# `_meta` keys a runtime sends back, by where, against what the app does with them. A
+# vendor extension arrives here first, before any option does: Claude's goal and Grok's
+# hooks were both offered here before either had a control anywhere.
+READ_FOR_NOTHING = "read for nothing: "
+META = {
+    "initialize": {
+        # Claude and Codex's adapters
+        "steering": "Send now: a prompt sent into the running turn",
+        "jetbrains": "sessionFailure read, for a failed turn's reason; the rest read for nothing",
+        "goal": READ_FOR_NOTHING + "_session/goal, a standing objective (Claude, Codex), is not offered",
+        # Grok: what it says about itself and its host, and its model list again.
+        **{key: READ_FOR_NOTHING + "Grok describing itself" for key in [
+            "agentId", "agentInstanceId", "agentVersion", "hostname", "currentWorkingDirectory",
+            "defaultAuthMethodId", "metadata", "grokShell", "x.ai/mcp/sdk", "x.ai/pluginDirs"]},
+        "modelState": READ_FOR_NOTHING + "the model option says the same, per model effort included",
+        "availableCommands": READ_FOR_NOTHING + "the same commands arrive once the conversation opens",
+        "mcpServers": READ_FOR_NOTHING + "Grok's own MCP servers; the app sends its own",
+        "mcpApps": READ_FOR_NOTHING + "Grok's MCP apps",
+        "cancelRewind": READ_FOR_NOTHING + "Grok's rewind on cancel",
+        "feedbackTraceOffer": READ_FOR_NOTHING + "send_feedback is taken away (015)",
+        "sessionRecap": READ_FOR_NOTHING + "Grok's recap of a picked-up conversation",
+        "voiceMode": READ_FOR_NOTHING + "the composer sends no sound",
+    },
+    "agentCapabilities": {
+        "claudeCode": READ_FOR_NOTHING + "promptQueueing; Send now goes by steering",
+        "authStatus": "which account is signed in (RuntimeAccount)",
+        "x.ai/fs_notify": READ_FOR_NOTHING + "Grok watching files the app writes",
+        "x.ai/hooks": READ_FOR_NOTHING + "Grok's client hooks (pre_tool_use, stop): the app has none to offer",
+        "x.ai/capabilities": READ_FOR_NOTHING + "Grok's X search tools, which the tool allowlist leaves out",
+    },
+    "session/new": {},
+}
+
 path = subprocess.run(["/bin/zsh", "-lc", 'printf %s "$PATH"'],
                       capture_output=True, text=True).stdout
 env = dict(os.environ)
 env["PATH"] = path
 
+def scratch_home(name):
+    """An empty home for one runtime, with the XDG folders inside it, for --scratch-home."""
+    home = tempfile.mkdtemp(prefix=f"agents-handshake-{name}-")
+    # Codex will not start with a CODEX_HOME that is not there.
+    for folder in (".codex", ".copilot"):
+        os.makedirs(f"{home}/{folder}")
+    return {"HOME": home, "XDG_CONFIG_HOME": f"{home}/.config", "XDG_DATA_HOME": f"{home}/.local/share",
+            "XDG_CACHE_HOME": f"{home}/.cache", "XDG_STATE_HOME": f"{home}/.local/state",
+            "CODEX_HOME": f"{home}/.codex", "COPILOT_HOME": f"{home}/.copilot",
+            # npx's cache is npm's, not the runtime's: kept, so Claude's adapter is not fetched again.
+            "npm_config_cache": os.path.expanduser("~/.npm")}
+
+class Conversation:
+    """One runtime process, spoken to one request at a time."""
+
+    def __init__(self, name, command):
+        extra = {**(scratch_home(name) if SCRATCH_HOME else {}), **RUNTIME_ENV.get(name, {})}
+        self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL, text=True, bufsize=1,
+                                        env={**env, **extra})
+        self.out = queue.Queue()
+        self.next_id = 0
+        threading.Thread(target=lambda: [self.out.put(line) for line in self.process.stdout] or self.out.put(None),
+                         daemon=True).start()
+
+    def request(self, method, params, timeout=60):
+        """The result, or {"error": …} for an error, or None for no answer in time."""
+        self.next_id += 1
+        ask = self.next_id
+        self.process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": ask, "method": method,
+                                             "params": params}) + "\n")
+        self.process.stdin.flush()
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                line = self.out.get(timeout=max(0.1, deadline - time.time()))
+            except queue.Empty:
+                return None
+            if line is None:
+                return None
+            try:
+                message = json.loads(line.strip())
+            except Exception:
+                continue
+            if message.get("id") != ask or "method" in message:
+                # A notification, or a request of the runtime's own: the app would answer
+                # it, this script has nothing to say.
+                if "method" in message and "id" in message:
+                    self.process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": message["id"],
+                                                         "error": {"code": -32601, "message": "not here"}}) + "\n")
+                    self.process.stdin.flush()
+                continue
+            if "error" in message:
+                return {"error": message["error"]}
+            return message.get("result") or {}
+        return None
+
+    def end(self):
+        self.process.kill()
+
 def handshake(name, command):
     try:
-        process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=subprocess.DEVNULL, text=True, bufsize=1,
-                                   env={**env, **RUNTIME_ENV.get(name, {})})
+        conversation = Conversation(name, command)
     except FileNotFoundError:
-        return None
-    out = queue.Queue()
-    threading.Thread(target=lambda: [out.put(line) for line in process.stdout] or out.put(None),
-                     daemon=True).start()
-    process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
-                                    "params": {"protocolVersion": 1,
-                                               "clientCapabilities": CLIENT}}) + "\n")
-    process.stdin.flush()
-    deadline = time.time() + 60
-    result = None
-    while time.time() < deadline:
-        try:
-            line = out.get(timeout=max(0.1, deadline - time.time()))
-        except queue.Empty:
-            break
-        if line is None:
-            break
-        try:
-            message = json.loads(line.strip())
-        except Exception:
-            continue
-        if message.get("id") == 1:
-            result = message.get("result")
-            break
-    process.kill()
-    return result
+        return None, None
+    result = conversation.request("initialize", {"protocolVersion": 1, "clientCapabilities": CLIENT})
+    if result is None or "error" in result:
+        conversation.end()
+        return None, None
+    return conversation, result
 
 # The protocol says a capability is advertised by being present: most of them are an
 # empty object, which is easy to read as "nothing here" and is the opposite.
@@ -136,10 +272,59 @@ def flatten(value, prefix=""):
             found[name] = True
     return found
 
+def meta_keys(value):
+    meta = value.get("_meta") if isinstance(value, dict) else None
+    return sorted(meta) if isinstance(meta, dict) else []
+
+def check_meta(where, value):
+    """New `_meta` keys at `where`, printed; how many there were."""
+    new = 0
+    for key in meta_keys(value):
+        action = META.get(where, {}).get(key)
+        if action is None:
+            action = "NEW, and not written down anywhere"
+            new += 1
+        print(f"   _meta.{key:39} {action} ({where})")
+    return new
+
+def check_options(name, session):
+    """Every option and choice the conversation offers, against OPTIONS; how many are new."""
+    known = OPTIONS.get(name, {})
+    offered = session.get("configOptions") or []
+    new = 0
+    for option in offered:
+        oid = option.get("id", "?")
+        kind = option.get("type", "select")
+        choices = [c["value"] for c in option.get("options") or [] if isinstance(c, dict) and "value" in c]
+        # A grouped select nests its choices one level down.
+        for group in option.get("options") or []:
+            if isinstance(group, dict) and "group" in group:
+                choices += [c.get("value") for c in group.get("options") or []]
+        label = f"option {oid} ({option.get('category') or 'no category'}, {kind})"
+        if oid not in known:
+            new += 1
+            print(f"   {label:45} NEW, and not written down anywhere")
+            continue
+        values, action = known[oid]
+        print(f"   {label:45} {action}")
+        if values == "boolean":
+            if kind != "boolean":
+                new += 1
+                print(f"      now a {kind}, not a boolean: NEW")
+        elif values is not None:
+            for choice in choices:
+                if choice not in values:
+                    new += 1
+                    print(f"      choice {choice}: NEW, and not written down anywhere")
+    for oid in sorted(set(known) - {o.get("id") for o in offered}):
+        print(f"   option {oid:38} no longer offered")
+    return new
+
 missing = 0
+unread = []
 for name, command in RUNTIMES.items():
     print(f"\n== {name}")
-    result = handshake(name, command)
+    conversation, result = handshake(name, command)
     if result is None:
         print("   not installed, or would not answer")
         continue
@@ -160,7 +345,31 @@ for name, command in RUNTIMES.items():
     methods = result.get("authMethods") or []
     if methods:
         print(f"   authMethods: {', '.join(m.get('id', '?') for m in methods)}")
+    missing += check_meta("initialize", result)
+    missing += check_meta("agentCapabilities", result.get("agentCapabilities"))
 
-print(f"\n{missing} advertised capabilities with neither an action in the app nor a reason in the spec.")
+    if SESSIONS:
+        folder = tempfile.mkdtemp(prefix=f"agents-handshake-{name}-cwd-")
+        if name in RUNTIME_AUTH:
+            conversation.request("authenticate", {"methodId": RUNTIME_AUTH[name]})
+        session = conversation.request("session/new", {"cwd": folder, "mcpServers": []}, timeout=90)
+        if session is None or "error" in session:
+            why = (session or {}).get("error", {}).get("message") or "no answer in 90 seconds"
+            print(f"   options not read: {why}")
+            unread.append(name)
+        else:
+            missing += check_options(name, session)
+            missing += check_meta("session/new", session)
+            capabilities = result.get("agentCapabilities") or {}
+            sessions = capabilities.get("sessionCapabilities") or {}
+            if "delete" in sessions:
+                conversation.request("session/delete", {"sessionId": session.get("sessionId")}, timeout=20)
+            elif "close" in sessions:
+                conversation.request("session/close", {"sessionId": session.get("sessionId")}, timeout=20)
+    conversation.end()
+
+print(f"\n{missing} advertised capabilities, options or _meta keys with neither an action in the app nor a reason in the spec.")
+if unread:
+    print(f"Options not read for {', '.join(unread)}: sign in, or run without --scratch-home, to check them.")
 sys.exit(1 if missing else 0)
 PY
