@@ -11,15 +11,20 @@ struct SandboxCapsule: View {
     let runtimeDefault: SandboxChoice
     /// Codex's current mode, which is its sandbox.
     var codexMode: String?
+    /// What its latest start ran under (FR-010), when that is still what it would ask for.
+    var effective: EffectiveSandbox?
     /// Whether a turn is running, so the menu can say when a change applies (FR-012).
     var isWorking = false
     let choose: (SandboxChoice?) -> Void
 
     var body: some View {
         let choices = SandboxCatalog.choices(for: runtimeID)
-        let words = SandboxWords.state(SandboxCatalog.state(runtimeID: runtimeID,
-                                                           choice: override ?? runtimeDefault,
-                                                           codexMode: codexMode))
+        let asked = override ?? runtimeDefault
+        // The start's own record while it still stands: a capped helper says so. A choice
+        // changed since shows what the next turn will be.
+        let standing = effective.flatMap { $0.requested == asked ? $0 : nil }
+        let words = SandboxWords.state(standing?.state
+            ?? SandboxCatalog.state(runtimeID: runtimeID, choice: asked, codexMode: codexMode))
         if choices.isEmpty {
             Text(words)
                 .appText(.fine)
@@ -29,7 +34,8 @@ struct SandboxCapsule: View {
                 .fixedSize()
                 .help(SandboxCatalog.entry(for: runtimeID)?.why ?? words)
         } else {
-            SelectCapsule(name: "Command sandbox", title: words) { dismiss in
+            SelectCapsule(name: standing?.reason.map { "Command sandbox: \($0)" } ?? "Command sandbox",
+                          title: words) { dismiss in
                 SelectChoice(title: SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
                              description: nil, isChosen: override == nil) {
                     choose(nil)

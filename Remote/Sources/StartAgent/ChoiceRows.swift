@@ -16,6 +16,7 @@ struct ChoiceRows: View {
             if model.startWorktrees.isRepository {
                 worktreeRow
             }
+            sandboxRow
         }
         .paperListRow()
         Section {
@@ -126,6 +127,54 @@ struct ChoiceRows: View {
             .appText(.reading)
         }
         .accessibilityLabel("Worktree, \(worktreeTitle)")
+    }
+
+    /// The new agent's command sandbox (064): its own choice, or its runtime's default.
+    /// A runtime with no choice says its state, with why.
+    @ViewBuilder
+    private var sandboxRow: some View {
+        if let runtimeID = model.startRuntimeID {
+            let choices = SandboxCatalog.choices(for: runtimeID)
+            let runtimeDefault = model.sandboxSettings.choice(for: runtimeID)
+            let title = SandboxWords.override(model.startSandbox, runtimeDefault: runtimeDefault, runtimeID: runtimeID)
+            if choices.isEmpty {
+                LabeledContent("Sandbox") {
+                    Text(SandboxWords.state(SandboxCatalog.state(runtimeID: runtimeID, choice: .runtime)))
+                        .foregroundStyle(.secondary)
+                }
+                .appText(.reading)
+                .accessibilityHint(SandboxCatalog.entry(for: runtimeID)?.why ?? "")
+            } else {
+                Menu {
+                    Button {
+                        model.startSandbox = nil
+                    } label: {
+                        choiceLabel(SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
+                                    chosen: model.startSandbox == nil)
+                    }
+                    ForEach(choices, id: \.self) { choice in
+                        Button {
+                            model.startSandbox = choice
+                            // Codex's sandbox is its mode (FR-005a).
+                            if runtimeID == RuntimeCatalog.codex.id, choice == .off {
+                                model.choose("agent-full-access", for: "mode")
+                            }
+                        } label: {
+                            choiceLabel(SandboxWords.choice(choice, runtimeID: runtimeID),
+                                        chosen: model.startSandbox == choice)
+                            Text(SandboxWords.explanation(choice, runtimeID: runtimeID,
+                                                          name: model.startRuntime?.runtime.name ?? runtimeID))
+                        }
+                    }
+                } label: {
+                    LabeledContent("Sandbox") {
+                        Text(title).foregroundStyle(.secondary)
+                    }
+                    .appText(.reading)
+                }
+                .accessibilityLabel("Sandbox, \(title)")
+            }
+        }
     }
 
     private var worktreeTitle: String {

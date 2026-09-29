@@ -334,6 +334,10 @@ final class RemoteModel {
     private(set) var startOptions: [ConfigOption] = []
     /// What has been chosen, by option id. Sent as the start's options.
     private(set) var startChosen: [String: JSONValue] = [:]
+    /// The new agent's own sandbox choice (064). Nil follows its runtime's default.
+    var startSandbox: SandboxChoice?
+    /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
+    private(set) var sandboxSettings = SandboxSettings()
     private(set) var startChoicesState: StartChoicesState = .loading
     /// Why the last Send did not start anything, in one sentence. Shown in the sheet
     /// rather than as the app's alert, which a sheet would hide.
@@ -407,6 +411,7 @@ final class RemoteModel {
     func chooseRuntime(_ runtimeID: String) async {
         guard runtimeID != startRuntimeID else { return }
         startRuntimeID = runtimeID
+        startSandbox = nil
         startRefusal = nil
         await loadStartChoices()
     }
@@ -533,7 +538,7 @@ final class RemoteModel {
         let request = DaemonAPI.StartRequest(
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
-            worktree: startWorktree, requestID: retrying ?? UUID())
+            worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox)
         return await send(start: request)
     }
 
@@ -551,6 +556,12 @@ final class RemoteModel {
             // Send is a fresh start.
             unsettledStart = nil
             startRefusal = refused.message
+            // Its sandbox would not start (064): what it said, and the way on.
+            if refused.code == DaemonAPI.Failure.sandboxWillNotStart,
+               let why = try? refused.data?.decode(DaemonAPI.SandboxWillNotStart.self) {
+                startRefusal = refused.message + " " + (why.detail.split(separator: "\n").first.map(String.init) ?? "")
+                    + (why.offOffered ? " Set Sandbox to Off to start without it." : "")
+            }
             return false
         } catch {
             startRefusal = "Your Mac stopped answering before it said whether the agent started. "
@@ -906,6 +917,10 @@ final class RemoteModel {
                    let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
                     self.files.apply(change)
                 }
+                if notification.method == DaemonAPI.Notification.sandboxChanged,
+                   let settings = try? notification.params?.decode(SandboxSettings.self) {
+                    self.sandboxSettings = settings
+                }
                 if notification.method == DaemonAPI.Notification.runtimeChanged {
                     await self.refreshRuntimes()
                 }
@@ -988,6 +1003,7 @@ final class RemoteModel {
         await refreshWorkflows()
         await refreshRuntimes()
         await refreshModes()
+        await refreshSandboxSettings()
         await settleUnsettledStart()
         await loadTranscript()
         settleSelection()
@@ -1377,6 +1393,38 @@ final class RemoteModel {
         guard let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
                                                  returning: DaemonAPI.RememberedModes.self) else { return }
         work.replaceRememberedModes(modes)
+    }
+
+    /// A Mac too old to know the method leaves every runtime as configured, which is
+    /// what it does.
+    private func refreshSandboxSettings() async {
+        guard let settings = try? await client.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
+                                                    returning: SandboxSettings.self) else { return }
+        sandboxSettings = settings
+    }
+
+    /// One agent's own sandbox choice from the phone (064); nil follows the default.
+    func setAgentSandbox(_ agentID: UUID, _ choice: SandboxChoice?) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsSetSandbox,
+                                  DaemonAPI.SetSandboxRequest(agentID: agentID, choice: choice))
+        } catch {
+            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+        }
+    }
+
+    /// The sandbox card's answer, from the phone (064, FR-007a).
+    func answerSandbox(_ agentID: UUID, carryOn: Bool) async {
+        do {
+            try await client.call(DaemonAPI.Method.agentsAnswerSandbox,
+                                  DaemonAPI.AnswerSandboxRequest(agentID: agentID, carryOn: carryOn))
+        } catch {
+            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+        }
     }
 
     private func refreshRuntimes() async {

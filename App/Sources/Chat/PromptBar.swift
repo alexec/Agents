@@ -767,6 +767,7 @@ struct PromptBar: View {
                            override: agent == nil ? model.draftSandbox : agent?.sandboxOverride,
                            runtimeDefault: model.sandboxSettings.choice(for: runtimeID),
                            codexMode: mode,
+                           effective: agent?.effectiveSandbox,
                            isWorking: agent?.state == .running) { choice in
                 if let agent {
                     Task { await model.setAgentSandbox(agent.id, choice) }

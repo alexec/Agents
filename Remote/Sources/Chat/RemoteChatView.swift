@@ -215,7 +215,21 @@ struct RemoteChatView: View {
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },
-            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
+            continueWithoutSandbox: sandboxAnswer(carryOn: true),
+            keepStopped: sandboxAnswer(carryOn: false),
+            waitingSandbox: waitingSandbox)
+    }
+
+    /// The open agent's sandbox card, while it waits (064).
+    private var waitingSandbox: SandboxFailureRecord? {
+        model.selection.flatMap { model.agent($0) }?.pendingSandboxFailure
+    }
+
+    private func sandboxAnswer(carryOn: Bool) -> (@MainActor () async -> Void)? {
+        guard waitingSandbox != nil, let id = model.selection else { return nil }
+        let model = model
+        return { await model.answerSandbox(id, carryOn: carryOn) }
     }
 }
 

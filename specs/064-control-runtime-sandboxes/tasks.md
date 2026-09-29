@@ -74,9 +74,9 @@ description: "Tasks for 064, Control runtime sandboxes"
 **Independent Test**: Claude default Off; a new agent writes outside its project; a Cursor agent is unaffected; an override On on one agent blocks it; clearing inherits.
 
 - [ ] T029 [US2] Live check on a scratch root (run-app): Claude and Grok Off/On from Settings and from the pill take effect at the next turn (outside write on disk; Grok's process sandboxed per `sandbox_check`); `daemon.log` launch lines
-- [ ] T030 [P] [US2] Remote: `SandboxCapsule` in the Remote prompt bar and start form (`Remote/Sources/Chat/`, `Remote/Sources/StartAgent/ChoiceRows.swift`), `sandbox/state` read and `agents/setSandbox` in `RemoteModel`, `ChatActions` for the card in `Remote/Sources/Chat/RemoteChatView.swift`; `StartRequest.sandbox` from the phone
+- [X] T030 [P] [US2] Remote: `SandboxCapsule` in the Remote prompt bar and start form (`Remote/Sources/Chat/`, `Remote/Sources/StartAgent/ChoiceRows.swift`), `sandbox/state` read and `agents/setSandbox` in `RemoteModel`, `ChatActions` for the card in `Remote/Sources/Chat/RemoteChatView.swift`; `StartRequest.sandbox` from the phone
 - [ ] T031 [US2] Servers: on the devbox (test-servers), a Mac default reaches the server daemon, again after reconnect; a Claude agent there resolves with the server's catalog
-- [ ] T032 [US2] Mid-turn change: the menu says "Applies from its next turn" while running; the running command is untouched
+- [X] T032 [US2] Mid-turn change: the menu says "Applies from its next turn" while running; the running command is untouched
 
 ---
 
@@ -86,7 +86,7 @@ description: "Tasks for 064, Control runtime sandboxes"
 
 **Independent Test**: each runtime's Settings page and pill say its state and why; after recovery the pill says Sandbox off.
 
-- [ ] T033 [US3] The pill shows `effectiveSandbox` when the agent has one (after recovery, a capped helper's reason as its tooltip), otherwise the resolved choice (`Shared/UI/Chat/SandboxCapsule.swift`)
+- [X] T033 [US3] The pill shows `effectiveSandbox` when the agent has one (after recovery, a capped helper's reason as its tooltip), otherwise the resolved choice (`Shared/UI/Chat/SandboxCapsule.swift`)
 - [ ] T034 [US3] With the sandbox Off, folder scope and app tool approvals still refuse or ask (SC-007): a scratch-root check through the socket
 
 ---
