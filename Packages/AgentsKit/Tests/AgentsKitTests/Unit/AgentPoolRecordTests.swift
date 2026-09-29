@@ -3,21 +3,27 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// What a chat that carries on keeps on its record (052): the pool entry it is on, and
-/// its own switch.
+/// What a chat that carried on kept on its record (052): the pool entry it was on, and
+/// its own switch. Since 065 they are read from an older record and never written.
 @Suite("A chat's pool fields, on the record")
 struct AgentPoolRecordTests {
-    @Test func theyAreWrittenOnlyWhenSetAndSurviveBeingSaved() throws {
+    @Test func theyAreReadFromAnOlderRecordAndNeverWritten() throws {
         let plain = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/repo"))
-        let json = try #require(try JSONSerialization.jsonObject(with: StoreCoding.encoder.encode(plain)) as? [String: Any])
-        #expect(json["poolEntryID"] == nil && json["switchingOff"] == nil)
+        var json = try #require(try JSONSerialization.jsonObject(with: StoreCoding.encoder.encode(plain)) as? [String: Any])
+        #expect(json["poolEntryID"] == nil && json["switchingOff"] == nil && json["allowanceWait"] == nil)
 
-        var moved = plain
-        moved.poolEntryID = UUID()
-        moved.switchingOff = true
-        let read = try StoreCoding.decoder.decode(Agent.self, from: StoreCoding.encoder.encode(moved))
-        #expect(read.poolEntryID == moved.poolEntryID)
+        // As 052 wrote them.
+        let entry = UUID()
+        json["poolEntryID"] = entry.uuidString
+        json["switchingOff"] = true
+        var read = try StoreCoding.decoder.decode(Agent.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(read.poolEntryID == entry)
         #expect(read.switchingOff)
+
+        // Saved again, they are gone.
+        read.title = "Saved again"
+        let again = try #require(try JSONSerialization.jsonObject(with: StoreCoding.encoder.encode(read)) as? [String: Any])
+        #expect(again["poolEntryID"] == nil && again["switchingOff"] == nil)
     }
 
     /// A record written before 052 has neither field: on the runtime it started with,

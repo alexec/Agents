@@ -101,7 +101,7 @@ today without a pool.
 
 | Field or file | What happens |
 |---|---|
-| `Agent.allowanceWait` | Decoded if an old record has it. Cleared at launch. No timer, no resume. |
+| `Agent.allowanceWait` | Decoded if an old record has it. Cleared at launch. No timer, no resume. Such a record stopped with **Its allowance ran out** under 052, which it keeps; one with no reason at all is mended on load like any other record. |
 | `Agent.poolEntryID`, `Agent.switchingOff` | Decoded, never set again. |
 | `pool.json` | Not read, not written. Left on disk. Its credit amounts and expiries are dropped. |
 | `switches.jsonl` | Not written, not read. Left on disk. |
