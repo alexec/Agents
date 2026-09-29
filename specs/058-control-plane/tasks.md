@@ -51,8 +51,8 @@ replaced, and removing what they left is a task in this list.
 **Purpose**: prove the risky parts before any code rests on them. Record each result in
 `research.md` under its spike. If S2 or S4 fails, stop and ask Alex.
 
-- [ ] T021 Merge `main` into `agents/control-plane`. It is 99 or more commits ahead. Check with `git merge-base` afterwards that the merge landed on this branch (memory: a branch can move under a merge). Build both schemes one after the other with plugin validation skipped, and pass `swift build` in `Packages/AgentsKit`.
-- [ ] T022 [P] Spike S2, the sandboxed window's WebSocket, in `specs/058-control-plane/spikes/s2-sandbox-ws/`. Make a throwaway macOS app target with only `com.apple.security.app-sandbox` and `com.apple.security.network.client`, and `NSBonjourServices` = `_agents-control._tcp`. Using `URLSessionWebSocketTask` with a delegate that checks a SHA-256 SPKI pin, it must:
+- [x] T021 (53fc1e5e; both schemes build, 64 control tests pass) Merge `main` into `agents/control-plane`. It is 99 or more commits ahead. Check with `git merge-base` afterwards that the merge landed on this branch (memory: a branch can move under a merge). Build both schemes one after the other with plugin validation skipped, and pass `swift build` in `Packages/AgentsKit`.
+- [x] T022 (passed: spikes/s2-sandbox-ws/RESULTS.md; the Local Network prompt is left for T053) [P] Spike S2, the sandboxed window's WebSocket, in `specs/058-control-plane/spikes/s2-sandbox-ws/`. Make a throwaway macOS app target with only `com.apple.security.app-sandbox` and `com.apple.security.network.client`, and `NSBonjourServices` = `_agents-control._tcp`. Using `URLSessionWebSocketTask` with a delegate that checks a SHA-256 SPKI pin, it must:
   - dial `wss://127.0.0.1:<port>` and `wss://<this Mac>.local:<port>`, served by a throwaway NIO WebSocket server with a self-signed certificate;
   - exchange a line each way;
   - browse Bonjour with `NWBrowser`.
@@ -215,6 +215,7 @@ violations.
 - [ ] T053 [US1] Walk quickstart Walk 1, steps 1–7, with the store configuration on a scratch root and a real Claude turn:
   - screenshot each step;
   - check the window has no child processes and there is no sandbox violation in `/usr/bin/log`;
+  - open the store build from Finder and dial a control plane on another machine, and record the Local Network prompt and what refusing it does (S2 left this open);
   - check Reveal and the shared skills page reach the host.
 
   Record it in `specs/058-control-plane/walks/us1-store.md`.

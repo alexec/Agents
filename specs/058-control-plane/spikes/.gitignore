@@ -1,0 +1,7 @@
+# Spike build output and throwaway keys stay out of git (secret scanning blocked a push once).
+.build/
+build/
+*.pem
+*.key
+*.crt
+*.p12

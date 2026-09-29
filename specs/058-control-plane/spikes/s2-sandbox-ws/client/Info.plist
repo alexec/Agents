@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key><string>com.alexecollins.agents.spike.s2</string>
+	<key>CFBundleName</key><string>S2Client</string>
+	<key>CFBundleExecutable</key><string>S2Client</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleVersion</key><string>1</string>
+	<key>CFBundleShortVersionString</key><string>0.1</string>
+	<key>LSMinimumSystemVersion</key><string>14.0</string>
+	<key>LSUIElement</key><true/>
+	<key>NSBonjourServices</key>
+	<array><string>_agents-control._tcp</string></array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Spike S2 finds and connects to an Agents control plane on your network.</string>
+</dict>
+</plist>

@@ -490,6 +490,22 @@ These run before the code they gate (plan Phase 0):
     loopback with `URLSessionWebSocketTask`.
   - It browses Bonjour with only `network.client`.
   - This proves R7 and R8 in the sandbox.
+  - **Result, 2026-09-28: passed** ([spikes/s2-sandbox-ws/RESULTS.md](spikes/s2-sandbox-ws/RESULTS.md)).
+    - An ad-hoc-signed app with only `app-sandbox` and `network.client` was confirmed
+      sandboxed: its home was the container, and reading `~/Desktop` was denied.
+    - It dialled a self-signed `wss://` by SPKI pin over loopback and over the LAN address,
+      and a line went each way. A wrong pin was refused (`-999 cancelled`).
+    - Bonjour browse found the service in under 0.1 s.
+    - No App Transport Security exception was needed.
+    - Three consequences for this design:
+      - **Pins are P-256 only** (R6). The client builds the SPKI from the raw key with the
+        fixed P-256 header; another key type would need a DER parser.
+      - **Names on the certificate do not matter under a pin** (R8), so adding a Tailscale
+        name needs no new certificate.
+      - **The Local Network prompt was not seen.** The client was started from a shell that
+        likely already had access, and every dial stayed on this Mac. A walk of the real
+        store build, opened from Finder and dialling another machine, must still show the
+        prompt and what a refusal does (T053).
 - **S3: the Linux host dialer.** A static musl `agentsd` with `NIOWebSocket` and NIOSSL
   dials a copy behind a TLS-terminating proxy (Caddy) and a pinned self-signed copy. Measure
   the growth in binary size.

@@ -1,0 +1,4 @@
+Registering Service S2 spike._agents-control._tcp.local port 8797 TXT v=1
+DATE: ---Mon 28 Sep 2026---
+21:45:01.557  ...STARTING...
+21:45:02.303  Got a reply for service S2 spike._agents-control._tcp.local.: Name now registered and active
