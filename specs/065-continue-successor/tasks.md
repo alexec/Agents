@@ -83,7 +83,7 @@ out runtime is sent.
 - [ ] T023 [US4] Reword the pool sentences in `PoolWords` and in `raiseAllowanceOut`/`raiseAllowanceBack` per `contracts/runtime-state.md` ("failed and left the pool" and "is back in the pool" go), and update `PoolWordsTests`. (Started: the out/back event sentences no longer name the pool; the wait sentences go with Phase 5.)
 - [ ] T024 [P] [US4] Add the state line, the plan-left line, and **Mark available** to `App/Sources/Settings/AgentRuntimesSettingsView.swift`; ask for readings when the page opens; switch `AppModel` from `poolStatus` to `runtimeAllowances`.
 - [x] T025 [P] [US4] Change the prompt bar notice in `App/Sources/Chat/PromptBar.swift` to `RuntimeAllowances.startingOnOut`, without the offer of another runtime, and with Send left enabled.
-- [ ] T026 [P] [US4] Add `Remote/Sources/Projects/RuntimesView.swift` (rows, read-only, Mark available as a swipe action) in place of `Remote/Sources/Pool/PoolPageView.swift`, reached from **Spending** in `TotalsView.swift`; switch `RemoteModel` to `runtimes/allowances`.
+- [x] T026 [P] [US4] Add `Remote/Sources/Projects/RuntimesView.swift` (rows, read-only, Mark available as a swipe action) in place of `Remote/Sources/Pool/PoolPageView.swift`, reached from **Spending** in `TotalsView.swift`; switch `RemoteModel` to `runtimes/allowances`.
 - [ ] T027 [US4] Walk it with the run-app skill on a scratch root: seed an out runtime with `pool/applyAllowances` (`since` at least 4h ago), see the card, the prompt bar notice, a check passing in `daemon.log`, and Mark available; screenshot the Agent Runtimes page.
 
 **Checkpoint**: The person can see which runtimes are out, and when each is checked, without a pool.

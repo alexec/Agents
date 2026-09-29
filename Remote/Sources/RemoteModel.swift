@@ -1029,6 +1029,7 @@ final class RemoteModel {
         await refreshResuming()
         await refreshCostState()
         await refreshPoolStatus()
+        await refreshRuntimeAllowances()
         await refreshLeases()
         await refreshEvents()
         await refreshWorkflows()
@@ -1283,6 +1284,23 @@ final class RemoteModel {
     var isShowingPool = false
     /// Continue with, as a list: a chat moving by hand, or changing what a switch chose.
     var continuing: RemoteContinue?
+
+    /// Every runtime's state on the Mac (065, US4).
+    var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
+
+    func refreshRuntimeAllowances() async {
+        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesAllowances, Optional<String>.none,
+                                                      returning: RuntimeAllowances.self) else { return }
+        work.replaceRuntimeAllowances(allowances)
+    }
+
+    /// The person says a runtime is back. The phone may: it costs one turn if wrong.
+    func markRuntimeAvailable(_ credentialKey: String) async {
+        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesMarkAvailable,
+                                                      DaemonAPI.MarkRuntimeAvailable(credentialKey: credentialKey),
+                                                      returning: RuntimeAllowances.self) else { return }
+        work.replaceRuntimeAllowances(allowances)
+    }
 
     func refreshPoolStatus(days: Int? = nil) async {
         guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
