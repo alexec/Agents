@@ -19,7 +19,7 @@ Start: `<root>/tools/opencode/current/bin/opencode acp`, with the agent's folder
 {"autoupdate":false,
  "permission":{"bash":"ask","edit":"ask","webfetch":"ask"},
  "share":"disabled",
- "tools":{"task":false,"todowrite":false}}
+ "tools":{"task":false}}
 ```
 
 A test holds this byte for byte. The `permission` rules turn into `session/request_permission`

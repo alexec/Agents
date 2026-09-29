@@ -172,7 +172,25 @@ public enum RuntimeLaunchCatalog {
         // ACP sends this notice without a trailing newline, before any error chunks.
         turnNoticePattern: #"^Info: Disabled tools: [a-z_][a-z_0-9]*(?:, [a-z_][a-z_0-9]*)*"#)
 
-    public static let builtIn: [RuntimeLaunch] = [antigravity, copilot, cursor]
+    /// OpenCode (049, research R3, R7).
+    ///
+    /// - `OPENCODE_DISABLE_AUTOUPDATE`, `OPENCODE_DISABLE_SHARE`: the same as the inline
+    ///   config's `autoupdate` and `share`, as switches that a person's own config cannot
+    ///   turn back on.
+    /// - `OPENCODE_AUTH_CONTENT` removed: on the Mac, OpenCode uses its own sign-in in the
+    ///   person's home (D3). A server run is lent the Mac's through this variable, set after
+    ///   this by the lending (D7), never from a stray one in the daemon's environment.
+    /// - `OPENCODE_ENABLE_QUESTION_TOOL` removed: questions go through the app's `ask_form`.
+    public static let opencode = RuntimeLaunch(
+        runtimeID: "opencode",
+        environment: [
+            "OPENCODE_DISABLE_AUTOUPDATE": "1",
+            "OPENCODE_DISABLE_SHARE": "1",
+            "OPENCODE_AUTH_CONTENT": nil,
+            "OPENCODE_ENABLE_QUESTION_TOOL": nil,
+        ])
+
+    public static let builtIn: [RuntimeLaunch] = [antigravity, copilot, cursor, opencode]
 
     /// Nothing extra for a runtime that is not listed.
     public static func launch(for runtimeID: String) -> RuntimeLaunch {

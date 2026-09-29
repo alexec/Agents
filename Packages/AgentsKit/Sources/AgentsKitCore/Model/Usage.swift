@@ -68,7 +68,8 @@ public struct TurnUsage: Codable, Hashable, Sendable {
         thoughtTokens = try c.decodeIfPresent(Int.self, forKey: .thoughtTokens)
         cachedReadTokens = try c.decodeIfPresent(Int.self, forKey: .cachedReadTokens)
         cachedWriteTokens = try c.decodeIfPresent(Int.self, forKey: .cachedWriteTokens)
-        cost = try c.decodeIfPresent(Cost.self, forKey: .cost)
+        // A zero is not a price (049 P2): see `Cost.init(wire:)`.
+        cost = try c.decodeIfPresent(Cost.self, forKey: .cost).flatMap { $0.amount == 0 ? nil : $0 }
     }
 }
 
@@ -84,6 +85,11 @@ public struct Cost: Codable, Hashable, Sendable {
         self.currency = currency
     }
 
+    /// Nil for an amount of zero as well as for none. A runtime reports zero for a model it
+    /// has no per-token price for — OpenCode's free Zen models, a subscription, a local
+    /// model (049 research R2) — and no runtime bills a turn at exactly zero on purpose. So
+    /// the meter says the cost is not measured rather than "$0", and no cost limit is ever
+    /// taken to cover it (Alex, 2026-09-28: for every runtime).
     public init?(wire: JSONValue?) {
         guard let wire, let currency = wire["currency"]?.stringValue else { return nil }
         switch wire["amount"] {
@@ -91,6 +97,7 @@ public struct Cost: Codable, Hashable, Sendable {
         case .int(let value): self.amount = Decimal(value)
         default: return nil
         }
+        guard amount != 0 else { return nil }
         self.currency = currency
     }
 

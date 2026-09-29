@@ -374,6 +374,42 @@ public enum ToolPolicyCatalog {
         escalationTool: "ask_question",
         preferredAuthMethods: ["oauth-personal", "oauth-business"])
 
+    /// OpenCode: its own configuration, inline, in `OPENCODE_CONFIG_CONTENT`, which OpenCode
+    /// merges over the person's `opencode.json` for this process only (049 D4). Measured
+    /// against OpenCode 1.18.33 on 2026-09-28 (research R3).
+    ///
+    /// - `tools.task: false` takes OpenCode's sub-agents out of the model's list, not only
+    ///   refuses them: `opencode debug agent build` shows a deny rule, and a real turn no
+    ///   longer lists `task`. Nothing is residue. `todowrite` stays, as Claude's to-do tool
+    ///   stays: a list inside the turn, which OpenCode reports as the plan.
+    /// - `permission`: OpenCode's own default is `"*": "allow"`, so left alone it edits,
+    ///   runs commands and fetches without asking. These make it ask, as every other runtime
+    ///   does; **Always approve** (061) answers for the person.
+    /// - `autoupdate` and `share` off: the app's pinned copy is never replaced under a running
+    ///   agent (D5), and no conversation is published to a web page (FR-017).
+    ///
+    /// Its `question` tool is off over ACP unless `OPENCODE_ENABLE_QUESTION_TOOL` is set,
+    /// which `RuntimeLaunchCatalog.opencode` removes, so no escalation tool: a question goes
+    /// through the app's own `ask_form`, or ends the turn as needs_answer.
+    public static let opencode = ToolPolicy(
+        runtimeID: RuntimeCatalog.opencode.id,
+        removed: [
+            RemovedTool(name: "task", category: .agents),
+        ],
+        lever: .environmentJSON(variable: "OPENCODE_CONFIG_CONTENT", value: .object([
+            "autoupdate": .bool(false),
+            "permission": .object([
+                "bash": .string("ask"),
+                "edit": .string("ask"),
+                "webfetch": .string("ask"),
+            ]),
+            "share": .string("disabled"),
+            "tools": .object([
+                "task": .bool(false),
+            ]),
+        ])),
+        preferredAuthMethods: ["opencode-login"])
+
     /// In the same order as `RuntimeCatalog.builtIn`, so the two read side by side.
-    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini, antigravity]
+    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini, antigravity, opencode]
 }

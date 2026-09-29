@@ -19,6 +19,7 @@ extension PersonalDotAgents {
     static let ownServerConfigs: [String: String] = [
         "claude": ".claude.json", "codex": ".codex/config.toml", "cursor": ".cursor/mcp.json",
         "copilot": ".copilot/mcp-config.json", "gemini": ".gemini/settings.json",
+        "opencode": ".config/opencode/opencode.json",
     ]
 
     public static func snapshot(home: URL?, installed: Set<String>, record: Record,

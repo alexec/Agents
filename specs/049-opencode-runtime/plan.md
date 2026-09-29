@@ -24,7 +24,8 @@ What is new:
 2. **OpenCode's own settings for the app's agents are passed in the environment** (D4, R3).
    The policy lever `.environmentJSON(OPENCODE_CONFIG_CONTENT)` carries:
    - `autoupdate: false` and `share: "disabled"`
-   - `tools: {task: false, todowrite: false}`: removed, with no residue
+   - `tools: {task: false}`: removed, with no residue. `todowrite` stays, as Claude's and
+     Gemini's to-do lists stay: a list inside the turn (built 2026-09-28)
    - `permission: {edit: "ask", bash: "ask", webfetch: "ask"}`
 
    `RuntimeLaunch.environment` adds `OPENCODE_DISABLE_AUTOUPDATE=1` and

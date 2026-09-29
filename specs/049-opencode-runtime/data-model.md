@@ -30,8 +30,8 @@ See [contracts/archive-manifest-v2.md](contracts/archive-manifest-v2.md).
 
 | Field | Value |
 |---|---|
-| removed | `task` (.agents), `todowrite` (.todos) |
-| kept | — |
+| removed | `task` (.agents) |
+| kept | `todowrite` — a to-do list inside the turn, kept as Claude's and Gemini's are |
 | residue | — (R3: both removed fully) |
 | lever | `.environmentJSON(variable: "OPENCODE_CONFIG_CONTENT", value: …)` — [contract](contracts/opencode-launch.md) |
 | escalationTool | nil — OpenCode's `question` tool is off over ACP; the app's `ask_form` is used |

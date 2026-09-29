@@ -23,14 +23,14 @@ run-app skill), never on the real home.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `--archive-github <runtime> <owner/repo> <tag>` to `scripts/update-toolset.sh`.
+- [x] T001 Add `--archive-github <runtime> <owner/repo> <tag>` to `scripts/update-toolset.sh`.
   - It reads `gh api repos/<owner/repo>/releases/tags/<tag>` and writes `url`, `sha256` (GitHub's
     `digest` without its `sha256:` prefix) and `size` for each platform key.
   - Platform keys come from the asset names, per contracts/archive-manifest-v2.md: `arm64` →
     `aarch64`, `x64` → `x86_64`, then a `-baseline` and/or `-musl` suffix.
   - It allows only `https://github.com/<owner>/<repo>/releases/download/` URLs, and skips
     `opencode-desktop-*` assets.
-- [ ] T002 Generate `App/Resources/toolsets/opencode/manifest.json` with
+- [x] T002 Generate `App/Resources/toolsets/opencode/manifest.json` with
   `scripts/update-toolset.sh --archive-github opencode anomalyco/opencode v1.18.33`.
   - `kind: "archive"`, `runtimeID: "opencode"`, `version: "1.18.33"`,
     `source: "github:anomalyco/opencode@v1.18.33"`, `minFreeBytes: 500000000`.
@@ -46,7 +46,7 @@ run-app skill), never on the real home.
 
 ## Phase 2: Foundational (archive toolsets v2, blocking every story)
 
-- [ ] T004 [P] Write the tests in `Tests/Unit/ArchiveToolsetTests.swift` first:
+- [x] T004 [P] Write the tests in `Tests/Unit/ArchiveToolsetTests.swift` first:
   - Replace the `["antigravity"]` pin with a check that every archive manifest loads.
   - Platform choice: `{linux, x86_64, avx2:false, musl:true}` → `linux-x86_64-baseline-musl`;
     it falls back to dropping `-baseline`, then `-musl`; it never takes a musl build for glibc
@@ -54,17 +54,17 @@ run-app skill), never on the real home.
   - `format` comes from the URL (`.zip`, `.tar.gz`), and any other suffix is refused when the
     manifest loads.
   - A size mismatch is refused.
-- [ ] T005 In `Core/Runtimes/ArchiveToolset.swift`, add `Platform.format` (`zip` | `tarGz`),
+- [x] T005 In `Core/Runtimes/ArchiveToolset.swift`, add `Platform.format` (`zip` | `tarGz`),
   derived from the URL and never decoded. Add `HostFacts {os, arch, avx2, musl}` and
   `platformKey(for:)` implementing the choice rules in contracts/archive-manifest-v2.md. Keep
   version 1 manifests valid.
-- [ ] T006 In `Kit/Runtimes/MacArchiveInstaller.swift`:
+- [x] T006 In `Kit/Runtimes/MacArchiveInstaller.swift`:
   - Unpack `.tar.gz` with `/usr/bin/tar -xzf` (keep `ditto -x -k` for zip).
   - Refuse a download whose byte count ≠ `size`, with 048's checksum sentence.
   - Choose the Mac key through `platformKey(for:)`, with `avx2` from
     `sysctlbyname("hw.optional.avx2_0")`: true on arm64, and false when absent.
   - Never set `com.apple.quarantine` on the unpacked file (R1).
-- [ ] T007 [P] Add an integration test in `Tests/Integration/MacArchiveInstallerTests.swift`:
+- [x] T007 [P] Add an integration test in `Tests/Integration/MacArchiveInstallerTests.swift`:
   install a local `.tar.gz` test release through the file-URL path and check that `ok` is
   written last and `current` moves. Then check that a truncated archive leaves nothing in place.
 
@@ -79,45 +79,45 @@ still green.
 
 **Independent test**: quickstart §1, §3 and §5 on a scratch root.
 
-- [ ] T008 [US1] Add `RuntimeCatalog.opencode` in `Core/Runtimes/RuntimeCatalog.swift`:
+- [x] T008 [US1] Add `RuntimeCatalog.opencode` in `Core/Runtimes/RuntimeCatalog.swift`:
   - `id "opencode"`, `name "OpenCode"`, `executable "opencode"`, `arguments ["acp"]`
   - `install .toolset(runtimeID: "opencode")`, `installPage https://opencode.ai/docs/`,
     `usesAppCopyOnly: true`
   - **Append** it to `builtIn`, never prepend: `builtIn[0]` is the default runtime.
   - Do **not** add it to `carriesConversationAcrossFolders` (R9).
   - Add a header paragraph on the name trap (spec, *The name trap*).
-- [ ] T009 [US1] Add `ToolPolicyCatalog.opencode` in `Core/Runtimes/ToolPolicyCatalog.swift`,
+- [x] T009 [US1] Add `ToolPolicyCatalog.opencode` in `Core/Runtimes/ToolPolicyCatalog.swift`,
   appended to `builtIn` in the same order as `RuntimeCatalog.builtIn`:
-  - `removed: task (.agents), todowrite (.todos)`, `residue: []`
+  - `removed: task (.agents)`, `residue: []` (`todowrite` kept, as Claude's and Gemini's to-do lists are)
   - `lever: .environmentJSON(variable: "OPENCODE_CONFIG_CONTENT", value:)` with exactly
-    `{"autoupdate":false,"permission":{"bash":"ask","edit":"ask","webfetch":"ask"},"share":"disabled","tools":{"task":false,"todowrite":false}}`
+    `{"autoupdate":false,"permission":{"bash":"ask","edit":"ask","webfetch":"ask"},"share":"disabled","tools":{"task":false}}`
     (contracts/opencode-launch.md)
   - `escalationTool: nil`, `preferredAuthMethods: ["opencode-login"]`
-- [ ] T010 [US1] Add `RuntimeLaunchCatalog.opencode` in `Core/Runtimes/RuntimeLaunch.swift`,
+- [x] T010 [US1] Add `RuntimeLaunchCatalog.opencode` in `Core/Runtimes/RuntimeLaunch.swift`,
   with the environment `OPENCODE_DISABLE_AUTOUPDATE=1`, `OPENCODE_DISABLE_SHARE=1`,
   `OPENCODE_AUTH_CONTENT=nil` and `OPENCODE_ENABLE_QUESTION_TOOL=nil`. Add it to `builtIn`.
-- [ ] T011 [P] [US1] Add a test in `Tests/Unit/OpenCodeRuntimeTests.swift`: the launch
+- [x] T011 [P] [US1] Add a test in `Tests/Unit/OpenCodeRuntimeTests.swift`: the launch
   environment of an OpenCode process built by `ProcessSessionLauncher.environment` has
   `OPENCODE_CONFIG_CONTENT` byte for byte as the contract says, the two `DISABLE_` variables,
   and no `OPENCODE_AUTH_CONTENT` even when the login shell has one.
-- [ ] T012 [US1] Update the counts and pins that the new runtime changes:
+- [x] T012 [US1] Update the counts and pins that the new runtime changes:
   - `Tests/Unit/RuntimeDiscoveryTests.swift` (count)
   - `Tests/Unit/RuntimeAvailabilityCodingTests.swift`
   - `Tests/Fake/FakeLauncher.swift` (it makes `current/ok` for app-copy runtimes)
   - `Tests/Unit/ToolPolicyTests.swift` and `Tests/Unit/BriefingTests.swift`
 
   Then run those suites.
-- [ ] T013 [P] [US1] Add a rule for OpenCode in `Kit/Projects/PersonalDotAgents.swift` (:67-95):
+- [x] T013 [P] [US1] Add a rule for OpenCode in `Kit/Projects/PersonalDotAgents.swift` (:67-95):
   no skills folder link, no instructions link, `takesStdioServers: true`, no plugin handover
   (R8). Add its MCP entry in `Kit/Projects/PersonalDotAgents+Snapshot.swift` as "reads the
   app's session servers only".
-- [ ] T014 [US1] Zero cost is no cost (plan P2, confirmed by Alex).
+- [x] T014 [US1] Zero cost is no cost (plan P2, confirmed by Alex).
   - In `Core/Model/Usage.swift` and `Core/Model/Agent.swift` (`costIsUnmeasured`), and in the
     banking in `Kit/Daemon/DaemonCore+Commands.swift` (~:788 `bank`, ~:1118 `lastTurnUsage.cost`),
     a cost with `amount == 0` on a turn with tokens > 0 is unmeasured. It is never banked into
     `costToDate`.
   - Test it in `Tests/Unit/UsageCostTests.swift` with `Fixtures/opencode/usage-zero-cost.json`.
-- [ ] T015 [P] [US1] Show no cost for a zero cost on the meters, in
+- [x] T015 [P] [US1] Show no cost for a zero cost on the meters, in
   `App/Sources/Chat/ContextMeter.swift` (:89-100) and `Remote/Sources/Chat/RemoteChatView.swift`
   (:337).
 - [ ] T016 [US1] Add `opencode` to `scripts/acp-handshake.sh` (`RUNTIMES` via
@@ -142,7 +142,7 @@ still green.
 
 **Independent test**: quickstart §2.
 
-- [ ] T018 [P] [US2] Add an integration test in `Tests/Integration/OpenCodeNameTrapTests.swift`.
+- [x] T018 [P] [US2] Add an integration test in `Tests/Integration/OpenCodeNameTrapTests.swift`.
   Put a fake `opencode` that writes a marker file first on the search path, with no app copy.
   - Discovery reports OpenCode as not installed.
   - A start refuses with the "not installed" sentence and **Install**, within the start-up
@@ -282,7 +282,7 @@ sign-ins per run.
   Run `scripts/docs-check.py`.
 - [ ] T036 [P] Give OpenCode the "O" letter in `App/Sources/Settings/Shared/ReachDots.swift`
   (:24), so the fallback isn't relied on.
-- [ ] T037 In `App/Sources/Runtimes/InstallAgentsSheet.swift` (:141-148), the `downloadNote`
+- [x] T037 In `App/Sources/Runtimes/InstallAgentsSheet.swift` (:141-148), the `downloadNote`
   names "GitHub" for `github.com` hosts, as it names "Google" for `dl.google.com`.
 - [ ] T038 Build both schemes sequentially, skipping plugin validation (see memory), and
   `scripts/build-linux-agentsd.sh`. Then run the full suite on this branch and on main, three
