@@ -133,3 +133,36 @@ private actor Careless: ControlStore {
     func delete(_ key: String) async throws { objects[key] = nil }
     func list(prefix: String) async throws -> [StoredKey] { [] }
 }
+
+/// Version 2 codes: one URL and a pin (data-model.md "Code").
+@Suite("A code with an address")
+struct ControlCodeVersion2Tests {
+    let key = Data([0x04] + Array(repeating: 7, count: 64))
+    let secret = Data(repeating: 9, count: 32)
+
+    @Test func itReadsBackWithItsURLAndPin() throws {
+        let pin = ControlCode.base64url(Data(repeating: 1, count: 32))
+        let code = ControlCode(purpose: .client(.operator), controlKey: key, secret: secret,
+                               url: "https://mini.local:8791", pin: pin, name: "Alex's Mac: mini")
+        #expect(code.text.hasPrefix("agents-control:2:c:operator:"))
+        let back = try #require(ControlCode(text: code.text))
+        #expect(back == code)
+        #expect(back.url == "https://mini.local:8791")
+        #expect(back.pin == pin)
+        #expect(back.name == "Alex's Mac: mini")
+    }
+
+    @Test func aPubliclyTrustedAddressHasNoPin() throws {
+        let code = ControlCode(purpose: .host, controlKey: key, secret: secret,
+                               url: "https://agents.example.com", pin: nil, name: "cloud")
+        #expect(try #require(ControlCode(text: code.text)).pin == nil)
+    }
+
+    @Test func notAnHTTPSAddressOrABadPinIsRefused() {
+        let bad = ControlCode(purpose: .host, controlKey: key, secret: secret, url: "http://x", pin: nil, name: "n")
+        #expect(ControlCode(text: bad.text) == nil)
+        var badPin = ControlCode(purpose: .host, controlKey: key, secret: secret, url: "https://x", pin: nil, name: "n")
+        badPin.pin = "short"
+        #expect(ControlCode(text: badPin.text) == nil)
+    }
+}

@@ -99,14 +99,14 @@ WebSockets, with hosts and clients able to dial it. There is no UI change here b
 transport.
 
 - [x] T029 (in AgentsKitCore, beside the protocol, so the old bridge path can use it too) [P] Write `ControlStore` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/ControlStore.swift`, as contracts/store.md gives it: `get`, `put(when: .absent | .matching(etag) | .always)`, `delete` and `list(prefix:)`. Also write the errors `StoreError.conflict` and `.unavailable`, and a `MemoryStore` for tests.
-- [ ] T030 [P] In `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift` and `ControlCode.swift`:
+- [x] T030 (`HostLease`, since `Lease` was taken; `reach` stays until T073; the code keeps the control key) [P] In `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift` and `ControlCode.swift`:
   - Add `owner: PersonID` and `rev: Int` to `ClientRecord` and `HostRecord`. Add `relay: Bool`, `machineID` and `installedBy: command | ssh(destination)` to `HostRecord`, and remove `reach`.
   - Add `PersonID`, `Lease`, `CopyRecord` and `ControlEvent` as in data-model.md.
   - Change the code text to `agents-control:2:<c|h>:<grant|->:<url>:<pin|->:<secret>:<name>`, keeping a reader for version 1.
 - [x] T031 [P] In `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
   - move the control plane's failures to -32090…-32094, since main took -32070 (`signInWanted`) and -32080 (`catalogRefused`): `hostOffline`, `noSuchHost`, `lastOperator`, and the new `changedElsewhere` and `storeUnavailable` (contracts/control-api.md);
   - update every use and test.
-- [ ] T032 Make `ControlMethods` read and write through `ControlStore` instead of `GrantStore`, in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlMethods.swift`:
+- [x] T032 (through `ControlRecords`, a records layer in AgentsKitCore that the bridge's control plane and the move use too) Make `ControlMethods` read and write through `ControlStore` instead of `GrantStore`, in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlMethods.swift`:
   - a record cache with ETags;
   - store first, then change;
   - `lastSeen` written at most hourly;
@@ -118,7 +118,7 @@ transport.
   - the ETag is SHA-256 of the contents;
   - `put` takes `flock` on `<key>.lock`, compares, writes a temporary file, `fsync`s it and renames it into place;
   - `list` walks the prefix.
-- [ ] T034 [P] Store conformance tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/StoreConformanceTests.swift`. Run them against `MemoryStore` and `FolderStore`, and against `S3Store` when `AGENTS_TEST_S3` is set:
+- [ ] T034 (memory and folder done in `ControlStoreTests` and `ControlRecordsTests`; the bucket's run waits on T062) [P] Store conformance tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/StoreConformanceTests.swift`. Run them against `MemoryStore` and `FolderStore`, and against `S3Store` when `AGENTS_TEST_S3` is set:
   - create-only conflicts;
   - a stale `matching` conflicts;
   - `list` sees new keys;

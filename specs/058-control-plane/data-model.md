@@ -73,7 +73,8 @@ Rules:
 | `issuedBy` | ClientID | Who asked for it (shown in Settings). |
 
 - **The secret itself** is never stored. The code text a person sees is
-  `agents-control:2:<c|h>:<grant|->:<url>:<pin|->:<secret>:<name>`.
+  `agents-control:2:<c|h>:<grant|->:<key>:<secret>:<url>:<pin|->:<name>`. It keeps the
+  control plane's public key, so the new party checks the key it meets on its first connection.
 - **Using a code** creates `<hash>.spent` with `If-None-Match: *`, so it works once, at any
   copy.
 - **Expired codes** are deleted by any copy that lists them.
