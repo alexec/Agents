@@ -84,6 +84,11 @@ struct ChatTranscript: View {
         (agent.state == .running || agent.state == .waitingOnUser) && actions.canSendNow(agent.runtimeID)
     }
 
+    /// What is drawn: `items` folded into asks and outcomes.
+    private var rows: [OutcomeRow] { items.outcomes() }
+
+    private var isWorking: Bool { agent.state == .running || agent.state == .starting }
+
     var body: some View {
         ScrollViewReader { scroller in
             ScrollView {
@@ -96,11 +101,23 @@ struct ChatTranscript: View {
                     }
                     // Folded once by the model as each entry lands, not here on every
                     // redraw: a reply arrives several chunks a second.
-                    ForEach(items) { item in
-                        TranscriptRow(item: item,
-                                      isExpanded: expandedRuns.contains(item.id),
-                                      toggle: { toggle(item.id) })
-                            .id(item.id)
+                    // Asks and outcomes, with each turn's work folded under its ask.
+                    ForEach(rows) { row in
+                        switch row {
+                        case .item(let item):
+                            TranscriptRow(item: item,
+                                          isExpanded: expandedRuns.contains(item.id),
+                                          toggle: { toggle(item.id) })
+                                .id(item.id)
+                        case .steps(let id, _, _, _):
+                            StepsRow(row: row,
+                                     isLive: isWorking && id == rows.last(where: \.isSteps)?.id,
+                                     isExpanded: expandedRuns.contains(id),
+                                     toggle: { toggle(id) },
+                                     isRunExpanded: { expandedRuns.contains($0) },
+                                     toggleRun: { toggle($0) })
+                                .id(id)
+                        }
                     }
                     .environment(\.backgroundWork, agent.background)
                     ForEach(agent.queuedPrompts) { queued in
@@ -264,6 +281,8 @@ struct ChatTranscript: View {
                 // and it was asked for. Following on from here would take the reader
                 // straight back off the line they were sent to.
                 isFollowing = false
+                // Folded into a turn's steps, it has to be drawn before it can be reached.
+                if let fold = rows.first(where: { $0.holds(focusedEntry) }) { expandedRuns.insert(fold.id) }
                 withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(focusedEntry, anchor: .center) }
                 clearFocus()
             }
@@ -376,7 +395,7 @@ struct ChatTranscript: View {
         guard hasSettled, !isLoadingEarlier, hasMore else { return }
         isLoadingEarlier = true
         restoreFollowing = isFollowing
-        restoreIDs = items.prefix(8).map(\.id)
+        restoreIDs = rows.prefix(8).map(\.id)
         Task {
             await loadEarlier()
             // A beat before the next one can start, so one flick does not swallow
@@ -394,7 +413,7 @@ struct ChatTranscript: View {
         }
         // The first row may have been joined into the page that just arrived, so
         // its id is gone. The next row that is still there is the same line.
-        if let id = restoreIDs.first(where: { id in items.contains { $0.id == id } }) {
+        if let id = restoreIDs.first(where: { id in rows.contains { $0.id == id } }) {
             place(scroller, on: id, anchor: .top)
         }
     }
