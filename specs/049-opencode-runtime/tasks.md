@@ -168,14 +168,14 @@ and fetches ask.
 
 **Independent test**: quickstart §4 and §7.
 
-- [ ] T020 [US4] Add `opencode` to 061's `Core/Model/ClientPermissionSettings.swift` (a field,
+- [x] T020 [US4] Add `opencode` to 061's `Core/Model/ClientPermissionSettings.swift` (a field,
   `supports`, `mode(for:)`, default `ask`), to its store in `App/Sources/AppModel.swift`
   (:78, :897-905) and to the row in `App/Sources/Settings/AgentRuntimesSettingsView.swift`
   (:23-25, :57-95).
-- [ ] T021 [P] [US4] Add a test in `Tests/Unit/ClientPermissionSettingsTests.swift`: OpenCode
+- [x] T021 [P] [US4] Add a test in `Tests/Unit/ClientPermissionSettingsTests.swift`: OpenCode
   supports the setting. Under `alwaysApprove`, the daemon answers OpenCode's options
   (`once`/`always`/`reject`) with `once`.
-- [ ] T022 [US4] Live check on a scratch root (quickstart §4):
+- [x] T022 [US4] Live check on a scratch root (quickstart §4):
   - the agent lists its tools: `agents_*` are present, and `task` and `todowrite` are absent;
   - `finish_turn` arrives;
   - an `ask_form` question card arrives;
@@ -192,25 +192,25 @@ sentences.
 
 **Independent test**: quickstart §6.
 
-- [ ] T023 [US3] In `Core/ACP/ACPTypes.swift` (:163-183), add `"terminal-auth": true` to
+- [x] T023 [US3] In `Core/ACP/ACPTypes.swift` (:163-183), add `"terminal-auth": true` to
   `clientCapabilities._meta` beside `jetbrains.air`. Then run `scripts/acp-handshake.sh` for all
   eight runtimes, and record in research.md (R11) that no other runtime's auth methods changed
   for the worse.
-- [ ] T024 [US3] In `Kit/Daemon/DaemonCore+Runtimes.swift` (:26-35), for a `usesAppCopyOnly`
+- [x] T024 [US3] In `Kit/Daemon/DaemonCore+Runtimes.swift` (:26-35), for a `usesAppCopyOnly`
   runtime whose terminal-auth `command` equals `runtime.executable`, replace it with the shim's
   absolute path `<root>/tools/<id>/current/bin/<executable>`. Test it in
   `Tests/Unit/TerminalAuthCommandTests.swift` with `Fixtures/opencode/initialize.json`.
-- [ ] T025 [US3] In `Kit/Daemon/DaemonCore+Commands.swift` (`signInReason` :457-466):
+- [x] T025 [US3] In `Kit/Daemon/DaemonCore+Commands.swift` (`signInReason` :457-466):
   - treat `-32603` with `data.errorName == "APIError"` and "API key is invalid" as a refused
     sign-in;
   - make a `session/set_config_option` failure with `data.providerId` into "OpenCode isn't
     signed in to <provider>", with the sign-in sheet.
 
   Test both with the fixtures in `Tests/Unit/OpenCodeErrorTests.swift`.
-- [ ] T026 [US3] In `App/Sources/Runtimes/RuntimeAccountView.swift`, OpenCode's sheet shows no
+- [x] T026 [US3] In `App/Sources/Runtimes/RuntimeAccountView.swift`, OpenCode's sheet shows no
   Sign out. It shows a line naming `<app copy> auth logout`, as Cursor's does. If a
   `RuntimeLaunch.signInNotice` fits, use that rather than a special case.
-- [ ] T027 [US3] Live check (quickstart §6): pick an unsigned provider's model id over the
+- [x] T027 [US3] Live check (quickstart §6): pick an unsigned provider's model id over the
   socket to get the sentence. Then check that the sheet's command is the full path, and that
   Copy puts it on the pasteboard.
 
