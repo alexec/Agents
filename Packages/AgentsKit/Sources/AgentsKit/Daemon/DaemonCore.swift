@@ -341,10 +341,6 @@ public actor DaemonCore {
     /// Credentials whose allowance is being asked for now, so opening the Pool page
     /// twice starts one runtime, not two.
     var measuringAllowances: Set<String> = []
-    /// A chat whose allowance ran out this turn, waiting for its runtime to be let go
-    /// before it carries on (052). `resend` is whether the turn failed and its prompt
-    /// goes again.
-    var pendingCarry: [UUID: (reason: SwitchRecord.Reason, resend: Bool)] = [:]
     /// When `pool/changed` last went out, and whether one is held back to go at the end
     /// of the second (052 US3): a burst of changes is one broadcast.
     var poolBroadcastAt: ContinuousClock.Instant?
@@ -354,9 +350,9 @@ public actor DaemonCore {
     var modelsProbedAt: [String: Date] = [:]
     /// Checks already running, so a heartbeat cannot start the same one twice.
     var allowanceChecks: Set<String> = []
-    /// Credentials already tried for the prompt a chat is carrying (052): never gone back
-    /// to for the same prompt. Cleared by a turn that works.
-    var carryTried: [UUID: Set<String>] = [:]
+    /// Each chat's rate-limit refusals in the window (065): three on one chat is a limit
+    /// that persists. In memory; a restart forgets it.
+    var rateLimitStreaks: [UUID: [Date]] = [:]
     /// A handoff to send with the chat's next prompt, when the switch did not re-send one.
     var pendingHandoff: [UUID: String] = [:]
     /// How rate limits are retried. A test shortens the waits; nothing else changes it.
@@ -987,6 +983,7 @@ public actor DaemonCore {
             // of the list each time.
             if let mended = agents[id] { try? await store.save(mended) }
         }
+        clearAllowanceWaitsLeftFromBefore()
         startRetentionChecks()
     }
 

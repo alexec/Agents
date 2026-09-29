@@ -46,7 +46,7 @@ struct PoolStatusTests {
         await core.setAllowanceState(out(claude, until: clock.now.addingTimeInterval(3600), at: clock.now))
         await core.setAllowanceState(out(codex, until: nil, at: clock.now))
         var limited = AllowanceState(credentialKey: "copilot:sign-in", entryID: copilot.id, since: clock.now)
-        _ = limited.rateLimited(now: clock.now, retryAt: clock.now.addingTimeInterval(120), payment: copilot.payment)
+        limited.rateLimited(now: clock.now, retryAt: clock.now.addingTimeInterval(120))
         await core.setAllowanceState(limited)
 
         let status = await core.poolStatus()

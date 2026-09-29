@@ -161,18 +161,12 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         return true
     }
 
-    /// A rate limit. Returns true when it has come back often enough to count as spent
-    /// (three within ten minutes, R7); the entry is then out for a four-hour check.
-    public mutating func rateLimited(now: Date, retryAt: Date, payment: Payment,
-                                     policy: RateLimitPolicy = .standard) -> Bool {
-        rateLimitStreak = rateLimitStreak.filter { now.timeIntervalSince($0) < policy.window } + [now]
-        if rateLimitStreak.count >= policy.persistsAfter {
-            markOut(.rateLimitPersisted, until: nil, payment: payment, now: now, from: .typedFailure)
-            return true
-        }
+    /// A chat on it was rate limited and will try again at `retryAt`. Shown, and over
+    /// by itself at that time. Whether the limit has persisted is the chat's streak,
+    /// not this (065, `RateLimitPolicy.streak`).
+    public mutating func rateLimited(now: Date, retryAt: Date) {
         status = .rateLimited(until: retryAt)
         since = now
-        return false
     }
 
     /// A turn worked here: whatever was holding it is over.
@@ -278,5 +272,13 @@ public struct RateLimitPolicy: Hashable, Sendable {
 
     public func delay(forAttempt attempt: Int) -> TimeInterval {
         delays.isEmpty ? 30 : delays[min(attempt, delays.count - 1)]
+    }
+
+    /// One chat's refusals within the window, with this one added, and whether that
+    /// many means the limit has persisted (three within ten minutes, R7). The streak is
+    /// the chat's own: another chat's refusals on the same runtime do not count (065).
+    public func streak(_ earlier: [Date], adding now: Date) -> (streak: [Date], persists: Bool) {
+        let streak = earlier.filter { now.timeIntervalSince($0) < window } + [now]
+        return (streak, streak.count >= persistsAfter)
     }
 }

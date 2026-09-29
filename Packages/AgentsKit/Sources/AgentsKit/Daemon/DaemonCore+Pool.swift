@@ -68,9 +68,11 @@ extension DaemonCore {
         return recognition
     }
 
-    /// Act on a recognised limit at the end of a turn: say it, mark the credential, and
-    /// choose how the turn ends. Returns true when the turn will be sent again (a rate
-    /// limit being retried), so the caller leaves the agent to that.
+    /// Act on a recognised limit at the end of a turn: say it on this chat, mark the
+    /// runtime, and choose how the turn ends. Nothing carries the chat on (065): the
+    /// person starts another and asks it to read this one. Returns true when the turn
+    /// will be sent again (a rate limit being retried), so the caller leaves the agent
+    /// to that.
     func applyRecognition(_ recognition: Recognition, agentID: UUID, reason: inout EndedReason) async -> Bool {
         guard let agent = agents[agentID] else { return false }
         let entry = poolEntry(for: agent)
@@ -84,39 +86,38 @@ extension DaemonCore {
             state.markOut(.allowanceSpent, until: resetsAt, payment: entry.payment, now: at, from: .typedFailure)
             setAllowanceState(state)
             raiseAllowanceOut(entry, state: state, reason: "allowance spent")
-            if !willCarry(agent) {
-                await record(.runtimeNote(PoolWords.ranOut(agent.runtimeID, state: state, now: at)), for: agentID)
-            }
-            pendingCarry[agentID] = (.allowanceSpent, true)
+            await record(.runtimeNote(PoolWords.ranOut(agent.runtimeID, state: state, now: at)), for: agentID)
             reason = .allowanceSpent
         case .creditGone:
             state.markOut(.creditUsedUp, until: nil, payment: entry.payment, now: at, from: .words)
             setAllowanceState(state)
             raiseAllowanceOut(entry, state: state, reason: "credit used up")
-            if !willCarry(agent) { await record(.runtimeNote(PoolWords.creditGone(agent.runtimeID)), for: agentID) }
-            pendingCarry[agentID] = (.creditUsedUp, true)
+            await record(.runtimeNote(PoolWords.creditGone(agent.runtimeID)), for: agentID)
             reason = .allowanceSpent
         case .overage(let resetsAt):
             state.markOut(.overage, until: resetsAt, payment: entry.payment, now: at, from: .overageReport)
             setAllowanceState(state)
             raiseAllowanceOut(entry, state: state, reason: "paid extra usage began")
-            if !willCarry(agent) { await record(.runtimeNote(PoolWords.overageBegan(agent.runtimeID)), for: agentID) }
-            // The turn itself may have worked; then only the next one goes elsewhere.
-            pendingCarry[agentID] = (.overage, reason != .endTurn)
+            await record(.runtimeNote(PoolWords.overageBegan(agent.runtimeID)), for: agentID)
+            // The turn itself may have worked; then it stays worked.
             if reason == .endTurn { return false }
             reason = .allowanceSpent
         case .rateLimited(let retryAfter):
             let attempt = rateLimitAttempts[agentID, default: 0]
             let retryAt = retryAfter ?? at.addingTimeInterval(rateLimitPolicy.delay(forAttempt: attempt))
-            if state.rateLimited(now: at, retryAt: retryAt, payment: entry.payment, policy: rateLimitPolicy) {
-                setAllowanceState(state)
+            let (streak, persists) = rateLimitPolicy.streak(rateLimitStreaks[agentID, default: []], adding: at)
+            if persists {
+                rateLimitStreaks[agentID] = nil
                 rateLimitAttempts[agentID] = nil
+                state.markOut(.rateLimitPersisted, until: nil, payment: entry.payment, now: at, from: .typedFailure)
+                setAllowanceState(state)
                 raiseAllowanceOut(entry, state: state, reason: "still rate limited")
-                if !willCarry(agent) { await record(.runtimeNote(PoolWords.stillRateLimited(agent.runtimeID)), for: agentID) }
-                pendingCarry[agentID] = (.rateLimitPersisted, true)
+                await record(.runtimeNote(PoolWords.stillRateLimited(agent.runtimeID)), for: agentID)
                 reason = .rateLimited
                 return false
             }
+            rateLimitStreaks[agentID] = streak
+            state.rateLimited(now: at, retryAt: retryAt)
             setAllowanceState(state)
             guard let prompt = lastPrompts[agentID] else {
                 reason = .rateLimited
@@ -136,7 +137,7 @@ extension DaemonCore {
     func allowanceWorked(agentID: UUID) async {
         guard let agent = agents[agentID] else { return }
         rateLimitAttempts[agentID] = nil
-        carryTried[agentID] = nil
+        rateLimitStreaks[agentID] = nil
         let entry = poolEntry(for: agent)
         var state = allowanceState(for: entry)
         let at = now()
@@ -209,67 +210,6 @@ extension DaemonCore {
                             recorded: false)
         } catch {
             await record(.runtimeNote("Could not try again: \(reason(error))"), for: agentID)
-        }
-    }
-
-    // MARK: Carrying on (US1)
-
-    /// Whether a spent allowance will move this chat, so the note that it stopped is
-    /// not written only to be followed by the note that it moved.
-    func willCarry(_ agent: Agent) -> Bool {
-        pool.isEffective && !agent.switchingOff
-    }
-
-    /// Carry a chat on with the next entry, once its old runtime has been let go (FR-009
-    /// to FR-015). Called at the two places a turn ends. Nothing happens unless a spent
-    /// allowance was recognised this turn. True when a turn was started on the new
-    /// runtime; false when there was nowhere to go, or when the handoff waits for the
-    /// next prompt, so the caller carries on as for any ending.
-    @discardableResult
-    func carryOnIfPending(_ agentID: UUID) async -> Bool {
-        guard let pending = pendingCarry.removeValue(forKey: agentID),
-              var agent = agents[agentID], agent.state != .archived else { return false }
-        let current = poolEntry(for: agent)
-        var tried = carryTried[agentID, default: []]
-        tried.insert(AllowanceState.credentialKey(for: current))
-        let at = now()
-        let states = settledStates(at: at)
-        let decision = PoolPlan.next(current: current, pool: pool, switchingOff: agent.switchingOff,
-                                     states: states, tried: tried, unusable: { self.unusable($0) }, now: at)
-        guard case .switchTo(let entry) = decision else {
-            if let state = allowances[AllowanceState.credentialKey(for: current)] {
-                await record(.runtimeNote(PoolWords.ranOut(current.runtimeID, state: state, now: at)), for: agentID)
-            }
-            if case .everyoneOut = decision {
-                // Wait for the first check, the chat's own runtime included, and carry on
-                // once one passes (US4). Only with words to send again: a chat that ran
-                // out without being refused has nothing to wait to say.
-                if pending.resend, let prompt = lastPrompts[agentID],
-                   let back = PoolPlan.earliestReturn(current: current, pool: pool, states: states,
-                                                      unusable: { self.unusable($0) }, now: at) {
-                    await startWaiting(agentID, for: back, prompt: prompt)
-                } else {
-                    await record(.runtimeNote(PoolWords.everyoneOutNoTime), for: agentID)
-                }
-            }
-            return false
-        }
-        tried.insert(AllowanceState.credentialKey(for: entry))
-        carryTried[agentID] = tried
-        let why = switch pending.reason {
-        case .overage: "it started using paid extra usage"
-        case .creditUsedUp: "its credit was used up"
-        case .rateLimitPersisted: "it stayed rate limited"
-        case .runtimeFailed: "it failed"
-        case .everyoneOutResumed: "every runtime was out, and this one is back"
-        default: "its allowance ran out"
-        }
-        do {
-            return try await switchRuntime(agentID, to: entry, reason: pending.reason, why: why, resend: pending.resend)
-        } catch {
-            await record(.runtimeNote("Could not carry on with \(PoolWords.runtimeName(entry.runtimeID)): \(reason(error))"),
-                         for: agentID)
-            return false
         }
     }
 
@@ -561,19 +501,18 @@ extension DaemonCore {
         return .init(runtimeID: agent.runtimeID, plan: plan, options: options, agent: changed)
     }
 
-    // MARK: Everyone out (US4)
+    // MARK: Waits left from 052 (US4)
 
-    /// Wait for `back`, and carry on then with the words that were refused.
-    func startWaiting(_ agentID: UUID, for back: (at: Date, entry: PoolEntry), prompt: SentPrompt) async {
-        guard var agent = agents[agentID] else { return }
-        agent.allowanceWait = AllowanceWait(resumeAt: back.at, entryID: back.entry.id, runtimeID: back.entry.runtimeID,
-                                            text: prompt.text, blocks: prompt.blocks, from: prompt.from)
-        // Written and saved in one step (`changed` saves): an await between reading the
-        // record and writing it back would put back a stale copy over a prompt or a
-        // Stop waiting that landed meanwhile.
-        changed(agent)
-        await record(.runtimeNote(PoolWords.waiting(back.entry.runtimeID, until: back.at, now: now())), for: agentID)
-        broadcastPool()
+    /// A wait saved by an older build: cleared at launch and never resumed (065). The
+    /// chat stays where it ended; the note it already has says why.
+    func clearAllowanceWaitsLeftFromBefore() {
+        for (id, agent) in agents where agent.allowanceWait != nil {
+            var cleared = agent
+            cleared.allowanceWait = nil
+            if cleared.state == .stopped, cleared.endedReason == nil { cleared.endedReason = .allowanceSpent }
+            changed(cleared)
+            DaemonLog.shared.write("065: cleared an allowance wait left from before on agent \(id)")
+        }
     }
 
     /// Drop a chat's wait: the person prompted, stopped, parked or archived it (FR-017),
@@ -583,61 +522,6 @@ extension DaemonCore {
         agent.allowanceWait = nil
         changed(agent)
         broadcastPool()
-    }
-
-    /// Every wait whose time has come, on the workflow heartbeat, which is also the first
-    /// tick after a restart, so a wait that fell due while nothing ran is kept too. The
-    /// chat carries on where it can: on its own runtime if that is back, otherwise on
-    /// the first in the pool that is not out. If none is yet, it waits again, or stops.
-    func resumeAllowanceWaits(now at: Date) async {
-        let due = agents.values.filter { $0.allowanceWait?.isDue(now: at) == true && $0.state != .archived }
-        for agent in due {
-            guard let wait = agent.allowanceWait else { continue }
-            let waitedEntry = pool.entry(wait.entryID)
-                ?? (wait.runtimeID == agent.runtimeID ? poolEntry(for: agent) : nil)
-            let waitKey = waitedEntry.map { AllowanceState.credentialKey(for: $0) }
-            if let waitKey, allowanceChecks.contains(waitKey) { continue }
-            let current = poolEntry(for: agent)
-            let states = settledStates(at: at)
-            if states[AllowanceState.credentialKey(for: current)]?.isUsable(now: at) != true,
-               case .everyoneOut = PoolPlan.next(current: current, pool: pool, switchingOff: false,
-                                                  states: states, tried: [],
-                                                  unusable: { self.unusable($0) }, now: at),
-               let next = PoolPlan.earliestReturn(current: current, pool: pool, states: states,
-                                                  unusable: { self.unusable($0) }, now: at) {
-                var waiting = agent
-                waiting.allowanceWait?.resumeAt = next.at
-                changed(waiting)
-                broadcastPool()
-                continue
-            }
-            dropAllowanceWait(agent.id)
-            // A turn under way, or words already queued: the person has moved on.
-            guard turnTasks[agent.id] == nil, agent.queuedPrompts.isEmpty else { continue }
-            let prompt = SentPrompt(text: wait.text, blocks: wait.blocks, from: wait.from, preface: nil,
-                                    costBefore: agent.costToDate)
-            lastPrompts[agent.id] = prompt
-            carryTried[agent.id] = nil
-            if states[AllowanceState.credentialKey(for: current)]?.isUsable(now: at) ?? true {
-                await record(.runtimeNote(PoolWords.cameBack(agent.runtimeID)), for: agent.id)
-                await sendAgain(agent.id, prompt: prompt)
-            } else {
-                pendingCarry[agent.id] = (.everyoneOutResumed, true)
-                await carryOnIfPending(agent.id)
-            }
-        }
-    }
-
-    /// The refused words, sent again on the chat's own runtime, not recorded twice.
-    private func sendAgain(_ agentID: UUID, prompt: SentPrompt) async {
-        guard let agent = agents[agentID] else { return }
-        do {
-            let session = try await liveSession(for: agent)
-            await beginTurn(agentID: agentID, text: prompt.text, blocks: prompt.blocks, from: prompt.from,
-                            session: session, preface: prompt.preface, recorded: false)
-        } catch {
-            await record(.runtimeNote("Could not carry on: \(reason(error))"), for: agentID)
-        }
     }
 
     /// Stop waiting, from the Pool page or the phone (US4).
@@ -653,34 +537,6 @@ extension DaemonCore {
         guard var agent = agents[agentID], agent.switchingOff != off else { return }
         agent.switchingOff = off
         changed(agent)
-    }
-
-    /// A chat whose runtime is already known to be out moves before its turn rather than
-    /// failing first (FR-012, US3-AS5). Only when there is somewhere to go: otherwise the
-    /// turn is tried, and whatever the runtime says is heard as usual.
-    func moveFirstIfOut(_ agentID: UUID) async {
-        guard pool.isEffective, let agent = agents[agentID], !agent.switchingOff else { return }
-        let current = poolEntry(for: agent)
-        let at = now()
-        let states = settledStates(at: at)
-        guard let state = states[AllowanceState.credentialKey(for: current)], state.isOut else { return }
-        let decision = PoolPlan.next(current: current, pool: pool, switchingOff: false, states: states,
-                                     tried: [AllowanceState.credentialKey(for: current)],
-                                     unusable: { self.unusable($0) }, now: at)
-        guard case .switchTo = decision else { return }
-        pendingCarry[agentID] = (Self.carryReason(state), false)
-        await carryOnIfPending(agentID)
-    }
-
-    /// Why an out credential is out, as a switch says it.
-    static func carryReason(_ state: AllowanceState) -> SwitchRecord.Reason {
-        switch state.status {
-        case .out(_, _, .overage): .overage
-        case .out(_, _, .creditUsedUp), .out(_, _, .creditExpired): .creditUsedUp
-        case .out(_, _, .rateLimitPersisted): .rateLimitPersisted
-        case .out(_, _, .runtimeFailed): .runtimeFailed
-        default: .allowanceSpent
-        }
     }
 
     /// The handoff as the new runtime takes it: embedded, where it says it can hold

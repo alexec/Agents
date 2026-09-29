@@ -103,18 +103,13 @@ struct PoolSetTests {
         #expect(settings.entries == [claude, prepaid])
     }
 
-    @Test func aSignedOutEntryStaysAndIsSkipped() async throws {
-        var spent = FakeACPAgent.Script()
-        spent.promptResultMeta = try SessionFailureDecodingTests.fixture("quota-exhausted")
-        let (core, work, _) = try core([spent])
+    @Test func aSignedOutEntryStaysAndSaysSo() async throws {
+        let (core, _, _) = try core([])
         _ = try await core.setPool(PoolSettings(isOn: true, entries: [claude, codex, copilot]))
         await core.markNeedsSignIn(runtimeID: "codex")
         let status = await core.poolStatus()
         #expect(status.rows.map(\.entry.runtimeID) == ["claude", "codex", "copilot"])
         #expect(status.rows.first { $0.entry.runtimeID == "codex" }?.unusable == "not signed in")
-
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        await eventually("it moved past Codex") { await core.agent(id)?.runtimeID == "copilot" }
     }
 }
 

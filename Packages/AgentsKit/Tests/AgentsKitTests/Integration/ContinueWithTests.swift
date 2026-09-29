@@ -148,33 +148,6 @@ struct ContinueWithTests {
         #expect(await core.agent(id)?.runtimeID == "claude")
     }
 
-    @Test func adjustingAnAutomaticSwitchChangesTheNextTurnOnly() async throws {
-        var spent = claudeScript
-        spent.promptResultMeta = try SessionFailureDecodingTests.fixture("quota-exhausted")
-        let (core, work, launcher) = try await core([spent])
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        await eventually("it moved to Codex") { await core.agent(id)?.runtimeID == "codex" }
-        await eventually("Codex answered") { await core.agent(id)?.state == .finished }
-        let launches = launcher.launchCount
-
-        let preview = try await core.continueWith(.init(agentID: id, adjust: true))
-        #expect(preview.runtimeID == "codex")
-        #expect(preview.options.map(\.id).sorted() == ["llm", "permission_mode"])
-
-        let adjusted = try await core.continueWith(.init(agentID: id, adjust: true, choices: ["llm": "gpt-5"], confirmed: true))
-        #expect(adjusted.agent?.startOptions.values["llm"] == .string("gpt-5"))
-        #expect(await core.agent(id)?.runtimeID == "codex")
-        #expect(launcher.launchCount == launches, "no new session")
-        #expect(try await core.transcript(.init(agentID: id)).entries.contains {
-            if case .settingsChanged = $0.kind { true } else { false }
-        })
-        // Never looser than the mode the chat had before it moved.
-        let looser = await failure {
-            _ = try await core.continueWith(.init(agentID: id, adjust: true, choices: ["permission_mode": "agent"], confirmed: true))
-        }
-        #expect(looser?.message.contains("cannot be looser") == true)
-    }
-
     @Test func aPairedPhoneMayDoItToo() {
         #expect(ConnectionRole.device.allows(DaemonAPI.Method.agentsContinueWith))
         #expect(ConnectionRole.device.allows(DaemonAPI.Method.agentsSetSwitching))

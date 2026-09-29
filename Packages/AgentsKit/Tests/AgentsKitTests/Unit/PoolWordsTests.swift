@@ -20,7 +20,7 @@ struct PoolWordsTests {
         state.markOut(.creditExpired, until: nil, payment: .freeCredit(amount: nil, expires: now), now: now, from: .expiry)
         #expect(PoolWords.state(state, now: now) == "Free credit expired")
         state.markAvailable(now: now)
-        _ = state.rateLimited(now: now, retryAt: now.addingTimeInterval(30), payment: .allowance(label: nil))
+        state.rateLimited(now: now, retryAt: now.addingTimeInterval(30))
         #expect(PoolWords.state(state, now: now).hasPrefix("Rate limited · trying again at "))
     }
 

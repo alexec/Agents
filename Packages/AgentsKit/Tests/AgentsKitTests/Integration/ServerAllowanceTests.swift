@@ -61,10 +61,8 @@ struct ServerAllowanceTests {
         #expect(await mac.allowanceStates().contains { $0.credentialKey == "codex:sign-in" && $0.isOut })
         #expect(await mac.poolStatus().anyOut)
         #expect(await mac.eventLog.events.contains { $0.name == "cost.allowance_out" })
-
-        // The Mac chat's next turn moves before any refusal: the plan is known to be out.
-        try await mac.prompt(.init(agentID: id, text: "two"))
-        await eventually("it moved to Claude") { await mac.agent(id)?.runtimeID == "claude" }
+        // The Mac's chat is not moved by it (065): it stays on Codex.
+        #expect(await mac.agent(id)?.runtimeID == "codex")
     }
 
     @Test func aKeyKeepsItsOwnState() async throws {

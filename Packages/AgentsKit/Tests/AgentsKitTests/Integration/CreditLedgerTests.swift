@@ -65,11 +65,8 @@ struct CreditLedgerTests {
         // Never reset by a clock: two days on, still used up.
         clock.advance(by: 2 * 86400)
         #expect(await row(core, "gemini")?.state.isOut == true)
-
-        // The next turn goes to Copilot first, without asking Codex again.
-        await eventually("the chat is quiet") { await core.agent(id)?.state == .finished }
-        try await core.prompt(.init(agentID: id, text: "two"))
-        await eventually("it moved to Copilot") { await core.agent(id)?.runtimeID == "copilot" }
+        // The chat itself stays where it is (065).
+        #expect(await core.agent(id)?.runtimeID == "gemini")
     }
 
     @Test func aGrantPastItsDateIsOutAtOnce() async throws {
@@ -81,10 +78,7 @@ struct CreditLedgerTests {
         _ = try await core.setPool(PoolSettings(isOn: true, entries: [claude, expired, copilot]))
         let keyed = try #require(await row(core, "gemini"))
         #expect(PoolWords.state(keyed.state, now: clock.now) == "Free credit expired")
-
-        // Never tried: Claude's spent chat goes past it.
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        await eventually("it moved to Copilot") { await core.agent(id)?.runtimeID == "copilot" }
+        _ = (work, spent)
     }
 
     @Test func geminisFreeTierShowsMidnightPacificButStaysOutUntilChecked() async throws {

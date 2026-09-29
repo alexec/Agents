@@ -62,32 +62,9 @@ struct AllowanceStateTests {
 
     @Test func aRateLimitIsNotOut() {
         var state = state()
-        let persisted = state.rateLimited(now: now, retryAt: now.addingTimeInterval(30), payment: .allowance(label: nil))
-        #expect(!persisted)
+        state.rateLimited(now: now, retryAt: now.addingTimeInterval(30))
         #expect(!state.isOut)
         #expect(state.isUsable(now: now))
-    }
-
-    @Test func threeRateLimitsInTenMinutesAreOut() {
-        var state = state()
-        let payment = Payment.allowance(label: nil)
-        let r1 = state.rateLimited(now: now, retryAt: now.addingTimeInterval(30), payment: payment)
-        #expect(!r1)
-        let r2 = state.rateLimited(now: now.addingTimeInterval(30), retryAt: now.addingTimeInterval(150), payment: payment)
-        #expect(!r2)
-        let r3 = state.rateLimited(now: now.addingTimeInterval(150), retryAt: now.addingTimeInterval(180), payment: payment)
-        #expect(r3)
-        guard case .out(nil, let retry?, .rateLimitPersisted) = state.status else { Issue.record("\(state.status)"); return }
-        #expect(retry == now.addingTimeInterval(150 + 4 * 3600))
-    }
-
-    @Test func rateLimitsFarApartDoNotAddUp() {
-        var state = state()
-        let payment = Payment.allowance(label: nil)
-        _ = state.rateLimited(now: now, retryAt: now, payment: payment)
-        _ = state.rateLimited(now: now.addingTimeInterval(700), retryAt: now, payment: payment)
-        let r4 = state.rateLimited(now: now.addingTimeInterval(1400), retryAt: now, payment: payment)
-        #expect(!r4)
     }
 
     @Test func usedUpCreditNeverComesBackOnATimer() {
@@ -183,5 +160,33 @@ struct AllowanceStateTests {
         #expect(DaemonCore.probeModel(in: codex)?.name == "6 Luna")
         // Nothing says it is small: keep the runtime's own default.
         #expect(DaemonCore.probeModel(in: [choice("big", "Big"), choice("bigger", "Bigger")]) == nil)
+    }
+}
+
+/// Three rate limits within ten minutes, on one chat, is a limit that persists (065,
+/// T013). The streak is the chat's, kept by the daemon per agent; this is its arithmetic.
+@Suite("A chat's rate-limit streak")
+struct RateLimitStreakTests {
+    private let policy = RateLimitPolicy.standard
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+
+    @Test func theThirdWithinTheWindowPersists() {
+        var streak: [Date] = []
+        var persists = false
+        for minute in [0.0, 2, 4] {
+            (streak, persists) = policy.streak(streak, adding: start.addingTimeInterval(minute * 60))
+        }
+        #expect(persists)
+    }
+
+    @Test func refusalsOutsideTheWindowDoNotCount() {
+        let old = [start, start.addingTimeInterval(60)]
+        let (streak, persists) = policy.streak(old, adding: start.addingTimeInterval(630))
+        #expect(!persists)
+        #expect(streak.count == 2, "the first fell out of the window")
+    }
+
+    @Test func twoAreNotYetAStreak() {
+        #expect(!policy.streak([start], adding: start.addingTimeInterval(30)).persists)
     }
 }

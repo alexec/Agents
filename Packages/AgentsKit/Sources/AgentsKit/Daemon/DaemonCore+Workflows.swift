@@ -343,8 +343,6 @@ extension DaemonCore {
         // Allowances whose time to come back has come, and grants past their date (052).
         settlePoolClocks(now: now)
         checkDueAllowances(now: now)
-        // Chats waiting for one of them (US4).
-        await resumeAllowanceWaits(now: now)
 
         // The day rolling over, noticed on the heartbeat that is already running
         // rather than on a timer of its own. `now` is the parameter this already
