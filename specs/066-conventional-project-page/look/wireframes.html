@@ -1,0 +1,294 @@
+<!doctype html><html><head><meta charset="utf-8"><title>066 wireframes</title><style>
+/* Wireframes for a conventional project page (066). Lo-fi on purpose, in 057's paper style.
+   Open with #a … #e to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:1100px;line-height:1.4}
+.note{font:italic 12px -apple-system;color:#c2185b}
+.win{width:1100px;height:680px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;position:relative}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc;display:inline-block}
+.side{width:210px;background:#ebe8e1;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px}
+.side .lights{height:44px;display:flex;align-items:center;gap:7px;padding-left:6px}
+.side .p{padding:6px 8px;border-radius:6px;display:flex;justify-content:space-between;align-items:center}
+.side .p.on{background:rgba(0,0,0,.08)}
+.side .p small{display:block;color:#8a877f;font-size:11px}
+.side .h{font:600 11px -apple-system;color:#8a877f;padding:14px 8px 4px}
+.side .child{padding:4px 8px 4px 26px;border-radius:6px;display:flex;justify-content:space-between;color:#333}
+.side .child.on{background:#d9d4c8}
+.side .foot{margin-top:auto;padding:10px 8px;color:#8a877f;font-size:11px}
+.badge{width:7px;height:7px;border-radius:4px;background:#e07b39;display:inline-block}
+.count{color:#a09d95;font-variant-numeric:tabular-nums}
+.mid{width:370px;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;background:#f3f0ea}
+.tb{height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid rgba(0,0,0,.06)}
+.tb .title{font:600 13px -apple-system;color:#333}
+.tb .grow{flex:1}
+.icon{width:26px;height:24px;border-radius:6px;border:1px solid rgba(0,0,0,.12);display:inline-flex;align-items:center;justify-content:center;color:#555;font-size:13px;background:#faf8f4}
+.search{flex:1;height:24px;border-radius:6px;background:#e6e2da;color:#8a877f;display:flex;align-items:center;padding:0 8px;font-size:12px}
+.seg{display:flex;margin:10px 10px 4px;border-radius:7px;background:#e3dfd6;padding:2px}
+.seg span{flex:1;text-align:center;padding:4px 6px;white-space:nowrap;border-radius:5px;font-size:12px;color:#444;position:relative}
+.seg span.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15);font-weight:600}
+.seg span i{font-style:normal;color:#9a968d;margin-left:3px}
+.seg span b{position:absolute;top:3px;right:6px;width:6px;height:6px;border-radius:3px;background:#e07b39}
+.lh{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 2px;font:600 11px -apple-system;color:#8a877f}
+.pop{border:1px solid rgba(0,0,0,.15);border-radius:5px;padding:1px 6px;font-weight:500;color:#444;background:#faf8f4}
+.row{margin:2px 6px;padding:7px 8px;border-radius:7px;display:flex;gap:8px}
+.row.on{background:#d9d4c8}
+.row .ic{width:16px;color:#888;text-align:center}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .d{color:#8a877f;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .body{min-width:0;flex:1}
+.num{color:#8a877f;font-weight:400;margin-right:4px}
+.detail{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.detail .tb{justify-content:space-between}
+.btn{border:1px solid rgba(0,0,0,.15);border-radius:6px;padding:3px 10px;background:#faf8f4;font-size:12px;color:#333;white-space:nowrap}
+.btn.primary{background:#3b6fd8;color:#fff;border-color:#3b6fd8}
+.btn[disabled]{opacity:.45}
+.banner{margin:0;padding:8px 16px;background:#fbefd9;border-bottom:1px solid #eed7ad;display:flex;gap:10px;align-items:center;font-size:12px}
+.banner .grow{flex:1}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#8a877f}
+.empty .name{font:600 22px -apple-system;color:#333}
+.prompt{margin:0 22px 18px;border:1px solid rgba(0,0,0,.14);border-radius:14px;background:#fff;padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.prompt .ph{color:#a09d95;height:34px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:2px 9px;font-size:11px;color:#555;background:#faf8f4}
+.page{flex:1;overflow:hidden;padding:22px 28px;display:flex;flex-direction:column;gap:12px}
+.page h1{font:600 20px -apple-system;margin:0}
+.meta{color:#8a877f;font-size:12px}
+.card{background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+.card .k{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em}
+.line{display:flex;justify-content:space-between;gap:10px}
+.ok{color:#2e8b57}.bad{color:#c0392b}.run{color:#b8860b}
+.tag{display:inline-block;border-radius:9px;background:#ece8df;padding:1px 8px;font-size:11px;margin-right:4px;color:#555}
+.bar{height:9px;border-radius:4px;background:#e3dfd6}
+.sheetveil{position:absolute;inset:0;background:rgba(0,0,0,.18);display:flex;justify-content:center;padding-top:44px}
+.sheet{width:760px;height:560px;background:#f7f5f0;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);display:flex;overflow:hidden}
+.sheet .nav{width:200px;background:#ebe8e1;padding:14px 8px;display:flex;flex-direction:column;gap:2px}
+.sheet .nav div{padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between}
+.sheet .nav div.on{background:#d9d4c8;font-weight:600}
+.sheet .main{flex:1;padding:18px 24px;display:flex;flex-direction:column;gap:12px;position:relative}
+.form{display:grid;grid-template-columns:140px 1fr;gap:10px 14px;align-items:center}
+.form .l{color:#666;text-align:right}
+.field{border:1px solid rgba(0,0,0,.14);border-radius:6px;background:#fff;padding:4px 8px}
+.done{position:absolute;right:20px;bottom:16px}
+.n{position:absolute;font:italic 12px -apple-system;color:#c2185b;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:4px;border:1px dashed #c2185b;max-width:220px;line-height:1.35}
+</style></head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+
+<!-- ============ A ============ -->
+<div class="frame" id="a">
+<div class="cap">A · A project with nothing open</div>
+<div class="sub">The middle column shows one kind of thing, chosen at its top. The right pane is an empty new chat, with the prompt at the bottom where every chat has it.</div>
+<div class="win">
+  <div class="side">
+    <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="h">Projects</div>
+    <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
+    <div class="p">www.alexecollins.com</div>
+    <div class="p">RelaxedCounting</div>
+    <div class="p">Where</div>
+    <div class="p">Rehang</div>
+    <div class="p">Scribe</div>
+    <div class="h">Activity</div>
+    <div class="p">Events <span class="count">20:52</span></div>
+    <div class="p">Resources</div>
+    <div class="p">Today <span class="count">$196</span></div>
+    <div class="p">Pool <span class="badge"></span></div>
+    <div class="foot">Keeping this Mac awake</div>
+  </div>
+  <div class="mid">
+    <div class="tb"><span class="search">⌕ Search sessions</span><span class="icon" title="New session">✎</span></div>
+    <div class="seg"><span class="on">Sessions</span><span>Pull requests<i>1</i></span><span>Issues<i>2</i></span><span>Workflows<i>3</i></span></div>
+    <div class="lh">Needs you <span class="count">2</span></div>
+    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">058 control plane</div><div class="d">I've caught up on the 058 control-plane…</div></div></div>
+    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">Simplify the project page</div><div class="d">PR #38 is merged (main 4228c8f3)…</div></div></div>
+    <div class="lh">Waiting <span class="count">1</span></div>
+    <div class="row"><span class="ic">⌛</span><div class="body"><div class="t">Fail Swift builds on CI</div><div class="d">◷ Waiting for checks on #37 · again 21:40</div></div></div>
+    <div class="lh">Working <span class="count">2</span></div>
+    <div class="row"><span class="ic">✳</span><div class="body"><div class="t">Review the design of the app</div><div class="d">Reading the project page…</div></div></div>
+    <div class="row"><span class="ic">✳</span><div class="body"><div class="t">065: read another agent's work</div><div class="d">continue-successor</div></div></div>
+    <div class="lh">▸ Archived <span class="count">407</span></div>
+  </div>
+  <div class="detail">
+    <div class="tb"><span class="title">New session</span><span class="btn">☰ Project Settings</span></div>
+    <div class="banner">✋ <span class="grow">Plugin <b>swift-lsp</b> is waiting for your OK</span><span class="btn">Review…</span></div>
+    <div class="empty"><div class="name">Agents</div><div>~/Agents · main · this Mac</div></div>
+    <div class="prompt">
+      <div class="chips"><span class="chip">📁 Agents</span><span class="chip">Project folder ▾</span><span class="chip" style="margin-left:auto">Claude ▾</span></div>
+      <div class="ph">Say what's next</div>
+      <div class="chips"><span class="chip">Mode: Auto ▾</span><span class="chip">Reach: this folder ▾</span><span class="chip">Model: Default ▾</span><span class="chip">Effort: Default ▾</span><span class="chip" style="margin-left:auto">📎</span><span class="chip">🎙</span><span class="chip">↑</span></div>
+    </div>
+  </div>
+  <div class="n" style="left:232px;top:470px">Scope bar: one kind of thing at a time (⌘1–⌘4)</div>
+  <div class="n" style="left:232px;top:420px;max-width:300px">✎ Compose, as in Mail (⌘N)</div>
+  <div class="n" style="left:600px;top:400px;max-width:300px">Same place as the prompt in a chat. Sending turns this pane into the session.</div>
+  <div class="n" style="left:232px;top:520px;max-width:300px">PRs, issues, workflows are no longer below Archived</div>
+</div>
+</div>
+
+<!-- ============ B ============ -->
+<div class="frame" id="b">
+<div class="cap">B · Pull requests: pick one, read it on the right</div>
+<div class="sub">Rows have no buttons. The pull request's page says where it stands and carries Babysit, which opens frame A's new chat filled in.</div>
+<div class="win">
+  <div class="side">
+    <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="h">Projects</div>
+    <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
+    <div class="p">www.alexecollins.com</div>
+    <div class="p">RelaxedCounting</div>
+    <div class="p">Where</div>
+    <div class="p">Rehang</div>
+    <div class="p">Scribe</div>
+    <div class="foot">Keeping this Mac awake</div>
+  </div>
+  <div class="mid">
+    <div class="tb"><span class="search">⌕ Search pull requests</span><span class="icon">✎</span></div>
+    <div class="seg"><span>Sessions</span><span class="on">Pull requests<i>2</i><b></b></span><span>Issues<i>2</i></span><span>Workflows<i>3</i></span></div>
+    <div class="lh">Open <span>↻</span></div>
+    <div class="row on"><span class="ic run">◌</span><div class="body"><div class="t"><span class="num">#37</span>Fail Swift builds on CI</div><div class="d">checks running · issue-30-fail-swift-builds</div></div></div>
+    <div class="row"><span class="ic bad">✕</span><div class="body"><div class="t"><span class="num">#36</span>Keep the pool known</div><div class="d">checks failing · changes requested · not checked out</div></div></div>
+  </div>
+  <div class="detail">
+    <div class="tb"><span class="title">#37 Fail Swift builds on CI</span><span style="display:flex;gap:6px"><span class="btn">Open on GitHub ↗</span><span class="btn primary">Babysit</span></span></div>
+    <div class="page">
+      <h1>Fail Swift builds on CI</h1>
+      <div class="meta">#37 · issue-30-fail-swift-builds → main · opened by Alex Collins 2 hours ago</div>
+      <div class="card"><div class="k">Checks</div>
+        <div class="line"><span><span class="run">◌</span> build-mac</span><span class="meta">running 6 min</span></div>
+        <div class="line"><span><span class="ok">✓</span> swift test (Linux)</span><span class="meta">4 min</span></div>
+        <div class="line"><span><span class="ok">✓</span> lint</span><span class="meta">38 s</span></div></div>
+      <div class="card"><div class="k">Review and merge</div>
+        <div class="line"><span>No review yet</span><span class="meta">No conflicts</span></div></div>
+      <div class="card"><div class="k">Where it is</div>
+        <div class="line"><span>Worktree <b>issue-30-fail-swift-builds</b></span><span class="btn">Reveal in Finder</span></div></div>
+      <div class="card"><div class="k">Sessions on this pull request</div>
+        <div class="line"><span>⌛ Fail Swift builds on CI — waiting for checks</span><span class="btn">Open</span></div></div>
+    </div>
+  </div>
+  <div class="n" style="left:600px;top:540px;max-width:320px">Primary action on the page, not the row. Reads "Go to session" when one is already babysitting.</div>
+  <div class="n" style="left:232px;top:250px">Context menu: Open on GitHub, Babysit, Copy Link</div>
+  <div class="n" style="left:600px;top:610px;max-width:320px">Links the PR to the sessions working on it, which the app knows today but does not show</div>
+</div>
+</div>
+
+<!-- ============ C ============ -->
+<div class="frame" id="c">
+<div class="cap">C · Issues: the Project's Ready lane, and Start a session</div>
+<div class="sub">"Assign" becomes "Start a session", which says what it does. A status pop-up says which lane you are looking at.</div>
+<div class="win">
+  <div class="side">
+    <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="h">Projects</div>
+    <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
+    <div class="p">www.alexecollins.com</div>
+    <div class="p">RelaxedCounting</div>
+    <div class="p">Where</div>
+    <div class="p">Rehang</div>
+    <div class="p">Scribe</div>
+    <div class="foot">Keeping this Mac awake</div>
+  </div>
+  <div class="mid">
+    <div class="tb"><span class="search">⌕ Search issues</span><span class="icon">✎</span></div>
+    <div class="seg"><span>Sessions</span><span>Pull requests<i>1</i></span><span class="on">Issues<i>2</i></span><span>Workflows<i>3</i></span></div>
+    <div class="lh"><span>Status <span class="pop">Ready ▾</span></span><span>↻</span></div>
+    <div class="row on"><span class="ic">○</span><div class="body"><div class="t"><span class="num">#9</span>Define Continue successor</div><div class="d">enhancement · spec</div></div></div>
+    <div class="row"><span class="ic">○</span><div class="body"><div class="t"><span class="num">#10</span>Build the control plane</div><div class="d">enhancement</div></div></div>
+  </div>
+  <div class="detail">
+    <div class="tb"><span class="title">#9 Define Continue successor</span><span style="display:flex;gap:6px"><span class="btn">Open on GitHub ↗</span><span class="btn primary">Start a session</span></span></div>
+    <div class="page">
+      <h1>Define Continue successor</h1>
+      <div class="meta">#9 · Ready in "Agents roadmap" · opened 3 days ago</div>
+      <div><span class="tag">enhancement</span><span class="tag">spec</span></div>
+      <div class="card" style="gap:9px">
+        <div class="bar" style="width:92%"></div><div class="bar" style="width:84%"></div><div class="bar" style="width:70%"></div>
+        <div class="bar" style="width:40%;margin-bottom:8px"></div>
+        <div class="bar" style="width:88%"></div><div class="bar" style="width:60%"></div>
+      </div>
+      <div class="meta">Start a session opens a new chat with this issue as the prompt, in a new worktree, and moves the issue to In progress when it is sent.</div>
+    </div>
+  </div>
+  <div class="n" style="left:232px;top:250px;max-width:200px">Status pop-up: Ready · In progress · All</div>
+  <div class="n" style="left:600px;top:470px;max-width:300px">If the Project has no Ready/In progress status, the button is disabled and the reason is written here, not in a tooltip.</div>
+</div>
+</div>
+
+<!-- ============ D ============ -->
+<div class="frame" id="d">
+<div class="cap">D · Project Settings, as a sheet</div>
+<div class="sub">Opened from the toolbar, the project's context menu, or Project ▸ Settings… (⌥⌘,). Configuration's panes, moved as they are, plus General, which takes the name, place and money off the page.</div>
+<div class="win">
+  <div class="side">
+    <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="h">Projects</div>
+    <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
+    <div class="p">www.alexecollins.com</div>
+  </div>
+  <div class="mid"></div>
+  <div class="detail"></div>
+  <div class="sheetveil">
+    <div class="sheet">
+      <div class="nav">
+        <div class="on">General</div>
+        <div>Instructions &amp; skills</div>
+        <div>Plugins <span class="badge"></span></div>
+        <div>MCP servers</div>
+        <div>Worktrees <span class="count">6</span></div>
+      </div>
+      <div class="main">
+        <div style="font:600 17px -apple-system">General</div>
+        <div class="form">
+          <span class="l">Name</span><span class="field">Agents</span>
+          <span class="l">Folder</span><span style="display:flex;gap:8px;align-items:center">~/Agents <span class="btn">Reveal in Finder</span></span>
+          <span class="l">Machine</span><span>This Mac</span>
+          <span class="l">GitHub</span><span>alexcollins/agents · Project "Agents roadmap" <span class="btn">Change…</span></span>
+          <span class="l">Spent</span><span>$10,965 since it was added<br><span class="meta">59 sessions ran on a runtime that reports no price, so this is a minimum.</span></span>
+        </div>
+        <div style="margin-top:14px;border-top:1px solid rgba(0,0,0,.08);padding-top:14px" class="form">
+          <span class="l"></span><span><span class="btn">Remove Project…</span></span>
+        </div>
+        <span class="btn primary done">Done</span>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============ E ============ -->
+<div class="frame" id="e">
+<div class="cap">E · Alternative (not recommended): the project opens in the sidebar</div>
+<div class="sub">Mail's mailboxes: each project has a disclosure triangle with its four lists under it. The right pane is the same as A–D. It makes the sidebar long, and the "needs you" dot has to show twice.</div>
+<div class="win">
+  <div class="side">
+    <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="h">Projects</div>
+    <div class="p on"><div>▾ Agents</div><span class="badge"></span></div>
+    <div class="child on">Sessions <span class="badge"></span></div>
+    <div class="child">Pull requests <span class="count">1</span></div>
+    <div class="child">Issues <span class="count">2</span></div>
+    <div class="child">Workflows <span class="count">3</span></div>
+    <div class="p">▸ www.alexecollins.com</div>
+    <div class="p">▸ RelaxedCounting</div>
+    <div class="p">▸ Where</div>
+    <div class="p">▸ Rehang</div>
+    <div class="p">▸ Scribe</div>
+    <div class="foot">Keeping this Mac awake</div>
+  </div>
+  <div class="mid">
+    <div class="tb"><span class="search">⌕ Search sessions</span><span class="icon">✎</span></div>
+    <div class="lh">Needs you <span class="count">2</span></div>
+    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">058 control plane</div><div class="d">I've caught up on the 058 control-plane…</div></div></div>
+    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">Simplify the project page</div><div class="d">PR #38 is merged (main 4228c8f3)…</div></div></div>
+    <div class="lh">Working <span class="count">2</span></div>
+    <div class="row"><span class="ic">✳</span><div class="body"><div class="t">Review the design of the app</div><div class="d">Reading the project page…</div></div></div>
+  </div>
+  <div class="detail">
+    <div class="tb"><span class="title">New session</span><span class="btn">☰ Project Settings</span></div>
+    <div class="empty"><div class="name">Agents</div><div>~/Agents · main · this Mac</div></div>
+    <div class="prompt"><div class="ph">Say what's next</div><div class="chips"><span class="chip">Mode: Auto ▾</span><span class="chip">Model: Default ▾</span></div></div>
+  </div>
+</div>
+</div>
+</body></html>
