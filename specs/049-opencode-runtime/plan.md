@@ -249,7 +249,9 @@ See [research.md](research.md). Every open question in the spec's Assumptions is
 The five docs the spec lists, README's runtime count, and `scripts/runtime-tools.sh`.
 `docs-check.py` must pass.
 
-## Defaults this plan takes *(for Alex to overturn)*
+## Defaults this plan takes
+
+P1 and P2 confirmed by Alex on 2026-09-28. P3 is the spec's D7 default.
 
 - **P1. OpenCode asks before edits, commands and fetches**, whatever the person's own OpenCode
   config says. **Always approve** in Settings (061) turns the asks off. Without this, the app's
