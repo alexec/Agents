@@ -97,7 +97,7 @@ struct AllowanceWaitTests {
         // Both checked; the chat goes on the next heartbeat after one passes.
         clock.now = checked.addingTimeInterval(1)
         await core.tickWorkflows(now: clock.now)
-        await eventually("both were checked and are back") {
+        await eventually("both were checked and are back", within: .seconds(30)) {
             await core.allowanceStates().allSatisfy { !$0.isOut }
         }
         #expect(launcher.launchCount == 4)

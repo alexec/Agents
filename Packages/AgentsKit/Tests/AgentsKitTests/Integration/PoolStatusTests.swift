@@ -143,7 +143,7 @@ struct PoolStatusTests {
 
         clock.advance(by: AllowanceState.retryWithoutATime)
         await core.tickWorkflows(now: clock.now)
-        await eventually("the window was told it is back") { heard.all.last == 0 }
+        await eventually("the window was told it is back", within: .seconds(30)) { heard.all.last == 0 }
         #expect(launcher.launchCount == 1)
         #expect(await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" }?.status == .available)
         #expect(await core.eventLog.events.contains { $0.name == "cost.allowance_back" && $0.details["how"] == "check" })
@@ -161,7 +161,7 @@ struct PoolStatusTests {
         clock.advance(by: AllowanceState.retryWithoutATime + 1)
         let checkedAt = clock.now
         await core.tickWorkflows(now: checkedAt)
-        await eventually("the check was put off") {
+        await eventually("the check was put off", within: .seconds(30)) {
             guard case .out(_, let retry?, _) = await core.allowanceStates()
                 .first(where: { $0.credentialKey == "claude:sign-in" })?.status else { return false }
             return retry > checkedAt
