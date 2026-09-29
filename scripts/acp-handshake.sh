@@ -130,6 +130,7 @@ OPTIONS = {
         "model": (None, UNDER_PROMPT),
         "reasoning_effort": (["xhigh", "high", "medium", "low"], UNDER_PROMPT),
     },
+    # From the older `modes` and `models`: Gemini 0.61.0 sends no configOptions.
     "gemini": {
         "mode": (["default", "autoEdit", "yolo", "plan"], UNDER_PROMPT),
         "model": (None, UNDER_PROMPT),
@@ -291,6 +292,16 @@ def check_options(name, session):
     """Every option and choice the conversation offers, against OPTIONS; how many are new."""
     known = OPTIONS.get(name, {})
     offered = session.get("configOptions") or []
+    if not offered:
+        # Gemini sends no configOptions, only the older `modes` and `models`, which the
+        # app turns into the same two options. Read as those.
+        modes = (session.get("modes") or {}).get("availableModes") or []
+        models = (session.get("models") or {}).get("availableModels") or []
+        if modes:
+            offered.append({"id": "mode", "category": "mode", "type": "select",
+                            "options": [{"value": m.get("id")} for m in modes]})
+        if models:
+            offered.append({"id": "model", "category": "model", "type": "select", "options": []})
     new = 0
     for option in offered:
         oid = option.get("id", "?")
