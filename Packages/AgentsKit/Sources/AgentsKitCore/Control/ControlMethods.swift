@@ -287,7 +287,7 @@ public actor ControlMethods: ControlHandling {
             return DaemonAPI.ControlHost(id: record.id, name: record.name, platform: record.platform,
                                          version: record.version,
                                          state: ControlRouter.describe(record.id, state)["state"]?.stringValue ?? "offline",
-                                         reach: record.reach.isSSH ? "ssh" : "dialOut", machineID: record.machineID)
+                                         reach: "dialOut", machineID: record.machineID)
         }
     }
 

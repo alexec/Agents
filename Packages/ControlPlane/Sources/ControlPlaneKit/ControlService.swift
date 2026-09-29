@@ -133,6 +133,12 @@ public final class ControlService: @unchecked Sendable {
             startPairing: { grant in try JSONValue.encoding(try await codes.issue(.client(grant))) },
             startEnroll: { try JSONValue.encoding(try await codes.issue(.host)) })
         hooks.changed = { [weak self] event in await self?.announce(event) }
+        // hosts/install (T072): once over ssh with the key given, then the host is on its own.
+        let install = HostInstall(codes: codes, servers: ServerFiles.folder()) { [router = self.router] name, step in
+            await router.broadcastControl(DaemonAPI.Notification.controlInstallProgress,
+                                          ["name": .string(name), "step": .string(step)], operatorsOnly: true)
+        }
+        hooks.install = { params in try await install.run(params) }
         await methods.setHooks(hooks)
         await readiness.set(true)
 
@@ -154,16 +160,28 @@ public final class ControlService: @unchecked Sendable {
         await mesh?.onEvent { [weak self] event in await self?.apply(event) }
         await mesh?.onLinked { [weak self] _ in await self?.reconcile() }
 
+        let servers = ServerFiles.folder()
         let bootstrap = ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { [weak self, readiness] channel in
                 let service = self
-                return ControlWebSocketServer.configure(channel, tls: configuration.tls, plain: { head in
-                    switch head.uri.split(separator: "?").first {
-                    case "/healthz": (.ok, "ok\n")
-                    case "/readyz": readiness.now ? (.ok, "ready\n") : (.serviceUnavailable, "the store can't be reached\n")
-                    default: (.notFound, "not here\n")
+                return ControlWebSocketServer.configure(channel, tls: configuration.tls, reply: { head in
+                    let path = head.uri.split(separator: "?").first.map(String.init) ?? ""
+                    switch path {
+                    case "/healthz": return PlainReply(.ok, text: "ok\n")
+                    case "/readyz":
+                        return readiness.now ? PlainReply(.ok, text: "ready\n")
+                            : PlainReply(.serviceUnavailable, text: "the store can't be reached\n")
+                    // A server installs itself from here (T070): the script, then the host.
+                    case "/v1/install.sh":
+                        return PlainReply(.ok, Data(HostInstallScript.text.utf8), contentType: "text/x-shellscript")
+                    case let served where served.hasPrefix("/v1/servers/"):
+                        guard let data = ServerFiles.read(String(served.dropFirst("/v1/servers/".count)), in: servers) else {
+                            return PlainReply(.notFound, text: "this control plane has no such file\n")
+                        }
+                        return PlainReply(.ok, data)
+                    default: return PlainReply(.notFound, text: "not here\n")
                     }
                 }, opened: { socket in
                     guard let service else { return socket.close() }
@@ -503,7 +521,8 @@ public actor ControlCodes {
         }
         _ = try await store.put(Self.key(id), try ControlRecords.encoder.encode(stored), when: .absent)
         let code = ControlCode(purpose: purpose, controlKey: publicKey, secret: secret, url: url, pin: pin, name: name)
-        return DaemonAPI.ControlCodeShown(text: code.text, expires: expires)
+        let command: String? = if case .host = purpose { HostInstallScript.command(url: url, pin: pin, code: code.text) } else { nil }
+        return DaemonAPI.ControlCodeShown(text: code.text, expires: expires, command: command)
     }
 
     /// A code as stored, refused if unknown, expired or spent.

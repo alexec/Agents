@@ -117,16 +117,18 @@ final class ControlSettingsModel {
         case failed(String)
     }
 
-    /// Add a server: the control plane installs it over ssh and makes it a host (US3).
-    func install(destination: String, trust: String? = nil) async -> InstallOutcome {
+    /// Add a server over ssh (frame M2): the control plane installs the host once with the
+    /// key given here, which goes in this one call and is kept nowhere (058, T072).
+    func install(destination: String, name: String? = nil, key: String, trust: String? = nil) async -> InstallOutcome {
         installStep = nil
-        var params: [String: JSONValue] = ["destination": .string(destination)]
+        var params: [String: JSONValue] = ["destination": .string(destination), "key": .string(key)]
+        if let name, !name.isEmpty { params["name"] = .string(name) }
         if let trust { params["trust"] = .string(trust) }
         do {
             let answer = try await client.call(DaemonAPI.Method.hostsInstall, JSONValue.object(params))
             await refresh()
             if let fingerprint = answer["needsTrust"]?.stringValue { return .needsTrust(fingerprint: fingerprint) }
-            return .added(name: answer["name"]?.stringValue ?? destination)
+            return .added(name: answer["name"]?.stringValue ?? name ?? destination)
         } catch let error as JSONRPCError {
             return .failed(error.message)
         } catch {

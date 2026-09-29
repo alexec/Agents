@@ -1,21 +1,15 @@
 import AgentsKitCore
 import Foundation
 
-/// Servers the control plane installs and reaches over the person's own ssh (058, US3,
-/// R9, T039–T041).
-///
-/// What the window's `HostSet` did, moved here so every client sees the result: the ssh
-/// master and its forward, the install of the Linux `agentsd`, the host key's first
-/// trust. Each connected server becomes a host of the router through an `SSHUplink` over
-/// its forward. The control plane has no screen, so the first trust of a host key is a
-/// question put back to the operator who asked (`needsTrust`), answered by asking again
-/// with the fingerprint they saw.
+/// Servers the first build's control plane installs over the person's own ssh (058,
+/// T039–T041). Every one connects out afterwards (T073): the ssh is for the install and
+/// for starting the daemon again, and no master or forward is kept. The control plane has
+/// no screen, so the first trust of a host key is a question put back to the operator who
+/// asked (`needsTrust`), answered by asking again with the fingerprint they saw.
 actor SSHHosts {
     private let root: URL
     private let installedBy: String
     private weak var plane: ControlPlane?
-    private var connections: [HostID: ServerConnection] = [:]
-    private var uplinks: [HostID: SSHUplink] = [:]
     /// A host key fetched for somebody to look at, until they trust it or give up.
     private var fetched: [String: (HostKeyCheck.Fetched, HostKeyCheck.Resolved)] = [:]
 
@@ -50,10 +44,7 @@ actor SSHHosts {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That isn’t something ssh can connect to.")
         }
         loadDialOuts()
-        if let known = await plane?.methods.allHosts.first(where: { record in
-            if case .ssh(let destination, _) = record.reach { return destination == made.sshName }
-            return dialOuts[record.id.rawValue]?.destination == made.sshName
-        }) {
+        if let known = await plane?.methods.allHosts.first(where: { dialOuts[$0.id.rawValue]?.destination == made.sshName }) {
             throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: "\(known.name) is already a host.")
         }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -73,85 +64,23 @@ actor SSHHosts {
             }
         }
         if let dialled = try await enrolByDialling(made, fingerprint: fingerprint) { return dialled }
-        let record = HostRecord(id: made.id, name: made.label,
-                                reach: .ssh(destination: made.sshName, hostKeyFingerprint: fingerprint),
-                                installed: true)
-        let connected = try await connect(record)
-        return ["host": .string(record.id.rawValue), "name": .string(record.name), "platform": .string(connected.platform)]
-    }
-
-    /// Reach a server this control plane knows: at start, on Check again, after a drop.
-    @discardableResult
-    func connect(_ record: HostRecord) async throws -> HostRecord {
-        guard case .ssh(let destination, _) = record.reach else { return record }
-        let connection = connections[record.id] ?? ServerConnection(
-            hostID: record.id, ssh: ssh(destination, id: record.id),
-            socket: folder.appendingPathComponent("\(record.id.rawValue).sock"), installedBy: installedBy,
-            binary: { await Self.binary(for: $0) })
-        connections[record.id] = connection
-        let name = record.name
-        await connection.setOnState { [weak self] state in await self?.moved(record.id, name: name, to: state) }
-        await connection.connect()
-        let state = await connection.state
-        guard case .connected = state else {
-            if case .failed(let problem) = state {
-                throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: "\(name): \(Self.words(problem))")
-            }
-            throw JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "\(name) could not be reached.")
-        }
-        var updated = record
-        if let facts = await connection.facts {
-            updated.platform = "\(facts.system) \(facts.architecture.display)"
-            updated.version = facts.installedVersion ?? Self.version
-        }
-        try await plane?.methods.enroll(updated)
-        // Said again now it is on record: a client that listed hosts between the forward
-        // coming up and this would otherwise not know of it until something else moved.
-        await plane?.router.broadcastControl(DaemonAPI.Notification.controlHostChanged,
-                                             ControlRouter.describe(updated.id, .online))
-        return updated
-    }
-
-    /// The master's state moved: a host is online while its forward is, and not otherwise.
-    private func moved(_ host: HostID, name: String, to state: ServerConnection.State) async {
-        switch state {
-        case .connecting(let step):
-            await progress(name, step.rawValue)
-        case .connected:
-            await progress(name, "connected")
-            uplinks[host]?.close()
-            let uplink = SSHUplink(socket: folder.appendingPathComponent("\(host.rawValue).sock"))
-            uplinks[host] = uplink
-            await plane?.router.attachHost(host, transport: uplink)
-        case .offline, .failed, .idle, .updateWaiting:
-            uplinks.removeValue(forKey: host)?.close()
-            if case .failed(let problem) = state {
-                await plane?.router.setState(.failed(reason: Self.words(problem)), of: host)
-            }
-        }
+        throw JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                           message: "\(made.label) installed, but could not reach the control plane. It has to be able to connect out to it.")
     }
 
     func checkAgain(_ host: HostID) async throws {
         guard let record = await plane?.methods.host(host) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(host.rawValue).")
         }
-        if record.reach.isSSH {
-            try await connect(record)
-            return
-        }
+        _ = record
         loadDialOuts()
         guard let dial = dialOuts[host.rawValue] else { return }
         try await startDialOut(dial, host: host, name: record.name)
     }
 
-    /// Hosts that are no longer on record are let go: their masters stop, their agents stay.
+    /// Hosts that are no longer on record are let go; their agents stay.
     func sync(_ records: [HostRecord]) async {
         let kept = Set(records.map(\.id))
-        for (id, connection) in connections where !kept.contains(id) {
-            uplinks.removeValue(forKey: id)?.close()
-            await connection.disconnect()
-            connections[id] = nil
-        }
         loadDialOuts()
         let before = dialOuts.count
         dialOuts = dialOuts.filter { kept.contains(HostID(rawValue: $0.key)) }
@@ -160,11 +89,8 @@ actor SSHHosts {
 
     /// Every server on record, as the control plane starts.
     func reconnectAll(_ records: [HostRecord]) async {
-        for record in records where record.reach.isSSH {
-            Task { try? await self.connect(record) }
-        }
         loadDialOuts()
-        for record in records where !record.reach.isSSH {
+        for record in records {
             guard let dial = dialOuts[record.id.rawValue] else { continue }
             let name = record.name
             Task { try? await self.startDialOut(dial, host: record.id, name: name) }

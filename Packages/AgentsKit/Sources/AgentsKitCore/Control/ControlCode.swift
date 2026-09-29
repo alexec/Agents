@@ -121,9 +121,13 @@ public extension DaemonAPI {
     struct ControlCodeShown: Codable, Sendable, Hashable {
         public var text: String
         public var expires: Date
-        public init(text: String, expires: Date) {
+        /// For a host code: the one line to run on the server, which installs the host and
+        /// joins with the code (058, T071).
+        public var command: String?
+        public init(text: String, expires: Date, command: String? = nil) {
             self.text = text
             self.expires = expires
+            self.command = command
         }
     }
 

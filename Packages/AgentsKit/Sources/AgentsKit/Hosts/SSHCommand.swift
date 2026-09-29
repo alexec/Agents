@@ -16,6 +16,10 @@ public struct SSHCommand: Sendable {
     /// never touch a master.
     public var controlPath: URL?
     public var environment: [String: String]
+    /// Options for every command that logs in: a key given for one install and the
+    /// known-hosts file its host key went into (058, T072), where the person's own config
+    /// is not the one to use.
+    public var options: [String] = []
 
     public static let system = URL(filePath: "/usr/bin/ssh")
 
@@ -78,7 +82,7 @@ public struct SSHCommand: Sendable {
 
     /// §§ 5–8: a shell command on the server, over the master.
     public func runArguments(_ remote: String) -> [String] {
-        Self.batch + control + ["--", destination, remote]
+        Self.batch + options + control + ["--", destination, remote]
     }
 
     /// The window's environment, less anything that could open a prompt the window does

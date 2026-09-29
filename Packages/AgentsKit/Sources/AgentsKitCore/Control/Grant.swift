@@ -77,14 +77,21 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
-/// How the control plane reaches a host.
+/// How the control plane reaches a host: every host connects out now, with a key of its
+/// own (FR-010). Hosts the control plane reached over ssh are gone (058, T073); a record
+/// that still says so is read as a host that dials out, which it becomes when it next
+/// installs.
 public enum HostReach: Codable, Hashable, Sendable {
-    /// The host connects out, with a key of its own (FR-010).
     case dialOut
-    /// The control plane holds an ssh forward to the host's socket (FR-012, R8).
-    case ssh(destination: String, hostKeyFingerprint: String?)
 
-    public var isSSH: Bool { if case .ssh = self { return true }; return false }
+    private enum Keys: String, CodingKey { case dialOut }
+
+    public init(from decoder: any Decoder) throws { self = .dialOut }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: Keys.self)
+        try container.encode([String: String](), forKey: .dialOut)
+    }
 }
 
 /// A machine that runs agents. `hosts.json` under the control root.

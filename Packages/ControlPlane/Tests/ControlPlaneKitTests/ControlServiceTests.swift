@@ -134,6 +134,32 @@ struct ControlServiceTests {
         #expect(slow == 0)
     }
 
+    /// A server's way in (T070, T071): the script is served, and a host code comes with the
+    /// line that runs it, pinned.
+    @Test func aHostCodeComesWithItsCommand() async throws {
+        let running = try await start(pin: "2UzJa_LFGyMNe2ZNiDRxlVlv6-iVoUATcy_Xg7jQW4Y")
+        defer { Task { await running.service.stop() } }
+        let shown = try await running.service.codes.issue(.host)
+        let command = try #require(shown.command)
+        #expect(command.hasPrefix("curl -fsSL --insecure --pinnedpubkey sha256//2UzJa/LFGyMNe2ZNiDRxlVlv6+iVoUATcy/Xg7jQW4Y= "))
+        #expect(command.hasSuffix("/v1/install.sh | sh -s -- '\(shown.text)'"))
+        #expect(try await running.service.codes.issue(.client(.device)).command == nil)
+
+        let (data, response) = try await URLSession.shared.data(from: running.url.appendingPathComponent("v1/install.sh"))
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(String(decoding: data, as: UTF8.self) == HostInstallScript.text)
+        let (_, missing) = try await URLSession.shared.data(from: running.url.appendingPathComponent("v1/servers/../../etc/passwd"))
+        #expect((missing as? HTTPURLResponse)?.statusCode == 404)
+    }
+
+    /// `scripts/host-install.sh` is what every copy serves.
+    @Test func theCheckedInScriptIsTheServedOne() throws {
+        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("scripts/host-install.sh")
+        #expect(try String(contentsOf: file, encoding: .utf8) == HostInstallScript.text)
+    }
+
     @Test func aCodeWorksOnce() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }

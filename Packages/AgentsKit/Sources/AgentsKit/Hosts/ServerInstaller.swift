@@ -169,6 +169,15 @@ public struct ServerInstaller: Sendable {
             """)
     }
 
+    /// Leave a one-time host code where the daemon reads it on its next start (058, T072):
+    /// not on its command line, where anyone on the server could see it in `ps`.
+    public func leaveJoinCode(_ code: String) async throws {
+        try await check("""
+            umask 077; d="$HOME/.agents-server/root"; mkdir -p "$d"; rm -f "$d/control-host.json"; \
+            printf %s \(Self.quote(code)) > "$d/control-join-code"
+            """)
+    }
+
     // MARK: § 7 Start
 
     /// Start the server's daemon in the background. Returns once it has detached;

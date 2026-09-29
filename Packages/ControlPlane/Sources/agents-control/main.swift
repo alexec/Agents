@@ -14,6 +14,7 @@ import Musl
 //   agents-control serve --home DIR [--no-bonjour] [--key-fd N] [--store-credentials-fd N]
 //   agents-control code (--client operator|device | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
+//   agents-control install-script      the script a server runs to become a host
 //   agents-control store check [--store URL]
 //   agents-control store copy --from URL --to URL
 //
@@ -231,6 +232,7 @@ case "hosts": await list(hosts: true)
 case "clients": await list(hosts: false)
 case "store" where arguments.dropFirst().first == "check": await checkStore()
 case "store" where arguments.dropFirst().first == "copy": await copyStore()
+case "install-script": print(HostInstallScript.text, terminator: "")
 case "--version", "version": print("agents-control \(ControlPlaneKit.version)")
 default:
     fail("""

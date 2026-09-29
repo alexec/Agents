@@ -27,6 +27,8 @@ let package = Package(
             dependencies: [
                 .product(name: "AgentsKitCore", package: "AgentsKit"),
                 .product(name: "ControlDial", package: "AgentsKit"),
+                // hosts/install (T072): ssh, the host key check and the installer.
+                .product(name: "AgentsKit", package: "AgentsKit"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),

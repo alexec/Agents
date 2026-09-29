@@ -163,12 +163,35 @@ private final class UpgradeRequester: ChannelInboundHandler, RemovableChannelHan
 
 // MARK: - The server's side
 
+/// An answer to a request that is not a WebSocket: health checks, the install script and
+/// the Linux host binaries (058, T070).
+public struct PlainReply: Sendable {
+    public var status: HTTPResponseStatus
+    public var body: Data
+    public var contentType: String
+    public init(_ status: HTTPResponseStatus, _ body: Data, contentType: String = "application/octet-stream") {
+        self.status = status
+        self.body = body
+        self.contentType = contentType
+    }
+    public init(_ status: HTTPResponseStatus, text: String) {
+        self.init(status, Data(text.utf8), contentType: "text/plain; charset=utf-8")
+    }
+}
+
 public enum ControlWebSocketServer {
     /// Adds what a server needs to a new connection: TLS if it has a context, HTTP with the
     /// upgrade to a WebSocket at `/v1/connect`, and `plain` for every other request
     /// (`/healthz`, `/readyz`). `opened` is called with each WebSocket as lines.
     public static func configure(_ channel: any Channel, tls: NIOSSLContext?,
                                  plain: @escaping @Sendable (HTTPRequestHead) -> (HTTPResponseStatus, String),
+                                 opened: @escaping @Sendable (WebSocketLineTransport) -> Void) -> EventLoopFuture<Void> {
+        configure(channel, tls: tls, reply: { head in let (status, text) = plain(head); return PlainReply(status, text: text) },
+                  opened: opened)
+    }
+
+    public static func configure(_ channel: any Channel, tls: NIOSSLContext?,
+                                 reply plain: @escaping @Sendable (HTTPRequestHead) -> PlainReply,
                                  opened: @escaping @Sendable (WebSocketLineTransport) -> Void) -> EventLoopFuture<Void> {
         do {
             if let tls { try channel.pipeline.syncOperations.addHandler(NIOSSLServerHandler(context: tls)) }
@@ -196,14 +219,14 @@ public enum ControlWebSocketServer {
     }
 }
 
-/// Everything that is not a WebSocket: a line of text and a status, then close.
+/// Everything that is not a WebSocket: a reply and a status, then close.
 private final class PlainHTTP: ChannelInboundHandler, RemovableChannelHandler, @unchecked Sendable {
     typealias InboundIn = HTTPServerRequestPart
     typealias OutboundOut = HTTPServerResponsePart
-    let answer: @Sendable (HTTPRequestHead) -> (HTTPResponseStatus, String)
+    let answer: @Sendable (HTTPRequestHead) -> PlainReply
     private var head: HTTPRequestHead?
 
-    init(answer: @escaping @Sendable (HTTPRequestHead) -> (HTTPResponseStatus, String)) { self.answer = answer }
+    init(answer: @escaping @Sendable (HTTPRequestHead) -> PlainReply) { self.answer = answer }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         switch unwrapInboundIn(data) {
@@ -211,15 +234,15 @@ private final class PlainHTTP: ChannelInboundHandler, RemovableChannelHandler, @
         case .body: break
         case .end:
             guard let head else { return }
-            let (status, text) = answer(head)
+            let reply = answer(head)
             var headers = HTTPHeaders()
-            headers.add(name: "Content-Type", value: "text/plain; charset=utf-8")
-            headers.add(name: "Content-Length", value: "\(text.utf8.count)")
+            headers.add(name: "Content-Type", value: reply.contentType)
+            headers.add(name: "Content-Length", value: "\(reply.body.count)")
             headers.add(name: "Connection", value: "close")
-            context.write(wrapOutboundOut(.head(HTTPResponseHead(version: head.version, status: status, headers: headers))),
+            context.write(wrapOutboundOut(.head(HTTPResponseHead(version: head.version, status: reply.status, headers: headers))),
                           promise: nil)
-            var body = context.channel.allocator.buffer(capacity: text.utf8.count)
-            body.writeString(text)
+            var body = context.channel.allocator.buffer(capacity: reply.body.count)
+            body.writeBytes(reply.body)
             context.write(wrapOutboundOut(.body(.byteBuffer(body))), promise: nil)
             context.writeAndFlush(wrapOutboundOut(.end(nil))).whenComplete { _ in context.close(promise: nil) }
         }
