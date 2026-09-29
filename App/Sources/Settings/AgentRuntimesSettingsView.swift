@@ -58,7 +58,7 @@ struct AgentRuntimesSettingsView: View {
             let tools = StoreLocations.default.tools.path
             return path.hasPrefix(tools + "/")
                 ? "Installed in the app’s own folder, with nothing added to your PATH."
-                : "Runs through your own Node (\(path))."
+                : "Runs through your own Node."
         }
         return "Installing puts it in the app’s own folder, with nothing added to your PATH."
     }
