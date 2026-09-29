@@ -94,6 +94,8 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("e", modifiers: [.command, .option])
             Button("Resources") { model.showResources() }
                 .keyboardShortcut("l", modifiers: [.command, .option])
+            Button("Runtimes") { model.showRuntimes() }
+                .keyboardShortcut("r", modifiers: [.command, .option])
             Button("Spending") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
             Divider()
