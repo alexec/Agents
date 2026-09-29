@@ -230,7 +230,7 @@ private struct SettingsRail: View {
             }
             Spacer()
             if pane == .shared {
-                Text("Your own set, for every project. A project’s own .agents folder is under Project configuration.")
+                Text("Your own set, for every project. A project’s own .agents folder is in its Project Settings.")
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(10)
@@ -338,7 +338,7 @@ private struct SettingsRail: View {
 
 /// One line of the rail. The whole line is the button (memory: a tap on a card never fires),
 /// lit in the accent when chosen, as Shared's own column was.
-private struct RailButton<Content: View>: View {
+struct RailButton<Content: View>: View {
     let lit: Bool
     let label: String
     let selected: Bool

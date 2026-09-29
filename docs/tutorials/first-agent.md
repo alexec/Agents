@@ -111,8 +111,8 @@ In the Agents window, click **Add Folder…** in the empty project list (once yo
 projects, it is **+** at the top of the list, then **Add Folder…**), and pick
 `weather-app` in your `Demo` folder.
 
-You should see `weather-app` in the list on the left, and its page beside it with
-**New session** at the top.
+You should see `weather-app` in the list on the left, and beside it an empty new session:
+the project's name in the middle, and the prompt at the bottom.
 
 ![The project page: New session, with the folder, the runtime (Claude) and the prompt](images/first-agent-02.png)
 

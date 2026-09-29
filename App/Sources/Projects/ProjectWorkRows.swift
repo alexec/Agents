@@ -1,9 +1,10 @@
 import AgentsKit
 import SwiftUI
 
-/// What the project is working on besides its sessions, under them in the middle column:
-/// its workflows. A list section of rows the size of a session's, so the column reads as
-/// one list.
+/// What the project is working on besides its sessions, under them in the middle column
+/// and above Archived: its workflows. A list section of rows the size of a session's, so
+/// the column reads as one list, and each opens its page on the right as a session opens
+/// its chat.
 ///
 /// Left out when there are none, so a project with no workflows shows only its sessions.
 struct ProjectWorkSections: View {
@@ -66,7 +67,6 @@ private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
             trailing
         }
         .padding(.vertical, 6)
-        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
     }
 }
 
@@ -78,15 +78,27 @@ private struct WorkflowListRow: View {
     let summary: WorkflowSummary
 
     var body: some View {
-        WorkRow(summary.workflow.name) {
-            WorkflowStatusIcon(summary: summary)
-                .appText(.fine)
-        } detail: {
-            Text(summary.workflow.summary)
-        } trailing: {
-            EmptyView()
+        // The row is the button, so a click, VoiceOver and the keyboard all open it.
+        Button { model.openWorkflow = summary.id } label: {
+            WorkRow(summary.workflow.name) {
+                WorkflowStatusIcon(summary: summary)
+                    .appText(.fine)
+            } detail: {
+                Text(summary.workflow.summary)
+            } trailing: {
+                EmptyView()
+            }
         }
-        .onTapGesture { model.openWorkflow = summary.id }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+        .accessibilityLabel(summary.workflow.name)
+        .accessibilityAddTraits(model.openWorkflow == summary.id ? [.isButton, .isSelected] : .isButton)
+        // Lit while its page is the one on the right, as a session's row is while its
+        // chat is (066). The list's own selection is the sessions', so drawn here.
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(model.openWorkflow == summary.id ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear))
+                .padding(.horizontal, 10))
         .contextMenu {
             Button("Open") { model.openWorkflow = summary.id }
             if summary.awaitingApproval != nil {

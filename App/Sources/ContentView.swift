@@ -111,8 +111,8 @@ struct ContentView: View {
                     if let id = model.selection, model.selectedAgent == nil { _ = await model.tombstone(for: id) }
                 }
         } else {
-            // The project on its own: a new session, its workflows and worktrees. Its
-            // sessions are the middle column's.
+            // The project on its own: a new session. Its sessions and workflows are the
+            // middle column's, and its settings a sheet.
             ProjectAgentsView(selection: Binding(get: { model.selection },
                                                  set: { model.selection = $0 }))
                 .paperGround()
@@ -170,6 +170,14 @@ struct ContentView: View {
                 .keyboardShortcut(.defaultAction)
         } message: {
             Text(model.problem ?? "")
+        }
+        // One project's settings, over whatever the window is showing (066).
+        .sheet(isPresented: Binding(get: { requests.projectSettings != nil },
+                                    set: { if !$0 { requests.projectSettings = nil } })) {
+            ProjectSettingsSheet(pane: Binding(get: { requests.projectSettings },
+                                               set: { requests.projectSettings = $0 }))
+                .environment(requests)
+                .paperSheet()
         }
         // An agent that needs its runtime signed in gets the sign-in, not an error.
         .sheet(isPresented: Binding(get: { model.signInRuntimeID != nil },

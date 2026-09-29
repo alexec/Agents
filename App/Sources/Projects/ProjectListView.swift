@@ -171,6 +171,11 @@ struct ProjectListView: View {
 
     @ViewBuilder
     private func menu(for summary: DaemonAPI.ProjectSummary) -> some View {
+        Button("Project Settings…") {
+            model.showProject(summary.key)
+            requests.projectSettings = .general
+        }
+        Divider()
         Button("Archive") {
             Task { await model.archiveProject(summary.key) }
         }

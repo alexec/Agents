@@ -37,6 +37,11 @@ struct SessionsColumn: View {
                     }
                 }
             }
+            // Its workflows, above Archived so a long archive never buries them (066).
+            // Not while searching, which is a search of the sessions.
+            if query.isEmpty {
+                ProjectWorkSections(folder: model.selectedProject)
+            }
             let archived = matching(model.agents(in: model.selectedProjectKey, group: .archived))
             // What has been retired from here (051), as the section's last line.
             let retiredLine = query.isEmpty
@@ -54,11 +59,6 @@ struct SessionsColumn: View {
                 } header: {
                     heading("Archived", count: archived.count)
                 }
-            }
-            // What else the project is working on: its workflows. Not while searching,
-            // which is a search of the sessions.
-            if query.isEmpty {
-                ProjectWorkSections(folder: model.selectedProject)
             }
         }
         .listStyle(.sidebar)
@@ -81,15 +81,6 @@ struct SessionsColumn: View {
         // whatever the right-hand side is reading. The primary checkout is "main".
         .navigationTitle(AppCheckout.windowTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name))
         .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if model.selectedProjectSummary != nil {
-                NewSessionRow {
-                    picked = []
-                    selection = nil
-                    requests.focusPrompt()
-                }
-            }
-        }
         .toolbar {
             ToolbarSpacer(.fixed)
             ToolbarItem {
@@ -97,6 +88,16 @@ struct SessionsColumn: View {
                     get: { requests.wantsSessionSearchFocus },
                     set: { if !$0 { requests.wantsSessionSearchFocus = false } }))
                     .frame(width: 240)
+            }
+            ToolbarSpacer(.fixed)
+            // Compose, where Mail and Notes have it (066): the empty project pane is the
+            // new chat, and this is the way back to it from a session.
+            ToolbarItem {
+                Button { newSession() } label: {
+                    Label("New Session", systemImage: "square.and.pencil")
+                }
+                .help("Start a new session in this project (⌘N)")
+                .disabled(model.selectedProjectSummary == nil)
             }
             if picked.count > 1 {
                 ToolbarSpacer(.fixed)
@@ -113,8 +114,22 @@ struct SessionsColumn: View {
             }
         }
         .onChange(of: picked) { _, ids in applyPicked(ids) }
+        // A workflow opened is what the right-hand side reads now, so no session stays
+        // lit or names the window.
+        .onChange(of: model.openWorkflow) { _, id in
+            guard id != nil else { return }
+            picked = []
+            selection = nil
+        }
         .onChange(of: selection) { _, id in applySelection(id) }
         .onAppear { applySelection(selection) }
+    }
+
+    private func newSession() {
+        picked = []
+        selection = nil
+        model.openWorkflow = nil
+        requests.focusPrompt()
     }
 
     /// One pick opens that chat; several keep the open chat only if it is among them.
@@ -200,31 +215,6 @@ struct SessionsColumn: View {
         AgentGroup.allCases.contains {
             !matching(model.agents(in: model.selectedProjectKey, group: $0)).isEmpty
         }
-    }
-}
-
-/// The sessions column's first line: start a new session in this project, as ⌘N does.
-/// The whole row is the button, so it can be hit anywhere along it.
-private struct NewSessionRow: View {
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Label("New session", systemImage: "square.and.pencil")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .contentShape(.rect)
-                .background(isHovered ? Paper.wash : .clear,
-                            in: RoundedRectangle(cornerRadius: Paper.Radius.card))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .help("Start a new session in this project (⌘N)")
-        .padding(.horizontal, 10)
-        .padding(.top, 6)
-        .background(Paper.ground)
     }
 }
 
