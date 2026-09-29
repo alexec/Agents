@@ -55,6 +55,11 @@ struct SessionsColumn: View {
                     heading("Archived", count: archived.count)
                 }
             }
+            // What else the project is working on: pull requests, Ready issues and
+            // workflows. Not while searching, which is a search of the sessions.
+            if query.isEmpty {
+                ProjectWorkSections(folder: model.selectedProject)
+            }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
@@ -62,7 +67,7 @@ struct SessionsColumn: View {
         .overlay {
             if model.selectedProjectSummary == nil {
                 EmptyState.noProject
-            } else if !hasAny {
+            } else if !hasAny, !(query.isEmpty && hasWork) {
                 ContentUnavailableView(query.isEmpty ? "No sessions yet" : "No matches",
                                        systemImage: "bubble.left.and.bubble.right",
                                        description: Text(query.isEmpty
@@ -105,6 +110,14 @@ struct SessionsColumn: View {
                 ToolbarItem {
                     SidebarToggle(windowWidth: frame.windowWidth)
                 }
+            }
+        }
+        // The pull requests and issues the daemon has, then a refresh, each time a
+        // project opens (038 FR-008). Never polled from here.
+        .task(id: model.selectedProject) {
+            if let folder = model.selectedProject {
+                await model.loadPullRequests(for: folder)
+                await model.loadGitHubProjectBoard(for: folder)
             }
         }
         .onChange(of: picked) { _, ids in applyPicked(ids) }
@@ -182,6 +195,16 @@ struct SessionsColumn: View {
             [agent.title, agent.report?.message].compactMap { $0 }
                 .contains { $0.localizedCaseInsensitiveContains(words) }
         }
+    }
+
+    /// Whether `ProjectWorkSections` has anything to draw, so the empty state does not
+    /// sit over it.
+    private var hasWork: Bool {
+        guard let folder = model.selectedProject.map(Project.standardize) else { return false }
+        if let list = model.pullRequestLists[folder], !list.pullRequests.isEmpty || list.problem != nil { return true }
+        if let board = model.githubProjectBoards[folder],
+           board.problem != nil || board.issues.contains(where: { $0.status == .ready }) { return true }
+        return model.workflows(in: folder).contains { !$0.isArchived }
     }
 
     private var hasAny: Bool {

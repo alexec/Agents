@@ -1,14 +1,11 @@
 import AgentsKit
 import SwiftUI
 
-/// The project itself, with no session picked: its name, somewhere to say what you want
-/// done, and under that one list at a time — workflows, issues, worktrees or pull
-/// requests — picked from a row of tabs. Its sessions are the middle column's
-/// (`SessionsColumn`).
-///
-/// Tabs rather than every list stacked, because six sections on one page was a page to
-/// scroll past rather than read. Plugins are Configuration's; one that waits for an OK
-/// is a line above the tabs, since nothing is given it until somebody looks.
+/// The project itself, with no session picked: its name and somewhere to say what you
+/// want done. Nothing else. Its sessions, pull requests, Ready issues and workflows are
+/// the middle column's (`SessionsColumn`); its worktrees, skills and plugins are
+/// Configuration's. A plugin waiting for an OK is one line here, since no agent is given
+/// it until somebody looks.
 ///
 /// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
 /// options, the folders and servers, attachments, dictation, the lot. On a project page
@@ -21,9 +18,6 @@ struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
     @State private var showingConfiguration = false
-    @AppStorage("projectPageTab") private var chosenTab: ProjectTab = .workflows
-
-    static let cardSpacing: CGFloat = 2
 
     private var folder: URL? { model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
@@ -53,7 +47,8 @@ struct ProjectAgentsView: View {
                 // The folder is this project's and not the bar's to change.
                 PromptBar(folderIsFixed: true)
                     .padding(.top, 4)
-                agents
+                waitingPlugins
+                    .chatColumn()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -70,14 +65,8 @@ struct ProjectAgentsView: View {
         .onChange(of: folder) { _, folder in
             adopt(folder)
         }
-        // The pull requests the daemon has, then a refresh, each time a project opens
-        // (038 FR-008). Never polled from here.
         .task(id: folder) {
-            if let folder {
-                await model.loadPullRequests(for: folder)
-                await model.loadGitHubProjectBoard(for: folder)
-                await model.refreshPlugins(in: folder)
-            }
+            if let folder { await model.refreshPlugins(in: folder) }
         }
     }
 
@@ -152,95 +141,6 @@ struct ProjectAgentsView: View {
             """
     }
 
-    /// One of this project's lists at a time, each one a card you can go into.
-    ///
-    /// One `GlassEffectContainer` around the lot, so the cards blend with each other
-    /// rather than each carrying its own separate render.
-    private var agents: some View {
-        GlassEffectContainer(spacing: Self.cardSpacing) {
-            LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
-                waitingPlugins
-                tabs
-                switch tab {
-                case .pullRequests: PullRequestsSection(folder: folder, selection: $selection)
-                case .issues: GitHubProjectBoardSection(selection: $selection, folder: folder)
-                case .workflows: WorkflowsSection(folder: folder, selection: $selection)
-                // Worktrees the app made here, which outlive the agents in them (030).
-                case .worktrees: WorktreesSection(folder: folder)
-                }
-            }
-            .chatColumn()
-            .padding(.bottom, 28)
-        }
-        .animation(.default, value: model.agents.map(\.state))
-        // Parking moves a chat without changing its state (040).
-        .animation(.default, value: model.agents.map(\.parking))
-        // Who is working in which worktree changes when an agent is archived or
-        // brought back, and a worktree's git status as a turn ends, so the list is
-        // asked for again whenever an agent here changes state. Not polled.
-        .onChange(of: states) { Task { await model.loadDraftWorktrees() } }
-    }
-
-    // MARK: Tabs
-
-    /// The tabs this project has: pull requests and issues only on GitHub, worktrees
-    /// only in a repository. Workflows always, since any folder can have them.
-    private var tabs: some View {
-        Picker("Show", selection: Binding(get: { tab }, set: { chosenTab = $0 })) {
-            ForEach(availableTabs, id: \.self) { tab in
-                Text(label(tab)).tag(tab)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .padding(.top, 18)
-        .padding(.bottom, 8)
-    }
-
-    private var availableTabs: [ProjectTab] {
-        ProjectTab.allCases.filter { tab in
-            switch tab {
-            case .pullRequests: pullRequests != nil
-            case .issues: board != nil
-            case .workflows: folder != nil
-            case .worktrees: folder != nil && model.draftCwd == folder && model.draftWorktrees.isRepository
-            }
-        }
-    }
-
-    /// The one chosen, or the first there is when that one is not on this project.
-    private var tab: ProjectTab {
-        availableTabs.contains(chosenTab) ? chosenTab : availableTabs.first ?? .workflows
-    }
-
-    private func label(_ tab: ProjectTab) -> String {
-        guard let count = count(tab) else { return tab.title }
-        return "\(tab.title) \(count)"
-    }
-
-    private func count(_ tab: ProjectTab) -> Int? {
-        switch tab {
-        case .pullRequests:
-            guard let list = pullRequests, list.showsRows, list.fetchedAt != nil else { return nil }
-            return list.pullRequests.count
-        case .issues:
-            guard let board, board.projectID != nil else { return nil }
-            return board.issues.count
-        case .workflows:
-            return model.workflows(in: folder).filter { !$0.isArchived }.count
-        case .worktrees:
-            return model.draftWorktrees.worktrees.filter { !$0.isProjectFolder }.count
-        }
-    }
-
-    private var pullRequests: PullRequestList? {
-        folder.flatMap { model.pullRequestLists[Project.standardize($0)] }
-    }
-
-    private var board: GitHubProjectBoard? {
-        folder.flatMap { model.githubProjectBoards[Project.standardize($0)] }
-    }
-
     /// Plugins new or changed since they were approved, which no agent is given until
     /// somebody says so on Configuration.
     @ViewBuilder
@@ -269,26 +169,6 @@ struct ProjectAgentsView: View {
         }
     }
 
-    /// Every agent's state on this page, archived ones included.
-    private var states: [AgentState] {
-        AgentGroup.allCases.flatMap { model.agents(in: model.selectedProjectKey, group: $0) }.map(\.state)
-    }
-
-}
-
-
-/// The page's lists, one at a time.
-enum ProjectTab: String, CaseIterable {
-    case workflows, issues, worktrees, pullRequests
-
-    var title: String {
-        switch self {
-        case .pullRequests: "Pull requests"
-        case .issues: "Issues"
-        case .workflows: "Workflows"
-        case .worktrees: "Worktrees"
-        }
-    }
 }
 
 /// A part of a page, a step above the `GroupHeading`s inside it.
