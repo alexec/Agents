@@ -1,7 +1,8 @@
 import AgentsKit
 import SwiftUI
 
-/// The two working lanes from the first GitHub Project linked to this repository.
+/// The two working lanes from the first GitHub Project linked to this repository, under
+/// the project page's Issues tab.
 struct GitHubProjectBoardSection: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
@@ -45,15 +46,12 @@ struct GitHubProjectBoardSection: View {
                     }
                 }
             }
-            .padding(.top, 22)
+            .padding(.top, 12)
         }
     }
 
     private func header(_ board: GitHubProjectBoard, folder: URL) -> some View {
         HStack(spacing: 8) {
-            Text("GitHub Project")
-                .appText(.reading).fontWeight(.semibold)
-                .accessibilityAddTraits(.isHeader)
             if let title = board.projectTitle, let url = board.projectURL {
                 Button(title) { openURL(url) }
                     .buttonStyle(.link)

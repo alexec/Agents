@@ -1,8 +1,8 @@
 import AgentsKit
 import SwiftUI
 
-/// The person's open pull requests on a GitHub project, between Sessions and Workflows
-/// (038 US1): what is happening, then what it is happening to, then what will happen.
+/// The person's open pull requests on a GitHub project (038 US1), under the project
+/// page's Pull requests tab, which is what names it.
 ///
 /// Present only on a project whose `origin` is on GitHub, so a project that is not
 /// looks exactly as it did (SC-006). Nothing here polls: the daemon refreshes on its own
@@ -31,22 +31,22 @@ struct PullRequestsSection: View {
             } else if let problem = list.problem {
                 problemLine(problem)
             }
-            if let refused = model.babysitterRefusals[list.folder] {
-                Text(refused)
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 2)
-            }
         }
     }
 
     // MARK: The parts
 
+    /// What to do on the left, where the eye starts; ↻ out of the way on the right.
     private func heading(_ list: PullRequestList, folder: URL) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("Pull requests")
-                .appText(.reading).fontWeight(.semibold)
-                .accessibilityAddTraits(.isHeader)
+            // Babysitting is asked for one pull request at a time, on its row. A
+            // babysitter workflow made before that is still somewhere to go.
+            if list.showsRows, let id = list.babysitterWorkflowID {
+                Button("Show babysitter") { model.openWorkflow = list.folder.path + "/" + id }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+            }
+            Spacer()
             Button {
                 Task { await model.refreshPullRequests(for: folder) }
             } label: {
@@ -57,23 +57,8 @@ struct PullRequestsSection: View {
             .foregroundStyle(.secondary)
             .help("Refresh")
             .accessibilityLabel("Refresh pull requests")
-            Spacer()
-            // With a problem there is nothing to babysit, so no button.
-            if list.showsRows {
-                if let id = list.babysitterWorkflowID {
-                    Button("Show babysitter") { model.openWorkflow = list.folder.path + "/" + id }
-                        .buttonStyle(.paper)
-                        .appText(.fine)
-                } else {
-                    Button("Babysit my pull requests") {
-                        Task { await model.addBabysitter(in: list.folder) }
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                }
-            }
         }
-        .padding(.top, 22)
+        .padding(.top, 12)
         .padding(.bottom, 2)
         .padding(.leading, 2)
     }

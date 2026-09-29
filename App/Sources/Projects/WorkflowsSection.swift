@@ -2,11 +2,7 @@ import AgentsKit
 import AppKit
 import SwiftUI
 
-/// A project's standing arrangements, under the agents working on it.
-///
-/// Below rather than above, because you come to a project page to see what is
-/// happening, and workflows are what will happen. Putting them first would push what
-/// needs you under the fold on any project with a few of them.
+/// A project's standing arrangements, under the project page's Workflows tab.
 struct WorkflowsSection: View {
     @Environment(AppModel.self) private var model
     let folder: URL?
@@ -32,7 +28,6 @@ struct WorkflowsSection: View {
 
     var body: some View {
         if folder != nil {
-            heading
             if workflows.isEmpty {
                 if archived.isEmpty { empty } else { allArchived }
             } else {
@@ -52,17 +47,6 @@ struct WorkflowsSection: View {
                 }
             }
         }
-    }
-
-    /// The count, and nothing else.
-    ///
-    /// There was a *Pause all* here, from when pausing was a thing separate from
-    /// archiving. Stopping every workflow in a project at once is a real want, but one
-    /// switch that silently holds three things is a poor way to serve it: what somebody
-    /// actually needs is to see which ones went quiet, and archiving them says that on
-    /// each row.
-    private var heading: some View {
-        SectionHeading(title: "Workflows")
     }
 
     /// Why the next one an agent is asked for will be refused, said before it is

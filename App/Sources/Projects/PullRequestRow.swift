@@ -5,7 +5,8 @@ import SwiftUI
 ///
 /// Two lines, in the page's one kind of card. The first says what state it is in, with
 /// checks and review in columns of their own so a list of them reads down as well as
-/// across. The second says where it is checked out and what babysitting last did.
+/// across. The second says where it is checked out and what babysitting last did, and
+/// offers to babysit it: that fills the prompt bar rather than starting anything.
 ///
 /// Grey, all of it, except babysitting having stopped, which is the one thing here that
 /// waits for the person (wireframes §4). A failing check is the pull request's state,
@@ -18,13 +19,11 @@ struct PullRequestRow: View {
     let folder: URL
     @Binding var selection: UUID?
 
-    private var key: AppModel.PullRequestKey { .init(folder: folder, number: pull.number) }
-
     var body: some View {
         // One card. Its first line is the button that opens the pull request on GitHub
         // (FR-005); its second line sits beside that button rather than inside it,
         // because a button's label is one element to accessibility, and the worktree
-        // link, Check out and Resume must each be reachable on their own.
+        // link, Babysit and Resume must each be reachable on their own.
         VStack(alignment: .leading, spacing: 4) {
             Button { openURL(pull.url) } label: {
                 firstLine
@@ -110,28 +109,51 @@ struct PullRequestRow: View {
 
     private var secondLine: some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            if model.checkingOut.contains(key) {
-                Text("Checking out \(pull.headBranch)…")
-            } else if let worktree = pull.worktree {
+            if let worktree = pull.worktree {
                 where_(worktree)
                 babysitting
             } else {
-                // A failure stays, with its reason, beside the button to try again.
-                if let failure = model.checkoutFailures[key] {
-                    Text("Couldn't check out: \(failure)")
-                        .lineLimit(2)
-                } else {
-                    Text("Not checked out here")
-                }
-                Button(model.checkoutFailures[key] == nil ? "Check out into a worktree" : "Try again") {
-                    Task { await model.checkOut(pull.number, in: folder) }
-                }
-                .buttonStyle(.paper)
-                .padding(.leading, 6)
+                Text("Not checked out here")
             }
+            Spacer(minLength: 8)
+            Button("Babysit this PR") { babysit() }
+                .buttonStyle(.paper)
         }
         .appText(.fine)
         .foregroundStyle(.secondary)
+    }
+
+    /// Fill the page's prompt bar to babysit this one pull request: where to work, and
+    /// what to say. Nothing starts until the person sends it.
+    ///
+    /// Where is the worktree it is already checked out in, else a new worktree on its
+    /// branch when that branch is here, else a new worktree the agent checks it out into.
+    /// The branches are asked for again first, since a fetch since the page opened is
+    /// what puts the branch here.
+    private func babysit() {
+        model.offeredPrompt = """
+            Babysit pull request #\(pull.number), "\(pull.title)" (\(pull.url.absoluteString)). \
+            If its branch \(pull.headBranch) is not checked out here, run `gh pr checkout \(pull.number)` first. \
+            Then fix failing checks, address or answer review comments, resolve conflicts with \
+            the base branch, and push. Stop when the checks pass and nothing is waiting on the author.
+            """
+        Task {
+            await model.loadDraftWorktrees()
+            let listed = model.draftWorktrees
+            let place: WorktreeChoice?
+            if let worktree = pull.worktree {
+                let root = worktree.root.standardizedFileURL.path
+                let isProjectFolder = listed.worktrees.contains {
+                    $0.isProjectFolder && $0.root.standardizedFileURL.path == root
+                }
+                place = isProjectFolder ? nil : .existing(worktree.root)
+            } else if listed.branches.contains(where: { $0.name == pull.headBranch }) {
+                place = .branch(pull.headBranch)
+            } else {
+                place = .new
+            }
+            model.chooseWorktree(place)
+        }
     }
 
     /// The worktree's name, leading to the agent working there when there is one
