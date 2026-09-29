@@ -115,8 +115,9 @@ A person opening the Mac app with no control plane is asked how they want to wor
 - **Set one up on this Mac**, which points them to the host download.
 
 The host download is signed by us and installed outside the App Store. It runs a host and a
-single-copy control plane on this Mac, kept running by macOS. It shows a code, and the window
-pairs with it as operator.
+single-copy control plane on this Mac, kept running by macOS. The person chooses where that
+control plane keeps what it remembers: a folder on this Mac, or an S3-compatible bucket of
+their own. It shows a code, and the window pairs with it as operator.
 
 **Why this priority**: The window no longer starts anything, so without this it opens to nothing.
 
@@ -134,6 +135,12 @@ the end. Within a minute of the install finishing, an empty window lists this Ma
    code, **Then** the window is paired, as operator only if the code was issued as one.
 4. **Given** the host download is installed twice, **Then** nothing runs twice and nothing
    already paired is lost.
+5. **Given** the person chooses a bucket and gives its address and keys, **When** set-up
+   finishes, **Then** the control plane keeps everything in that bucket, and nothing in a folder
+   on this Mac.
+6. **Given** a control plane already running here, **When** the person switches it from a
+   folder to a bucket or back, **Then** every client, host and grant is still there afterwards,
+   and no client or host needs pairing again.
 
 ---
 
@@ -162,8 +169,8 @@ by one copy while connected to another.
 3. **Given** a code shown by one copy, **When** it is used at another, **Then** it works, once.
 4. **Given** a client is forgotten, or a host removed, on one copy, **Then** it is cut off at
    once on every copy.
-5. **Given** a single copy on this Mac with a plain folder for its store (the host download's
-   set-up), **Then** it behaves exactly as several copies do, minus the failover.
+5. **Given** a single copy on this Mac (the host download's set-up), with either a folder or a
+   bucket for its store, **Then** it behaves exactly as several copies do, minus the failover.
 
 ---
 
@@ -419,8 +426,12 @@ Mac, and see its projects under their own heading.
 
 - **FR-023**: A Mac MUST become a host by installing a download signed by us, outside the App
   Store. It MUST be kept running by macOS across logouts and restarts.
-- **FR-024**: The host download MUST be able to run a single-copy control plane on the same Mac,
-  with a folder for its store. It is offered as **Set one up on this Mac**.
+- **FR-024**: The host download MUST be able to run a single-copy control plane on the same Mac.
+  It is offered as **Set one up on this Mac**.
+- **FR-024a**: The person MUST choose where that control plane keeps what it remembers: a folder
+  on this Mac (the default), or an S3-compatible bucket they give. They MUST be able to switch
+  between them later without any client or host pairing again. The bucket's keys MUST be kept
+  only in this Mac's keychain.
 - **FR-025**: On a Mac with today's set-up, the host download MUST take over the existing agents,
   history and projects in place.
 - **FR-026**: A Mac host MUST be able to act as the iCloud relay and notification mailbox for the

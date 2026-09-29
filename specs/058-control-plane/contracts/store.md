@@ -53,15 +53,25 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
    - It is for one machine only.
 6. **The S3 backend.**
    - Plain HTTPS with SigV4, and path-style addressing if `AGENTS_STORE_PATH_STYLE=1` (MinIO).
-   - Credentials come from the environment or the standard AWS files, never from the store.
+   - Credentials come from the environment, the standard AWS files, or (in the host app) an
+     inherited descriptor, and never from the store.
 7. **No secrets in the store.** That means no private keys and no code secrets, only their
    hashes.
+
+## Copying a store
+
+`agents-control store copy --from <store> --to <store>` copies every key under `v1/`. It refuses
+a destination that already has `control.json`. It is run with no copy serving (the host app
+stops its copy first), and afterwards it compares the key count and each object's SHA-256.
+`leases/` and `copies/` are skipped, because both are rebuilt when a copy starts. Nothing in
+the store records where it lives, so a switch needs no change to any record.
 
 ## Configuration
 
 | Variable | Meaning |
 |---|---|
 | `AGENTS_STORE` | `file:///path` or `s3://bucket/prefix` |
+| `--store-credentials-fd` | the host app hands bucket keys through an inherited descriptor, instead of the environment |
 | `AGENTS_STORE_ENDPOINT` | S3-compatible endpoint (MinIO, R2); AWS if unset |
 | `AGENTS_CONTROL_KEY_FILE` / `AGENTS_CONTROL_KEY` | the control plane's private key (never in the store) |
 | `AGENTS_CONTROL_URL` | the one address clients and hosts are given |

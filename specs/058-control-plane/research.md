@@ -320,7 +320,22 @@ image and a Homebrew cask.
   - It registers `agentsd` with `SMAppService` as a launch agent. `LocalServices` moves here,
     unchanged in substance.
   - If the person chooses **Run the control plane here**, it also registers `agents-control`
-    (single copy, folder store) and `agents-relay` as launch agents.
+    (single copy) and `agents-relay` as launch agents.
+- **Where the single copy keeps its store** (FR-024a). The person chooses when they set it up:
+  - **This Mac** (the default): a folder, `~/Library/Application Support/Agents Control/store`.
+  - **A bucket**: an S3-compatible endpoint (AWS, R2, B2, or MinIO on a NAS), bucket, prefix,
+    access key and secret. The host app checks them with the start-up probe (R4) before
+    saving. The access key and secret go in the host app's keychain and reach
+    `agents-control` through the same inherited descriptor as the control key, never in a file
+    or the environment of a launch agent's plist.
+  - **Switching later** stops the copy, copies every object from one store to the other
+    (`agents-control store copy --from … --to …`, which refuses a destination that is not
+    empty), checks the counts and ETags, points the copy at the new store and starts it. Nothing
+    in the store names where it lives, so clients and hosts notice nothing. The old store is
+    kept until the person removes it.
+  - **Why a bucket at home.** What the control plane remembers outlives this Mac. A copy on
+    rented hosting can later join the same bucket, so a person can grow from one Mac to
+    several copies without moving anything.
 - **Its window** is small. It shows:
   - this host's state;
   - the code to pair a window or phone;

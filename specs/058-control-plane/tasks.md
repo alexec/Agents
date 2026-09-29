@@ -85,7 +85,7 @@ replaced, and removing what they left is a task in this list.
 
 - [ ] T027 [P] Draw frames K–N in `specs/058-control-plane/look/wireframes.html`, the same style as A–J, and export `k.png`–`n.png`. The frames:
   - **K**: the window's first run, in two states: the host app is absent, which gives *Connect to a control plane* and *Set one up on this Mac*, pointing to the download; and the host app is found by Bonjour, which gives *Pair with “Alex's Mac”*.
-  - **L**: the host app's window: this host's state, the code to pair a window or phone, *Run the control plane here*, *Join one elsewhere*, *Relay for my devices*, and the move.
+  - **L**: the host app's window: this host's state, the code to pair a window or phone, *Run the control plane here*, *Join one elsewhere*, *Relay for my devices*, and the move. Also where the control plane keeps its store: *This Mac* (the default) or *A bucket* (endpoint, bucket, prefix, access key, secret, and a Check button), plus *Switch store…* once it is running.
   - **M**: Add a Server, with two tabs: *Run a command*, showing a host code and the one-line command; and *Install over ssh*, with the destination and a key used once.
   - **N**: Clients, with a relayed device and its away marker, and the "reached through <Mac>" line.
 - [ ] T028 Update `specs/058-control-plane/look/README.md` with what each of K–N shows and why. Ask Alex to approve with AskUserQuestion. Record his decisions in the README and stop UI work until he answers.
@@ -246,11 +246,24 @@ hand-started processes, and SC-006 timed.
 - [ ] T056 [US2] The control plane's key in the host app, in `Host/Sources/ControlKey.swift`: made once and kept in the keychain. On a Mac with today's set-up, it is the existing `relay-mac-key`. It is handed to `agents-control` through an inherited descriptor (`--key-fd`) by a small launcher, `Host/Sources/ControlLauncher.swift`, that the launch agent runs. The key is never written to disk (FR-010).
 - [ ] T057 [US2] On first start, the single copy makes a self-signed certificate in its folder and a store in `~/Library/Application Support/Agents Control/store`. It advertises `_agents-control._tcp` with the pin in its TXT record, and listens on 8791 with URL `https://<.local name>:8791`.
 - [ ] T058 [US2] Build frame L in `Host/Sources/HostWindow.swift`, after approval (T028): state, the code to pair, *Run the control plane here*, *Join one elsewhere* (a host code, which gives only the host), *Relay for my devices*, and the move entry (T086).
+- [ ] T058a [US2] Store choice in the host app, in `Host/Sources/StoreChoice.swift` (FR-024a, research R9):
+  - *This Mac* (the default), a folder, or *A bucket*: endpoint, bucket, prefix, access key and secret;
+  - *Check* runs the start-up probe (contracts/store.md rule 4) before saving;
+  - the keys are kept in the host app's keychain and handed to `agents-control` through `--store-credentials-fd`, never in a plist, file or environment variable;
+  - `agents-control serve` reads that descriptor in `Packages/ControlPlane/Sources/agents-control/main.swift`.
+- [ ] T058b [US2] Write `agents-control store copy --from --to` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/StoreCopy.swift`, following contracts/store.md "Copying a store":
+  - refuse a destination that has `control.json`;
+  - skip `leases/` and `copies/`;
+  - verify the count and SHA-256 of each object.
+
+  Add *Switch store…* in the host app: stop the copy, copy, point the copy at the new store, and start it. The old store is kept until removed. Add tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/StoreCopyTests.swift`: folder to memory and back, a non-empty destination refused, and every record intact.
 - [ ] T059 [US2] The window pairs with a host app it found (frame K, second state): a code handed over through the host app's window, or typed. Installing twice registers nothing twice (US2-4).
 - [ ] T060 [US2] Walk US2 on a scratch root:
   - install the host app's scratch build and choose *Run the control plane here*;
   - pair the store-configured window and time it (SC-006);
   - log out and in (or `launchctl print` shows the jobs);
+  - set up once with *This Mac* and once with *A bucket* on MinIO;
+  - switch a running set-up from the folder to MinIO and back, and check the window and a host carry on without pairing again (US2-5, US2-6);
   - unregister the jobs afterwards.
 
   Record it in `specs/058-control-plane/walks/us2-host-app.md`.

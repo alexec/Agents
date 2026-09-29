@@ -251,6 +251,6 @@ Phase 2 and again before Phase 9.
 | Peer links and proxied uplinks between copies | FR-006: any copy serves any client for every host | A broker (Redis/NATS) is a service the spec rules out. Sticky routing cannot serve a client that needs every host |
 | Leases in the store | One holder per host uplink, with takeover when a copy dies | Without them, two copies could both believe they hold a host |
 | A third Mac target (host app) plus a relay helper | App Store rules, and CloudKit needs a signed bundle | A bare pkg cannot register `SMAppService` jobs or carry CloudKit |
-| Two store backends | Alex asked for disk or S3 | Only S3 would make the single copy on a Mac need a bucket. Only disk cannot share state across machines |
+| Two store backends, both offered at home | Alex asked for disk or S3, and for home users to choose either (FR-024a) | Only S3 would make every home user need a bucket. Only disk cannot share state across machines, or outlive the Mac |
 | HMAC proof of keys instead of signatures | It proves the same keys, with no second BoringSSL on Linux (R6) | ECDSA would add swift-crypto or hand-written signing |
 | Two window configurations until the move | FR-039: the old set-up works until the person moves | One configuration would force the move on the first launch |
