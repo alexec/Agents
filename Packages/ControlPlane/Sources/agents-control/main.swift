@@ -29,6 +29,7 @@ import Musl
 //   AGENTS_CONTROL_KEY_FILE     the control plane's private key, raw, 0600 (made if missing)
 //   AGENTS_CONTROL_KEY          or the key itself, base64url
 //   AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
+//   AGENTS_CONTROL_PIN          the load balancer's certificate pin, for codes, when it terminates TLS
 
 setvbuf(stdout, nil, _IOLBF, 0)
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -116,7 +117,8 @@ func serve() async {
     } catch {
         fail("TLS: \(error)")
     }
-    let pin = tls.flatMap { $0.pin.isEmpty ? nil : $0.pin }
+    // Behind a load balancer that terminates TLS, the pin is its certificate's, given.
+    let pin = tls.flatMap { $0.pin.isEmpty ? nil : $0.pin } ?? environment["AGENTS_CONTROL_PIN"].flatMap { $0.isEmpty ? nil : $0 }
     let name = value("--name") ?? environment["AGENTS_CONTROL_NAME"] ?? (home != nil ? localName() : url.host ?? "control plane")
     do {
         let service = try ControlService(.init(store: store(), privateKey: privateKey(), url: url, pin: pin,
