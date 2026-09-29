@@ -1280,10 +1280,6 @@ final class RemoteModel {
     var poolStatus: PoolStatus? { work.poolStatus }
     func agent(_ id: UUID) -> Agent? { work.agent(id) }
 
-    /// The Pool page, over whatever is on screen (a switch note's Pool link).
-    var isShowingPool = false
-    /// Continue with, as a list: a chat moving by hand, or changing what a switch chose.
-    var continuing: RemoteContinue?
 
     /// Every runtime's state on the Mac (065, US4).
     var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
@@ -1306,38 +1302,6 @@ final class RemoteModel {
         guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
                                                   returning: PoolStatus.self) else { return }
         work.replacePoolStatus(status)
-    }
-
-    /// The person says a runtime is back (FR-023). The phone may: it costs one turn if wrong.
-    func markPoolEntryAvailable(_ entryID: UUID) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolMarkAvailable,
-                                                  DaemonAPI.PoolMarkAvailable(entryID: entryID),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
-    }
-
-    func stopWaiting(_ agentID: UUID) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolStopWaiting,
-                                                  DaemonAPI.PoolStopWaiting(agentID: agentID),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
-    }
-
-    func continueWith(_ request: DaemonAPI.ContinueWithRequest) async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
-        do {
-            return .success(try await client.call(DaemonAPI.Method.agentsContinueWith, request,
-                                                  returning: DaemonAPI.ContinueWithResult.self))
-        } catch let error as JSONRPCError {
-            return .failure(error)
-        } catch {
-            return .failure(JSONRPCError(code: -32603, message: "\(error)"))
-        }
-    }
-
-    func setSwitching(_ agentID: UUID, isOn: Bool) async {
-        _ = try? await client.call(DaemonAPI.Method.agentsSetSwitching,
-                                   DaemonAPI.SetSwitchingRequest(agentID: agentID, isOn: isOn),
-                                   returning: Agent?.self)
     }
 
     /// What each agent holds and waits for (036). The phone only reads it: the

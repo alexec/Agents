@@ -30,10 +30,6 @@ struct ProjectListView: View {
                         .paperListRow()
                     NavigationLink { TotalsView() } label: { SpendingRow() }
                         .paperListRow()
-                    if model.poolStatus?.rows.isEmpty == false {
-                        NavigationLink { PoolPageView() } label: { PoolRow() }
-                            .paperListRow()
-                    }
                 }
             }
         }

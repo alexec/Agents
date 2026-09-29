@@ -28,7 +28,6 @@ struct AgentCard: View {
                            isUnread: agent.isUnread,
                            endedReason: agent.endedReason,
                            outcomeUnknown: agent.endingIsUnaccountedFor,
-                           isWaitingForAllowance: agent.allowanceWait != nil,
                            isParked: agent.parking?.isParked == true)
                     .padding(.top, 1)
 
