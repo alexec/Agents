@@ -79,7 +79,7 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
 <!-- ============ A ============ -->
 <div class="frame" id="a">
 <div class="cap">A · A project with nothing open</div>
-<div class="sub">The middle column shows one kind of thing, chosen at its top. The right pane is an empty new chat, with the prompt at the bottom where every chat has it.</div>
+<div class="sub">The middle column is the project's sessions, and nothing else. The right pane is an empty new chat, with the prompt at the bottom where every chat has it.</div>
 <div class="win">
   <div class="side">
     <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
@@ -99,126 +99,75 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
   </div>
   <div class="mid">
     <div class="tb"><span class="search">⌕ Search sessions</span><span class="icon" title="New session">✎</span></div>
-    <div class="seg"><span class="on">Sessions</span><span>Pull requests<i>1</i></span><span>Issues<i>2</i></span><span>Workflows<i>3</i></span></div>
     <div class="lh">Needs you <span class="count">2</span></div>
     <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">058 control plane</div><div class="d">I've caught up on the 058 control-plane…</div></div></div>
-    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">Simplify the project page</div><div class="d">PR #38 is merged (main 4228c8f3)…</div></div></div>
+    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">Simplify the project page</div><div class="d">Merged to main 4228c8f3…</div></div></div>
     <div class="lh">Waiting <span class="count">1</span></div>
-    <div class="row"><span class="ic">⌛</span><div class="body"><div class="t">Fail Swift builds on CI</div><div class="d">◷ Waiting for checks on #37 · again 21:40</div></div></div>
+    <div class="row"><span class="ic">⌛</span><div class="body"><div class="t">Fail Swift builds on CI</div><div class="d">◷ Waiting for custom.build_green · again 21:40</div></div></div>
     <div class="lh">Working <span class="count">2</span></div>
     <div class="row"><span class="ic">✳</span><div class="body"><div class="t">Review the design of the app</div><div class="d">Reading the project page…</div></div></div>
-    <div class="row"><span class="ic">✳</span><div class="body"><div class="t">065: read another agent's work</div><div class="d">continue-successor</div></div></div>
+    <div class="row"><span class="ic">✳</span><div class="body"><div class="t">065: read another agent's work</div><div class="d">Writing the spec…</div></div></div>
     <div class="lh">▸ Archived <span class="count">407</span></div>
   </div>
   <div class="detail">
     <div class="tb"><span class="title">New session</span><span class="btn">☰ Project Settings</span></div>
-    <div class="banner">✋ <span class="grow">Plugin <b>swift-lsp</b> is waiting for your OK</span><span class="btn">Review…</span></div>
-    <div class="empty"><div class="name">Agents</div><div>~/Agents · main · this Mac</div></div>
+    <div class="banner">✋ <span class="grow">Workflow <b>Nightly build</b> changed and is waiting for your OK</span><span class="btn">Review…</span></div>
+    <div class="empty"><div class="name">Agents</div><div>~/Agents · this Mac</div></div>
     <div class="prompt">
       <div class="chips"><span class="chip">📁 Agents</span><span class="chip">Project folder ▾</span><span class="chip" style="margin-left:auto">Claude ▾</span></div>
       <div class="ph">Say what's next</div>
       <div class="chips"><span class="chip">Mode: Auto ▾</span><span class="chip">Reach: this folder ▾</span><span class="chip">Model: Default ▾</span><span class="chip">Effort: Default ▾</span><span class="chip" style="margin-left:auto">📎</span><span class="chip">🎙</span><span class="chip">↑</span></div>
     </div>
   </div>
-  <div class="n" style="left:232px;top:470px">Scope bar: one kind of thing at a time (⌘1–⌘4)</div>
-  <div class="n" style="left:232px;top:420px;max-width:300px">✎ Compose, as in Mail (⌘N)</div>
+  <div class="n" style="left:232px;top:430px;max-width:320px">✎ Compose, as in Mail (⌘N). Replaces the "New session" row.</div>
+  <div class="n" style="left:232px;top:480px;max-width:320px">One kind of row: every row opens its chat on the right.</div>
   <div class="n" style="left:600px;top:400px;max-width:300px">Same place as the prompt in a chat. Sending turns this pane into the session.</div>
-  <div class="n" style="left:232px;top:520px;max-width:300px">PRs, issues, workflows are no longer below Archived</div>
+  <div class="n" style="left:760px;top:84px;max-width:300px;top:92px">One banner for anything waiting for an OK: a plugin or a workflow</div>
 </div>
 </div>
 
 <!-- ============ B ============ -->
 <div class="frame" id="b">
-<div class="cap">B · Pull requests: pick one, read it on the right</div>
-<div class="sub">Rows have no buttons. The pull request's page says where it stands and carries Babysit, which opens frame A's new chat filled in.</div>
+<div class="cap">B · Project Settings ▸ Workflows</div>
+<div class="sub">Workflows are rules the project follows, so they sit with its settings, as Mail keeps Rules in its settings. What a workflow starts is a session, which shows in the list like any other.</div>
 <div class="win">
   <div class="side">
     <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
     <div class="h">Projects</div>
     <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
     <div class="p">www.alexecollins.com</div>
-    <div class="p">RelaxedCounting</div>
-    <div class="p">Where</div>
-    <div class="p">Rehang</div>
-    <div class="p">Scribe</div>
-    <div class="foot">Keeping this Mac awake</div>
   </div>
-  <div class="mid">
-    <div class="tb"><span class="search">⌕ Search pull requests</span><span class="icon">✎</span></div>
-    <div class="seg"><span>Sessions</span><span class="on">Pull requests<i>2</i><b></b></span><span>Issues<i>2</i></span><span>Workflows<i>3</i></span></div>
-    <div class="lh">Open <span>↻</span></div>
-    <div class="row on"><span class="ic run">◌</span><div class="body"><div class="t"><span class="num">#37</span>Fail Swift builds on CI</div><div class="d">checks running · issue-30-fail-swift-builds</div></div></div>
-    <div class="row"><span class="ic bad">✕</span><div class="body"><div class="t"><span class="num">#36</span>Keep the pool known</div><div class="d">checks failing · changes requested · not checked out</div></div></div>
-  </div>
-  <div class="detail">
-    <div class="tb"><span class="title">#37 Fail Swift builds on CI</span><span style="display:flex;gap:6px"><span class="btn">Open on GitHub ↗</span><span class="btn primary">Babysit</span></span></div>
-    <div class="page">
-      <h1>Fail Swift builds on CI</h1>
-      <div class="meta">#37 · issue-30-fail-swift-builds → main · opened by Alex Collins 2 hours ago</div>
-      <div class="card"><div class="k">Checks</div>
-        <div class="line"><span><span class="run">◌</span> build-mac</span><span class="meta">running 6 min</span></div>
-        <div class="line"><span><span class="ok">✓</span> swift test (Linux)</span><span class="meta">4 min</span></div>
-        <div class="line"><span><span class="ok">✓</span> lint</span><span class="meta">38 s</span></div></div>
-      <div class="card"><div class="k">Review and merge</div>
-        <div class="line"><span>No review yet</span><span class="meta">No conflicts</span></div></div>
-      <div class="card"><div class="k">Where it is</div>
-        <div class="line"><span>Worktree <b>issue-30-fail-swift-builds</b></span><span class="btn">Reveal in Finder</span></div></div>
-      <div class="card"><div class="k">Sessions on this pull request</div>
-        <div class="line"><span>⌛ Fail Swift builds on CI — waiting for checks</span><span class="btn">Open</span></div></div>
+  <div class="mid"></div>
+  <div class="detail"></div>
+  <div class="sheetveil">
+    <div class="sheet">
+      <div class="nav">
+        <div>General</div>
+        <div>Instructions &amp; skills</div>
+        <div>Plugins</div>
+        <div>MCP servers</div>
+        <div class="on">Workflows <span class="badge"></span></div>
+      </div>
+      <div class="main">
+        <div class="line" style="align-items:center"><span style="font:600 17px -apple-system">Workflows</span><span class="btn">＋ New Workflow…</span></div>
+        <div class="card" style="padding:0;gap:0">
+          <div class="line" style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);background:#fbefd9"><span><b>✋ Nightly build</b><br><span class="meta">Changed since you approved it · every day at 03:00</span></span><span style="display:flex;gap:6px;align-items:center"><span class="btn">Review…</span></span></div>
+          <div class="line" style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06)"><span><b>Catch up after sleep</b><br><span class="meta">When this Mac wakes · last ran 07:12</span></span><span class="meta">›</span></div>
+          <div class="line" style="padding:10px 14px"><span><b>Merge when green</b><br><span class="meta">On custom.build_green · last ran yesterday</span></span><span class="meta">›</span></div>
+        </div>
+        <div class="meta">Each workflow is a file in .agents/workflows. Click one to see what it does, its runs, and Run Now.</div>
+        <span class="btn primary done">Done</span>
+      </div>
     </div>
   </div>
-  <div class="n" style="left:600px;top:540px;max-width:320px">Primary action on the page, not the row. Reads "Go to session" when one is already babysitting.</div>
-  <div class="n" style="left:232px;top:250px">Context menu: Open on GitHub, Babysit, Copy Link</div>
-  <div class="n" style="left:600px;top:610px;max-width:320px">Links the PR to the sessions working on it, which the app knows today but does not show</div>
+  <div class="n" style="left:720px;top:470px;max-width:300px">Click a row: its page opens inside the sheet with a ‹ back, as System Settings drills in. Right-click: Run Now, Archive.</div>
 </div>
 </div>
 
 <!-- ============ C ============ -->
 <div class="frame" id="c">
-<div class="cap">C · Issues: the Project's Ready lane, and Start a session</div>
-<div class="sub">"Assign" becomes "Start a session", which says what it does. A status pop-up says which lane you are looking at.</div>
-<div class="win">
-  <div class="side">
-    <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-    <div class="h">Projects</div>
-    <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
-    <div class="p">www.alexecollins.com</div>
-    <div class="p">RelaxedCounting</div>
-    <div class="p">Where</div>
-    <div class="p">Rehang</div>
-    <div class="p">Scribe</div>
-    <div class="foot">Keeping this Mac awake</div>
-  </div>
-  <div class="mid">
-    <div class="tb"><span class="search">⌕ Search issues</span><span class="icon">✎</span></div>
-    <div class="seg"><span>Sessions</span><span>Pull requests<i>1</i></span><span class="on">Issues<i>2</i></span><span>Workflows<i>3</i></span></div>
-    <div class="lh"><span>Status <span class="pop">Ready ▾</span></span><span>↻</span></div>
-    <div class="row on"><span class="ic">○</span><div class="body"><div class="t"><span class="num">#9</span>Define Continue successor</div><div class="d">enhancement · spec</div></div></div>
-    <div class="row"><span class="ic">○</span><div class="body"><div class="t"><span class="num">#10</span>Build the control plane</div><div class="d">enhancement</div></div></div>
-  </div>
-  <div class="detail">
-    <div class="tb"><span class="title">#9 Define Continue successor</span><span style="display:flex;gap:6px"><span class="btn">Open on GitHub ↗</span><span class="btn primary">Start a session</span></span></div>
-    <div class="page">
-      <h1>Define Continue successor</h1>
-      <div class="meta">#9 · Ready in "Agents roadmap" · opened 3 days ago</div>
-      <div><span class="tag">enhancement</span><span class="tag">spec</span></div>
-      <div class="card" style="gap:9px">
-        <div class="bar" style="width:92%"></div><div class="bar" style="width:84%"></div><div class="bar" style="width:70%"></div>
-        <div class="bar" style="width:40%;margin-bottom:8px"></div>
-        <div class="bar" style="width:88%"></div><div class="bar" style="width:60%"></div>
-      </div>
-      <div class="meta">Start a session opens a new chat with this issue as the prompt, in a new worktree, and moves the issue to In progress when it is sent.</div>
-    </div>
-  </div>
-  <div class="n" style="left:232px;top:250px;max-width:200px">Status pop-up: Ready · In progress · All</div>
-  <div class="n" style="left:600px;top:470px;max-width:300px">If the Project has no Ready/In progress status, the button is disabled and the reason is written here, not in a tooltip.</div>
-</div>
-</div>
-
-<!-- ============ D ============ -->
-<div class="frame" id="d">
-<div class="cap">D · Project Settings, as a sheet</div>
-<div class="sub">Opened from the toolbar, the project's context menu, or Project ▸ Settings… (⌥⌘,). Configuration's panes, moved as they are, plus General, which takes the name, place and money off the page.</div>
+<div class="cap">C · Project Settings ▸ General</div>
+<div class="sub">Opened from the toolbar, the project's context menu, or Project ▸ Settings… (⌥⌘,). It takes the name, place and money off the page.</div>
 <div class="win">
   <div class="side">
     <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
@@ -233,9 +182,9 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
       <div class="nav">
         <div class="on">General</div>
         <div>Instructions &amp; skills</div>
-        <div>Plugins <span class="badge"></span></div>
+        <div>Plugins</div>
         <div>MCP servers</div>
-        <div>Worktrees <span class="count">6</span></div>
+        <div>Workflows <span class="badge"></span></div>
       </div>
       <div class="main">
         <div style="font:600 17px -apple-system">General</div>
@@ -243,7 +192,6 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
           <span class="l">Name</span><span class="field">Agents</span>
           <span class="l">Folder</span><span style="display:flex;gap:8px;align-items:center">~/Agents <span class="btn">Reveal in Finder</span></span>
           <span class="l">Machine</span><span>This Mac</span>
-          <span class="l">GitHub</span><span>alexcollins/agents · Project "Agents roadmap" <span class="btn">Change…</span></span>
           <span class="l">Spent</span><span>$10,965 since it was added<br><span class="meta">59 sessions ran on a runtime that reports no price, so this is a minimum.</span></span>
         </div>
         <div style="margin-top:14px;border-top:1px solid rgba(0,0,0,.08);padding-top:14px" class="form">
@@ -256,39 +204,41 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
 </div>
 </div>
 
-<!-- ============ E ============ -->
-<div class="frame" id="e">
-<div class="cap">E · Alternative (not recommended): the project opens in the sidebar</div>
-<div class="sub">Mail's mailboxes: each project has a disclosure triangle with its four lists under it. The right pane is the same as A–D. It makes the sidebar long, and the "needs you" dot has to show twice.</div>
+<!-- ============ D ============ -->
+<div class="frame" id="d">
+<div class="cap">D · Alternative: Sessions | Workflows over the list</div>
+<div class="sub">Keeps workflows beside the work. A two-way switch at the top of the column; a workflow opens its page on the right, as a session opens its chat.</div>
 <div class="win">
   <div class="side">
     <div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
     <div class="h">Projects</div>
-    <div class="p on"><div>▾ Agents</div><span class="badge"></span></div>
-    <div class="child on">Sessions <span class="badge"></span></div>
-    <div class="child">Pull requests <span class="count">1</span></div>
-    <div class="child">Issues <span class="count">2</span></div>
-    <div class="child">Workflows <span class="count">3</span></div>
-    <div class="p">▸ www.alexecollins.com</div>
-    <div class="p">▸ RelaxedCounting</div>
-    <div class="p">▸ Where</div>
-    <div class="p">▸ Rehang</div>
-    <div class="p">▸ Scribe</div>
+    <div class="p on"><div>Agents<small>Needs you</small></div><span class="badge"></span></div>
+    <div class="p">www.alexecollins.com</div>
+    <div class="p">RelaxedCounting</div>
+    <div class="p">Where</div>
+    <div class="p">Rehang</div>
+    <div class="p">Scribe</div>
     <div class="foot">Keeping this Mac awake</div>
   </div>
   <div class="mid">
-    <div class="tb"><span class="search">⌕ Search sessions</span><span class="icon">✎</span></div>
-    <div class="lh">Needs you <span class="count">2</span></div>
-    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">058 control plane</div><div class="d">I've caught up on the 058 control-plane…</div></div></div>
-    <div class="row"><span class="ic" style="color:#e07b39">!</span><div class="body"><div class="t">Simplify the project page</div><div class="d">PR #38 is merged (main 4228c8f3)…</div></div></div>
-    <div class="lh">Working <span class="count">2</span></div>
-    <div class="row"><span class="ic">✳</span><div class="body"><div class="t">Review the design of the app</div><div class="d">Reading the project page…</div></div></div>
+    <div class="tb"><span class="search">⌕ Search workflows</span><span class="icon">✎</span></div>
+    <div class="seg"><span>Sessions</span><span class="on">Workflows<i>3</i><b></b></span></div>
+    <div class="row on"><span class="ic" style="color:#e07b39">✋</span><div class="body"><div class="t">Nightly build</div><div class="d">Waiting for your OK · every day at 03:00</div></div></div>
+    <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Catch up after sleep</div><div class="d">When this Mac wakes · last ran 07:12</div></div></div>
+    <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Merge when green</div><div class="d">On custom.build_green · last ran yesterday</div></div></div>
   </div>
   <div class="detail">
-    <div class="tb"><span class="title">New session</span><span class="btn">☰ Project Settings</span></div>
-    <div class="empty"><div class="name">Agents</div><div>~/Agents · main · this Mac</div></div>
-    <div class="prompt"><div class="ph">Say what's next</div><div class="chips"><span class="chip">Mode: Auto ▾</span><span class="chip">Model: Default ▾</span></div></div>
+    <div class="tb"><span class="title">Nightly build</span><span style="display:flex;gap:6px"><span class="btn">Run Now</span><span class="btn primary">Approve</span></span></div>
+    <div class="page">
+      <h1>Nightly build</h1>
+      <div class="meta">.agents/workflows/nightly-build.md · changed since you approved it</div>
+      <div class="card"><div class="k">When</div><div>Every day at 03:00</div></div>
+      <div class="card"><div class="k">What it asks</div><div class="bar" style="width:90%"></div><div class="bar" style="width:70%"></div></div>
+      <div class="card"><div class="k">Runs</div>
+        <div class="line"><span>Last night 03:00 — published custom.build_green</span><span class="btn">Open session</span></div></div>
+    </div>
   </div>
+  <div class="n" style="left:232px;top:300px;max-width:320px">Two segments is thin for a scope bar; that is why B is recommended</div>
 </div>
 </div>
 </body></html>
