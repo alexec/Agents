@@ -112,6 +112,13 @@ public enum Briefing {
     /// Waiting on what happens, and saying that something has (042).
     public static let events = EventWords.briefing
 
+    /// Carrying on another session's work (065). Told to every agent, a helper too: the
+    /// person says "continue Login redirect" to whichever chat they opened.
+    public static let sessions = """
+        To continue another session in this project, read it with \(AppTool.readSession), \
+        by id or exact title; \(AppTool.listSessions) lists them. Reading leaves it as it was.
+        """
+
     /// Ask, rather than guess or stop.
     ///
     /// The act, and then the reason it is worth doing: the question is held by the
@@ -237,7 +244,7 @@ public enum Briefing {
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]
             + (managesAgents ? [helpers] : [])
-            + [leases, events]
+            + [leases, events, sessions]
             + [residue(policy.residue)].compactMap { $0 }
     }
 

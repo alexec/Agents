@@ -37,6 +37,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsStopHelper,
         DaemonAPI.Method.agentsArchiveHelper,
         DaemonAPI.Method.agentsListHelpers,
+        DaemonAPI.Method.agentsListSessions,
+        DaemonAPI.Method.agentsReadSession,
         DaemonAPI.Method.agentsPushPullRequest,
         DaemonAPI.Method.agentsReplyOnPullRequest,
         DaemonAPI.Method.leasesLease,

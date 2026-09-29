@@ -11,6 +11,13 @@ import Testing
 /// takes its feature with it, and nothing else fails.
 @Suite("What every agent is told")
 struct BriefingTests {
+    @Test func everyAgentIsToldHowToContinueAnotherSession() {
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(Briefing.lines(for: policy).contains(Briefing.sessions))
+            #expect(Briefing.lines(for: policy, managesAgents: false).contains(Briefing.sessions))
+        }
+    }
+
     @Test func everyLineIsInTheBlockThatIsSent() {
         for policy in ToolPolicyCatalog.builtIn {
             for line in Briefing.lines(for: policy) {
@@ -152,12 +159,15 @@ struct BriefingTests {
     /// Raised with ask_form, to 2,650 and 2,450: every runtime is told the app's own
     /// ask tool by name, and Cursor names AskQuestion as well (~70 characters on the
     /// longest line).
+    ///
+    /// Raised with reading another session (065), to 2,800 and 2,600 and nine lines: one
+    /// line, told to every agent, helpers included (about 150 characters with its break).
     @Test func itStaysShortEnoughToBeRead() {
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy)
-            #expect(text.count < 2_650, "\(policy.runtimeID): \(text.count)")
-            #expect(Briefing.lines(for: policy).count <= 8, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false).count < 2_450,
+            #expect(text.count < 2_800, "\(policy.runtimeID): \(text.count)")
+            #expect(Briefing.lines(for: policy).count <= 9, "\(policy.runtimeID)")
+            #expect(Briefing.text(for: policy, managesAgents: false).count < 2_600,
                     "\(policy.runtimeID), for an agent another agent started")
         }
     }

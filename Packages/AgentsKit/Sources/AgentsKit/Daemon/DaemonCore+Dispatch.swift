@@ -705,6 +705,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)
                 return .success(["note": .string(try listHelpers(request))])
 
+            case DaemonAPI.Method.agentsListSessions:
+                let request = try require(params, as: DaemonAPI.ListSessionsRequest.self)
+                return .success(["note": .string(try listSessions(request))])
+
+            case DaemonAPI.Method.agentsReadSession:
+                let request = try require(params, as: DaemonAPI.ReadSessionRequest.self)
+                return .success(["note": .string(try await readSession(request))])
+
             case DaemonAPI.Method.agentsReportOutcome:
                 let request = try require(params, as: DaemonAPI.ReportOutcomeRequest.self)
                 return .success(["note": .string(try await reportOutcome(request))])

@@ -163,6 +163,18 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                                          discardChanges: discardChanges),
                                fallback: "The move is asked for.")
         }
+    } sessions: { call in
+        // Only ever the caller's own project: the daemon takes it from the token (065).
+        switch call {
+        case .list:
+            return await relay(DaemonAPI.Method.agentsListSessions,
+                               DaemonAPI.ListSessionsRequest(token: token),
+                               fallback: "There are no sessions in this project.")
+        case .read(let session):
+            return await relay(DaemonAPI.Method.agentsReadSession,
+                               DaemonAPI.ReadSessionRequest(token: token, session: session),
+                               fallback: SessionLookup.unavailable)
+        }
     }
     let task = Task {
         await service.run()

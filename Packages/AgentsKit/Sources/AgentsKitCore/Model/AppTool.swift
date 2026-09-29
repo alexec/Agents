@@ -49,6 +49,15 @@ public enum AppTool {
     /// The agents the caller started that are still here, and the places in use.
     public static let listMyAgents = "list_my_agents"
 
+    // Two for reading another session in the same project (065). Offered to every
+    // agent, including one another agent started: reading is not managing anyone.
+
+    /// The sessions in the caller's project, newest first.
+    public static let listSessions = "list_sessions"
+
+    /// One session's history, by id or exact title.
+    public static let readSession = "read_session"
+
     // Three more for taking turns with the Mac's shared things (036). Offered to every
     // agent, including one another agent started: waiting for the simulator is not
     // managing anyone.
@@ -115,6 +124,7 @@ public enum AppTool {
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
         archiveAgent, listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, publishEvent, pushPullRequest, replyOnPullRequest, suggestPrompts, reportOutcome,
+        listSessions, readSession,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's
