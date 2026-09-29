@@ -377,6 +377,14 @@ public actor ControlCodes {
         self.name = name
     }
 
+    /// For `agents-control code`, which makes a code against the store with no copy running
+    /// in its process.
+    public static func forCommandLine(store: any ControlStore, privateKey: Data, url: String, pin: String?,
+                                      name: String) -> ControlCodes {
+        let publicKey = (try? ControlAgreement.publicKey(privateKey: privateKey)) ?? Data()
+        return ControlCodes(store: store, privateKey: privateKey, publicKey: publicKey, url: url, pin: pin, name: name)
+    }
+
     /// A new code, written to the store, for `clients/startPairing` or `hosts/startEnroll`
     /// or `agents-control code`.
     public func issue(_ purpose: ControlCode.Purpose, lifetime: TimeInterval = ControlCode.lifetime)

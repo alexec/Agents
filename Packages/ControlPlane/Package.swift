@@ -34,7 +34,11 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
             ]),
-        .executableTarget(name: "agents-control", dependencies: ["ControlPlaneKit"]),
+        .executableTarget(name: "agents-control", dependencies: [
+            "ControlPlaneKit",
+            .product(name: "AgentsKitCore", package: "AgentsKit"),
+            .product(name: "NIOSSL", package: "swift-nio-ssl"),
+        ]),
         .testTarget(name: "ControlPlaneKitTests", dependencies: [
             "ControlPlaneKit",
             .product(name: "ControlDial", package: "AgentsKit"),

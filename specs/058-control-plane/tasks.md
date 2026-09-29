@@ -136,7 +136,7 @@ transport.
   - a wrong key, a replay to another origin, a flipped nonce, an expired code and a spent code are each refused with the contracts' reason;
   - the server's MAC is checked by the client;
   - a device key made by today's `DeviceKey` proves itself as `c:` under the Mac's relay key (FR-038).
-- [ ] T037 Write the HTTP and WebSocket server in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/HTTPServer.swift`:
+- [x] T037 (the pipeline is `ControlWebSocketServer` in the kit's `ControlDial` target, shared with the dialler; the self-signed certificate is made in two openssl steps, since BoringSSL refuses LibreSSL's one-step key) Write the HTTP and WebSocket server in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/HTTPServer.swift`:
   - `GET /v1/connect` upgrades;
   - `GET /healthz` gives 200;
   - `GET /readyz` gives 200 after a store read and 503 otherwise;
@@ -144,14 +144,14 @@ transport.
   - pings every 20 s, closing after two missed;
   - a 64 MB message cap.
 - [ ] T038 [P] Rework `Packages/AgentsKit/Sources/LinuxControlDial/LinuxControlDial.swift` into `HostDial`, a `NIOWebSocket` client over NIOSSL. It checks either a publicly trusted certificate or a pin, runs `ControlAuth` as the peer, and returns a `LineTransport`. It is linked into `AgentsKit` on macOS and Linux both (drop the Linux-only condition in `Packages/AgentsKit/Package.swift`), and `ControlUplink` uses it.
-- [ ] T039 Write `Session` in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/Session.swift`. After `ControlAuth`, a WebSocket becomes a router client session, a host uplink, or a code session:
+- [x] T039 (in `ControlService.accept`; codes are `ControlCodes`, spent by `.absent`) Write `Session` in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/Session.swift`. After `ControlAuth`, a WebSocket becomes a router client session, a host uplink, or a code session:
   - a code session may send only `clients/announce` or `hosts/announce`;
   - it creates `codes/<hash>.spent` with `.absent` before admitting;
   - it closes after the reply.
 
   Every text message is one wire line.
 - [ ] T040 [P] Write the apps' transport in `Packages/AgentsKit/Sources/AgentsKitCore/Control/WebSocketLink.swift`: `URLSessionWebSocketTask` with a pin-checking delegate, `ControlAuth` as the peer, and one message per line. It is gated on `canImport(Foundation) && !os(Linux)`. `ControlLink` takes it in place of the TLS-PSK dial.
-- [ ] T041 Write `ControlService` and the `agents-control` CLI in `Packages/ControlPlane/Sources/ControlPlaneKit/ControlService.swift` and `Sources/agents-control/main.swift`:
+- [x] T041 (s3:// waits on T062; smoke-run on /tmp/cpsmoke: serve, pin, /healthz, /readyz, codes, SIGTERM) Write `ControlService` and the `agents-control` CLI in `Packages/ControlPlane/Sources/ControlPlaneKit/ControlService.swift` and `Sources/agents-control/main.swift`:
   - `serve`: store from `AGENTS_STORE`; key from `AGENTS_CONTROL_KEY_FILE`, `AGENTS_CONTROL_KEY` or an inherited descriptor, `--key-fd`; URL from `AGENTS_CONTROL_URL`;
   - `code --client operator|device` and `code --host`;
   - `hosts` and `clients` (list);
