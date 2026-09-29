@@ -71,7 +71,10 @@ public enum ControlDial {
                     let config: NIOHTTPClientUpgradeConfiguration = (
                         upgraders: [upgrader],
                         completionHandler: { context in context.channel.pipeline.removeHandler(requester, promise: nil) })
-                    try channel.pipeline.syncOperations.addHTTPClientHandlers(withClientUpgrade: config)
+                    // Forwarded, not dropped: behind a proxy (Caddy) the server's hello can
+                    // arrive in the same read as the 101, and NIO's default throws it away.
+                    try channel.pipeline.syncOperations.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes,
+                                                                              withClientUpgrade: config)
                     try channel.pipeline.syncOperations.addHandler(requester)
                     return channel.eventLoop.makeSucceededVoidFuture()
                 } catch {

@@ -139,6 +139,8 @@ public actor ControlRecords {
     /// `clients/setGrant`, refused if it would leave no operator (FR-016). The check is
     /// made on the records as read; a change elsewhere in between is `conflict`.
     public func setGrant(_ grant: Grant, of id: UUID) async throws {
+        // Paired at another copy since this one last read the store (US3).
+        if clientsHeld[id] == nil { try await load() }
         guard var record = clientsHeld[id]?.record else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: "No client has that id.")
         }
@@ -152,6 +154,7 @@ public actor ControlRecords {
     /// `clients/forget`: a tombstone against the version read, refused for the last
     /// operator. Nothing happens for a client that is not known.
     public func forget(_ id: UUID) async throws {
+        if clientsHeld[id] == nil { try await load() }
         guard let held = clientsHeld[id] else { return }
         var after = clientsHeld.mapValues(\.record)
         after[id] = nil
@@ -185,6 +188,7 @@ public actor ControlRecords {
     /// `hosts/remove`: a tombstone. Returns whether there was such a host.
     @discardableResult
     public func remove(_ id: HostID) async throws -> Bool {
+        if hostsHeld[id] == nil { try await load() }
         guard let held = hostsHeld[id] else { return false }
         var tombstone = held.record
         tombstone.forgotten = true

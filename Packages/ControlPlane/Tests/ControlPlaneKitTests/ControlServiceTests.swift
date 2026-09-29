@@ -113,6 +113,27 @@ struct ControlServiceTests {
         link.disconnect()
     }
 
+    /// Fifty connections one after another, over TLS: every one finishes the key exchange.
+    /// A server's first frame arriving with the upgrade's response must not be lost.
+    @Test func everyConnectionFinishesTheKeyExchange() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tls-\(UUID().uuidString)")
+        let made = try SelfSigned.make(in: dir, name: "127.0.0.1")
+        let running = try await start(tls: made.0, pin: made.pin)
+        defer { Task { await running.service.stop() } }
+        let (_, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client(.operator)).text,
+                                         pin: made.pin)
+        var slow = 0
+        for _ in 0..<50 {
+            let started = Date()
+            let control = DaemonClient(link: link.controlLink)
+            try await control.connect(startIfNeeded: false, timeout: .seconds(20))
+            _ = try await control.call(DaemonAPI.Method.hostsList)
+            if Date().timeIntervalSince(started) > 2 { slow += 1 }
+            link.disconnect()
+        }
+        #expect(slow == 0)
+    }
+
     @Test func aCodeWorksOnce() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }

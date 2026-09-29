@@ -294,7 +294,7 @@ hand-started processes, and SC-006 timed.
 
 **Independent test**: quickstart Walk 2 in full.
 
-- [ ] T061 [US3] Proxied host sessions in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlRouter.swift`. A `HostSession` is either local or proxied, and a proxied one is a stream on a peer link with this copy's own channel numbers. Add router tests for:
+- [x] T061 (ControlRouter: local or proxied host sessions, peer streams mapped at the holder; router tests are the copies tests) [US3] Proxied host sessions in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlRouter.swift`. A `HostSession` is either local or proxied, and a proxied one is a stream on a peer link with this copy's own channel numbers. Add router tests for:
   - a client on B reaching a host on A;
   - a `gone` closing B's channels;
   - a grant check at B.
@@ -306,32 +306,32 @@ hand-started processes, and SC-006 timed.
   - credentials from the environment or `~/.aws`.
 
   Run T034's conformance against MinIO.
-- [ ] T063 [US3] Write leases in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/Leases.swift`, following data-model.md's Lease states:
+- [x] T063 (Copies/Leases.swift: take on an authenticated uplink, renew every 10 s, lost → close and gone, released when the uplink ends) [US3] Write leases in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/Leases.swift`, following data-model.md's Lease states:
   - create or take over on an authenticated uplink (epoch + 1);
   - renew every 10 s with `.matching`;
   - on a lost renewal, close the uplink and broadcast `hostMoved`;
   - on an expired lease, mark the host offline.
-- [ ] T064 [US3] Write the copy registry and peer links in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/PeerLinks.swift`:
+- [x] T064 (Copies/PeerLinks.swift: copies/<id>.json heartbeat, the smaller id dials, x: bound to the peer origin) [US3] Write the copy registry and peer links in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/PeerLinks.swift`:
   - `copies/<id>.json` with a heartbeat every 10 s, and gone after 30 s;
   - one WebSocket for each pair of copies, with `ControlAuth` identity `x:`;
   - the `{p, c, open|m|close|gone}` streams;
   - `event`, `presence` and `host` messages;
   - redial while both copies are registered.
-- [ ] T065 [US3] Channel mapping at the holding copy, in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/ProxyUplink.swift`: `(peer, c)` maps to a fresh uplink channel and back. A peer dropping closes its channels on the host.
-- [ ] T066 [US3] Changes across copies:
+- [x] T065 (ProxyUplink at the proxying copy; the holder maps (peer, c) in the router) [US3] Channel mapping at the holding copy, in `Packages/ControlPlane/Sources/ControlPlaneKit/Copies/ProxyUplink.swift`: `(peer, c)` maps to a fresh uplink channel and back. A peer dropping closes its channels on the host.
+- [x] T066 (broadcast then events/<day>/…; applied at every copy; catch-up by reconciling sessions on link up and every 15 s instead of replaying events/) [US3] Changes across copies:
   - store first, then broadcast `event` on every peer link, then write `events/<day>/<ulid>.json`;
   - apply received events (close forgotten clients, reopen channels on a grant change, mark hosts);
   - catch up from `events/` when joining;
   - re-list every 15 s.
-- [ ] T067 [P] [US3] Copies tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/CopiesTests.swift`, with three in-process copies over one `MemoryStore`:
+- [x] T067 (7 CopiesTests over one MemoryStore) [P] [US3] Copies tests in `Packages/ControlPlane/Tests/ControlPlaneKitTests/CopiesTests.swift`, with three in-process copies over one `MemoryStore`:
   - a client on each copy sees every host;
   - killing the holder moves the lease and the host redials;
   - a code shown at one copy is used at another, once;
   - a forget reaches every copy within 2 s;
   - two grant changes race and one gets `changedElsewhere`;
   - with the store down, live calls carry on and pairing gets `storeUnavailable`.
-- [ ] T068 [P] [US3] Write `deploy/Containerfile` for `agents-control`, with a static musl build and a non-root user. Write `deploy/compose.yaml` with MinIO from `cgr.dev/chainguard/minio` (bucket `agents-walk`), three copies, and Caddy terminating TLS with a local CA whose pin goes in the codes. Add `deploy/README.md`.
-- [ ] T069 [US3] Walk quickstart Walk 2, steps 1–10, in Colima with the devbox, a scratch host, the store-configured window and the fake device. Screenshot and time the failovers (SC-003). Record it in `specs/058-control-plane/walks/us3-copies.md`.
+- [x] T068 (deploy/: Containerfile, compose.yaml, Caddyfile, make-secrets.sh, README; scripts/build-linux-control.sh) [P] [US3] Write `deploy/Containerfile` for `agents-control`, with a static musl build and a non-root user. Write `deploy/compose.yaml` with MinIO from `cgr.dev/chainguard/minio` (bucket `agents-walk`), three copies, and Caddy terminating TLS with a local CA whose pin goes in the codes. Add `deploy/README.md`.
+- [x] T069 (walks/us3-copies.md; the devbox and fake device not walked (one URL, T078)) [US3] Walk quickstart Walk 2, steps 1–10, in Colima with the devbox, a scratch host, the store-configured window and the fake device. Screenshot and time the failovers (SC-003). Record it in `specs/058-control-plane/walks/us3-copies.md`.
 
 ---
 
