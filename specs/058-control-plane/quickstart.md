@@ -47,7 +47,7 @@ Wire and store details are in [contracts/wire.md](contracts/wire.md) and
 ## Walk 2: three copies, a bucket and a load balancer (US3, US6; Phase 3)
 
 **Prerequisites:** Colima running, and `deploy/compose.yaml` bringing up:
-- MinIO (bucket `agents-walk`);
+- MinIO from `cgr.dev/chainguard/minio` (bucket `agents-walk`; `minio/minio` no longer exists);
 - three `agents-control` copies with `AGENTS_STORE=s3://agents-walk/w1`;
 - Caddy terminating TLS in front of them with a local certificate, pinned in the codes.
 

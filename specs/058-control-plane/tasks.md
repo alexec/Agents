@@ -58,12 +58,12 @@ replaced, and removing what they left is a task in this list.
   - browse Bonjour with `NWBrowser`.
 
   Record pass or fail for each in research.md S2.
-- [ ] T023 [P] Spike S3, the host dialer on Linux, in `specs/058-control-plane/spikes/s3-linux-ws/`. Build a static musl aarch64 program with `NIOWebSocket` and NIOSSL that dials `wss://` in two ways:
+- [x] T023 (passed: +5.9 MB for NIOSSL and WebSocket; the pinned path needs an empty trust store; spikes/s3-linux-ws/RESULTS.md) [P] Spike S3, the host dialer on Linux, in `specs/058-control-plane/spikes/s3-linux-ws/`. Build a static musl aarch64 program with `NIOWebSocket` and NIOSSL that dials `wss://` in two ways:
   - through Caddy terminating TLS, with a publicly trusted-style local CA;
   - to a self-signed server by pin.
 
   Run it in the devbox container against servers on this Mac. Measure the stripped size against the 5.8 MB baseline from S1, and record it in research.md S3.
-- [ ] T024 [P] Spike S4, conditional writes, in `specs/058-control-plane/spikes/s4-conditional/`. Run MinIO in Colima beside `agents-devbox`. Against MinIO, and against one real S3 bucket if Alex provides one (ask; otherwise MinIO and R2's documented behaviour only), test:
+- [x] T024 (passed on MinIO; five store rules added, conditional delete dropped for tombstones; no real S3 bucket was used; spikes/s4-conditional/RESULTS.md) [P] Spike S4, conditional writes, in `specs/058-control-plane/spikes/s4-conditional/`. Run MinIO in Colima beside `agents-devbox`. Against MinIO, and against one real S3 bucket if Alex provides one (ask; otherwise MinIO and R2's documented behaviour only), test:
   - `PUT` with `If-None-Match: *` twice (the second gets 412);
   - `PUT` with `If-Match: <etag>` (a stale ETag gets 412);
   - two writers racing one lease key 100 times (exactly one wins each round).
@@ -124,6 +124,8 @@ transport.
   - a stale `matching` conflicts;
   - `list` sees new keys;
   - a spent code is written once when 20 tasks race;
+  - 412, 409 and 404 on a conditional put all surface as `conflict`, and a stale write after A→B→A is refused because `rev` changed (store.md rules 8–10);
+  - forgetting writes a tombstone that reads as absent (rule 11);
   - the start-up probe fails on a store that ignores conditions (a test double).
 - [ ] T035 [P] Write `ControlAuth` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlAuth.swift`. It covers both sides of the three messages in contracts/wire.md (hello, auth, ok or refused):
   - the transcript `"agents-auth-v1" | sn | pn | id | origin`;
@@ -313,7 +315,7 @@ hand-started processes, and SC-006 timed.
   - a forget reaches every copy within 2 s;
   - two grant changes race and one gets `changedElsewhere`;
   - with the store down, live calls carry on and pairing gets `storeUnavailable`.
-- [ ] T068 [P] [US3] Write `deploy/Containerfile` for `agents-control`, with a static musl build and a non-root user. Write `deploy/compose.yaml` with MinIO (bucket `agents-walk`), three copies, and Caddy terminating TLS with a local CA whose pin goes in the codes. Add `deploy/README.md`.
+- [ ] T068 [P] [US3] Write `deploy/Containerfile` for `agents-control`, with a static musl build and a non-root user. Write `deploy/compose.yaml` with MinIO from `cgr.dev/chainguard/minio` (bucket `agents-walk`), three copies, and Caddy terminating TLS with a local CA whose pin goes in the codes. Add `deploy/README.md`.
 - [ ] T069 [US3] Walk quickstart Walk 2, steps 1–10, in Colima with the devbox, a scratch host, the store-configured window and the fake device. Screenshot and time the failovers (SC-003). Record it in `specs/058-control-plane/walks/us3-copies.md`.
 
 ---
@@ -324,7 +326,7 @@ hand-started processes, and SC-006 timed.
 
 **Independent test**: quickstart Walk 3.
 
-- [ ] T070 [P] [US4] Write `scripts/host-install.sh`, served by the control plane at `GET /v1/install.sh` and linked from the command. It downloads the Linux host tarball for the machine (from the release, or from the copy with `--from-control`), installs it for the user with a systemd user unit, and runs `agentsd --control <code>`.
+- [ ] T070 [P] [US4] Write `scripts/host-install.sh`, served by the control plane at `GET /v1/install.sh` and linked from the command. It checks for system CA roots when the control plane's certificate is publicly trusted (S3), downloads the Linux host tarball for the machine (from the release, or from the copy with `--from-control`), installs it for the user with a systemd user unit, and runs `agentsd --control <code>`.
 - [ ] T071 [US4] `hosts/startEnroll` returns `{code, command}` in `ControlMethods.swift`, with the command built from `url`, `pin` and the code.
 - [ ] T072 [US4] Move `hosts/install` into the service, in `Packages/ControlPlane/Sources/ControlPlaneKit/Hosts/HostInstall.swift`, from `SSHHosts`:
   - `{name, destination, key, trust?}`;

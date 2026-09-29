@@ -276,8 +276,9 @@ exchange, every text message is one line of today's wire:
     works in the sandbox with `com.apple.security.network.client`.
   - *Hosts on the Mac and on Linux:* one NIO dialer (`NIOWebSocket` over NIOSSL), from
     `LinuxControlDial` reworked, so both platforms run the same code.
-- **Size.** The first S1 measured 51.5 MB for swift-crypto and NIOSSL together. NIOSSL alone
-  is roughly half that. Spike S3 measures it (plan).
+- **Size.** S3 measured it: NIOSSL and the WebSocket stack add about 5.9 MB to a static Linux
+  binary. S1's 51.5 MB was almost all Foundation (48.2 MB on its own), which `agentsd` links
+  anyway.
 
 **Rationale**: HTTPS and WebSockets are what every load balancer, TLS terminator, tunnel and
 proxy understands (FR-011). Keeping the lines inside means the router, the host and every
@@ -509,9 +510,39 @@ These run before the code they gate (plan Phase 0):
 - **S3: the Linux host dialer.** A static musl `agentsd` with `NIOWebSocket` and NIOSSL
   dials a copy behind a TLS-terminating proxy (Caddy) and a pinned self-signed copy. Measure
   the growth in binary size.
+  - **Result, 2026-09-28: passed** ([spikes/s3-linux-ws/RESULTS.md](spikes/s3-linux-ws/RESULTS.md)).
+    - Through Caddy's internal CA, with full verification including the host name, a line
+      went each way, and a wrong root was refused.
+    - Direct to a self-signed server, it was accepted by SPKI pin
+      (`.noHostnameVerification`, an empty trust store, and `customVerificationCallback`),
+      and a wrong pin was refused before any line was sent.
+    - **Size:** the stripped dialer is 11,652,464 bytes, against 5,786,992 for a print-only
+      binary: **+5.9 MB**. With Foundation linked on both sides it adds 5.0 MB.
+    - **One snag for the host dialer:** with default trust roots, NIOSSL fails on a box without
+      `ca-certificates`. The pinned path must set an empty trust store. The publicly trusted
+      path needs system roots, so the install command checks for them (T070).
 - **S4: conditional writes.**
   - `If-None-Match` and `If-Match` against MinIO (in Colima, beside the devbox) and against
     one real S3 bucket.
   - Two writers racing a lease, and a spent code written twice.
+  - **Result, 2026-09-28: passed on MinIO, with five rules to add**
+    ([spikes/s4-conditional/RESULTS.md](spikes/s4-conditional/RESULTS.md)). A Swift SigV4
+    signer of our own worked over URLSession, path-style.
+    - **Races:** create-once and update-if-match each had exactly one winner in 100 of 100
+      rounds, with 2 writers and with 8, and the stored bytes were always the winner's.
+    - **Statuses:** a stale ETag or a second create gets 412. `If-Match` on a missing key gets
+      404. AWS documents 409 under concurrency.
+    - **The five rules**, now in contracts/store.md:
+      - 412, 409 and 404 on a conditional put all mean `conflict`;
+      - ETags are passed back exactly as received;
+      - every write changes the bytes (`rev` or `epoch` goes up), because identical bytes keep
+        the same ETag, so A→B→A would let a stale write through;
+      - the start-up probe also tries a stale `If-Match`;
+      - conditional delete is never relied on: MinIO ignores it, and AWS added it only in
+        2025. Forgetting and removing write a tombstone instead.
+    - **The MinIO image is gone.** `minio/minio` left Docker Hub on 2026-09-11, and open-source
+      MinIO is archived. Walks use `cgr.dev/chainguard/minio`, built from MinIO's source.
+    - **Cloudflare R2** documents both headers, but not whether they hold under a race. Race it
+      before relying on R2 for leases.
 - **S5: a sandboxed archive.** Archive the Mac app with the sandbox on and the reduced link,
   and list what fails to build. That list is the real size of R12.

@@ -52,7 +52,7 @@ carry over (R2).
 **Testing**:
 - `swift test` in `Packages/AgentsKit` and in the new `Packages/ControlPlane`.
 - An in-memory store and in-memory WebSocket pairs for the router, lease and peer tests.
-- MinIO (in Colima, beside the devbox) for the S3 store.
+- MinIO (`cgr.dev/chainguard/minio`; `minio/minio` left Docker Hub on 2026-09-11) in Colima, beside the devbox, for the S3 store.
 - A local load balancer (a Caddy container) in front of three copies for the US3 walk.
 - The run-app and test-servers skills for the scratch walks.
 

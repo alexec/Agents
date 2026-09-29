@@ -279,6 +279,126 @@ body.one .frame{display:none}body.one .frame:target{display:flex}
    </div>
   </div></div></div></div></div>
 
+
+<!-- ============ Re-plan 2026-09-28: frames K–N ============ -->
+<style>
+/* K–N: the App Store window, the host app, servers by command, relayed clients. */
+.hw{width:720px;height:600px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.hb{flex:1;padding:14px 22px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.fld{border:1px solid #cfcac0;background:#fff;border-radius:5px;padding:3px 8px;font-size:12px;flex:1;min-width:0;color:#333}
+.fld.dim{color:#aaa}
+.kvf{display:grid;grid-template-columns:90px 1fr;gap:6px 10px;align-items:center;font-size:12px;padding:8px 12px}
+.kvf b{font-weight:400;color:#8a877f;text-align:right}
+.tog{width:30px;height:18px;border-radius:9px;background:#5b8a5b;position:relative;flex:none}
+.tog:after{content:"";position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:7px;background:#fff}
+.cmd{font:12px "SF Mono",Menlo,monospace;background:#fff;border:1px solid #cfcac0;border-radius:6px;padding:8px 10px;line-height:1.5;word-break:break-all}
+.away{font-size:10.5px;color:#9a4f10;background:#f7e7d6;border-radius:8px;padding:1px 6px}
+.via{font-size:10.5px;color:#3d5a80;background:#e3eaf3;border-radius:8px;padding:1px 6px}
+</style>
+
+<!-- K — First run of the App Store window, no host app on this Mac -->
+<div class="frame" id="k"><div class="cap">K · First run (App Store window): nothing set up on this Mac</div>
+<div class="sub">The App Store window can't run anything itself, so <b>Set one up on this Mac</b> now sends the person to <b>Agents Host</b>, our small app from outside the App Store that runs their agents and the control plane. The window watches for it: once it's installed, this screen turns into K2 by itself.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents</span></div>
+ <div class="center"><div class="choose">
+  <h1>Where should your agents run?</h1>
+  <p>This window is where you work with your agents. They run on a <b>control plane</b> you own: on this Mac, on another Mac, or on a server. Your iPhone and iPad connect to it too.</p>
+  <div class="opts">
+   <div class="opt rec"><div class="t">Set one up on this Mac</div>
+    <div class="d">Install <b>Agents Host</b>, a free app from us. It runs your agents and the control plane on this Mac, and keeps them running with this window closed. It isn't in the App Store because it runs programs for your agents.</div>
+    <span class="btn p">Get Agents Host…</span></div>
+   <div class="opt"><div class="t">Connect to a control plane</div>
+    <div class="d">You already run one, on another Mac or a server. You'll need a pairing code from it.</div>
+    <span class="btn">Connect…</span></div>
+  </div>
+  <p style="font-size:12px">Waiting for Agents Host… It appears here as soon as it's running. Nothing passes through a service of ours.</p>
+ </div></div></div></div>
+
+<!-- K2 — the host app is running on this Mac -->
+<div class="frame" id="k2"><div class="cap">K2 · First run: Agents Host found on this Mac</div>
+<div class="sub">Found on this Mac (by Bonjour, with the pin from its record), so there is no code to type: <b>Pair</b> shows the same code in Agents Host's window to confirm, and the window pairs as an operator. A control plane elsewhere is still one click away.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents</span></div>
+ <div class="center"><div class="choose" style="width:520px">
+  <h1>Agents Host is running on this Mac</h1>
+  <div class="card">
+   <div class="line"><span class="cdot g"></span><div class="l"><b>Alex's Mac mini</b><div class="s">Control plane · 1 host · keeps its store on this Mac</div></div><span class="btn p">Pair</span></div>
+  </div>
+  <p style="font-size:12.5px">Pairing lets this window do everything: start agents, sign runtimes in, add servers and pair your phone. Agents Host will show a code to confirm it's you.</p>
+  <p style="font-size:12px"><span class="link">Connect to a different control plane…</span></p>
+ </div></div></div></div>
+
+<!-- L — the host app's window -->
+<div class="frame" id="l"><div class="cap">L · Agents Host</div>
+<div class="sub">The host app's one window. It says what this Mac is doing and holds the choices only a machine can make: whether the control plane runs here and where it keeps its store (this Mac, or a bucket of the person's own), whether this Mac relays for their devices away from home, and the move from today's set-up. The code to pair a window or phone is here too.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="strip info">You have agents from the earlier Agents app on this Mac. <span class="sp" style="flex:1"></span><span class="btn">Move Across…</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span class="on">Run it here</span><span>Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Running at <span class="mono">https://mini.local:8791</span><div class="s">since 09:12 · 3 clients · 4 hosts</div></div><span class="btn">Restart</span></div>
+   <div class="line"><div class="l">Keeps its store</div><span class="seg"><span>On this Mac</span><span class="on">In a bucket</span></span></div>
+   <div class="kvf">
+    <b>Endpoint</b><span class="fld">https://s3.eu-west-2.amazonaws.com</span>
+    <b>Bucket</b><span class="fld">alex-agents</span>
+    <b>Prefix</b><span class="fld">control</span>
+    <b>Access key</b><span class="fld">AKIA••••••••W3QF</span>
+    <b>Secret</b><span class="fld">••••••••••••••••</span>
+    <b></b><span style="display:flex;gap:8px;align-items:center"><span class="btn">Check</span><span style="color:#5b8a5b;font-size:12px">✓ Works, with safe concurrent writes</span><span class="sp" style="flex:1"></span><span class="link">Switch Store…</span></span>
+   </div>
+  </div>
+  <div class="foot">The keys stay in this Mac's keychain. In a bucket, what the control plane remembers outlives this Mac, and a copy elsewhere can share it later.</div>
+  <div class="card"><div class="line"><div class="l">Relay for my devices<div class="s">Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you</div></div><span class="tog"></span></div></div>
+ </div></div></div>
+
+<!-- M — Add a Server: run a command -->
+<div class="frame" id="m"><div class="cap">M · Settings ▸ Control plane ▸ Hosts ▸ Add a Server: run a command</div>
+<div class="sub">The usual way now: the server installs itself and connects out, so nothing has to reach it. The command carries a one-time host code; the sheet closes by itself when the server joins. <b>Install over ssh</b> is the other tab (M2).</div>
+<div class="win"><div class="rail" data-on="control" data-page="hosts"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Hosts</span></span></div>
+  <div class="sheet-bg"><div class="sheet">
+   <div class="t">Add a Server</div>
+   <div><span class="seg"><span class="on">Run a command</span><span>Install over ssh</span></span></div>
+   <div class="d">On the server, as the user your agents should run as:</div>
+   <div class="cmd">curl -fsSL https://mini.local:8791/v1/install.sh | sh -s -- 'agents-control:2:h:-:https%3A%2F%2Fmini.local%3A8791:Qk3v…:Zp9d…:Alex'</div>
+   <div style="display:flex;gap:8px;align-items:center"><span class="btn">Copy</span><span class="d" style="font-size:12px">Works once, for 4:52 · Linux, arm64 or x86-64</span></div>
+   <div class="steps" style="font-size:12.5px"><div><span class="wip">◌</span> Waiting for the server to connect…</div></div>
+   <div class="acts"><span class="btn">Cancel</span></div>
+  </div></div></div></div></div>
+
+<!-- M2 — Add a Server: install over ssh -->
+<div class="frame" id="m2"><div class="cap">M2 · Add a Server: install over ssh</div>
+<div class="sub">For a server the person can already ssh to. The control plane installs the host once with the key given here, then lets go: it keeps neither the key nor the session, and the server connects out like any other.</div>
+<div class="win"><div class="rail" data-on="control" data-page="hosts"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Hosts</span></span></div>
+  <div class="sheet-bg"><div class="sheet">
+   <div class="t">Add a Server</div>
+   <div><span class="seg"><span>Run a command</span><span class="on">Install over ssh</span></span></div>
+   <div class="kvf" style="padding:4px 0">
+    <b>Server</b><span class="fld">agents@devbox.lan</span>
+    <b>Name</b><span class="fld">devbox</span>
+    <b>Key</b><span style="display:flex;gap:6px"><span class="fld">~/.ssh/id_ed25519</span><span class="btn">Choose…</span></span>
+   </div>
+   <div class="d" style="font-size:12px">The key is used for this install only. The control plane doesn't keep it, and afterwards the server connects to the control plane by itself.</div>
+   <div class="acts"><span class="btn">Cancel</span><span class="btn p">Install</span></div>
+  </div></div></div></div></div>
+
+<!-- N — Clients with a relayed device -->
+<div class="frame" id="n"><div class="cap">N · Settings ▸ Control plane ▸ Clients: a device away from home</div>
+<div class="sub">As F, plus how each client is reaching the control plane right now. The iPhone is away and has no route to the control plane's address, so it comes in through the iCloud relay on a Mac host, and says which. Away limits apply to it as today.</div>
+<div class="win"><div class="rail" data-on="control" data-page="clients"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Clients</span></span></div>
+  <div class="body"><div class="col">
+   <div class="card">
+    <div class="line"><span class="ic">▭</span><div class="l"><b>This window</b> <span class="me">you</span><div class="s">Mac · connected directly</div></div><span class="grant"><span class="on">Operator</span><span>Device</span></span></div>
+    <div class="line"><span class="ic">▯</span><div class="l"><b>Alex's iPhone</b> <span class="away">away</span><div class="s">iPhone · connected through <b>Alex's Mac mini</b> (iCloud relay)</div></div><span class="grant"><span>Operator</span><span class="on">Device</span></span><span class="btn">Forget…</span></div>
+    <div class="line"><span class="ic">▯</span><div class="l"><b>Alex's iPad</b><div class="s">iPad · seen yesterday</div></div><span class="grant"><span>Operator</span><span class="on">Device</span></span><span class="btn">Forget…</span></div>
+   </div>
+   <div style="display:flex;gap:8px;margin-top:4px"><span class="btn">Pair a Device…</span><span class="btn">Pair a Mac…</span></div>
+   <div class="foot">Forgetting cuts a client off at once, directly and through the relay. To use it again, pair it again.</div>
+  </div></div></div></div></div>
+
 <script>
 // 055's rail, with Devices and Servers folded into one opening group, Control plane.
 const groups = [
