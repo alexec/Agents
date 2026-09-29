@@ -55,6 +55,7 @@ jobs:
         with:
           path: build/DD
           key: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          restore-keys: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}-
 
       - name: Restore SwiftPM build cache
         id: swiftpm-cache
@@ -64,6 +65,7 @@ jobs:
             Daemon/.build
             Packages/CodeText/.build
           key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          restore-keys: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}-
 
       - name: Restore AgentsKit build cache
         id: agentskit-cache
@@ -71,6 +73,7 @@ jobs:
         with:
           path: Packages/AgentsKit/.build
           key: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
+          restore-keys: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}-
 
       - name: Tools
         run: |
@@ -88,15 +91,21 @@ jobs:
         run: python3 scripts/normalize-metaltoolchain-cache.py Packages/AgentsKit/.build
 
       - name: Build AgentsKit tests
+        id: build-agentskit
         if: steps.test-selection.outputs.agentskit != 'skip'
         run: swift build --build-tests --package-path Packages/AgentsKit
 
+      # Every save below also runs when the job fails, times out or is cancelled, so a
+      # cold build that runs out of time still leaves its work for the next run. What a
+      # cut-short build leaves is saved under a -partial- key of its own: under the real
+      # key it would count as a hit from then on, and the finished build never be saved.
+      # Each restore falls back to the latest partial.
       - name: Save AgentsKit build cache
-        if: ${{ steps.test-selection.outputs.agentskit != 'skip' && steps.agentskit-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && contains(fromJSON('["success", "failure", "cancelled"]'), steps.build-agentskit.outcome) }}
         uses: actions/cache/save@v5
         with:
           path: Packages/AgentsKit/.build
-          key: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
+          key: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}${{ steps.build-agentskit.outcome != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
 
       - name: Generate the project
         run: xcodegen generate
@@ -109,28 +118,31 @@ jobs:
       # One scheme after the other, and with plug-in validation skipped: without it
       # SwiftTerm's plug-in fails and says nothing. No signing on a runner.
       - name: Build Agents (macOS)
+        id: build-mac
         run: >
           xcodebuild build -project Agents.xcodeproj -scheme Agents
           -destination 'platform=macOS' -derivedDataPath build/DD
           -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
 
       - name: Build Remote (iOS Simulator)
+        id: build-remote
         run: >
           xcodebuild build -project Agents.xcodeproj -scheme Remote
           -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD
           -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
 
       - name: Save Xcode build cache
-        if: ${{ steps.xcode-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && steps.xcode-cache.outputs.cache-hit != 'true' && contains(fromJSON('["success", "failure", "cancelled"]'), steps.build-mac.outcome) }}
         uses: actions/cache/save@v5
         with:
           path: build/DD
-          key: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          key: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}${{ (steps.build-mac.outcome != 'success' || steps.build-remote.outcome != 'success') && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
 
       # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
       # a whole Swift build inside the test run, holding a test thread for minutes,
       # which on a shared runner stalls everything else. Built here instead.
       - name: Build agentsd for the tests
+        id: build-agentsd
         if: steps.test-selection.outputs.agentskit != 'skip'
         run: swift build --package-path Daemon --product agentsd
 
@@ -142,19 +154,20 @@ jobs:
 
       # Build CodeText tests before execution so the cache can be saved before tests.
       - name: Build CodeText tests
+        id: build-codetext
         if: steps.test-selection.outputs.codetext != 'skip'
         run: swift build --build-tests --package-path Packages/CodeText
 
       - name: Save SwiftPM build cache
         # This combined cache contains both paths below. Save it only when both
         # package builds ran, so a skipped package cannot produce a partial cache.
-        if: ${{ steps.test-selection.outputs.agentskit != 'skip' && steps.test-selection.outputs.codetext != 'skip' && steps.swiftpm-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && steps.test-selection.outputs.agentskit != 'skip' && steps.test-selection.outputs.codetext != 'skip' && steps.swiftpm-cache.outputs.cache-hit != 'true' && contains(fromJSON('["success", "failure", "cancelled"]'), steps.build-agentsd.outcome) }}
         uses: actions/cache/save@v5
         with:
           path: |
             Daemon/.build
             Packages/CodeText/.build
-          key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}${{ (steps.build-agentsd.outcome != 'success' || steps.build-codetext.outcome != 'success') && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
 
       - name: Test CodeText
         if: steps.test-selection.outputs.codetext != 'skip'
