@@ -51,6 +51,16 @@ struct RemoteChatView: View {
             }
             form
         }
+        // Right to left across the chat brings what was exchanged in from that side, as
+        // the Mac's two-finger swipe does. Left to right stays the system's Back.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 30)
+                .onEnded { drag in
+                    guard let agent, drag.translation.width < -80,
+                          abs(drag.translation.width) > abs(drag.translation.height) * 2 else { return }
+                    model.panes.state(for: agent.id).show(.exchanged)
+                }
+        )
         .environment(\.chatActions, actions)
         .navigationTitle(agent?.title ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)

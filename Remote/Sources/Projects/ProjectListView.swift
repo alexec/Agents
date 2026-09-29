@@ -11,13 +11,29 @@ struct ProjectListView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Binding var selection: URL?
+    @Binding var compactColumn: NavigationSplitViewColumn
 
     var body: some View {
         List(selection: $selection) {
             ForEach(model.projects, id: \.folder) { summary in
-                NavigationLink(value: summary.folder) {
-                    ProjectRow(summary: summary)
+                // A button rather than a link to the selection: tapping the project
+                // already chosen changed nothing, so on a phone nothing opened.
+                Button {
+                    selection = summary.folder
+                    compactColumn = .detail
+                } label: {
+                    HStack {
+                        ProjectRow(summary: summary)
+                        if sizeClass != .regular {
+                            Image(systemName: "chevron.right")
+                                .appText(.fine).fontWeight(.semibold)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .tag(summary.folder)
                 .paperListRow()
             }

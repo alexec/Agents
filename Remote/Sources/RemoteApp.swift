@@ -48,6 +48,9 @@ struct RemoteApp: App {
 struct RemoteView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
+    /// Which column a phone shows. Set to the project whenever one is chosen, so a tap
+    /// on a project always opens it, whatever the list's selection was left at.
+    @State private var compactColumn = NavigationSplitViewColumn.sidebar
 
     /// What is pushed over the project: a workflow's page, a conversation, or a
     /// conversation opened from a workflow's page, which goes back to it. A chat is
@@ -65,8 +68,8 @@ struct RemoteView: View {
 
     var body: some View {
         @Bindable var model = model
-        NavigationSplitView {
-            ProjectListView(selection: $model.selectedProject)
+        NavigationSplitView(preferredCompactColumn: $compactColumn) {
+            ProjectListView(selection: $model.selectedProject, compactColumn: $compactColumn)
         } detail: {
             NavigationStack(path: path) {
                 ProjectPageView()
@@ -87,6 +90,10 @@ struct RemoteView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        // A project opened for the person (a banner, a start) is shown, not only chosen.
+        .onChange(of: model.selectedProject) { _, folder in
+            if folder != nil { compactColumn = .detail }
+        }
         // Where this device is, told to the Mac on every change (021).
         .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase) }
         .task {
