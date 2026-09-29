@@ -40,8 +40,11 @@ public enum ControlWire {
         public var grant: Grant
         public var client: String
         public var device: UUID?
+        /// The device reached the control plane through `agents-relay` (T096).
+        public var relayed: Bool?
 
-        public init(grant: Grant, client: String, device: UUID? = nil) {
+        public init(grant: Grant, client: String, device: UUID? = nil, relayed: Bool? = nil) {
+            self.relayed = relayed
             self.grant = grant
             self.client = client
             self.device = device

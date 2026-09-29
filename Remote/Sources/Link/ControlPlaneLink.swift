@@ -10,6 +10,10 @@ import UIKit
 /// did to the Mac; `RemoteModel` reaches every other host over a second connection
 /// wrapped by `ControlLink`. The first build's TLS link to a Mac's bridge (`AwayLink`)
 /// stays only for a Mac that has not moved yet (until T112).
+///
+/// Away from anywhere that reaches the control plane's address, it goes through
+/// `agents-relay` in the person's iCloud instead (T077), with the same key exchange end
+/// to end inside, and back to the address as soon as it answers again.
 enum RemoteControl {
     private static var folder: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -17,6 +21,24 @@ enum RemoteControl {
     }
     private static var membershipFile: URL { folder.appendingPathComponent("control-client.json") }
     private static var keyFile: URL { folder.appendingPathComponent("control-client-key") }
+    private static var relayKeyFile: URL { folder.appendingPathComponent("control-relay-key.pub") }
+
+    /// The relay's key, as the control plane named it in `control/status`, over a
+    /// connection this device had already proved and checked the pin of. Without it
+    /// nothing is written to iCloud.
+    static var relayKey: Data? {
+        guard let data = try? Data(contentsOf: relayKeyFile), data.count == 65 else { return nil }
+        return data
+    }
+
+    static func keepRelayKey(_ key: Data?) {
+        guard membership != nil, key != relayKey else { return }
+        if let key {
+            try? key.write(to: relayKeyFile, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        } else {
+            try? FileManager.default.removeItem(at: relayKeyFile)
+        }
+    }
 
     /// This device's pairing with a control plane, if it has one.
     static var membership: ControlMembership? {
@@ -43,6 +65,7 @@ enum RemoteControl {
     /// Forget the pairing: this device goes back to asking for a code.
     static func forget() {
         try? FileManager.default.removeItem(at: membershipFile)
+        try? FileManager.default.removeItem(at: relayKeyFile)
     }
 
     /// The link the Remote's model is built on while paired with a control plane.
@@ -51,23 +74,88 @@ enum RemoteControl {
               let dial = try? ControlCodeUse.clientDial(membership, privateKey: key, kind: kind.rawValue, dial: dial) else {
             return nil
         }
-        return ControlPlaneLink(dial: dial)
+        let relayed: @Sendable () async throws -> any LineTransport = {
+            guard let relayKey else { throw RelayTrouble.notPaired }
+            return try await ControlCodeUse.relayedDial(membership, privateKey: key, relayKey: relayKey,
+                                                        channel: CloudKitRelayChannel())()
+        }
+        return ControlPlaneLink(dial: dial, relayed: relayed)
     }
 }
 
-/// A connection to the control plane as this device: nothing to start when it doesn't
-/// answer, only the reconnect loop to try again.
+/// A connection to the control plane as this device: its address first, then the relay
+/// when the address cannot be reached (T077). Nothing to start when neither answers, only
+/// the reconnect loop to try again.
 struct ControlPlaneLink: DaemonLink {
     let dial: @Sendable () async throws -> any LineTransport
+    var relayed: (@Sendable () async throws -> any LineTransport)?
+
+    /// The same link without the relay: for a second connection, which the relay cannot
+    /// carry beside the first.
+    var addressOnly: ControlPlaneLink { ControlPlaneLink(dial: dial, relayed: nil) }
+
+    /// How often a relayed connection looks for the address again.
+    static let lookAgain: Duration = .seconds(30)
+
     func transport() async throws -> any LineTransport {
         do {
             return try await dial()
         } catch let refusal as ControlAuth.Refusal {
             // `DaemonClient` keeps only "could not connect"; the model asks what was said.
+            // A control plane that answered and refused is not one to go round.
             ControlPlaneLink.refused.set(refusal.reason)
             throw refusal
+        } catch {
+            guard let relayed else { throw error }
+            let transport: any LineTransport
+            do {
+                transport = try await relayed()
+            } catch let refusal as ControlAuth.Refusal {
+                ControlPlaneLink.refused.set(refusal.reason)
+                throw refusal
+            } catch RelayTrouble.notPaired {
+                throw error
+            }
+            watchForTheAddress(while: transport)
+            return transport
         }
     }
+
+    /// While relayed, try the address now and then; when it answers, end the relayed
+    /// connection so the model reconnects, and the address wins. One watcher, for the
+    /// latest relayed connection.
+    private func watchForTheAddress(while relayed: any LineTransport) {
+        guard Self.watching.hold(relayed) else { return }
+        let dial = self.dial
+        Task.detached {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.lookAgain)
+                if let direct = try? await dial() {
+                    direct.close()
+                    Self.watching.take()?.close()
+                    return
+                }
+            }
+        }
+    }
+
+    static let watching = Watching()
+
+    /// The relayed connection in use, and whether somebody is already watching for the
+    /// address on its behalf.
+    final class Watching: @unchecked Sendable {
+        private let lock = NSLock()
+        private var relayed: (any LineTransport)?
+        /// Holds the connection; true when no watcher is running yet.
+        func hold(_ transport: any LineTransport) -> Bool {
+            lock.withLock {
+                defer { relayed = transport }
+                return relayed == nil
+            }
+        }
+        func take() -> (any LineTransport)? { lock.withLock { defer { relayed = nil }; return relayed } }
+    }
+
     func start() async throws {}
 
     /// The last refusal the control plane gave this device, taken once.

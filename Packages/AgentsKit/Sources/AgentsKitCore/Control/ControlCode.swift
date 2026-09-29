@@ -152,7 +152,11 @@ public extension DaemonAPI {
         public var platform: String
         public var version: String
         public var machineID: String
-        public init(publicKey: Data, name: String, platform: String, version: String, machineID: String) {
+        /// `agents-relay` enrolling (T096): never the home host, and relaying from the start.
+        public var relay: Bool?
+        public init(publicKey: Data, name: String, platform: String, version: String, machineID: String,
+                    relay: Bool? = nil) {
+            self.relay = relay
             self.publicKey = publicKey
             self.name = name
             self.platform = platform

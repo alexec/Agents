@@ -181,7 +181,7 @@ final class RunHereSetup {
         let machine = MachineID.current
         guard await within(.seconds(60), {
             let hosts = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
-            return hosts?.contains { $0.machineID == machine && $0.state == "online" } == true
+            return hosts?.contains { $0.machineID == machine && $0.state == "online" && $0.relay != true } == true
         }) else {
             states[.host] = .failed("This Mac’s agents didn’t join the control plane. Their log is in \(services.hostRoot.path).")
             return nil

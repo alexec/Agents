@@ -1448,7 +1448,8 @@ final class AppModel {
         controlPlaneName = status.name
         // `.mac` is `client`, already. Every other host, including another machine's
         // home host, gets a client of its own on the same link.
-        let others = listed.filter { $0.id != .mac }
+        // A relay host (`agents-relay`) runs no agents: nothing to reach there.
+        let others = listed.filter { $0.id != .mac && $0.relay != true }
         hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.state == "online")) })
         for host in others where host.state == "online" {
             let server = controlHosts[host.id] ?? DaemonClient(link: controlLink.link(for: host.id))

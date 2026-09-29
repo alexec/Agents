@@ -30,7 +30,10 @@ public actor ControlRouter {
         public var client: UUID
         public var grant: Grant
         public var kind: ClientRecord.Kind
-        public init(session: UUID, client: UUID, grant: Grant, kind: ClientRecord.Kind) {
+        /// The device came through `agents-relay` (T096), not straight here.
+        public var relayed: Bool
+        public init(session: UUID, client: UUID, grant: Grant, kind: ClientRecord.Kind, relayed: Bool = false) {
+            self.relayed = relayed
             self.session = session
             self.client = client
             self.grant = grant
@@ -73,6 +76,9 @@ public actor ControlRouter {
     private var clients: [UUID: ClientSession] = [:]
     private var hosts: [HostID: HostSession] = [:]
     private var known: Set<HostID>
+    /// Hosts that only relay (T096), and whether each is relaying now: they carry
+    /// devices through iCloud and are given no client channels, only channel 0.
+    private var relays: [HostID: Bool] = [:]
     private var states: [HostID: HostState] = [:]
     /// Where each client last said the person was. One record per client, across every
     /// host that client has a channel to (058, R6).
@@ -267,7 +273,7 @@ public actor ControlRouter {
     /// A peer opens a stream to a host held here: a fresh channel on the real uplink.
     /// Its grant was checked at the peer, where the client is.
     public func openFromPeer(_ peer: String, host: HostID, channel: Int, _ open: ControlWire.ChannelOpen) {
-        guard var session = hosts[host], session.local else {
+        guard relays[host] == nil, var session = hosts[host], session.local else {
             peers[peer]?(PeerWire.frame(host, ControlWire.close(channel)))
             return
         }
@@ -384,9 +390,10 @@ public actor ControlRouter {
     /// A paired client has connected. Returns its session, which ends when the
     /// transport does.
     @discardableResult
-    public func attachClient(_ client: ClientRecord, transport: any LineTransport) -> UUID {
+    public func attachClient(_ client: ClientRecord, transport: any LineTransport, relayed: Bool = false) -> UUID {
         let id = UUID()
-        clients[id] = ClientSession(caller: Caller(session: id, client: client.id, grant: client.grant, kind: client.kind),
+        clients[id] = ClientSession(caller: Caller(session: id, client: client.id, grant: client.grant, kind: client.kind,
+                                                   relayed: relayed),
                                     transport: transport)
         for host in hosts.keys { openChannel(for: id, to: host) }
         Task { [weak self] in
@@ -435,14 +442,15 @@ public actor ControlRouter {
     }
 
     private func openChannel(for sessionID: UUID, to host: HostID) {
-        guard var hostSession = hosts[host], let caller = clients[sessionID]?.caller else { return }
+        guard relays[host] == nil, var hostSession = hosts[host], let caller = clients[sessionID]?.caller else { return }
         let channel = hostSession.nextChannel
         hostSession.nextChannel += 1
         hostSession.channels[channel] = .session(sessionID)
         hosts[host] = hostSession
         clients[sessionID]?.channels[host] = channel
         let open = ControlWire.ChannelOpen(grant: caller.grant, client: caller.client.uuidString,
-                                           device: caller.grant == .device ? caller.client : nil)
+                                           device: caller.grant == .device ? caller.client : nil,
+                                           relayed: caller.relayed ? true : nil)
         try? hostSession.transport.write(line: ControlWire.open(channel, open))
     }
 
@@ -535,6 +543,48 @@ public actor ControlRouter {
     private func write(_ line: String, to sessionID: UUID) {
         guard let session = clients[sessionID] else { return }
         do { try session.transport.write(line: line) } catch { detachClient(sessionID) }
+    }
+
+    // MARK: Relay hosts (T096–T097)
+
+    /// Whether a host only relays (`HostRecord.relay`): nil for a host that runs agents,
+    /// false for a relay switched off, true for one relaying. A host found to be a relay
+    /// has its client channels closed.
+    public func setRelay(_ host: HostID, _ relay: Bool?) {
+        guard let relay else {
+            guard relays.removeValue(forKey: host) != nil else { return }
+            for sessionID in clients.keys { openChannel(for: sessionID, to: host) }
+            return
+        }
+        let was = relays.updateValue(relay, forKey: host)
+        guard was == nil else { return }
+        for (sessionID, session) in clients {
+            guard let channel = session.channels[host] else { continue }
+            clients[sessionID]?.channels[host] = nil
+            hosts[host]?.channels[channel] = nil
+            try? hosts[host]?.transport.write(line: ControlWire.close(channel))
+        }
+    }
+
+    /// A relaying host whose uplink ends at this copy, if there is one online.
+    public func relayHeldHere() -> HostID? { relaysHeldHere().first }
+
+    /// Relaying hosts whose uplinks end here.
+    public func relaysHeldHere() -> [HostID] {
+        relays.filter { $0.value && hosts[$0.key]?.local == true }.keys.sorted { $0.rawValue < $1.rawValue }
+    }
+
+    /// A notification on a host's channel 0, when its uplink ends here.
+    @discardableResult
+    public func tell(_ host: HostID, _ method: String, _ params: JSONValue) -> Bool {
+        guard let session = hosts[host], session.local,
+              let line = try? JSONRPCCodec.encode(.notification(method: method, params: params)) else { return false }
+        do {
+            try session.transport.write(line: ControlWire.channel(0, message: line))
+            return true
+        } catch {
+            return false
+        }
     }
 
     // MARK: The control plane's own notifications

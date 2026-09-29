@@ -28,7 +28,7 @@ public enum ControlJoin {
         guard case .host = code.purpose else { throw Failure("that is not a host code") }
         let announce = DaemonAPI.HostAnnounce(publicKey: try ControlAgreement.publicKey(privateKey: privateKey),
                                               name: hello.name ?? "A host", platform: hello.platform,
-                                              version: hello.version, machineID: hello.machineID)
+                                              version: hello.version, machineID: hello.machineID, relay: hello.relay)
         let admitted = try await self.announce(code, method: DaemonAPI.Method.hostsAnnounce, params: try JSONValue.encoding(announce))
         guard let host = admitted.host else { throw Failure("the control plane did not say which host this is") }
         return ControlMembership(host: host, controlKey: code.controlKey, addresses: [], name: code.name,

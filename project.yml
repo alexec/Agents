@@ -373,6 +373,41 @@ targets:
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
 
+  # agents-relay (058, T096): the bridge's relay and mailbox, cut down to a helper of
+  # Agents Host that carries devices to the control plane through iCloud. Signed as the
+  # bridge, with its iCloud container (Alex's choice: nothing new in the developer
+  # account), so it must not run beside the old bridge's mailbox on one Mac.
+  agents-relay:
+    type: application
+    supportedDestinations: [macOS]
+    sources:
+      - path: Host/Relay/Sources
+      - path: Bridge/agents-bridge.entitlements
+        buildPhase: none
+    dependencies:
+      - package: AgentsKit
+    info:
+      path: Host/Relay/Info.plist
+      properties:
+        CFBundleName: agents-relay
+        CFBundleDisplayName: Agents Relay
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: true
+        LSBackgroundOnly: true
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.bridge
+        PRODUCT_NAME: agents-relay
+        CODE_SIGN_ENTITLEMENTS: Bridge/agents-bridge.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+
   # Agents Host (058, US2, T054): the download of its own that runs this Mac's host and,
   # when chosen, the control plane's single copy, as launch agents. Not sandboxed and not
   # in the App Store, because it runs programs for the person's agents; Developer ID for
@@ -408,6 +443,10 @@ targets:
           destination: wrapper
           subpath: Contents/Helpers
       - target: agents-control
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      - target: agents-relay
         copy:
           destination: wrapper
           subpath: Contents/Helpers
@@ -494,6 +533,12 @@ schemes:
     build:
       targets:
         agents-bridge: all
+    run:
+      config: Debug
+  agents-relay:
+    build:
+      targets:
+        agents-relay: all
     run:
       config: Debug
   Remote:

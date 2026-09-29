@@ -20,7 +20,7 @@ Sent with no `h`. Grant column: which client grant may call it. Params and resul
 | Method | Grant | Params → Result |
 |---|---|---|
 | `daemon/ping` | any, and pairing | → `{}` (so today's clients' liveness check works) |
-| `control/status` | any | → `{name, version, url, copy, homeHost, machineID}` |
+| `control/status` | any | → `{name, version, url, copy, homeHost, machineID, relayKey?}`. `relayKey` is the relaying host's public key, which a device keeps so it can come through the relay when the address can't be reached (T077) |
 | `hosts/list` | any | → `[{id, name, platform, version, state, machineID, relay}]` (no `reach`: every host dials out) |
 | `hosts/startEnroll` | operator | → `{code, command}`: the host code, and the one-line install command for a server (FR-018) |
 | `hosts/install` | operator | `{name, destination, key, trust?}` → `{host}` or `{needsTrust: fingerprint}`. `key` is a private key for this install only; it is held in memory until the call ends and never stored (FR-018a). Progress comes as `control/installProgress`. The copy that takes the call does the install |
@@ -34,7 +34,7 @@ Sent with no `h`. Grant column: which client grant may call it. Params and resul
 | `clients/setGrant` | operator | `{client, grant}` → `{}`; refuses to leave no operator |
 | `clients/forget` | operator | `{client}` → `{}`; refuses the last operator; closes at once, home and relay |
 | `presence/report` | any | as today; broadcast to peer copies, and folded for notices (R5, R10) |
-| `hosts/setRelay` | operator | `{host, relay: Bool}` → `{}`: a macOS host relays for this person's devices (R10) |
+| `hosts/setRelay` | operator | `{host, relay: Bool}` → `{}`: switches a relay host (`agents-relay`) on or off. A host that runs agents cannot be made one: `invalidParams` (R10, T097) |
 
 Legacy names `devices/list`, `devices/startPairing`, `devices/stopPairing`, `devices/announce`,
 `devices/forget` are accepted as aliases until the Remote and the window move to `clients/*`.
@@ -52,10 +52,11 @@ Legacy names `devices/list`, `devices/startPairing`, `devices/stopPairing`, `dev
 
 | Method | Params → Result |
 |---|---|
-| `hosts/announce` | `{name, publicKey, platform, version, machineID}` → `{host}` (enrolment connection only) |
-| `host/hello` | `{version, platform, machineID}` → `{}` |
-| `attention/need` | `{need, headline, buzz}` / `{withdraw: needID}` → `{}`. The copy forwards it, with folded presence, to a relay host (R10) |
-| `relay/deliver` (control plane → relay host) | `{need, presence}` → `{}`: seal to the person's devices and post to the iCloud mailbox |
+| `hosts/announce` | `{name, publicKey, platform, version, machineID, relay?}` → `{host}` (enrolment connection only). `relay: true` is `agents-relay`: never the home host, relaying from the start |
+| `host/hello` | `{version, platform, machineID, name?, relay?}` → `{}` |
+| `attention/need` | `{need, headline, buzz}` / `{withdraw: needID}` → `{}`. The copy that holds the relay host chooses the device from folded presence, with the ladder (`NoticeDesk`), and sends `relay/deliver`; any other copy passes the need to its peers. With no relay host, a need reaches only the clients connected to its host (R10, T097) |
+| `relay/devices` (control plane → relay host, notification) | `{devices: [{id, publicKey}]}`: whom it may carry for |
+| `relay/deliver` (control plane → relay host, notification) | `{needID, device, publicKey?, headline?, alert}`: seal `headline` to `publicKey` and post it to the iCloud mailbox for `device`; no `headline` is a withdrawal |
 
 ## Failures (added to `DaemonAPI.Failure`)
 

@@ -43,7 +43,7 @@ final class ControlSettingsModel {
     var isOnThisMac: Bool { status?.machineID == MachineID.current }
 
     /// The host on this Mac: shown first and without buttons (the look gate's decision).
-    var thisMacHost: DaemonAPI.ControlHost? { hosts.first { $0.machineID == MachineID.current } }
+    var thisMacHost: DaemonAPI.ControlHost? { hosts.first { $0.machineID == MachineID.current && $0.relay != true } }
     var otherHosts: [DaemonAPI.ControlHost] { hosts.filter { $0.machineID != MachineID.current } }
 
     var onlineCount: Int { hosts.filter { $0.state == "online" }.count }

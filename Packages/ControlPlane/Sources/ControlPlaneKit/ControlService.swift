@@ -69,6 +69,8 @@ public final class ControlService: @unchecked Sendable {
     private var refresher: Task<Void, Never>?
     private let readiness = Readiness()
     private let sockets = Sockets()
+    /// What this copy has told its relay host for each need (T097).
+    let desk = NoticeDesk()
 
     public init(_ configuration: Configuration) throws {
         self.configuration = configuration
@@ -127,6 +129,7 @@ public final class ControlService: @unchecked Sendable {
         try await methods.refresh()
         for host in await methods.knownHosts { await router.know(host) }
         await router.setHomeHost(await methods.controlSettings.homeHost)
+        await syncRelays()
         await methods.attach(router)
         let codes = self.codes
         var hooks = ControlMethods.Hooks(
@@ -139,6 +142,10 @@ public final class ControlService: @unchecked Sendable {
                                           ["name": .string(name), "step": .string(step)], operatorsOnly: true)
         }
         hooks.install = { params in try await install.run(params) }
+        // Notices (T097): a need goes to the relay host, wherever it is held.
+        hooks.need = { [weak self] _, params in await self?.heard(params) }
+        hooks.relayChanged = { [weak self] _ in await self?.syncRelays() }
+        hooks.clientsChanged = { [weak self] _ in await self?.tellRelayDevices() }
         await methods.setHooks(hooks)
         await readiness.set(true)
 
@@ -158,6 +165,7 @@ public final class ControlService: @unchecked Sendable {
             Task { await mesh?.broadcast(PeerWire.presence(client: client, grant: grant, report: report)) }
         }
         await mesh?.onEvent { [weak self] event in await self?.apply(event) }
+        await mesh?.onNeed { [weak self] need in await self?.deliver(need, fromPeer: true) }
         await mesh?.onLinked { [weak self] _ in await self?.reconcile() }
 
         let servers = ServerFiles.folder()
@@ -221,6 +229,7 @@ public final class ControlService: @unchecked Sendable {
             for host in await methods.knownHosts { await router.know(host) }
             await readiness.set(true)
             await reconcile()
+            await syncRelays()
         } catch {
             await readiness.set(false)
             log("store: \(error)")
@@ -254,6 +263,7 @@ public final class ControlService: @unchecked Sendable {
         case .clientPaired, .hostEnrolled, .hostMoved:
             for host in await methods.knownHosts { await router.know(host) }
         }
+        await syncRelays()
         log("applied \(event.kind.rawValue) \(event.subject) from another copy")
     }
 
@@ -295,14 +305,23 @@ public final class ControlService: @unchecked Sendable {
                 return key
             }
             guard let admitted else { throw ControlAuth.Refusal(.unknown) }
+            // A device through `agents-relay` (T096): the exchange is its own, end to end,
+            // and it says it came that way, for itself only.
+            let relayed = auth.kind == "relay"
+            if relayed {
+                guard case .client(let id) = identity, auth.for == id.uuidString, admitted.client?.grant == .device else {
+                    throw ControlAuth.Refusal(.badMessage)
+                }
+            }
             try reader.write(line: ControlAuth.Message.ok(ControlAuth.OK(
-                mac: ControlCode.base64url(mac), grant: admitted.client?.grant, host: admitted.host)).line)
+                mac: ControlCode.base64url(mac), grant: admitted.client?.grant, host: admitted.host,
+                relayed: relayed ? true : nil)).line)
             switch identity {
             case .client:
                 guard let client = admitted.client else { throw ControlAuth.Refusal(.unknown) }
-                await router.attachClient(client, transport: reader)
+                await router.attachClient(client, transport: reader, relayed: relayed)
                 try? await methods.admit(client)
-                log("client \(client.name) (\(client.grant.rawValue)) connected from \(socket.remote)")
+                log("client \(client.name) (\(client.grant.rawValue)) connected\(relayed ? " through the relay" : "") from \(socket.remote)")
             case .host(let host):
                 await hostArrived(host, reader)
             case .pairing(let id), .enrolling(let id):
@@ -404,6 +423,9 @@ public final class ControlService: @unchecked Sendable {
                                                      publicKey: announce.publicKey, grant: grant, paired: Date()))
                 admitted = DaemonAPI.Admitted(client: announce.id, grant: grant)
                 log("\(announce.name) paired as \(grant.rawValue)")
+                // Known at every copy at once: the relay host may be held at another.
+                await self.announce(ControlEvent(kind: .clientPaired, subject: announce.id.uuidString, at: Date(), by: "code"))
+                Task { await self.tellRelayDevices() }
             case (.host, DaemonAPI.Method.hostsAnnounce):
                 guard let announce = try? params?.decode(DaemonAPI.HostAnnounce.self) else {
                     throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Say which host you are.")
@@ -413,10 +435,15 @@ public final class ControlService: @unchecked Sendable {
                 // a moved set-up's is: the window's own client is that host (data-model.md).
                 let macTaken = await records.host(.mac) != nil
                 let home = !configuration.machineID.isEmpty && announce.machineID == configuration.machineID && !macTaken
+                    && announce.relay != true
                 let host = home ? HostID.mac : HostID.make()
                 try await methods.enroll(HostRecord(id: host, name: announce.name, publicKey: announce.publicKey,
                                                     platform: announce.platform, version: announce.version,
-                                                    machineID: announce.machineID))
+                                                    machineID: announce.machineID, relay: announce.relay == true ? true : nil))
+                if announce.relay == true { await router.setRelay(host, true) }
+                // Every other copy knows it at once: a relay host must be given no channels
+                // there either, and a host must be reachable before the next re-list.
+                await self.announce(ControlEvent(kind: .hostEnrolled, subject: host.rawValue, at: Date(), by: "code"))
                 await router.know(host)
                 admitted = DaemonAPI.Admitted(host: host)
                 log("host \(announce.name) enrolled as \(host)")
@@ -437,6 +464,61 @@ public final class ControlService: @unchecked Sendable {
         if let line = try? JSONRPCCodec.encode(reply) { try? reader.write(line: line) }
         // Give the reply time to leave before the socket closes.
         try? await Task.sleep(for: .milliseconds(200))
+    }
+
+    // MARK: Relay hosts and notices (T096–T097)
+
+    /// The router is held to the records: which hosts only relay. Then every relay host
+    /// here hears the devices again.
+    func syncRelays() async {
+        for record in await records.hosts { await router.setRelay(record.id, record.relay) }
+        await tellRelayDevices()
+    }
+
+    /// Every device client and its key, to each relay host whose uplink ends here: whom
+    /// it may carry for (FR-008).
+    func tellRelayDevices() async {
+        let relays = await router.relaysHeldHere()
+        guard !relays.isEmpty else { return }
+        let devices = await methods.allClients.compactMap { record -> DaemonAPI.RelayDevices.Device? in
+            guard record.grant == .device, !record.publicKey.isEmpty else { return nil }
+            return .init(id: record.id, publicKey: record.publicKey)
+        }
+        guard let params = try? JSONValue.encoding(DaemonAPI.RelayDevices(devices: devices)) else { return }
+        for relay in relays { await router.tell(relay, DaemonAPI.Method.relayDevices, params) }
+    }
+
+    /// A host's `attention/need` (R6): to the relay host if it is held here, otherwise
+    /// to the other copies, one of which may hold it. With no relay host anywhere, a need
+    /// reaches only the clients connected to its host, over their own channels.
+    func heard(_ params: JSONValue?) async {
+        guard let need = try? params?.decode(DaemonAPI.AttentionNeed.self) else { return }
+        await deliver(need, fromPeer: false)
+    }
+
+    func deliver(_ need: DaemonAPI.AttentionNeed, fromPeer: Bool) async {
+        guard let relay = await router.relayHeldHere() else {
+            if !fromPeer { await mesh?.broadcast(PeerWire.need(need)) }
+            return
+        }
+        let flags = await router.notifyFlags()
+        let devices = await methods.allClients.compactMap { record -> Device? in
+            guard record.grant == .device, !record.publicKey.isEmpty else { return nil }
+            let kind: Device.Kind = switch record.kind {
+            case .iPhone: .iPhone
+            case .iPad: .iPad
+            case .mac, .unknown: .unknown
+            }
+            return Device(id: record.id, publicKey: record.publicKey, name: record.name, kind: kind,
+                          announcedAt: record.paired, lastSeenAt: record.lastSeen,
+                          mayNotify: flags[record.id] ?? record.mayNotify)
+        }
+        let deliveries = await desk.heard(need, presences: await router.foldedPresences(), devices: devices)
+        for delivery in deliveries {
+            guard let params = try? JSONValue.encoding(delivery) else { continue }
+            await router.tell(relay, DaemonAPI.Method.relayDeliver, params)
+            log("notice: \(delivery.headline == nil ? "withdrew" : "sent") \(delivery.needID) for \(delivery.device) to relay \(relay)")
+        }
     }
 
     func log(_ line: String) {

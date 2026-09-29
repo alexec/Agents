@@ -9,6 +9,8 @@ public extension DaemonAPI.Method {
     static let hostsCheckAgain = "hosts/checkAgain"
     static let hostsUpdate = "hosts/update"
     static let hostsRemove = "hosts/remove"
+    /// `{host, relay}`: whether a host carries the person's devices through iCloud (T097).
+    static let hostsSetRelay = "hosts/setRelay"
     static let clientsList = "clients/list"
     static let clientsStartPairing = "clients/startPairing"
     static let clientsStopPairing = "clients/stopPairing"
@@ -21,6 +23,12 @@ public extension DaemonAPI.Method {
     static let hostHello = "host/hello"
     static let attentionNeed = "attention/need"
     static let controlPing = "control/ping"
+
+    // To a relay host, on its channel 0 (058, T096–T097): notifications, never answered.
+    /// `RelayDevices`: the devices it may carry for, with their keys.
+    static let relayDevices = "relay/devices"
+    /// `RelayDelivery`: one mailbox item to seal and post.
+    static let relayDeliver = "relay/deliver"
 }
 
 public extension DaemonAPI.Notification {
@@ -45,6 +53,9 @@ public extension DaemonAPI {
         public var awayFromHome: Bool?
         /// The asking client's own record, so a window can mark itself "you".
         public var you: UUID?
+        /// The public key of the host that relays through iCloud, if one does (T077): what a
+        /// device keeps so it can reach the control plane through the relay when away.
+        public var relayKey: Data?
 
         public init(name: String, version: String, homeHost: HostID?, machineID: String,
                     startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {
@@ -68,9 +79,12 @@ public extension DaemonAPI {
         public var state: String
         public var reach: String
         public var machineID: String?
+        /// A relay host (`agents-relay`): it carries devices through iCloud and runs no agents.
+        public var relay: Bool?
 
         public init(id: HostID, name: String, platform: String, version: String, state: String,
-                    reach: String, machineID: String?) {
+                    reach: String, machineID: String?, relay: Bool? = nil) {
+            self.relay = relay
             self.id = id
             self.name = name
             self.platform = platform
@@ -98,8 +112,12 @@ public extension DaemonAPI {
         public var platform: String
         public var machineID: String
         public var name: String?
+        /// Said by `agents-relay` (T096): this host only relays, and gets no client channels.
+        public var relay: Bool?
 
-        public init(host: HostID? = nil, version: String, platform: String, machineID: String, name: String? = nil) {
+        public init(host: HostID? = nil, version: String, platform: String, machineID: String, name: String? = nil,
+                    relay: Bool? = nil) {
+            self.relay = relay
             self.host = host
             self.version = version
             self.platform = platform
@@ -157,6 +175,47 @@ public extension DaemonAPI {
         public init(host: HostID, purge: Bool? = nil) {
             self.host = host
             self.purge = purge
+        }
+    }
+
+    /// `hosts/setRelay`.
+    struct HostRelayRequest: Codable, Sendable, Hashable {
+        public var host: HostID
+        public var relay: Bool
+        public init(host: HostID, relay: Bool) {
+            self.host = host
+            self.relay = relay
+        }
+    }
+
+    /// `relay/devices`: every device client, with the key its frames are sealed to.
+    struct RelayDevices: Codable, Sendable, Hashable {
+        public struct Device: Codable, Sendable, Hashable {
+            public var id: UUID
+            public var publicKey: Data
+            public init(id: UUID, publicKey: Data) {
+                self.id = id
+                self.publicKey = publicKey
+            }
+        }
+        public var devices: [Device]
+        public init(devices: [Device]) { self.devices = devices }
+    }
+
+    /// `relay/deliver`: what the control plane chose (T097). The relay host seals the
+    /// headline to `publicKey` and posts it for `device`; no headline is a withdrawal.
+    struct RelayDelivery: Codable, Sendable, Hashable {
+        public var needID: NeedID
+        public var device: UUID
+        public var publicKey: Data?
+        public var headline: Headline?
+        public var alert: Bool
+        public init(needID: NeedID, device: UUID, publicKey: Data? = nil, headline: Headline? = nil, alert: Bool = false) {
+            self.needID = needID
+            self.device = device
+            self.publicKey = publicKey
+            self.headline = headline
+            self.alert = alert
         }
     }
 }

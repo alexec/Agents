@@ -56,9 +56,14 @@ or `hosts/announce`. The reply carries the record. The socket then closes, and t
 reconnects with its own identity. Using the code creates `codes/<id>.spent` first (store.md),
 so a second use is `refused: spent`.
 
-**A relayed device.** `agents-relay` opens the socket with `kind: relay` and `for: <device>`,
-and passes messages 1–3 between the device and the control plane through CloudKit unchanged.
-The device computes the MAC. The session is marked `relayed`, and today's away limits apply.
+**A relayed device (T096).** `agents-relay` opens a socket of its own to the control plane's
+address, with the pin, for each device session it carries, and proves nothing on it. It passes
+every line between the device and the control plane through CloudKit unchanged, messages 1–3
+first. The device computes the MAC and says `kind: relay` and `for: <its own id>` in its
+`auth`. The control plane refuses `badMessage` when `for` is not the identity proving itself,
+or when that client is not a device. Otherwise its `ok` says `relayed: true` and the session
+is marked `relayed`. The relay carries one session per device at a time, so a device reaches
+only its home host while relayed; the Remote's second, wrapped connection waits for the address.
 
 ## Client ⇄ control plane (unchanged from the first build)
 
@@ -88,9 +93,23 @@ The legacy bare line goes to the home host only while a moved set-up still has o
 {"c":0,"m":{…}}          // host/hello, attention/need, control/ping
 ```
 
-`relayed` is new: the host applies today's away limits on that channel. Channel numbers are
-unique for one uplink's life. Losing the uplink closes every channel, and the host redials any
-copy.
+`relayed` is new: the host is told the channel came through the relay. It has no away limits
+of its own today; the Remote keeps a relayed prompt's attachments under a record's size (046).
+Channel numbers are unique for one uplink's life. Losing the uplink closes every channel, and
+the host redials any copy.
+
+**A relay host** (`agents-relay`, `HostRecord.relay` set) is never sent `open`. On its channel
+0 it hears two notifications, which it never answers:
+
+```jsonc
+{"c":0,"m":{"jsonrpc":"2.0","method":"relay/devices","params":{"devices":[{"id":"…","publicKey":"<b64 X9.63>"}]}}}
+{"c":0,"m":{"jsonrpc":"2.0","method":"relay/deliver","params":{"needID":{…},"device":"…","publicKey":"…","headline":{…},"alert":true}}}
+```
+
+`relay/devices` is every device client and its key: the devices whose zones it may read and
+whose frames it may open (FR-008). It is sent when the relay says hello, when a client pairs
+or is forgotten, and at every 15 s re-list. `relay/deliver` is one mailbox item: the relay
+seals `headline` to `publicKey` and posts it for `device`. No `headline` is a withdrawal.
 
 ## Copy ⇄ copy (the peer link)
 
@@ -105,6 +124,7 @@ After the key exchange with identity `x:<copy-id>`:
 // changes and presence
 {"event":{"kind":"clientForgotten","subject":"6f1c…","at":"…","by":"…"}}
 {"presence":{"client":"…","state":"active|away","at":"…"}}
+{"need":{"need":{…},"headline":{…},"buzz":true}}                        // T097: to the copy holding the relay host
 {"host":{"id":"H","state":"online","epoch":8}}                          // holder → everyone
 ```
 
@@ -112,5 +132,9 @@ After the key exchange with identity `x:<copy-id>`:
   H's real uplink, and back.
 - **When B receives `gone`,** it marks its proxied session for H closed, and re-reads the lease
   to find the new holder. Clients see `hostChanged` only if no copy holds H within 5 s.
+- **A need** is sent to every peer by a copy that holds no relay host. The copy that holds one
+  chooses the device and delivers it; the others drop it. Pairing and enrolling are announced
+  to the peers at once (`clientPaired`, `hostEnrolled`), so the relay's copy knows the device
+  and every copy knows not to open channels on a new relay host.
 - **A peer link dropping** closes every stream on it. Each copy redials the other while both are
   registered (`copies/`).

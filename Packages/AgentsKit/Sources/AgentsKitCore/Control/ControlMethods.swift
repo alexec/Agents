@@ -26,6 +26,8 @@ public actor ControlMethods: ControlHandling {
         /// A change a person made, for every other copy to apply (058, US3, T066). Called
         /// after the store has it.
         public var changed: @Sendable (ControlEvent) async -> Void = { _ in }
+        /// A host started or stopped relaying, or a relay host said hello (T096).
+        public var relayChanged: @Sendable (HostID) async -> Void = { _ in }
 
         public init(startPairing: @escaping @Sendable (Grant) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
@@ -139,7 +141,7 @@ public actor ControlMethods: ControlHandling {
     private static let own: Set<String> = [
         DaemonAPI.Method.ping, DaemonAPI.Method.controlStatus, DaemonAPI.Method.hostsList,
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsCheckAgain,
-        DaemonAPI.Method.hostsUpdate, DaemonAPI.Method.hostsRemove,
+        DaemonAPI.Method.hostsUpdate, DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay,
         DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
         DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget,
         DaemonAPI.Method.devicesList, DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesStopPairing,
@@ -180,6 +182,7 @@ public actor ControlMethods: ControlHandling {
                                                                   startedAt: startedAt, port: port,
                                                                   awayFromHome: awayFromHome)
             status.you = caller.client
+            status.relayKey = await records.hosts.first { $0.relay == true }?.publicKey
             return try JSONValue.encoding(status)
         case DaemonAPI.Method.hostsList:
             return try JSONValue.encoding(await hostList())
@@ -225,6 +228,21 @@ public actor ControlMethods: ControlHandling {
         case DaemonAPI.Method.hostsCheckAgain:
             try await hooks.checkAgain(try Self.require(params, as: DaemonAPI.HostRequest.self).host)
             return [:]
+        case DaemonAPI.Method.hostsSetRelay:
+            let request = try Self.require(params, as: DaemonAPI.HostRelayRequest.self)
+            guard var record = await records.host(request.host) else {
+                throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(request.host.rawValue).")
+            }
+            // Only `agents-relay` carries devices; a host that runs agents cannot start to.
+            guard record.relay != nil else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: "\(record.name) does not relay.")
+            }
+            record.relay = request.relay
+            try await records.save(record)
+            await hooks.relayChanged(request.host)
+            await hooks.changed(ControlEvent(kind: .hostEnrolled, subject: request.host.rawValue, at: Date(),
+                                             by: caller.client.uuidString))
+            return [:]
         case DaemonAPI.Method.hostsRemove:
             let request = try Self.require(params, as: DaemonAPI.HostRequest.self)
             guard try await records.remove(request.host) else {
@@ -251,13 +269,16 @@ public actor ControlMethods: ControlHandling {
             record.platform = hello.platform
             record.machineID = hello.machineID
             if let name = hello.name { record.name = name }
+            // Relaying from its first hello; switched off, it stays off when it reconnects.
+            if hello.relay == true, record.relay == nil { record.relay = true }
             try await enroll(record)
-            if hello.machineID == settings.machineID, settings.homeHost == nil {
+            if hello.machineID == settings.machineID, settings.homeHost == nil, hello.relay != true {
                 try await setHomeHost(host)
                 await router?.setHomeHost(host)
             }
             await router?.broadcastControl(DaemonAPI.Notification.controlHostChanged,
                                            ControlRouter.describe(host, .online))
+            if record.relay == true { await hooks.relayChanged(host) }
             return [:]
         case DaemonAPI.Method.attentionNeed:
             await hooks.need(host, params)
@@ -287,7 +308,7 @@ public actor ControlMethods: ControlHandling {
             return DaemonAPI.ControlHost(id: record.id, name: record.name, platform: record.platform,
                                          version: record.version,
                                          state: ControlRouter.describe(record.id, state)["state"]?.stringValue ?? "offline",
-                                         reach: "dialOut", machineID: record.machineID)
+                                         reach: "dialOut", machineID: record.machineID, relay: record.relay)
         }
     }
 

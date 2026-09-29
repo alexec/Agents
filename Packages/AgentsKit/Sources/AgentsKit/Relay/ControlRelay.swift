@@ -1,0 +1,212 @@
+// Not on Linux: the relay is iCloud's, and a Mac's (037, 046).
+#if canImport(CryptoKit)
+import AgentsKitCore
+import ControlDial
+import Foundation
+
+/// `agents-relay` (058, T096–T097): a Mac's helper that carries the person's devices
+/// through iCloud to their control plane, and posts their notices.
+///
+/// It enrols with a host code, as a host that only relays, and keeps one uplink. The
+/// control plane opens no client channels on it; on channel 0 it says which devices may
+/// be carried for (`relay/devices`) and what to post (`relay/deliver`).
+///
+/// A device's relayed session is a WebSocket of its own to the control plane's address,
+/// dialled here with the pin; every line is carried untouched, the key exchange first, so
+/// the device proves itself to the control plane end to end and this sees nothing but
+/// what the control plane would show that device. Frames are sealed between the device
+/// and this relay's key, which is its host key: the key `control/status` names.
+public final class ControlRelay: @unchecked Sendable {
+    public struct Failure: Error, Sendable, CustomStringConvertible {
+        public var description: String
+        public init(_ description: String) { self.description = description }
+    }
+
+    /// The membership and key, in the relay's own folder.
+    public struct Files: Sendable {
+        public var folder: URL
+        public init(folder: URL) { self.folder = folder }
+        public var membership: URL { folder.appendingPathComponent("relay-host.json") }
+        public var key: URL { folder.appendingPathComponent("relay-key") }
+    }
+
+    public typealias Dial = @Sendable (URL, String?) async throws -> any LineTransport
+
+    private let files: Files
+    private let membership: ControlMembership
+    private let privateKey: Data
+    private let channel: any RelayChannel
+    private let mailbox: any Mailbox
+    private let dial: Dial
+    private let log: @Sendable (String) -> Void
+    public let core: RelayHostCore
+    private let lock = NSLock()
+    private var tasks: [Task<Void, Never>] = []
+    private var uplink: (any LineTransport)?
+    private let stopped = ManagedAtomicFlag()
+    private let hello: DaemonAPI.HostHello
+    private var mailboxReady = false
+    private var carrying: [UUID: Data]?
+
+    /// Enrol with a host code, once: what the relay keeps to dial again.
+    @discardableResult
+    public static func enroll(_ code: ControlCode, files: Files, name: String) async throws -> ControlMembership {
+        let key = try ControlAgreement.loadOrMake(file: files.key)
+        let membership = try await ControlJoin.enrollHost(code, privateKey: key, hello: hello(name: name))
+        try membership.save(files.membership)
+        return membership
+    }
+
+    static func hello(name: String) -> DaemonAPI.HostHello {
+        DaemonAPI.HostHello(version: Daemon.version, platform: "macOS relay",
+                            machineID: MachineID.current, name: name, relay: true)
+    }
+
+    public init(files: Files, name: String, channel: any RelayChannel, mailbox: any Mailbox,
+                dial: @escaping Dial = { url, pin in try await ControlDial.connect(url, pin: pin) },
+                log: @escaping @Sendable (String) -> Void = { _ in }) throws {
+        guard let membership = ControlMembership.load(files.membership), membership.host != nil, membership.url != nil else {
+            throw Failure("this relay has not joined a control plane; give it a host code")
+        }
+        self.files = files
+        self.membership = membership
+        privateKey = try ControlAgreement.loadOrMake(file: files.key)
+        self.channel = channel
+        self.mailbox = mailbox
+        self.dial = dial
+        self.log = log
+        hello = Self.hello(name: name)
+        core = RelayHostCore(channel: channel, key: try DeviceKey.software(privateKey: privateKey),
+                             openDaemon: { throw Failure("a relay has no daemon of its own") })
+    }
+
+    /// The key frames and devices seal to: this relay's host key.
+    public var publicKey: Data { (try? ControlAgreement.publicKey(privateKey: privateKey)) ?? Data() }
+
+    public func start() async {
+        guard let text = membership.url, let url = URL(string: text) else { return }
+        let pin = membership.pin, dial = self.dial
+        // A device's session: a socket of its own to the control plane, nothing proved
+        // on it here. The device's first line is its answer to the control plane's hello.
+        await core.setOpenDevice { _ in try await dial(url, pin) }
+        let hostDial = try? ControlJoin.hostDial(membership, privateKey: privateKey)
+        let carrying = Task { [core] in await core.run() }
+        let sweeping = Task { [core] in
+            while !Task.isCancelled {
+                await core.sweep()
+                try? await Task.sleep(for: .seconds(3600))
+            }
+        }
+        let uplinking = Task { [weak self] in
+            guard let hostDial else { return }
+            await self?.runUplink(hostDial)
+        }
+        lock.withLock { tasks = [carrying, sweeping, uplinking] }
+    }
+
+    public func stop() {
+        guard stopped.set() else { return }
+        let (running, open) = lock.withLock { () -> ([Task<Void, Never>], (any LineTransport)?) in
+            defer { tasks = []; uplink = nil }
+            return (tasks, uplink)
+        }
+        for task in running { task.cancel() }
+        open?.close()
+    }
+
+    // MARK: The uplink
+
+    private func runUplink(_ hostDial: @escaping @Sendable () async throws -> any LineTransport) async {
+        var wait: Duration = ControlUplink.firstWait
+        while !stopped.isSet && !Task.isCancelled {
+            do {
+                let transport = try await hostDial()
+                wait = ControlUplink.firstWait
+                lock.withLock { uplink = transport }
+                let line = try JSONRPCCodec.encode(.request(id: .number(1), method: DaemonAPI.Method.hostHello,
+                                                            params: try JSONValue.encoding(hello)))
+                try transport.write(line: ControlWire.channel(0, message: line))
+                log("relay: connected to \(membership.name)")
+                do {
+                    for try await line in transport.lines() { await heard(line, on: transport) }
+                } catch {}
+                transport.close()
+                lock.withLock { uplink = nil }
+                log("relay: the control plane went")
+            } catch {
+                log("relay: could not reach the control plane: \(error)")
+            }
+            guard !stopped.isSet else { return }
+            try? await Task.sleep(for: wait)
+            wait = min(wait * 2, ControlUplink.longestWait)
+        }
+    }
+
+    private func heard(_ line: String, on transport: any LineTransport) async {
+        guard let frame = try? ControlWire.readHost(line) else { return }
+        switch frame {
+        case .message(0, let message):
+            guard case .notification(let method, let params)? = try? JSONRPCCodec.decode(line: message) else { return }
+            switch method {
+            case DaemonAPI.Method.relayDevices:
+                guard let list = try? params?.decode(DaemonAPI.RelayDevices.self) else { return }
+                let devices = Dictionary(list.devices.map { ($0.id, $0.publicKey) }, uniquingKeysWith: { $1 })
+                await core.setPaired(devices)
+                let changed = lock.withLock { () -> Bool in
+                    defer { carrying = devices }
+                    return carrying != devices
+                }
+                if changed { log("relay: carrying for \(devices.count) devices") }
+            case DaemonAPI.Method.relayDeliver:
+                guard let delivery = try? params?.decode(DaemonAPI.RelayDelivery.self) else { return }
+                await deliver(delivery)
+            default:
+                return
+            }
+        case .open, .message, .close:
+            // A relay runs nothing for a client, and a channel the control plane opened
+            // by mistake is left unanswered rather than closed: closing it would end the
+            // client's whole connection.
+            return
+        }
+    }
+
+    // MARK: Notices (T097)
+
+    /// Seal the headline to the device the control plane chose, and post it; or post the
+    /// withdrawal. What to send and to whom is the control plane's; only the key is here.
+    public func deliver(_ delivery: DaemonAPI.RelayDelivery) async {
+        var envelope: Envelope?
+        if let headline = delivery.headline {
+            guard let key = delivery.publicKey, let sealed = try? Envelope.seal(headline, to: key) else {
+                log("relay: could not seal a need for \(delivery.device)")
+                return
+            }
+            envelope = sealed
+        }
+        let item = MailboxItem(needID: delivery.needID, device: delivery.device, envelope: envelope,
+                               alert: delivery.alert, postedAt: Date())
+        do {
+            try await prepareMailbox()
+            try await mailbox.post(item)
+            log("relay: posted \(envelope == nil ? "a withdrawal" : "a need") for \(delivery.device)")
+        } catch {
+            log("relay: posting failed: \(error)")
+        }
+    }
+
+    private func prepareMailbox() async throws {
+        guard !lock.withLock({ mailboxReady }) else { return }
+        if let prepared = mailbox as? any PreparedMailbox { try await prepared.prepare() }
+        lock.withLock { mailboxReady = true }
+    }
+}
+
+/// A mailbox with something to set up before its first post: CloudKit's zone and
+/// subscription.
+public protocol PreparedMailbox: Mailbox {
+    func prepare() async throws
+}
+
+extension CloudKitMailbox: PreparedMailbox {}
+#endif

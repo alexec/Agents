@@ -979,7 +979,9 @@ final class RemoteModel {
                 self.hostWatch = nil
                 return
             }
-            let base = self.baseLink
+            // Through the relay a device has one session at a time (046), and it is the
+            // home host's: the other hosts wait until the control plane's address answers.
+            let base: any DaemonLink = (self.baseLink as? ControlPlaneLink)?.addressOnly ?? self.baseLink
             let link = ControlLink { try await base.transport() }
             let control = DaemonClient(link: link.controlLink)
             while !Task.isCancelled {
@@ -998,9 +1000,12 @@ final class RemoteModel {
         guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self),
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
         else { return }
-        controlHosts = listed
+        controlHosts = listed.filter { $0.relay != true }
         controlHome = status.homeHost
-        let others = listed.filter { $0.id != status.homeHost && $0.state == "online" }
+        // The relay's key, from the control plane itself (T077): kept for when its address
+        // cannot be reached.
+        RemoteControl.keepRelayKey(status.relayKey)
+        let others = listed.filter { $0.id != status.homeHost && $0.state == "online" && $0.relay != true }
         for host in others {
             let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
             otherHosts[host.id] = other
@@ -1222,7 +1227,7 @@ final class RemoteModel {
             }
             // The relay's wake-up (046): a push when the Mac writes to this device's
             // zone, so a relayed session looks at once. Polling still works without it.
-            if hasMacKey {
+            if hasMacKey || RemoteControl.relayKey != nil {
                 do {
                     try await CloudKitRelayChannel().subscribe(device: deviceID)
                     note("relay: subscribed")

@@ -17,7 +17,7 @@ enum ThisMacHost {
     static func resolve(_ hosts: [DaemonAPI.ControlHost]?, controlPlaneIsHere: Bool,
                         machine: String = MachineID.current) -> HostID? {
         guard let hosts else { return .mac }
-        if let id = hosts.first(where: { $0.machineID == machine })?.id { return id }
+        if let id = hosts.first(where: { $0.machineID == machine && $0.relay != true })?.id { return id }
         if hosts.isEmpty, controlPlaneIsHere { return .mac }
         return nil
     }

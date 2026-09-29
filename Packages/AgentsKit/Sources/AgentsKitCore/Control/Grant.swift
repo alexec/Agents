@@ -109,7 +109,9 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     public var installed: Bool
     /// The machine it runs on, so a window can tell a host on its own Mac (R11).
     public var machineID: String?
-    /// A macOS host that runs the iCloud relay and mailbox for its person's devices (R10).
+    /// A macOS host that runs the iCloud relay and mailbox for its person's devices (R10):
+    /// `agents-relay`, which runs no agents. Nil for any other host; false while switched
+    /// off with `hosts/setRelay`.
     public var relay: Bool?
     public var owner: PersonID?
     /// As `ClientRecord.rev`.

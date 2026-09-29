@@ -109,6 +109,51 @@ struct CopiesTests {
 
     // MARK: The tests
 
+    /// A need raised at one copy reaches the relay host another copy holds (T097).
+    @Test func aNeedReachesTheRelayHeldByAnotherCopy() async throws {
+        let copies = try await copies(2)
+        defer { Task { await stop(copies) } }
+        let (host, uplink) = try await host(code: try await copies[0].service.codes.issue(.host).text, dialling: [copies[0].url])
+        defer { uplink.stop() }
+        await eventually { await copies[0].service.router.holds(host) }
+
+        // The relay joins at the other copy, and dials only that one.
+        let files = ControlRelay.Files(folder: FileManager.default.temporaryDirectory
+            .appendingPathComponent("relay-\(UUID().uuidString)", isDirectory: true))
+        let code = try #require(ControlCode(text: try await copies[1].service.codes.issue(.host).text))
+        let relayHost = try #require(try await ControlRelay.enroll(code, files: files, name: "relay").host)
+        let mailbox = FakeMailbox()
+        let relay = try ControlRelay(files: files, name: "relay", channel: FakeRelayChannel(cloud: FakeRelayCloud()),
+                                     mailbox: mailbox)
+        await relay.start()
+        defer { relay.stop() }
+        await eventually { await copies[1].service.router.relayHeldHere() == relayHost }
+
+        // A phone at the first copy says it may be notified.
+        let key = ControlAgreement.generate()
+        let phoneCode = try #require(ControlCode(text: try await copies[0].service.codes.issue(.client(.device)).text))
+        let membership = try await ControlCodeUse.pairClient(phoneCode, privateKey: key.privateKey, id: UUID(), name: "phone",
+                                                             kind: .iPhone, dial: ControlJoin.nio)
+        let device = try #require(membership.client)
+        let phone = ControlLink(dial: try ControlCodeUse.clientDial(membership, privateKey: key.privateKey, kind: "iphone",
+                                                                    dial: ControlJoin.nio))
+        defer { phone.disconnect() }
+        let there = DaemonClient(link: phone.link(for: host))
+        try await there.connect(startIfNeeded: false)
+        _ = try await there.call(DaemonAPI.Method.presenceReport,
+                                 try JSONValue.encoding(DaemonAPI.PresenceReport(watching: nil, active: false, mayNotify: true)))
+        await eventually { await copies[1].service.router.notifyFlags()[device] == true }
+
+        let asked = Need(id: .permission(UUID()), agentID: UUID(), folder: URL(filePath: "/work"), kind: .permission,
+                         raisedAt: Date().addingTimeInterval(-600),
+                         headline: Headline(h1: "work", h2: "Across copies", h3: "may run a command"))
+        uplink.tell(DaemonAPI.Method.attentionNeed, try JSONValue.encoding(DaemonAPI.AttentionNeed.offer(asked, buzz: true)))
+        await eventually { await !mailbox.waiting(for: device).isEmpty }
+        let item = try #require(await mailbox.waiting(for: device).first)
+        let headline = try Envelope.open(try #require(item.envelope), with: try DeviceKey.software(privateKey: key.privateKey))
+        #expect(headline.h2 == "Across copies")
+    }
+
     @Test func aClientOnEachCopySeesEveryHost() async throws {
         let store = MemoryStore()
         let all = try await copies(store: store)

@@ -15,6 +15,8 @@ public enum PeerWire {
         case event(ControlEvent)
         /// A client here said where the person is.
         case presence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport)
+        /// A host's `attention/need`, for the copy that holds a relay host (T097).
+        case need(DaemonAPI.AttentionNeed)
     }
 
     /// `{"p":"H","c":…}` from a host frame's line.
@@ -38,6 +40,10 @@ public enum PeerWire {
     public static func presence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport) -> String {
         encode(["presence": .object(["client": .string(client.uuidString), "grant": .string(grant.rawValue),
                                      "report": (try? JSONValue.encoding(report)) ?? .null])])
+    }
+
+    public static func need(_ need: DaemonAPI.AttentionNeed) -> String {
+        encode(["need": (try? JSONValue.encoding(need)) ?? .null])
     }
 
     public static func read(_ line: String) -> Frame? {
@@ -66,6 +72,9 @@ public enum PeerWire {
            let grant = presence["grant"]?.stringValue.flatMap(Grant.init(rawValue:)),
            let report = try? presence["report"]?.decode(DaemonAPI.PresenceReport.self) {
             return .presence(client: client, grant: grant, report: report)
+        }
+        if let need = object["need"], let decoded = try? need.decode(DaemonAPI.AttentionNeed.self) {
+            return .need(decoded)
         }
         return nil
     }

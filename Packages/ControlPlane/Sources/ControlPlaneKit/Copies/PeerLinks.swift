@@ -50,6 +50,7 @@ public actor CopyMesh {
     private var ticker: Task<Void, Never>?
     /// A change from another copy, for the service to apply.
     private var applyEvent: (@Sendable (ControlEvent) async -> Void)?
+    private var heardNeed: (@Sendable (DaemonAPI.AttentionNeed) async -> Void)?
     /// A link came up: a chance to catch up on changes missed while it was down.
     private var linked: (@Sendable (String) async -> Void)?
     let log: @Sendable (String) -> Void
@@ -65,6 +66,8 @@ public actor CopyMesh {
 
     public func onEvent(_ apply: @escaping @Sendable (ControlEvent) async -> Void) { applyEvent = apply }
     public func onLinked(_ linked: @escaping @Sendable (String) async -> Void) { self.linked = linked }
+    /// A need another copy heard from one of its hosts (T097).
+    public func onNeed(_ heard: @escaping @Sendable (DaemonAPI.AttentionNeed) async -> Void) { heardNeed = heard }
 
     static func key(_ copy: String) -> String { "v1/copies/\(copy).json" }
 
@@ -208,6 +211,8 @@ public actor CopyMesh {
             await applyEvent?(event)
         case .presence(let client, let grant, let report):
             await router.notePeerPresence(client: client, grant: grant, report: report)
+        case .need(let need):
+            await heardNeed?(need)
         }
     }
 

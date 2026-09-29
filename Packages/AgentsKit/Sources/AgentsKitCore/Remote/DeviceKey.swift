@@ -85,6 +85,12 @@ public struct DeviceKey: Sendable {
                                               sharedInfo: Data(id.utf8), outputByteCount: 32)
     }
 
+    /// A key already in hand: 32 raw bytes, as `ControlAgreement` makes them (058, T096).
+    public static func software(privateKey: Data) throws -> DeviceKey {
+        let key = try P256.KeyAgreement.PrivateKey(rawRepresentation: privateKey)
+        return DeviceKey(publicKey: key.publicKey.x963Representation, holder: .software(key))
+    }
+
     /// A key that lives only for this process: for tests, and for a Mac that is only
     /// ever the sender.
     public static func ephemeral() -> DeviceKey {
