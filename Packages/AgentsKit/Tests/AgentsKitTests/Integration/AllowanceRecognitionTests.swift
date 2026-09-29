@@ -119,7 +119,7 @@ struct AllowanceRecognitionTests {
         #expect(try await notes(core, id).contains { $0.contains("started using paid extra usage") })
     }
 
-    @Test func anUnrecognisedRefusalWithNoPoolIsWhatItWasBefore() async throws {
+    @Test func anUnrecognisedRefusalWithNoPoolStopsTheChatAndMarksTheRuntimeFailed() async throws {
         var script = FakeACPAgent.Script()
         script.promptError = JSONRPCError(code: -32603, message: "Internal error")
         let (core, work, _) = try core(script)
@@ -127,8 +127,9 @@ struct AllowanceRecognitionTests {
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         #expect(await core.agent(id)?.endedReason == .processDied)
         #expect(try await notes(core, id).contains("Claude stopped answering."))
-        // Nothing would ever check it outside a pool, so it is not put out.
-        #expect(await core.allowanceStates().allSatisfy { !$0.isOut })
+        // Every runtime is tracked and checked, pool or none (065, US4 scenario 5).
+        let state = try #require(await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" })
+        guard case .out(_, _?, .runtimeFailed) = state.status else { Issue.record("\(state.status)"); return }
     }
 
     @Test func anUnrecognisedRefusalStopsTheTurnAndTakesItOutOfThePool() async throws {

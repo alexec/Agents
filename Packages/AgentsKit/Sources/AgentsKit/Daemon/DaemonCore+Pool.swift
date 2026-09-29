@@ -25,11 +25,27 @@ extension DaemonCore {
     func poolEntry(for agent: Agent) -> PoolEntry {
         if let entry = pool.entry(agent.poolEntryID), entry.runtimeID == agent.runtimeID { return entry }
         if let entry = pool.entries.first(where: { $0.runtimeID == agent.runtimeID }) { return entry }
-        if agent.runtimeID == RuntimeCatalog.gemini.id {
-            return PoolEntry(runtimeID: agent.runtimeID, payment: .freeTier(reset: .gemini),
+        return Self.ownEntry(runtimeID: agent.runtimeID)
+    }
+
+    /// A runtime as it runs with no pool: its own sign-in, on an allowance, except
+    /// Gemini, which only ever runs on its key (046).
+    static func ownEntry(runtimeID: String) -> PoolEntry {
+        if runtimeID == RuntimeCatalog.gemini.id {
+            return PoolEntry(runtimeID: runtimeID, payment: .freeTier(reset: .gemini),
                              credentialRef: CredentialKind.geminiAPIKey.rawValue)
         }
-        return PoolEntry(runtimeID: agent.runtimeID, payment: .allowance(label: nil))
+        return PoolEntry(runtimeID: runtimeID, payment: .allowance(label: nil))
+    }
+
+    /// The entry a credential key is for: the pool's, where a pool still names it, or
+    /// the runtime's own (065: every runtime is tracked, pool or none).
+    func entry(forKey key: String) -> PoolEntry {
+        if let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == key }) { return entry }
+        let own = Self.ownEntry(runtimeID: AllowanceState.runtimeID(of: key))
+        return AllowanceState.credentialKey(for: own) == key
+            ? own : PoolEntry(runtimeID: own.runtimeID, payment: .allowance(label: nil),
+                              credentialRef: String(key.dropFirst(own.runtimeID.count + 1)))
     }
 
     /// The state of an entry's credential, made on first use.
@@ -163,15 +179,11 @@ extension DaemonCore {
     }
 
     func runtimeFailed(runtimeID: String) {
-        guard let entry = pool.entries.first(where: { $0.runtimeID == runtimeID }) else { return }
-        markRuntimeFailed(entry)
+        markRuntimeFailed(pool.entries.first(where: { $0.runtimeID == runtimeID }) ?? Self.ownEntry(runtimeID: runtimeID))
     }
 
-    /// Only in a pool that is on: outside one nothing checks it, so it would stay out.
+    /// Any runtime, pool or none (065): the four-hour check brings it back.
     private func markRuntimeFailed(_ entry: PoolEntry) {
-        let key = AllowanceState.credentialKey(for: entry)
-        guard pool.isEffective,
-              pool.entries.contains(where: { AllowanceState.credentialKey(for: $0) == key }) else { return }
         var state = allowanceState(for: entry)
         guard state.markFailed(now: now()) else { return }
         setAllowanceState(state)
@@ -556,8 +568,10 @@ extension DaemonCore {
             details["retry_after"] = ISO8601DateFormatter().string(from: retry)
         }
         let sentence: String
-        if case .out(_, _, .runtimeFailed) = state.status {
-            sentence = "\(PoolWords.runtimeName(entry.runtimeID)) failed and left the pool."
+        if case .out(_, let retry, .runtimeFailed) = state.status {
+            let name = PoolWords.runtimeName(entry.runtimeID)
+            sentence = retry.map { "\(name) failed. The app checks it again at \(PoolWords.time($0, now: now()))." }
+                ?? "\(name) failed."
         } else {
             sentence = "\(PoolWords.runtimeName(entry.runtimeID))’s allowance ran out."
         }
@@ -571,7 +585,7 @@ extension DaemonCore {
         let name = PoolWords.runtimeName(entry.runtimeID)
         let failed = if case .out(_, _, .runtimeFailed) = after?.status { true } else { false }
         raise(EventDraft(name: "cost.allowance_back", at: now(), scope: .mac,
-                         sentence: failed ? "\(name) is back in the pool." : "\(name)’s allowance came back.",
+                         sentence: failed ? "\(name) is working again." : "\(name)’s allowance came back.",
                          details: ["runtime": entry.runtimeID, "how": how]))
     }
 
@@ -641,6 +655,37 @@ extension DaemonCore {
             states[key] = state
         }
         return states
+    }
+
+    /// Every runtime's state, pool or none (065, US4): a row for each runtime this Mac
+    /// finds, and one for any other credential with a state. A runtime nothing has
+    /// happened to is available.
+    public func runtimeAllowances() -> RuntimeAllowances {
+        let at = now()
+        var keys: [String] = []
+        for runtime in RuntimeCatalog.builtIn {
+            if case .missing = discovery.locate(runtime) { continue }
+            keys.append(AllowanceState.credentialKey(for: Self.ownEntry(runtimeID: runtime.id)))
+        }
+        for key in allowances.keys.sorted() where !keys.contains(key) { keys.append(key) }
+        let rows = keys.map { key -> RuntimeAllowances.Row in
+            let entry = entry(forKey: key)
+            var state = allowances[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
+            state.settle(now: at)
+            return RuntimeAllowances.Row(credentialKey: key, state: state, unusable: unusable(entry))
+        }
+        return RuntimeAllowances(rows: rows, at: at)
+    }
+
+    /// The person says a runtime is back, by its credential (065). Idempotent.
+    public func markRuntimeAvailable(credentialKey key: String) -> RuntimeAllowances {
+        if var state = allowances[key] {
+            let wasOut = state.isOut
+            state.markAvailable(now: now())
+            setAllowanceState(state)
+            if wasOut { raiseAllowanceBack(entry(forKey: key), how: "person") }
+        }
+        return runtimeAllowances()
     }
 
     /// The person says a credential is back (FR-023). Idempotent; open to paired devices.
@@ -717,9 +762,10 @@ extension DaemonCore {
     /// Check out credentials every four hours. The retry date is only permission to
     /// ask: it never makes an unverified runtime usable by itself.
     func checkDueAllowances(now at: Date) {
-        guard pool.isEffective else { return }
-        let entries = pool.entries + agents.values.filter { $0.state != .archived }
-            .map { poolEntry(for: $0) }
+        // Every credential with a state, pool or none (065), each once.
+        var seen: Set<String> = []
+        let entries = allowances.keys.sorted().map { entry(forKey: $0) }
+            .filter { seen.insert(AllowanceState.credentialKey(for: $0)).inserted }
         for entry in entries {
             let key = AllowanceState.credentialKey(for: entry)
             if !entry.payment.isCredit, var state = allowances[key],
@@ -889,14 +935,17 @@ extension DaemonCore {
     /// How long a reading asked for stands before the Pool page asks again.
     static let readingKeptFor: TimeInterval = 300
 
-    /// Ask each runtime in the pool that can say what is left of its plan, where the
-    /// last answer is older than `readingKeptFor`. Grok is the one that can be asked;
+    /// Ask each runtime that can say what is left of its plan, where the last answer is
+    /// older than `readingKeptFor`. Grok, whether or not a pool names it (065). Grok is the one that can be asked;
     /// Claude says it during turns, unasked. Each ask starts the runtime for a moment,
     /// as signing in does. Runs behind the Pool page: the page draws what is known
     /// now, and the answer arrives as `pool/changed`.
     func measureAllowances() async {
         let at = now()
-        let asked = pool.entries.filter { entry in
+        var seen: Set<String> = []
+        let candidates = (pool.entries + [Self.ownEntry(runtimeID: RuntimeCatalog.grok.id)])
+            .filter { seen.insert(AllowanceState.credentialKey(for: $0)).inserted }
+        let asked = candidates.filter { entry in
             guard entry.runtimeID == RuntimeCatalog.grok.id, !entry.isKeyed, unusable(entry) == nil else { return false }
             let key = AllowanceState.credentialKey(for: entry)
             guard !measuringAllowances.contains(key) else { return false }
