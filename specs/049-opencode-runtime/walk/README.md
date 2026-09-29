@@ -110,3 +110,10 @@ Seen, not fixed here:
 - Settings ▸ Servers says "Setting up 127.0.0.1 failed: tar …" for Codex's failed install, not
   naming Codex, which reads as the whole server failing (043/046 wording; the devbox has no `xz`).
 - A server chat's model menu has no "Sign in, sign out, providers…"; the Mac chat's chooser does.
+
+# SC-005 (T039), 2026-09-29
+
+After every walk (`/tmp/run-oc`, `oc4`, `oc6`, `oc7`, the devbox): your own `~/.config/opencode`,
+`~/.local/share/opencode`, `~/.local/state/opencode`, `~/.cache/opencode` and `~/.opencode` have
+nothing newer than 2026-09-12, before this work began, and there is no `auth.json` in the real
+home. No share link appears in either scratch home or in the devbox's OpenCode data.

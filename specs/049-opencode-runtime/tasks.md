@@ -272,7 +272,7 @@ sign-ins per run.
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T035 [P] Update the docs:
+- [x] T035 [P] Update the docs:
   - `docs/reference/runtimes.md`: the runtime table and count, the OpenCode row, questions,
     limits, skills and instructions;
   - `docs/how-to/sign-a-runtime-in.md`: `auth login` and its providers, and that Zen works
@@ -283,14 +283,14 @@ sign-ins per run.
   - `README.md`: the runtime count (:98-101) and tool scoping (:182).
 
   Run `scripts/docs-check.py`.
-- [ ] T036 [P] Give OpenCode the "O" letter in `App/Sources/Settings/Shared/ReachDots.swift`
+- [x] T036 [P] Give OpenCode the "O" letter in `App/Sources/Settings/Shared/ReachDots.swift`
   (:24), so the fallback isn't relied on.
 - [x] T037 In `App/Sources/Runtimes/InstallAgentsSheet.swift` (:141-148), the `downloadNote`
   names "GitHub" for `github.com` hosts, as it names "Google" for `dl.google.com`.
 - [ ] T038 Build both schemes sequentially, skipping plugin validation (see memory), and
   `scripts/build-linux-agentsd.sh`. Then run the full suite on this branch and on main, three
   runs each, and compare them (the suite is flaky under load).
-- [ ] T039 SC-005 check (quickstart §10): hash the scratch home's `~/.config/opencode` and
+- [x] T039 SC-005 check (quickstart §10): hash the scratch home's `~/.config/opencode` and
   `auth.json` before and after all the walks. Record that the app wrote nothing and that no
   share happened.
 - [ ] T040 Remote: build for the generic simulator only. The phone look (an OpenCode row in the
