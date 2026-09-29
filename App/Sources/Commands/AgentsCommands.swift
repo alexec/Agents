@@ -26,6 +26,11 @@ final class WindowRequests {
     /// Set to put the keyboard in the sessions column's search field.
     var wantsSessionSearchFocus = false
 
+    /// The Project Settings pane showing, or nil while the sheet is shut (066). Set by
+    /// the toolbar, the project's context menu, the menu bar and the project's banner,
+    /// and taken down by the sheet's Done.
+    var projectSettings: ProjectSettingsPane?
+
     func focusPrompt() { wantsPromptFocus = true }
     func focusSessionSearch() { wantsSessionSearchFocus = true }
 }
@@ -68,6 +73,9 @@ struct AgentsCommands: Commands {
             Button("Show in Finder") { showInFinder() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(folderForFinder == nil)
+            Button("Project Settings…") { requests.projectSettings = .general }
+                .keyboardShortcut(",", modifiers: [.command, .option])
+                .disabled(model.selectedProjectSummary == nil)
         }
 
         CommandGroup(after: .sidebar) {

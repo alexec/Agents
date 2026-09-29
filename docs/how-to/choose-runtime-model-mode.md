@@ -19,7 +19,7 @@ running, and reads the meter that says how full its context is.
 
 **For a new agent**
 
-1. Open the project's page, or click **New session**.
+1. Open the project's page, or click **New Session** (the compose button above the sessions).
 2. Click the runtime above the prompt, on the right, and choose one. A runtime that cannot
    be used says why under its name, such as **Needs signing in**.
 3. Under the prompt, the runtime's own choices appear as capsules. Their names and values

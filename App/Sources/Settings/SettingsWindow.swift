@@ -9,7 +9,7 @@ import SwiftUI
 /// one place to choose from.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("settingsPane") private var paneRaw = SettingsPane.appearance.rawValue
+    @AppStorage("settingsPane") private var paneRaw = SettingsPane.general.rawValue
     @AppStorage("settingsSharedPage") private var sharedPageRaw = SharedPage.overview.rawValue
     @AppStorage("settingsRuntimeID") private var runtimeIDRaw = RuntimeCatalog.claude.id
     /// Shared's snapshot lives here, not in its pane, because the rail shows its counts.
@@ -24,7 +24,7 @@ struct SettingsWindow: View {
 
     private var pane: Binding<SettingsPane> {
         Binding(
-            get: { SettingsPane(rawValue: paneRaw) ?? .appearance },
+            get: { SettingsPane(rawValue: paneRaw) ?? .general },
             set: { paneRaw = $0.rawValue })
     }
 
@@ -94,7 +94,7 @@ struct SettingsWindow: View {
     @ViewBuilder
     private var content: some View {
         switch pane.wrappedValue {
-        case .appearance: FormColumn { GeneralSettingsView() }
+        case .general: FormColumn { GeneralSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
@@ -109,13 +109,11 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: String, Hashable, CaseIterable {
-    // Keep the old persisted raw value so Settings opens on the same pane after upgrade.
-    case appearance = "general"
-    case runtimes, shared, spending, devices, servers
+    case general, runtimes, shared, spending, devices, servers
 
     var title: String {
         switch self {
-        case .appearance: "Appearance"
+        case .general: "General"
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
@@ -126,7 +124,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
 
     var symbol: String {
         switch self {
-        case .appearance: "circle.lefthalf.filled"
+        case .general: "gearshape"
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
@@ -135,9 +133,9 @@ enum SettingsPane: String, Hashable, CaseIterable {
         }
     }
 
-    /// Appearance on its own; the panes about agents; Shared, drawn as a heading over its
+    /// General on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
-    static let groups: [[SettingsPane]] = [[.appearance], [.runtimes, .spending], [.shared], [.devices, .servers]]
+    static let groups: [[SettingsPane]] = [[.general], [.runtimes, .spending], [.shared], [.devices, .servers]]
 }
 
 /// The Settings scene's window has no grow box, and `windowResizability` on that
@@ -227,7 +225,7 @@ private struct SettingsRail: View {
             }
             Spacer()
             if pane == .shared {
-                Text("Your own set, for every project. A project’s own .agents folder is under Project configuration.")
+                Text("Your own set, for every project. A project’s own .agents folder is in its Project Settings.")
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(10)
@@ -335,7 +333,7 @@ private struct SettingsRail: View {
 
 /// One line of the rail. The whole line is the button (memory: a tap on a card never fires),
 /// lit in the accent when chosen, as Shared's own column was.
-private struct RailButton<Content: View>: View {
+struct RailButton<Content: View>: View {
     let lit: Bool
     let label: String
     let selected: Bool

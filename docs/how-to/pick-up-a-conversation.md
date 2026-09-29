@@ -17,7 +17,7 @@ up so it carries on in Agents, or delete one you no longer want.
 
 ## Steps
 
-1. Open the project's page, or click **New session** at the top of the sessions column.
+1. Open the project's page, or click **New Session**, the compose button above the sessions column.
 2. Above the prompt, choose the runtime you used, such as **Claude**, and the folder the
    conversation was in.
 3. Click the clock button beside the runtime (**Conversations this runtime is already

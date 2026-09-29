@@ -1,23 +1,23 @@
 import AgentsKit
 import SwiftUI
 
-/// The project itself, with no session picked: its name and somewhere to say what you
-/// want done. Nothing else. Its sessions and workflows are
-/// the middle column's (`SessionsColumn`); its worktrees, skills and plugins are
-/// Configuration's. A plugin waiting for an OK is one line here, since no agent is given
-/// it until somebody looks.
+/// The project itself, with no session picked: an empty new chat (066, look/ frame A).
+///
+/// It is laid out as a chat is, with the prompt at the foot of the pane, so starting a
+/// session and carrying one on happen in the same place, and sending turns this pane
+/// into the session without the bar moving. Above the prompt, the project's name and
+/// where it is, where a chat's transcript would be. The project's sessions and workflows
+/// are the middle column's (`SessionsColumn`); its settings are a sheet
+/// (`ProjectSettingsSheet`). Anything in it waiting for somebody's OK — a plugin, a
+/// workflow — is one banner across the top, since no agent gets it until somebody looks.
 ///
 /// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
-/// options, the folders and servers, attachments, dictation, the lot. On a project page
-/// it is in the same mode it is in for a new chat, with the folder already set to this
-/// project, so saying what you want done starts an agent here and takes you into it.
-///
-/// Everything sits in the same column the transcript and prompt bar use, so the page
-/// and a conversation are the same width at every size of window.
+/// options, the folders and servers, attachments, dictation, the lot — in the mode it is
+/// in for a new chat, with the folder already set to this project.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
     @Binding var selection: UUID?
-    @State private var showingConfiguration = false
 
     private var folder: URL? { model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
@@ -30,35 +30,30 @@ struct ProjectAgentsView: View {
                 EmptyState.noProject
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .navigationTitle("")
-            } else if showingConfiguration {
-                ProjectConfigurationView(folder: folder) { showingConfiguration = false }
             } else {
                 page
             }
         }
-        .onChange(of: model.selectedProjectKey) { showingConfiguration = false }
     }
 
     private var page: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                heading
-                // Its own margins, the same as in a chat, so it is not padded twice.
-                // The folder is this project's and not the bar's to change.
-                PromptBar(folderIsFixed: true)
-                    .padding(.top, 4)
-                waitingPlugins
-                    .chatColumn()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 0) {
+            WaitingForOKBanner(folder: folder)
+            Spacer(minLength: 24)
+            heading
+            Spacer(minLength: 24)
+            // Its own margins, the same as in a chat. The folder is this project's and
+            // not the bar's to change.
+            PromptBar(folderIsFixed: true)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(summary?.name ?? "Project")
         .toolbar {
             ToolbarItem {
-                Button { showingConfiguration = true } label: {
-                    Label("Project configuration", systemImage: "gearshape")
+                Button { requests.projectSettings = .general } label: {
+                    Label("Project Settings", systemImage: "slider.horizontal.3")
                 }
-                .help("Configure this project")
+                .help("Project Settings (⌥⌘,)")
             }
         }
         .onAppear { adopt(folder) }
@@ -77,98 +72,102 @@ struct ProjectAgentsView: View {
         Task { await model.loadDraftOptions() }
     }
 
-    /// Just the name.
+    /// The name, and where the project is, in the middle of the empty pane.
     ///
-    /// The path used to sit under it. The prompt below carries the folder already, and
-    /// saying where the project is twice on one screen is saying it once too often.
-    /// What is left here is the one case where the folder is news: it has gone.
+    /// What it has cost is on Project Settings ▸ General: it is a report, and nobody acts
+    /// on it from here. The one thing about the folder that is news here is that it has gone.
     private var heading: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(spacing: 6) {
             Text(summary?.name ?? "Project")
                 .appText(.title).fontWeight(.semibold)
                 .lineLimit(1)
-            // Which machine, when it is not this one (037).
-            if let summary, summary.host != .mac {
-                Text("on \(model.hosts.label(summary.host))")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            }
-            if let summary, !summary.exists {
-                Label("Folder is missing", systemImage: "exclamationmark.triangle")
+            if let summary {
+                Text(place(summary))
                     .appText(.supporting)
-                    .tinted(.failure)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
                     .help(summary.folder.path)
-            }
-            if let summary, let spent = spent(summary) {
-                Text(spent)
-                    .appText(.supporting)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .help(spentInWords)
-                    .accessibilityLabel(spentInWords)
+                if !summary.exists {
+                    Label("Folder is missing", systemImage: "exclamationmark.triangle")
+                        .appText(.supporting)
+                        .tinted(.failure)
+                        .lineLimit(1)
+                }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .multilineTextAlignment(.center)
         .chatColumn()
-        .padding(.top, 28)
     }
 
-    /// What this project has cost, or nothing at all.
-    ///
-    /// `Cost.total(of:)` returns nil when nothing has been spent, and nothing is what
-    /// is drawn then — a zero would be a claim, and the app has not made one. The
-    /// period is named because the sidebar's money line is about this sitting and this
-    /// one is about the whole life of the work; a bare figure could be mistaken for it.
-    private func spent(_ summary: DaemonAPI.ProjectSummary) -> String? {
-        guard let total = Cost.total(of: summary.costToDate) else { return nil }
-        guard summary.unmeasuredAgents > 0 else { return "\(total) all time" }
-        let chats = summary.unmeasuredAgents == 1 ? "1 chat" : "\(summary.unmeasuredAgents) chats"
-        return "\(total) all time · at least, \(chats) went unpriced"
+    /// `~/Agents · this Mac`, or the path and the server's name.
+    private func place(_ summary: DaemonAPI.ProjectSummary) -> String {
+        let machine = summary.host == .mac ? "this Mac" : model.hosts.label(summary.host)
+        return "\(ProjectPlace.path(summary.folder, on: summary.host)) · \(machine)"
+    }
+}
+
+/// Everything in the project waiting for somebody's OK, as one banner across the top of
+/// the pane: plugins new or changed since they were approved, which no agent is given
+/// until then, and workflows likewise, which do not run. Review opens the one thing when
+/// there is one, and otherwise the place they are listed.
+private struct WaitingForOKBanner: View {
+    @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
+    let folder: URL?
+
+    private var plugins: [ProjectPlugin] {
+        model.plugins(in: folder).filter { $0.awaitingApproval != nil }
+    }
+    private var workflows: [WorkflowSummary] {
+        model.workflows(in: folder).filter { $0.awaitingApproval != nil && !$0.isArchived }
     }
 
-    /// Said in words, because a caption under a name is not something VoiceOver
-    /// announces as being about money at all.
-    private var spentInWords: String {
-        guard let summary, summary.unmeasuredAgents > 0 else {
-            return "What this project has cost in total, across every chat in it including archived ones."
-        }
-        let chats = summary.unmeasuredAgents == 1 ? "chat" : "chats"
-        return """
-            What this project has cost in total, across every chat in it including \
-            archived ones. It is a floor rather than the whole: \
-            \(summary.unmeasuredAgents) \(chats) ran on a runtime that reported no price.
-            """
-    }
-
-    /// Plugins new or changed since they were approved, which no agent is given until
-    /// somebody says so on Configuration.
-    @ViewBuilder
-    private var waitingPlugins: some View {
-        let waiting = model.plugins(in: folder).filter { $0.awaitingApproval != nil }
-        if !waiting.isEmpty {
+    var body: some View {
+        if !plugins.isEmpty || !workflows.isEmpty {
             HStack(spacing: 10) {
                 Image(systemName: "hand.raised")
                     .tinted(.attention)
                     .accessibilityHidden(true)
-                Text(waiting.count == 1
-                     ? "Plugin \(waiting[0].name) is waiting for your OK"
-                     : "\(waiting.count) plugins are waiting for your OK")
+                Text(sentence)
                     .appText(.supporting)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 Spacer(minLength: 8)
-                Button("Review") { showingConfiguration = true }
+                Button("Review…") { review() }
                     .buttonStyle(.paper)
                     .appText(.fine)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .paperRow()
-            .padding(.top, 18)
+            .background(Paper.wash)
+            .overlay(alignment: .bottom) { Rectangle().fill(Paper.rule).frame(height: 1) }
+            .accessibilityElement(children: .contain)
         }
     }
 
+    private var sentence: String {
+        switch (plugins.count, workflows.count) {
+        case (1, 0): return "Plugin \(plugins[0].name) is waiting for your OK"
+        case (0, 1): return "Workflow \(workflows[0].workflow.name) is waiting for your OK"
+        default:
+            var parts: [String] = []
+            if !plugins.isEmpty { parts.append(plugins.count == 1 ? "1 plugin" : "\(plugins.count) plugins") }
+            if !workflows.isEmpty { parts.append(workflows.count == 1 ? "1 workflow" : "\(workflows.count) workflows") }
+            let total = plugins.count + workflows.count
+            return "\(parts.joined(separator: " and ")) \(total == 1 ? "is" : "are") waiting for your OK"
+        }
+    }
+
+    /// Plugins first: they are approved on Project Settings, and a workflow is approved
+    /// on its own page, which is one click from the middle column anyway.
+    private func review() {
+        if !plugins.isEmpty {
+            requests.projectSettings = .plugins
+        } else if let first = workflows.first {
+            model.openWorkflow = first.id
+        }
+    }
 }
 
 /// A part of a page, a step above the `GroupHeading`s inside it.

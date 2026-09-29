@@ -295,6 +295,8 @@ final class AppModel {
             // transcript entry is ours to keep, so the shared model is told first.
             work.watching = selection
             presence?.watching(selection)
+            // A session picked is the session shown, not a workflow left open over it.
+            if selection != nil { openWorkflow = nil }
             Task { await loadTranscript() }
         }
     }
