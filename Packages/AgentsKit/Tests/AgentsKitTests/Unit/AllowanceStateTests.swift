@@ -67,11 +67,16 @@ struct AllowanceStateTests {
         #expect(state.isUsable(now: now))
     }
 
-    @Test func usedUpCreditNeverComesBackOnATimer() {
+    /// The provider said the key's credit is used up. There is no ledger to wait on
+    /// (065): it is checked every four hours like any other runtime, and never simply
+    /// comes back with time.
+    @Test func usedUpCreditIsCheckedLikeAnyOtherAndNeverComesBackOnATimer() {
         var state = state()
         let payment = Payment.prepaid(amount: Cost(amount: 10, currency: "USD"), expires: nil)
         state.markOut(.creditUsedUp, until: nil, payment: payment, now: now, from: .words)
-        #expect(state.returnsAt == nil)
+        guard case .out(nil, let retry?, .creditUsedUp) = state.status else { Issue.record("\(state.status)"); return }
+        #expect(retry == now.addingTimeInterval(AllowanceState.retryWithoutATime))
+        #expect(PoolWords.state(state, now: now).hasPrefix("Credit used up · checking after "))
         #expect(!state.isUsable(now: now.addingTimeInterval(365 * 86400)))
         let changed = state.settle(now: now.addingTimeInterval(365 * 86400))
         #expect(!changed)
@@ -104,35 +109,6 @@ struct AllowanceStateTests {
         state.markAvailable(now: now)
         #expect(state.status == .available)
         #expect(state.learnedFrom == .person)
-    }
-
-    @Test func creditIsUsedUpByTheLedgerBeforeTheProviderSaysSo() {
-        var state = state()
-        let payment = Payment.prepaid(amount: Cost(amount: Decimal(string: "0.05")!, currency: "USD"), expires: nil)
-        let turn = Cost(amount: Decimal(string: "0.03")!, currency: "USD")
-        let r5 = state.add(cost: turn, payment: payment, now: now)
-        #expect(!r5)
-        let r6 = state.add(cost: turn, payment: payment, now: now)
-        #expect(r6)
-        guard case .out(nil, nil, .creditUsedUp) = state.status else { Issue.record("\(state.status)"); return }
-    }
-
-    @Test func aRuntimeThatNeverSaysWhatItCostIsUnknownNotZero() {
-        var state = state()
-        let payment = Payment.freeCredit(amount: Cost(amount: 1, currency: "USD"), expires: nil)
-        let r7 = state.add(cost: nil, payment: payment, now: now)
-        #expect(!r7)
-        #expect(state.spent == .unknown)
-        let r8 = state.add(cost: Cost(amount: 5, currency: "USD"), payment: payment, now: now)
-        #expect(!r8)
-    }
-
-    @Test func anExpiredGrantIsOut() {
-        var state = state()
-        let payment = Payment.freeCredit(amount: nil, expires: now.addingTimeInterval(-60))
-        let r9 = state.checkExpiry(payment: payment, now: now)
-        #expect(r9)
-        guard case .out(nil, nil, .creditExpired) = state.status else { Issue.record("\(state.status)"); return }
     }
 
     @Test func aRelayedPlanIsTheSamePlan() {

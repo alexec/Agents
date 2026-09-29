@@ -127,15 +127,16 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         status = .out(until: until, retryAfter: now.addingTimeInterval(Self.retryWithoutATime), why: why)
     }
 
-    /// Spent. `until` is the runtime's own return time; allowances get a check every
-    /// four hours, whether the runtime gave a time or not. Credit needs the person.
+    /// Spent. `until` is the runtime's own return time. Every credential gets a check
+    /// every four hours, whether the runtime gave a time or not: a key's credit too, now
+    /// the app keeps no ledger of it (065) and the provider is what says it is used up.
     public mutating func markOut(_ why: OutReason, until: Date?, payment: Payment, now: Date, from source: Source) {
         let back: Date?
         let retry: Date?
         switch payment {
         case .freeCredit, .prepaid:
-            back = nil
-            retry = nil
+            back = until
+            retry = now.addingTimeInterval(Self.retryWithoutATime)
         case .freeTier(let reset):
             back = until ?? reset.next(after: now)
             retry = now.addingTimeInterval(Self.retryWithoutATime)
@@ -186,68 +187,6 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         since = now
         learnedFrom = .person
         rateLimitStreak = []
-    }
-
-    /// Add what a turn cost, and say whether the credit is now used up (FR-001b). A
-    /// turn that reported no cost makes the spending unknown rather than zero.
-    public mutating func add(cost: Cost?, payment: Payment, now: Date) -> Bool {
-        guard payment.isCredit else { return false }
-        switch (spent, cost) {
-        case (.unknown, _): return false
-        case (.known, nil):
-            spent = .unknown
-            return false
-        case (.known(let before), let cost?):
-            let total = Cost(amount: (before?.amount ?? 0) + cost.amount, currency: cost.currency)
-            spent = .known(total)
-            guard let amount = payment.amount, amount.currency == total.currency,
-                  total.amount >= amount.amount else { return false }
-            markOut(.creditUsedUp, until: nil, payment: payment, now: now, from: .ledger)
-            return true
-        }
-    }
-
-    /// A free grant past its date is out, and stays out (US2-AS8).
-    public mutating func checkExpiry(payment: Payment, now: Date) -> Bool {
-        guard let expires = payment.expires, expires <= now, !isOut else { return false }
-        markOut(.creditExpired, until: nil, payment: payment, now: now, from: .expiry)
-        return true
-    }
-
-    /// Bring credit's state in line with what the entry now says (US2-AS7, AS8): a grant
-    /// past its date is out at once, credit already spent past a lowered amount is used
-    /// up, and a raised amount or a later date brings it back. Nothing but credit is
-    /// touched, and a timer never resets used-up credit: only this, when the person
-    /// changes the entry, or Mark available. Returns whether anything changed.
-    @discardableResult
-    public mutating func reconcile(payment: Payment, now: Date) -> Bool {
-        guard payment.isCredit else { return false }
-        let expired = payment.expires.map { $0 <= now } ?? false
-        let spentAll: Bool = {
-            guard case .known(let total?) = spent, let amount = payment.amount,
-                  amount.currency == total.currency else { return false }
-            return total.amount >= amount.amount
-        }()
-        switch status {
-        case .out(_, _, .creditExpired) where !expired:
-            status = spentAll ? .out(until: nil, retryAfter: nil, why: .creditUsedUp) : .available
-        case .out(_, _, .creditUsedUp) where !spentAll:
-            status = expired ? .out(until: nil, retryAfter: nil, why: .creditExpired) : .available
-        case .out:
-            return false
-        default:
-            if expired {
-                status = .out(until: nil, retryAfter: nil, why: .creditExpired)
-            } else if spentAll {
-                status = .out(until: nil, retryAfter: nil, why: .creditUsedUp)
-            } else {
-                return false
-            }
-        }
-        since = now
-        learnedFrom = expired ? .expiry : .ledger
-        rateLimitStreak = []
-        return true
     }
 
     /// What makes two entries one allowance: the runtime and the credential it runs on.

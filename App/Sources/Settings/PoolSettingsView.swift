@@ -7,7 +7,6 @@ import SwiftUI
 /// be free or prepaid credit (FR-001a).
 struct PoolSettingsView: View {
     @Environment(AppModel.self) private var model
-    @State private var isAddingCredit = false
     @State private var refusal: String?
     /// Each runtime's model option, as it last advertised it in any project. Empty for
     /// one never run here: its menu then offers only "as the chat had".
@@ -63,8 +62,6 @@ struct PoolSettingsView: View {
                     }
                     .disabled(addable.isEmpty)
                     .fixedSize()
-                    Button("Add credit on an API key…") { isAddingCredit = true }
-                    Text("Free or prepaid credit only. Never suggested.").appText(.fine).foregroundStyle(.secondary)
                 }
                 if let refusal {
                     Text(refusal).appText(.fine).foregroundStyle(StateTint.failure.style(or: .primary))
@@ -77,9 +74,6 @@ struct PoolSettingsView: View {
             .paperListRow()
         }
         .formStyle(.grouped)
-        .sheet(isPresented: $isAddingCredit) {
-            AddCreditSheet { entry in save { $0.entries.append(entry) } }
-        }
         .task { await model.refreshPoolStatus() }
         .task(id: pool.entries.map(\.runtimeID)) { await loadModels() }
     }

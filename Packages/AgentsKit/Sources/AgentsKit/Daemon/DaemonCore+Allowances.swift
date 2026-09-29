@@ -160,13 +160,6 @@ extension DaemonCore {
         let before = state
         state.worked(now: at)
         if let rateLimit = latestRateLimit[agentID] { state.lastRateLimit = rateLimit }
-        if entry.payment.isCredit {
-            let cost = spentThisTurn(agentID: agentID)
-            if state.add(cost: cost, payment: entry.payment, now: at) {
-                await record(.runtimeNote(PoolWords.creditGone(agent.runtimeID)), for: agentID)
-            }
-            _ = state.checkExpiry(payment: entry.payment, now: at)
-        }
         if state != before { setAllowanceState(state) }
         if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked", after: before) }
     }
@@ -188,16 +181,6 @@ extension DaemonCore {
         guard state.markFailed(now: now()) else { return }
         setAllowanceState(state)
         raiseAllowanceOut(entry, state: state, reason: "runtime failed")
-    }
-
-    /// What this agent spent since its turn began, from what it had banked then.
-    private func spentThisTurn(agentID: UUID) -> Cost? {
-        guard let agent = agents[agentID], let before = lastPrompts[agentID]?.costBefore else { return nil }
-        for (currency, total) in agent.costToDate {
-            let delta = total - (before[currency] ?? 0)
-            if delta > 0 { return Cost(amount: delta, currency: currency) }
-        }
-        return agent.costToDate.isEmpty ? nil : Cost(amount: 0, currency: agent.costToDate.keys.first!)
     }
 
     /// Send the same prompt again once the rate limit's wait is over, unless the agent
@@ -628,31 +611,18 @@ extension DaemonCore {
         }
         pool = next
         try allowanceStore.save(next)
-        // A changed amount or date counts now, not at the next turn (US2-AS7, AS8).
-        let at = now()
-        for entry in next.entries where entry.payment.isCredit {
-            var state = allowanceState(for: entry)
-            let wasOut = state.isOut
-            guard state.reconcile(payment: entry.payment, now: at) else { continue }
-            setAllowanceState(state)
-            if wasOut, !state.isOut { raiseAllowanceBack(entry, how: "person") }
-        }
         broadcastPool()
         return poolStatus()
     }
 
-    /// Every credential's state as of `at`, for deciding and for showing: return times
-    /// that have passed are over, and credit is judged against what its entry says now.
-    /// An entry nobody has used yet is in it too, so an expired grant is out before it is
-    /// ever tried. Nothing is written.
+    /// Every credential's state as of `at`, for showing: return times that have passed
+    /// are over. An entry nobody has used yet is in it too. Nothing is written.
     func settledStates(at: Date) -> [String: AllowanceState] {
         var states = allowances
         for key in states.keys { states[key]?.settle(now: at) }
         for entry in pool.entries {
             let key = AllowanceState.credentialKey(for: entry)
-            var state = states[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
-            state.reconcile(payment: entry.payment, now: at)
-            states[key] = state
+            states[key] = states[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
         }
         return states
     }
@@ -745,13 +715,6 @@ extension DaemonCore {
                 raiseAllowanceBack(entry, how: "time")
             }
         }
-        for entry in pool.entries where entry.payment.expires != nil {
-            var state = allowanceState(for: entry)
-            guard state.checkExpiry(payment: entry.payment, now: at) else { continue }
-            allowances[state.credentialKey] = state
-            changed = true
-            raiseAllowanceOut(entry, state: state, reason: "credit expired")
-        }
         guard changed else { return }
         do {
             try allowanceStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
@@ -770,7 +733,7 @@ extension DaemonCore {
             .filter { seen.insert(AllowanceState.credentialKey(for: $0)).inserted }
         for entry in entries {
             let key = AllowanceState.credentialKey(for: entry)
-            if !entry.payment.isCredit, var state = allowances[key],
+            if var state = allowances[key],
                case .out(let until, let retry, let why) = state.status {
                 let firstCheck = state.since.addingTimeInterval(AllowanceState.retryWithoutATime)
                 if retry.map({ $0 < firstCheck }) ?? true {
