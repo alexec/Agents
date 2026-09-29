@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-@Suite("The chat as asks and outcomes")
+@Suite("The chat as asks and the last block of each")
 struct OutcomePageTests {
     private func ask(_ text: String) -> TranscriptItem {
         .entry(TranscriptEntry(kind: .userMessage(text)))
@@ -16,29 +16,37 @@ struct OutcomePageTests {
         .toolRun(id: UUID(), calls: titles.map { ToolCall(toolCallID: $0, title: $0) })
     }
 
-    private func texts(_ rows: [OutcomeRow]) -> [String] {
-        rows.map { row in
-            switch row {
-            case .steps: return "steps \(row.stepCount)"
-            case .item(.entry(let entry)): return entry.text ?? "other"
-            case .item: return "run"
+    private func texts(_ items: [TranscriptItem]) -> [String] {
+        items.map { item in
+            switch item {
+            case .entry(let entry): return entry.text ?? "other"
+            case .toolRun(_, let calls): return calls.last?.title ?? ""
             }
         }
     }
 
-    @Test func aTurnIsTheAskItsStepsAndItsLastMessage() {
-        let rows = [ask("Fix it"), said("Looking."), run("Read a", "Read b"), said("Fixed.")].outcomes()
-        #expect(texts(rows) == ["Fix it", "steps 3", "Fixed."])
+    private let report = TranscriptItem.entry(TranscriptEntry(kind: .workReported(
+        WorkReport(outcome: .done, message: "Fixed it", at: Date()))))
+
+    @Test func aTurnIsTheAskAndItsLastBlock() {
+        let page = [ask("Fix it"), said("Looking."), run("Read a", "Read b"), said("Fixed.")].outcomes()
+        #expect(texts(page) == ["Fix it", "Fixed."])
     }
 
-    @Test func eachTurnFoldsOnItsOwn() {
-        let rows = [ask("One"), run("a"), said("Done one"), ask("Two"), said("Done two")].outcomes()
-        #expect(texts(rows) == ["One", "steps 1", "Done one", "Two", "Done two"])
+    @Test func aToolCallCanBeTheLastBlock() {
+        let page = [ask("Go"), said("First I'll read"), run("Read a", "Edit b")].outcomes()
+        #expect(texts(page) == ["Go", "Edit b"])
     }
 
-    @Test func aTurnStillGoingShowsItsLatestMessage() {
-        let rows = [ask("Go"), said("First I'll read"), run("Read a")].outcomes()
-        #expect(texts(rows) == ["Go", "steps 1", "First I'll read"])
+    @Test func theReportIsNeverDrawn() {
+        let page = [ask("Go"), run("Edit a"), said("Done."), report].outcomes()
+        #expect(texts(page) == ["Go", "Done."])
+        #expect(texts([ask("Go"), run("Edit a"), report].outcomes()) == ["Go", "Edit a"])
+    }
+
+    @Test func eachTurnKeepsItsOwnLastBlock() {
+        let page = [ask("One"), run("a"), said("Done one"), ask("Two"), said("Done two")].outcomes()
+        #expect(texts(page) == ["One", "Done one", "Two", "Done two"])
     }
 
     @Test func errorsAndAnswersStayOnThePage() {
@@ -46,18 +54,10 @@ struct OutcomePageTests {
             SessionNotice(severity: "error", title: "Broke"))))
         let answer = TranscriptItem.entry(TranscriptEntry(kind: .elicitationAnswered(
             id: UUID(), summary: "", answers: [ElicitationAnswer(question: "Which?", answer: "A")])))
-        let rows = [ask("Go"), run("a"), answer, error, said("Done")].outcomes()
-        #expect(rows.count == 5)
-        #expect(texts(rows).first == "Go")
-        #expect(texts(rows)[1] == "steps 1")
-        #expect(texts(rows).last == "Done")
-    }
-
-    @Test func theFoldKeepsItsIdAsTheTurnGrows() {
-        let first = run("a")
-        let before = [ask("Go"), first].outcomes()
-        let after = [ask("Go"), first, said("x"), run("b"), said("y")].outcomes()
-        #expect(before[1].id == first.id)
-        #expect(after[1].id == first.id)
+        let page = [ask("Go"), run("a"), answer, run("b"), error, said("Done")].outcomes()
+        #expect(page.count == 4)
+        #expect(page[1] == answer)
+        #expect(page[2] == error)
+        #expect(texts(page).last == "Done")
     }
 }

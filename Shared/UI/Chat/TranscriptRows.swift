@@ -280,69 +280,6 @@ struct QueuedPromptRow: View {
     }
 }
 
-/// The work of one turn, as one line under the ask: how long and how many steps.
-///
-/// What was asked and what came of it are what the page is for. Everything between
-/// them is here when wanted — click the line and the turn's steps are drawn as they
-/// always were — and otherwise it is one line, not a screenful.
-struct StepsRow: View {
-    let row: OutcomeRow
-    /// The turn is still going, so there is no "worked for" yet.
-    let isLive: Bool
-    let isExpanded: Bool
-    let toggle: () -> Void
-    /// The runs inside, each opened on its own.
-    let isRunExpanded: (UUID) -> Bool
-    let toggleRun: (UUID) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button(action: { withAnimation(.easeOut(duration: 0.15)) { toggle() } }) {
-                Text(summary)
-                    .appText(.supporting)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .help(isExpanded ? "Hide the steps" : "Show every step of this turn")
-            .accessibilityHint(isExpanded ? "Hides the steps" : "Shows every step of this turn")
-            if isExpanded, case .steps(_, let items, _, _) = row {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(items) { item in
-                        TranscriptRow(item: item,
-                                      isExpanded: isRunExpanded(item.id),
-                                      toggle: { toggleRun(item.id) })
-                            .id(item.id)
-                    }
-                }
-                .padding(.leading, 12)
-                .overlay(alignment: .leading) {
-                    Rectangle().fill(.quaternary).frame(width: 1)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var summary: String {
-        let count = row.stepCount
-        let steps = count == 1 ? "1 step" : "\(count) steps"
-        if isLive { return "\(steps) so far" }
-        guard case .steps(_, _, let started?, let ended?) = row, ended.timeIntervalSince(started) >= 1 else {
-            return steps.prefix(1).uppercased() + steps.dropFirst()
-        }
-        return "Worked for \(Self.duration(ended.timeIntervalSince(started))) · \(steps)"
-    }
-
-    static func duration(_ seconds: TimeInterval) -> String {
-        let s = Int(seconds.rounded())
-        if s < 60 { return "\(s)s" }
-        if s < 3600 { return s % 60 == 0 || s >= 600 ? "\(s / 60)m" : "\(s / 60)m \(s % 60)s" }
-        return "\(s / 3600)h \((s % 3600) / 60)m"
-    }
-}
-
 /// A run of tool calls: what it is doing now, and the rest a tap away.
 ///
 /// Folded, the run is its latest line and nothing else — no count, no chevron — and
