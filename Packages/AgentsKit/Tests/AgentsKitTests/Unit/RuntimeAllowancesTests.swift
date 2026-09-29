@@ -51,6 +51,13 @@ struct SpentAllowanceGroupTests {
         #expect(EndedReason.allowanceSpent.summary == "Its allowance ran out")
     }
 
+    @Test func itIsDrawnWithTheStopMarkNotTheNeedsYouMark() {
+        let shape = StatusShape(state: .stopped, outcome: nil, isWaiting: false, isComingBack: false,
+                                endedReason: .allowanceSpent)
+        #expect(shape == .stopped)
+        #expect(!shape.wantsAPerson)
+    }
+
     @Test func aRateLimitThatPersistedStillNeedsYou() {
         let group = AgentGroup(for: .stopped, wantsEyes: false, report: nil, outcomeAsked: false,
                                parked: false, endedReason: .rateLimited)
