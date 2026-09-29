@@ -78,7 +78,14 @@ public enum ControlDial {
                     return channel.eventLoop.makeFailedFuture(error)
                 }
             }
-        let channel = try await bootstrap.connect(host: host, port: port).get()
+        let channel: any Channel
+        do {
+            channel = try await bootstrap.connect(host: host, port: port).get()
+        } catch {
+            // Nothing will complete the promise now, and NIO traps on one left behind.
+            opened.fail(error)
+            throw error
+        }
         channel.closeFuture.whenComplete { _ in opened.fail(Failure("the connection closed before the WebSocket opened")) }
         let deadline = channel.eventLoop.scheduleTask(in: timeout) {
             opened.fail(Failure("no WebSocket from \(url) within the time allowed"))

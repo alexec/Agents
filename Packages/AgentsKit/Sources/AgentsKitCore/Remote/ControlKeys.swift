@@ -68,13 +68,20 @@ public struct ControlMembership: Codable, Sendable, Hashable {
     public var controlKey: Data
     public var addresses: [String]
     public var name: String
+    /// The control plane's one address, and its certificate's pin: a membership made from
+    /// a version 2 code, which is dialled over a WebSocket (058 re-plan).
+    public var url: String?
+    public var pin: String?
 
-    public init(client: UUID? = nil, host: HostID? = nil, controlKey: Data, addresses: [String], name: String) {
+    public init(client: UUID? = nil, host: HostID? = nil, controlKey: Data, addresses: [String], name: String,
+                url: String? = nil, pin: String? = nil) {
         self.client = client
         self.host = host
         self.controlKey = controlKey
         self.addresses = addresses
         self.name = name
+        self.url = url
+        self.pin = pin
     }
 
     public static func load(_ file: URL) -> ControlMembership? {

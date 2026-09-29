@@ -1,3 +1,4 @@
+import ControlDial
 import Foundation
 #if canImport(Darwin)
 import Darwin
@@ -209,6 +210,15 @@ public final class Daemon: @unchecked Sendable {
     /// A host of a control plane elsewhere (058, T021): enrolled once with a host code,
     /// then dialled with its own key, kept beside it in this root.
     private func joinOverTheNetwork(_ control: Control, server: DaemonServer, hello: DaemonAPI.HostHello) async {
+        // A version 2 code, or a membership made from one, goes over the WebSocket, on a
+        // Mac and on Linux alike (058 re-plan). The first build's codes keep their path
+        // until it is removed.
+        let kept = ControlMembership.load(locations.controlHostMembership)
+        let code = control.code.flatMap(ControlCode.init(text:))
+        if kept?.url != nil || (kept == nil && code?.url != nil) {
+            await joinOverWebSocket(code: kept == nil ? code : nil, server: server, hello: hello)
+            return
+        }
         #if canImport(Network) && canImport(CryptoKit)
         let membershipFile = locations.controlHostMembership
         do {
@@ -243,6 +253,34 @@ public final class Daemon: @unchecked Sendable {
         #else
         DaemonLog.shared.write("uplink: this build cannot reach a control plane over the network")
         #endif
+    }
+
+    /// Enrols with a version 2 host code if there is no membership yet, then dials as this
+    /// host with its own key, kept beside the membership in this root.
+    private func joinOverWebSocket(code: ControlCode?, server: DaemonServer, hello: DaemonAPI.HostHello) async {
+        let membershipFile = locations.controlHostMembership
+        do {
+            let privateKey = try ControlAgreement.loadOrMake(file: locations.controlHostKey)
+            var membership = ControlMembership.load(membershipFile)
+            if membership == nil, let code {
+                let joined = try await ControlJoin.enrollHost(code, privateKey: privateKey, hello: hello)
+                try joined.save(membershipFile)
+                membership = joined
+                DaemonLog.shared.write("uplink: enrolled with \(joined.name) as \(joined.host?.rawValue ?? "?")")
+            }
+            guard let membership else {
+                DaemonLog.shared.write("uplink: no control plane to join; start with --control <code>")
+                return
+            }
+            let uplink = ControlUplink(server: server, hello: hello,
+                                       dial: try ControlJoin.hostDial(membership, privateKey: privateKey))
+            self.uplink = uplink
+            await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+            uplink.start()
+            DaemonLog.shared.write("uplink: a host of \(membership.name) at \(membership.url ?? "?"), as \(membership.host?.rawValue ?? "?")")
+        } catch {
+            DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
+        }
     }
 
     /// Serve until there is nothing in hand and nobody connected.

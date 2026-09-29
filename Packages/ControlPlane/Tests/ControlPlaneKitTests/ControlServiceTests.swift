@@ -216,6 +216,16 @@ struct ControlServiceTests {
         await #expect(throws: (any Error).self) { _ = try await ControlDial.connect(running.url, pin: wrong) }
     }
 
+    /// A refused connection is an error to retry, never a crash (the dialler once left a
+    /// promise behind, and NIO trapped on it when agentsd redialled a restarting copy).
+    @Test func dialingAPortNobodyListensOnFailsAndCanBeTriedAgain() async throws {
+        let port = try await freePort()
+        let url = URL(string: "http://127.0.0.1:\(port)")!
+        for _ in 0..<3 {
+            await #expect(throws: (any Error).self) { _ = try await ControlDial.connect(url) }
+        }
+    }
+
     // MARK: Helpers
 
     func status(_ url: URL) async throws -> Int {

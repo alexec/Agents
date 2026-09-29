@@ -143,7 +143,7 @@ transport.
   - optional NIOSSL termination from `AGENTS_CONTROL_TLS_CERT` and `_KEY`, or `--self-signed <dir>`, which makes the certificate and prints the pin;
   - pings every 20 s, closing after two missed;
   - a 64 MB message cap.
-- [ ] T038 [P] Rework `Packages/AgentsKit/Sources/LinuxControlDial/LinuxControlDial.swift` into `HostDial`, a `NIOWebSocket` client over NIOSSL. It checks either a publicly trusted certificate or a pin, runs `ControlAuth` as the peer, and returns a `LineTransport`. It is linked into `AgentsKit` on macOS and Linux both (drop the Linux-only condition in `Packages/AgentsKit/Package.swift`), and `ControlUplink` uses it.
+- [x] T038 (as the `ControlDial` target, with `ControlJoin`; `LinuxControlDial` goes with the removals in T042) [P] Rework `Packages/AgentsKit/Sources/LinuxControlDial/LinuxControlDial.swift` into `HostDial`, a `NIOWebSocket` client over NIOSSL. It checks either a publicly trusted certificate or a pin, runs `ControlAuth` as the peer, and returns a `LineTransport`. It is linked into `AgentsKit` on macOS and Linux both (drop the Linux-only condition in `Packages/AgentsKit/Package.swift`), and `ControlUplink` uses it.
 - [x] T039 (in `ControlService.accept`; codes are `ControlCodes`, spent by `.absent`) Write `Session` in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/Session.swift`. After `ControlAuth`, a WebSocket becomes a router client session, a host uplink, or a code session:
   - a code session may send only `clients/announce` or `hosts/announce`;
   - it creates `codes/<hash>.spent` with `.absent` before admitting;
@@ -158,7 +158,7 @@ transport.
   - `--store` for `code`, `hosts` and `clients`.
 
   On first start it writes `control.json` and `people/<id>.json` with `.absent`. It refuses to start if the key does not match `control.json`'s `controlKey`.
-- [ ] T042 Point `agentsd --control <url|code>` at `HostDial`. The membership stores `url` and `pin` instead of addresses, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/Daemon.swift` and `LinuxControlJoin.swift`. Then:
+- [ ] T042 (the join is done: a version 2 code or membership goes over `ControlJoin` on a Mac and on Linux, walked with the real agentsd and agents-control on /tmp/cpjoin, across a restart; the removals wait until the window has moved, T049c/T050) Point `agentsd --control <url|code>` at `HostDial`. The membership stores `url` and `pin` instead of addresses, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/Daemon.swift` and `LinuxControlJoin.swift`. Then:
   - remove `ControlNet`, `ControlDialling`, `UnixSocketListener`'s control use and `ControlPlane.swift`'s bridge wiring, once `ControlServiceTests` (T043) passes;
   - keep `daemon.sock` for agent tools (FR-021);
   - check that `ControlNetTests` is replaced by T043.
