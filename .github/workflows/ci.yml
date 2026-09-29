@@ -55,7 +55,9 @@ jobs:
         with:
           path: build/DD
           key: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
-          restore-keys: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}-
+          restore-keys: |
+            macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}-
+            macos-xcode-27-derived-
 
       - name: Restore SwiftPM build cache
         id: swiftpm-cache
@@ -65,7 +67,9 @@ jobs:
             Daemon/.build
             Packages/CodeText/.build
           key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
-          restore-keys: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}-
+          restore-keys: |
+            macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}-
+            macos-xcode-27-swiftpm-
 
       - name: Restore AgentsKit build cache
         id: agentskit-cache
@@ -73,7 +77,9 @@ jobs:
         with:
           path: Packages/AgentsKit/.build
           key: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
-          restore-keys: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}-
+          restore-keys: |
+            macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}-
+            macos-xcode-27-agentskit-
 
       - name: Tools
         run: |
@@ -99,7 +105,9 @@ jobs:
       # cold build that runs out of time still leaves its work for the next run. What a
       # cut-short build leaves is saved under a -partial- key of its own: under the real
       # key it would count as a hit from then on, and the finished build never be saved.
-      # Each restore falls back to the latest partial.
+      # Each restore falls back to the latest partial of its own key, then to the latest
+      # cache of its kind: a key changes with any manifest or source, so an exact hit is
+      # rare, and an older build is still most of the work.
       - name: Save AgentsKit build cache
         if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && contains(fromJSON('["success", "failure", "cancelled"]'), steps.build-agentskit.outcome) }}
         uses: actions/cache/save@v5
