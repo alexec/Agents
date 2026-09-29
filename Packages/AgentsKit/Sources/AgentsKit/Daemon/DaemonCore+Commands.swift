@@ -327,7 +327,7 @@ extension DaemonCore {
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
 
-        await session.apply(request.startOptions)
+        await noteRefused(await session.apply(request.startOptions), agentID: agent.id)
         agent = agents[agent.id] ?? agent
         changed(agent)
 
@@ -988,7 +988,7 @@ extension DaemonCore {
         remember(OptionCache.Entry(options: refreshed, commands: commands),
                  for: OptionCache.key(runtimeID: updated.runtimeID, cwd: updated.cwd, mcpServers: updated.mcpServers))
         changed(updated)
-        await session.apply(updated.startOptions)
+        await noteRefused(await session.apply(updated.startOptions), agentID: agent.id)
         live[agent.id] = session
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
@@ -1638,6 +1638,30 @@ extension DaemonCore {
     }
 
     // MARK: Options and permissions
+
+    /// Say which remembered choices a runtime would not take as the agent started, rather
+    /// than let the conversation run on something else unannounced. A model of a provider
+    /// the runtime is not signed in to (049: OpenCode) is a sign-in, and the sheet is
+    /// offered. Each refused choice is forgotten, so the menu shows what is in use.
+    func noteRefused(_ refused: [ACPSession.RefusedOption], agentID: UUID) async {
+        guard !refused.isEmpty, var agent = agents[agentID] else { return }
+        let runtime = RuntimeCatalog.runtime(id: agent.runtimeID)
+        let name = runtime?.name ?? agent.runtimeID
+        for refusal in refused {
+            let choice = refusal.value.stringValue ?? refusal.id
+            // Forgotten either way, so a choice refused once is said once, not every start.
+            agent.startOptions.values.removeValue(forKey: refusal.id)
+            if let error = refusal.error as? JSONRPCError, let provider = Self.unsignedProvider(error) {
+                await record(.runtimeNote("\(name) isn’t signed in to \(provider), so it can’t use \(choice). "
+                                          + "Sign it in from the runtime menu, then pick the model again."), for: agentID)
+                askForSignIn(runtimeID: agent.runtimeID, agentID: agentID)
+            } else {
+                await record(.runtimeNote("\(name) wouldn’t take \(choice) for \(refusal.id), so it kept its own."),
+                             for: agentID)
+            }
+        }
+        changed(agent)
+    }
 
     public func setOption(_ request: DaemonAPI.SetOptionRequest) async throws -> [ConfigOption] {
         guard let session = live[request.agentID] else {

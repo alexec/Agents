@@ -647,12 +647,25 @@ public actor ACPSession {
     }
 
     /// Apply everything the user chose in the start form, in one go.
-    public func apply(_ startOptions: StartOptions) async {
-        for (id, value) in startOptions.values {
+    /// Applies each remembered choice, and returns the ones the runtime refused.
+    @discardableResult
+    public func apply(_ startOptions: StartOptions) async -> [RefusedOption] {
+        var refused: [RefusedOption] = []
+        for (id, value) in startOptions.values.sorted(by: { $0.key < $1.key }) {
             // One option a runtime has since stopped offering must not stop an agent
-            // starting, so a refusal here is noted and passed over.
-            _ = try? await setOption(id: id, value: value)
+            // starting, so a refusal here is handed back to be noted, and passed over.
+            do { _ = try await setOption(id: id, value: value) } catch {
+                refused.append(RefusedOption(id: id, value: value, error: error))
+            }
         }
+        return refused
+    }
+
+    /// A remembered choice the runtime would not take when the agent started.
+    public struct RefusedOption: Sendable {
+        public var id: String
+        public var value: JSONValue
+        public var error: any Error
     }
 
     /// The user's answer to a question the agent is blocked on. `nil` cancels it.

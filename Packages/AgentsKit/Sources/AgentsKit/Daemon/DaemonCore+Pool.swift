@@ -346,7 +346,7 @@ extension DaemonCore {
         needsBriefing.insert(agentID)
         listen(to: made.session, agentID: agentID)
         await prepareServing(made.session, agentID: agentID)
-        await made.session.apply(agent.startOptions)
+        await noteRefused(await made.session.apply(agent.startOptions), agentID: agentID)
         changed(agents[agentID] ?? agent)
 
         await self.record(.poolSwitch(record), for: agentID)

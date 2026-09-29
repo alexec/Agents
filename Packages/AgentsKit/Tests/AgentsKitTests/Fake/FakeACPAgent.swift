@@ -37,6 +37,9 @@ actor FakeACPAgent {
         var sessionGoneError: JSONRPCError?
         /// What `session/prompt` fails with instead of taking a turn (043: a refused sign-in).
         var promptError: JSONRPCError?
+        /// What `session/set_config_option` fails with, by option id (049: OpenCode refusing
+        /// a model of a provider nobody signed in to).
+        var setOptionErrors: [String: JSONRPCError] = [:]
         /// What the runtime calls the session, sent as a `session_info_update`.
         var title: String?
         /// `_meta` on the `session/prompt` result: where Claude's and Codex's adapters put
@@ -251,6 +254,7 @@ actor FakeACPAgent {
             guard let id = params?["configId"]?.stringValue else {
                 return .failure(JSONRPCError(code: JSONRPCError.invalidParams, message: "no configId"))
             }
+            if let error = script.setOptionErrors[id] { return .failure(error) }
             setOptions.append((id, params?["value"] ?? .null))
             let options = (try? JSONValue.encoding(script.configOptions)) ?? .array([])
             return .success(["configOptions": options])
