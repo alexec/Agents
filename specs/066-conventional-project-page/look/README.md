@@ -1,7 +1,9 @@
 # 066 · Wireframes: a conventional project page
 
-**Not approved yet.** Frames A–C are the proposal. Workflows stay below the sessions in the
-middle column, as Alex chose on 2026-09-28.
+**Approved by Alex, 2026-09-28: frames A–C.** Workflows stay below the sessions in the middle
+column, as he chose. Built in 909b1004; there the sheet keeps a Worktrees pane (main still has
+it) and General has Archive Project where the frame has Remove Project…, since the app has no
+remove.
 
 These frames assume the app has no GitHub support (pull requests, issues, Projects) and no
 Worktrees section in Configuration, as Alex has them now. What is left on the project page is
