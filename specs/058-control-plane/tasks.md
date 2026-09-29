@@ -183,7 +183,7 @@ Walk quickstart Walk 1, steps 1–2, with `agentsd` and a scripted client.
 **Independent test**: quickstart Walk 1, steps 3–7, with no child processes and no sandbox
 violations.
 
-- [ ] T044 [US1] Add the `AGENTS_STORE` configuration to the Agents target in `project.yml`:
+- [x] T044 (a second target, `AgentsStore`, over the same sources, with its own bundle id `com.alexecollins.agents.store` so a walk never shares the real app's defaults; the ssh servers, launch agents and move files are excluded; a store-only `HostSet` and `ControlConfig` stand in) [US1] Add the `AGENTS_STORE` configuration to the Agents target in `project.yml`:
   - `App/Agents-Store.entitlements` with `com.apple.security.app-sandbox`, `network.client`, `device.audio-input` and `files.user-selected.read-only`;
   - `NSBonjourServices` = `_agents-control._tcp`, and `NSLocalNetworkUsageDescription`;
   - link `AgentsKitCore` only;
@@ -203,13 +203,13 @@ violations.
   - `MachineID`, if its `gethostuuid` works in the sandbox (checked in T053).
 
   `agentsd` and the tests keep building, and nothing moved imports `Process` or POSIX file calls.
-- [ ] T044b [US1] Write `scripts/check-store-window.sh`, run by the store build: under `AGENTS_STORE`, fail on `FileManager`, `contentsOf:`, `NSWorkspace` given a path, `dlsym`, `Process` or `posix_spawn` in `App/` and `Shared/UI` outside an allow-list (the container, and `mac/*` results). Linking only Core does not catch these (S5).
+- [x] T044b (`scripts/check-store-window.py`, a build phase of AgentsStore; 17 allowed lines carry `// store-ok:` with their reason) [US1] Write `scripts/check-store-window.sh`, run by the store build: under `AGENTS_STORE`, fail on `FileManager`, `contentsOf:`, `NSWorkspace` given a path, `dlsym`, `Process` or `posix_spawn` in `App/` and `Shared/UI` outside an allow-list (the container, and `mac/*` results). Linking only Core does not catch these (S5).
 - [x] T045 (in `DaemonCore+Mac.swift`, with `/usr/bin/open`; `DaemonAPI+Mac.swift` in Core) [P] [US1] Write the Mac host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/MacHostMethods.swift`:
   - `mac/reveal {path}`, `mac/open {path, app?}` and `mac/terminal {path?, command?}`, operator only, answered only on macOS with `NSWorkspace`;
   - Linux answers `unsupportedHere`;
   - add them to `DaemonAPI.Method` and to the device refusal list, and add grant tests.
 - [x] T046 (changed: the shared pages already read over RPC, so `shared/*` was not needed; `files/browse` already answers whether a path is there, so no `files/stat`; added `files/readText` and `files/saveText` by full path, operator only, 1 MB) [P] [US1] Write the shared-folder host methods in `Packages/AgentsKit/Sources/AgentsKit/Daemon/SharedMethods.swift`: `shared/list` and `shared/read` for any grant, and `shared/write` and `shared/remove` for operators, over the host's `~/.agents` (054's layout). Add `files/stat {path}` → `{exists, kind, size, modified}`, and add grant tests.
-- [ ] T047 [US1] Replace every `isOnThisMac` direct read with host calls. The places:
+- [x] T047 (`readsDisk(of:)` is false in the store window; `readText`/`saveText` over files/readText and files/saveText; the plugins list over files/browse; the clone hint says `~/<name>`) [US1] Replace every `isOnThisMac` direct read with host calls. The places:
   - in `App/Sources/AppModel.swift`, `textFile` becomes `files/read` and `pathIsThere` becomes `files/stat`;
   - `App/Sources/Projects/WorkflowPage.swift`, `WorkflowRow.swift`, `App/Sources/Sidebar/BackgroundPane.swift`, `FilesPane.swift` and `App/Sources/AgentList/AgentRow.swift`;
   - the shared pages (`App/Sources/Settings/SharedSettingsView.swift` and its pages), which use `shared/*`;
@@ -217,7 +217,7 @@ violations.
   - `CloneSheet.swift`, which uses a new host field, the host's clone parent, instead of `DaemonCore.defaultCloneParent()` (S5).
 
   Keep `ThisMacHost` only to decide whether Reveal and Open are offered.
-- [ ] T048 [US1] Send Reveal in Finder, Open in another app and open Terminal through `mac/*` on this Mac's host. The places are `App/Sources/Sidebar/OpenElsewhere.swift`, `App/Sources/Commands/AgentsCommands.swift`, `AgentRow.swift`, `BackgroundPane.swift` and `RuntimeAccountView.swift`, and also `PluginsSection.swift`, `SharedSettingsView.swift`, `AgentsSetup.swift` and `ChatView.swift` (S5: 16 files use `NSWorkspace` on paths).
+- [x] T048 (`model.reveal`/`open`/`openTerminal`, and `SharedFiles` through the model in the store window) [US1] Send Reveal in Finder, Open in another app and open Terminal through `mac/*` on this Mac's host. The places are `App/Sources/Sidebar/OpenElsewhere.swift`, `App/Sources/Commands/AgentsCommands.swift`, `AgentRow.swift`, `BackgroundPane.swift` and `RuntimeAccountView.swift`, and also `PluginsSection.swift`, `SharedSettingsView.swift`, `AgentsSetup.swift` and `ChatView.swift` (S5: 16 files use `NSWorkspace` on paths).
 - [ ] T049a [US1] `AppModel` reaches every host only through the control plane's host list (`controlHosts`), and drops `DaemonClient()` (the `SocketLink` default) and `DaemonLock`, under `AGENTS_STORE` (S5: about 24 sites in `AppModel`).
 - [ ] T049b [US1] Retire the window's ssh servers under `AGENTS_STORE`:
   - remove `HostSet`, `ServerConnection`, `SSHCommand`, `SSHMaster`, `ServerBinaries`, `AddServerFlow`'s ssh path and `RebuiltServerSheet`;
@@ -226,7 +226,7 @@ violations.
 - [ ] T049c [US1] `ControlConfig` is a remote endpoint only under `AGENTS_STORE`: no local socket, `Daemon.platform`, or *run a host here*. `LocalServices`, `MoveAcross`, `WindowFiles` and `FirstRunView`'s *Run one here* leave the window (they move to the host app in T055 and T086). Afterwards the store configuration builds with no errors (the S5 list, `spikes/s5-sandbox-build/pass2-after-moves.errors`, is the checklist).
 - [ ] T050 [US1] In `App/Sources/Control/ControlConfig.swift`, the config holds `url`, `pin` and the client id in the container's defaults, with the key in the window's keychain. `AppModel` builds every client from one `ControlLink` over `WebSocketLink`. It has no path without a control plane under `AGENTS_STORE` (FR-028).
 - [ ] T051 [US1] Build frame K in `App/Sources/Control/FirstRunView.swift` and `ConnectSheet.swift`, after Alex approves it (T028). It has the two states. *Set one up on this Mac* opens the host app's download page URL, taken from `Info.plist` `AgentsHostDownloadURL`, and Bonjour finds an installed host app.
-- [ ] T052 [US1] Presence under the sandbox: in `App/Sources/Presence/PresenceReporter.swift`, drop the `CGSSessionScreenIsLocked` probe. The window reports only its own activity, and the Mac host reports the lock state. Check with 043's presence tests.
+- [x] T052 (the store window reports only its own activity; the lock probe is the host's) [US1] Presence under the sandbox: in `App/Sources/Presence/PresenceReporter.swift`, drop the `CGSSessionScreenIsLocked` probe. The window reports only its own activity, and the Mac host reports the lock state. Check with 043's presence tests.
 - [ ] T053 [US1] Walk quickstart Walk 1, steps 1–7, with the store configuration on a scratch root and a real Claude turn:
   - screenshot each step;
   - check the window has no child processes and there is no sandbox violation in `/usr/bin/log`;

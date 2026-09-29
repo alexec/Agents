@@ -77,14 +77,14 @@ enum BackgroundOutput {
             let temp = FileManager.default.temporaryDirectory
                 .appendingPathComponent("agents-output-\(item.id)")
                 .appendingPathExtension(ext)
-            guard (try? text.write(to: temp, atomically: true, encoding: .utf8)) != nil else { return }
+            guard (try? text.write(to: temp, atomically: true, encoding: .utf8)) != nil else { return }  // store-ok: the app's own temporary folder
             local = temp
         } else {
             return
         }
         // Async because this function already is: the synchronous open is not the one
         // a concurrent context is offered.
-        try? await NSWorkspace.shared.open([local],
+        try? await NSWorkspace.shared.open([local],  // store-ok: a copy in the app's own temporary folder
                                             withApplicationAt: URL(fileURLWithPath: "/System/Applications/TextEdit.app"),
                                             configuration: NSWorkspace.OpenConfiguration())
     }

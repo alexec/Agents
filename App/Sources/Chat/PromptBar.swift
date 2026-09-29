@@ -507,7 +507,7 @@ struct PromptBar: View {
     /// as a reference, which every runtime takes.
     private func attach(_ url: URL) {
         let isImage = ["png", "jpg", "jpeg", "gif", "heic", "webp"].contains(url.pathExtension.lowercased())
-        if isImage, model.promptCapabilities.allows(.image), let data = try? Data(contentsOf: url) {
+        if isImage, model.promptCapabilities.allows(.image), let data = try? Data(contentsOf: url) {  // store-ok: a file the person picked or dropped
             attachments.append(.image(data, mimeType: mimeType(for: url), name: url.lastPathComponent))
         } else {
             attachments.append(.file(url))

@@ -57,7 +57,7 @@ struct ImageFile: View {
             }
         }
         .task(id: probe) {
-            let loaded = server == nil ? NSImage(contentsOf: url) : NSImage(data: probe.prefix)
+            let loaded = server == nil ? NSImage(contentsOf: url) : NSImage(data: probe.prefix)  // store-ok: server is never nil in the store window: the host read it
             image = loaded
             failed = loaded == nil
         }

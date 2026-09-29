@@ -146,6 +146,12 @@ targets:
   AgentsStore:
     type: application
     supportedDestinations: [macOS]
+    # The sandbox gate (T044b): linking only Core stops a Process, not a read of the disk
+    # or Finder pointed at a path. This does, before anything compiles.
+    preBuildScripts:
+      - name: Check the sandbox gate
+        script: python3 "$SRCROOT/scripts/check-store-window.py"
+        basedOnDependencyAnalysis: false
     sources:
       - path: App/Sources
         excludes:
@@ -206,6 +212,8 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) AGENTS_STORE"
+        # The gate reads the sources, which a sandboxed script phase may not.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         # While US1 is under way: see every error, not the first file's (S5).
         OTHER_SWIFT_FLAGS: "$(inherited) -Xfrontend -continue-building-after-errors"
   # The remote: the same app, laid out for a phone and an iPad. It links

@@ -40,7 +40,7 @@ enum MacPageActions {
         static func image(at url: URL) -> NSImage? {
             let key = "\(url.path)|\(stamp(of: url).map { "\($0.size)-\($0.modifiedAt.timeIntervalSince1970)" } ?? "")"
             if let cached = cache.object(forKey: key as NSString) { return cached }
-            guard let loaded = NSImage(contentsOf: url) else { return nil }
+            guard let loaded = NSImage(contentsOf: url) else { return nil }  // store-ok: readsDisk(of:) is false in the store window, which returns before this
             cache.setObject(loaded, forKey: key as NSString)
             return loaded
         }

@@ -274,7 +274,7 @@ struct AgentRow: View {
     private func refreshWorktree() async {
         guard let worktree = agent.worktree else { worktreeGone = false; return }
         if model.readsDisk(of: agent.host) {
-            worktreeGone = !FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))
+            worktreeGone = !FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))  // store-ok: readsDisk(of:) is false in the store window
         } else {
             worktreeGone = await !model.pathIsThere(worktree.root, on: agent.host)
         }

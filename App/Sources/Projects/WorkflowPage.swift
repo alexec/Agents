@@ -550,7 +550,7 @@ struct WorkflowPage: View {
     private func readRaw(_ workflow: Workflow) async -> String? {
         let file = url(workflow)
         let host = model.selectedProjectHost
-        if model.readsDisk(of: host) { return try? String(contentsOf: file, encoding: .utf8) }
+        if model.readsDisk(of: host) { return try? String(contentsOf: file, encoding: .utf8) }  // store-ok: readsDisk(of:) is false in the store window
         #if AGENTS_STORE
         return await model.readText(file, on: host)
         #else

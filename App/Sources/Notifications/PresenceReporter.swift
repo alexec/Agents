@@ -115,8 +115,14 @@ enum MacActivity {
     }
 
     private static var isLocked: Bool {
+        #if AGENTS_STORE
+        // The App Store window reports only its own activity; whether the screen is locked
+        // is the Mac host's to say (058, T052).
+        return false
+        #else
         guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
         return (session["CGSSessionScreenIsLocked"] as? Bool) == true
+        #endif
     }
 
     private static var secondsSinceInput: TimeInterval {

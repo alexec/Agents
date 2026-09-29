@@ -512,7 +512,7 @@ final class AppModel {
 
     /// The text of a file. This Mac's is read here; another host's is `files/read` (R11).
     func textFile(at url: URL, on host: HostID, agentID: UUID?) async -> String? {
-        if readsDisk(of: host) { return try? String(contentsOf: url, encoding: .utf8) }
+        if readsDisk(of: host) { return try? String(contentsOf: url, encoding: .utf8) }  // store-ok: readsDisk(of:) is false in the store window
         #if AGENTS_STORE
         if agentID == nil { return await readText(url, on: host) }
         #endif
@@ -527,7 +527,7 @@ final class AppModel {
     /// `files/browse`, and a host that cannot be asked is left as still there.
     func pathIsThere(_ url: URL, on host: HostID) async -> Bool {
         if readsDisk(of: host) {
-            return FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
+            return FileManager.default.fileExists(atPath: url.path(percentEncoded: false))  // store-ok: readsDisk(of:) is false in the store window
         }
         if controlPlaneAway || hosts.isOffline(host) { return true }
         do {
@@ -2765,11 +2765,11 @@ final class AppModel {
                   let url = URL(string: uri), url.isFileURL,
                   let agent = work.agent(agentID),
                   !url.path.hasPrefix(agent.cwd.path),
-                  FileManager.default.fileExists(atPath: url.path) else {
+                  FileManager.default.fileExists(atPath: url.path) else {  // store-ok: a file the person attached: picked or dropped, so the sandbox lets it be read
                 carried.append(attachment)
                 continue
             }
-            guard let data = try? Data(contentsOf: url), data.count <= DaemonAPI.attachmentLimit else {
+            guard let data = try? Data(contentsOf: url), data.count <= DaemonAPI.attachmentLimit else {  // store-ok: a file the person attached: picked or dropped
                 problem = "\(name) is too big to send to \(hosts.label(host))."
                 return nil
             }
