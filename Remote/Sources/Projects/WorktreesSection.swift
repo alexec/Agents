@@ -5,20 +5,45 @@ import SwiftUI
 /// own (030), as the Mac's project page has them.
 ///
 /// All of them are listed, but only the app's own can be removed: one made in a
-/// terminal, or by a runtime, is somebody else's. Hidden when there are none. Archiving
-/// the last agent in one removes it only when everything in it is committed, so this is
-/// where the rest go when you are finished.
+/// terminal, or by a runtime, is somebody else's. Shown for any git folder, even with
+/// none, for Refresh and Clean up. Archiving the last agent in one removes it only when
+/// everything in it is committed, so this is where the rest go when you are finished.
 struct WorktreesSection: View {
     @Environment(RemoteModel.self) private var model
     let folder: URL
 
     private var worktrees: [DaemonAPI.WorktreeSummary] {
-        model.projectWorktrees.worktrees.filter { !$0.isProjectFolder }
+        guard model.projectWorktreesAnswered == folder else { return [] }
+        return model.projectWorktrees.worktrees.filter { !$0.isProjectFolder }
     }
 
     var body: some View {
-        if !worktrees.isEmpty {
-            SectionHeading(title: "Worktrees")
+        if model.projectWorktreesAnswered == folder, model.projectWorktrees.isRepository {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Worktrees")
+                    .appText(.reading).fontWeight(.semibold)
+                    .accessibilityAddTraits(.isHeader)
+                Button {
+                    Task { await model.loadProjectWorktrees(in: folder) }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Refresh worktrees")
+                Spacer()
+                Button("Clean up worktrees") {
+                    StartDraftKeeper.shared.note(
+                        "Remove worktrees and delete branches for any work that has been merged to the default branch.",
+                        [], in: folder)
+                    model.startingIn = folder
+                }
+                .buttonStyle(.paper)
+                .appText(.supporting)
+            }
+            .padding(.top, 18)
+            .padding(.leading, 2)
             ForEach(worktrees) { worktree in
                 WorktreeRow(worktree: worktree, folder: folder)
             }

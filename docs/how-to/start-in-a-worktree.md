@@ -83,6 +83,11 @@ tooltip says why. Start a new agent in a worktree instead.
    Only worktrees the app made have **Remove…**. Ones you made yourself in Terminal are
    listed but left for you to remove.
 
+On the project's page, **Refresh worktrees** updates the list after changes made outside
+the app. **Clean up worktrees** fills a new agent's prompt with a request to remove
+worktrees and branches for work already merged into the default branch. Review the
+request, then send it when you are ready.
+
 ## If it doesn't work
 
 - **New worktree** is greyed out with *There is no commit here yet to base a worktree
