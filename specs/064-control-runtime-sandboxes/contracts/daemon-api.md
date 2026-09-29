@@ -20,7 +20,7 @@ JSON-RPC over `daemon.sock` and the phone bridge, in the style of `clientPermiss
 ## Changed requests
 
 - `StartRequest.sandbox: SandboxChoice?`: the new agent's override. Nil follows the default.
-- `OptionsRequest.sandbox: SandboxChoice?`: the draft process launches with the same choice; a draft is reused only when it matches.
+- A draft is made with its runtime default's choice and is reused only by a start that resolves to the same one.
 - `agents/setOption` of Codex's `mode` also writes that agent's override (FR-005c).
 
 ## New error

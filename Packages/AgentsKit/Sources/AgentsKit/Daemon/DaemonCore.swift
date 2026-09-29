@@ -569,6 +569,9 @@ public actor DaemonCore {
         /// Fixed when the session is made, so a draft made for an agent that may not
         /// start others cannot be used for one that may, or the other way round.
         var managesAgents = true
+        /// The sandbox choice its runtime was started with (064). A start that resolves to
+        /// another cannot use it: the choice is fixed when the process starts.
+        var sandbox: SandboxChoice = .runtime
         /// The connection that asked for it (029). `nil` for a draft the daemon made
         /// for itself — a workflow's — which no connection going can orphan.
         var connection: UUID?
@@ -1348,13 +1351,17 @@ public struct ProcessSessionLauncher: SessionLauncher {
             try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
         }
+        // The command sandbox asked for (064): Grok's before its own arguments, as its
+        // flags go before `agent stdio`; Gemini's over every other variable.
+        let sandbox = LaunchSandbox.additions(runtimeID: runtime.id, choice: LaunchSandbox.value)
         return try ACPSession.launch(executable: URL(fileURLWithPath: path),
-                                     arguments: runtime.arguments + policy.launchArguments
+                                     arguments: sandbox.arguments + runtime.arguments + policy.launchArguments
                                          + RuntimePolicyFiles(locations: locations).arguments(for: policy),
                                      cwd: cwd,
                                      environment: Self.environment(for: policy, locations: locations,
                                                                    onto: LoginShellPath.environment(),
-                                                                   onServer: onServer),
+                                                                   onServer: onServer)
+                                         .merging(sandbox.environment) { _, sandbox in sandbox },
                                      capabilities: Self.capabilities(for: policy),
                                      launch: RuntimeLaunchCatalog.launch(for: runtime.id),
                                      authMethodBeforeContinuing: policy.authMethodBeforeContinuing)

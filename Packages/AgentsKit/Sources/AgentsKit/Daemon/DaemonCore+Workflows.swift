@@ -597,13 +597,15 @@ extension DaemonCore {
     private func settled(_ settings: WorkflowSettings, folder: URL, runtime: Runtime,
                          prompt: String, managesAgents: Bool) async throws -> DaemonAPI.StartRequest {
         let draftID = UUID()
+        // A workflow's agent follows the runtime's default (064, FR-011).
+        let sandbox = resolveSandbox(runtimeID: runtime.id, override: nil, starter: nil).choice
         let pending = Task { [self] in
             try await freshSession(runtimeID: runtime.id, cwd: folder, mcpServers: [],
-                                   managesAgents: managesAgents)
+                                   managesAgents: managesAgents, sandbox: sandbox)
         }
         let draft = Draft(runtimeID: runtime.id, cwd: folder,
                           mcpServers: [], personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
-                          pending: pending, managesAgents: managesAgents)
+                          pending: pending, managesAgents: managesAgents, sandbox: sandbox)
         drafts[draftID] = draft
 
         let made: DaemonCore.MadeSession

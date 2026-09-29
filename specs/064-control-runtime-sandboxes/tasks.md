@@ -32,15 +32,15 @@ description: "Tasks for 064, Control runtime sandboxes"
 
 **Purpose**: every agent starts with its resolved choice. Both P1 stories need it: US2 to honour a choice, US1 to continue without the sandbox.
 
-- [ ] T010 [P] Unit tests in `Tests/Unit/SandboxSettingsTests.swift`: settings round-trip, a missing key is `runtime`, `setting(.runtime)` removes the key, unknown values decode safely, the store sets an unreadable file aside, `Agent` without the new keys decodes with nil
-- [ ] T011 [P] Unit tests in `Tests/Unit/SandboxCatalogTests.swift`: `choices` per runtime (Claude, Codex, Grok: runtime/on/off; Gemini: runtime/off; Cursor, Copilot, Antigravity, OpenCode: none), `state` per route (Codex from the mode), every runtime in `RuntimeCatalog.builtIn` has an entry
-- [ ] T012 `resolvedSandbox(for:caller:)` in `Kit/Daemon/DaemonCore+Sandbox.swift`: override, else default, else `runtime`; a choice not in `SandboxCatalog.choices` becomes `runtime`; helper cap: a caller whose `effectiveSandbox.state == .on` makes Off `runtime` with reason "Limited by the agent that started it"
-- [ ] T013 TaskLocal `LaunchSandbox` in `Kit/Daemon/DaemonCore+Sandbox.swift`, bound around `launcher.launch` in `freshSession`, `liveSession` (`Kit/Daemon/DaemonCore+Commands.swift`) and the draft in `options()`; `OptionsRequest.sandbox`, a draft reused only when its choice matches
-- [ ] T014 `ProcessSessionLauncher.launch` in `Kit/Daemon/DaemonCore.swift`: Grok's route arguments before the runtime's own, Gemini's route environment merged last; nothing for `runtime`
-- [ ] T015 Claude: `_meta.claudeCode.options.sandbox = {"enabled": Bool}` for On/Off where the app builds Claude's `_meta` options, on new and resumed sessions; nothing for `runtime`
-- [ ] T016 Codex: a start or resume resolved to Off starts in `agent-full-access`; On from Full access in `read-only` (FR-005c), in the start path of `Kit/Daemon/DaemonCore+Commands.swift`
-- [ ] T017 Write `effectiveSandbox` after each handshake (`SandboxCatalog.state`, Codex from the mode in force, the helper reason)
-- [ ] T018 Integration tests in `Tests/Integration/SandboxLaunchTests.swift` with `FakeLauncher`: Grok Off launches with `--sandbox off` first; Gemini Off has `GEMINI_SANDBOX=false`; default `runtime` adds nothing (SC-006); an override beats the default and clearing it inherits; another runtime unaffected; workflow and helper starts inherit; helper cap; a change applies at the next turn's launch; Codex default Off starts in Full access
+- [X] T010 [P] Unit tests in `Tests/Unit/SandboxSettingsTests.swift`: settings round-trip, a missing key is `runtime`, `setting(.runtime)` removes the key, unknown values decode safely, the store sets an unreadable file aside, `Agent` without the new keys decodes with nil
+- [X] T011 [P] Unit tests in `Tests/Unit/SandboxCatalogTests.swift`: `choices` per runtime (Claude, Codex, Grok: runtime/on/off; Gemini: runtime/off; Cursor, Copilot, Antigravity, OpenCode: none), `state` per route (Codex from the mode), every runtime in `RuntimeCatalog.builtIn` has an entry
+- [X] T012 `resolvedSandbox(for:caller:)` in `Kit/Daemon/DaemonCore+Sandbox.swift`: override, else default, else `runtime`; a choice not in `SandboxCatalog.choices` becomes `runtime`; helper cap: a caller whose `effectiveSandbox.state == .on` makes Off `runtime` with reason "Limited by the agent that started it"
+- [X] T013 TaskLocal `LaunchSandbox` in `Kit/Daemon/DaemonCore+Sandbox.swift`, bound around `launcher.launch` in `freshSession`, `liveSession` (`Kit/Daemon/DaemonCore+Commands.swift`) and the draft in `options()`; a draft carries the default's choice and is reused only when the start resolves to the same (no `OptionsRequest.sandbox` needed)
+- [X] T014 `ProcessSessionLauncher.launch` in `Kit/Daemon/DaemonCore.swift`: Grok's route arguments before the runtime's own, Gemini's route environment merged last; nothing for `runtime`
+- [X] T015 Claude: `_meta.claudeCode.options.sandbox = {"enabled": Bool}` for On/Off where the app builds Claude's `_meta` options, on new and resumed sessions; nothing for `runtime`
+- [X] T016 Codex: a start or resume resolved to Off starts in `agent-full-access`; On from Full access in `read-only` (FR-005c), in the start path of `Kit/Daemon/DaemonCore+Commands.swift`
+- [X] T017 Write `effectiveSandbox` after each handshake (`SandboxCatalog.state`, Codex from the mode in force, the helper reason)
+- [X] T018 Integration tests in `Tests/Integration/SandboxLaunchTests.swift` with `FakeLauncher`: Grok Off launches with `--sandbox off` first; Gemini Off has `GEMINI_SANDBOX=false`; default `runtime` adds nothing (SC-006); an override beats the default and clearing it inherits; another runtime unaffected; workflow and helper starts inherit; helper cap; a change applies at the next turn's launch; Codex default Off starts in Full access
 
 **Checkpoint**: choices reach the runtime.
 

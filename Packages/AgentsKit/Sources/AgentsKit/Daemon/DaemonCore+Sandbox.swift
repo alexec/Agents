@@ -64,3 +64,77 @@ extension DaemonCore {
         changed(agent)
     }
 }
+
+/// The sandbox choice the runtime about to be started resolved to (064), set around
+/// `SessionLauncher.launch` as `LentEnvironment` is, and read by `ProcessSessionLauncher`
+/// for the routes that are arguments or environment.
+public enum LaunchSandbox {
+    @TaskLocal public static var value: SandboxChoice = .runtime
+
+    /// What the choice adds to a runtime's launch: arguments before its own, and
+    /// environment over everything else. Nothing for `runtime` (FR-003c, SC-006).
+    public static func additions(runtimeID: String, choice: SandboxChoice) -> (arguments: [String], environment: [String: String]) {
+        guard choice != .runtime, let route = SandboxCatalog.entry(for: runtimeID)?.route else { return ([], [:]) }
+        switch route {
+        case .arguments(let on, let off):
+            return (choice == .on ? on : off, [:])
+        case .environment(let on, let off):
+            return ([], choice == .on ? (on ?? [:]) : off)
+        case .claudeMeta, .codexMode, .fixed:
+            return ([], [:])
+        }
+    }
+
+    /// Claude's `_meta` for the choice: `claudeCode.options.sandbox.enabled`, which the
+    /// adapter gives Claude Code as flag settings (research R7).
+    public static func meta(runtimeID: String, choice: SandboxChoice) -> JSONValue? {
+        guard choice != .runtime, SandboxCatalog.entry(for: runtimeID)?.route == .claudeMeta else { return nil }
+        return ["claudeCode": ["options": ["sandbox": ["enabled": .bool(choice == .on)]]]]
+    }
+}
+
+extension DaemonCore {
+    /// The choice an agent's next start or turn uses, and why it is not what was asked
+    /// (FR-003a, FR-011): its own override, else its runtime's default, else as configured.
+    /// A choice the catalog does not offer is as configured (FR-002). A helper started by
+    /// an agent whose sandbox is on cannot be looser than it (R10).
+    func resolveSandbox(runtimeID: String, override: SandboxChoice?, starter: UUID?) -> (choice: SandboxChoice, reason: String?) {
+        var choice = override ?? sandboxSettings.choice(for: runtimeID)
+        if !SandboxCatalog.choices(for: runtimeID).contains(choice) { choice = .runtime }
+        if choice == .off, let starter, agents[starter]?.effectiveSandbox?.state == .on {
+            return (.runtime, "Limited by the agent that started it")
+        }
+        return (choice, nil)
+    }
+
+    func resolveSandbox(for agent: Agent) -> (choice: SandboxChoice, reason: String?) {
+        resolveSandbox(runtimeID: agent.runtimeID, override: agent.sandboxOverride, starter: agent.startedByAgent)
+    }
+
+    /// Codex starts in the mode its sandbox choice needs (FR-005c): Full access for Off,
+    /// Ask for approval when On would otherwise leave it in Full access.
+    func codexStartOptions(_ options: StartOptions, runtimeID: String, choice: SandboxChoice) -> StartOptions {
+        guard runtimeID == RuntimeCatalog.codex.id else { return options }
+        var options = options
+        let mode = options.values["mode"]?.stringValue
+        switch choice {
+        case .off: options.values["mode"] = .string(Self.codexFullAccess)
+        case .on where mode == Self.codexFullAccess: options.values["mode"] = .string(Self.codexAskForApproval)
+        default: break
+        }
+        return options
+    }
+
+    /// What the agent's latest start runs under (FR-010), written after each handshake.
+    func noteEffectiveSandbox(agentID: UUID, choice: SandboxChoice, reason: String?) {
+        guard var agent = agents[agentID] else { return }
+        let effective = EffectiveSandbox(
+            state: SandboxCatalog.state(runtimeID: agent.runtimeID, choice: choice,
+                                        codexMode: agent.startOptions.values["mode"]?.stringValue),
+            requested: agent.sandboxOverride ?? sandboxSettings.choice(for: agent.runtimeID),
+            reason: reason)
+        guard agent.effectiveSandbox != effective else { return }
+        agent.effectiveSandbox = effective
+        changed(agent)
+    }
+}

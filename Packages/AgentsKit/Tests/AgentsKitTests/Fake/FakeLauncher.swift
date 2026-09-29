@@ -15,6 +15,8 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     private(set) var launches: [(runtime: String, cwd: URL, at: ContinuousClock.Instant)] = []
     /// What each launch was lent (043): `LentEnvironment.value` at the moment it started.
     private(set) var lent: [[String: String]] = []
+    /// The sandbox choice each launch resolved to (064): `LaunchSandbox.value` as it started.
+    private(set) var sandboxes: [SandboxChoice] = []
 
     /// What the sessions it makes advertise. The capability flags decide what an agent
     /// asks of us, so a test that wants to be asked for a file turns them on here.
@@ -32,6 +34,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
         let script = scripts.isEmpty ? defaultScript : scripts.removeFirst()
         launches.append((runtime.id, cwd, .now))
         lent.append(LentEnvironment.value)
+        sandboxes.append(LaunchSandbox.value)
         lock.unlock()
 
         let (mine, theirs) = PairedTransport.pair()

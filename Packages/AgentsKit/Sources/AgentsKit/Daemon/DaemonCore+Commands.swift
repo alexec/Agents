@@ -16,14 +16,18 @@ extension DaemonCore {
     public func options(_ request: DaemonAPI.OptionsRequest,
                         connection: UUID? = nil) async throws -> DaemonAPI.OptionsResponse {
         let draftID = UUID()
+        // As the runtime's default would have it: an override chosen in the form after
+        // this makes the start let the draft go (064).
+        let sandbox = resolveSandbox(runtimeID: request.runtimeID, override: nil, starter: nil).choice
         let pending = Task { [self] in
             try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
-                                   mcpServers: request.mcpServers)
+                                   mcpServers: request.mcpServers, sandbox: sandbox)
         }
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
                                 mcpServers: request.mcpServers,
                                 personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
                                 pending: pending,
+                                sandbox: sandbox,
                                 connection: connection)
         let key = OptionCache.key(runtimeID: request.runtimeID, cwd: request.cwd,
                                   mcpServers: request.mcpServers)
@@ -241,7 +245,9 @@ extension DaemonCore {
         // They are read once, when the session is made, so reusing a session that
         // never heard about a server would attach it in name only.
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
+        let sandbox = resolveSandbox(runtimeID: request.runtimeID, override: request.sandbox, starter: starter)
         let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == cwd
+                                     && $0.sandbox == sandbox.choice
                                      && $0.mcpServers == request.mcpServers
                                      && $0.personalServers == PersonalDotAgents.mcpStamp(home: locations.personalHome)
                                      && $0.managesAgents == (starter == nil) ? $0 : nil }
@@ -260,7 +266,8 @@ extension DaemonCore {
             if let draft { Task { [self] in await endDraft(draft) } }
             let made = try await freshSession(runtimeID: request.runtimeID, cwd: cwd,
                                               mcpServers: request.mcpServers,
-                                              managesAgents: starter == nil)
+                                              managesAgents: starter == nil,
+                                              sandbox: sandbox.choice)
             session = made.session
             sessionID = made.sessionID
             appToken = made.appToken
@@ -274,7 +281,8 @@ extension DaemonCore {
                           cwd: cwd,
                           title: Agent.fallbackTitle(from: request.prompt),
                           runtimeSessionID: sessionID,
-                          startOptions: request.startOptions,
+                          startOptions: codexStartOptions(request.startOptions, runtimeID: request.runtimeID,
+                                                          choice: sandbox.choice),
                           advertisedOptions: await session.options,
                           availableCommands: await session.commands,
                           additionalDirectories: request.additionalDirectories,
@@ -295,6 +303,7 @@ extension DaemonCore {
                           chainDepth: chainDepth,
                           worktree: placed?.worktree,
                           startRequestID: request.requestID)
+        agent.sandboxOverride = request.sandbox
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
         // so an agent stranded in it by a failed write would keep `isHoldingAgents`
@@ -327,7 +336,8 @@ extension DaemonCore {
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
 
-        await noteRefused(await session.apply(request.startOptions), agentID: agent.id)
+        await noteRefused(await session.apply(agent.startOptions), agentID: agent.id)
+        noteEffectiveSandbox(agentID: agent.id, choice: sandbox.choice, reason: sandbox.reason)
         agent = agents[agent.id] ?? agent
         changed(agent)
 
@@ -378,7 +388,8 @@ extension DaemonCore {
     /// will not take without an agent ever existing to be refused on.
     func freshSession(runtimeID: String, cwd: URL,
                               mcpServers: [MCPServer] = [],
-                              managesAgents: Bool = true) async throws -> MadeSession {
+                              managesAgents: Bool = true,
+                              sandbox: SandboxChoice = .runtime) async throws -> MadeSession {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "There is no runtime called \(runtimeID).")
@@ -404,7 +415,9 @@ extension DaemonCore {
         var launched: ACPSession?
         do {
             let session = try LentEnvironment.$value.withValue(lent) {
-                try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+                try LaunchSandbox.$value.withValue(sandbox) {
+                    try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+                }
             }
             launched = session
             await hearAuthStatus(from: session, runtimeID: runtimeID)
@@ -419,7 +432,8 @@ extension DaemonCore {
                                                capabilities: handshake.agentCapabilities?.mcpCapabilities)
             let result = try await session.newSession(cwd: cwd,
                                                       mcpServers: servers,
-                                                      meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
+                                                      meta: sessionMeta(runtimeID: runtimeID, cwd: cwd,
+                                                                        sandbox: sandbox))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
         } catch {
@@ -885,9 +899,14 @@ extension DaemonCore {
         await syncCodexPlugins(before: agent.runtimeID)
         linkGeminiProjectPlugins(runtimeID: agent.runtimeID, cwd: agent.cwd)
         let session: ACPSession
+        // Resolved at every pick-up, which is every turn: a changed default or override
+        // applies from the next turn and never mid-command (064, FR-012).
+        let sandbox = resolveSandbox(for: agent)
         do {
             session = try LentEnvironment.$value.withValue(lent) {
-                try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+                try LaunchSandbox.$value.withValue(sandbox.choice) {
+                    try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+                }
             }
         } catch {
             runtimeFailed(agentID: agent.id)
@@ -895,7 +914,7 @@ extension DaemonCore {
         }
         await hearAuthStatus(from: session, runtimeID: runtime.id)
         do {
-            return try await connect(session, runtime: runtime, for: agent)
+            return try await connect(session, runtime: runtime, for: agent, sandbox: sandbox)
         } catch {
             // Nothing holds a session that never made it into `live`, and a process
             // left behind here is a runtime nobody will ever end.
@@ -914,7 +933,8 @@ extension DaemonCore {
         }
     }
 
-    private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent) async throws -> ACPSession {
+    private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent,
+                         sandbox: (choice: SandboxChoice, reason: String?)) async throws -> ACPSession {
         let handshake = try await session.initialize()
         // Picked back up with what `~/.agents` holds now, not what it held at the start (054).
         reconcileHome()
@@ -931,7 +951,7 @@ extension DaemonCore {
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).
-        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd)
+        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd, sandbox: sandbox.choice)
 
         // Only what this start learns is carried across the awaits below. The rest of
         // the record is read again at the end: a start takes seconds, and a prompt
@@ -985,8 +1005,11 @@ extension DaemonCore {
         // preview, which starts nothing (052, US5).
         remember(OptionCache.Entry(options: refreshed, commands: commands),
                  for: OptionCache.key(runtimeID: updated.runtimeID, cwd: updated.cwd, mcpServers: updated.mcpServers))
+        updated.startOptions = codexStartOptions(updated.startOptions, runtimeID: updated.runtimeID,
+                                                 choice: sandbox.choice)
         changed(updated)
         await noteRefused(await session.apply(updated.startOptions), agentID: agent.id)
+        noteEffectiveSandbox(agentID: agent.id, choice: sandbox.choice, reason: sandbox.reason)
         live[agent.id] = session
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
