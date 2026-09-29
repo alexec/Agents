@@ -273,9 +273,12 @@ struct PromptBar: View {
                 SelectCapsule(name: "Runtime",
                               title: model.draftRuntimeID.map(runtimeName) ?? "Runtime") { dismiss in
                     ScrollingChoices {
+                        if !outRuntimes.isEmpty {
+                            SelectGroupHeading(title: "Available")
+                        }
                         ForEach(availableRuntimes) { status in
                             SelectChoice(title: status.runtime.name,
-                                         description: signInNote(status.runtime.id),
+                                         description: rateLimitNote(status.runtime.id) ?? signInNote(status.runtime.id),
                                          isChosen: status.runtime.id == model.draftRuntimeID) {
                                 chooseRuntime(status.runtime.id)
                                 dismiss()
@@ -914,15 +917,20 @@ struct PromptBar: View {
     }
 
     private func isOut(_ runtimeID: String) -> Bool {
-        model.runtimeAllowances?.rows.contains { $0.runtimeID == runtimeID && $0.state.isOut } == true
+        model.runtimeAllowances?.isOut(runtimeID) == true
+    }
+
+    /// A rate limit is not an out runtime: the runtime can still take a turn, and
+    /// `isUsable` says so. It is a throttle, though, and one row in the available run
+    /// that says nothing about it reads as no throttle at all.
+    private func rateLimitNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.rateLimitNote(for: runtimeID)
     }
 
     /// What is wrong with it, under the name. It says nothing about another runtime:
     /// there is no order to take one from (065).
     private func outNote(_ runtimeID: String) -> String? {
-        guard let allowances = model.runtimeAllowances,
-              let row = allowances.rows.first(where: { $0.runtimeID == runtimeID }) else { return nil }
-        return row.line(now: allowances.at)
+        model.runtimeAllowances?.note(for: runtimeID)
     }
 
     private func runtimeName(_ id: String) -> String {

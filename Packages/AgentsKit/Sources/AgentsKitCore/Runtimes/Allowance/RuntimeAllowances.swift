@@ -21,6 +21,34 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
 
     public var anyOut: Bool { rows.contains { $0.state.isOut } }
 
+    /// Whether this runtime's plan is spent, on any of its credentials. A chooser asks
+    /// this to put a runtime in its out run: a spent plan cannot take a turn, but it is
+    /// still worth naming rather than hiding, because that is the only way back to it.
+    public func isOut(_ runtimeID: String) -> Bool {
+        rows.contains { $0.runtimeID == runtimeID && $0.state.isOut }
+    }
+
+    /// Its first row's line, which is the Mac's own wording for what is wrong with it.
+    /// Nil when nothing has happened to this runtime, or when nothing is known.
+    public func note(for runtimeID: String) -> String? {
+        guard let row = firstRow(runtimeID) else { return nil }
+        return row.line(now: at)
+    }
+
+    /// A rate limit, which is not an out runtime: the runtime can still take a turn, and
+    /// `isUsable` says so. It is a throttle all the same, and a chooser that says
+    /// nothing about it reads as no throttle at all. Nil unless it is rate limited right
+    /// now, so a limit that has run out does not keep claiming to be one.
+    public func rateLimitNote(for runtimeID: String) -> String? {
+        guard let row = firstRow(runtimeID),
+              case .rateLimited = row.state.current(now: at) else { return nil }
+        return row.line(now: at)
+    }
+
+    private func firstRow(_ runtimeID: String) -> Row? {
+        rows.first { $0.runtimeID == runtimeID }
+    }
+
     /// The prompt bar's warning for a new chat on an out runtime, or nil. It names no
     /// other runtime: there is no order to take one from (065).
     public func startingOnOut(_ runtimeID: String) -> String? {
