@@ -98,14 +98,13 @@ replaced, and removing what they left is a task in this list.
 WebSockets, with hosts and clients able to dial it. There is no UI change here beyond the
 transport.
 
-- [ ] T029 [P] Write `ControlStore` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/ControlStore.swift`, as contracts/store.md gives it: `get`, `put(when: .absent | .matching(etag) | .always)`, `delete` and `list(prefix:)`. Also write the errors `StoreError.conflict` and `.unavailable`, and a `MemoryStore` for tests.
+- [x] T029 (in AgentsKitCore, beside the protocol, so the old bridge path can use it too) [P] Write `ControlStore` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/ControlStore.swift`, as contracts/store.md gives it: `get`, `put(when: .absent | .matching(etag) | .always)`, `delete` and `list(prefix:)`. Also write the errors `StoreError.conflict` and `.unavailable`, and a `MemoryStore` for tests.
 - [ ] T030 [P] In `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift` and `ControlCode.swift`:
   - Add `owner: PersonID` and `rev: Int` to `ClientRecord` and `HostRecord`. Add `relay: Bool`, `machineID` and `installedBy: command | ssh(destination)` to `HostRecord`, and remove `reach`.
   - Add `PersonID`, `Lease`, `CopyRecord` and `ControlEvent` as in data-model.md.
   - Change the code text to `agents-control:2:<c|h>:<grant|->:<url>:<pin|->:<secret>:<name>`, keeping a reader for version 1.
-- [ ] T031 [P] In `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
-  - move `noSuchHost` to -32074;
-  - add `changedElsewhere` (-32071) and `storeUnavailable` (-32073), as contracts/control-api.md gives them;
+- [x] T031 [P] In `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
+  - move the control plane's failures to -32090…-32094, since main took -32070 (`signInWanted`) and -32080 (`catalogRefused`): `hostOffline`, `noSuchHost`, `lastOperator`, and the new `changedElsewhere` and `storeUnavailable` (contracts/control-api.md);
   - update every use and test.
 - [ ] T032 Make `ControlMethods` read and write through `ControlStore` instead of `GrantStore`, in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlMethods.swift`:
   - a record cache with ETags;
@@ -115,7 +114,7 @@ transport.
   - a conflict answered with `changedElsewhere`.
 
   The store protocol moves to AgentsKitCore if `ControlMethods` needs it; otherwise it takes an injected store. Delete `GrantStore.swift` and its tests.
-- [ ] T033 [P] Write `FolderStore` in `Packages/ControlPlane/Sources/ControlPlaneKit/Store/FolderStore.swift`:
+- [x] T033 (in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlStore.swift`, so both the bridge and the service use it) [P] Write `FolderStore`:
   - the ETag is SHA-256 of the contents;
   - `put` takes `flock` on `<key>.lock`, compares, writes a temporary file, `fsync`s it and renames it into place;
   - `list` walks the prefix.

@@ -1788,12 +1788,19 @@ public enum DaemonAPI {
         public static let notPermitted = -32045
         /// A call for a host the control plane knows but cannot reach right now (058).
         /// Answered by the control plane at once, rather than left to time out.
-        public static let hostOffline = -32070
+        /// (-32070 is `signInWanted` and -32080 `catalogRefused`: the control plane's own start at -32090.)
+        public static let hostOffline = -32090
         /// A call naming a host the control plane has never enrolled, or has removed.
-        public static let noSuchHost = -32071
+        public static let noSuchHost = -32091
         /// Demoting or forgetting the last client allowed to do everything: nobody could
-        /// then change it back (058, FR-009).
-        public static let lastOperator = -32072
+        /// then change it back (058, FR-016).
+        public static let lastOperator = -32092
+        /// A change another copy of the control plane made first: the store refused this
+        /// one's write, and nothing was changed. Try again (058, contracts/store.md).
+        public static let changedElsewhere = -32093
+        /// The control plane's store cannot be reached. Live connections carry on;
+        /// nothing new can be remembered until it is back.
+        public static let storeUnavailable = -32094
     }
 
     // MARK: Workflows

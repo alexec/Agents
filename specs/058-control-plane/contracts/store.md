@@ -34,8 +34,8 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
 ## Rules
 
 1. **Store first.** A change a person makes is written to the store before it is broadcast.
-   If the write fails, the call fails with `-32071 changedElsewhere` (a conflict) or
-   `-32073 storeUnavailable`, and nothing is broadcast.
+   If the write fails, the call fails with `-32093 changedElsewhere` (a conflict) or
+   `-32094 storeUnavailable`, and nothing is broadcast.
 2. **Conflicts on grants and forgets.** A conflict is never retried blindly: the operator is
    told to try again. Lease renewals are retried once, after a re-read.
 3. **The last operator.** It is checked against the version read (`matching`), so two copies

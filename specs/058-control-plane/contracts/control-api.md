@@ -59,10 +59,12 @@ Legacy names `devices/list`, `devices/startPairing`, `devices/stopPairing`, `dev
 
 ## Failures (added to `DaemonAPI.Failure`)
 
+-32070 (`signInWanted`) and -32080 (`catalogRefused`) were taken on main, so the control plane's own start at -32090.
+
 | Code | Name | When |
 |---|---|---|
-| -32070 | `hostOffline` | A request for a host that is not online. |
-| -32072 | `lastOperator` | Demoting or forgetting the last operator. |
-| -32071 | `changedElsewhere` | A conditional write lost to another copy. Nothing was changed. Try again. (Was `noSuchHost`, which moves to -32074.) |
-| -32073 | `storeUnavailable` | The store cannot be reached. Live connections carry on, but nothing is remembered. |
-| -32074 | `noSuchHost` | `h` names no host. |
+| -32090 | `hostOffline` | A request for a host that is not online. |
+| -32091 | `noSuchHost` | `h` names no host. |
+| -32092 | `lastOperator` | Demoting or forgetting the last operator. |
+| -32093 | `changedElsewhere` | A conditional write lost to another copy. Nothing was changed. Try again. |
+| -32094 | `storeUnavailable` | The store cannot be reached. Live connections carry on, but nothing is remembered. |

@@ -108,7 +108,7 @@ bucket, under one key layout:
   - *Create:* `If-None-Match: *`.
   - *Update:* `If-Match: <etag>`.
   - A refused write means someone else changed the record first. The copy re-reads and either
-    retries (a lease renewal) or refuses the call with `-32071 changedElsewhere` (a grant
+    retries (a lease renewal) or refuses the call with `-32093 changedElsewhere` (a grant
     change).
   - AWS S3, Cloudflare R2 and MinIO all honour both headers. A bucket that does not is refused
     at start-up by a probe write.
