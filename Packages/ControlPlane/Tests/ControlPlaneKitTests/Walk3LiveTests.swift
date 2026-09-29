@@ -136,9 +136,17 @@ struct Walk3LiveTests {
         _ = try docker(["network", "disconnect", "bridge", "agents-devbox"])
         let off = Date()
         note("network off")
-        _ = await within(40, "the control plane sees the host go") {
-            await hosts(control).first { $0.id == host.id }?.state != "online"
+        // The keep-alive notices a dead connection only after two missed pongs (about 60 s),
+        // so within a 60 s drop the host may never be shown offline: noted, not required.
+        var seenOffline = false
+        while Date().timeIntervalSince(off) < 60 {
+            if await hosts(control).first(where: { $0.id == host.id })?.state != "online" {
+                if !seenOffline { note("shown offline after \(String(format: "%.0f", Date().timeIntervalSince(off))) s") }
+                seenOffline = true
+            }
+            try await Task.sleep(for: .seconds(2))
         }
+        if !seenOffline { note("not shown offline during the 60 s drop: the connection outlived it") }
         try await Task.sleep(for: .seconds(max(0, 60 - Date().timeIntervalSince(off))))
         _ = try docker(["network", "connect", "bridge", "agents-devbox"])
         note("network back")

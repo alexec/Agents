@@ -351,7 +351,7 @@ hand-started processes, and SC-006 timed.
   - the Linux binaries come from the host app's or container's resources.
 - [x] T073 (SSHUplink and HostReach.ssh gone (old records read as dialOut); SSHHosts only installs and restarts dial-out hosts. hosts/update over the uplink not built: a host updates by running the command again) [US4] Remove `SSHUplink.swift`, ssh-reached `HostRecord.reach`, and `hosts/checkAgain`'s ssh path. `hosts/update` asks the host to update itself over its uplink.
 - [x] T074 (App/Sources/Control/ControlAddServerSheet.swift: Run a command (closes when the server joins) / Install over ssh (key read once from Choose…)) [US4] Build frame M in `App/Sources/Control/AddServerSheet.swift`, after approval: *Run a command* shows the code and command with a copy button; *Install over ssh* picks a key file, whose contents are sent once and never kept.
-- [ ] T075 [US4] Walk quickstart Walk 3 with test-servers on the devbox, both ways:
+- [x] T075 (walks/us4-servers.md; Walk3LiveTests on the devbox: command and ssh install both joined, nothing left behind, back 2.1 s after a 60 s drop, removed while still running; frame M not walked on screen) [US4] Walk quickstart Walk 3 with test-servers on the devbox, both ways:
   - no ssh process and no key file is left afterwards;
   - a network drop and return;
   - remove.
