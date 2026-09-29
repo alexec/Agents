@@ -75,6 +75,7 @@ final class AppModel {
     /// How long archived agents are kept (051). Nil from a daemon before 051.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
     var poolStatus: PoolStatus? { work.poolStatus }
+    var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
     /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
     private(set) var clientPermissions = ClientPermissionSettings()
 
@@ -762,6 +763,21 @@ final class AppModel {
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
 
+    /// Every runtime's state on this Mac (065, US4). Asking also asks Grok what is left.
+    func refreshRuntimeAllowances() async {
+        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesAllowances, Optional<String>.none,
+                                                      returning: RuntimeAllowances.self) else { return }
+        work.replaceRuntimeAllowances(allowances)
+    }
+
+    /// The person says a runtime is back, by its credential (065).
+    func markRuntimeAvailable(_ credentialKey: String) async {
+        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesMarkAvailable,
+                                                      DaemonAPI.MarkRuntimeAvailable(credentialKey: credentialKey),
+                                                      returning: RuntimeAllowances.self) else { return }
+        work.replaceRuntimeAllowances(allowances)
+    }
+
     /// The pool and each credential's state (052).
     func refreshPoolStatus(days: Int? = nil) async {
         guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
@@ -1293,6 +1309,10 @@ final class AppModel {
         // the model: a server's spending is kept beside it, and a server's wakefulness,
         // modes and notices have no place in this window (037).
         switch method {
+        case DaemonAPI.Notification.runtimesAllowancesChanged:
+            // A server's runtimes are its own; this window shows the Mac's (065). What a
+            // server learns about a plan the Mac relays still arrives as `pool/changed`.
+            return
         case DaemonAPI.Notification.costChanged:
             serverCosts[host] = try? params?.decode(DaemonAPI.CostState.self)
             noteServerSpent(host)
@@ -1433,6 +1453,7 @@ final class AppModel {
         async let retention: Void = refreshRetentionState()
         async let clientPermissions: Void = refreshClientPermissions()
         async let pool: Void = refreshPoolStatus()
+        async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let leases: Void = refreshLeases()
@@ -1441,7 +1462,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, pool)
+                   transcript, pool, runtimeStates)
         #if DEBUG
         openFromLaunchArguments()
         #endif

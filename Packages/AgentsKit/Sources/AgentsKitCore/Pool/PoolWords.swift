@@ -219,10 +219,11 @@ public enum PoolWords {
         case .out(let until?, _, _):
             return "\(name) is out. Its provider says it resets at \(time(until, now: now)); the app checks before using it again."
         case .out(nil, let retry?, _):
-            // Not a time the provider gave: only when the app will try it again.
-            return "\(name) is out, so its first turn would be refused. It is tried again after \(time(retry, now: now))."
+            // Not a time the provider gave: only when the app checks it again. Sending is
+            // still the person's to do (065): a turn that works brings it back.
+            return "\(name) is out. The app checks it again at \(time(retry, now: now))."
         default:
-            return "\(name) is out, so its first turn would be refused."
+            return "\(name) is out."
         }
     }
 

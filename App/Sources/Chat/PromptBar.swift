@@ -188,22 +188,16 @@ struct PromptBar: View {
         }
     }
 
-    /// A new chat about to start on a runtime that is out (052, US3): said before the
-    /// first prompt, with the first runtime in the pool that is not out.
+    /// A new chat about to start on a runtime that is out (052, US3; 065): said before
+    /// the first prompt, and only said. Send still sends; there is no other runtime to
+    /// offer, since there is no order to take one from.
     @ViewBuilder
     private var startingOnOut: some View {
         if agent == nil, let runtimeID = model.draftRuntimeID,
-           let notice = model.poolStatus?.startingOnOut(runtimeID) {
-            HStack(spacing: 10) {
-                Text(notice.sentence)
-                    .appText(.fine)
-                    .foregroundStyle(StateTint.attention.style(or: .primary))
-                if let instead = notice.instead {
-                    Button("Use \(PoolWords.runtimeName(instead)) instead") { chooseRuntime(instead) }
-                        .buttonStyle(.paper)
-                        .appText(.fine)
-                }
-            }
+           let sentence = model.runtimeAllowances?.startingOnOut(runtimeID) {
+            Text(sentence)
+                .appText(.fine)
+                .foregroundStyle(StateTint.attention.style(or: .primary))
         }
     }
 

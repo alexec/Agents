@@ -504,6 +504,15 @@ extension DaemonCore {
                 let settings = try require(params, as: ClientPermissionSettings.self)
                 return .success(try JSONValue.encoding(try setClientPermissions(settings)))
 
+            case DaemonAPI.Method.runtimesAllowances:
+                // Someone is looking at the runtimes: ask what is left, behind the answer.
+                Task { await self.measureAllowances() }
+                return .success(try JSONValue.encoding(runtimeAllowances()))
+
+            case DaemonAPI.Method.runtimesMarkAvailable:
+                let request = try require(params, as: DaemonAPI.MarkRuntimeAvailable.self)
+                return .success(try JSONValue.encoding(markRuntimeAvailable(credentialKey: request.credentialKey)))
+
             case DaemonAPI.Method.poolState:
                 let request = (try? require(params, as: DaemonAPI.PoolStateRequest.self)) ?? .init()
                 // Someone is looking at the pool: ask what is left, behind the answer.

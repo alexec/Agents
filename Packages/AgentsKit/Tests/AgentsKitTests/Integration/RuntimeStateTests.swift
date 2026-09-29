@@ -109,6 +109,22 @@ struct RuntimeStateTests {
         #expect(rows.anyOut)
     }
 
+    @Test func aChangeIsBroadcastAndAPhoneMayAskAndMarkAvailable() async throws {
+        let (core, _, _) = try core()
+        let heard = RuntimeStatesHeard()
+        await core.setBroadcaster { method, params in
+            guard method == DaemonAPI.Notification.runtimesAllowancesChanged, let params,
+                  let rows = try? params.decode(RuntimeAllowances.self) else { return }
+            heard.append(rows.anyOut)
+        }
+        await core.setAllowanceState(claudeOut(at: Date()))
+        await eventually("the window heard claude is out") { heard.all.last == true }
+        _ = await core.markRuntimeAvailable(credentialKey: "claude:sign-in")
+        await eventually("the window heard it is back", within: .seconds(5)) { heard.all.last == false }
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.runtimesAllowances))
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.runtimesMarkAvailable))
+    }
+
     @Test func grokIsAskedForWhatIsLeftWithNoPool() async throws {
         var grok = FakeACPAgent.Script()
         grok.billing = [
@@ -124,4 +140,12 @@ struct RuntimeStateTests {
         await core.measureAllowances()
         #expect(await state(core, "grok:sign-in")?.reading?.window == "weekly")
     }
+}
+
+/// What `runtimes/allowancesChanged` carried, in order. The broadcaster runs anywhere.
+private final class RuntimeStatesHeard: @unchecked Sendable {
+    private let lock = NSLock()
+    private var seen: [Bool] = []
+    func append(_ value: Bool) { lock.lock(); seen.append(value); lock.unlock() }
+    var all: [Bool] { lock.lock(); defer { lock.unlock() }; return seen }
 }

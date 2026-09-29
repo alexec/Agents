@@ -298,6 +298,9 @@ public enum DaemonAPI {
         public static let clientPermissionsState = "clientPermissions/state"
         public static let clientPermissionsSet = "clientPermissions/set"
         /// The pool of runtimes a chat can carry on with, and each one's state (052).
+        /// Every runtime's state, pool or none (065, US4), and the person saying one is back.
+        public static let runtimesAllowances = "runtimes/allowances"
+        public static let runtimesMarkAvailable = "runtimes/markAvailable"
         public static let poolState = "pool/state"
         public static let poolSet = "pool/set"
         public static let poolMarkAvailable = "pool/markAvailable"
@@ -407,6 +410,8 @@ public enum DaemonAPI {
         public static let clientPermissionsChanged = "clientPermissions/changed"
         /// The pool, its states or its switches changed (052). Debounced to one a second.
         public static let poolChanged = "pool/changed"
+        /// `RuntimeAllowances`, whenever a runtime's state changes (065).
+        public static let runtimesAllowancesChanged = "runtimes/allowancesChanged"
         /// The retention settings, or what the archive holds, changed (051). A
         /// `RetentionState`.
         public static let retentionChanged = "retention/changed"
@@ -1977,6 +1982,12 @@ public enum DaemonAPI {
         public init(token: String) {
             self.token = token
         }
+    }
+
+    /// `runtimes/markAvailable` (065): a runtime is back, by its credential key.
+    public struct MarkRuntimeAvailable: Codable, Sendable {
+        public var credentialKey: String
+        public init(credentialKey: String) { self.credentialKey = credentialKey }
     }
 
     /// What an agent passes to `list_sessions` (065): nothing but who it is. Its project

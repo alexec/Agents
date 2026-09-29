@@ -719,6 +719,7 @@ extension DaemonCore {
         }
         poolBroadcastAt = clock.now
         broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
+        broadcast(DaemonAPI.Notification.runtimesAllowancesChanged, runtimeAllowances())
     }
 
     static let poolBroadcastGap: Duration = .seconds(1)
@@ -727,6 +728,7 @@ extension DaemonCore {
         poolBroadcastHeld = false
         poolBroadcastAt = ContinuousClock().now
         broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
+        broadcast(DaemonAPI.Notification.runtimesAllowancesChanged, runtimeAllowances())
     }
 
     /// The pool's clocks, on the workflow heartbeat (no timer of its own): short

@@ -96,6 +96,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsRetired,
         // The phone reads the pool and may say a runtime is back; it never edits the
         // pool (052, contracts/daemon-api.md).
+        DaemonAPI.Method.runtimesAllowances,
+        DaemonAPI.Method.runtimesMarkAvailable,
         DaemonAPI.Method.poolState,
         DaemonAPI.Method.poolMarkAvailable,
         DaemonAPI.Method.poolStopWaiting,

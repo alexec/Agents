@@ -39,6 +39,6 @@ struct StartingOnOutTests {
         #expect(status.startingOnOut("claude")?.instead == nil)
         // No time from the provider: only when the app tries it again, never "until".
         let sentence = status.startingOnOut("claude")?.sentence
-        #expect(sentence?.hasPrefix("Claude is out, so its first turn would be refused. It is tried again after ") == true)
+        #expect(sentence?.hasPrefix("Claude is out. The app checks it again at ") == true)
     }
 }
