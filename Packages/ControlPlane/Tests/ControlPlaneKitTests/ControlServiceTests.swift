@@ -248,6 +248,23 @@ struct ControlServiceTests {
         await #expect(throws: (any Error).self) { _ = try await WebSocketLink.connect(running.url, pin: wrong) }
     }
 
+    /// A host on the control plane's own machine is its home host, `mac`; any other
+    /// machine's gets an id of its own.
+    @Test func theHostOnTheControlPlanesMachineIsMac() async throws {
+        let port = try await freePort()
+        let url = URL(string: "http://127.0.0.1:\(port)")!
+        let service = try ControlService(.init(store: MemoryStore(), privateKey: control.privateKey, url: url,
+                                               bind: "127.0.0.1", port: port, name: "test", machineID: "linux-1"))
+        try await service.start()
+        defer { Task { await service.stop() } }
+        let (home, first) = try await host(at: url, code: try await service.codes.issue(.host).text)
+        first.stop()
+        #expect(home == .mac)
+        let (other, second) = try await host(at: url, code: try await service.codes.issue(.host).text)
+        second.stop()
+        #expect(other != .mac)
+    }
+
     // MARK: Helpers
 
     func status(_ url: URL) async throws -> Int {

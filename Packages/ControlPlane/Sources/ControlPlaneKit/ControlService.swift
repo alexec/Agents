@@ -289,7 +289,11 @@ public final class ControlService: @unchecked Sendable {
                     throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Say which host you are.")
                 }
                 try await codes.spend(id)
-                let host = HostID.make()
+                // The host on the control plane's own machine is its home host, `mac`, as
+                // a moved set-up's is: the window's own client is that host (data-model.md).
+                let macTaken = await records.host(.mac) != nil
+                let home = !configuration.machineID.isEmpty && announce.machineID == configuration.machineID && !macTaken
+                let host = home ? HostID.mac : HostID.make()
                 try await methods.enroll(HostRecord(id: host, name: announce.name, publicKey: announce.publicKey,
                                                     platform: announce.platform, version: announce.version,
                                                     machineID: announce.machineID))

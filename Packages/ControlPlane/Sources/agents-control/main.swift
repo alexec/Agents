@@ -85,7 +85,8 @@ func serve() async {
     do {
         let service = try ControlService(.init(store: store(), privateKey: privateKey(), url: url, pin: pin,
                                                tls: tls?.context, bind: value("--bind") ?? "0.0.0.0",
-                                               port: port, name: name))
+                                               port: port, name: name,
+                                               machineID: environment["AGENTS_CONTROL_MACHINE_ID"] ?? MachineID.current))
         try await service.start()
         if let pin { print("pin \(pin)") }
         let stop = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
