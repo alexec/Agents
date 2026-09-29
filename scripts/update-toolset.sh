@@ -35,9 +35,70 @@
 # and nothing else), size, SHA-256 (the registry has none, so every archive is downloaded and
 # hashed here), command and arguments. `knownBroken` reasons already in the manifest are kept.
 # The id is the SHA-256 of that file. The archives themselves are never kept or committed.
+#
+# Or a runtime whose vendor publishes one program per platform as GitHub release assets
+# (049, OpenCode):
+#
+#   ./scripts/update-toolset.sh --archive-github <runtime> <owner/repo> <tag> [--min-free-bytes N]
+#   ./scripts/update-toolset.sh --archive-github opencode anomalyco/opencode v1.18.33 --min-free-bytes 500000000
+#
+# Every `<runtime>-<os>-<arch>[-baseline][-musl].{zip,tar.gz}` asset becomes a platform
+# (arm64 → aarch64, x64 → x86_64, darwin/linux only), with GitHub's own `digest` and `size`:
+# nothing is downloaded. Only github.com release URLs of that repo are accepted, and the
+# vendor's desktop app (`<runtime>-desktop-*`) is skipped. The program inside is `<runtime>`.
 set -euo pipefail
 
 root=${0:A:h:h}
+
+if [[ ${1:-} == --archive-github ]]; then
+  runtime=${2:?runtime id, e.g. opencode}
+  repo=${3:?owner/repo, e.g. anomalyco/opencode}
+  tag=${4:?release tag, e.g. v1.18.33}
+  shift 4
+  min_free=500000000
+  while (( $# )); do
+    case $1 in
+      --min-free-bytes) min_free=$2; shift 2 ;;
+      *) print -u2 "unknown option $1"; exit 2 ;;
+    esac
+  done
+  out=$root/App/Resources/toolsets/$runtime
+  mkdir -p $out
+  gh api "repos/$repo/releases/tags/$tag" | RUNTIME=$runtime REPO=$repo TAG=$tag MIN_FREE=$min_free OUT=$out python3 -c '
+import json, os, re, sys
+release = json.load(sys.stdin)
+runtime, repo, tag, out = os.environ["RUNTIME"], os.environ["REPO"], os.environ["TAG"], os.environ["OUT"]
+prefix = f"https://github.com/{repo}/releases/download/"
+pattern = re.compile(rf"^{re.escape(runtime)}-(darwin|linux)-(arm64|x64)((?:-baseline)?(?:-musl)?)\.(zip|tar\.gz)$")
+arch = {"arm64": "aarch64", "x64": "x86_64"}
+platforms = {}
+for asset in release["assets"]:
+    match = pattern.match(asset["name"])
+    if not match:
+        continue
+    url = asset["browser_download_url"]
+    if not url.startswith(prefix):
+        sys.exit(f"refusing {url}: not a {repo} release download")
+    digest = asset.get("digest") or ""
+    if not digest.startswith("sha256:"):
+        sys.exit(asset["name"] + " has no sha256 digest on GitHub")
+    os_name, cpu, variant, _ = match.groups()
+    platforms[f"{os_name}-{arch[cpu]}{variant}"] = {
+        "url": url, "sha256": digest.removeprefix("sha256:"), "size": asset["size"],
+        "command": runtime, "arguments": []}
+for needed in ("darwin-aarch64", "darwin-x86_64", "linux-x86_64", "linux-aarch64"):
+    if needed not in platforms:
+        sys.exit(f"{tag} has no {needed} asset")
+manifest = {"runtimeID": runtime, "kind": "archive", "version": tag.removeprefix("v"),
+            "source": f"github:{repo}@{tag}", "minFreeBytes": int(os.environ["MIN_FREE"]),
+            "platforms": platforms}
+with open(f"{out}/manifest.json", "w") as f:
+    json.dump(manifest, f, indent=2, sort_keys=True)
+    f.write("\n")
+print(f"Wrote {out}/manifest.json ({tag}, {len(platforms)} platforms)")
+'
+  exit 0
+fi
 
 if [[ ${1:-} == --archive ]]; then
   runtime=${2:?runtime id, e.g. antigravity}

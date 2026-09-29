@@ -141,10 +141,9 @@ struct RuntimeInstallRow: View {
     /// manifest the app carries; nil for everything else.
     static func downloadNote(for runtimeID: String) -> String? {
         guard let archive = bundledArchives[runtimeID],
-              let platform = archive.manifest.platforms[ArchiveToolset.macPlatform],
+              let platform = archive.manifest.platforms[archive.macPlatformKey],
               platform.knownBroken == nil else { return nil }
-        let vendor = platform.url.host()?.hasSuffix("google.com") == true ? "Google" : (platform.url.host() ?? "")
-        return "\(ArchiveToolset.megabytes(platform.size)) from \(vendor)"
+        return "\(ArchiveToolset.megabytes(platform.size)) from \(ArchiveToolset.vendor(of: archive))"
     }
 
     private static let bundledArchives: [String: ArchiveToolset] = Bundle.main
