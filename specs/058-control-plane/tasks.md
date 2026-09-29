@@ -69,7 +69,7 @@ replaced, and removing what they left is a task in this list.
   - two writers racing one lease key 100 times (exactly one wins each round).
 
   Record the results in research.md S4.
-- [ ] T025 [P] Spike S5, a sandboxed archive. On a throwaway branch in a scratch worktree (never this tree), turn on `com.apple.security.app-sandbox` in `App/Agents.entitlements` and link only `AgentsKitCore` for the Agents target in `project.yml`. Run `xcodegen`, then build. List every file that fails and why. Record the list in research.md S5; it sizes US1's tasks T043–T053. Delete the scratch worktree afterwards.
+- [ ] T025 [P] Spike S5, a sandboxed archive. On a throwaway branch in a scratch worktree (never this tree), turn on `com.apple.security.app-sandbox` in `App/Agents.entitlements` and link only `AgentsKitCore` for the Agents target in `project.yml`. Run `xcodegen`, then build. List every file that fails and why. Record the list in research.md S5; it sizes US1's tasks T044–T053. Delete the scratch worktree afterwards.
 - [ ] T026 Create the package skeleton `Packages/ControlPlane/Package.swift`:
   - platforms macOS 27, and Linux via the static SDK;
   - targets `ControlPlaneKit`, `agents-control` and `ControlPlaneKitTests`;
