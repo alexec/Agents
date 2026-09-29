@@ -21,6 +21,9 @@ closed. You follow them from the Mac as you would any other project.
   see [Claude and Codex: your Mac's sign-ins](#claude-and-codex-your-macs-sign-ins) below.
   The server needs `curl` or `wget`, access to the internet, and a glibc Linux (glibc 2.28
   or newer, as on Debian 10, Ubuntu 20.04 or RHEL 8 and later).
+- For OpenCode, nothing on the server either: once OpenCode is set up on this Mac, Agents
+  downloads the server's build on this Mac and copies it over ssh, so the server needs no
+  internet access and may be glibc or musl (Alpine).
 - For Grok, Copilot or Cursor: install the runtime on the server yourself and sign in
   there, as that user. See [Runtimes](../reference/runtimes.md).
 
@@ -64,6 +67,25 @@ in Terminal and `/login`), a server's Claude can't start, unless the server has 
 sign-in: sign Claude in on the server itself, and mark the server **Use this server’s own
 sign-in only** if you want it used every time.
 
+### OpenCode: your Mac's provider keys
+
+Once OpenCode is set up on this Mac, Agents puts the same OpenCode version on a server as it
+connects: this Mac downloads the server's build from OpenCode's GitHub releases, checks it,
+and copies it over ssh. The server's entry in **Settings ▸ Servers** shows the download and
+copy as they happen, then **OpenCode: ready (installed by Agents)**.
+
+OpenCode on a server works signed out, on OpenCode Zen's free models. Each OpenCode run there
+also borrows the providers this Mac signed in to with a key (`opencode auth login` on this
+Mac): the run is handed them in memory as it starts, and nothing of them is written on the
+server. Providers the server has signed in to with a key of its own stay available beside
+them; for a provider in both, this Mac's key is used. A browser sign-in, such as ChatGPT or
+GitHub Copilot, is never lent: it renews itself, and a server renewing it would leave this
+Mac's copy stale. OpenCode's sign-in sheet on this Mac says which providers servers borrow
+and which stay.
+
+If a provider refuses the key this Mac lent, the conversation says so and names
+`opencode auth login` on this Mac. Sign in to that provider again there, then send again.
+
 ### Add the server
 
 1. In the Mac app, click **+** (**New project**) at the top of the **Projects** list and
@@ -105,7 +127,8 @@ sign-in only** if you want it used every time.
 If Claude is already signed in on the server and you would rather its own sign-in were
 used than this Mac's, open **Settings ▸ Servers**, find the server, and turn on **Use this
 server's own sign-in only**. That also stops Codex from using this Mac's ChatGPT sign-in
-there.
+there, and OpenCode from borrowing this Mac's provider keys: it uses the server's own
+OpenCode sign-in and its free models.
 
 ### When the server is offline
 
@@ -163,6 +186,8 @@ The sheet says what went wrong in one sentence. The common ones:
 - **… has neither curl nor wget to download Claude.** Install one of them on the server.
 - **… can't reach the internet to download Claude.** The server needs to reach the
   internet once, to download Claude's tools.
+- **OpenCode can't be installed here: there is no OpenCode for …** OpenCode publishes no
+  build for that machine.
 - **Claude can't be installed on …: it uses musl.** Agents installs Claude only on glibc
   Linux. Install Claude there yourself, or use another server.
 - **Claude on this Mac isn’t signed in with a Claude account.** Sign Claude in on this

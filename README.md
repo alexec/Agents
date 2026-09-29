@@ -95,12 +95,13 @@ daemon afterwards. Nothing it does reaches the agents you are running.
 Everything the protocol defines, decided by what each runtime advertises rather than by
 which runtime it is.
 
-Seven runtimes are known: Claude, Codex, Gemini, Antigravity, Grok, Copilot and Cursor.
+Eight runtimes are known: Claude, Codex, Gemini, Antigravity, OpenCode, Grok, Copilot and Cursor.
 Grok, Copilot and Cursor are commands of their own that you install. Claude is an npm
 adapter, because `claude` has no ACP flag, run through your Node or installed in the app's
-own folder. Codex, Gemini and Antigravity are only ever the app's own copies, installed from
-the set-up sheet or **Settings ▸ Agent Runtimes**. What the app starts for Cursor is
-`cursor-agent`, not `agent`, which belongs to Grok.
+own folder. Codex, Gemini, Antigravity and OpenCode are only ever the app's own copies,
+installed from the set-up sheet or **Settings ▸ Agent Runtimes**. What the app starts for
+Cursor is `cursor-agent`, not `agent`, which belongs to Grok, and an `opencode` on the PATH is
+never looked up: two unrelated programs share that name.
 
 No code in the app asks which runtime it is talking to. A runtime that advertises a thing
 gets that thing, and one that does not, does not: Cursor offers no options to pick from and
@@ -179,8 +180,11 @@ this app's remit. Grok takes an allow list on the session, plus a config overlay
 writes under its own root. Cursor has no lever at all, so its three conflicting tools stay
 — and are named in the briefing instead, along with what to use in their place. Codex
 takes feature switches in a `CODEX_CONFIG` set only for its sessions, Gemini loses its
-subagents and task tracker, and Antigravity takes a deny list under `_meta.agy` and loses
-`start_subagent`.
+subagents and task tracker, Antigravity takes a deny list under `_meta.agy` and loses
+`start_subagent`, and OpenCode takes an `OPENCODE_CONFIG_CONTENT` laid over the person's own
+config that removes `task`, turns sharing and self-update off, and makes edits, commands and
+web fetches ask. OpenCode's own question tool is left off, so its questions go through the
+app's `ask_form`.
 
 Nothing the work needs is touched: reading, searching, editing, writing, running commands,
 planning and keeping a to-do list stay, and so does the question tool each runtime raises

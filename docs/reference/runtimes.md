@@ -8,8 +8,8 @@ description: The coding agents the app can start, what it runs for each, and wha
 
 A runtime is the coding agent that does the work in a conversation. This page lists the
 ones the app knows how to start. Most you install and sign in to yourself, and the app
-finds them on your Mac, or on a server when the project is on a server. Codex, Gemini
-and Antigravity are only ever the app's own copies: **Install** on their rows in **Settings ▸ Agent Runtimes** puts
+finds them on your Mac, or on a server when the project is on a server. Codex, Gemini,
+Antigravity and OpenCode are only ever the app's own copies: **Install** on their rows in **Settings ▸ Agent Runtimes** puts
 them in place.
 
 What a runtime can do in the app is decided by what it says about itself when it starts,
@@ -26,6 +26,7 @@ newer version.
 | **Cursor** | `cursor-agent acp` | Yes | Yes | All | The command is `cursor-agent`, not `agent`, which is Grok's. It offers no options to pick from and no way to sign out, so the app shows neither. Three of its own tools, which overlap with the app's, cannot be turned off. It asks your permission before using some of the app's tools. Its Agent, Plan and Ask stay under the prompt; permission mode is **Default** or **Always-approve** in **Settings ▸ Agent Runtimes**, not a capsule here. |
 | **Codex** | The app's own copy of `@agentclientprotocol/codex-acp`, installed from the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes: **ChatGPT** first, then a ChatGPT device code or an OpenAI API key | All | Never a `codex` or `npx` of yours: the app runs the exact version it carries, and offers **Update** when a newer app carries a newer one. Signing in with ChatGPT is shared with Codex in Terminal. Its questions reach you as a card. Its three modes are **Ask for approval**, **Approve for me** and **Full access**. It shows how much of its context is used, with no cost. Its own sub-agents are on, and shown over the prompt as they run. |
 | **Antigravity** | The app's own copy of Google's Antigravity ACP server (`agy_acp_server`, not the `agy` command), downloaded from Google by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes, with a personal or business Google account, in your browser | All | The one Google runtime a Google account alone can sign in to; Gemini is for an API key, and the Gemini key is never lent to Antigravity. It keeps its settings, conversations and sign-in in a folder of the app's own, never in `~/.gemini`. It runs on this Mac only; servers are not supported yet. Its questions reach you as a card. Its own tool for starting subagents is switched off. |
+| **OpenCode** | The app's own copy of OpenCode (`opencode acp`), downloaded from its GitHub releases by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Hands you the command to run in Terminal, the app's own copy by its full path, with **Open Terminal** and **Copy**. It adds one provider at a time, so the sheet keeps offering it when ready, and names `opencode auth logout` for taking one away. | All | Never an `opencode` of yours: two different programs go by that name, and the app runs the version it carries. It works signed out, on OpenCode Zen's free models. It asks your permission before editing files, running commands and fetching web pages; set **Default** or **Always-approve** in **Settings ▸ Agent Runtimes**. Its questions reach you as a card. Sharing and self-update are off, and its own tool for starting subagents is switched off. A picked model whose provider is not signed in is dropped at the next start, with a note saying so. On a server it borrows this Mac's provider keys for each run. |
 
 In every column:
 
@@ -38,9 +39,10 @@ In every column:
   needs signing in** or **Not asked yet**.
 - **App tools available**: the tools on [Tools the app gives agents](agent-tools.md).
 - **On a server**: an agent in a server project is offered only the runtimes on that
-  server. Claude, Codex and Gemini are the exceptions: Agents installs them on the server
-  itself. Claude and Codex sign in there through this Mac's own sign-ins, and Gemini with
-  the key in Settings. See
+  server. Claude, Codex, Gemini and OpenCode are the exceptions: Agents installs them on the
+  server itself. Claude and Codex sign in there through this Mac's own sign-ins, Gemini with
+  the key in Settings, and OpenCode borrows the provider keys it is signed in with on this Mac,
+  for each run. See
   [Add a Linux server](../how-to/add-a-linux-server.md).
 
 ## What the app shows from a runtime
@@ -52,7 +54,7 @@ Each of these is offered to every runtime, and shown for those that say they can
 | **Send now**: a prompt sent into the running turn | On a prompt waiting its turn. See [Send a prompt while an agent is working](../how-to/send-while-an-agent-works.md). | Claude, Codex |
 | Background shells and subagents | A list over the prompt, and the **Background** pane. See [Watch an agent's background work](../how-to/watch-background-work.md). | Claude, Codex |
 | The plan | A checklist in the conversation, and a strip at the top of the chat on iPhone and iPad. Cursor's to-do list is shown as its plan, without the items it cancelled. | Runtimes that send a plan; Cursor through its to-do list |
-| Questions as a card | Above the prompt. See [Answer a question or a permission request](../how-to/answer-a-question.md). | Claude, Codex, Cursor, Antigravity. Grok and Gemini end their turn with the question instead. |
+| Questions as a card | Above the prompt. See [Answer a question or a permission request](../how-to/answer-a-question.md). | Claude, Codex, Cursor, Antigravity, OpenCode. Grok and Gemini end their turn with the question instead. |
 | Which account is signed in | Under the runtime's name in the runtime menu, and in its sign-in sheet, such as **Claude Max**. | Runtimes that report it |
 | Notices | A line in the conversation with a title and a detail: an error in red, a warning or information in grey. | Runtimes that send them |
 | Providers you can turn off | **Turn off** beside a provider under **Who answers** in the sign-in sheet. | Runtimes with more than one provider |
@@ -76,6 +78,7 @@ The app recognises the refusal per runtime:
 | **Copilot** | Recognised from "You have exceeded your monthly quota". | Not yet recognised. | Checked every four hours. |
 | **Grok** | Recognised from Grok's 402 "usage balance exhausted" (Build / SuperGrok). | Not yet recognised. | Checked every four hours; what is left of its plan is shown. |
 | **Cursor** | Recognised from "Upgrade your plan to continue". | Not yet recognised. | Checked every four hours. |
+| **OpenCode** | Not yet recognised: the turn stops, and the runtime is marked out, as for any error. | Not yet recognised. | Checked every four hours. |
 
 A crash or an error the app does not recognise also marks the runtime out, and stops that
 turn. Each check asks for a short reply on a small model in a read-only mode where the runtime
@@ -97,6 +100,7 @@ way it can take them. See [Share skills, instructions and servers with every age
 | **Copilot** | reads `~/.agents/skills` | `~/.copilot/copilot-instructions.md`, a link | through the app's local bridge for servers it would start; its own of the same name wins | no way in over the app |
 | **Gemini** | reads `~/.agents/skills` | `~/.gemini/AGENTS.md`, a link, beside its own `GEMINI.md` | sent at start | a link in `~/.gemini/extensions`; a project's plugins are switched on only in that project |
 | **Antigravity** | a link in the folder the app gives it | none | sent at start | no way in |
+| **OpenCode** | reads `~/.agents/skills` | follows `~/.claude/CLAUDE.md`, the link above, unless you keep your own `~/.config/opencode/AGENTS.md` | sent at start | no way in: its plugins are its own npm packages |
 
 For the conversations the app starts, each runtime's own tools for scheduling, starting
 other agents, sending notifications and saving documents elsewhere are taken away, so that

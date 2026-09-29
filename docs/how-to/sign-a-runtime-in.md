@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Sign a runtime such as Claude Code, Codex, Copilot, Cursor, Gemini or Grok in or out, from the app.
+description: Sign a runtime such as Claude Code, Codex, Copilot, Cursor, Gemini, Grok or OpenCode in or out, from the app.
 ---
 
 # Sign a runtime in
@@ -71,6 +71,21 @@ It is kept in this Mac's Keychain and handed to Gemini agents on this Mac and on
 A `GEMINI_API_KEY` already in your shell profile is used when Settings has none. Starting a
 Gemini agent with neither says **Gemini needs an API key. Add one in Settings ▸ Agent Runtimes.**
 
+**OpenCode: one provider at a time**
+
+OpenCode works signed out, on OpenCode Zen's free models, so its sheet says **Signed in and
+ready** from the start and still offers **Login with opencode**. Each sign-in adds one
+provider, such as Anthropic, OpenAI or GitHub Copilot, whose models then join the model menu.
+
+1. Click **Login with opencode**. The sheet hands you `opencode auth login` with the full path
+   of the app's own copy, never a bare `opencode`, which could be another program of that name.
+2. Click **Open Terminal**, paste it, choose a provider and follow what it asks.
+3. Click **I have done it**. The provider's models are in the menu for the next agent.
+
+To take a provider away, run the `opencode auth logout` command the sheet names in a terminal:
+OpenCode has no sign-out the app can call. A model you picked whose provider is not signed in
+is dropped when the agent next starts, and the conversation says so.
+
 **Choose who answers**
 
 Some runtimes can use more than one model provider. For those, the sheet has **Who
@@ -85,8 +100,10 @@ off**, beside a provider the runtime does not need, stops it being offered.
    example **This stops 2 agents mid-conversation.**
 
 iPhone and iPad cannot sign runtimes in: sign in on the Mac. Signing Claude or Codex in on
-this Mac also signs them in on your Linux servers: their requests go through this Mac. For
-any other runtime on a server, sign in on the server itself; see
+this Mac also signs them in on your Linux servers: their requests go through this Mac.
+OpenCode on a server borrows the providers this Mac signed in to with a key; a browser
+sign-in such as ChatGPT stays on this Mac, and the sheet says which. For any other runtime on
+a server, sign in on the server itself; see
 [Add a Linux server](add-a-linux-server.md).
 
 ## If it doesn't work

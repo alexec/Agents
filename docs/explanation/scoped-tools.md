@@ -91,6 +91,15 @@ each one has.
 - **Gemini** loses its own subagents and task tracker.
 - **Antigravity** takes a list of tools to deny for each session. It loses its tool for
   starting subagents; its question tool stays, and its questions reach you as a card.
+- **OpenCode** takes its own settings in a variable set only for the sessions the app
+  starts, laid over your `opencode.json` for that process. It loses its tool for starting
+  subagents, which leaves nothing behind in its tool list. Its to-do list stays, as Claude's
+  and Gemini's do. Sharing a conversation to OpenCode's website and self-update are
+  switched off, as switches your own settings cannot turn back on. Left to itself OpenCode
+  asks for nothing, so the app makes it ask before editing files, running commands and
+  fetching web pages, unless you choose **Always-approve** for it in **Settings ▸ Agent
+  Runtimes**. Its own question tool is off, so its questions come through the app's and
+  reach you as a card.
 
 Where a tool can only be named in the briefing, the agent is being asked, not stopped.
 That is weaker, and the app says so rather than pretending otherwise.
