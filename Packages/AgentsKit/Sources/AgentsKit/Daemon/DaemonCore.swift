@@ -1164,7 +1164,7 @@ public actor DaemonCore {
             let runtimeID = agents[agentID]?.runtimeID
             let reviewsClientSide = runtimeID.map(ClientPermissionSettings.supports) == true
             // Our own tool, answered by us. Nobody is asked whether the app may show
-            // the app's own suggestions. Cursor and Grok keep only the turn-ending
+            // the app's own suggestions. Cursor, Grok and OpenCode keep only the turn-ending
             // ones automatic (061): workflows, agents, leases and publishing still ask.
             if let option = reviewsClientSide
                 ? autoAllowedTurnTool(request)
@@ -1185,7 +1185,7 @@ public actor DaemonCore {
                 await record(.runtimeNote(refusal.note), for: agentID)
                 return
             }
-            // Always-approve for Cursor and Grok (061): answer once, before any card or
+            // Always-approve for Cursor, Grok and OpenCode (061, 049): answer once, before any card or
             // attention event. Prefer allow_once so switching back to Default still asks.
             // Pending cards already on screen are never touched.
             if reviewsClientSide,

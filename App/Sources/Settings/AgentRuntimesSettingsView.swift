@@ -76,12 +76,8 @@ private struct ClientPermissionModeRow: View {
         Binding(
             get: { model.clientPermissions.mode(for: runtimeID) },
             set: { mode in
-                var settings = model.clientPermissions
-                switch runtimeID {
-                case RuntimeCatalog.cursor.id: settings.cursor = mode
-                case RuntimeCatalog.grok.id: settings.grok = mode
-                default: return
-                }
+                guard ClientPermissionSettings.supports(runtimeID) else { return }
+                let settings = model.clientPermissions.setting(mode, for: runtimeID)
                 Task { await model.setClientPermissions(settings) }
             })
     }
