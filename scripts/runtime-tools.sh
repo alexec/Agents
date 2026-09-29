@@ -40,6 +40,9 @@ RUNTIMES = {
     # Google's ACP server, never the agy CLI (049, R1): the app's own copy's shim, named by
     # AGENTS_ANTIGRAVITY_SHIM, e.g. <root>/tools/antigravity/current/bin/agy_acp_server.
     "antigravity": [os.environ.get("AGENTS_ANTIGRAVITY_SHIM", "agents-antigravity-shim-not-set")],
+    # Never an opencode on the PATH (049, D1: two programs have that name): the app's own
+    # copy's shim, named by AGENTS_OPENCODE_SHIM, e.g. <root>/tools/opencode/current/bin/opencode.
+    "opencode": [os.environ.get("AGENTS_OPENCODE_SHIM", "agents-opencode-shim-not-set"), "acp"],
 }
 
 # What a runtime needs in its environment to run at all, scoped or not (049): Antigravity
@@ -51,6 +54,11 @@ RUNTIME_ENV = {
                     "AGY_ACP_DISABLE_WORKSPACE_TRUST": "1",
                     **({"GEMINI_API_KEY": os.environ["AGENTS_ANTIGRAVITY_KEY"]}
                        if os.environ.get("AGENTS_ANTIGRAVITY_KEY") else {})},
+    # OpenCode reads and writes its own config and data under the XDG folders: a scratch
+    # home for each run, so the person's ~/.config/opencode is never read or touched.
+    "opencode": (lambda home: {"HOME": home, "XDG_CONFIG_HOME": f"{home}/.config",
+                               "XDG_DATA_HOME": f"{home}/.local/share", "XDG_CACHE_HOME": f"{home}/.cache",
+                               "XDG_STATE_HOME": f"{home}/.local/state"})(_tempfile.mkdtemp(prefix="agents-opencode-home-")),
 }
 # Signed in with before any session, when the key above is given.
 RUNTIME_AUTH = {"antigravity": "gemini-api-key"} if os.environ.get("AGENTS_ANTIGRAVITY_KEY") else {}
@@ -139,6 +147,18 @@ POLICIES = {
         "meta": {"agy": {"disabledTools": ["start_subagent"]}},
         "args": [],
         "env": {},
+    },
+    # Its own config inline in OPENCODE_CONFIG_CONTENT (049, R3): task removed, asks forced on.
+    "opencode": {
+        "removed": ["task"],
+        "kept": [],
+        "residue": [],
+        "meta": None,
+        "args": [],
+        "env": {"OPENCODE_DISABLE_AUTOUPDATE": "1", "OPENCODE_DISABLE_SHARE": "1"},
+        "inline_env": {"OPENCODE_CONFIG_CONTENT": json.dumps({
+            "autoupdate": False, "permission": {"bash": "ask", "edit": "ask", "webfetch": "ask"},
+            "share": "disabled", "tools": {"task": False}}, sort_keys=True, separators=(",", ":"))},
     },
     # Feature switches in CODEX_CONFIG, JSON inline rather than a file (047, R5).
     "codex": {

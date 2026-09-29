@@ -120,7 +120,7 @@ still green.
 - [x] T015 [P] [US1] Show no cost for a zero cost on the meters, in
   `App/Sources/Chat/ContextMeter.swift` (:89-100) and `Remote/Sources/Chat/RemoteChatView.swift`
   (:337).
-- [ ] T016 [US1] Add `opencode` to `scripts/acp-handshake.sh` (`RUNTIMES` via
+- [x] T016 [US1] Add `opencode` to `scripts/acp-handshake.sh` (`RUNTIMES` via
   `AGENTS_OPENCODE_SHIM`, with a scratch `HOME`/`XDG_*` in `RUNTIME_ENV`) and to
   `scripts/runtime-tools.sh` (its copy of the catalog and policy).
 - [ ] T017 [US1] Live gate. On a scratch root (run-app skill):
