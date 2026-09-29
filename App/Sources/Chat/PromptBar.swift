@@ -438,7 +438,7 @@ struct PromptBar: View {
                                                  set: { if !$0 { dictation.dismissProblem() } })) {
             // Where a switch would fix it, offer to open the switch.
             if let permission = dictation.problem?.permission {
-                Button("Open System Settings") { NSWorkspace.shared.open(permission.settings) }
+                Button("Open System Settings") { NSWorkspace.shared.open(permission.settings) }  // store-ok: System Settings, not a path
             }
             Button("OK", role: .cancel) {}
         } message: {

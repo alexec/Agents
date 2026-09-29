@@ -21,12 +21,16 @@ struct FirstRunView: View {
         VStack(alignment: .leading, spacing: 20) {
             if let found = thisMacs { foundHere(found) } else { choice }
         }
-        .frame(maxWidth: 640, alignment: .leading)
+        // A floor on the width: laid out narrower, the words fixed to their height push
+        // the window thousands of points tall.
+        .frame(minWidth: 520, maxWidth: 640, alignment: .leading)
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .paperGround()
         .sheet(isPresented: $connecting) { ConnectSheet().paperSheet() }
         .onAppear { browser.start() }
+        // A walk's window pairs itself from AGENTS_CONTROL; nothing else sets it.
+        .task { await model.pairForWalk() }
         .onDisappear { browser.stop() }
     }
 
@@ -109,7 +113,7 @@ struct FirstRunView: View {
 
     private func getAgentsHost() {
         let text = Bundle.main.object(forInfoDictionaryKey: "AgentsHostDownloadURL") as? String
-        if let url = text.flatMap(URL.init(string:)) { NSWorkspace.shared.open(url) }
+        if let url = text.flatMap(URL.init(string:)) { NSWorkspace.shared.open(url) }  // store-ok: a web page
     }
 }
 #endif

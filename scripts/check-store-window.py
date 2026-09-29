@@ -24,7 +24,7 @@ PATTERNS = [
     (r"FileManager\.default\.(fileExists|contentsOfDirectory|createDirectory|removeItem|moveItem|copyItem|attributesOfItem|enumerator|homeDirectoryForCurrentUser)", "the disk"),
     (r"contentsOf(File)?:", "the disk"),
     (r"\.write\(to:", "the disk"),
-    (r"NSWorkspace\.shared\.(activateFileViewerSelecting|open\(\[|open\(URL\(filePath|icon\(forFile)", "Finder or an app on a path"),
+    (r"NSWorkspace\.shared\.(activateFileViewerSelecting|open\(|icon\(forFile)", "Finder or an app on a path"),
     (r"\bdlsym\b|\bProcess\(\)|posix_spawn|\bFDTransport\b|connectUnixSocket", "another process"),
 ]
 

@@ -54,6 +54,9 @@ struct FilesPane: View {
     #endif
     private var server: RemoteFiles? { onThisMac ? nil : model.serverFiles(agent.host) }
     private var serverLabel: String? { onThisMac ? nil : model.hosts.label(agent.host) }
+    /// Where a file the pane will not draw is, when Finder here cannot show it: nil for
+    /// this Mac's host, whose files the store window reveals and opens through it.
+    private var elsewhere: String? { model.isOnThisMac(agent.host) ? nil : model.hosts.label(agent.host) }
     private var serverChanges: Int { server?.changeCount(agentID: agent.id, folder: folder) ?? 0 }
 
     var body: some View {
@@ -252,10 +255,11 @@ struct FilesPane: View {
                     }
                 }
             case .image(let description):
-                ImageFile(url: url, probe: probe, description: description, server: serverLabel)
+                ImageFile(url: url, probe: probe, description: description, server: serverLabel,
+                          elsewhere: elsewhere, host: agent.host)
             case .binary(let description):
                 // Its bytes are never shown (FR-014). What is shown is the way out.
-                OpenElsewhere(url: url, description: description, server: serverLabel)
+                OpenElsewhere(url: url, description: description, server: elsewhere, host: agent.host)
             }
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)

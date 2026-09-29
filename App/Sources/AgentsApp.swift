@@ -13,13 +13,6 @@ struct AgentsApp: App {
     @State private var requests = WindowRequests()
     @State private var frame = SidebarFrame()
 
-    #if AGENTS_STORE
-    init() {
-        let model = _model.wrappedValue
-        Task { @MainActor in await model.pairForWalk() }
-    }
-    #endif
-
     var body: some Scene {
         // Still a `WindowGroup`, but one window in practice: File ▸ New Window is
         // replaced by New Session (see `AgentsCommands`), and tabbing is off. Not a

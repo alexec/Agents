@@ -162,7 +162,7 @@ struct AgentsCommands: Commands {
         }
 
         CommandGroup(replacing: .help) {
-            Button("Agents Help") { NSWorkspace.shared.open(Self.helpURL) }
+            Button("Agents Help") { NSWorkspace.shared.open(Self.helpURL) }  // store-ok: a web page
                 .keyboardShortcut("?")
         }
     }

@@ -176,6 +176,15 @@ struct ContentView: View {
         .environment(requests)
         .environment(sidebarStates)
         .environment(webHolders)
+        #if AGENTS_STORE
+        // A file a chat links to is on its host: that host opens it (058, US1). Links to
+        // the web are the window's own.
+        .environment(\.openURL, OpenURLAction { url in
+            guard url.isFileURL else { return .systemAction }
+            model.open(url, on: model.selectedProjectHost)
+            return .handled
+        })
+        #endif
         .task { await model.stayConnected() }
         // No tabs: the only way left to a second window, and a second window would be a
         // mirror of the first, because what is selected lives on the one model.

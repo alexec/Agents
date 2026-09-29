@@ -45,14 +45,46 @@ line in the walk's pairing log.
     (`applicationSupportDirectory`), whatever `AGENTS_ROOT` says. It never reads a daemon's
     root.
 
+## The screen walk (2026-09-29, after unlock)
+
+Screenshots are in `walks/us1-store/`.
+
+| Step | Result |
+|---|---|
+| Frame K, unpaired (`frame-K.png`) | Matches the approved frame: two cards and the waiting line. |
+| Frame K2 (`frame-K2.png`) | `dns-sd -R "Alex's MacBook Air" _agents-control._tcp` stood in for Agents Host's advertisement, and K turned into K2 by itself. |
+| Pairing through the sheet (`pair-sheet.png`) | Pair, a fresh operator code inserted into CODE, then Connect. The control plane logged `paired as operator`, and the window went to the host's projects (`paired-2.png`). |
+| A real Claude turn (`turn-3.png`, `turn-5.png`) | Sent from the store window's composer. The permission card showed in the window and was answered Yes there. Claude wrote `/tmp/cpstore/work/hello.txt` ("hello from the store window"), and the chat ended with Claude's summary. |
+| Reveal in Finder (`files-2.png`) | Pressed on a zip in the Files pane. The host's `mac/reveal` opened Finder on `/private/tmp/cpstore/work`. |
+| Shared page (`shared-1.png`) | Answered by the host: "The shared folder is off for this copy of the app". A scratch host keeps `~/.agents` alone, so the route is proven but the Skills page itself needs a real host. |
+| Child processes and sandbox denials | None, across all four window launches. |
+| The Local Network prompt | It never appeared on this Mac: not while browsing Bonjour, and not while dialling 127.0.0.1. A second machine is still needed to see it. |
+
+### Found on screen and fixed
+
+- **The walk hook paired a throwaway model.**
+  - It was called from `AgentsApp.init`, where the `@State` model isn't yet the window's.
+  - It now runs from K's `.task`.
+- **Frame K made the window 6,054 points tall.**
+  - Laid out at no width, the words fixed to their height push the window's minimum up.
+  - A minimum width of 520 on the column fixes it: the window resizes to 720 again.
+- **The Files pane told the store window "On This Mac. Open it there."**
+  - It offered no Reveal or Open, because in the store build it treats every host as a server.
+  - Showing is now decided by `isOnThisMac` (`elsewhere`), while reading still goes through the host.
+  - `OpenElsewhere` sends Reveal and Open through `mac/reveal` and `mac/open` on the file's host, instead of calling `NSWorkspace` itself.
+- **The gate missed `NSWorkspace.shared.open(<variable>)`.**
+  - It now flags every `open(`.
+  - A chat's resource links go through the window's `openURL`, and the store window sends `file://` links to the host.
+  - Web and System Settings links carry `store-ok`.
+- **The scratch host was started wrongly.**
+  - It ran with `--serve`, which made it a server that asks to be lent Claude's sign-in, and carried this session's `CLAUDE_*` variables.
+  - A Mac host runs without `--serve`, as `LocalServices` starts it. That is a walk set-up error, not a product one.
+
 ## Still open
 
-- **Screenshots of each step, clicking Reveal, and opening the shared skills page.** The
-  screen was locked for the whole walk (idle more than 19 minutes), so these wait for an
-  unlock. The route itself is proven over the socket above.
-- **The Local Network prompt.** Opening the store build from Finder and dialling a control
-  plane on another machine needs a second machine and a person at the screen.
-- **A real Claude turn from the store window.** This needs the screen.
+- **The Local Network prompt,** against a control plane on another machine.
+- **The shared Skills page** against a host whose shared folder is on (a real Agents Host, T055).
+- **The window's first open height** (1410) is the screen's rather than `defaultSize`'s 720. It resizes freely.
 
 ## Deviations from the tasks
 

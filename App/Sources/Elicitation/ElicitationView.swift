@@ -41,7 +41,7 @@ struct ElicitationView: View {
                 case .url(let url):
                     HStack(spacing: 8) {
                         Button("Open") {
-                            if let link = URL(string: url) { NSWorkspace.shared.open(link) }
+                            if let link = URL(string: url) { NSWorkspace.shared.open(link) }  // store-ok: a link the agent sent, to the browser
                         }
                         .buttonStyle(.paperProminent)
                         .keyboardShortcut(.defaultAction)
