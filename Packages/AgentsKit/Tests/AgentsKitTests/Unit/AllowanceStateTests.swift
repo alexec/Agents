@@ -168,4 +168,20 @@ struct AllowanceStateTests {
         #expect(AllowanceState.credentialKey(for: mac) == AllowanceState.credentialKey(for: server))
         #expect(AllowanceState.credentialKey(for: mac) != AllowanceState.credentialKey(for: keyed))
     }
+
+    @Test func theCheckRunsOnASmallModelOrTheDefault() {
+        func choice(_ value: String, _ name: String, _ description: String? = nil) -> ConfigChoice {
+            ConfigChoice(value: .string(value), name: name, description: description)
+        }
+        let claude = [choice("default", "Default (recommended)"), choice("opus", "Opus"), choice("haiku", "Haiku")]
+        #expect(DaemonCore.probeModel(in: claude)?.name == "Haiku")
+        // Codex names none small; its descriptions do. Never its first, frontier model.
+        let codex = [choice("gpt-6-astra", "6 Astra", "Frontier intelligence for the most demanding work."),
+                     choice("gpt-6-sol", "6 Sol", "Workhorse model for coding and everyday work."),
+                     choice("gpt-6-luna", "6 Luna", "Fast and affordable model for easier tasks."),
+                     choice("gpt-5.6-luna", "5.6 Luna", "Older fast and efficient model.")]
+        #expect(DaemonCore.probeModel(in: codex)?.name == "6 Luna")
+        // Nothing says it is small: keep the runtime's own default.
+        #expect(DaemonCore.probeModel(in: [choice("big", "Big"), choice("bigger", "Bigger")]) == nil)
+    }
 }

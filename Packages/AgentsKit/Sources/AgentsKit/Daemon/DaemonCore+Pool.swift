@@ -151,7 +151,7 @@ extension DaemonCore {
             _ = state.checkExpiry(payment: entry.payment, now: at)
         }
         if state != before { setAllowanceState(state) }
-        if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked") }
+        if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked", after: before) }
     }
 
     /// A failed runtime leaves the pool even when the failure was not a quota error.
@@ -698,9 +698,12 @@ extension DaemonCore {
     }
 
     /// An allowance came back: the person said so, or a turn on it worked (042).
-    func raiseAllowanceBack(_ entry: PoolEntry, how: String) {
+    /// `after` is the state it came back from: a runtime that failed did not run out.
+    func raiseAllowanceBack(_ entry: PoolEntry, how: String, after: AllowanceState? = nil) {
+        let name = PoolWords.runtimeName(entry.runtimeID)
+        let failed = if case .out(_, _, .runtimeFailed) = after?.status { true } else { false }
         raise(EventDraft(name: "cost.allowance_back", at: now(), scope: .mac,
-                         sentence: "\(PoolWords.runtimeName(entry.runtimeID))’s allowance came back.",
+                         sentence: failed ? "\(name) is back in the pool." : "\(name)’s allowance came back.",
                          details: ["runtime": entry.runtimeID, "how": how]))
     }
 
@@ -881,7 +884,7 @@ extension DaemonCore {
             markSignedIn(runtimeID: entry.runtimeID)
             state.worked(now: at)
             setAllowanceState(state)
-            raiseAllowanceBack(entry, how: "check")
+            raiseAllowanceBack(entry, how: "check", after: expected)
         } else {
             state.deferCheck(now: at)
             setAllowanceState(state)
@@ -892,6 +895,7 @@ extension DaemonCore {
     /// or project content, and a read-only mode wherever the runtime advertises one.
     private func probeAllowance(runtimeID: String) async -> Bool {
         var session: ACPSession?
+        var chosen: [String] = []
         do {
             let (made, _) = try await handshakeOnly(runtimeID: runtimeID)
             session = made
@@ -904,12 +908,15 @@ extension DaemonCore {
                    return ["plan", "ask", "read-only"].contains(value.split(separator: "#").last.map(String.init) ?? value)
                }) {
                 try await made.setOption(id: mode.id, value: choice.value)
+                chosen.append("mode \(choice.value.stringValue ?? choice.name)")
             } else if ModeMemory.modeOption(in: options) != nil {
+                DaemonLog.shared.write("pool check for \(runtimeID): failed, no read-only mode to check in")
                 return false
             }
             if let model = WorkflowSettings.modelOption(in: options),
-               let choice = model.options?.min(by: { Self.probeModelRank($0) < Self.probeModelRank($1) }) {
+               let choice = Self.probeModel(in: model.options ?? []) {
                 try await made.setOption(id: model.id, value: choice.value)
+                chosen.append("model \(choice.value.stringValue ?? choice.name)")
             }
             let replies = Task { () -> String in
                 var text = ""
@@ -929,9 +936,12 @@ extension DaemonCore {
             let recognition = LimitRecognition.classify(failure: answer.failure,
                                                         runtimeError: answer.runtimeError?.sentence ?? reply,
                                                         runtimeID: runtimeID, rateLimit: answer.rateLimit)
-            return answer.reason == .endTurn && answer.failure == nil && answer.runtimeError == nil
+            let passed = answer.reason == .endTurn && answer.failure == nil && answer.runtimeError == nil
                 && recognition == .none && answer.rateLimit?.isRejected != true
                 && ["ok", "ok."].contains(reply.lowercased())
+            DaemonLog.shared.write("pool check for \(runtimeID): \(passed ? "passed" : "failed") "
+                                   + "(\(chosen.joined(separator: ", ")); reply \(reply.prefix(80).debugDescription))")
+            return passed
         } catch {
             DaemonLog.shared.write("pool check failed for \(runtimeID): \(error)")
             if let session { await session.end(gracePeriod: .seconds(1)) }
@@ -939,14 +949,18 @@ extension DaemonCore {
         }
     }
 
-    /// Runtime options have no prices. Prefer the small model families advertised by
-    /// the runtimes; retain their order when neither name identifies a smaller one.
-    private static func probeModelRank(_ choice: ConfigChoice) -> Int {
-        let name = "\(choice.name) \(choice.value.stringValue ?? "")".lowercased()
-        for (rank, word) in ["nano", "flash-lite", "haiku", "mini", "flash", "small", "lite", "fast"].enumerated() {
-            if name.contains(word) { return rank }
+    /// Runtime options have no prices. The first of the small model families the runtimes
+    /// advertise, by name or in their own description ("Fast and affordable"). Nil when
+    /// none says it is small: the runtime's default then stays, rather than the first
+    /// in its list, which is often its largest.
+    static func probeModel(in choices: [ConfigChoice]) -> ConfigChoice? {
+        let small = ["nano", "flash-lite", "haiku", "mini", "flash", "small", "lite", "fast", "affordable"]
+        func rank(_ choice: ConfigChoice) -> Int? {
+            let words = "\(choice.name) \(choice.value.stringValue ?? "") \(choice.description ?? "")".lowercased()
+            return small.firstIndex { words.contains($0) }
         }
-        return 100
+        return choices.compactMap { choice in rank(choice).map { (choice, $0) } }
+            .min { $0.1 < $1.1 }?.0
     }
 
     /// Why an entry cannot be used at all, in the page's words.
