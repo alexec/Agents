@@ -25,8 +25,8 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
 | `people/<id>.json` | first start | `absent` | start |
 | `clients/<uuid>.json` | pairing, setGrant, lastSeen (hourly) | `absent` on pairing, `matching` after | start, every 15 s, on event |
 | `hosts/<id>.json` | enrolment, hello (version change), remove | `absent` / `matching` | the same |
-| `codes/<hash>.json` | startPairing, startEnroll | `absent` | on use |
-| `codes/<hash>.spent` | first use | `absent`: the winner admits | on use |
+| `codes/<id>.json` | startPairing, startEnroll | `absent` | on use |
+| `codes/<id>.spent` | first use | `absent`: the winner admits | on use |
 | `leases/<host>.json` | the holding copy | `absent`, or `matching` to renew or take over | on routing, on `gone` |
 | `copies/<id>.json` | each copy, every 10 s | `always` (only its own key) | peer discovery, every 10 s |
 | `events/<day>/<ulid>.json` | whichever copy made the change | `absent` | on (re)joining peers |
@@ -56,8 +56,9 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
    - Plain HTTPS with SigV4, and path-style addressing if `AGENTS_STORE_PATH_STYLE=1` (MinIO).
    - Credentials come from the environment, the standard AWS files, or (in the host app) an
      inherited descriptor, and never from the store.
-7. **No secrets in the store.** That means no private keys and no code secrets, only their
-   hashes.
+7. **No secrets in the store.** That means no private keys and no code secrets. A code is
+   stored by its id alone; its secret is the id and a tag any copy makes again from the
+   control plane's private key (`ControlAuth.codeSecret`).
 8. **What counts as a conflict** (S4). A conditional put answered 412, 409, or 404 (an
    `If-Match` on a key that is gone) throws `StoreError.conflict`.
 9. **ETags verbatim.** An ETag is sent back exactly as the store gave it, quotes included.

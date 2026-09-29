@@ -42,10 +42,10 @@ Three messages open every socket. Nothing else is accepted until the server's `o
 
 | Identity | K |
 |---|---|
-| `c:<uuid>`, a client | `clientKey`: HKDF(ECDH(control, client), `agents-lan-v1`, uuid), as today |
-| `h:<id>`, a host | `hostKey`: HKDF(ECDH(control, host), `agents-host-v1`, id), as today |
-| `p:<hash>`, a client code | `codeKey(secret)`. `hash` = SHA-256(secret), base64url |
-| `e:<hash>`, a host code | the same, for a host |
+| `c:<uuid>`, a client | `clientKey`: HKDF(ECDH(control, client), `agents-control-client-v1`, uuid), as the first build's `ControlKeys` |
+| `h:<id>`, a host | `hostKey`: HKDF(ECDH(control, host), `agents-control-host-v1`, id), as today |
+| `p:<id>`, a client code | `codeKey(secret)`. The secret is the code's 16-byte id and a 16-byte tag, HMAC under a key from the control plane's private key, so any copy can make it again from the id; `id` is the hex of those 16 bytes |
+| `e:<id>`, a host code | the same, for a host |
 | `x:<copy-id>`, a peer copy | HKDF(control private key, `agents-copy-v1`, "") |
 
 **After `ok` with a code identity**, the new party sends one line:
@@ -53,7 +53,7 @@ Three messages open every socket. Nothing else is accepted until the server's `o
 {"m":{"jsonrpc":"2.0","id":1,"method":"clients/announce","params":{"id":"<uuid>","publicKey":"…","name":"…","kind":"iphone"}}}
 ```
 or `hosts/announce`. The reply carries the record. The socket then closes, and the party
-reconnects with its own identity. Using the code creates `codes/<hash>.spent` first (store.md),
+reconnects with its own identity. Using the code creates `codes/<id>.spent` first (store.md),
 so a second use is `refused: spent`.
 
 **A relayed device.** `agents-relay` opens the socket with `kind: relay` and `for: <device>`,

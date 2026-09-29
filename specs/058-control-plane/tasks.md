@@ -126,12 +126,12 @@ transport.
   - 412, 409 and 404 on a conditional put all surface as `conflict`, and a stale write after A→B→A is refused because `rev` changed (store.md rules 8–10);
   - forgetting writes a tombstone that reads as absent (rule 11);
   - the start-up probe fails on a store that ignores conditions (a test double).
-- [ ] T035 [P] Write `ControlAuth` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlAuth.swift`. It covers both sides of the three messages in contracts/wire.md (hello, auth, ok or refused):
+- [x] T035 (a code's secret is its id and a tag any copy can remake, so no copy needs another's secret) [P] Write `ControlAuth` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlAuth.swift`. It covers both sides of the three messages in contracts/wire.md (hello, auth, ok or refused):
   - the transcript `"agents-auth-v1" | sn | pn | id | origin`;
   - the MACs tagged `c` and `s`;
   - K for `c:`, `h:`, `p:`, `e:` and `x:` using `ControlAgreement`;
   - `origin` normalised to lowercase scheme, host and port.
-- [ ] T036 [P] Key exchange tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlAuthTests.swift`:
+- [x] T036 (11 tests) [P] Key exchange tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlAuthTests.swift`:
   - each identity kind round-trips;
   - a wrong key, a replay to another origin, a flipped nonce, an expired code and a spent code are each refused with the contracts' reason;
   - the server's MAC is checked by the client;

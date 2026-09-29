@@ -63,19 +63,20 @@ Rules:
 
 `reach` (`dialOut` or `ssh`) from the first build is gone: every host dials out.
 
-## Code (`codes/<sha256(secret)>.json`, and `.spent`)
+## Code (`codes/<id>.json`, and `.spent`)
 
 | Field | Type | Notes |
 |---|---|---|
-| `purpose` | `client(grant)` \| `host` | Identity `p:` or `e:` plus the hash. |
+| `purpose` | `client(grant)` \| `host` | Identity `p:` or `e:` plus the id: 16 random bytes, in hex. |
 | `owner` | PersonID | |
 | `expires` | Date | Five minutes, or longer for the App Review demo code (R13). |
 | `issuedBy` | ClientID | Who asked for it (shown in Settings). |
 
-- **The secret itself** is never stored. The code text a person sees is
+- **The secret itself** is never stored: it is the id and a 16-byte tag, HMAC under a key
+  from the control plane's private key, which any copy makes again (`ControlAuth`). The code text a person sees is
   `agents-control:2:<c|h>:<grant|->:<key>:<secret>:<url>:<pin|->:<name>`. It keeps the
   control plane's public key, so the new party checks the key it meets on its first connection.
-- **Using a code** creates `<hash>.spent` with `If-None-Match: *`, so it works once, at any
+- **Using a code** creates `<id>.spent` with `If-None-Match: *`, so it works once, at any
   copy.
 - **Expired codes** are deleted by any copy that lists them.
 

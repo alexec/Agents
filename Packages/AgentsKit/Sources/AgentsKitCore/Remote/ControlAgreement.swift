@@ -53,6 +53,9 @@ public enum ControlAgreement {
 
     public static func sha256(_ data: Data) -> Data { SHA256.sum(data) }
 
+    /// HMAC-SHA256 (RFC 2104), as CryptoKit's `HMAC<SHA256>` computes it.
+    public static func hmacSHA256(key: Data, message: Data) -> Data { HMAC.sha256(key: key, message: message) }
+
     /// HKDF-SHA256 (RFC 5869), the same derivation CryptoKit's `HKDF` and
     /// `hkdfDerivedSymmetricKey` perform.
     public static func hkdfSHA256(ikm: Data, salt: Data, info: Data, length: Int) -> Data {
