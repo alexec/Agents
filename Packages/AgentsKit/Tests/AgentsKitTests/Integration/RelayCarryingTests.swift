@@ -33,7 +33,7 @@ struct RelayCarryingTests {
                                      pipes.add(far)
                                      // The daemon agreeing that this is the phone's
                                      // connection, as the real one does first.
-                                     Task {
+                                     _ = Task {
                                          for try await line in far.lines() where line.contains(DeviceBinder.requestID) {
                                              try far.write(line: #"{"jsonrpc":"2.0","id":"\#(DeviceBinder.requestID)","result":{}}"#)
                                          }

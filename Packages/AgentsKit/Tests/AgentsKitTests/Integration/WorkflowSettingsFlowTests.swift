@@ -101,7 +101,7 @@ struct WorkflowSettingsFlowTests {
         #expect(sent?.contains { $0.id == "mode" } != true)
         // One process. Asking what the runtime offered reused the session it answered
         // with, rather than starting a second one to run in.
-        #expect(await launcher.launchCount == 1)
+        #expect(launcher.launchCount == 1)
     }
 
     @Test func aWorkflowWithNoSettingsTakesTheOldPath() async throws {
@@ -119,7 +119,7 @@ struct WorkflowSettingsFlowTests {
         // way — so what is asserted is its whole consequence: one process, and not a
         // word said to the runtime about how to behave.
         #expect(await launcher.lastAgent?.setOptions.isEmpty == true)
-        #expect(await launcher.launchCount == 1)
+        #expect(launcher.launchCount == 1)
         #expect(await core.drafts.isEmpty)
     }
 
@@ -150,7 +150,7 @@ struct WorkflowSettingsFlowTests {
         #expect(detail.contains("acceptEdits"))
         // The session made to ask the question was let go of, not left running.
         #expect(await core.drafts.isEmpty)
-        #expect(await launcher.launchCount == 1)
+        #expect(launcher.launchCount == 1)
     }
 
     @Test func aWorkflowNamingAnUnknownRuntimeIsRefusedNotRehomed() async throws {
@@ -165,7 +165,7 @@ struct WorkflowSettingsFlowTests {
         #expect(await core.allAgents().isEmpty)
         // Nothing was started at all: a workflow that says `runtime: grok` and quietly
         // runs on Claude is the same betrayal as one that loses its permission mode.
-        #expect(await launcher.launchCount == 0)
+        #expect(launcher.launchCount == 0)
         guard case .refused(.settingRefused(let setting, _), _, _) = summary.lastOutcome else {
             Issue.record("expected a settings refusal, got \(String(describing: summary.lastOutcome))")
             return
@@ -305,6 +305,6 @@ struct WorkflowSettingsFlowTests {
         // Nothing remembered here yet, and — the point of the method — nothing started
         // to find out. Reading a workflow must not spawn a runtime.
         #expect(offered.isEmpty)
-        #expect(await launcher.launchCount == 0)
+        #expect(launcher.launchCount == 0)
     }
 }

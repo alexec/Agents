@@ -17,7 +17,7 @@ struct RuntimeAllowancesTests {
     @Test func anOutRuntimeIsWarnedAboutWithTheProvidersTime() {
         let rows = RuntimeAllowances(rows: [row("claude:sign-in", out: true, until: now.addingTimeInterval(3600)),
                                             row("codex:sign-in")], at: now)
-        let sentence = try? #require(rows.startingOnOut("claude"))
+        let sentence = rows.startingOnOut("claude")
         #expect(sentence?.hasPrefix("Claude is out. Its provider says it resets at ") == true)
         #expect(sentence?.contains("Codex") == false, "no other runtime is offered")
     }

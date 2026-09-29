@@ -15,6 +15,7 @@ let package = Package(
         .executableTarget(
             name: "agentsd",
             dependencies: [.product(name: "AgentsKit", package: "AgentsKit")],
-            path: "Sources"),
+            path: "Sources",
+            swiftSettings: [.treatAllWarnings(as: .error)]),
     ]
 )

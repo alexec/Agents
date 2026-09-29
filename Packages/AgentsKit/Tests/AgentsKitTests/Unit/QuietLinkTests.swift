@@ -15,7 +15,7 @@ struct QuietLinkTests {
         func transport() async throws -> any LineTransport {
             let (near, far) = PairedTransport.pair()
             let quiet = quiet
-            Task {
+            _ = Task {
                 for try await line in far.lines() {
                     guard !quiet.isSet,
                           let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],

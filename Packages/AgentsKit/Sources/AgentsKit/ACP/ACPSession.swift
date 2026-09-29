@@ -760,7 +760,7 @@ public actor ACPSession {
         guard notificationTask == nil else { return }
         notificationTask = Task { [weak self] in
             guard let self else { return }
-            for await notification in await self.connection.incomingNotifications() {
+            for await notification in self.connection.incomingNotifications() {
                 await self.receive(notification.method, notification.params)
             }
             // Nothing more is coming, so a marker that has not arrived never will.

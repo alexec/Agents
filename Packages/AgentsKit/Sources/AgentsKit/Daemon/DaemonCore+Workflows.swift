@@ -834,6 +834,7 @@ extension DaemonCore {
     /// obeys every other rule — the run in flight, the ceilings, the archive —
     /// returning the refusal on the summary rather than swallowing it. Somebody is
     /// watching when they tap this, so being told why matters more here than anywhere.
+    @discardableResult
     public func runWorkflow(_ request: DaemonAPI.WorkflowRequest) async throws -> WorkflowSummary {
         guard let workflow = workflow(request.workflowID, in: request.folder) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,

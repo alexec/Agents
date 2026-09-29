@@ -20,7 +20,7 @@ public final class DaemonLog: @unchecked Sendable {
         rollIfNeeded(url)
         let line = Data("\(ISO8601DateFormatter().string(from: Date())) \(message)\n".utf8)
         if let handle = try? FileHandle(forWritingTo: url) {
-            try? handle.seekToEnd()
+            _ = try? handle.seekToEnd()
             try? handle.write(contentsOf: line)
             try? handle.close()
         } else {
@@ -30,7 +30,7 @@ public final class DaemonLog: @unchecked Sendable {
 
     private func rollIfNeeded(_ url: URL) {
         let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
-        guard (size ?? 0) > limit else { return }
+        guard size > limit else { return }
         let previous = url.deletingPathExtension().appendingPathExtension("previous.log")
         try? FileManager.default.removeItem(at: previous)
         try? FileManager.default.moveItem(at: url, to: previous)

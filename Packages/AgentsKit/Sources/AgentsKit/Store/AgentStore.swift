@@ -242,7 +242,7 @@ public actor AgentStore {
         let url = locations.transcript(agentID)
         try FileManager.default.createDirectory(at: locations.agent(agentID), withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(atPath: url.path, contents: nil)
+            _ = FileManager.default.createFile(atPath: url.path, contents: nil)
         }
         let handle = try FileHandle(forUpdating: url)
         let end = try handle.seekToEnd()

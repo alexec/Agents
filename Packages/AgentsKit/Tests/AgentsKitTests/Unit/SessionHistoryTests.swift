@@ -182,7 +182,7 @@ struct SessionHistoryTests {
         #expect(!text.contains("REPLY 1 "))
         #expect(text.contains("- [ ] Verify"))
         #expect(text.count <= 8_000)
-        let leftOut = try? #require(document.leftOut)
+        let leftOut = document.leftOut
         #expect((leftOut ?? 0) > 0)
         #expect(text.contains("\(leftOut ?? -1) turns in the middle were left out to fit."))
     }

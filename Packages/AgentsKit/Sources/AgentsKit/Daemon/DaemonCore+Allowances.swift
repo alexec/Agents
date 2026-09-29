@@ -346,7 +346,7 @@ extension DaemonCore {
             let wait = Self.allowanceBroadcastGap - (clock.now - last)
             Task {
                 try? await Task.sleep(for: wait)
-                await self.sendHeldAllowanceBroadcast()
+                self.sendHeldAllowanceBroadcast()
             }
             return
         }

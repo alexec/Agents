@@ -43,7 +43,7 @@ struct OpenCodeFixtureTests {
     @Test func aFreeModelsZeroCostIsNoCost() throws {
         let update = try #require(try Self.message("usage-zero-cost.json")["params"]?["update"])
         guard case .usage(let usage) = SessionUpdate.decode(update) else { Issue.record("not usage"); return }
-        #expect((usage.used ?? 0) > 0)
+        #expect(usage.used > 0)
         #expect(usage.cost == nil)
     }
 }
