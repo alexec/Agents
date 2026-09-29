@@ -74,6 +74,7 @@ public actor ServerConnection {
     private let tools: ToolsetInstaller
     private let toolset: @Sendable () -> Toolset?
     private let otherToolsets: @Sendable () -> [Toolset]
+    private let archives: @Sendable () -> [ArchiveToolset]
     private let wantsClaude: @Sendable () async -> Bool
     private let wantsOther: @Sendable (String) async -> Bool
     private let offer: @Sendable () async -> DaemonAPI.CredentialsOffer?
@@ -82,6 +83,7 @@ public actor ServerConnection {
     private var onState: (@Sendable (State) async -> Void)?
     private var onClaude: (@Sendable (Claude) async -> Void)?
     private var onToolset: (@Sendable (String, Claude) async -> Void)?
+    private var onProgress: (@Sendable (String, String) async -> Void)?
     private var wasConnected = false
     private var isConnecting = false
 
@@ -96,12 +98,15 @@ public actor ServerConnection {
     ///     credential for it (FR-002). Otherwise it waits for `installClaude()`.
     ///   - otherToolsets, wants: the same for every other runtime the app installs (046:
     ///     Gemini), each installed as the server connects when `wants` says so for its id.
+    ///   - archives: runtimes the vendor ships as an archive, which this Mac downloads and
+    ///     copies over (049: OpenCode). `wants` decides for them too.
     public init(hostID: HostID, ssh: SSHCommand, socket: URL, installedBy: String,
                 binary: @escaping @Sendable (Architecture) async -> ServerBinary?,
                 toolset: @escaping @Sendable () -> Toolset? = { nil },
                 wantsClaude: @escaping @Sendable () async -> Bool = { false },
                 otherToolsets: @escaping @Sendable () -> [Toolset] = { [] },
                 wants: @escaping @Sendable (String) async -> Bool = { _ in false },
+                archives: @escaping @Sendable () -> [ArchiveToolset] = { [] },
                 offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
                 lender: DaemonClient.CredentialLender? = nil,
                 relay: @escaping @Sendable () async -> [RelayGrant] = { [] }) {
@@ -116,6 +121,7 @@ public actor ServerConnection {
         self.tools = ToolsetInstaller(ssh: ssh)
         self.toolset = toolset
         self.otherToolsets = otherToolsets
+        self.archives = archives
         self.wantsClaude = wantsClaude
         self.wantsOther = wants
         self.binary = binary
@@ -139,6 +145,11 @@ public actor ServerConnection {
     /// Every runtime's toolset moving, Claude's included (046).
     public func setOnToolset(_ handler: @escaping @Sendable (String, Claude) async -> Void) {
         onToolset = handler
+    }
+
+    /// What an archive install is doing, by runtime id (049): downloading, checking, copying.
+    public func setOnProgress(_ handler: @escaping @Sendable (String, String) async -> Void) {
+        onProgress = handler
     }
 
     public func connect() async {
@@ -282,9 +293,32 @@ public actor ServerConnection {
 
     // MARK: The app's toolsets (043 Claude, 046 the rest)
 
-    /// Claude's first, then the others in the order the app carries them.
-    private var allToolsets: [Toolset] {
-        (toolset().map { [$0] } ?? []) + otherToolsets().filter { $0.manifest.runtimeID != RuntimeCatalog.claude.id }
+    /// A toolset of either kind: Node and a package the server fetches (043, 046), or a
+    /// vendor's archive this Mac fetches (049).
+    enum Installable: Sendable {
+        case node(Toolset)
+        case archive(ArchiveToolset)
+
+        var id: String {
+            switch self {
+            case .node(let toolset): toolset.id
+            case .archive(let toolset): toolset.id
+            }
+        }
+
+        var runtimeID: String {
+            switch self {
+            case .node(let toolset): toolset.manifest.runtimeID
+            case .archive(let toolset): toolset.manifest.runtimeID
+            }
+        }
+    }
+
+    /// Claude's first, then the others in the order the app carries them, archives last.
+    private var allToolsets: [Installable] {
+        let node = (toolset().map { [$0] } ?? []) + otherToolsets().filter { $0.manifest.runtimeID != RuntimeCatalog.claude.id }
+        let taken = Set(node.map(\.manifest.runtimeID))
+        return node.map(Installable.node) + archives().filter { !taken.contains($0.manifest.runtimeID) }.map(Installable.archive)
     }
 
     private func wants(_ runtimeID: String) async -> Bool {
@@ -298,8 +332,8 @@ public actor ServerConnection {
         for toolset in allToolsets { await settle(toolset, probed) }
     }
 
-    private func settle(_ toolset: Toolset, _ probed: ServerFacts) async {
-        let runtimeID = toolset.manifest.runtimeID
+    private func settle(_ toolset: Installable, _ probed: ServerFacts) async {
+        let runtimeID = toolset.runtimeID
         let installed = probed.toolsetID(for: runtimeID) ?? (runtimeID == RuntimeCatalog.claude.id ? probed.toolsetID : nil)
         if installed == toolset.id {
             // Old toolsets go only when nothing could still be running from one: an agent
@@ -309,7 +343,10 @@ public actor ServerConnection {
         }
         // The person's own npx is Claude's own way (037); a runtime that runs only the app's
         // copy has none.
-        let usesOwn = !(RuntimeCatalog.runtime(id: runtimeID)?.usesAppCopyOnly ?? true) && toolset.shimName == "npx"
+        var usesOwn = false
+        if case .node(let node) = toolset {
+            usesOwn = !(RuntimeCatalog.runtime(id: runtimeID)?.usesAppCopyOnly ?? true) && node.shimName == "npx"
+        }
         if installed == nil, usesOwn, probed.hasNpx { return await moveToolset(runtimeID, .own) }
         let wanted = await wants(runtimeID)
         guard installed != nil || wanted else { return await moveToolset(runtimeID, .notInstalled) }
@@ -325,18 +362,30 @@ public actor ServerConnection {
 
     /// Install a runtime's toolset now (046). Says how it went in `state(of:)`.
     public func install(runtimeID: String) async {
-        guard let toolset = allToolsets.first(where: { $0.manifest.runtimeID == runtimeID }),
+        guard let toolset = allToolsets.first(where: { $0.runtimeID == runtimeID }),
               let facts, state == .connected || state == .updateWaiting else { return }
         await install(toolset, on: facts, installed: facts.toolsetID(for: runtimeID))
     }
 
-    private func install(_ toolset: Toolset, on facts: ServerFacts, installed: String?) async {
-        let runtimeID = toolset.manifest.runtimeID
+    private func install(_ toolset: Installable, on facts: ServerFacts, installed: String?) async {
+        let runtimeID = toolset.runtimeID
         await moveToolset(runtimeID, .installing)
         do {
             // An update already downloaded and waiting for a turn to end is not fetched again.
             if !(await tools.isInstalled(toolset.id, runtimeID: runtimeID)) {
-                try await tools.install(toolset, on: facts)
+                switch toolset {
+                case .node(let node):
+                    try await tools.install(node, on: facts)
+                case .archive(let archive):
+                    #if canImport(Security)
+                    let report = onProgress
+                    try await ServerArchiveInstaller(ssh: tools.ssh).install(archive, on: facts) { step in
+                        Task { await report?(runtimeID, step) }
+                    }
+                    #else
+                    throw HostProblem.toolsetInstallFailed("Only the app on a Mac installs \(runtimeID) on a server.")
+                    #endif
+                }
             }
             // Replacing one in use waits for its turns to end (FR-007): what is running
             // keeps its files; the swap is tried again on the next connect.

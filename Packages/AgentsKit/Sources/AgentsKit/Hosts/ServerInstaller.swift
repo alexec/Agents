@@ -42,6 +42,7 @@ public struct ServerInstaller: Sendable {
         grep -i '^[[:space:]]*AllowStreamLocalForwarding' /etc/ssh/sshd_config 2>/dev/null || echo default; \
         printf 'libc:%s\\n' "$(ldd --version 2>&1 | head -1)"; \
         printf 'fetch:%s\\n' "$(command -v curl || command -v wget || echo none)"; \
+        grep -qsw avx2 /proc/cpuinfo && echo avx2:yes || { [ -r /proc/cpuinfo ] && echo avx2:no || echo avx2:unknown; }; \
         t="$HOME/.agents-server/tools/claude/current"; \
         printf 'toolset:%s\\n' "$([ -f "$t/ok" ] && basename "$(readlink "$t")" || echo none)"; \
         for r in \(toolsetRuntimes); do t="$HOME/.agents-server/tools/$r/current"; \
@@ -100,6 +101,9 @@ public struct ServerInstaller: Sendable {
                 // environment does not sign its adapter in by itself.
                 if value == "env" || value == "file" { facts.ownSignIns.insert(String(key.dropFirst("signin.".count))) }
             case "npx": facts.hasNpx = value == "yes"
+            // Only a definite no picks a `-baseline` build (049). An ARM64 server says no as
+            // well, and no vendor has an ARM64 `-baseline`, so the chooser passes over it.
+            case "avx2": facts.avx2 = value != "no"
             case "signin": if value == "env" || value == "file" { facts.hasOwnClaudeSignIn = true }
             default: continue
             }

@@ -119,6 +119,9 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     /// The server has a Claude sign-in of its own: `~/.claude/.credentials.json`, or a
     /// Claude variable in the login environment. Only ever a yes or no.
     public var hasOwnClaudeSignIn: Bool = false
+    /// The CPU has AVX2 (049): without it an x86-64 server needs a vendor's `-baseline`
+    /// build. True where the probe could not tell, which is what every vendor assumes.
+    public var avx2: Bool = true
 
     public init(system: String, architecture: Architecture, home: String, freeBytes: Int64,
                 installedVersion: String?, installedSHA256: String? = nil,
@@ -159,6 +162,7 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         hasOwnClaudeSignIn = try c.decodeIfPresent(Bool.self, forKey: .hasOwnClaudeSignIn) ?? false
         toolsetIDs = try c.decodeIfPresent([String: String].self, forKey: .toolsetIDs) ?? [:]
         ownSignIns = try c.decodeIfPresent(Set<String>.self, forKey: .ownSignIns) ?? []
+        avx2 = try c.decodeIfPresent(Bool.self, forKey: .avx2) ?? true
         // Facts saved before 046 knew Claude's alone.
         if toolsetIDs.isEmpty, let toolsetID { toolsetIDs[RuntimeCatalog.claude.id] = toolsetID }
     }
@@ -178,6 +182,15 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     public var canInstallToolsets: Bool {
         if case .glibc(let major, let minor) = libc { return (major, minor) >= (2, 28) }
         return false
+    }
+
+    /// What choosing a vendor's archive for this server goes by (049): its platform, whether
+    /// its CPU has AVX2, and whether its C library is musl. Nil off Linux or on another
+    /// architecture.
+    public var archiveFacts: ArchiveToolset.HostFacts? {
+        guard system == "Linux", let base = ArchiveToolset.linuxPlatform(architecture) else { return nil }
+        if case .musl = libc { return ArchiveToolset.HostFacts(base: base, avx2: avx2, musl: true) }
+        return ArchiveToolset.HostFacts(base: base, avx2: avx2)
     }
 
     /// Linux on one of the two architectures there is a binary for (FR-004).

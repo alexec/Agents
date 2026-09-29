@@ -277,7 +277,8 @@ struct FakeArchive {
     let archive: URL
     static let platform = "darwin-aarch64"
 
-    init(wrongChecksum: Bool = false, wrongSize: Bool = false, tarGz: Bool = false, knownBroken: String? = nil) throws {
+    init(wrongChecksum: Bool = false, wrongSize: Bool = false, tarGz: Bool = false, knownBroken: String? = nil,
+         platform: String = Self.platform) throws {
         let fm = FileManager.default
         root = fm.temporaryDirectory.appendingPathComponent("archive-toolset-\(UUID().uuidString)", isDirectory: true)
         let staging = root.appendingPathComponent("staging", isDirectory: true)
@@ -296,7 +297,7 @@ struct FakeArchive {
         let size = ((try fm.attributesOfItem(atPath: archive.path)[.size] as? Int64) ?? 0) + (wrongSize ? 1 : 0)
         let manifest = ArchiveToolset.Manifest(
             runtimeID: "antigravity", version: "0.0.0-fake", source: "test", minFreeBytes: 1024,
-            platforms: [Self.platform: .init(url: archive, sha256: sha, size: size, command: "agy_acp_server.par",
+            platforms: [platform: .init(url: archive, sha256: sha, size: size, command: "agy_acp_server.par",
                                              arguments: ["--uid="], knownBroken: knownBroken)])
         try JSONEncoder().encode(manifest).write(to: bundle.appendingPathComponent(Toolset.manifestFile))
         toolset = try ArchiveToolset.load(from: bundle)
