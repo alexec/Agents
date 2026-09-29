@@ -89,6 +89,22 @@ struct BooleanCapsule: View {
     }
 }
 
+/// A heading inside an open select, dividing one list into groups of things that are
+/// not the same. The top name is what the setting is; this says which part of it a run
+/// of rows belongs to.
+struct SelectGroupHeading: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .appText(.fine)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+    }
+}
+
 /// One line in an open select.
 struct SelectChoice: View {
     let title: String

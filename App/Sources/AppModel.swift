@@ -125,6 +125,7 @@ final class AppModel {
             guard showsSpending, showsSpending != oldValue else { return }
             showsResources = false
             showsEvents = false
+            showsRuntimes = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -142,6 +143,7 @@ final class AppModel {
             guard showsResources, showsResources != oldValue else { return }
             showsSpending = false
             showsEvents = false
+            showsRuntimes = false
             selection = nil
             openWorkflow = nil
         }
@@ -154,6 +156,23 @@ final class AppModel {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
             showsResources = false
+            showsRuntimes = false
+            selection = nil
+            openWorkflow = nil
+        }
+    }
+
+    /// Whether the window is showing Runtimes: each runtime and where its allowance
+    /// stands (065). A page like Events, and not persisted for the same reason.
+    ///
+    /// It used to be in Settings, which is where a control belongs. What it says is
+    /// the state of the machine, and it changes without anybody touching a setting.
+    var showsRuntimes = false {
+        didSet {
+            guard showsRuntimes, showsRuntimes != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
             selection = nil
             openWorkflow = nil
         }
@@ -189,12 +208,18 @@ final class AppModel {
         showsResources = true
     }
 
+    /// Runtimes, from the prompt bar's warning about starting on one that is out.
+    func showRuntimes() {
+        showsRuntimes = true
+    }
+
     /// An agent's chat, from the Resources page or a capsule naming its holder: its
     /// own project first, as a banner does, so the sidebar and the page agree.
     func openAgent(_ agentID: UUID) {
         showsSpending = false
         showsResources = false
         showsEvents = false
+        showsRuntimes = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         } else if let gone = work.tombstones[agentID] {
@@ -220,7 +245,7 @@ final class AppModel {
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
         get {
-            showsEvents ? .events : showsResources ? .resources
+            showsEvents ? .events : showsResources ? .resources : showsRuntimes ? .runtimes
                 : showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project)
         }
         set {
@@ -231,11 +256,14 @@ final class AppModel {
                 showResources()
             case .events:
                 showEvents()
+            case .runtimes:
+                showRuntimes()
             case .project(let key):
                 showsSpending = false
                 showsResources = false
                 showsEvents = false
-                    showProject(key)
+                showsRuntimes = false
+                showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
                 // come and go — must not empty the detail column. Nothing is picked
