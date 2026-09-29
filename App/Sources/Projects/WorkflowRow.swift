@@ -244,7 +244,7 @@ struct WorkflowRow: View {
 ///
 /// Grey, all of it, except the one that wants you — the same rule the agent list
 /// follows, and the reason it holds here is that most refusals resolve themselves.
-private struct WorkflowStatusIcon: View {
+struct WorkflowStatusIcon: View {
     let summary: WorkflowSummary
 
     var body: some View {
