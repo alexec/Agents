@@ -91,6 +91,9 @@ private struct RuntimeRow: View {
             Text(row.line(now: at) + (row.chats > 0 ? " · \(row.chats) chat\(row.chats == 1 ? "" : "s") on it" : ""))
                 .appText(.fine)
                 .foregroundStyle(row.state.isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.secondary))
+            if row.unusable == nil, let reading = PoolWords.reading(row.state.reading, now: at) {
+                Text(reading).appText(.fine).foregroundStyle(.secondary)
+            }
         }
         .accessibilityElement(children: .combine)
     }

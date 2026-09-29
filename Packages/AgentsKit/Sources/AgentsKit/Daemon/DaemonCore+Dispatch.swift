@@ -506,6 +506,8 @@ extension DaemonCore {
 
             case DaemonAPI.Method.poolState:
                 let request = (try? require(params, as: DaemonAPI.PoolStateRequest.self)) ?? .init()
+                // Someone is looking at the pool: ask what is left, behind the answer.
+                Task { await self.measureAllowances() }
                 return .success(try JSONValue.encoding(await poolStatus(days: request.days)))
 
             case DaemonAPI.Method.poolSet:
@@ -549,6 +551,10 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsShowFile:
                 let request = try require(params, as: DaemonAPI.ShowFileRequest.self)
                 return .success(["note": .string(try await showFile(request))])
+
+            case DaemonAPI.Method.agentsAskForm:
+                let request = try require(params, as: DaemonAPI.AskFormRequest.self)
+                return .success(["note": .string(try await askForm(request))])
 
             case DaemonAPI.Method.artifactWrite:
                 let request = try require(params, as: DaemonAPI.ArtifactWriteRequest.self)
@@ -676,6 +682,24 @@ extension DaemonCore {
             case DaemonAPI.Method.pullRequestsCheckout:
                 let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
                 return .success(try JSONValue.encoding(try await checkOutPullRequest(request.number, in: request.folder)))
+
+            // GitHub Projects issue board (063). This is the Mac project's view and its
+            // assignment action; the device role intentionally has no access.
+            case DaemonAPI.Method.projectIssuesList:
+                let request = try require(params, as: GitHubProjectBoardRequest.self)
+                return .success(try JSONValue.encoding(await githubProjectBoard(for: request.folder)))
+
+            case DaemonAPI.Method.projectIssuesRefresh:
+                let request = try require(params, as: GitHubProjectBoardRequest.self)
+                return .success(try JSONValue.encoding(await refreshGitHubProjectBoard(in: request.folder)))
+
+            case DaemonAPI.Method.projectIssuesAssign:
+                let request = try require(params, as: GitHubIssueAssignmentRequest.self)
+                return .success(try JSONValue.encoding(try await assignGitHubIssue(request)))
+
+            case DaemonAPI.Method.projectIssuesSyncStatus:
+                let request = try require(params, as: GitHubProjectStatusSyncRequest.self)
+                return .success(try JSONValue.encoding(try await syncGitHubIssueStatus(request)))
 
             case DaemonAPI.Method.agentsListHelpers:
                 let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)

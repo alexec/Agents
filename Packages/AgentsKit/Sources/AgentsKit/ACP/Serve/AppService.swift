@@ -34,6 +34,9 @@ public actor AppService {
     /// And the third: read and write the project's standing arrangements.
     public static let workflowToolName = AppTool.manageWorkflows
 
+    /// Ask the person and wait: the form card every runtime can reach.
+    public static let askFormToolName = AppTool.askForm
+
     /// And the older name for the outcome half: say how the work went, on its own.
     public static let reportOutcomeToolName = AppTool.reportOutcome
 
@@ -74,6 +77,9 @@ public actor AppService {
 
     /// Where a file to show goes.
     public typealias FileSink = @Sendable (ShownFile) async -> Outcome
+
+    /// Where an `ask_form` goes. May take as long as the person takes to answer.
+    public typealias AskFormSink = @Sendable (String?, [DaemonAPI.AskFormRequest.Question]) async -> Outcome
 
     /// Where a workflow question goes. Unlike the other two this can take a while:
     /// a write waits on somebody answering.
@@ -170,6 +176,7 @@ public actor AppService {
     private let finishSink: FinishSink
     private let sink: Sink
     private let fileSink: FileSink
+    private let askFormSink: AskFormSink
     private let workflowSink: WorkflowSink
     private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
@@ -193,6 +200,9 @@ public actor AppService {
                 },
                 sink: @escaping Sink,
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
+                askForm: @escaping AskFormSink = { _, _ in
+                    .refused("This app cannot ask the person.")
+                },
                 workflows: @escaping WorkflowSink = { _, _, _ in
                     .refused("This app cannot manage workflows.")
                 },
@@ -218,6 +228,7 @@ public actor AppService {
         self.finishSink = finishTurn
         self.sink = sink
         self.fileSink = showFile
+        self.askFormSink = askForm
         self.workflowSink = workflows
         self.outcomeSink = reportOutcome
         self.agentsSink = agents
@@ -323,6 +334,15 @@ public actor AppService {
                         """, isError: true))
                 }
                 return .success(Self.reply(await fileSink(file)))
+            }
+
+            if name.hasSuffix(Self.askFormToolName) {
+                switch Self.askFormCall(arguments) {
+                case .failure(let problem):
+                    return .success(Self.reply(problem.message, isError: true))
+                case .success(let call):
+                    return .success(Self.reply(await askFormSink(call.title, call.questions)))
+                }
             }
 
             if name.hasSuffix(Self.workflowToolName) {
@@ -558,8 +578,37 @@ public actor AppService {
         // The two for moving itself, for every agent (053).
         // Not for a runtime that would forget the conversation on the way.
         let moveTools = movesItself ? [Self.enterWorktreeTool, Self.exitWorktreeTool] : []
-        return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool] + agentTools + leaseTools
+        return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool, Self.askFormTool]
+            + agentTools + leaseTools
             + eventTools + moveTools + pullRequestTools + [Self.tool, Self.reportOutcomeTool]
+    }
+
+    /// The questions an `ask_form` call carried, or why it cannot be asked.
+    static func askFormCall(_ arguments: JSONValue?)
+        -> Result<(title: String?, questions: [DaemonAPI.AskFormRequest.Question]), AgentCallProblem> {
+        let title = arguments?["title"]?.stringValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedTitle = (title?.isEmpty == false) ? title : nil
+        guard let raw = arguments?["questions"]?.arrayValue, !raw.isEmpty else {
+            return .failure("Nothing was asked: send at least one question in `questions`.")
+        }
+        var questions: [DaemonAPI.AskFormRequest.Question] = []
+        for item in raw {
+            let id = item["id"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let prompt = item["prompt"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !id.isEmpty, !prompt.isEmpty else {
+                return .failure("Nothing was asked: each question needs an `id` and a `prompt`.")
+            }
+            let options = item["options"]?.arrayValue?.compactMap { option -> DaemonAPI.AskFormRequest.Question.Option? in
+                let optionID = option["id"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !optionID.isEmpty else { return nil }
+                return .init(id: optionID, label: option["label"]?.stringValue)
+            }
+            questions.append(.init(id: id, prompt: prompt,
+                                   options: (options?.isEmpty == false) ? options : nil,
+                                   allowMultiple: item["allow_multiple"]?.boolValue))
+        }
+        return .success((cleanedTitle, questions))
     }
 
     /// Which of the two move calls a tool name is, with its arguments read (053). `nil`
@@ -924,6 +973,74 @@ public actor AppService {
                             """],
             ],
             "required": .array(["path"]),
+        ],
+    ]
+
+    /// Ask the person a question and wait. The channel every runtime can reach.
+    static let askFormTool: JSONValue = [
+        "name": .string(askFormToolName),
+        "title": "Ask the person a question",
+        "description": """
+            Ask me a question or a short form and wait for my answer. Use this when \
+            something is mine to decide — a choice between real alternatives, a missing \
+            credential, anything hard to undo — rather than guessing or ending the turn \
+            with the question in your reply.
+
+            Your question reaches me wherever I am, including on my phone, and the call \
+            waits until I answer, skip or cancel. Prefer your runtime's own question \
+            tool when you have one; use this when you do not, or when that tool is not \
+            in your catalogue.
+
+            Each question may offer options to pick, or leave options out for free \
+            text. Set allow_multiple when more than one option may be chosen.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "title": [
+                    "type": "string",
+                    "description": "Optional heading for the form as a whole.",
+                ],
+                "questions": [
+                    "type": "array",
+                    "minItems": .int(1),
+                    "items": [
+                        "type": "object",
+                        "properties": [
+                            "id": [
+                                "type": "string",
+                                "description": "A short stable id for this question.",
+                            ],
+                            "prompt": [
+                                "type": "string",
+                                "description": "The question in your own words.",
+                            ],
+                            "options": [
+                                "type": "array",
+                                "items": [
+                                    "type": "object",
+                                    "properties": [
+                                        "id": ["type": "string"],
+                                        "label": ["type": "string"],
+                                    ],
+                                    "required": .array(["id"]),
+                                ],
+                                "description": """
+                                    Choices to pick from. Leave out, or pass an empty \
+                                    list, for a free-text answer.
+                                    """,
+                            ],
+                            "allow_multiple": [
+                                "type": "boolean",
+                                "description": "True when more than one option may be chosen.",
+                            ],
+                        ],
+                        "required": .array(["id", "prompt"]),
+                    ],
+                    "description": "One or more questions. Keep it short.",
+                ],
+            ],
+            "required": .array(["questions"]),
         ],
     ]
 

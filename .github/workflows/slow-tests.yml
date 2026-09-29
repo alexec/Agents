@@ -1,0 +1,37 @@
+name: slow-tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  slow-tests:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      AGENTS_RUN_SLOW: "1"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build agentsd for server integration tests
+        run: swift build --package-path Daemon --product agentsd
+
+      - name: Run slow AgentsKit tests
+        run: |
+          filter=$(scripts/slow-tests.sh Packages/AgentsKit)
+          swift test --package-path Packages/AgentsKit --filter "$filter"
+      - name: Run quarantined flaky tests
+        continue-on-error: true
+        env:
+          AGENTS_RUN_FLAKY: "1"
+        run: |
+          status=0
+          for package in Packages/CodeText Packages/AgentsKit; do
+            filter=$(scripts/flaky-tests.sh "$package")
+            [ -n "$filter" ] || continue
+            swift test --package-path "$package" --filter "$filter" || status=1
+          done
+          exit $status

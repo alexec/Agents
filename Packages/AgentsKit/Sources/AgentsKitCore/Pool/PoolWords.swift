@@ -41,6 +41,45 @@ public enum PoolWords {
         }
     }
 
+    /// What the runtime last said is left of its plan window: "28% left this week ·
+    /// resets Sun 20:39 · as of 14:02". Nil when there is no reading, or its window has
+    /// reset since, when it would say nothing true about the new one.
+    public static func reading(_ reading: AllowanceReading?, now: Date) -> String? {
+        guard let reading, reading.isCurrent(now: now) else { return nil }
+        let amount: String? = if let left = reading.left {
+            left <= 0 ? "None left" : "\(Int((left * 100).rounded()))% left"
+        } else if reading.nearlySpent {
+            "Nearly used up"
+        } else {
+            nil
+        }
+        let window = windowName(reading.window)
+        var parts: [String] = []
+        switch (amount, window) {
+        case (let amount?, let window?): parts.append("\(amount) \(window)")
+        case (let amount?, nil): parts.append(amount)
+        case (nil, let window?): parts.append(window.prefix(1).uppercased() + window.dropFirst())
+        case (nil, nil): break
+        }
+        if let resetsAt = reading.resetsAt { parts.append("resets \(time(resetsAt, now: now))") }
+        guard !parts.isEmpty else { return nil }
+        parts.append("as of \(time(reading.at, now: now))")
+        return parts.joined(separator: " · ")
+    }
+
+    /// "this week", "of the 5-hour window": a window's name as it follows an amount.
+    private static func windowName(_ window: String?) -> String? {
+        switch window {
+        case nil: nil
+        case "five_hour": "of the 5-hour window"
+        case "seven_day", "weekly": "this week"
+        case "seven_day_opus": "of the weekly Opus limit"
+        case "seven_day_sonnet": "of the weekly Sonnet limit"
+        case "monthly": "this month"
+        case let other?: "of the \(other.replacingOccurrences(of: "_", with: " ")) window"
+        }
+    }
+
     /// The capsule beside an entry's name (FR-001a).
     public static func payment(_ payment: Payment, spent: AllowanceState.Spent? = nil) -> String {
         switch payment {

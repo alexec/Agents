@@ -2,7 +2,18 @@ import Foundation
 
 public enum ClientPermissionMode: String, Codable, Sendable, Hashable {
     case `default`
-    case autoReview
+    case alwaysApprove
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        switch raw {
+        case Self.alwaysApprove.rawValue, "autoReview":
+            // `autoReview` was the 061 smart-review value; treat it as always-approve.
+            self = .alwaysApprove
+        default:
+            self = .default
+        }
+    }
 }
 
 /// The Mac's two independent permission choices (061). No per-agent override.

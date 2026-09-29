@@ -56,7 +56,7 @@ struct RelayCarryingTests {
         func stop() { running?.cancel() }
     }
 
-    @Test func aReplyOfFiveMegabytesArrivesWhole() async throws {
+    @Test(.slowUnderLoad) func aReplyOfFiveMegabytesArrivesWhole() async throws {
         let rig = await Rig(window: 0.05)
         defer { rig.stop() }
         let phone = try await rig.phone()
@@ -68,7 +68,7 @@ struct RelayCarryingTests {
         #expect(heard == big)
     }
 
-    @Test func aBusyTurnIsAFewPostsASecond() async throws {
+    @Test(.slowUnderLoad) func aBusyTurnIsAFewPostsASecond() async throws {
         let rig = await Rig()
         defer { rig.stop() }
         _ = try await rig.phone()

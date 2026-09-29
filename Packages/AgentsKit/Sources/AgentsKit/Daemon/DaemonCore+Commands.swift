@@ -1379,6 +1379,7 @@ extension DaemonCore {
         }
         for (id, pending) in elicitations where pending.agentID == agentID {
             elicitations.removeValue(forKey: id)
+            answerAsk(id, .success("Nobody answered: the agent stopped before they could."))
             await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
             broadcast(DaemonAPI.Notification.agentElicitation,
                       DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))

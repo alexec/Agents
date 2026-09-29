@@ -51,6 +51,9 @@ actor FakeACPAgent {
         /// Fail this many prompts, with `promptError` or `promptResultMeta`, and then take
         /// turns normally. Zero means every prompt fails the way the script says.
         var failTimes = 0
+        /// The answer to Grok's `_x.ai/billing`. Nil answers method-not-found, as every
+        /// other runtime does.
+        var billing: JSONValue?
         /// What the runtime says on its way out, sent while answering `session/close`.
         /// Real ones do this — a tool call marked cancelled, a last usage line — and
         /// it is the last thing they ever say, so there is no second chance to hear it.
@@ -187,6 +190,9 @@ actor FakeACPAgent {
         case ACP.Method.steering where script.steering != nil:
             steers.append(params ?? .null)
             return .success(["outcome": .string(script.steering ?? "")])
+
+        case ACP.Method.grokBilling where script.billing != nil:
+            return .success(script.billing ?? .null)
 
         case ACP.Method.newSession:
             newSessionParams = params

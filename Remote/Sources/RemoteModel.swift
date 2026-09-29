@@ -611,6 +611,9 @@ final class RemoteModel {
 
     /// The app's worktrees for the project on screen, for its Worktrees section.
     private(set) var projectWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
+    /// The folder `projectWorktrees` answers for, which lags `projectWorktreesFolder`
+    /// while another project's list is on its way.
+    private(set) var projectWorktreesAnswered: URL?
     private var projectWorktreesFolder: URL?
 
     /// Asked when the project page appears and after a removal, never polled.
@@ -622,6 +625,7 @@ final class RemoteModel {
             ?? .notARepository
         guard projectWorktreesFolder == folder else { return }
         projectWorktrees = answer
+        projectWorktreesAnswered = folder
     }
 
     /// What removing one would lose, or nil when the Mac could not say (and the app's

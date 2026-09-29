@@ -76,6 +76,11 @@ line such as **1 out · 3 chats on Codex**. The page shows:
 - **Runtimes, in order**: each with how it is paid for and its state in words, such as
   **Available**, **Out · reset 07:00 · checking after 09:00**, **Rate limited · trying again at 02:21** or **Credit used
   up**. **Mark available** is on any that is out.
+  Under it, where the runtime says so, is what is left of its plan: **28% left this week ·
+  resets Sun 20:39 · as of 14:02**. Grok is asked each time the page opens, at most every five
+  minutes. Claude says it during a turn, usually only once a limit is near or reached. Other
+  runtimes have no way to say it yet. The line is only shown: whether a chat runs is still the
+  state above it.
 - **Waiting for an allowance**: chats waiting, with when each is next checked, and **Stop waiting**.
 - **Matching models**: see below.
 - **Recent switches**: when, which chat, from which runtime to which, and why. **Show the last

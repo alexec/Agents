@@ -25,6 +25,9 @@ extension DaemonCore {
         case .new:
             return try await makeWorktree(in: repository, project: project,
                                           wanted: WorktreeName.from(prompt: prompt, now: now()))
+        case .named(let name):
+            return try await makeWorktree(in: repository, project: project,
+                                          wanted: WorktreeName.from(prompt: name, keepingFiller: true, now: now()))
         case .existing(let root):
             return try await existingWorktree(root, in: repository, project: project)
         case .branch(let name):

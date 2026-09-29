@@ -171,6 +171,11 @@ private struct PoolEntryRow: View {
                     }
                 }
                 .appText(.fine)
+                if row.unusable == nil, let reading = PoolWords.reading(row.state.reading, now: at) {
+                    Text(reading)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if isOut {

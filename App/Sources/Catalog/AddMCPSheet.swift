@@ -77,7 +77,7 @@ struct AddMCPSheet: View {
                                             .padding(.horizontal, 6).background(Color.secondary.opacity(0.12), in: Capsule())
                                     }
                                     if let host = result.remoteHost {
-                                        Text("remote · \(host)").appText(.fine).foregroundStyle(.orange)
+                                        Text("remote · \(host)").appText(.fine).tinted(.attention)
                                     }
                                 }
                             }
@@ -107,14 +107,14 @@ struct AddMCPSheet: View {
                 Text(preview.result.title).appText(.title)
                 Spacer()
             }
-            Text(preview.commandOrURL).font(.system(.footnote, design: .monospaced))
+            Text(preview.commandOrURL).appText(.code)
             if let host = preview.host {
                 Text(host).appText(.fine).foregroundStyle(.secondary)
             }
             ForEach(preview.variables, id: \.name) { variable in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(variable.name).font(.system(.footnote, design: .monospaced))
+                        Text(variable.name).appText(.code)
                         Text(variable.kind == .secret ? "secret" : "optional").appText(.fine)
                         if variable.alreadySet { Text("set").appText(.fine).foregroundStyle(.secondary) }
                     }
@@ -129,7 +129,7 @@ struct AddMCPSheet: View {
                 .padding(8)
                 .background(Paper.raised, in: RoundedRectangle(cornerRadius: 8))
             }
-            if let addError { Text(addError).appText(.fine).foregroundStyle(.red) }
+            if let addError { Text(addError).appText(.fine).tinted(.failure) }
             Spacer()
             HStack {
                 Spacer()

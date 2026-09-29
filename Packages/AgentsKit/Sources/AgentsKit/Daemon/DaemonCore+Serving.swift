@@ -49,6 +49,9 @@ extension DaemonCore {
         if case .accept(let content) = outcome, case .form(let schema) = pending.request.mode {
             answers = schema.answers(content, message: pending.request.message)
         }
+        // An `ask_form` call is waiting on this same id: wake it with the words the
+        // agent reads, then carry on as a runtime elicitation would.
+        answerAsk(pending.request.id, .success(Self.askFormNote(outcome: outcome, answers: answers)))
         await record(.elicitationAnswered(id: pending.request.id, summary: outcome.summary,
                                           answers: answers),
                      for: pending.agentID)
@@ -58,6 +61,25 @@ extension DaemonCore {
                                                     requestID: pending.request.id,
                                                     request: nil))
         reconsider()
+    }
+
+    /// What `ask_form` returns once the person has answered, skipped or cancelled.
+    static func askFormNote(outcome: ElicitationOutcome, answers: [ElicitationAnswer]) -> String {
+        switch outcome {
+        case .accept:
+            guard !answers.isEmpty else { return "They sent an empty answer." }
+            return "They answered:\n"
+                + answers.map { "- \($0.question): \($0.answer)" }.joined(separator: "\n")
+        case .decline:
+            return "They skipped the questions."
+        case .cancel:
+            return "They cancelled."
+        }
+    }
+
+    /// Resume an `ask_form` call waiting on this elicitation, if any.
+    func answerAsk(_ requestID: UUID, _ result: Result<String, JSONRPCError>) {
+        openAsks.removeValue(forKey: requestID)?.resume(returning: result)
     }
 
     func holdElicitation(_ request: ElicitationRequest, agentID: UUID) async {
@@ -87,6 +109,7 @@ extension DaemonCore {
                      for: agentID)
         await move(agentID, on: .permissionAnswered)
         elicitations.removeValue(forKey: requestID)
+        answerAsk(requestID, .success("They cancelled."))
         broadcast(DaemonAPI.Notification.agentElicitation,
                   DaemonAPI.ElicitationNotification(agentID: agentID, requestID: requestID, request: nil))
         reconsider()
