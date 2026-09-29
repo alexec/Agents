@@ -31,5 +31,5 @@
 
 ## Notes
 
-- Continue with and the pool are removed. A spent allowance still stops that chat and says so. The app does not remember that the runtime is out for other chats. An agent can list and read sessions in its project so the person can ask it to continue one.
+- Continue with and the pool are removed. A spent allowance still stops that chat and says so. The runtime is marked out and shown in Agent Runtimes and on the phone, never enforced. An agent can list and read sessions in its project so the person can ask it to continue one.
 - Plan written 2026-09-26; contracts, data model, quickstart and tasks are present. Cross-artifact review found and resolved the list-heading, allowance-outcome, branch-name and history-budget gaps. Ready for `/speckit-implement`.

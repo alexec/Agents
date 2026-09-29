@@ -1,8 +1,10 @@
 # Data Model: Read Another Session's History
 
-Nothing new is stored. A session is the `Agent` the app already has, and a history is text
-rendered from the transcript it already writes. This file says which existing fields the tools
-read, and which pool fields stop being written.
+A session is the `Agent` the app already has, and a history is text rendered from the
+transcript it already writes. A runtime's state is the `AllowanceState` the pool already kept,
+now kept for every runtime. The one new file is `payments.json`, which takes what is left of
+`pool.json`: how a key is paid for. This file says which fields the tools read, what the
+runtime state holds, and which pool fields stop being written.
 
 ## Session (existing `Agent`)
 
@@ -62,18 +64,65 @@ The status line for `.allowanceSpent` is already "Its allowance ran out".
 ## Rate-limit streak (in memory, per chat)
 
 `DaemonCore` holds `[UUID: [Date]]` for the chat, beside the existing `rateLimitAttempts`.
-It is not on the agent record and not in `allowances.json`. A restart forgets it. Three
-timestamps inside `RateLimitPolicy.standard`'s window (600 seconds, `persistsAfter` 3) end
-the retry. The delays stay `[30, 120]` seconds when the runtime gave no time.
+It is not on the agent record. A restart forgets it. Three timestamps inside
+`RateLimitPolicy.standard`'s window (600 seconds, `persistsAfter` 3) end the retry and mark
+the runtime out with `.rateLimitPersisted`. The delays stay `[30, 120]` seconds when the
+runtime gave no time. `AllowanceState.rateLimitStreak` is decoded and no longer written.
 
-## Fields that stop being written
+## Runtime state (existing `AllowanceState`, `allowances.json`)
+
+One per credential key, `‹runtimeID›:sign-in` or `‹runtimeID›:‹CredentialKind›`. Unchanged in
+shape, so a file written by the pool is read as it is.
+
+| Field | Role now |
+|---|---|
+| `credentialKey` | The identity. The runtime is the part before the colon. |
+| `status` | `.available`, `.rateLimited(until:)` or `.out(until:, retryAfter:, why:)`. Shown, never enforced. |
+| `since` | When it last changed. The first check is `since + 4h`. |
+| `spent` | The credit ledger, for a key on free or prepaid credit. |
+| `lastRateLimit`, `reading` | The plan window and what is left of it, for the row's second line. |
+| `entryID` | Decoded, not used. |
+| `rateLimitStreak` | Decoded, not written (above). |
+
+What changes it:
+
+| Event | New status | Event raised |
+|---|---|---|
+| A recognised spent allowance, used-up credit, overage, a persisted rate limit, or a crash or unrecognised failure, in any chat | `.out`, with the reason and the provider's time when given | `cost.allowance_out` |
+| A credit key's date passing, on the heartbeat | `.out(.creditExpired)` | `cost.allowance_out` |
+| A turn on it that works, a passing check, **Mark available**, raising a key's amount | `.available` | `cost.allowance_back`, with `how` |
+| A newer state from a server or the Mac (`pool/applyAllowances`), for a shared sign-in | That state | out or back, `how: another host` |
+
+Nothing reads `status` to decide whether a prompt is sent.
+
+## Runtime payment (new `RuntimePayment`, `payments.json`)
+
+Renamed from `PoolEntry`, without its order or its model.
+
+| Field | Meaning |
+|---|---|
+| `runtimeID` | The runtime. |
+| `credentialRef` | A `CredentialKind` raw value, or nil for the runtime's own sign-in. |
+| `payment` | `.allowance`, `.freeTier`, `.freeCredit` or `.prepaid` (the existing `Payment`). |
+
+`RuntimePayments` is the list, at most one per credential key. A credential with no entry is
+paid as `poolEntry(for:)` assumes today: an allowance, or Gemini's key on the free tier.
+
+Made once from `pool.json`, at the first launch that finds `pool.json` and no `payments.json`:
+each entry that is keyed or on credit is kept; a plain sign-in is the default and is dropped.
+`isOn`, the order and `levels` are not carried.
+
+## Fields and files that stop being written
 
 | Field or file | What happens |
 |---|---|
 | `Agent.allowanceWait` | Decoded if an old record has it. Cleared at launch. No timer, no resume. |
 | `Agent.poolEntryID`, `Agent.switchingOff` | Decoded, never set again. |
-| `pool.json`, `allowances.json` | Not loaded, not written. Left on disk. |
-| `agent.runtime_switched`, `cost.allowance_out`, `cost.allowance_back` | Not raised. Catalogue entries removed. Old log lines stay in the file. |
+| `pool.json` | Read once to make `payments.json`, then left on disk. |
+| `switches.jsonl` | Not written, not read. Left on disk. |
+| `agent.runtime_switched` | Not raised. Catalogue entry removed. Old log lines stay in the file. |
+
+`allowances.json` is still read and written.
 
 ## Transcript kinds that stay
 

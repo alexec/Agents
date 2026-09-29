@@ -115,35 +115,37 @@ line would read tens of megabytes to draw a list.
 **Rationale**: FR-001 and FR-003. The report is the sentence the agent recorded about its last
 turn, which is the same source `list_my_agents` uses.
 
-## R6. A spent allowance ends that chat only
+## R6. A spent allowance ends that chat, and marks its runtime
 
-**Decision**: `LimitRecognition.classify` stays. `applyRecognition` changes as follows.
+**Decision**: `LimitRecognition.classify` stays. `applyRecognition` ends the refused chat and
+records the runtime's state. It never moves the chat, waits, or starts anything.
 
-| Recognition | This chat | Remembered for other chats |
+| Recognition | This chat | The runtime's state |
 |---|---|---|
-| `.spent` | Note from `PoolWords.ranOut` (the "until" time only when the runtime gave one). `endedReason = .allowanceSpent`. No switch. | Nothing. |
-| `.creditGone` | Note from `PoolWords.creditGone`. Same ending reason, so an older phone still reads it. | Nothing. |
-| `.overage` | Note from `PoolWords.overageBegan`. If the turn itself failed, the same ending reason. A turn that completed stays completed, with the note. | Nothing. |
-| `.rateLimited` | The existing per-chat retry: the same prompt again after the runtime's time, or after 30s then 120s. Three refusals inside ten minutes on **this chat** stop it with the still-limited note and `.rateLimited`. | Nothing. The streak is a dictionary on the daemon, keyed by agent id, not saved. |
+| `.spent` | Note from `PoolWords.ranOut` (the "until" time only when the runtime gave one). `endedReason = .allowanceSpent`. No switch. | Out, `.allowanceSpent`, with the provider's time when given, and the first check four hours on. `cost.allowance_out`. |
+| `.creditGone` | Note from `PoolWords.creditGone`. Same ending reason, so an older phone still reads it. | Out, `.creditUsedUp`. Credit comes back only when the person raises the amount or marks it available. |
+| `.overage` | Note from `PoolWords.overageBegan`. If the turn itself failed, the same ending reason. A turn that completed stays completed, with the note. | Out, `.overage`. |
+| `.rateLimited` | The existing per-chat retry: the same prompt again after the runtime's time, or after 30s then 120s. Three refusals inside ten minutes on **this chat** stop it with the still-limited note and `.rateLimited`. | Rate limited until that time, for the page only. Three in ten minutes marks it out, `.rateLimitPersisted`, as today. |
+| A crash or an unrecognised failure | Ends as it does today. | Out, `.runtimeFailed`, with no pool to be in: every runtime is tracked. |
 
-`setAllowanceState`, `raiseAllowanceOut`, `raiseAllowanceBack`, `pendingCarry`,
-`carryOnIfPending`, `switchRuntime`, `startWaiting` and `allowanceWorked`'s ledger go.
-`pool.json` and `allowances.json` are not loaded and not written. A successful turn clears
-that agent's rate-limit streak and nothing else.
+`setAllowanceState`, `raiseAllowanceOut`, `raiseAllowanceBack`, the credit ledger in
+`allowanceWorked`, `notePlanWindow` and the readings stay. `pendingCarry`, `carryOnIfPending`,
+`switchRuntime`, `startWaiting`, `resumeAllowanceWaits`, `moveFirstIfOut`, `willCarry` and
+`carryTried` go. A successful turn clears that agent's rate-limit retry count and, as today,
+brings its runtime back.
 
-`classify` is called with the default payment, an allowance. Overage is only recognised on an
-allowance, which is what that default already expresses. Credit used up is recognised from
-the words (`insufficient_quota`, `credit balance is too low`) and does not need a pool entry.
+The rate-limit streak moves off `AllowanceState.rateLimitStreak` onto a per-agent dictionary
+on the daemon, so "three within ten minutes" is about the chat that was refused. The
+runtime is marked out when one chat's streak persists. `rateLimitStreak` stays decodable and
+is no longer written.
 
-**Rationale**: FR-009, FR-011, FR-012. The note and the status are the useful part of 052.
-The shared `AllowanceState` is the memory the spec removes: one chat's refusal currently
-marks the credential, and the next chat on that runtime is born out. The rate-limit streak
-lives in that same struct today (`AllowanceState.rateLimited`); moving it onto the agent id
-is what makes "three within ten minutes" a fact about the chat.
+**Rationale**: FR-009, FR-011, FR-012. The spec was revised on 2026-09-28 to keep the
+runtime's state: what goes is anything that acts on it. Nothing reads `isOut` to decide
+whether a prompt is sent. The prompt bar's notice reads it to warn (R11).
 
-**Alternatives considered**: keep writing `allowances.json` but stop reading it for other
-chats. Rejected. A file that says a runtime is out will get read by something. Not writing
-it is the requirement.
+**Alternatives considered**: stop writing `allowances.json`, as the first version of this
+plan said. Rejected by the revision: the person needs to see which runtime is out when they
+pick one for the next chat.
 
 ## R7. Where the chat sits in the list
 
@@ -163,40 +165,49 @@ have. The panel's heading for `AgentGroup.stopped` is now **Paused** (the groupi
 ones the spec names. The acceptance check is: heading Paused, status line "Its allowance ran
 out", absent from Waiting and from Needs you.
 
-## R8. What is deleted, and what is kept so old chats still read
+## R8. What is deleted, and what is kept
 
-**Decision**: Delete the pool UI and the carry-on. Keep decoding and drawing what old records
-already contain.
+**Decision**: Delete the pool and the carry-on. Keep the runtime's state, the checks, the
+readings and the credit on a key. Keep decoding and drawing what old records already contain.
 
 Deleted:
 
-- `App/Sources/Pool/` (the page, Continue with, Matching models, add-credit)
-- `Remote/Sources/Pool/`
+- `App/Sources/Pool/PoolPage.swift`, `ContinueWithMenu.swift`, `ContinueWithSheet.swift`,
+  `MatchingModelsGrid.swift`
+- `Remote/Sources/Pool/PoolPageView.swift`, replaced by a runtimes list (R11)
 - The Settings pane `SettingsPane.pool` and `PoolSettingsView`
-- The sidebar row and Option-Command-P
+- The sidebar Pool row, its red dot and Option-Command-P
 - The "Carry on when ‹runtime› runs out" toggle and the allowance-wait lines on the Mac row
   and the phone card
-- Daemon carry, wait, shared-allowance sync, and `PoolStore`
+- `PoolPlan`, `MatchingModels`, `SettingsCarry`, `Handoff` (after `SessionHistory`),
+  `AllowanceWait` scheduling, the switch history (`switches.jsonl` stops being written)
+- `PoolSettings.isOn`, the order of entries, and `levels`
+- The daemon methods `pool/set`, `pool/stopWaiting`, `pool/models`, and Continue with
 
 Kept:
 
+- `AllowanceState`, `AllowanceReading`, `LimitRecognition`, `RateLimitPolicy`, `PoolWords`
+- `allowances.json`, with the same credential keys, so a runtime out before the update is
+  still out after it and keeps its next check
+- The availability check (`checkDueAllowances`, `probeAllowance`) and Grok's reading
+  (`measureAllowances`), without the `pool.isEffective` guard
+- `AddCreditSheet`, moved to Settings ▸ Agent Runtimes (R10)
+- `pool/applyAllowances` and `sharedAllowances`, so a server and the Mac still share a plan's
+  state; the method keeps its name so an older server still speaks to a newer Mac
+- `cost.allowance_out` and `cost.allowance_back`, with the pool's words taken out of their
+  sentences ("failed and left the pool" becomes "failed, and is checked again at ‹time›")
 - `poolSwitch`, `handoff` and `settingsChanged` on `TranscriptEntry`, and the views that draw
-  them. A chat that did switch, before this feature, still shows that it did.
+  them
 - `poolEntryID`, `switchingOff`, `allowanceWait` on `Agent`, decoded if present, no longer
   written. At launch a set `allowanceWait` is cleared and no turn is started. A stopped agent
   left with no reason gets `.allowanceSpent`.
-- `PoolWords`, because the live notes and the old switch rows both speak through it.
-- `LimitRecognition` and `RateLimitPolicy`.
 - **Carry on** for a blocked chat (`Block.carryOnPrompt`, 039). That button is not Continue
   with.
 
-`agent.runtime_switched`, `cost.allowance_out` and `cost.allowance_back` leave the event
-catalogue. Lines already in `events.jsonl` stay in the file. Workflows that named them stop
-matching, which is the spec: a runtime-wide "out" is not an event any more.
+`agent.runtime_switched` leaves the event catalogue. Lines already in `events.jsonl` stay.
 
-**Rationale**: FR-010. Hiding the pages and leaving the daemon able to switch would fail the
-independent test, which is that no second conversation starts. Deleting the transcript kinds
-would make an older chat fail to decode.
+**Rationale**: FR-010, FR-012 to FR-014. Hiding the pages and leaving the daemon able to
+switch would fail the independent test, which is that no second conversation starts.
 
 ## R9. The briefing
 
@@ -209,3 +220,69 @@ would make an older chat fail to decode.
 **Rationale**: The same reason the other lines exist. An agent told the act in the briefing
 does not have to discover the tool by failing. The restraint is the second and third
 sentences: a read is not a takeover, and another project is a refusal.
+
+## R10. Where the runtime's state and a key's credit live
+
+**Decision**: `PoolEntry` becomes `RuntimePayment`: a runtime, the credential it runs on
+(`credentialRef`, nil for its own sign-in), and how that is paid for. There is at most one
+per credential key, and no order. `RuntimePayments` is stored in `payments.json`. A runtime
+with no entry is its own sign-in on an allowance, except Gemini, which is its key on the free
+tier, as `poolEntry(for:)` already assumes. `fallbackModel` goes with Matching models.
+
+At first launch after the update, `payments.json` is made from `pool.json`: every entry that
+is credit or runs on a key keeps its payment. A plain sign-in entry is the default and is not
+copied. `pool.json` is then left on disk and not read again.
+
+`AllowanceState` stays keyed by `credentialKey` (`runtime:sign-in` or `runtime:‹kind›`), so
+`allowances.json` needs no migration. `entryID` stays decodable and is not used; a state's
+runtime is the part of its key before the colon.
+
+Every runtime the app locates is tracked: a state is made the first time a turn on it is
+recognised, fails, or works, as today, but without the pool guard. The Agent Runtimes page
+shows a row for each located runtime, available when it has no state.
+
+**Rationale**: FR-012, FR-013. A Gemini key's amount and expiry are what stop the app using it
+before the provider bills. They are a runtime's settings, so they go with the runtime.
+
+**Alternatives considered**: keep `pool.json` and ignore `isOn` and the order. Rejected: a file
+called the pool with fields nothing reads is the next person's confusion.
+
+## R11. Where the state is shown
+
+**Decision**:
+
+- **Mac**: each runtime's card in **Settings ▸ Agent Runtimes** gets a state line
+  (`PoolWords` state words: **Available**, **Rate limited · trying again at 02:21**, **Out ·
+  reset 07:00 · checking after 09:00**, **Credit used up**), the reading line under it, and
+  **Mark available** when it is out. Gemini's card has **Credit on this key…**, the add-credit
+  sheet. Opening the page asks for Grok's reading, as opening the Pool page did.
+- **Prompt bar**: `PoolStatus.startingOnOut` becomes `RuntimeAllowances.startingOnOut`. It
+  says the runtime is out and until when. It no longer offers another runtime, since there is
+  no order to take one from.
+- **iPhone and iPad**: the Remote has no runtime settings. The Pool row under **Spending**
+  becomes **Runtimes**: the same rows, read-only, with **Mark available** as a swipe action.
+  The spec's "the runtime's settings on the iPhone and iPad" is this list.
+- The sidebar keeps no dot. The events (`cost.allowance_out`) are how the person is told when
+  they are not looking.
+
+**Rationale**: FR-013, SC-005. The state is for choosing a runtime, which the person does in
+Settings or at the prompt bar.
+
+## R12. The daemon API
+
+**Decision**:
+
+| Before | After |
+|---|---|
+| `pool/state` → `PoolStatus` | `runtimes/allowances` → `RuntimeAllowances` (a row per located runtime and per keyed credential: runtime, credential key, payment, state, reading, unusable) |
+| `pool/changed` | `runtimes/allowancesChanged`, at most once a second as today |
+| `pool/markAvailable` (entry id) | `runtimes/markAvailable` (credential key) |
+| `pool/set` | `runtimes/setPayment` (one `RuntimePayment`; nil payment removes it) |
+| `pool/stopWaiting`, `pool/models`, Continue with | removed |
+| `pool/applyAllowances` | kept, same name and shape |
+
+Both paired devices may call `runtimes/allowances` and `runtimes/markAvailable`, as they
+could the pool's. `runtimes/setPayment` is Mac-only, as `pool/set` was.
+
+**Rationale**: `runtimes/` is where the Agent Runtimes page already talks to the daemon. An
+older Remote asking `pool/state` gets method-not-found and shows nothing, which is the spec.

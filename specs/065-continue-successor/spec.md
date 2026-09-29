@@ -208,8 +208,8 @@ another runtime's plan reading is shown on its row.
 6. **Given** a new chat whose runtime is out, **When** the person is about to send its first
    message, **Then** the prompt bar says the runtime is out, and until when if known. The
    person can still send.
-7. **Given** the iPhone or iPad, **When** the person looks at a runtime's settings, **Then** the
-   same state is shown there.
+7. **Given** the iPhone or iPad, **When** the person opens **Spending ▸ Runtimes**, **Then** the
+   same state is shown there, with **Mark available**.
 
 ---
 
@@ -278,8 +278,8 @@ another runtime's plan reading is shown on its row.
   prompt to a runtime because it is marked out. A new chat about to start on an out runtime
   MUST say so before its first message, and MUST let the person send anyway.
 - **FR-013**: The runtime's state, what is left of its plan when the runtime reports it, and
-  **Mark available** MUST be shown in **Settings ▸ Agent Runtimes** on the Mac, and in the
-  runtime's settings on the iPhone and iPad.
+  **Mark available** MUST be shown in **Settings ▸ Agent Runtimes** on the Mac, and in a
+  **Runtimes** list under **Spending** on the iPhone and iPad, which have no runtime settings.
 - **FR-014**: The events that say a runtime went out or came back (`cost.allowance_out`,
   `cost.allowance_back`) MUST still be sent. `agent.runtime_switched` MUST be removed.
 
