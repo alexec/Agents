@@ -1,54 +1,58 @@
 ---
 diataxis: explanation
-description: How the iPhone and iPad apps reach your Mac, what they can and cannot do, and what that means for security today.
+description: How the iPhone and iPad apps reach your agents on every host, what they can and cannot do, and how pairing and forgetting a device work.
 devices: [mac, iphone, ipad]
 ---
 
-# How the phone and iPad reach the Mac
+# How the phone and iPad reach your agents
 
-The iPhone and iPad apps are windows onto your Mac, like the Mac window itself. Nothing
-runs on them. This page explains how they reach the Mac, what they can do there, and what
-you should know about the connection as it is today.
+The iPhone and iPad apps are windows onto your agents, like the Mac window itself. Nothing
+runs on them. This page explains how they reach your agents, what they can do there, and
+what you should know about the connection.
 
-## The work stays on the Mac
+## The work stays on the hosts
 
-Your agents belong to the daemon on your Mac (see
-[The window and the daemon](window-and-daemon.md)). The phone and the iPad talk to that
-same daemon. They read the same conversations, and what you do on them happens on the Mac.
-An agent you start from your phone runs in the project's folder on the Mac, with the Mac's
-runtimes, and shows up on the Mac as if you had started it there.
+Your agents belong to hosts: your Mac with Agents Host, and any server you have added (see
+[The window and the host](window-and-daemon.md)). The phone and the iPad connect to your
+control plane, as the Mac window does, and reach every host through it (see
+[The control plane](control-plane.md)). They read the same conversations, and what you do
+on them happens on the host. An agent you start from your phone runs in the project's
+folder on that project's host, with that host's runtimes, and shows up in every window as
+if you had started it there.
 
-That is why the Mac needs to be awake and reachable for the phone to be of use, and why
-nothing is lost if your phone runs out of battery.
+That is why the phone needs the control plane, and the host, to be up for it to be of use,
+and why nothing is lost if your phone runs out of battery.
 
-## Three ways to reach you
+## Every host
 
-There are three separate paths from the Mac to your devices.
+A paired iPhone or iPad sees the projects on every host, each under its host's heading, as
+the Mac window does. A server you add once appears on your devices within a few seconds,
+with nothing to do on them.
 
-The first is a direct connection on your local network. A small helper on the Mac, the
-bridge, offers the daemon to devices on the same network. The phone and iPad find the Mac
-by themselves, without you typing an address. At home, everything you see and do in the
-iPhone and iPad apps goes over this connection, and it is instant.
+## Pairing and grants
 
-The second is the relay, for when your device is somewhere else. The same requests and
-updates go through your own iCloud account instead, each one sealed so that only your Mac
-and that one device can read it. Nothing passes through a server of ours. The device
-switches between the two by itself: leave the house and a line at the top says **Away —
-slower, through iCloud**; come back and it goes. The relay is slower, about two or three
-seconds for each answer, which is why a few things wait until you are home (see below).
+A device is paired once, with a code your control plane shows. There are two places to
+get one:
 
-The third is notifications. When an agent needs you and you are not at the Mac, the Mac
-sends a short notice to your device through your own iCloud account. It is sealed so that
-only that one device can read it. If you are at the Mac, the Mac tells you itself and your
-devices stay quiet. If you are away, the device you used most recently is told, and the
-iPhone when it cannot tell which. When the question is answered, or goes away, the notice
-is taken down.
+- In the Mac window, **Settings ▸ Control plane ▸ Clients ▸ Pair a Device…** shows a code
+  to scan with Agents on the device.
+- In Agents Host on the Mac that runs the control plane, **Pair a Window or Phone…** with
+  **An iPhone or iPad** chosen shows the code as text, to copy and paste into the device.
+
+A code works once, for five minutes. The device keeps a key of its own, and proves it holds
+that key each time it connects. A device that has not paired says **Connect to your
+agents**, and sends nothing.
+
+Every client is given a grant. A device is paired with the **device** grant: it can do
+what a phone could always do, on every host, and no more. In **Settings ▸ Control plane ▸
+Clients** you can change a device to **Operator**, and back, without pairing it again; its
+next request is judged by the new grant.
 
 ## What you can do from the phone and iPad
 
-On the direct connection, the iPhone and iPad can:
+With the device grant, the iPhone and iPad can, on any host:
 
-- see every project on the Mac and its agents, grouped the same way as on the Mac,
+- see every project and its agents, grouped the same way as on the Mac,
 - read a conversation as it happens, and answer permission requests and questions,
 - send a prompt, attach a file or a picture, dictate, and change the agent's mode or model,
 - start a new agent, in the project folder or in a worktree, and remove a worktree,
@@ -59,53 +63,62 @@ On the direct connection, the iPhone and iPad can:
 - see what an agent holds or waits for (see [Leases on shared resources](leases.md)), and
   what has been spent.
 
-## What stays on the Mac
+## What stays with an operator
 
-Some things are only on the Mac:
+Some things need the operator grant, which a Mac window has. They are refused for a device
+by the control plane, and again by the host:
 
-- the browser pane,
-- the Resources page, where you end a lease,
-- adding, archiving and renaming projects,
-- signing a runtime in, and changing settings such as spending limits,
-- servers: your devices see only the projects on your Mac, not projects on a Linux server.
+- adding, archiving and renaming projects, and browsing a host's folders,
+- signing a runtime in, lending a credential, and changing settings such as spending
+  limits,
+- adding and removing hosts, and pairing, promoting or forgetting clients.
 
-## The connection today
+The browser pane and the Resources page, where you end a lease, are on the Mac only.
 
-Be aware of how the connections work today.
+## At home and away
 
-The bridge is not started by the app. You start it by hand on the Mac, and it runs until
-you stop it. While it is not running, your devices cannot reach the Mac from anywhere, and
-notifications that were due wait on the Mac until it is.
+At home, the device connects to the control plane's address, the one its code carried,
+over HTTPS. It checks the control plane's certificate against the one named in the code,
+so nothing else on the network can stand in for it.
 
-**Pairing is a code you scan.** In Settings ▸ Devices on the Mac, **Pair a Device…** shows a
-code for five minutes. Scanning it with Agents on the device, on the Mac's Wi‑Fi, pairs it:
-the code carries the Mac's key and a secret that works once. After that, the device can
-reach the Mac at home and from anywhere, and nothing else on the network can. A device that
-has not paired says **Pair with your Mac**, and sends nothing, on the network or through
-iCloud. The Mac and the device must be signed in to the same iCloud account for the relay.
+Away from home, the device connects to that same address if it can reach it, which it can
+when the control plane runs on hosting of your own with a public name. If it cannot, for
+instance because the control plane is on your Mac at home, it can go through the relay
+instead: the same requests and updates pass through your own iCloud account, each one
+sealed so that only your control plane and that one device can read it. Nothing passes
+through a server of ours. A device on the relay says **Away — slower, through iCloud**.
+The relay is slower, about two or three seconds for each answer, so the terminal, the live
+page, files and attaching pictures wait until the device can reach the address again.
+Through the relay, a device reaches this Mac's host; your other hosts wait until it can
+reach the control plane's address again.
 
-**Away, the everyday things work**: your projects and agents, reading a conversation and
-following it as it grows, sending prompts, answering questions and permissions, starting,
-stopping and archiving agents, changing an agent's mode or model, and the events list. The
-terminal, the live page, files and attaching pictures say **Needs the same network as your
-Mac**, because they send too much, too often, for iCloud. They open by themselves when you
-are back on the Mac's Wi‑Fi.
+Notifications take the same path. When an agent on any host needs you, a short notice is
+sealed to your device and posted to your own iCloud account. When the question is
+answered, or goes away, the notice is taken down.
 
-**Forgetting a device.** In Settings ▸ Devices on the Mac, **Forget…** cuts a device off at
-once, at home and away, closes anything it has open, and deletes what was waiting for it in
-iCloud. To use it again, pair it again with a new code.
+The relay and notifications are run by a Mac host, because they need your iCloud account.
+In this build, Agents Host cannot switch them on yet: its **Relay for my devices** row says
+**Not in this build yet**. Until it can, a device reaches your agents only where it can
+reach the control plane's address, and gets no notifications. A set-up with no Mac host at
+all never has them.
 
-**Everything is encrypted, and locked to paired devices.** On the Mac's network the device
-and the Mac talk over TLS with a key only the two of them can make, so a device that has not
-paired cannot connect at all. Through iCloud, each message is sealed to the one device or
-Mac it is for before it leaves. A paired device can do what the phone app does, and no
-more: it cannot sign runtimes in or out, lend credentials, browse the Mac's folders, change
-settings or quit the Mac's agents.
+## Forgetting a device
+
+In **Settings ▸ Control plane ▸ Clients** on the Mac, **Forget…** cuts a device off at
+once, directly and through the relay, and on every copy of the control plane. Its next
+attempt to connect is refused. To use it again, pair it again with a new code. The app
+will not let you forget or demote the last operator.
+
+## Devices paired before the control plane
+
+An iPhone or iPad paired with the earlier Agents app on your Mac keeps working after you
+move that set-up across to a control plane, without pairing again. The next time it
+connects the old way, it is told where the control plane is, and connects there from then
+on, with the device grant. See [Move an existing set-up across](../how-to/move-an-existing-set-up.md).
 
 ## Related
 
-- [Follow an agent from your iPhone](../tutorials/follow-from-iphone.md), for pairing and
-  answering away from the Mac.
+- [Connect a window or phone](../how-to/connect-a-window-or-phone.md), for pairing.
 - [Answer a question or a permission request](../how-to/answer-a-question.md), for the
   card on every device.
 - [Statuses and groups](../reference/statuses.md), for what each line at the top of the

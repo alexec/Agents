@@ -16,6 +16,24 @@ sessions need you until you open them. An agent can start up to five helpers of 
 and a project's workflows (Markdown files under `.agents/workflows/`) start agents
 by themselves on a schedule or when something happens.
 
+## Setting it up
+
+On a Mac, Agents is two apps:
+
+- **Agents**, the window, built for the App Store. It runs in the sandbox and starts
+  nothing: it is a screen onto your agents, as the iPhone and iPad app is.
+- **Agents Host**, a download signed by us and installed outside the App Store. It runs
+  this Mac's agents, and optionally the control plane every window, phone and server
+  connects to, kept running by macOS.
+
+The control plane is yours: on your Mac through Agents Host, or as several copies of
+`agents-control` in containers on hosting you rent, sharing an S3-compatible bucket. A
+Linux server becomes a host by running one command the window shows. See
+[Set up Agents on this Mac](https://alexec.github.io/Agents/how-to/set-up-on-this-mac/)
+and [The control plane](https://alexec.github.io/Agents/explanation/control-plane/).
+
+Neither app is in the App Store yet, so today both are built from source.
+
 ## Build and run
 
 ```sh
@@ -23,12 +41,29 @@ xcodegen generate      # regenerate Agents.xcodeproj after editing project.yml
 open Agents.xcodeproj
 ```
 
+The schemes:
+
+| Scheme | What it builds |
+|---|---|
+| `AgentsStore` | the App Store window: sandboxed, no helpers, reaches everything through a control plane |
+| `AgentsHost` | Agents Host, carrying `agentsd`, `agents-control` and `agents-relay` |
+| `Remote` | the iPhone and iPad app |
+| `Agents` | the developer window, which still starts a daemon of its own (see below); it goes once everyone has moved across |
+
 From the command line:
 
 ```sh
-xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build
+xcodebuild -scheme AgentsStore -destination 'platform=macOS' -skipPackagePluginValidation build
+xcodebuild -scheme AgentsHost -destination 'platform=macOS' -skipPackagePluginValidation build
 swift test --package-path Packages/AgentsKit
+swift test --package-path Packages/ControlPlane
 ```
+
+Build the schemes one after another, not at once. The Linux programs are cross-built on
+the Mac, with the swift.org toolchain and Static Linux SDK that match Xcode's Swift:
+`scripts/build-linux-agentsd.sh` for a server's host, and `scripts/build-linux-control.sh`
+for the control plane's container. `deploy/` runs three copies of the control plane over
+MinIO behind Caddy, for trying it out; see `deploy/README.md`.
 
 `-skipPackagePluginValidation` is needed because SwiftTerm ships a build-tool plug-in,
 and Xcode will not run one from the command line until it has been trusted. Xcode itself
@@ -37,11 +72,15 @@ build commands instead.
 
 ## The daemon
 
-The app is a window. The agents belong to a helper, `agentsd`, which lives inside the app
-bundle at `Contents/Helpers/agentsd` and is started by the app in a session of its own, so
-agents keep working when the window is gone. There is no login item and nothing to install.
+The window runs nothing. The agents belong to a helper, `agentsd`, which is a host of the
+control plane. Agents Host carries it at `Contents/Helpers/agentsd` and registers it with
+macOS as a launch agent, so it runs with every window closed, starts at login, and never
+exits for being idle. On a Linux server the same daemon lives in `~/.agents-server`.
 
-It exits by itself once it is holding no agents and no window is connected.
+The developer window (the `Agents` scheme) still carries its own `agentsd` and starts it in
+a session of its own, as the app did before the control plane. That daemon exits by itself
+once it is holding no agents and no window is connected. The rest of this section is about
+that daemon, and about the root every daemon keeps.
 
 ```sh
 # Is it running?

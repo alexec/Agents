@@ -27,18 +27,20 @@ started in. See [Give an agent more folders and MCP servers](../how-to/give-an-a
 
 ## A project lives on one host
 
-A host is a machine where agents can do their work. Your Mac is one. A Linux server you
-reach with SSH can be another, once you add it to the app.
+A host is a machine where agents can do their work. Your Mac is one, once Agents Host runs
+on it. A Linux server can be another, and so can a second Mac, once it joins your control
+plane (see [The control plane](control-plane.md)).
 
 Each project belongs to exactly one host, and its folder is a path on that host. An agent
 in a project on a server runs on the server: its commands run there, its edits land
 there, and the runtimes you can pick from are the ones installed and signed in on that
 server, not on your Mac. The files pane, the terminal and the worktrees all show the
-server's copy.
+server's copy. The same is true of a project on this Mac: the window asks this Mac's host
+for its files just as it asks a server's.
 
-Projects on your Mac and projects on servers sit in the same list, and a server project
-says which server it is on. There is no switch that turns the whole window into a view of
-one server.
+Projects on every host sit in the same list, each under its host's heading, in every
+window and on every phone and iPad. There is no switch that turns the whole window into a
+view of one host.
 
 The reason for one host per project is that a folder is only ever in one place. Keeping
 two copies of it on two machines in step would mean deciding, every time they differ,
@@ -46,24 +48,37 @@ which one is right, and an agent's half-finished edit is exactly the kind of dif
 nobody can decide about. So the work happens where the folder is, and the window goes to
 it.
 
+## Hosts join by connecting out
+
+A host is never reached by anything. It connects out to your control plane over HTTPS,
+with a key of its own, and keeps that connection open. To add a server, you run one
+command on it, which a window shows you with a code that works once; it installs the host
+there in your home folder, and the host joins. A window can instead install it for you over
+ssh with a key you give for that install only; afterwards the control plane keeps neither
+the key nor the session, and the server connects out like any other. See
+[Add a server](../how-to/add-a-server.md).
+
+Connecting out means a server behind a firewall or a home router joins without a port
+being opened to it, and a server you add once is seen by every window and device, with
+nothing to set up on each.
+
 ## Why put a project on a server
 
-The window only ever asks the daemon for things, so the daemon can be somewhere else. On
-a server, the app puts its own daemon in your home folder there and reaches it through
-your SSH connection. Nothing it runs on the server listens on a network port.
-
 That buys three things. The agents on a server keep working while your Mac sleeps, loses
-its network, or has the app closed, because nothing they need is on the Mac. The work can
-happen on Linux, or on a machine with more room than a laptop. And the Mac stays quiet
+its network, or has the window closed, because nothing they need is on the Mac. The work
+can happen on Linux, or on a machine with more room than a laptop. And the Mac stays quiet
 while four agents build at once somewhere else.
 
-When the Mac is away from a server, its projects show what the app last knew, marked as
-not current, and the app does not take a prompt or an answer for them that it cannot
-deliver. When the connection comes back, you see everything that happened meanwhile. On
-the server, the daemon does not stop when it is idle, so it is still there for the next
-connection.
+When a host is offline, its projects show what the app last knew, marked as not current,
+and the app does not take a prompt or an answer for them that it cannot deliver. A host
+that loses its connection keeps its agents working, and reconnects by itself when it can.
+When it does, you see everything that happened meanwhile. A host never stops for being
+idle, so it is still there for the next connection.
 
-For now, your iPhone and iPad see only the projects on your Mac.
+If your control plane runs on your Mac, a server's agents keep working while the Mac
+sleeps, but you cannot see or answer them until the Mac is back. Running the control plane
+as copies on hosting of your own removes that gap; see
+[Run the control plane as several copies](../how-to/run-several-copies.md).
 
 ## Why worktrees
 
@@ -160,7 +175,8 @@ the commit it took, and checks each file against GitHub's own record of it at th
 
 ## Related
 
-- [Add a project](../how-to/add-a-project.md), [Add a Linux server](../how-to/add-a-linux-server.md)
+- [Add a project](../how-to/add-a-project.md), [Add a server](../how-to/add-a-server.md)
   and [Start an agent in its own worktree](../how-to/start-in-a-worktree.md).
+- [The control plane](control-plane.md).
 - [Give an agent more folders and MCP servers](../how-to/give-an-agent-more-folders.md).
 - [Settings and the Resources page](../reference/settings.md).

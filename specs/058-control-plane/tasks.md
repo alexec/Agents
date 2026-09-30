@@ -441,9 +441,9 @@ again.
 
 ## Phase 13: Polish and close (plan Phase 9)
 
-- [ ] T098 [P] Write `docs/explanation/control-plane.md` as the spec's Docs section gives it: copies, the store, hosts and clients, where to run it, what happens when it or the store is down, and why.
-- [ ] T099 [P] Update `docs/explanation/window-and-daemon.md`, `phone-and-ipad.md`, `projects-hosts-worktrees.md` and the `README.md` set-up, following the spec's Docs section.
-- [ ] T100 [P] Add `docs/how-to/` pages and put them in `mkdocs.yml`:
+- [x] T098 (docs/explanation/control-plane.md) [P] Write `docs/explanation/control-plane.md` as the spec's Docs section gives it: copies, the store, hosts and clients, where to run it, what happens when it or the store is down, and why.
+- [x] T099 (window-and-daemon.md now "The window and the host", phone-and-ipad.md, projects-hosts-worktrees.md, README "Setting it up"; tutorials first-agent and follow-from-iphone still describe the old pairing) [P] Update `docs/explanation/window-and-daemon.md`, `phone-and-ipad.md`, `projects-hosts-worktrees.md` and the `README.md` set-up, following the spec's Docs section.
+- [x] T100 (five how-to pages in mkdocs.yml; scripts/docs.sh check passes) [P] Add `docs/how-to/` pages and put them in `mkdocs.yml`:
   - set one up on this Mac;
   - run the control plane as several copies with a bucket;
   - connect a window or phone;
