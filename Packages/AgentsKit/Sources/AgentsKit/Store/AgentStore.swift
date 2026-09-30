@@ -399,7 +399,7 @@ public actor AgentStore {
     private func appendTurns(_ turns: [TurnSummary], for agentID: UUID) throws {
         let url = locations.turns(agentID)
         if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(atPath: url.path, contents: nil)
+            _ = FileManager.default.createFile(atPath: url.path, contents: nil)
         }
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
