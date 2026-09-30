@@ -34,3 +34,9 @@ Codex: the mode decides:
 Cursor: no control, and why (Copilot, Antigravity and OpenCode are the same shape):
 
 ![cursor](7-settings-cursor.png)
+
+## 4. From a real failure (walk, 2026-09-30)
+
+Claude with its sandbox On, in an app already inside a sandbox, so Claude's could not start:
+
+![card from a real failure](8-card-real-failure.png)

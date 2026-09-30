@@ -153,7 +153,7 @@ struct SandboxRecoveryTests {
             #expect(error.code == DaemonAPI.Failure.sandboxWillNotStart)
             let data = try #require(try error.data?.decode(DaemonAPI.SandboxWillNotStart.self))
             #expect(data.offOffered)
-            #expect(data.detail.contains("Sandbox required but unavailable"))
+            #expect(data.detail.hasPrefix("Claude Code returned an error result: Sandbox required but unavailable"))
         }
         #expect(await core.allAgents().isEmpty, "the form keeps the prompt; no agent")
     }

@@ -94,4 +94,16 @@ own Seatbelt fails to nest, as in research R11), built from 0a22385c/d8b892c0:
   went ahead (and then stopped on Grok's spent balance, which is Grok's).
 - Found and fixed on the way: ToolSearch and the app's own `finish_turn` counted as work done;
   a Gemini whose sandbox is on had no deadline at all and would have waited for ever.
+- **Screenshot**: the card from a real Claude failure, waiting, with **Keep stopped**,
+  **Continue without sandbox** and the pill reading **Sandbox on**: `look/8-card-real-failure.png`.
+- **Server (devbox, Linux ARM64, the branch's Linux agentsd)**: Claude's default set **On** in
+  Settings reached the server (`sandbox/state` there: `claude: on`). A new Claude agent there
+  was refused with `sandboxWillNotStart` and Claude's own words ("Sandbox required but
+  unavailable … bubblewrap (bwrap) not installed, socat not installed"), `offOffered: true`.
+  The same start with `sandbox: off` started with **Sandbox off** and, its permission
+  answered, wrote outside its project. The details came back wrapped as `string("…")`; fixed
+  to take the error's text (the server walked still ran the earlier build).
+- **Not walked**: **Start without sandbox** over a new chat's prompt on screen. It needs typing
+  into the front window while Alex was using the Mac; the refusal it answers is proven above
+  over the socket on the Mac and the server.
 

@@ -171,11 +171,21 @@ extension DaemonCore {
     /// of its stderr (R11). Nil for anything else, which is then handled as before.
     func sandboxStartFailure(runtimeID: String, error: any Error, session: ACPSession?) async -> String? {
         guard !(SandboxCatalog.entry(for: runtimeID)?.failurePatterns ?? []).isEmpty else { return nil }
-        let words = (error as? JSONRPCError).map { "\($0.message)\n\($0.data.map { "\($0)" } ?? "")" }
+        let words = (error as? JSONRPCError).map { ([$0.message] + Self.strings(in: $0.data)).joined(separator: "\n") }
             ?? "\(error)"
         if let detail = SandboxFailureDetector.match(runtimeID: runtimeID, text: words) { return detail }
         guard let session else { return nil }
         return SandboxFailureDetector.match(runtimeID: runtimeID, text: await session.standardErrorTail())
+    }
+
+    /// Every string inside an error's data, as the runtime wrote it: Claude puts its words in
+    /// `data.details`, others elsewhere or nowhere.
+    static func strings(in value: JSONValue?) -> [String] {
+        guard let value else { return [] }
+        if let text = value.stringValue { return [text] }
+        if let items = value.arrayValue { return items.flatMap { strings(in: $0) } }
+        if case .object(let fields) = value { return fields.keys.sorted().flatMap { strings(in: fields[$0]) } }
+        return []
     }
 
     /// Whether a runtime that never answered is Gemini with its sandbox on (R6): the one
