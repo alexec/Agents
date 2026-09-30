@@ -1,9 +1,8 @@
-# Walk 6: App Store checks (US8, T093), as far as it is mine
+# Walk 6: App Store checks (US8, T093)
 
 2026-09-29, from the branch at 86eec71f plus the home-host fix below.
 
-Validating the archives with `altool`, and uploading them, need Alex's App Store Connect
-credentials, so steps 1–2 stop at what can be checked here.
+Both archives validate with `altool`. Uploading and submitting them are Alex's call.
 
 ## Steps 1–2: the archives
 
@@ -35,11 +34,32 @@ Store Connect API instead.
 - **Exports.** Both archives were made again (both still pass `check-store-archive.sh`) and
   exported for App Store Connect: `Agents.pkg`, signed by the installer certificate, and
   `Agents.ipa`.
-- **`altool --validate-app`** stopped on both with "Unable to find Apple ID for Bundle ID … create
-  this app in App Store Connect first". There are no app records yet. Making them reserves
-  the names, which is Alex's call.
+- **`altool --validate-app`** first stopped on both with "Unable to find Apple ID for Bundle ID
+  … create this app in App Store Connect first", because there were no app records yet.
 
-Still Alex's: the two app records, then validation, and any upload.
+### App records and validation (with Alex's go-ahead, 21:4x)
+
+- **The records.** Made in App Store Connect's New App form in Chrome, with English (U.K.)
+  and Full Access. Both creations said the user access "could not be saved", but that all
+  users have access, which is what Full Access means.
+
+  | Record | Platform | Bundle ID | SKU | Apple ID |
+  |---|---|---|---|---|
+  | Agents for Mac | macOS | `com.alexecollins.agents.store` | `agents-store-mac` | 6817621702 |
+  | Agents for iPhone and iPad | iOS | `com.alexecollins.agents.remote` | `agents-remote-ios` | 6817621595 |
+
+- **`Agents.ipa`**: VERIFY SUCCEEDED with no errors.
+- **`Agents.pkg`**: first VERIFY FAILED, 90255: "The installer package includes files that
+  are only readable by the root user."
+  - The archive was made from a shell with umask 077, so `_CodeSignature/CodeResources` was
+    `0600`, and the installer package keeps modes.
+  - The archive's modes were opened (`chmod -R go+rX`) and it was exported again under umask
+    022. Then: VERIFY SUCCEEDED with no errors.
+  - `check-store-archive.sh` now fails a Mac archive holding a file not everyone can read.
+    It passes both archives here, and it failed a copy with `CodeResources` at `0600`.
+- **Nothing was uploaded.**
+
+Still Alex's: the upload and submission.
 
 ## Step 3: the demo control plane
 

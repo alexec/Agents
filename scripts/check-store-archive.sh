@@ -13,6 +13,10 @@
 # For a Mac archive it also checks the app's entitlements are T044's list and no more:
 # the sandbox, network client, audio input and user-selected read-only files, plus the
 # identifiers signing adds.
+#
+# For a Mac archive every file must be readable by everyone: App Store Connect refuses an
+# installer package holding one only its owner can read (90255), which a shell with umask
+# 077 leaves in _CodeSignature.
 
 set -euo pipefail
 archive=${1:?usage: check-store-archive.sh path/to/Some.xcarchive}
@@ -62,6 +66,13 @@ while IFS= read -r -d '' file; do
   fi
 done < <(find $app -type f -print0)
 print "$count Mach-O files"
+
+if (( mac )); then
+  while IFS= read -r -d '' file; do
+    print "BAD ${file#$app/} (not readable by everyone; archive with umask 022)"
+    failures=$(( failures + 1 ))
+  done < <(find $app ! -perm -o+r -print0)
+fi
 
 if (( mac )); then
   expected=(
