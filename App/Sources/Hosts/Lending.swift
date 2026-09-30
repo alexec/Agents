@@ -14,7 +14,58 @@ struct TokenAsk: Identifiable {
     let answer: CheckedContinuation<Bool, Never>
 }
 
+/// A server asked for a sign-in this Mac relays (058, T091): asked of the person, once per
+/// server and runtime, before the control plane lets the server reach this Mac's relay.
+struct SignInLendAsk: Identifiable {
+    let id = UUID()
+    let runtimeName: String
+    let label: String
+    let answer: CheckedContinuation<Bool, Never>
+}
+
 extension AppModel {
+    /// A server of the control plane wants a sign-in this Mac relays (T091). Asks the
+    /// person the first time; then the control plane lets the server tunnel to this Mac's
+    /// host, which relays the sign-in, and the server is told where its gate goes. The
+    /// token never leaves this Mac. Nil when this is not such a case.
+    func relaySignInThroughControl(_ wanted: DaemonAPI.CredentialWanted, to id: HostID) async -> Bool? {
+        guard reachesThroughControl(id), ToolPolicyCatalog.policy(for: wanted.runtime).relay != nil,
+              let lender = thisMacHostID, lender != id, let control = controlPlaneClient() else { return nil }
+        defer { Task { await control.disconnect() } }
+        let allowed = controlPlaneHosts?.first { $0.id == id }?.signInFrom?[wanted.runtime] == lender
+        if !allowed {
+            let name = RuntimeCatalog.runtime(id: wanted.runtime)?.name ?? wanted.runtime
+            let yes = await withCheckedContinuation { answer in
+                signInLendAsk = SignInLendAsk(runtimeName: name, label: hosts.label(id), answer: answer)
+            }
+            guard yes else { return false }
+            do {
+                try await control.connect(startIfNeeded: false, timeout: .seconds(5))
+                _ = try await control.call(DaemonAPI.Method.hostsLendSignIn,
+                                           DaemonAPI.LendSignIn(host: id, from: lender, runtime: wanted.runtime, allowed: true))
+            } catch {
+                return false
+            }
+        }
+        do {
+            let grant = try await client(for: lender).call(DaemonAPI.Method.relayGrant,
+                                                          DaemonAPI.RelayGrantRequest(runtime: wanted.runtime),
+                                                          returning: DaemonAPI.RelayGrantReply.self)
+            _ = try await client(for: id).call(DaemonAPI.Method.relayOffer, DaemonAPI.RelayOffer(
+                runtime: wanted.runtime, socketPath: "tunnel", caCertificate: grant.caCertificate, standIn: grant.standIn))
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// The person answered the lend ask.
+    func finishSignInLendAsk(allowed: Bool) {
+        guard let ask = signInLendAsk else { return }
+        signInLendAsk = nil
+        ask.answer.resume(returning: allowed)
+    }
+
     /// What a server may be lent from here, sent on every connect (043). Names only.
     func credentialOffer(_ id: HostID) -> DaemonAPI.CredentialsOffer {
         let ownOnly = hosts.host(id)?.ownSignInOnly ?? false
@@ -38,6 +89,8 @@ extension AppModel {
     /// that was refused is then sent again.
     func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: HostID) async -> Bool {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false) else { return false }
+        // A sign-in this Mac relays, to a server of the control plane (T091).
+        if let relayed = await relaySignInThroughControl(wanted, to: id) { return relayed }
         if credentials.secretToLend(wanted.runtime) == nil {
             let saved = await withCheckedContinuation { answer in
                 tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: hosts.label(id), answer: answer)

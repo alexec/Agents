@@ -182,6 +182,7 @@ public final class Daemon: @unchecked Sendable {
                 }
                 self.uplink = uplink
                 await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+                await lendAndBorrowSignIns(through: uplink)
                 uplink.start()
                 DaemonLog.shared.write("uplink: a host of the control plane at \(socket), as \(control.host)")
             } else {
@@ -205,6 +206,14 @@ public final class Daemon: @unchecked Sendable {
         // without this it would not take the assertion until one of them next changed
         // state — which for a long turn could be half an hour (024 FR-014).
         await core.reviseWakefulness()
+    }
+
+    /// A sign-in relayed between hosts through the control plane (058, T091): this Mac's
+    /// relays are what a tunnel to it reaches, and a server's gate opens a tunnel from it.
+    private func lendAndBorrowSignIns(through uplink: ControlUplink) async {
+        let core = self.core
+        uplink.setLendingPort { runtime in await core.signInRelayPort(runtime) }
+        await core.setTunnelOpener { runtime in try await uplink.openTunnel(runtime: runtime) }
     }
 
     /// A host of a control plane elsewhere (058, T021): enrolled once with a host code,
@@ -243,6 +252,7 @@ public final class Daemon: @unchecked Sendable {
             let uplink = ControlUplink(server: server, hello: hello, dial: ControlDialling.hostDial(membership, key: key))
             self.uplink = uplink
             await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+            await lendAndBorrowSignIns(through: uplink)
             uplink.start()
             DaemonLog.shared.write("uplink: a host of \(membership.name) over the network, as \(membership.host?.rawValue ?? "?")")
         } catch {
@@ -283,6 +293,7 @@ public final class Daemon: @unchecked Sendable {
                                        dial: try ControlJoin.hostDial(membership, privateKey: privateKey))
             self.uplink = uplink
             await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+            await lendAndBorrowSignIns(through: uplink)
             uplink.start()
             DaemonLog.shared.write("uplink: a host of \(membership.name) at \(membership.url ?? "?"), as \(membership.host?.rawValue ?? "?")")
         } catch {

@@ -82,6 +82,10 @@ extension DaemonCore {
                 try offerRelay(request, connection: connection)
                 return .success([:])
 
+            case DaemonAPI.Method.relayGrant:
+                let request = try require(params, as: DaemonAPI.RelayGrantRequest.self)
+                return .success(try JSONValue.encoding(try await grantRelay(request.runtime)))
+
             case DaemonAPI.Method.credentialsLend:
                 let request = try require(params, as: DaemonAPI.CredentialsLend.self)
                 try lendCredential(request, connection: connection)

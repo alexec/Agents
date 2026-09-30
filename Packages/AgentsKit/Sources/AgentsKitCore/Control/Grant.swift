@@ -113,6 +113,9 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     /// `agents-relay`, which runs no agents. Nil for any other host; false while switched
     /// off with `hosts/setRelay`.
     public var relay: Bool?
+    /// The hosts whose sign-in this host may use, by runtime, relayed through the control
+    /// plane (058, T091): an operator said yes to each.
+    public var signInFrom: [String: HostID]?
     public var owner: PersonID?
     /// As `ClientRecord.rev`.
     public var rev: Int

@@ -65,6 +65,15 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
             // A server asked for a credential there is none of (043).
             .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
+            .alert(model.signInLendAsk.map { "Let \($0.label) use this Mac’s \($0.runtimeName) sign-in?" } ?? "",
+                   isPresented: Binding(get: { model.signInLendAsk != nil },
+                                        set: { if !$0 { model.finishSignInLendAsk(allowed: false) } }),
+                   presenting: model.signInLendAsk) { _ in
+                Button("Allow") { model.finishSignInLendAsk(allowed: true) }
+                Button("Don’t Allow", role: .cancel) { model.finishSignInLendAsk(allowed: false) }
+            } message: { ask in
+                Text("Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Control plane ▸ Hosts.")
+            }
             // A known server with a new key: rebuilt, or not what it says (043).
             #if !AGENTS_STORE
             .sheet(item: Binding(get: { model.hosts.rebuiltAsk },

@@ -486,6 +486,15 @@ public actor DaemonCore {
     var relayOffers: [UUID: [String: DaemonAPI.RelayOffer]] = [:]
     /// One gate per forwarded relay socket, started on the first offer of it.
     var relayGates: [String: RelayGate] = [:]
+    /// A borrowing host's own end of each tunnelled relay (058, T091), by runtime.
+    var tunnelSockets: [String: TunnelSocket] = [:]
+    /// How this host asks its control plane for a tunnel to the Mac that lends it a
+    /// sign-in: set when it has an uplink.
+    var tunnelOpener: (@Sendable (String) async throws -> any LineTransport)?
+    #if canImport(Network) && canImport(Security)
+    /// The sign-ins this Mac's host relays to servers through the control plane (T091).
+    lazy var signInRelays = HostSignInRelays(locations: locations)
+    #endif
     /// What a window lent this Mac's own agents (046, D3): Gemini's key, which has no other
     /// way in. Kept for the daemon's life, not the connection's, so an agent a workflow starts
     /// with no window open still has it; in memory only, and gone when the window stops

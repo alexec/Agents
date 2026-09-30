@@ -108,6 +108,24 @@ extension DaemonCore {
     /// (once per forwarded socket) and keep the offer for as long as the connection lasts.
     /// Only on a server; the Mac's own agents use the Mac's sign-in directly.
     func offerRelay(_ offer: DaemonAPI.RelayOffer, connection: UUID?) throws {
+        // Through the control plane (058, T091): a tunnel to the lending Mac, not a socket a
+        // window forwarded. Kept for the daemon's life, as the operator's yes is.
+        if offer.socketPath == Self.tunnelTarget {
+            guard let opener = tunnelOpener else {
+                throw JSONRPCError(code: DaemonAPI.Failure.notAServer, message: "This host has no control plane to tunnel through.")
+            }
+            let runtime = offer.runtime
+            let path = locations.root.appendingPathComponent("relay-\(runtime).sock").path
+            if tunnelSockets[runtime] == nil {
+                tunnelSockets[runtime] = try TunnelSocket(path: path) { try await opener(runtime) }
+            }
+            var kept = offer
+            kept.socketPath = path
+            if relayGates[path] == nil { relayGates[path] = try RelayGate(target: path) }
+            relayOffers[Self.tunnelOffers, default: [:]][runtime] = kept
+            DaemonLog.shared.write("relay offered for \(runtime) through the control plane, on port \(relayGates[path]?.port ?? 0)")
+            return
+        }
         guard onServer else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
                                message: "This Mac's own agents use this Mac's sign-in; nothing is relayed to them.")
@@ -118,6 +136,34 @@ extension DaemonCore {
         }
         relayOffers[connection, default: [:]][offer.runtime] = offer
         DaemonLog.shared.write("relay offered for \(offer.runtime) on port \(relayGates[offer.socketPath]?.port ?? 0)")
+    }
+
+    /// What a tunnelled offer names as its socket, and where such offers are kept.
+    static let tunnelTarget = "tunnel"
+    static let tunnelOffers = UUID(uuidString: "00000000-0000-0000-0000-000000000058")!
+
+    /// The borrowing host's tunnel opener, once it has an uplink (T091).
+    public func setTunnelOpener(_ opener: @escaping @Sendable (String) async throws -> any LineTransport) {
+        tunnelOpener = opener
+    }
+
+    /// `relay/grant`, on the Mac's host: relay a sign-in to a server through the control
+    /// plane. The token stays here; what goes back is the stand-in and the relay's CA.
+    func grantRelay(_ runtimeID: String) async throws -> DaemonAPI.RelayGrantReply {
+        #if canImport(Network) && canImport(Security)
+        return try await signInRelays.grant(runtimeID)
+        #else
+        throw JSONRPCError(code: DaemonAPI.Failure.notPermitted, message: "Only a Mac relays a sign-in.")
+        #endif
+    }
+
+    /// Where the relay for `runtimeID` listens here, for a tunnel to connect to.
+    public func signInRelayPort(_ runtimeID: String) -> UInt16? {
+        #if canImport(Network) && canImport(Security)
+        return signInRelays.port(for: runtimeID)
+        #else
+        return nil
+        #endif
     }
 
     /// The offer relaying `runtimeID`'s sign-in: the asking connection's, else any other's.

@@ -55,6 +55,8 @@ public actor ControlRouter {
     private enum Target: Hashable {
         case session(UUID)
         case peer(String, Int)
+        /// The other end of a tunnel between two hosts (T091): that host's channel.
+        case tunnel(HostID, Int)
     }
 
     private struct HostSession {
@@ -336,6 +338,10 @@ public actor ControlRouter {
             case .peer(let peer, let theirs):
                 _ = channel
                 peers[peer]?(PeerWire.frame(host, ControlWire.close(theirs)))
+            // A tunnel ends at both hosts with either.
+            case .tunnel(let other, let theirs):
+                hosts[other]?.channels[theirs] = nil
+                try? hosts[other]?.transport.write(line: ControlWire.close(theirs))
             }
         }
         if let newState { setState(newState, of: host) }
@@ -351,6 +357,10 @@ public actor ControlRouter {
             guard case .session(let sessionID) = target else {
                 if case .peer(let peer, let theirs) = target {
                     peers[peer]?(PeerWire.frame(host, ControlWire.channel(theirs, message: message)))
+                }
+                // A tunnel's bytes go to the other host as they came, never read.
+                if case .tunnel(let other, let theirs) = target {
+                    try? hosts[other]?.transport.write(line: ControlWire.channel(theirs, message: message))
                 }
                 return
             }
@@ -369,6 +379,9 @@ public actor ControlRouter {
             case .peer(let peer, let theirs):
                 hosts[host]?.proxied[target] = nil
                 peers[peer]?(PeerWire.frame(host, ControlWire.close(theirs)))
+            case .tunnel(let other, let theirs):
+                hosts[other]?.channels[theirs] = nil
+                try? hosts[other]?.transport.write(line: ControlWire.close(theirs))
             }
         case .open:
             // Only the control plane opens channels. A host that tries is ignored.
@@ -595,6 +608,39 @@ public actor ControlRouter {
     private func write(_ line: String, to sessionID: UUID) {
         guard let session = clients[sessionID] else { return }
         do { try session.transport.write(line: line) } catch { detachClient(sessionID) }
+    }
+
+    // MARK: Tunnels between hosts (T091)
+
+    /// A channel on each of two hosts, joined: what one sends on its end reaches the other
+    /// untouched. For a sign-in `lender` relays to `borrower`, which asked with `ref`. Either
+    /// end closing, or either host going, closes both. False when either host is not here.
+    @discardableResult
+    public func openTunnel(borrower: HostID, lender: HostID, runtime: String, ref: String) -> Bool {
+        guard borrower != lender, var near = hosts[borrower], var far = hosts[lender] else { return false }
+        let nearChannel = near.nextChannel
+        near.nextChannel += 1
+        let farChannel = far.nextChannel
+        far.nextChannel += 1
+        near.channels[nearChannel] = .tunnel(lender, farChannel)
+        far.channels[farChannel] = .tunnel(borrower, nearChannel)
+        hosts[borrower] = near
+        hosts[lender] = far
+        try? far.transport.write(line: ControlWire.open(farChannel, ControlWire.ChannelOpen(
+            grant: .operator, client: "tunnel:" + borrower.rawValue, tunnel: runtime)))
+        try? near.transport.write(line: ControlWire.open(nearChannel, ControlWire.ChannelOpen(
+            grant: .operator, client: "tunnel:" + lender.rawValue, tunnel: runtime, tunnelRef: ref)))
+        return true
+    }
+
+    /// The tunnels open now, as (borrower, lender) pairs: for tests.
+    public func tunnels() -> [(HostID, HostID)] {
+        hosts.flatMap { host, session in
+            session.channels.values.compactMap { target -> (HostID, HostID)? in
+                guard case .tunnel(let other, _) = target else { return nil }
+                return (host, other)
+            }
+        }
     }
 
     // MARK: Relay hosts (T096–T097)

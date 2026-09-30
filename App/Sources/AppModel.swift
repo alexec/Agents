@@ -408,6 +408,8 @@ final class AppModel {
     let credentials = ServerCredentials(locations: .default)
     /// A server asked for a credential there is none of; the window asks the person (043).
     var tokenAsk: TokenAsk?
+    /// A server asked for a sign-in this Mac relays; the window asks the person (T091).
+    var signInLendAsk: SignInLendAsk?
     /// What a server with no connection answers through: nothing, at once.
     private static let unreachable = DaemonClient(link: UnreachableLink())
 
@@ -419,6 +421,14 @@ final class AppModel {
         // A control plane's host is never reached by this window's own ssh (T024).
         if controlLink != nil { return Self.unreachable }
         return hosts.client(for: host) ?? Self.unreachable
+    }
+
+    /// Whether `host` is one of the control plane's, reached through it.
+    func reachesThroughControl(_ host: HostID) -> Bool { controlHosts[host] != nil }
+
+    /// A connection to the control plane's own methods, for one call (T091); nil with none.
+    func controlPlaneClient() -> DaemonClient? {
+        controlLink.map { DaemonClient(link: $0.controlLink) }
     }
 
     /// The host on this Mac, when there is one. `.mac` when the window has no control plane.

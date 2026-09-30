@@ -24,6 +24,12 @@ public final class ControlUplink: @unchecked Sendable {
     private var nextHello = 1
     /// Said each time the uplink comes up or goes, for the log and for tests.
     private let onChange: @Sendable (Bool) -> Void
+    /// A lending Mac's (058, T091): the loopback port of its relay for a runtime's sign-in.
+    private var lendingPort: (@Sendable (String) async -> UInt16?)?
+    /// A borrowing host's tunnels asked for and not yet opened, by reference, and the
+    /// request each was asked with.
+    private var waitingTunnels: [String: CheckedContinuation<any LineTransport, any Error>] = [:]
+    private var tunnelAsks: [Int: String] = [:]
 
     public static let firstWait: Duration = .seconds(1)
     public static let longestWait: Duration = .seconds(30)
@@ -50,6 +56,74 @@ public final class ControlUplink: @unchecked Sendable {
         }
         old?.close()
         for channel in open { channel.end(tellingTheControlPlane: false) }
+    }
+
+    /// Where this host's relays listen, when it lends a sign-in (T091).
+    public func setLendingPort(_ port: @escaping @Sendable (String) async -> UInt16?) {
+        lock.withLock { lendingPort = port }
+    }
+
+    /// A tunnel to the host that lends this one `runtime`'s sign-in (T091): asked of the
+    /// control plane on channel 0, which opens it only for a lend an operator allowed.
+    public func openTunnel(runtime: String) async throws -> any LineTransport {
+        let ref = UUID().uuidString.lowercased()
+        let result = try await withCheckedThrowingContinuation { (waiting: CheckedContinuation<any LineTransport, any Error>) in
+            let (transport, id) = lock.withLock { () -> ((any LineTransport)?, Int) in
+                let id = nextHello
+                nextHello += 1
+                waitingTunnels[ref] = waiting
+                tunnelAsks[id] = ref
+                return (uplink, id)
+            }
+            guard let transport,
+                  let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.Method.tunnelOpen,
+                                                               params: try JSONValue.encoding(DaemonAPI.TunnelOpen(runtime: runtime, ref: ref)))),
+                  (try? transport.write(line: ControlWire.channel(0, message: line))) != nil else {
+                finishTunnel(ref, .failure(TunnelPipe.Failure("this host is not connected to its control plane")))
+                return
+            }
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(15))
+                self?.finishTunnel(ref, .failure(TunnelPipe.Failure("the control plane did not open the tunnel")))
+            }
+        }
+        return result
+    }
+
+    private func finishTunnel(_ ref: String, _ result: Result<any LineTransport, any Error>) {
+        let waiting = lock.withLock { () -> CheckedContinuation<any LineTransport, any Error>? in
+            tunnelAsks = tunnelAsks.filter { $0.value != ref }
+            return waitingTunnels.removeValue(forKey: ref)
+        }
+        waiting?.resume(with: result)
+    }
+
+    /// A tunnel channel opened by the control plane: the borrower's, for the connection
+    /// that asked; the lender's, to its relay on loopback.
+    private func tunnelOpened(_ number: Int, runtime: String, ref: String?, on transport: any LineTransport) {
+        let channel = Channel(number: number, uplink: transport)
+        channel.onEnd = { [weak self] in _ = self?.lock.withLock { self?.channels.removeValue(forKey: number) } }
+        let replaced = lock.withLock { channels.updateValue(channel, forKey: number) }
+        replaced?.end(tellingTheControlPlane: false)
+        if let ref {
+            finishTunnel(ref, .success(channel))
+            return
+        }
+        let port = lock.withLock { lendingPort }
+        Task.detached {
+            guard let port, let relay = await port(runtime) else {
+                DaemonLog.shared.write("relay: asked to lend \(runtime)'s sign-in, which this host does not relay")
+                channel.end(tellingTheControlPlane: true)
+                return
+            }
+            do {
+                TunnelPipe.pump(try TunnelPipe.connectLoopback(port: relay), channel)
+                DaemonLog.shared.write("relay: a tunnel for \(runtime) opened")
+            } catch {
+                DaemonLog.shared.write("relay: \(error)")
+                channel.end(tellingTheControlPlane: true)
+            }
+        }
     }
 
     /// The channels open now, for tests.
@@ -111,6 +185,10 @@ public final class ControlUplink: @unchecked Sendable {
         switch frame {
         case .open(let number, let open):
             guard number > 0 else { return }
+            if let runtime = open.tunnel {
+                tunnelOpened(number, runtime: runtime, ref: open.tunnelRef, on: transport)
+                return
+            }
             let channel = Channel(number: number, uplink: transport)
             let replaced = lock.withLock { channels.updateValue(channel, forKey: number) }
             replaced?.end(tellingTheControlPlane: false)
@@ -120,8 +198,13 @@ public final class ControlUplink: @unchecked Sendable {
         case .close(let number):
             let channel = lock.withLock { channels.removeValue(forKey: number) }
             channel?.end(tellingTheControlPlane: false)
-        case .message(0, _):
-            // Replies to `host/hello`, and `control/ping`. Nothing here waits on them.
+        case .message(0, let message):
+            // Replies to `host/hello` and `control/ping`, which nothing waits on; and to
+            // `tunnel/open`, whose refusal ends the wait for it.
+            if case .failure(.number(let id), let error)? = try? JSONRPCCodec.decode(line: message),
+               let ref = lock.withLock({ tunnelAsks[Int(id)] }) {
+                finishTunnel(ref, .failure(error))
+            }
             return
         case .message(let number, let message):
             lock.withLock { channels[number] }?.yield(message)
@@ -144,6 +227,8 @@ public final class ControlUplink: @unchecked Sendable {
         private let stream: AsyncThrowingStream<String, any Error>
         private let continuation: AsyncThrowingStream<String, any Error>.Continuation
         private let closed = ManagedAtomicFlag()
+        /// A tunnel's: take it off the uplink's list when it ends.
+        var onEnd: (@Sendable () -> Void)?
 
         init(number: Int, uplink: any LineTransport) {
             self.number = number
@@ -168,6 +253,7 @@ public final class ControlUplink: @unchecked Sendable {
             guard closed.set() else { return }
             continuation.finish()
             if tellingTheControlPlane { try? uplink.write(line: ControlWire.close(number)) }
+            onEnd?()
         }
     }
 }

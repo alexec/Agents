@@ -11,6 +11,15 @@ public extension DaemonAPI.Method {
     static let hostsRemove = "hosts/remove"
     /// `{host, relay}`: whether a host carries the person's devices through iCloud (T097).
     static let hostsSetRelay = "hosts/setRelay"
+    /// `{host, from, runtime, allowed}`: whether `host` may use `from`'s sign-in for a
+    /// runtime, relayed through the control plane (058, T091). An operator's, after the
+    /// window asked the person.
+    static let hostsLendSignIn = "hosts/lendSignIn"
+    /// A host, on its channel 0 (T091): a tunnel to the host that lends it a sign-in.
+    static let tunnelOpen = "tunnel/open"
+    /// On the Mac's host (T091): start relaying a runtime's sign-in, and say what a server
+    /// needs to use it. Never the token.
+    static let relayGrant = "relay/grant"
     static let clientsList = "clients/list"
     static let clientsStartPairing = "clients/startPairing"
     static let clientsStopPairing = "clients/stopPairing"
@@ -85,6 +94,8 @@ public extension DaemonAPI {
         public var machineID: String?
         /// A relay host (`agents-relay`): it carries devices through iCloud and runs no agents.
         public var relay: Bool?
+        /// The hosts whose sign-in this one may use, by runtime (T091).
+        public var signInFrom: [String: HostID]?
 
         public init(id: HostID, name: String, platform: String, version: String, state: String,
                     reach: String, machineID: String?, relay: Bool? = nil) {
@@ -209,6 +220,48 @@ public extension DaemonAPI {
             self.pin = pin
             self.controlKey = controlKey
             self.name = name
+        }
+    }
+
+    /// `hosts/lendSignIn`.
+    struct LendSignIn: Codable, Sendable, Hashable {
+        public var host: HostID
+        public var from: HostID
+        public var runtime: String
+        public var allowed: Bool
+        public init(host: HostID, from: HostID, runtime: String, allowed: Bool) {
+            self.host = host
+            self.from = from
+            self.runtime = runtime
+            self.allowed = allowed
+        }
+    }
+
+    /// `tunnel/open`, from the borrowing host.
+    struct TunnelOpen: Codable, Sendable, Hashable {
+        public var runtime: String
+        public var ref: String
+        public init(runtime: String, ref: String) {
+            self.runtime = runtime
+            self.ref = ref
+        }
+    }
+
+    /// `relay/grant`'s request and answer: what the borrowing host's gate needs. The
+    /// stand-in holds no secret of the Mac's (S4).
+    struct RelayGrantRequest: Codable, Sendable, Hashable {
+        public var runtime: String
+        public init(runtime: String) { self.runtime = runtime }
+    }
+
+    struct RelayGrantReply: Codable, Sendable, Hashable {
+        public var runtime: String
+        public var caCertificate: String
+        public var standIn: String
+        public init(runtime: String, caCertificate: String, standIn: String) {
+            self.runtime = runtime
+            self.caCertificate = caCertificate
+            self.standIn = standIn
         }
     }
 

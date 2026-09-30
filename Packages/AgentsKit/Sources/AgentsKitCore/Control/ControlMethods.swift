@@ -142,6 +142,7 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.ping, DaemonAPI.Method.controlStatus, DaemonAPI.Method.hostsList,
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsCheckAgain,
         DaemonAPI.Method.hostsUpdate, DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay,
+        DaemonAPI.Method.hostsLendSignIn,
         DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
         DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget, DaemonAPI.Method.clientsConnections,
         DaemonAPI.Method.devicesList, DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesStopPairing,
@@ -238,6 +239,18 @@ public actor ControlMethods: ControlHandling {
         case DaemonAPI.Method.hostsCheckAgain:
             try await hooks.checkAgain(try Self.require(params, as: DaemonAPI.HostRequest.self).host)
             return [:]
+        case DaemonAPI.Method.hostsLendSignIn:
+            let request = try Self.require(params, as: DaemonAPI.LendSignIn.self)
+            guard var record = await records.host(request.host), await records.host(request.from) != nil else {
+                throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No such host.")
+            }
+            var lends = record.signInFrom ?? [:]
+            lends[request.runtime] = request.allowed ? request.from : nil
+            record.signInFrom = lends.isEmpty ? nil : lends
+            try await records.save(record)
+            await hooks.changed(ControlEvent(kind: .hostEnrolled, subject: request.host.rawValue, at: Date(),
+                                             by: caller.client.uuidString))
+            return [:]
         case DaemonAPI.Method.hostsSetRelay:
             let request = try Self.require(params, as: DaemonAPI.HostRelayRequest.self)
             guard var record = await records.host(request.host) else {
@@ -302,6 +315,18 @@ public actor ControlMethods: ControlHandling {
         case DaemonAPI.Method.attentionNeed:
             await hooks.need(host, params)
             return [:]
+        case DaemonAPI.Method.tunnelOpen:
+            // Only to a lender an operator said yes to, for that runtime (T091).
+            let request = try Self.require(params, as: DaemonAPI.TunnelOpen.self)
+            if await records.host(host)?.signInFrom?[request.runtime] == nil { try? await refresh() }
+            guard let lender = await records.host(host)?.signInFrom?[request.runtime] else {
+                throw JSONRPCError(code: DaemonAPI.Failure.notPermitted,
+                                   message: "No host lends this host its \(request.runtime) sign-in.")
+            }
+            guard await router?.openTunnel(borrower: host, lender: lender, runtime: request.runtime, ref: request.ref) == true else {
+                throw JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "The host that lends this sign-in is offline.")
+            }
+            return [:]
         default:
             throw JSONRPCError.methodNotFound(method)
         }
@@ -324,10 +349,12 @@ public actor ControlMethods: ControlHandling {
         let states = await router?.hostStates ?? [:]
         return await records.hosts.map { record in
             let state = states[record.id] ?? .offline(since: Date())
-            return DaemonAPI.ControlHost(id: record.id, name: record.name, platform: record.platform,
-                                         version: record.version,
-                                         state: ControlRouter.describe(record.id, state)["state"]?.stringValue ?? "offline",
-                                         reach: "dialOut", machineID: record.machineID, relay: record.relay)
+            var listed = DaemonAPI.ControlHost(id: record.id, name: record.name, platform: record.platform,
+                                               version: record.version,
+                                               state: ControlRouter.describe(record.id, state)["state"]?.stringValue ?? "offline",
+                                               reach: "dialOut", machineID: record.machineID, relay: record.relay)
+            listed.signInFrom = record.signInFrom
+            return listed
         }
     }
 
