@@ -143,7 +143,7 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsCheckAgain,
         DaemonAPI.Method.hostsUpdate, DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay,
         DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
-        DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget,
+        DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget, DaemonAPI.Method.clientsConnections,
         DaemonAPI.Method.devicesList, DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesStopPairing,
         DaemonAPI.Method.devicesForget,
     ]
@@ -188,6 +188,14 @@ public actor ControlMethods: ControlHandling {
             return try JSONValue.encoding(await hostList())
         case DaemonAPI.Method.clientsList, DaemonAPI.Method.devicesList:
             return try JSONValue.encoding(await records.clients)
+        case DaemonAPI.Method.clientsConnections:
+            // The relaying host by name; with more than one, the first, as a relayed
+            // session does not say which carried it.
+            let relay = await records.hosts.first { $0.relay == true }?.name
+            let links = await router?.connections() ?? [:]
+            return try JSONValue.encoding(links.map { client, relayed in
+                DaemonAPI.ClientConnection(client: client, relayed: relayed, through: relayed ? relay : nil)
+            }.sorted { $0.client.uuidString < $1.client.uuidString })
         case DaemonAPI.Method.clientsStartPairing:
             let grant = (params?["grant"]?.stringValue).flatMap(Grant.init(rawValue:)) ?? .device
             return try await hooks.startPairing(grant)

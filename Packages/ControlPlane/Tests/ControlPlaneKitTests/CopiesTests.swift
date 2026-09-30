@@ -270,6 +270,73 @@ struct CopiesTests {
         }
     }
 
+    /// Frame N across copies (T080): a client connected at one copy is listed as connected
+    /// at another, and no longer once it goes.
+    @Test func howAClientConnectsIsKnownAtEveryCopy() async throws {
+        let all = try await copies(2)
+        defer { Task { await stop(all) } }
+        let (phone, link) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client(.device)).text,
+                                             kind: .iPhone)
+        let control = DaemonClient(link: link.controlLink)
+        try await control.connect(startIfNeeded: false)
+        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), grant: .operator, kind: .mac)
+        func links() async -> [DaemonAPI.ClientConnection] {
+            (try? await all[0].service.methods.handle(method: DaemonAPI.Method.clientsConnections, params: nil, from: caller)
+                .decode([DaemonAPI.ClientConnection].self)) ?? []
+        }
+        await eventually { await links().contains { $0.client == phone && !$0.relayed } }
+        #expect(await links().first { $0.client == phone }?.relayed == false)
+        link.disconnect()
+        await eventually { await !links().contains { $0.client == phone } }
+        #expect(await !links().contains { $0.client == phone })
+    }
+
+    /// Two operators each demote the other at the same moment, at two copies (FR-016,
+    /// T081): one is refused, and there is always an operator left.
+    @Test func theLastOperatorHoldsAcrossCopies() async throws {
+        let all = try await copies(2)
+        defer { Task { await stop(all) } }
+        for round in 0..<5 {
+            let (first, firstLink) = try await client(at: all[0].url, code: try await all[0].service.codes.issue(.client(.operator)).text)
+            firstLink.disconnect()
+            let (second, secondLink) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client(.operator)).text)
+            secondLink.disconnect()
+            // Every other operator from earlier rounds steps down first, so these two are the last.
+            for copy in all { try await copy.service.methods.refresh() }
+            let caller = ControlRouter.Caller(session: UUID(), client: first, grant: .operator, kind: .mac)
+            for other in await all[0].service.methods.allClients where other.grant == .operator && other.id != first && other.id != second {
+                _ = try await all[0].service.methods.handle(method: DaemonAPI.Method.clientsSetGrant,
+                                                            params: ["client": .string(other.id.uuidString), "grant": "device"],
+                                                            from: caller)
+            }
+            for copy in all { try await copy.service.methods.refresh() }
+
+            async let a: Bool = demote(first, at: all[0], by: second)
+            async let b: Bool = demote(second, at: all[1], by: first)
+            let (one, two) = await (a, b)
+            #expect(!(one && two), "round \(round): both operators stepped down")
+            for copy in all { try await copy.service.methods.refresh() }
+            let operators = await all[0].service.methods.allClients.filter { $0.grant == .operator }
+            #expect(!operators.isEmpty, "round \(round): no operator left")
+        }
+    }
+
+    /// Whether the demotion went through; a refusal is lastOperator or changedElsewhere.
+    func demote(_ client: UUID, at copy: Copy, by caller: UUID) async -> Bool {
+        let who = ControlRouter.Caller(session: UUID(), client: caller, grant: .operator, kind: .mac)
+        do {
+            _ = try await copy.service.methods.handle(method: DaemonAPI.Method.clientsSetGrant,
+                                                      params: ["client": .string(client.uuidString), "grant": "device"], from: who)
+            return true
+        } catch let error as JSONRPCError {
+            #expect([DaemonAPI.Failure.lastOperator, DaemonAPI.Failure.changedElsewhere].contains(error.code))
+            return false
+        } catch {
+            Issue.record("\(error)")
+            return false
+        }
+    }
+
     @Test func withTheStoreDownLiveCallsCarryOnAndPairingIsRefused() async throws {
         let store = MemoryStore()
         let all = try await copies(2, store: store)

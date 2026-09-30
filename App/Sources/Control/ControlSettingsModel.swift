@@ -15,6 +15,9 @@ final class ControlSettingsModel {
     private(set) var status: DaemonAPI.ControlStatus?
     private(set) var hosts: [DaemonAPI.ControlHost] = []
     private(set) var clients: [ClientRecord] = []
+    /// How each connected client reaches the control plane now (frame N). Empty from a
+    /// control plane that does not say.
+    private(set) var connections: [UUID: DaemonAPI.ClientConnection] = [:]
     /// Said when an action was refused, in the words the control plane used.
     var problem: String?
     private(set) var isReachable = false
@@ -83,6 +86,9 @@ final class ControlSettingsModel {
             hosts = try await client.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
             clients = try await client.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
                 .sorted { ($0.id == status?.you ? 0 : 1, $0.paired) < ($1.id == status?.you ? 0 : 1, $1.paired) }
+            let links = (try? await client.call(DaemonAPI.Method.clientsConnections,
+                                                returning: [DaemonAPI.ClientConnection].self)) ?? []
+            connections = Dictionary(links.map { ($0.client, $0) }, uniquingKeysWith: { $1 })
             isReachable = true
         } catch {
             isReachable = false
@@ -130,7 +136,7 @@ final class ControlSettingsModel {
             if let fingerprint = answer["needsTrust"]?.stringValue { return .needsTrust(fingerprint: fingerprint) }
             return .added(name: answer["name"]?.stringValue ?? name ?? destination)
         } catch let error as JSONRPCError {
-            return .failed(error.message)
+            return .failed(HostProblem.controlRefusal(error))
         } catch {
             return .failed("The control plane can’t be reached.")
         }
@@ -148,7 +154,7 @@ final class ControlSettingsModel {
             problem = nil
             return shown
         } catch let error as JSONRPCError {
-            problem = error.message
+            problem = HostProblem.controlRefusal(error)
         } catch {
             problem = "The control plane can’t be reached."
         }
@@ -178,7 +184,7 @@ final class ControlSettingsModel {
             _ = try await client.call(method, params)
             problem = nil
         } catch let error as JSONRPCError {
-            problem = error.message
+            problem = HostProblem.controlRefusal(error)
         } catch {
             problem = "The control plane can’t be reached."
         }

@@ -166,7 +166,17 @@ public final class ControlService: @unchecked Sendable {
         }
         await mesh?.onEvent { [weak self] event in await self?.apply(event) }
         await mesh?.onNeed { [weak self] need in await self?.deliver(need, fromPeer: true) }
-        await mesh?.onLinked { [weak self] _ in await self?.reconcile() }
+        await mesh?.onLinked { [weak self] _ in
+            await self?.reconcile()
+            // A copy that just linked hears how every client here reaches it (T080).
+            guard let self else { return }
+            for (client, relayed) in await self.router.linksHere() {
+                await self.mesh?.broadcast(PeerWire.link(client: client, relayed: relayed))
+            }
+        }
+        await router.onLinkChanged { client, relayed in
+            Task { await mesh?.broadcast(PeerWire.link(client: client, relayed: relayed)) }
+        }
 
         let servers = ServerFiles.folder()
         let bootstrap = ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)

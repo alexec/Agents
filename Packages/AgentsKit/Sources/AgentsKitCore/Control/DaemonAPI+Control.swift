@@ -17,6 +17,8 @@ public extension DaemonAPI.Method {
     static let clientsAnnounce = "clients/announce"
     static let clientsSetGrant = "clients/setGrant"
     static let clientsForget = "clients/forget"
+    /// How each client reaches the control plane now (frame N, T080).
+    static let clientsConnections = "clients/connections"
 
     // A host, on its channel 0.
     static let hostsAnnounce = "hosts/announce"
@@ -175,6 +177,20 @@ public extension DaemonAPI {
         public init(host: HostID, purge: Bool? = nil) {
             self.host = host
             self.purge = purge
+        }
+    }
+
+    /// One row of `clients/connections`: a client connected now, and how.
+    struct ClientConnection: Codable, Sendable, Hashable {
+        public var client: UUID
+        /// Only through the iCloud relay.
+        public var relayed: Bool
+        /// The relaying host's name, when relayed.
+        public var through: String?
+        public init(client: UUID, relayed: Bool, through: String? = nil) {
+            self.client = client
+            self.relayed = relayed
+            self.through = through
         }
     }
 

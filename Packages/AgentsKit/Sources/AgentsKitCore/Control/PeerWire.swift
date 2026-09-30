@@ -17,6 +17,8 @@ public enum PeerWire {
         case presence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport)
         /// A host's `attention/need`, for the copy that holds a relay host (T097).
         case need(DaemonAPI.AttentionNeed)
+        /// How a client reaches the sender now: relayed or not, or no longer (T080).
+        case link(client: UUID, relayed: Bool?)
     }
 
     /// `{"p":"H","c":…}` from a host frame's line.
@@ -46,6 +48,12 @@ public enum PeerWire {
         encode(["need": (try? JSONValue.encoding(need)) ?? .null])
     }
 
+    public static func link(client: UUID, relayed: Bool?) -> String {
+        var body: [String: JSONValue] = ["client": .string(client.uuidString)]
+        if let relayed { body["relayed"] = .bool(relayed) } else { body["gone"] = true }
+        return encode(["link": .object(body)])
+    }
+
     public static func read(_ line: String) -> Frame? {
         if line.hasPrefix(#"{"p":""#) {
             let rest = line.dropFirst(6)
@@ -72,6 +80,9 @@ public enum PeerWire {
            let grant = presence["grant"]?.stringValue.flatMap(Grant.init(rawValue:)),
            let report = try? presence["report"]?.decode(DaemonAPI.PresenceReport.self) {
             return .presence(client: client, grant: grant, report: report)
+        }
+        if let link = object["link"], let client = link["client"]?.stringValue.flatMap(UUID.init(uuidString:)) {
+            return .link(client: client, relayed: link["gone"] != nil ? nil : (link["relayed"]?.boolValue ?? false))
         }
         if let need = object["need"], let decoded = try? need.decode(DaemonAPI.AttentionNeed.self) {
             return .need(decoded)

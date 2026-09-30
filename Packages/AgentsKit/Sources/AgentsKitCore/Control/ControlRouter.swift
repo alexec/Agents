@@ -85,6 +85,10 @@ public actor ControlRouter {
     private var notedPresence: [UUID: NotedPresence] = [:]
     /// How to reach each peer copy on its link, for streams carried for it (T064).
     private var peers: [String: @Sendable (String) -> Void] = [:]
+    /// How each client connected at another copy reaches it: relayed or not (T080).
+    private var peerLinks: [String: [UUID: Bool]] = [:]
+    /// Told when a client here connects, or its last session ends (nil), so other copies know.
+    private var linkChanged: (@Sendable (UUID, Bool?) -> Void)?
     /// Told each presence report a client here makes, so other copies fold it too.
     private var presenceHeard: (@Sendable (UUID, Grant, DaemonAPI.PresenceReport) -> Void)?
 
@@ -262,6 +266,9 @@ public actor ControlRouter {
     /// A peer's link went: every stream it had open on a host here closes there.
     public func dropPeer(_ id: String) {
         peers[id] = nil
+        if let gone = peerLinks.removeValue(forKey: id), !gone.isEmpty {
+            broadcastControl(DaemonAPI.Notification.controlClientChanged, [:], operatorsOnly: true)
+        }
         for (host, session) in hosts where session.local {
             for (target, channel) in session.proxied {
                 guard case .peer(id, _) = target else { continue }
@@ -396,6 +403,7 @@ public actor ControlRouter {
                                                    relayed: relayed),
                                     transport: transport)
         for host in hosts.keys { openChannel(for: id, to: host) }
+        noteLink(client.id)
         Task { [weak self] in
             do {
                 for try await line in transport.lines() { await self?.clientLine(line, from: id) }
@@ -417,6 +425,50 @@ public actor ControlRouter {
             try? hosts[host]?.transport.write(line: ControlWire.close(channel))
         }
         session.transport.close()
+        noteLink(client)
+    }
+
+    // MARK: How clients reach the control plane (T080)
+
+    /// How a client reaches this copy now: nil when it doesn't, true when only through
+    /// the relay. A client with a direct session counts as direct.
+    private func linkHere(_ client: UUID) -> Bool? {
+        let mine = clients.values.filter { $0.caller.client == client }
+        guard !mine.isEmpty else { return nil }
+        return mine.allSatisfy(\.caller.relayed)
+    }
+
+    private var toldLinks: [UUID: Bool] = [:]
+
+    /// A client's link changed here: other copies are told, and operators' Settings.
+    private func noteLink(_ client: UUID) {
+        let now = linkHere(client)
+        guard toldLinks[client] != now else { return }
+        toldLinks[client] = now
+        linkChanged?(client, now)
+        broadcastControl(DaemonAPI.Notification.controlClientChanged, ["client": .string(client.uuidString)], operatorsOnly: true)
+    }
+
+    public func onLinkChanged(_ changed: @escaping @Sendable (UUID, Bool?) -> Void) { linkChanged = changed }
+
+    /// Every client connected here, as `onLinkChanged` said it: for a peer that just linked.
+    public func linksHere() -> [UUID: Bool] { toldLinks }
+
+    /// A peer copy said how one of its clients reaches it.
+    public func notePeerLink(_ peer: String, client: UUID, relayed: Bool?) {
+        peerLinks[peer, default: [:]][client] = relayed
+        broadcastControl(DaemonAPI.Notification.controlClientChanged, ["client": .string(client.uuidString)], operatorsOnly: true)
+    }
+
+    /// How every connected client reaches the control plane, at any copy: true when only
+    /// through the relay.
+    public func connections() -> [UUID: Bool] {
+        var all: [UUID: Bool] = [:]
+        for links in peerLinks.values {
+            for (client, relayed) in links { all[client] = (all[client] ?? true) && relayed }
+        }
+        for (client, relayed) in toldLinks { all[client] = (all[client] ?? true) && relayed }
+        return all
     }
 
     /// `clients/forget`: every session of that client, at once (FR-008).

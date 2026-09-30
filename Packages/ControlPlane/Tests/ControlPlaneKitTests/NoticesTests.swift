@@ -152,6 +152,11 @@ struct NoticesTests {
         let answer = try await there.call(DaemonAPI.Method.agentsList)
         #expect(answer["host"]?.stringValue == host.rawValue)
         #expect(answer["role"]?.stringValue == "device")
+        // Frame N: an operator sees it come through the relay, and which Mac relays.
+        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), grant: .operator, kind: .mac)
+        let links = try await running.service.methods.handle(method: DaemonAPI.Method.clientsConnections, params: nil, from: caller)
+            .decode([DaemonAPI.ClientConnection].self)
+        #expect(links.first { $0.client == device } == DaemonAPI.ClientConnection(client: device, relayed: true, through: "relay mac"))
         // Everything iCloud held was sealed: no line of the exchange is legible there.
         for record in await relay.cloud.stored(device: device) {
             #expect(!String(decoding: record.sealed, as: UTF8.self).contains("hello"))
