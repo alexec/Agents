@@ -180,6 +180,12 @@ targets:
         NSCameraUsageDescription: >-
           To read the pairing code your Mac shows, so only your own phone or iPad can
           connect to it.
+        # Dictation: the shared prompt asks for both when first used. Recognition runs
+        # on the phone or iPad, so these descriptions are written for that device.
+        NSMicrophoneUsageDescription: >-
+          To hear what you say while you dictate into your prompt.
+        NSSpeechRecognitionUsageDescription: >-
+          To turn what you say into words for your prompt.
         # A silent push — a need moved elsewhere, or met — wakes the app to show or
         # remove its own banner (021 T079). Best effort by Apple's design.
         UIBackgroundModes:

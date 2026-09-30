@@ -120,7 +120,13 @@ struct RuntimeStateTests {
         await core.setAllowanceState(claudeOut(at: Date()))
         await eventually("the window heard claude is out") { heard.all.last == true }
         _ = await core.markRuntimeAvailable(credentialKey: "claude:sign-in")
-        await eventually("the window heard it is back", within: .seconds(5)) { heard.all.last == false }
+        // The shared timeout, not a shorter one of its own: a runtime's state is
+        // broadcast at most once a second, and a change inside that second is held and
+        // sent from a task a second later, so this second notification is not due
+        // immediately. Under a full parallel suite that hold lands well past five
+        // seconds, and a wait that outlasted it failed a run that had nothing wrong
+        // with it (2026-09-30).
+        await eventually("the window heard it is back") { heard.all.last == false }
         #expect(ConnectionRole.device.allows(DaemonAPI.Method.runtimesAllowances))
         #expect(ConnectionRole.device.allows(DaemonAPI.Method.runtimesMarkAvailable))
     }
