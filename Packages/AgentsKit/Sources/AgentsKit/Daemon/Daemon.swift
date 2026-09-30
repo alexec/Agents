@@ -39,6 +39,12 @@ public final class Daemon: @unchecked Sendable {
         guard let lock = DaemonLock(at: locations.lock) else { throw StartError.alreadyRunning }
         self.lock = lock
         DaemonLog.shared.setDestination(locations.log)
+        // Before any runtime starts, so every helper is started from the copy.
+        if let own = DaemonCore.ownExecutable,
+           let pinned = PinnedHelper.pin(own, in: locations.helpers) {
+            DaemonCore.pinnedHelper.path = pinned.path
+            DaemonLog.shared.write("helper: runtimes start \(pinned.path)")
+        }
         let store = try AgentStore(locations: locations)
         var discovery = discovery
         if serve, discovery.serverHome == nil { discovery.serverHome = ServerSignIn.home }
