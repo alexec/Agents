@@ -182,13 +182,17 @@ struct BriefingTests {
     /// the word "workflow" in the ordinary course of telling an agent what a workflow
     /// is, and Grok's residue happens to be called that.
     @Test func theResidueLineNamesThisRuntimesResidueAndNoOthers() throws {
-        let cursor = try #require(Briefing.residue(ToolPolicyCatalog.cursor.residue))
-        #expect(Briefing.text(for: ToolPolicyCatalog.cursor).contains(cursor))
-        for tool in ToolPolicyCatalog.cursor.residue {
-            #expect(cursor.contains("`\(tool.name)`"))
-        }
+        // Grok since 2026-09-29: Cursor's three tools came back, so the runtime with
+        // residue left to warn about is Grok's, and Copilot's unknown-id one stands in
+        // for "somebody else's residue".
+        let grok = try #require(Briefing.residue(ToolPolicyCatalog.grok.residue))
+        #expect(Briefing.text(for: ToolPolicyCatalog.grok).contains(grok))
         for tool in ToolPolicyCatalog.grok.residue {
-            #expect(!cursor.contains("`\(tool.name)`"))
+            #expect(grok.contains("`\(tool.name)`"))
+        }
+        let others = ToolPolicyCatalog.copilot.residue.map(\.name) + ToolPolicyCatalog.cursor.kept.map(\.name)
+        for name in others {
+            #expect(!grok.contains("`\(name)`"))
         }
     }
 
@@ -202,13 +206,18 @@ struct BriefingTests {
         #expect(!claude.contains("do not work in this app"))
     }
 
-    /// One sentence per category however many tools share it, so Cursor's two goal
-    /// tools do not produce the same advice twice.
+    /// One sentence per category however many tools share it, so Grok's two standing
+    /// arrangements do not produce the same advice twice, and Copilot's one leftover
+    /// sub-agent tool is answered with the sub-agent advice rather than the scheduling one.
     @Test func theAdviceIsSaidOncePerCategory() throws {
-        let line = try #require(Briefing.residue(ToolPolicyCatalog.cursor.residue))
+        let grok = try #require(Briefing.residue(ToolPolicyCatalog.grok.residue))
         let advice = RemitCategory.standingArrangements.instead
-        #expect(line.components(separatedBy: advice).count == 2)
-        #expect(line.contains(RemitCategory.agents.instead))
+        #expect(grok.components(separatedBy: advice).count == 2)
+        #expect(!grok.contains(RemitCategory.agents.instead))
+
+        let copilot = try #require(Briefing.residue(ToolPolicyCatalog.copilot.residue))
+        #expect(copilot.contains(RemitCategory.agents.instead))
+        #expect(!copilot.contains(advice))
     }
 
     /// The cron sentence is spent only where there is still something to forbid. On a

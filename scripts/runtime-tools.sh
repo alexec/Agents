@@ -74,7 +74,8 @@ CLIENT = {
 
 GROK_KEEP = ["read_file", "list_dir", "grep", "search_replace", "write",
              "run_terminal_command", "todo_write", "ask_user_question",
-             "web_search", "web_fetch", "open_page", "open_page_with_find"]
+             "web_search", "web_fetch", "open_page", "open_page_with_find",
+             "spawn_subagent", "kill_command_or_subagent", "get_command_or_subagent_output"]
 
 GROK_OVERLAY = """# Written by the Agents app. Do not edit: rebuilt on every launch.
 [features]
@@ -82,37 +83,25 @@ image_gen = false
 video_gen = false
 """
 
-GEMINI_POLICY = """# Written by the Agents app. Do not edit: rebuilt on every launch.
-
-[[rule]]
-toolName = ["tracker_create_task", "tracker_update_task", "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency", "tracker_visualize"]
-decision = "deny"
-priority = 999
-denyMessage = "Use `manage_workflows` for anything that has to happen on its own."
-
-[[rule]]
-toolName = ["invoke_agent"]
-decision = "deny"
-priority = 999
-denyMessage = "This app starts and stops agents; ask me rather than starting one."
-"""
-
+# Sub-agents and task tracking came back for every runtime on 2026-09-29, so this table
+# is the audit of that: `kept` is a list of things a runtime used to have taken away and
+# must have again, and a run that says GONE has found a runtime that moved.
 POLICIES = {
     "claude": {
+        "lever": "a deny list under _meta.claudeCode.options.disallowedTools",
         "removed": ["Workflow", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup",
-                    "Monitor", "RemoteTrigger", "PushNotification", "Agent", "ListAgents",
-                    "SendMessage", "TaskOutput", "TaskStop", "ReportFindings", "DesignSync",
+                    "Monitor", "RemoteTrigger", "PushNotification", "ReportFindings", "DesignSync",
                     "mcp__claude_ai_Claude_Docs", "mcp__claude_ai_Google_Drive",
                     "EnterWorktree", "ExitWorktree"],
-        "kept": ["AskUserQuestion"],
+        "kept": ["AskUserQuestion", "Agent", "ListAgents", "SendMessage", "TaskOutput", "TaskStop"],
         "residue": [],
         "meta": {"claudeCode": {"options": {"disallowedTools": None}}},  # filled from removed
         "args": [],
         "env": {},
     },
     "grok": {
-        "removed": ["scheduler_create", "scheduler_delete", "scheduler_list", "send_feedback",
-                    "spawn_subagent", "kill_command_or_subagent", "get_command_or_subagent_output"],
+        "lever": "an allow list as _meta.agentProfile.tools, plus a config overlay on disk",
+        "removed": ["scheduler_create", "scheduler_delete", "scheduler_list", "send_feedback"],
         "kept": GROK_KEEP,
         "residue": ["workflow", "monitor"],
         "meta": {"agentProfile": {"name": "agents-app",
@@ -122,69 +111,74 @@ POLICIES = {
         "env": {"GROK_CONFIG_PATH": GROK_OVERLAY},  # written to a temp file below
     },
     "copilot": {
-        "removed": ["task", "list_agents", "read_agent", "write_agent", "session_store_sql"],
-        "kept": [],
+        "lever": "three launch flags, one of them --excluded-tools",
+        "removed": ["session_store_sql"],
+        "kept": ["task", "list_agents", "read_agent", "write_agent"],
         "residue": ["search_code_subagent"],
         "meta": None,
         "args": ["--disable-mcp-server", "software-factory", "--disable-builtin-mcps",
-                 "--excluded-tools", "task", "list_agents", "read_agent", "write_agent",
-                 "session_store_sql"],
+                 "--excluded-tools", "session_store_sql"],
         "env": {},
     },
     "cursor": {
+        "lever": "none; no rule kind names a built-in tool",
         "removed": [],
-        "kept": [],
-        "residue": ["Task", "CreateGoal", "UpdateGoal"],
+        "kept": ["Task", "CreateGoal", "UpdateGoal"],
+        "residue": [],
         "meta": None,
         "args": [],
         "env": {},
     },
-    # A deny list under _meta.agy.disabledTools on session/new (049, R7).
+    # A deny list under _meta.agy.disabledTools on session/new (049, R7), which is sent
+    # only while there is something in it.
     "antigravity": {
-        "removed": ["start_subagent"],
-        "kept": ["ask_question"],
+        "lever": "a deny list under _meta.agy.disabledTools, empty and so not sent",
+        "removed": [],
+        "kept": ["ask_question", "start_subagent"],
         "residue": [],
-        "meta": {"agy": {"disabledTools": ["start_subagent"]}},
+        "meta": None,
         "args": [],
         "env": {},
     },
-    # Its own config inline in OPENCODE_CONFIG_CONTENT (049, R3): task removed, asks forced on.
+    # Its own config inline in OPENCODE_CONFIG_CONTENT (049, R3): asks forced on.
     "opencode": {
-        "removed": ["task"],
-        "kept": [],
+        "lever": "its own config inline in OPENCODE_CONFIG_CONTENT",
+        "removed": [],
+        "kept": ["task"],
         "residue": [],
         "meta": None,
         "args": [],
         "env": {"OPENCODE_DISABLE_AUTOUPDATE": "1", "OPENCODE_DISABLE_SHARE": "1"},
         "inline_env": {"OPENCODE_CONFIG_CONTENT": json.dumps({
             "autoupdate": False, "permission": {"bash": "ask", "edit": "ask", "webfetch": "ask"},
-            "share": "disabled", "tools": {"task": False}}, sort_keys=True, separators=(",", ":"))},
+            "share": "disabled"}, sort_keys=True, separators=(",", ":"))},
     },
     # Feature switches in CODEX_CONFIG, JSON inline rather than a file (047, R5).
     "codex": {
-        "removed": ["clock.sleep", "goals", "automations", "memories", "apps"],
-        "kept": ["request_user_input"],
-        "residue": ["spawn_agent", "send_message", "followup_task", "interrupt_agent",
-                    "list_agents", "wait_agent"],
-        "meta": None,
-        "args": [],
-        "env": {},
-        "inline_env": {"CODEX_CONFIG": json.dumps({"features": {
-            "sleep_tool": False, "goals": False, "in_app_local_automation": False,
-            "memories": False, "apps": False, "multi_agent": False,
-            "default_mode_request_user_input": True}}, sort_keys=True, separators=(",", ":"))},
-    },
-    # A file named by an argument rather than a variable (046, R5).
-    "gemini": {
-        "removed": ["invoke_agent", "tracker_create_task", "tracker_update_task",
-                    "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency",
-                    "tracker_visualize"],
-        "kept": [],
+        "lever": "feature switches in CODEX_CONFIG, JSON inline rather than a file",
+        "removed": ["clock.sleep", "automations", "memories", "apps"],
+        "kept": ["request_user_input", "goals"],
         "residue": [],
         "meta": None,
         "args": [],
         "env": {},
-        "files": {"--policy": GEMINI_POLICY},  # written to a temp file below
+        "inline_env": {"CODEX_CONFIG": json.dumps({"features": {
+            "sleep_tool": False, "goals": True, "in_app_local_automation": False,
+            "memories": False, "apps": False, "multi_agent": True,
+            "default_mode_request_user_input": True}}, sort_keys=True, separators=(",", ":"))},
+    },
+    # A file named by an argument rather than a variable (046, R5), written only while
+    # there is a deny rule in it. There is none today, so Gemini is sent no file.
+    "gemini": {
+        "lever": "a deny file named by --policy, and none to write",
+        "removed": [],
+        "kept": ["invoke_agent", "tracker_create_task", "tracker_update_task",
+                 "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency",
+                 "tracker_visualize"],
+        "residue": [],
+        "meta": None,
+        "args": [],
+        "env": {},
     },
 }
 
@@ -322,7 +316,7 @@ def names(said):
 
 def report(name):
     command, policy = RUNTIMES[name], POLICIES[name]
-    print(f"\n== {name}")
+    print(f"\n== {name}, scoped by {policy['lever']}")
     scoped = ask(name, command, policy, scoped=True)
     if scoped is None:
         print("   not installed, or would not answer")
@@ -331,7 +325,9 @@ def report(name):
         print("   started, but said nothing about its tools")
         return 0
 
-    if not policy["removed"] and not policy["args"] and policy["meta"] is None and not policy.get("files"):
+    sends_anything = (policy["removed"] or policy["args"] or policy["meta"] is not None
+                      or policy.get("files") or policy.get("inline_env"))
+    if not sends_anything:
         print("   no lever on this runtime; everything conflicting is residue")
     else:
         # Substring rather than word match: a name may be a whole server

@@ -14,10 +14,10 @@ Only Copilot has any.
 copilot --acp
         --disable-mcp-server software-factory
         --disable-builtin-mcps
-        --excluded-tools task list_agents read_agent write_agent session_store_sql
+        --excluded-tools session_store_sql
 ```
 
-- Names are bare. `task`, never `functions.task`.
+- Names are bare. `session_store_sql`, never `functions.session_store_sql`.
 - A name Copilot does not recognise produces `Info: Unknown tool name in the tool excludedlist:
   "…"`, arriving as agent message text, and the session starts with the rest applied.
 - `--disable-mcp-server` is repeated per server; `--excluded-tools` takes all its names at once.
@@ -67,15 +67,19 @@ sends no `_meta` at all, exactly as today.
         "disallowedTools": [
           "Workflow", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup",
           "Monitor", "RemoteTrigger", "PushNotification",
-          "Agent", "ListAgents", "SendMessage", "TaskOutput", "TaskStop",
           "ReportFindings", "DesignSync",
-          "mcp__claude_ai_Claude_Docs", "mcp__claude_ai_Google_Drive"
+          "mcp__claude_ai_Claude_Docs", "mcp__claude_ai_Google_Drive",
+          "EnterWorktree", "ExitWorktree"
         ]
       }
     }
   }
 }
 ```
+
+A runtime with nothing to deny sends no `_meta` for it at all: an empty `disabledTools` would say we
+looked and had nothing to hide, which is a different thing from saying nothing. Antigravity's lever
+is `_meta.agy.disabledTools` and it is in that state today (2026-09-29).
 
 The adapter appends this to its own denials, so `AskUserQuestion` — which it disables only when the
 client cannot render a form, and this client can — is unaffected. Do not send
@@ -96,7 +100,8 @@ is not ours to set.
       "tools": [
         "read_file", "list_dir", "grep", "search_replace", "write",
         "run_terminal_command", "todo_write", "ask_user_question",
-        "web_search", "web_fetch", "open_page", "open_page_with_find"
+        "web_search", "web_fetch", "open_page", "open_page_with_find",
+        "spawn_subagent", "kill_command_or_subagent", "get_command_or_subagent_output"
       ]
     }
   }
@@ -116,6 +121,7 @@ are residue; the rest are welcome.
 | Claim | How it is checked |
 |---|---|
 | No conflicting tool named in the policy appears in the agent's own account of its tools | Live test per runtime, and the check script |
+| A tool the policy keeps is still there — the sub-agent and task-tracker tools above all | Check script per runtime, which prints GONE for a kept tool that is not; a live test for Grok's allowlist, where unlisted means unavailable |
 | The escalation tool is still there | Live test per runtime that has one |
 | Reading, searching, editing, writing and running commands are still there | Live test per runtime |
 | The app's three served tools are still there and still callable | Existing live tests for suggestions and workflows, unchanged |

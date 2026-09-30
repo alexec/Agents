@@ -3,7 +3,7 @@
 ## On the Mac
 
 ```text
-<root>/tools/gemini/current/bin/gemini --acp --skip-trust --policy <root>/runtimes/gemini-policy.toml
+<root>/tools/gemini/current/bin/gemini --acp --skip-trust
 ```
 
 `bin/gemini` is the toolset's shim: `exec <toolset>/node/bin/node <toolset>/lib/node_modules/@google/gemini-cli/bundle/gemini.js "$@"`.
@@ -18,16 +18,16 @@ Nothing is looked up on the PATH, so a person's own `gemini` is never used (D1).
 
 ## The policy file
 
-Rebuilt before every launch from `ToolPolicyCatalog.gemini.removed`; never read back.
+Rebuilt before every launch from `ToolPolicyCatalog.gemini.removed`; never read back. There is
+nothing in `removed` today — `invoke_agent` and the six `tracker_*` tools came back with the rest on
+2026-09-29 — so no file is written and `--policy` is not passed at all. A file of no rules would say
+we had thought about it and had nothing to deny, which is not the same as saying nothing.
+
+For the day a rule comes back, the shape is fixed and `ToolPolicyCatalog.geminiPolicy(removing:)` is
+what writes it:
 
 ```toml
 # Written by the Agents app. Do not edit: rebuilt on every launch.
-
-[[rule]]
-toolName = ["tracker_create_task", "tracker_update_task", "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency", "tracker_visualize"]
-decision = "deny"
-priority = 999
-denyMessage = "<RemitCategory.standingArrangements.instead>"
 
 [[rule]]
 toolName = ["invoke_agent"]
@@ -40,10 +40,13 @@ One rule per category, so each refusal names the app's own tool. Priority 999 is
 1000 would jump tiers and is refused). Which tier `--policy` files land in, and so whether a
 person's own `allow` could still win, is confirmed in the spike.
 
+`GEMINI_CLI_SYSTEM_DEFAULTS_PATH` is unaffected by any of this: that file is how `AGENTS.md` is read
+beside `GEMINI.md`, and it is written whatever the deny rules are.
+
 ## On a server
 
 ```text
-~/.agents-server/tools/gemini/current/bin/gemini --acp --policy <server root>/runtimes/gemini-policy.toml
+~/.agents-server/tools/gemini/current/bin/gemini --acp
 ```
 
 - Environment: the server's, with `GEMINI_API_KEY` set to the lent key and `GOOGLE_API_KEY`

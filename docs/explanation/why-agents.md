@@ -114,9 +114,10 @@ editing and chatting in one window.
 
 **An agent in a terminal** (Claude Code, Grok, Cursor's agent).
 You keep the same tool, because Agents runs it, and adds a window over all your sessions.
-In the conversations Agents starts, the tool's own scheduling, sub-agents and
-notifications go through the app instead; from Terminal it is unchanged. See
-[Why agents' own tools are taken away](scoped-tools.md).
+In the conversations Agents starts, the tool's own scheduling, notifications and reports go
+through the app instead; from Terminal it is unchanged. Its sub-agents are left alone — the
+agent runs them itself, and Claude's and Codex's are drawn over the prompt so you can watch
+them. See [Why agents' own tools are taken away](scoped-tools.md).
 
 **An agent in someone's cloud** (Copilot's coding agent, Codex in the cloud, Claude Code
 on the web).
