@@ -314,6 +314,34 @@ struct ControlServiceTests {
 
     // MARK: Helpers
 
+    /// A control plane of servers only (the review demo, T092) has a home host: the first to
+    /// join, until a host on its own machine does.
+    @Test func aServerIsHomeUntilTheControlPlanesOwnMachineJoins() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        let (server, uplink) = try await host(at: running.url, code: try await running.service.codes.issue(.host).text)
+        defer { uplink.stop() }
+        await eventually { await running.service.methods.controlSettings.homeHost == server }
+        #expect(await running.service.methods.controlSettings.homeHost == server)
+
+        // This machine's own host ("m", as `start` names the control plane's).
+        let key = ControlAgreement.generate()
+        let announced = try await use(try await running.service.codes.issue(.host).text, at: running.url,
+                                      method: DaemonAPI.Method.hostsAnnounce, params: try JSONValue.encoding(
+            DaemonAPI.HostAnnounce(publicKey: key.publicKey, name: "this Mac", platform: "macOS arm64", version: "1", machineID: "m")))
+        let mac = try #require(try announced.decode(DaemonAPI.Admitted.self).host)
+        let server2 = DaemonServer(url: URL(fileURLWithPath: "/tmp/unused-\(UUID()).sock")) { _, _, _ in .success([:]) }
+        let hostKey = try ControlAuth.hostKey(privateKey: key.privateKey, peer: control.publicKey, host: mac)
+        let macUplink = ControlUplink(server: server2, hello: DaemonAPI.HostHello(host: mac, version: "1", platform: "macOS arm64",
+                                                                                machineID: "m")) { [control] in
+            try await join(running.url, .init(identity: .host(mac), key: hostKey, kind: "host", controlKey: control.publicKey))
+        }
+        macUplink.start()
+        defer { macUplink.stop() }
+        await eventually { await running.service.methods.controlSettings.homeHost == mac }
+        #expect(await running.service.methods.controlSettings.homeHost == mac)
+    }
+
     func status(_ url: URL) async throws -> Int {
         let (_, response) = try await URLSession.shared.data(from: url)
         return (response as? HTTPURLResponse)?.statusCode ?? 0

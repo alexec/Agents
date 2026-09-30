@@ -282,9 +282,18 @@ public actor ControlMethods: ControlHandling {
             // Relaying from its first hello; switched off, it stays off when it reconnects.
             if hello.relay == true, record.relay == nil { record.relay = true }
             try await enroll(record)
-            if hello.machineID == settings.machineID, settings.homeHost == nil, hello.relay != true {
-                try await setHomeHost(host)
-                await router?.setHomeHost(host)
+            // The home host is where a device's plain connection goes: the host on the
+            // control plane's own machine, or, on a control plane with none (servers only,
+            // like the review demo), the first host to join until one on its machine does.
+            if hello.relay != true {
+                let onThisMachine = hello.machineID == settings.machineID
+                let home = settings.homeHost
+                var homeIsHere = false
+                if let home { homeIsHere = await records.host(home)?.machineID == settings.machineID }
+                if home == nil || (onThisMachine && home != host && !homeIsHere) {
+                    try await setHomeHost(host)
+                    await router?.setHomeHost(host)
+                }
             }
             await router?.broadcastControl(DaemonAPI.Notification.controlHostChanged,
                                            ControlRouter.describe(host, .online))
