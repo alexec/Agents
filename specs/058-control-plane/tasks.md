@@ -449,7 +449,7 @@ again.
   - connect a window or phone;
   - add a server;
   - move an existing set-up across.
-- [ ] T101 Measure R14: terminal echo and question delivery, median of 200, each compared with `daemon.sock`, through one copy, through two copies and through Caddy. Write the results in `specs/058-control-plane/walks/latency.md`. If SC-004 fails, stop and ask Alex.
+- [x] T101 (walks/latency.md, LatencyLiveTests: one copy adds 0.3–0.4 ms to a key and 0.2–0.3 ms to a question; two copies and Caddy reported; SC-004 passes) Measure R14: terminal echo and question delivery, median of 200, each compared with `daemon.sock`, through one copy, through two copies and through Caddy. Write the results in `specs/058-control-plane/walks/latency.md`. If SC-004 fails, stop and ask Alex.
 - [ ] T102 Run `security-review` on the branch. Focus on:
   - the operator role reachable from the network;
   - the key exchange and its lack of TLS binding;
