@@ -457,8 +457,8 @@ again.
   - the store layout and its secrets;
   - the ssh key given for an install;
   - the relay passing the exchange through.
-- [ ] T103 Compare six full runs of `swift test` in `Packages/AgentsKit` and `Packages/ControlPlane` on this branch and on main. Build both schemes and the store configuration, and pass the Linux gate.
-- [ ] T104 Merge `main` again before closing, and re-run T103's builds.
+- [x] T103 (walks/suite-compare.md: alternating six runs, the branch below main; main's RawHTTP taken off the pool, ControlAgreement on CryptoKit where present) Compare six full runs of `swift test` in `Packages/AgentsKit` and `Packages/ControlPlane` on this branch and on main. Build both schemes and the store configuration, and pass the Linux gate.
+- [x] T104 (main merged e682db9a and 14884087, main at 84519ec8; every scheme, both packages and the Linux gate built again) Merge `main` again before closing, and re-run T103's builds.
 - [ ] T105 Alex's own move: only with his go-ahead (AskUserQuestion), and with the hand-started bridge on 8790 stopped first.
 - [ ] T106 In a **separate** change, after T105 is walked, remove:
   - the developer window path (`SocketLink` spawning, `HostSet`, `LocalServices` in the window);

@@ -270,7 +270,14 @@ enum RawHTTP {
     }
 
     static func send(port: UInt16, _ head: String, body: Data, responses: Int) async throws -> [Response] {
-        try await Task.detached {
+        // Off the pool, not detached onto it: the read blocks until the bridge answers, and
+        // the bridge needs the pool to answer. Six of these at once in a full run held six
+        // of its threads and starved everything else.
+        try await offThePool { Result { try blockingSend(port: port, head, body: body, responses: responses) } }.get()
+    }
+
+    private static func blockingSend(port: UInt16, _ head: String, body: Data, responses: Int) throws -> [Response] {
+        try {
             let fd = socket(AF_INET, SOCK_STREAM, 0)
             guard fd >= 0 else { throw TestFailure("no socket") }
             defer { close(fd) }
@@ -301,7 +308,7 @@ enum RawHTTP {
                 buffer.append(contentsOf: chunk[0..<count])
             }
             return answers
-        }.value
+        }()
     }
 
     private static func parse(_ buffer: Data) -> (Response, Int)? {

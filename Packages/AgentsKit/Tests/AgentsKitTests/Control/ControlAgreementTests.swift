@@ -15,13 +15,13 @@ struct ControlAgreementTests {
 
     @Test func theGeneratorIsPrivateKeyOne() throws {
         let one = Data(repeating: 0, count: 31) + [1]
-        let pub = try ControlAgreement.publicKey(privateKey: one)
+        let pub = try ControlAgreement.portablePublicKey(privateKey: one)
         #expect(hex(pub) == "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5")
     }
 
     @Test func twiceTheGeneratorIsTheKnownPoint() throws {
         let two = Data(repeating: 0, count: 31) + [2]
-        let pub = try ControlAgreement.publicKey(privateKey: two)
+        let pub = try ControlAgreement.portablePublicKey(privateKey: two)
         #expect(hex(pub) == "047cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc4766997807775510db8ed040293d9ac69f7430dbba7dade63ce982299e04b79d227873d1")
     }
 
@@ -30,8 +30,9 @@ struct ControlAgreementTests {
         for _ in 0..<4 {
             let a = P256.KeyAgreement.PrivateKey()
             let b = P256.KeyAgreement.PrivateKey()
-            #expect(try ControlAgreement.publicKey(privateKey: a.rawRepresentation) == a.publicKey.x963Representation)
-            let ours = try ControlAgreement.sharedSecret(privateKey: a.rawRepresentation,
+            // This file's own arithmetic, which Linux uses, held to CryptoKit's.
+            #expect(try ControlAgreement.portablePublicKey(privateKey: a.rawRepresentation) == a.publicKey.x963Representation)
+            let ours = try ControlAgreement.portableSharedSecret(privateKey: a.rawRepresentation,
                                                         peerPublic: b.publicKey.x963Representation)
             let kit = try a.sharedSecretFromKeyAgreement(with: b.publicKey)
             #expect(ours == kit.withUnsafeBytes { Data($0) })

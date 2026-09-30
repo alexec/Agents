@@ -2,6 +2,9 @@ import Foundation
 #if canImport(Glibc)
 import Glibc
 #endif
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
 
 /// The P-256 agreement and HKDF a Linux host uses to dial a control plane (058, T044).
 ///
@@ -9,6 +12,11 @@ import Glibc
 /// is the 65-byte X9.63 point, the shared secret is the x coordinate, and the HKDF is
 /// SHA-256. Kept here, rather than in `swift-crypto`, so the Linux binary links BoringSSL
 /// once — inside `swift-nio-ssl`, for the handshake — and not a second time for the keys.
+///
+/// Where CryptoKit is there it does the curve itself: the arithmetic here takes a fifth of a
+/// second a multiplication unoptimised, which a debug build and a suite of eighty tests
+/// dialling at once turned into seconds of every core. `ControlAgreementTests` holds the
+/// two to the same bytes.
 public enum ControlAgreement {
     public struct Failure: Error, Sendable {
         public var description: String
@@ -51,6 +59,20 @@ public enum ControlAgreement {
     }
 
     public static func publicKey(privateKey: Data) throws -> Data {
+        #if canImport(CryptoKit)
+        guard valid(privateKey) != nil,
+              let key = try? CryptoKit.P256.KeyAgreement.PrivateKey(rawRepresentation: privateKey) else {
+            throw Failure("That is not a P-256 private key.")
+        }
+        return key.publicKey.x963Representation
+        #else
+        return try portablePublicKey(privateKey: privateKey)
+        #endif
+    }
+
+    /// `publicKey` in this file's own arithmetic: what Linux uses, and what the tests hold
+    /// to CryptoKit's.
+    static func portablePublicKey(privateKey: Data) throws -> Data {
         guard let scalar = valid(privateKey) else { throw Failure("That is not a P-256 private key.") }
         let point = P256.scalarMultiply(P256.generator, by: scalar)
         let affine = try P256.affine(point)
@@ -59,6 +81,23 @@ public enum ControlAgreement {
 
     /// The x coordinate both ends feed to HKDF.
     public static func sharedSecret(privateKey: Data, peerPublic: Data) throws -> Data {
+        #if canImport(CryptoKit)
+        guard valid(privateKey) != nil,
+              let key = try? CryptoKit.P256.KeyAgreement.PrivateKey(rawRepresentation: privateKey) else {
+            throw Failure("That is not a P-256 private key.")
+        }
+        guard let peer = try? CryptoKit.P256.KeyAgreement.PublicKey(x963Representation: peerPublic),
+              let shared = try? key.sharedSecretFromKeyAgreement(with: peer) else {
+            throw Failure("That is not a P-256 public key.")
+        }
+        return shared.withUnsafeBytes { Data($0) }
+        #else
+        return try portableSharedSecret(privateKey: privateKey, peerPublic: peerPublic)
+        #endif
+    }
+
+    /// `sharedSecret` in this file's own arithmetic.
+    static func portableSharedSecret(privateKey: Data, peerPublic: Data) throws -> Data {
         guard let scalar = valid(privateKey) else { throw Failure("That is not a P-256 private key.") }
         let peer = try P256.point(x963: peerPublic)
         let shared = P256.scalarMultiply(peer, by: scalar)
