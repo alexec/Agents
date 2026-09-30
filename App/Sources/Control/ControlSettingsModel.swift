@@ -47,7 +47,12 @@ final class ControlSettingsModel {
 
     /// The host on this Mac: shown first and without buttons (the look gate's decision).
     var thisMacHost: DaemonAPI.ControlHost? { hosts.first { $0.machineID == MachineID.current && $0.relay != true } }
-    var otherHosts: [DaemonAPI.ControlHost] { hosts.filter { $0.machineID != MachineID.current } }
+    /// Every other host, and this Mac's relay: it shares the Mac's machine but is not its host.
+    var otherHosts: [DaemonAPI.ControlHost] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
+
+    /// Bumped by every action, so a control that showed a refused change is drawn again
+    /// from the records even when they did not change.
+    private(set) var revision = 0
 
     var onlineCount: Int { hosts.filter { $0.state == "online" }.count }
     var operatorCount: Int { clients.filter { $0.grant == .operator }.count }
@@ -180,6 +185,7 @@ final class ControlSettingsModel {
     }
 
     private func perform(_ method: String, _ params: some Encodable & Sendable) async {
+        defer { revision += 1 }
         do {
             _ = try await client.call(method, params)
             problem = nil

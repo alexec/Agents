@@ -75,6 +75,9 @@ struct ControlClientsPage: View {
                 grantPicker(client.grant) { grant in
                     Task { await control.setGrant(grant, of: client.id) }
                 }
+                // A refused change leaves the record as it was, which a Binding alone would
+                // not redraw: the segment clicked would stay lit.
+                .id("\(client.grant.rawValue)-\(control.revision)")
                 if !isYou {
                     Button("Forget…") { forgettingClient = client }.buttonStyle(.paper)
                 }

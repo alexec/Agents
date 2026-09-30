@@ -247,6 +247,11 @@ struct ControlHostsPage: View {
     }
 
     private func line(_ host: DaemonAPI.ControlHost) -> String {
+        // agents-relay (T096): it runs no agents, so the rest of the line is not its.
+        if host.relay != nil {
+            let state = host.state == "online" ? "" : "\(host.state.capitalized) · "
+            return state + (host.relay == true ? "Relays your devices through iCloud" : "Relaying switched off")
+        }
         var parts: [String] = []
         if host.state != "online" { parts.append(host.state.capitalized) }
         if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }

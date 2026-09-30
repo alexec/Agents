@@ -183,6 +183,8 @@ public actor ControlMethods: ControlHandling {
                                                                   awayFromHome: awayFromHome)
             status.you = caller.client
             status.relayKey = await records.hosts.first { $0.relay == true }?.publicKey
+            // A relay host is what takes devices out of the house (T096).
+            if status.relayKey != nil { status.awayFromHome = true }
             return try JSONValue.encoding(status)
         case DaemonAPI.Method.hostsList:
             return try JSONValue.encoding(await hostList())
