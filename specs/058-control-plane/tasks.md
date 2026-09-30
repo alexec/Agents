@@ -381,8 +381,8 @@ clients show as such.
 
 **Independent test**: US6 scenarios over two copies, as part of Walk 2 steps 8–9.
 
-- [ ] T080 [US6] Build frame N in `App/Sources/Control/ControlClientsPane.swift`, after approval: a relayed client's marker, and "reached through <Mac>".
-- [ ] T081 [US6] The Settings panes read `changedElsewhere` and `storeUnavailable` and say so in words in `App/Sources/Hosts/HostProblem+Words.swift`. The last-operator refusal holds across copies, as tested in T067.
+- [x] T080 (built, not yet on screen: `clients/connections` across copies through a `link` frame between copies; the pane moved to ControlClientsPane.swift with "connected directly", "connected through <Mac> (iCloud relay)" and *away*; the relaying Mac is the first relay host, as a relayed session does not say which carried it) [US6] Build frame N in `App/Sources/Control/ControlClientsPane.swift`, after approval: a relayed client's marker, and "reached through <Mac>".
+- [x] T081 (built: `HostProblem.controlRefusal`; the last-operator refusal did NOT hold across copies — two operators demoting each other at two copies both went through — fixed with `v1/operators.json`, rewritten conditionally on every change of operator, and tested in `CopiesTests.theLastOperatorHoldsAcrossCopies`) [US6] The Settings panes read `changedElsewhere` and `storeUnavailable` and say so in words in `App/Sources/Hosts/HostProblem+Words.swift`. The last-operator refusal holds across copies, as tested in T067.
 - [ ] T082 [US6] Walk: promote, forget and race over two copies, with screenshots of frames D–G and N. Record it in `specs/058-control-plane/walks/us6-grants.md`.
 
 ---
