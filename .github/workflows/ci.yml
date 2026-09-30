@@ -26,7 +26,13 @@ jobs:
     # The project targets the macOS and iOS 27 SDKs, which only this image has.
     # A preview image while macOS 27 is new; move to macos-27 when it is GA.
     runs-on: xcode-27
-    timeout-minutes: 10
+    # This is the cap on the whole job: the AgentsKit build, the generated project,
+    # both app builds, the daemon build, and both test suites. A cold cache put that
+    # past ten minutes, and the job was cancelled mid-build, which is a far worse
+    # signal than a slow one — and re-poisons the cache it was saving. Twenty leaves
+    # room for a cold run; the Test AgentsKit step below still has its own ten, so a
+    # hung suite is caught long before this.
+    timeout-minutes: 20
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
