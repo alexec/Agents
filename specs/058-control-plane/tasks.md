@@ -394,15 +394,15 @@ again.
 
 **Independent test**: quickstart Walk 4, steps 1–3.
 
-- [ ] T083 [US7] In the host app, point `agentsd` at the existing root `~/Library/Application Support/Agents` when it has data, copying nothing (FR-025). On a scratch root, this is `AGENTS_ROOT`.
-- [ ] T084 [US7] Write the store from `ControlMove` in `Packages/AgentsKit/Sources/AgentsKit/Control/ControlMove.swift`:
+- [x] T083 (HostPaths: a scratch AGENTS_ROOT holding an old set-up is the host root; the real one already is) [US7] In the host app, point `agentsd` at the existing root `~/Library/Application Support/Agents` when it has data, copying nothing (FR-025). On a scratch root, this is `AGENTS_ROOT`.
+- [x] T084 (`agents-control move --from`, into whichever store the copy uses; servers join with `code --host --command` run over the person's ssh by Agents Host, or are listed with it) [US7] Write the store from `ControlMove` in `Packages/AgentsKit/Sources/AgentsKit/Control/ControlMove.swift`:
   - `devices.json` entries become `clients/<id>.json` with grant `device` and their existing key;
   - `hosts.json` servers are enrolled over ssh (T072), or listed with their command;
   - the Mac's own host becomes `mac`.
-- [ ] T085 [US7] Tell moved devices the new URL and pin over the old bridge link and the relay (`control/moved {url, pin}`, a new notification to devices). Keep the old bridge's `DirectLink` running until every moved device has connected over WebSockets, or the person ends it from frame L.
-- [ ] T086 [US7] Run the move from frame L in `Host/Sources/MoveView.swift`, reusing frame I's content, instead of `App/Sources/Control/MoveAcross.swift`, which is removed under `AGENTS_STORE`.
-- [ ] T087 [P] [US7] Extend `ControlMoveTests` to cover the store output, a device key proving itself as `c:` afterwards, and a failed move leaving the old root working (FR-039).
-- [ ] T088 [US7] Walk quickstart Walk 4, steps 1–3, on a scratch root seeded the old way, with `FakeDeviceMoveLiveTests` (`pair`, then `again` over WebSockets). Record it in `specs/058-control-plane/walks/us7-move.md`.
+- [x] T085 (`control-moved.json` in the root; the daemon tells each device that binds or identifies itself; the Remote keeps it and dials with its own key; the old bridge is never stopped by the move, so the old link lasts until the earlier app is quit — no frame L button to end it yet) [US7] Tell moved devices the new URL and pin over the old bridge link and the relay (`control/moved {url, pin}`, a new notification to devices). Keep the old bridge's `DirectLink` running until every moved device has connected over WebSockets, or the person ends it from frame L.
+- [x] T086 (Host/Sources/MoveView.swift: frame L's strip and frame I's sheet; MoveAcross.swift was already out of AgentsStore) [US7] Run the move from frame L in `Host/Sources/MoveView.swift`, reusing frame I's content, instead of `App/Sources/Control/MoveAcross.swift`, which is removed under `AGENTS_STORE`.
+- [x] T087 (ControlMoveTests: the store a copy serves, a failed move leaves the root; MoveTests: a moved device proves itself as c:, another key is refused; ConnectionRoleTests: the notice to a device, not to one pairing) [P] [US7] Extend `ControlMoveTests` to cover the store output, a device key proving itself as `c:` afterwards, and a failed move leaving the old root working (FR-039).
+- [x] T088 (walks/us7-move.md: seeded root, the move from frame L, the agent kept, the devbox joined over ssh, the fake iPhone told over the old link and connecting the new way as itself) [US7] Walk quickstart Walk 4, steps 1–3, on a scratch root seeded the old way, with `FakeDeviceMoveLiveTests` (`pair`, then `again` over WebSockets). Record it in `specs/058-control-plane/walks/us7-move.md`.
 
 ---
 
