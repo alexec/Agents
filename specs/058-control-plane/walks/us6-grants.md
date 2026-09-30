@@ -64,12 +64,13 @@ once and shown again behind.
   - The record had not changed, so a picker drawn only from a Binding did not redraw.
   - The picker is now redrawn after every action.
 
-## Still to look at
+## The fixes, seen (19:2x, after Alex was back)
 
-These fixes are built and tested but were not seen on screen: the display went to sleep before
-they could be captured.
-- The relay row on Hosts.
-- "Reachable away from home: On".
-- The picker returning to Operator after a refusal.
+The set-up was started again on the same bucket, root, relay folder and window container. The
+system had switched to dark appearance in between.
 
-The set-up is still running on `/tmp/w6` for that.
+| Look | Result |
+|---|---|
+| E · Hosts (`us6-grants-E-hosts.png`) | The relay host has its own row: "walk6 relay mac · Relays your devices through iCloud", with Check again and Remove…. (This Mac shows offline here: the restarted scratch `agentsd` exited with the shell that started it. That is the walk's doing, not the app's; the first pass had it online.) |
+| D · Overview (`us6-grants-D-away-on.png`) | "Reachable away from home: On · Through your iCloud account, sealed to each device". |
+| A refused change (`us6-grants-picker-pressed.png`, `us6-grants-picker-refused.png`) | With MinIO stopped, Device was pressed on an operator. The segment showed Device while the call was out. When the refusal came back, it returned to Operator, with the words about the store under the list. |
