@@ -17,9 +17,14 @@ public enum AttentionSnapshotStore {
     public static let fileName = "attention-snapshot.json"
 
     /// Where the file is, or nil when the app group is not available — a simulator run
-    /// with no entitlement, or an extension out of context.
+    /// with no entitlement, an extension out of context, or a Linux server, which has no
+    /// app groups.
     public static var container: URL? {
+        #if canImport(Darwin)
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+        #else
+        nil
+        #endif
     }
 
     /// The file itself, or nil when there is no container.
