@@ -213,6 +213,20 @@ extension DaemonCore {
     /// credential it has not lent yet, or when nothing was lent and the server has no
     /// sign-in of its own. The window lends and asks again with the same `sendID`.
     func launchEnvironment(for runtimeID: String) throws -> [String: String] {
+        // A sign-in relayed through the control plane from the Mac that lends it (058, T091),
+        // on any host it was offered to.
+        if relayOffers[Self.tunnelOffers]?[runtimeID] != nil, let relayed = relayEnvironment(for: runtimeID) {
+            return relayed
+        }
+        #if os(Linux)
+        // A server of a control plane, for a runtime only a Mac relays, with no sign-in of its
+        // own: ask. An operator's window asks the person, then offers the tunnel, and the
+        // start is sent again (T091).
+        if hostsForControlPlane, ToolPolicyCatalog.policy(for: runtimeID).relay != nil,
+           !Self.lendableRuntimes.contains(runtimeID), !hasOwnSignIn(runtimeID) {
+            throw Self.wanted(runtimeID, offered: false)
+        }
+        #endif
         if !onServer { return try macLaunchEnvironment(for: runtimeID) }
         // A sign-in relayed from the Mac comes first on a server (047): the person's own
         // plan, with nothing of theirs on the server. "Own sign-in only" still means own.

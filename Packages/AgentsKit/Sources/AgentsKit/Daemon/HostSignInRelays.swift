@@ -33,7 +33,13 @@ public final class HostSignInRelays: @unchecked Sendable {
         case .file(let path):
             made = CodexFileSignIn(file: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(path))
         case .keychain(let service):
-            made = ClaudeKeychainSignIn(service: Self.testService ?? service)
+            // A walk's stand-in item is never renewed: renewing runs the Mac's own
+            // `claude`, which would spend a turn on the person's real sign-in.
+            if let test = Self.testService {
+                made = ClaudeKeychainSignIn(service: test, renewer: {})
+            } else {
+                made = ClaudeKeychainSignIn(service: service)
+            }
         }
         sources[runtimeID] = made
         return made
