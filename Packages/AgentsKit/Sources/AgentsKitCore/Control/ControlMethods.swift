@@ -292,8 +292,10 @@ public actor ControlMethods: ControlHandling {
             record.platform = hello.platform
             record.machineID = hello.machineID
             if let name = hello.name { record.name = name }
-            // Relaying from its first hello; switched off, it stays off when it reconnects.
-            if hello.relay == true, record.relay == nil { record.relay = true }
+            // Whether a host relays is settled when it enrols (`hosts/announce`) and changed
+            // only by an operator (`hosts/setRelay`). A host's own hello never makes it a
+            // relay: one that runs agents would otherwise hear every host's headlines and
+            // hold every device's notices (T102).
             try await enroll(record)
             // The home host is where a device's plain connection goes: the host on the
             // control plane's own machine, or, on a control plane with none (servers only,
