@@ -211,7 +211,7 @@ every turn, so those in your config file only choose the first value, or nothing
 | Approval policy | `approval_policy`, `approvals_reviewer` | from the mode | No: the mode decides every turn | — | Leave alone |
 | Web search | `web_search` | cached; live under **Full access** | Yes | Only through `CODEX_CONFIG` | Show, planned: the web access switch |
 | Usage data | `analytics.enabled`, `feedback.enabled` | on | Yes | Only through `CODEX_CONFIG` | Show, planned: the usage data switch |
-| Memories | `features.memories` | off | Yes | Yes | Set off today. Show, planned: the memory switch, on by default |
+| Memories | `features.memories` | off | Yes | Yes | Leave alone: Codex's own setting decides |
 | Browser, computer use, image generation | `features.browser_use`, `computer_use`, `image_generation` | on | Not yet measured | — | Measure: they may be tools that duplicate the app's |
 | Reasoning summaries | `model_reasoning_summary` | auto | No: the adapter chooses | — | Leave alone |
 | Folder trust | `projects.<path>.trust_level` | asks | The adapter trusts every agent's folder, so a project's own Codex config and hooks load | Yes | Leave alone |
