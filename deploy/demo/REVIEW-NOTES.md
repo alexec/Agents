@@ -33,7 +33,7 @@ Each code works once and lasts 60 days. If one has already been used, write to u
 ## What to try
 
 1. The project **Welcome** is on **Demo host**. Open it.
-2. Start an agent there with the **Demo** runtime. It is the only runtime on this host.
+2. Start an agent there with the **Demo** runtime, the only one available on this host.
 3. Type a prompt and send it. The agent answers "You said: …" and finishes its turn.
 4. On the Mac, **Settings ▸ Control plane** lists the demo control plane, its host and the
    clients connected to it, including the phone once it has connected.
