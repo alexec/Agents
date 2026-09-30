@@ -62,10 +62,18 @@ Each of these is offered to every runtime, and shown for those that say they can
 ## When an allowance runs out
 
 A chat whose runtime's allowance runs out stops there, with a note saying so, and the runtime
-is marked out for every chat to see in **Settings ▸ Agent Runtimes**. Nothing carries the chat
+is marked out for every chat to see on the **Runtimes** page, under Activity. Nothing carries the chat
 on: to go on, start a new chat on another runtime and ask it to continue this one (see
 [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)). A
 runtime that is out can still be sent a message; if that turn works, it is back.
+
+Where you pick a runtime, the ones that cannot take a turn are named as such rather than
+listed as if they could: the chooser above the prompt on the Mac, and the **Runtime** row
+of the new-session sheet on iPhone and iPad, each draw them in two runs, **Available** and
+**Out**, with the reason under the name. An out runtime stays pickable in both, because
+that is the only way back to it once its plan returns. A runtime that is merely rate
+limited is not out — it can still take a turn — but the chooser says so, rather than
+leaving you to find out from it.
 
 The app recognises the refusal per runtime:
 

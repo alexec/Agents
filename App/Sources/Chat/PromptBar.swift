@@ -275,12 +275,29 @@ struct PromptBar: View {
 
                 SelectCapsule(name: "Runtime",
                               title: model.draftRuntimeID.map(runtimeName) ?? "Runtime") { dismiss in
-                    ForEach(model.availableRuntimes) { status in
-                        SelectChoice(title: status.runtime.name,
-                                     description: signInNote(status.runtime.id),
-                                     isChosen: status.runtime.id == model.draftRuntimeID) {
-                            chooseRuntime(status.runtime.id)
-                            dismiss()
+                    ScrollingChoices {
+                        if !outRuntimes.isEmpty {
+                            SelectGroupHeading(title: "Available")
+                        }
+                        ForEach(availableRuntimes) { status in
+                            SelectChoice(title: status.runtime.name,
+                                         description: rateLimitNote(status.runtime.id) ?? signInNote(status.runtime.id),
+                                         isChosen: status.runtime.id == model.draftRuntimeID) {
+                                chooseRuntime(status.runtime.id)
+                                dismiss()
+                            }
+                        }
+                        if !outRuntimes.isEmpty {
+                            Divider().padding(.vertical, 4)
+                            SelectGroupHeading(title: "Out")
+                            ForEach(outRuntimes) { status in
+                                SelectChoice(title: status.runtime.name,
+                                             description: outNote(status.runtime.id),
+                                             isChosen: status.runtime.id == model.draftRuntimeID) {
+                                    chooseRuntime(status.runtime.id)
+                                    dismiss()
+                                }
+                            }
                         }
                     }
                     Divider().padding(.vertical, 4)
@@ -935,6 +952,43 @@ struct PromptBar: View {
         let account = model.accounts[runtimeID]
         if account?.state == .needsSignIn { return "Needs signing in" }
         return account?.signedInAs?.label
+    }
+
+    /// The runtimes to pick from, in two runs: those that can take a turn now, and those
+    /// whose allowance is spent (065). An out runtime is still here and still pickable,
+    /// because a chat on it takes the message and the runtime says no until its plan is
+    /// back. Grouping it away would hide the only way back to it once it recovers.
+    ///
+    /// A server's runtimes are left in one run: the allowance below is the Mac's own, so
+    /// splitting by it would label a server's runtime with the Mac's state. Runtimes is
+    /// where the Mac's own standing is read.
+    private var splitsByAllowance: Bool { model.selectedProjectHost == .mac }
+
+    private var availableRuntimes: [RuntimeStatus] {
+        guard splitsByAllowance else { return model.availableRuntimes }
+        return model.availableRuntimes.filter { !isOut($0.id) }
+    }
+
+    private var outRuntimes: [RuntimeStatus] {
+        guard splitsByAllowance else { return [] }
+        return model.availableRuntimes.filter { isOut($0.id) }
+    }
+
+    private func isOut(_ runtimeID: String) -> Bool {
+        model.runtimeAllowances?.isOut(runtimeID) == true
+    }
+
+    /// A rate limit is not an out runtime: the runtime can still take a turn, and
+    /// `isUsable` says so. It is a throttle, though, and one row in the available run
+    /// that says nothing about it reads as no throttle at all.
+    private func rateLimitNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.rateLimitNote(for: runtimeID)
+    }
+
+    /// What is wrong with it, under the name. It says nothing about another runtime:
+    /// there is no order to take one from (065).
+    private func outNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.note(for: runtimeID)
     }
 
     private func runtimeName(_ id: String) -> String {

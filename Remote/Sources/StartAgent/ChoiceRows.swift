@@ -56,14 +56,15 @@ struct ChoiceRows: View {
 
     private var runtimeRow: some View {
         Menu {
-            ForEach(model.runtimes) { status in
-                Button {
-                    Task { await model.chooseRuntime(status.runtime.id) }
-                } label: {
-                    Text(status.runtime.name)
-                    if let reason = status.unavailableReason { Text(reason) }
+            if !outRuntimes.isEmpty {
+                Section("Available") {
+                    runtimeButtons(in: availableRuntimes)
                 }
-                .disabled(!status.availability.isAvailable)
+                Section("Out") {
+                    runtimeButtons(in: outRuntimes, out: true)
+                }
+            } else {
+                runtimeButtons(in: model.runtimes)
             }
         } label: {
             LabeledContent("Runtime") {
@@ -74,6 +75,57 @@ struct ChoiceRows: View {
         }
         .disabled(model.runtimes.isEmpty)
         .accessibilityLabel("Runtime, \(model.startRuntime?.runtime.name ?? "none")")
+    }
+
+    @ViewBuilder
+    private func runtimeButtons(in runtimes: [RuntimeStatus], out: Bool = false) -> some View {
+        ForEach(runtimes) { status in
+            Button {
+                Task { await model.chooseRuntime(status.runtime.id) }
+            } label: {
+                Text(status.runtime.name)
+                if let detail = detail(for: status, out: out) { Text(detail) }
+            }
+            .disabled(!status.availability.isAvailable)
+        }
+    }
+
+    /// What is said under the name, and nothing more. Why it cannot start wins: that is
+    /// the one thing a person needs before choosing. Otherwise what its allowance says,
+    /// which is a reason in the out run and a throttle in the other.
+    private func detail(for status: RuntimeStatus, out: Bool) -> String? {
+        if let reason = status.unavailableReason { return reason }
+        return out ? outNote(status.runtime.id) : rateLimitNote(status.runtime.id)
+    }
+
+    /// The runtimes in two runs, as the Mac's chooser draws them (065): those that can
+    /// take a turn now, and those whose plan is spent. An out runtime stays listed and
+    /// stays pickable, because a chat on it takes the message and the runtime says no
+    /// until its plan is back, and hiding it would hide the only way back to it. Naming
+    /// it as out is the whole of the change: a list of runtimes by name says nothing
+    /// about which ones will turn a message down.
+    private var availableRuntimes: [RuntimeStatus] {
+        model.runtimes.filter { !isOut($0.id) }
+    }
+
+    private var outRuntimes: [RuntimeStatus] {
+        model.runtimes.filter { isOut($0.id) }
+    }
+
+    private func isOut(_ runtimeID: String) -> Bool {
+        model.runtimeAllowances?.isOut(runtimeID) == true
+    }
+
+    /// What is wrong with it, under the name, and which line of the Mac's own words.
+    /// It says nothing about another runtime: there is no order to take one from.
+    private func outNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.note(for: runtimeID)
+    }
+
+    /// A rate limit is not an out runtime, and an available run that says nothing about
+    /// one reads as no limit at all.
+    private func rateLimitNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.rateLimitNote(for: runtimeID)
     }
 
     /// Project folder, a new worktree, or one already there (030), as the Mac's start

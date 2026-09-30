@@ -75,7 +75,11 @@ agent's explanation, and the fix it suggests you commit next.
 ## 5. Start an agent from the phone
 
 1. Go back to the project and tap **+** at the top right, for a new session.
-2. Leave **Runtime** as it is. It is the runtime your Mac has set up.
+2. Leave **Runtime** as it is. It is the runtime your Mac has set up. If you open the
+   row, the runtimes are in two runs, **Available** and **Out**, with what is wrong with
+   each out one said under its name, exactly as the Mac's own chooser shows them. An out
+   one is still there to pick: a session on it takes the message and the runtime says no
+   until its plan is back.
 3. In **What should it do?**, type:
 
     ```text

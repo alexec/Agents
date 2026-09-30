@@ -370,6 +370,9 @@ final class RemoteModel {
             startRuntimeID = work.defaultRuntimeID(available: availableRuntimeIDs)
         }
         await loadStartChoices()
+        // The runtime menu groups by what the Mac's allowances say, so it needs them
+        // before it is opened, not after whoever happens to visit the Runtimes page.
+        await refreshRuntimeAllowances()
     }
 
     /// Put the sheet away. Its runtime is let go; what was typed is the keeper's.

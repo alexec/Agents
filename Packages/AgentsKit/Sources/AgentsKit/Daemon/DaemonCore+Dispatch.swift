@@ -488,19 +488,19 @@ extension DaemonCore {
             // already in place heard no broadcast, and would otherwise say nothing
             // about it until the verdict next moved (024 T037).
             case DaemonAPI.Method.wakeState:
-                return .success(try JSONValue.encoding(await wakeState()))
+                return .success(try JSONValue.encoding(wakeState()))
 
             case DaemonAPI.Method.wakeSettings:
-                return .success(try JSONValue.encoding(await readWakeSettings()))
+                return .success(try JSONValue.encoding(readWakeSettings()))
 
             case DaemonAPI.Method.wakeSet:
                 let settings = try require(params, as: WakeSettings.self)
-                return .success(try JSONValue.encoding(await setWakeSettings(settings)))
+                return .success(try JSONValue.encoding(setWakeSettings(settings)))
 
             // Retiring archived agents (051). The two writes are the person's; the
             // role table keeps devices and agents to the reads.
             case DaemonAPI.Method.retentionState:
-                return .success(try JSONValue.encoding(await retentionState()))
+                return .success(try JSONValue.encoding(retentionState()))
 
             case DaemonAPI.Method.retentionSet:
                 let request = try require(params, as: DaemonAPI.RetentionSetRequest.self)
@@ -512,7 +512,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.agentsRetired:
                 let request = try require(params, as: DaemonAPI.RetiredRequest.self)
-                return .success(try JSONValue.encoding(await retiredTombstones(request)))
+                return .success(try JSONValue.encoding(retiredTombstones(request)))
 
             case DaemonAPI.Method.clientPermissionsState:
                 return .success(try JSONValue.encoding(clientPermissionState()))

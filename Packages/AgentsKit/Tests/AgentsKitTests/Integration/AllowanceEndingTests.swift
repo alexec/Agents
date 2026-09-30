@@ -54,7 +54,7 @@ struct AllowanceEndingTests {
         #expect(agent.runtimeID == "claude")
         #expect(agent.endedReason == .allowanceSpent)
         #expect(agent.allowanceWait == nil)
-        #expect(await launcher.launches.map(\.runtime) == ["claude"], "no second runtime was started")
+        #expect(launcher.launches.map(\.runtime) == ["claude"], "no second runtime was started")
         let words = try await notes(core, id)
         #expect(words.contains { $0.hasPrefix("Claude’s allowance ran out") })
         #expect(!words.contains { $0.contains("Carried on with") })
@@ -71,7 +71,7 @@ struct AllowanceEndingTests {
 
         #expect(await core.agent(id)?.endedReason == .allowanceSpent)
         #expect(await core.agent(id)?.runtimeID == "claude")
-        #expect(await launcher.launches.count == 1)
+        #expect(launcher.launches.count == 1)
         #expect(try await notes(core, id).contains { $0.contains("credit is used up") })
         #expect(await claudeState(core)?.isOut == true)
     }
@@ -87,7 +87,7 @@ struct AllowanceEndingTests {
 
         #expect(await core.agent(id)?.endedReason == .endTurn, "the turn itself worked")
         #expect(await core.agent(id)?.runtimeID == "claude")
-        #expect(await launcher.launches.map(\.runtime).allSatisfy { $0 == "claude" })
+        #expect(launcher.launches.map(\.runtime).allSatisfy { $0 == "claude" })
         #expect(try await notes(core, id).contains { $0.contains("started using paid extra usage") })
     }
 
@@ -114,7 +114,7 @@ struct AllowanceEndingTests {
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the retry worked") { await core.agent(id)?.endedReason == .endTurn }
         #expect(await core.agent(id)?.runtimeID == "claude")
-        #expect(await launcher.launches.map(\.runtime).allSatisfy { $0 == "claude" })
+        #expect(launcher.launches.map(\.runtime).allSatisfy { $0 == "claude" })
     }
 
     @Test func aWaitLeftFromBeforeIsClearedAtLaunchAndNothingStarts() async throws {
@@ -133,6 +133,6 @@ struct AllowanceEndingTests {
         let loaded = try #require(await core.agent(agent.id))
         #expect(loaded.allowanceWait == nil)
         #expect(loaded.state == .stopped)
-        #expect(await launcher.launches.isEmpty, "nothing was started for it")
+        #expect(launcher.launches.isEmpty, "nothing was started for it")
     }
 }

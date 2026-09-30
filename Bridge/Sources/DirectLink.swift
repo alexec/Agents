@@ -144,11 +144,11 @@ final class DirectLink {
                     relay.start()
                 }
             }
-            let devices = self.devices.count, pairing = pairingSecret != nil
-            made.stateUpdateHandler = { state in
+            let devices = self.devices.count, pairing = pairingSecret != nil, port = self.port
+            made.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
-                    log("listening on port \(self.port) with TLS for \(devices) device(s)"
+                    log("listening on port \(port) with TLS for \(devices) device(s)"
                         + (pairing ? " and a pairing code" : ""))
                 case .failed(let error):
                     // Most likely the port, not yet let go by the listener before. Try

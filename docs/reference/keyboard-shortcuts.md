@@ -42,6 +42,7 @@ ones every Mac app has.
 | Command-Down Arrow | **View ▸ Jump to Latest** | Scrolls the conversation to its end. |
 | Option-Command-E | **View ▸ Events** | Opens the Events page. |
 | Option-Command-L | **View ▸ Resources** | Opens the Resources page, which shows who holds or is waiting for the simulators, browsers and screen. |
+| Option-Command-R | **View ▸ Runtimes** | Opens the Runtimes page, which shows what each runtime can be started on right now and where its allowance stands. |
 | Option-Command-S | **View ▸ Spending** | Opens the Spending page. See [Limit what agents spend](../how-to/limit-spending.md). |
 | Command-F | **View ▸ Find Session** | Puts the keyboard in the sessions column's search field. |
 | Command-? | **Help ▸ Agents Help** | Opens these docs. |
@@ -55,5 +56,5 @@ ones every Mac app has.
 - [Read an agent's changes](../how-to/read-an-agents-changes.md)
 - [Use a shell in an agent's folder](../how-to/use-a-shell.md)
 - [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
-- [Settings and the Resources page](settings.md)
+- [Settings, and the Runtimes and Resources pages](settings.md)
 - [Statuses and groups](statuses.md)

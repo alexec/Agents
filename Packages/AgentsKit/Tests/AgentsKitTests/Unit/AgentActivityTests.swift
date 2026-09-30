@@ -54,12 +54,12 @@ struct AgentActivityTests {
         #expect(agent(plans: [plan([("   ", .inProgress)])]).currentStep == nil)
     }
 
-    @Test func progressCountsWhatIsDone() {
+    @Test func progressCountsWhatIsDone() throws {
         let working = agent(plans: [plan([("One", .completed), ("Two", .completed),
                                           ("Three", .inProgress), ("Four", .pending)])])
-        let progress = try? #require(working.planProgress)
-        #expect(progress?.done == 2)
-        #expect(progress?.total == 4)
+        let progress = try #require(working.planProgress)
+        #expect(progress.done == 2)
+        #expect(progress.total == 4)
     }
 
     @Test func anEmptyPlanHasNoProgress() {

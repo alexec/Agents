@@ -25,7 +25,13 @@ struct AgentRuntimesSettingsView: View {
                         ClientPermissionModeRow(runtimeID: status.id, name: status.runtime.name)
                     }
                 } footer: {
-                    if let note = footer(for: status) { Text(note) }
+                    // Where its allowance stands is on the Runtimes page under Activity, not
+                    // here (065). This is where a runtime is changed; that is where its state
+                    // is read.
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let note = footer(for: status) { Text(note) }
+                        Text("Where its allowance stands is on the Runtimes page, under Activity.")
+                    }
                 }
                 .paperListRow()
                 // Its command sandbox (064): a default every agent on it follows, or why
@@ -34,15 +40,6 @@ struct AgentRuntimesSettingsView: View {
                     SandboxDefaultRow(runtimeID: status.id, name: status.runtime.name)
                 }
                 .paperListRow()
-                // Where it stands (065, US4): out, since when, when it is next checked, and
-                // what is left of its plan. Shown here because this is where a runtime is
-                // chosen from; never what decides whether a prompt is sent.
-                if let row = model.runtimeAllowances?.rows.first(where: { $0.runtimeID == status.id }) {
-                    Section("Allowance") {
-                        RuntimeAllowanceRow(row: row, at: model.runtimeAllowances?.at ?? Date())
-                    }
-                    .paperListRow()
-                }
             }
         }
         .paperForm()
@@ -50,7 +47,6 @@ struct AgentRuntimesSettingsView: View {
             await model.refreshRuntimes()
             await model.refreshClientPermissions()
             await model.refreshSandboxSettings()
-            await model.refreshRuntimeAllowances()
         }
     }
 
@@ -68,35 +64,6 @@ struct AgentRuntimesSettingsView: View {
                 : "Runs through your own Node."
         }
         return "Installing puts it in the app’s own folder, with nothing added to your PATH."
-    }
-}
-
-/// A runtime's allowance, in `PoolWords` (065, contracts/runtime-state.md).
-private struct RuntimeAllowanceRow: View {
-    @Environment(AppModel.self) private var model
-    let row: RuntimeAllowances.Row
-    let at: Date
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(row.line(now: at))
-                    .foregroundStyle(row.state.isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.primary))
-                if row.unusable == nil, let reading = PoolWords.reading(row.state.reading, now: at) {
-                    Text(reading)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if row.state.isOut {
-                // Asks nothing first: a wrong mark costs one refused turn (FR-023).
-                Button("Mark available") {
-                    Task { await model.markRuntimeAvailable(row.credentialKey) }
-                }
-                .controlSize(.small)
-            }
-        }
     }
 }
 

@@ -131,14 +131,14 @@ struct AgentStateTests {
     /// Suppressing its `agentStopped` trigger on the strength of that record alone
     /// would silently change what unarchiving does, which is why `move` gates on the
     /// event as well.
-    @Test func anUnarchivedAgentLooksPickUpAbleAndIsNot() {
+    @Test func anUnarchivedAgentLooksPickUpAbleAndIsNot() throws {
         var agent = Agent(runtimeID: "grok", cwd: URL(filePath: "/tmp"),
                           state: .archived, endedReason: .daemonGone,
                           archivedReason: .byUser)
-        let transition = try? #require(agent.state.applying(.unarchivedByUser,
+        let transition = try #require(agent.state.applying(.unarchivedByUser,
                                                             endedReason: agent.endedReason))
-        #expect(transition?.next == .stopped)
-        agent.state = transition!.next
+        #expect(transition.next == .stopped)
+        agent.state = transition.next
         // The record alone cannot tell the two apart — which is the point.
         #expect(agent.mayBePickedUpAfterRestart)
     }
