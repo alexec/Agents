@@ -185,5 +185,36 @@ extension ToolCall {
     }
 
     /// The one line a tool call is drawn as in a turn.
-    public var turnLine: String { describedAs ?? "Used a tool" }
+    public var turnLine: String {
+        if let describedAs { return describedAs }
+        if let kind = kind?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !kind.isEmpty {
+            let label: String
+            switch kind {
+            case "read": label = "Read file"
+            case "edit": label = "Edit file"
+            case "delete": label = "Delete file"
+            case "move": label = "Move file"
+            case "search": label = "Search files"
+            case "execute": label = "Run command"
+            case "fetch": label = "Fetch data"
+            case "other": label = Self.readableToolName(name) ?? "Used a tool"
+            default: label = Self.readableToolName(name) ?? Self.readableToolName(kind) ?? "Used a tool"
+            }
+            if let name = Self.readableToolName(name), !label.localizedCaseInsensitiveContains(name) {
+                return "\(label) (\(name))"
+            }
+            return label
+        }
+        return Self.readableToolName(name) ?? "Used a tool"
+    }
+
+    private static func readableToolName(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let words = value
+            .replacingOccurrences(of: "([a-z0-9])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "[_./-]+", with: " ", options: .regularExpression)
+            .split(whereSeparator: \.isWhitespace)
+        guard !words.isEmpty else { return nil }
+        return words.map { $0.capitalized }.joined(separator: " ")
+    }
 }
