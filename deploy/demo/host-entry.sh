@@ -10,7 +10,9 @@ if [ ! -d "$project/.git" ]; then
   git -c user.name=Demo -c user.email=demo@example.com add README.md
   git -c user.name=Demo -c user.email=demo@example.com commit -qm "Welcome"
 fi
-joined=""
+# Joined already: rejoin with the membership kept in the root. Without a flag the daemon
+# would take itself for an ordinary one and stop, idle, ten seconds later.
+joined="--control-network"
 [ -f "$AGENTS_ROOT/control-host.json" ] || joined="--control-code $(cat /codes/host)"
 # shellcheck disable=SC2086
 agentsd $joined --host-name "Demo host" &

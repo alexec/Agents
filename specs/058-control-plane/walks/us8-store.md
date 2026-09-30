@@ -57,9 +57,31 @@ Store Connect API instead.
     022. Then: VERIFY SUCCEEDED with no errors.
   - `check-store-archive.sh` now fails a Mac archive holding a file not everyone can read.
     It passes both archives here, and it failed a copy with `CodeResources` at `0600`.
-- **Nothing was uploaded.**
+- **Nothing was uploaded** that evening.
 
-Still Alex's: the upload and submission.
+### Upload, and the notes walked on screen (Alex's "Do T093 for me", 22:0x)
+
+- **Upload.** Both exports went up with `altool --upload-app` as 0.1.0 (1). The Mac build
+  processed to VALID; neither was submitted. Publishing is the product's eventual goal, not
+  this feature's: nothing further goes to App Store Connect without Alex asking.
+- **The demo, restarted.** Its host stopped every ten seconds. `host-entry.sh` passed no
+  control flag once it had joined, so the daemon took itself for an ordinary one and left,
+  idle. It now passes `--control-network`, and the host stays up across `docker restart`.
+- **The notes, on a fresh App Store window** (its container's pairing set aside, then put
+  back; launched behind with `open -g -n`, driven by AX):
+
+| Step | Result |
+|---|---|
+| Where should your agents run? → Connect… (`notes-1-fresh`, `notes-2-code`) | As the notes say. The sheet's words: "It works once, for five minutes", where the demo's codes last 60 days. |
+| Paste the operator code, Connect (`notes-5-paired`) | Paired. **Welcome** under **DEMO HOST**, the runtime menu on `demo`, "demo has nothing to adjust." |
+| Send "Hello from App Review" (`notes-6-turn`, `notes-7-agent`) | The agent answered "You said: Hello from App Review". But the window raised "Could not reach the helper that runs the agents", and the turn sat under Needs you. |
+
+- **Fixed:** the demo's turn now ends done. The echo cannot report, so the daemon reports it
+  (`askForOutcomeIfSilent`). Checked on the demo host with the rebuilt Linux `agentsd`: the
+  next turn ended `done` with nothing asked.
+- **Not fixed (T093a):** with no host on this Mac, the window keeps a THIS MAC heading with a
+  Connecting… row that never goes, and a call after Send goes to `.mac` and fails. The window's
+  main client is still this Mac's host.
 
 ## Step 3: the demo control plane
 

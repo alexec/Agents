@@ -1244,6 +1244,15 @@ extension DaemonCore {
     /// this leaves `outcomeAsked` false on a record whose turn is long over, which is
     /// harmless: only a fresh `.endTurn` opens the gate.
     func askForOutcomeIfSilent(agentID: UUID, reason: EndedReason) async {
+        // The review demo's echo (T092) cannot report, and has always done what it was
+        // asked by the time its turn ends: said so for it, or every turn a reviewer sent
+        // would sit under Needs you.
+        if reason == .endTurn, var agent = agents[agentID], agent.runtimeID == "demo",
+           agent.state == .finished, agent.report == nil {
+            agent.report = WorkReport(outcome: .done, message: "Said back what you typed.", at: now())
+            changed(agent)
+            return
+        }
         guard willAskForOutcome(agentID: agentID, reason: reason),
               var agent = agents[agentID] else { return }
         agent.outcomeAsked = true
