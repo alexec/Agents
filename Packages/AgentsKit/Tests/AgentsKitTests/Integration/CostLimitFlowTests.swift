@@ -356,7 +356,7 @@ struct CostLimitIntegrationTests {
         // 008's rule about the chain-depth limit, applied to money. Asserted on the
         // served tool list rather than by reading the source, so a tool added later
         // fails this rather than quietly widening what an agent may do.
-        let served = [AppTool.suggestPrompts, AppTool.showFile, AppTool.manageWorkflows]
+        let served = AppTool.all
         for forbidden in ["limit", "ceiling", "cost", "spend", "budget"] {
             #expect(!served.contains { $0.localizedCaseInsensitiveContains(forbidden) },
                     "\(forbidden) must not be reachable by an agent")

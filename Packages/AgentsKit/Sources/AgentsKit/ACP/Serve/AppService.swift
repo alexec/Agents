@@ -12,8 +12,7 @@ import Foundation
 /// the line under the agent's name and the row of chips above the prompt — and two
 /// that act mid-turn, `show_file` and `manage_workflows`. Four more act on other
 /// agents — `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` (028) —
-/// and are offered only to an agent the person or a workflow started. Two older names
-/// for the halves of the first are still served, for conversations briefed with them.
+/// and are offered only to an agent the person or a workflow started.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
 /// JSON-RPC over a pipe, which is what `JSONRPCConnection` already does for ACP.
@@ -24,10 +23,6 @@ public actor AppService {
     /// than whole.
     public static let finishTurnToolName = AppTool.finishTurn
 
-    /// The older name for the chips half of `finishTurnToolName`, still served so a
-    /// conversation briefed with it finds what it was told.
-    public static let toolName = AppTool.suggestPrompts
-
     /// The other one: show the user a file.
     public static let showFileToolName = AppTool.showFile
 
@@ -36,9 +31,6 @@ public actor AppService {
 
     /// Ask the person and wait: the form card every runtime can reach.
     public static let askFormToolName = AppTool.askForm
-
-    /// And the older name for the outcome half: say how the work went, on its own.
-    public static let reportOutcomeToolName = AppTool.reportOutcome
 
     /// And four that act on other agents (028), offered only to an agent the person or
     /// a workflow started: start one in this project, and stop, park or list the ones
@@ -70,9 +62,6 @@ public actor AppService {
         case refused(String)
     }
 
-    /// Where a suggestion goes.
-    public typealias Sink = @Sendable ([SuggestedPrompt]) async -> Outcome
-
     /// Where a file to show goes.
     public typealias FileSink = @Sendable (ShownFile) async -> Outcome
 
@@ -84,15 +73,11 @@ public actor AppService {
     public typealias WorkflowSink =
         @Sendable (DaemonAPI.ManageWorkflowsRequest.Action, String?, String?) async -> Outcome
 
-    /// Where an outcome goes: the wire spelling, and the agent's own sentence. Both
-    /// still strings here — the daemon owns which words it knows, because it is the
-    /// daemon that has to refuse one it does not.
-    public typealias OutcomeSink = @Sendable (String, String, BlockWords) async -> Outcome
-
     /// Where the one call goes: the outcome's wire spelling, the sentence, the chips,
-    /// which may be none, and the conversation's new title. One sink rather than the
-    /// two above in turn, because the daemon refuses the whole call or lands the whole
-    /// call, and two sinks could do half of each.
+    /// which may be none, and the conversation's new title. The outcome is still a
+    /// string here — the daemon owns which words it knows, because it is the daemon
+    /// that has to refuse one it does not. One sink for the lot, because the daemon
+    /// refuses the whole call or lands the whole call.
     public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String?, BlockWords) async -> Outcome
 
     /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
@@ -172,11 +157,9 @@ public actor AppService {
 
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
-    private let sink: Sink
     private let fileSink: FileSink
     private let askFormSink: AskFormSink
     private let workflowSink: WorkflowSink
-    private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
     private let leasesSink: LeasesSink
     private let eventsSink: EventsSink
@@ -196,16 +179,12 @@ public actor AppService {
                 finishTurn: @escaping FinishSink = { _, _, _, _, _ in
                     .refused("This app cannot end a turn.")
                 },
-                sink: @escaping Sink,
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
                 askForm: @escaping AskFormSink = { _, _ in
                     .refused("This app cannot ask the person.")
                 },
                 workflows: @escaping WorkflowSink = { _, _, _ in
                     .refused("This app cannot manage workflows.")
-                },
-                reportOutcome: @escaping OutcomeSink = { _, _, _ in
-                    .refused("This app cannot record an outcome.")
                 },
                 agents: @escaping AgentsSink = { _ in
                     .refused("This app cannot start or stop agents.")
@@ -221,11 +200,9 @@ public actor AppService {
                 }) {
         let box = self.box
         self.finishSink = finishTurn
-        self.sink = sink
         self.fileSink = showFile
         self.askFormSink = askForm
         self.workflowSink = workflows
-        self.outcomeSink = reportOutcome
         self.agentsSink = agents
         self.leasesSink = leases
         self.eventsSink = events
@@ -278,11 +255,12 @@ public actor AppService {
             // Longest suffix wins, though nothing here shares one: a runtime is free
             // to prefix a tool's name and none of them changes what follows it.
             if name.hasSuffix(Self.finishTurnToolName) {
-                // The outcome's checks are the report's, and they run here as well as
-                // at the daemon so an agent that got the word wrong is told which five
-                // there are before the call goes any further. The chips are cleaned
-                // the way the older tool cleans them, and may come to nothing: the
-                // call is the outcome; the chips ride along (FR-003).
+                // The outcome's checks run here as well as at the daemon so an agent
+                // that got the word wrong is told which five there are before the call
+                // goes any further. Never rounded to the nearest one: an unknown outcome
+                // read as `done` is exactly the unearned tick this exists to remove. The
+                // chips are cleaned, and may come to nothing: the call is the outcome;
+                // the chips ride along (FR-003).
                 let raw = (arguments?["outcome"]?.stringValue ?? "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard WorkOutcome(wire: raw) != nil else {
@@ -320,15 +298,6 @@ public actor AppService {
                         """, isError: true))
                 }
                 return .success(Self.reply(await finishSink(raw, message, prompts, title, words)))
-            }
-
-            if name.hasSuffix(Self.toolName) {
-                let prompts = SuggestedPrompt.list(in: arguments?["prompts"])
-                guard !prompts.isEmpty else {
-                    return .success(Self.reply("No suggestions were sent, so none are shown.",
-                                               isError: true))
-                }
-                return .success(Self.reply(await sink(prompts)))
             }
 
             if name.hasSuffix(Self.showFileToolName) {
@@ -394,27 +363,6 @@ public actor AppService {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await agentsSink(call)))
-                }
-            }
-
-            if name.hasSuffix(Self.reportOutcomeToolName) {
-                // Checked here as well as at the daemon, so an agent that sent a word
-                // we do not know is told which five we do before the call goes any
-                // further. Never rounded to the nearest one: an unknown outcome read
-                // as `done` is exactly the unearned tick this tool exists to remove.
-                let raw = (arguments?["outcome"]?.stringValue ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard WorkOutcome(wire: raw) != nil else {
-                    return .success(Self.reply(Self.unknownOutcome, isError: true))
-                }
-                let message = (arguments?["message"]?.stringValue ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !message.isEmpty else {
-                    return .success(Self.reply(Self.noWords, isError: true))
-                }
-                switch Self.blockWords(raw, arguments) {
-                case .success(let words): return .success(Self.reply(await outcomeSink(raw, message, words)))
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 }
             }
 
@@ -546,8 +494,8 @@ public actor AppService {
 
     /// Every tool this server offers, in the order they are listed.
     static func tools(managesAgents: Bool, movesItself: Bool = true) -> [JSONValue] {
-        // The one that ends a turn first, the two that act mid-turn, and the two
-        // older names last, described as such (023).
+        // The one that ends a turn first, then the ones that act mid-turn. The two
+        // older names for its halves were retired on 2026-09-29 (023 R5).
         // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
         // archive_agent is no longer offered: only the person archives. An older
@@ -568,7 +516,7 @@ public actor AppService {
         return [Self.finishTurnTool(movesItself: movesItself), Self.showFileTool, Self.workflowTool,
                 Self.askFormTool]
             + agentTools + sessionTools + leaseTools
-            + eventTools + [Self.tool, Self.reportOutcomeTool]
+            + eventTools
     }
 
     /// The questions an `ask_form` call carried, or why it cannot be asked.
@@ -924,52 +872,6 @@ public actor AppService {
                 ],
             ],
             "required": .array(["outcome", "message"]),
-        ],
-    ]
-
-    // The two older names. Kept because the briefing that named them is sent once
-    // and lives in the runtime's history, so a conversation begun before 2026-09-23
-    // and resumed after it calls these and has to find them. Listed, because some
-    // runtimes check a name against the list before calling it; described as the
-    // older names, because a fresh agent reading the whole list should be pointed at
-    // the one tool rather than left to pick. Their schemas and rules are untouched,
-    // but for the ceiling on the list below: since 031 only the first is kept, and a
-    // conversation told "up to four" must not be refused by a runtime checking the
-    // count against the schema before it calls.
-    //
-    // Removing them is deleting these two entries, their two branches in `handle`,
-    // their two sinks in the helper, and their two predicates in `PermissionRequest`.
-    // Nothing else may come to depend on them (023 FR-014).
-
-    /// The older name for the chips half of `finishTurnTool`.
-    static let tool: JSONValue = [
-        "name": .string(toolName),
-        "title": "Suggest what to ask next (older name)",
-        "description": """
-            The older name for the suggestions half of finish_turn. Use finish_turn \
-            instead: it takes the same prompts and the outcome together. This still \
-            works, and shows the first prompt in the person's empty prompt.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "prompts": [
-                    "type": "array",
-                    "minItems": .int(1),
-                    "description": "The suggestions, best first. Only the first is shown.",
-                    "items": [
-                        "type": "object",
-                        "properties": [
-                            "label": ["type": "string",
-                                      "description": "Two to five words for the button, e.g. \"Run the tests\"."],
-                            "prompt": ["type": "string",
-                                       "description": "The prompt itself, addressed to you, which goes into their prompt box when they tap it."],
-                        ],
-                        "required": .array(["label", "prompt"]),
-                    ],
-                ],
-            ],
-            "required": .array(["prompts"]),
         ],
     ]
 
@@ -1504,54 +1406,6 @@ public actor AppService {
             and waits first.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
-    ]
-
-    /// The older name for the outcome half of `finishTurnTool`. See `tool`.
-    static let reportOutcomeTool: JSONValue = [
-        "name": .string(reportOutcomeToolName),
-        "title": "Say how the work went (older name)",
-        "description": """
-            The older name for the outcome half of finish_turn. Use finish_turn \
-            instead: it takes the same outcome and message and your suggestions \
-            together. This still works, and records how the work went.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "outcome": [
-                    "type": "string",
-                    "enum": .array(["done", "nothing_to_do", "needs_answer",
-                                    "partly_done", "stuck", "blocked"]),
-                    "description": "The one that is true.",
-                ],
-                "message": [
-                    "type": "string",
-                    "description": """
-                        One or two sentences, for somebody who has not read the \
-                        conversation. For needs_answer, the question itself.
-                        """,
-                ],
-                "waiting_on": [
-                    "type": "array",
-                    "items": ["type": "string"],
-                    "description": """
-                        Only with blocked. The agents in this project you are waiting on, \
-                        by id (as start_agent or list_my_agents gave it) or by exact \
-                        title. You will be resumed once every one has finished.
-                        """,
-                ],
-                "check_again_in_minutes": [
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 1440,
-                    "description": """
-                        Only with blocked. When to be resumed anyway, to check on \
-                        something the app can't see, like a CI run or a review.
-                        """,
-                ],
-            ],
-            "required": .array(["outcome", "message"]),
-        ],
     ]
 }
 

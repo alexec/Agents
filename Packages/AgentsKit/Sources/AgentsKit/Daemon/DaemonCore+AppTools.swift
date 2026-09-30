@@ -477,8 +477,7 @@ extension DaemonCore {
     /// that start agents, change workflows, take leases or publish.
     func autoAllowedTurnTool(_ request: PermissionRequest) -> PermissionOption? {
         let call = request.toolCall
-        guard call.isFinishingTurn || call.isSuggestingPrompts
-                || call.isShowingFile || call.isReportingOutcome else { return nil }
+        guard call.isFinishingTurn || call.isShowingFile else { return nil }
         return request.options.first { $0.kind == .allowAlways }
             ?? request.options.first { $0.kind == .allowOnce }
     }

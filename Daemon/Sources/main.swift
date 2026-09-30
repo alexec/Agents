@@ -46,8 +46,7 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
 
     let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1),
                              managesAgents: managesAgents,
-                             movesItself: movesItself,
-                             finishTurn: { outcome, message, prompts, title, words in
+                             movesItself: movesItself) { outcome, message, prompts, title, words in
         await relay(DaemonAPI.Method.agentsFinishTurn,
                     DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
                                                 message: message, prompts: prompts,
@@ -62,10 +61,6 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                                     }
                                                 }),
                     fallback: "Noted.")
-    }) { prompts in
-        await relay(DaemonAPI.Method.agentsSuggestPrompts,
-                    DaemonAPI.SuggestPromptsRequest(token: token, prompts: prompts),
-                    fallback: "Shown in the person's empty prompt.")
     } showFile: { file in
         await relay(DaemonAPI.Method.agentsShowFile,
                     DaemonAPI.ShowFileRequest(token: token, file: file),
@@ -79,12 +74,6 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                     DaemonAPI.ManageWorkflowsRequest(token: token, action: action,
                                                      workflowID: workflowID, content: content),
                     fallback: "Done.")
-    } reportOutcome: { outcome, message, words in
-        await relay(DaemonAPI.Method.agentsReportOutcome,
-                    DaemonAPI.ReportOutcomeRequest(token: token, outcome: outcome,
-                                                   message: message, waitingOn: words.waitingOn,
-                                                   checkAgainInMinutes: words.checkAgainInMinutes),
-                    fallback: "Noted.")
     } agents: { call in
         switch call {
         case .start(let prompt, let runtime, let model, let permissionMode, let worktree):
