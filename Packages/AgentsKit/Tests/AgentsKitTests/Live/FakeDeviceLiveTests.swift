@@ -20,7 +20,7 @@ import ControlDial
 /// notice back from the mailbox with its key (T097).
 @Suite("A fake iPhone through a control plane",
        .enabled(if: ProcessInfo.processInfo.environment["AGENTS_FAKE_DEVICE_CODE"] != nil),
-       .serialized, .timeLimit(.minutes(2)))
+       .serialized, .timeLimit(.minutes(30)))
 struct FakeDeviceLiveTests {
     let codeText = ProcessInfo.processInfo.environment["AGENTS_FAKE_DEVICE_CODE"] ?? ""
 
@@ -125,7 +125,7 @@ struct FakeDeviceLiveTests {
         defer { Task { await away.disconnect() } }
 
         // 6. A need from a host, sealed by the relay to this device, read back with its key.
-        guard let hostCode, let code = ControlCode(text: hostCode) else { return }
+        guard let hostCode, let code = ControlCode(text: hostCode) else { return await hold() }
         let hostKey = ControlAgreement.generate()
         let hello = DaemonAPI.HostHello(version: "walk", platform: "fake", machineID: "fake-\(UUID().uuidString.prefix(8))",
                                         name: "fake host for a notice")
@@ -164,6 +164,15 @@ struct FakeDeviceLiveTests {
         #expect(mailbox.waiting(for: id).first { $0.needID == need.id }?.envelope == nil)
         print("fake-device: withdrawn in \(String(format: "%.1f", Date().timeIntervalSince(withdrawn))) s")
         print("FAKE-HOST-ID \(hostMembership.host?.rawValue ?? "-")")
+        await hold()
+    }
+
+    /// `AGENTS_FAKE_DEVICE_HOLD=<seconds>`: stay connected through the relay that long, so a
+    /// walk can look at the window meanwhile (frame N).
+    func hold() async {
+        guard let seconds = ProcessInfo.processInfo.environment["AGENTS_FAKE_DEVICE_HOLD"].flatMap(Double.init) else { return }
+        print("fake-device: holding the relayed connection for \(Int(seconds)) s")
+        try? await Task.sleep(for: .seconds(seconds))
     }
 
     /// The move's own live test (US7) still uses this name for the first build's link.

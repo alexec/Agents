@@ -18,7 +18,12 @@ public actor CopyMesh {
         public var privateKey: Data
         public var publicKey: Data
         public var beat: TimeInterval
-        public init(copy: String, peerURL: URL, privateKey: Data, publicKey: Data, beat: TimeInterval = CopyRecord.beatEvery) {
+        /// The pin of the copies' certificate, when each copy terminates TLS itself with the
+        /// one self-signed certificate they share: a peer dial checks it as a client does.
+        public var pin: String?
+        public init(copy: String, peerURL: URL, privateKey: Data, publicKey: Data, beat: TimeInterval = CopyRecord.beatEvery,
+                    pin: String? = nil) {
+            self.pin = pin
             self.copy = copy
             self.peerURL = peerURL
             self.privateKey = privateKey
@@ -126,7 +131,7 @@ public actor CopyMesh {
                                                   key: ControlAuth.copyKey(controlPrivateKey: configuration.privateKey),
                                                   kind: "copy", controlKey: configuration.publicKey)
         do {
-            let reader = try await ControlJoin.dial(url, pin: nil, as: credentials)
+            let reader = try await ControlJoin.dial(url, pin: url.scheme == "https" ? configuration.pin : nil, as: credentials)
             await linkUp(id, transport: reader)
         } catch {
             log("could not reach copy \(id) at \(url.absoluteString): \(error)")

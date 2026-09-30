@@ -92,7 +92,7 @@ public final class ControlService: @unchecked Sendable {
         let copy = copyID
         mesh = configuration.peerURL.map { url in
             CopyMesh(.init(copy: copy, peerURL: url, privateKey: configuration.privateKey, publicKey: publicKey,
-                           beat: configuration.copyBeat),
+                           beat: configuration.copyBeat, pin: configuration.pin),
                      store: configuration.store, router: router, leases: leases,
                      log: { FileHandle.standardError.write(Data("agents-control[\(copy)]: \($0)\n".utf8)) })
         }
