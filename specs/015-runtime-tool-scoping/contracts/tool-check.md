@@ -20,15 +20,15 @@ policy.
 ## What it prints
 
 ```text
-== grok
-   removed (7 of 7)
-   kept    ask_user_question, todo_write, enter_plan_mode, exit_plan_mode
+== grok, scoped by an allow list as _meta.agentProfile.tools, plus a config overlay on disk
+   removed (4 of 4)
+   kept    ask_user_question, spawn_subagent, kill_command_or_subagent, get_command_or_subagent_output
    residue workflow, monitor                        covered by the briefing
    NEW     some_new_tool                            NOT IN THE POLICY
 
-== cursor
+== cursor, scoped by none; no rule kind names a built-in tool
    no lever on this runtime; everything conflicting is residue
-   residue Task, CreateGoal, UpdateGoal             covered by the briefing
+   kept    Task, CreateGoal, UpdateGoal
    NEW     —
 
 3 tools offered by a runtime that the policy neither removes, keeps, nor explains.
@@ -36,6 +36,10 @@ policy.
 
 Exit code is the count of unaccounted-for tools, so it can be a step in a check later without being
 one now.
+
+`kept` is a list of things a runtime had taken away once and must have again, which is what makes
+this the check for the reversal of 2026-09-29: a run that prints `GONE … KEPT ON PURPOSE AND NOT
+THERE` has found a runtime that dropped its own sub-agents or task tracker.
 
 ## What it is not
 
@@ -53,6 +57,7 @@ In `Packages/AgentsKit/Tests/AgentsKitTests/`:
 | Every runtime in `RuntimeCatalog.builtIn` has a policy | Unit | The mapping is total |
 | Every `RemovedTool` and `ResidualTool` names a category, and every category names the app tool that replaces it | Unit | No removal without a reason |
 | A policy with a `words` lever produces no `_meta`, no flags and no environment | Unit | Cursor is not accidentally sent something |
+| A policy with nothing to deny sends no deny list and no policy file, and one with a rule sends it | Unit | An empty `disabledTools` is a different message from no `_meta` |
 | The three levers each produce the exact wire shape in [runtime-launch.md](./runtime-launch.md) | Unit | The contract, in a test |
 | `Briefing.text(for:)` names every residual tool of that runtime and no other | Unit | Words and policy cannot drift |
 | A residual tool's permission request is refused with the category's sentence, and never held | Integration, against the fake agent | The refusal path |

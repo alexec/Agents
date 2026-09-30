@@ -24,12 +24,13 @@ instead, and it is generated from the policy so it cannot disagree with it:
 > Grok: `workflow` and `monitor` do not work in this app. Use `manage_workflows` for anything that
 > has to happen on its own.
 
-> Cursor: `Task`, `CreateGoal` and `UpdateGoal` do not work in this app. Use `manage_workflows` for
-> anything that has to happen on its own, and ask me rather than starting another agent.
+> Copilot: `search_code_subagent` does not work in this app. This app starts and stops agents; ask me
+> rather than starting another agent.
 
-Claude and Copilot have no residue, so they get no line, and their briefing is shorter than it is
-today. This matters: the briefing is paid for on the first prompt of every conversation, and
-removal is how it gets cheaper.
+Six of the eight runtimes have no residue, so they get no line, and their briefing is shorter than
+it is today. This matters: the briefing is paid for on the first prompt of every conversation, and
+removal is how it gets cheaper. Cursor's line, which named `Task`, `CreateGoal` and `UpdateGoal`,
+went on 2026-09-29 when those three became tools the app keeps rather than residue it refuses.
 
 ---
 

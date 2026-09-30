@@ -3,10 +3,11 @@ import Foundation
 /// The config files the app writes for a runtime that will read policy only off disk,
 /// and the environment variables or launch arguments that point at them.
 ///
-/// Two runtimes need this. Grok's feature switches are read from a file named by
+/// Two runtimes can need this. Grok's feature switches are read from a file named by
 /// `GROK_CONFIG_PATH` and nowhere else — the same TOML handed over inline was measured and
-/// ignored — so scoping it means writing a file (Research R6, R11). Gemini's deny rules are
-/// read from a file named by `--policy` (046, R5).
+/// ignored — so scoping it means writing a file (Research R6, R11). Gemini's deny rules would be
+/// read from a file named by `--policy` (046, R5), and it is the same shape written by the same
+/// code path; there are no rules today (2026-09-29), so it writes nothing and passes no flag.
 ///
 /// Under the daemon's own root, which is the daemon's identity: a second daemon on a
 /// second root gets its own copy, exactly as every other file here does. Nothing goes

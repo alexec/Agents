@@ -18,11 +18,13 @@ Start: `<root>/tools/opencode/current/bin/opencode acp`, with the agent's folder
 ```json
 {"autoupdate":false,
  "permission":{"bash":"ask","edit":"ask","webfetch":"ask"},
- "share":"disabled",
- "tools":{"task":false}}
+ "share":"disabled"}
 ```
 
-A test holds this byte for byte. The `permission` rules turn into `session/request_permission`
+A test holds this byte for byte. `tools` was here with `{"task": false}` until 2026-09-29; there is
+no `tools` key at all now, and a runtime that is not in a policy's list is not taken away, so an
+empty object would have been the same message written longer. The `permission` rules turn into
+`session/request_permission`
 with options `once` (allow_once), `always` (allow_always) and `reject` (reject_once). Under 061's
 **Always approve**, the daemon answers `once` itself.
 

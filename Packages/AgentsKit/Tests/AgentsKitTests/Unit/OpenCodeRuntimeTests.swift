@@ -18,15 +18,17 @@ struct OpenCodeRuntimeTests {
         #expect(!RuntimeCatalog.canMoveFolders(runtimeID: "opencode"), "it keeps working in the old folder (R9)")
     }
 
-    /// contracts/opencode-launch.md, byte for byte.
+    /// contracts/opencode-launch.md, byte for byte. The `tools` object went with
+    /// `task` on 2026-09-29: there is nothing left for it to say.
     @Test func itsSettingsGoInOpenCodeConfigContent() {
         let policy = ToolPolicyCatalog.opencode
         #expect(policy.sessionMeta == nil)
         #expect(policy.launchArguments.isEmpty)
         #expect(policy.launchEnvironment == ["OPENCODE_CONFIG_CONTENT":
-            #"{"autoupdate":false,"permission":{"bash":"ask","edit":"ask","webfetch":"ask"},"share":"disabled","tools":{"task":false}}"#])
-        #expect(policy.removed.map(\.name) == ["task"])
-        #expect(policy.residue.isEmpty, "inline config removes it from the model's list (R3)")
+            #"{"autoupdate":false,"permission":{"bash":"ask","edit":"ask","webfetch":"ask"},"share":"disabled"}"#])
+        #expect(policy.removed.isEmpty)
+        #expect(policy.residue.isEmpty)
+        #expect(policy.kept.map(\.name) == ["task"], "its own sub-agent tool, back since 2026-09-29")
         #expect(policy.escalationTool == nil, "its question tool is off over ACP; ask_form is the way")
         #expect(policy.preferredAuthMethods == ["opencode-login"])
     }

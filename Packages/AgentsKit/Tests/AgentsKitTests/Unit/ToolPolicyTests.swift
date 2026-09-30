@@ -81,11 +81,19 @@ struct ToolPolicyTests {
     }
 
     /// The one tool this feature could break that would matter most. Every runtime the
-    /// app can ask a question through keeps the thing it asks with.
+    /// app can ask a question through keeps the thing it asks with, and says why.
+    ///
+    /// Held per runtime rather than over every non-empty `kept`, which is what this said
+    /// when keeping a tool meant one thing: sub-agents came back for every runtime on
+    /// 2026-09-29, so a runtime can now keep several tools and only one of them is the
+    /// way to reach the person.
     @Test func theEscalationPathIsKeptDeliberately() {
-        for policy in ToolPolicyCatalog.builtIn where !policy.kept.isEmpty {
+        for policy in ToolPolicyCatalog.builtIn {
+            guard let tool = policy.escalationTool else { continue }
+            #expect(policy.kept.contains { $0.name == tool },
+                    "\(policy.runtimeID) asks through \(tool) and does not keep it")
             #expect(policy.kept.contains { $0.because.contains("escalation path") },
-                    "\(policy.runtimeID) keeps things but does not say which is the escalation path")
+                    "\(policy.runtimeID) keeps \(tool) without saying it is the escalation path")
         }
         for policy in ToolPolicyCatalog.builtIn {
             #expect(!policy.removed.contains { $0.name == "AskUserQuestion" || $0.name == "ask_user_question" })
@@ -95,7 +103,9 @@ struct ToolPolicyTests {
     // MARK: The wire shapes
 
     /// Claude: a denial list, nested three keys deep, holding every removal and nothing
-    /// else. The contract is `contracts/runtime-launch.md` §3.
+    /// else. The contract is `contracts/runtime-launch.md` §3. Sub-agents are on the other
+    /// side of it: `Agent`, `TaskOutput` and `TaskStop` (057), then `ListAgents` and
+    /// `SendMessage` with the rest (2026-09-29).
     @Test func claudeSendsADenialList() throws {
         let policy = ToolPolicyCatalog.claude
         let meta = try #require(policy.sessionMeta)
@@ -105,12 +115,16 @@ struct ToolPolicyTests {
         #expect(names.contains("ScheduleWakeup"))
         #expect(names.contains("mcp__claude_ai_Google_Drive"))
         #expect(!names.contains("AskUserQuestion"))
+        for tool in ["Agent", "TaskOutput", "TaskStop", "ListAgents", "SendMessage"] {
+            #expect(!names.contains(tool), "Claude's sub-agent tool \(tool) is denied")
+        }
         #expect(policy.launchArguments.isEmpty)
         #expect(policy.environmentFiles.isEmpty)
     }
 
     /// Grok: an allow list, as a profile, with the profile's own fields beside the
-    /// tools rather than inside them.
+    /// tools rather than inside them. Sub-agents are named in it, which for an allow
+    /// list is the only way they can be: unlisted means unavailable (Research R6).
     @Test func grokSendsAProfile() throws {
         let policy = ToolPolicyCatalog.grok
         let meta = try #require(policy.sessionMeta)
@@ -118,7 +132,11 @@ struct ToolPolicyTests {
         let tools = try #require(profile["tools"]?.arrayValue).compactMap(\.stringValue)
         #expect(tools.contains("ask_user_question"))
         #expect(tools.contains("run_terminal_command"))
-        #expect(!tools.contains("spawn_subagent"))
+        for tool in ["spawn_subagent", "kill_command_or_subagent", "get_command_or_subagent_output"] {
+            #expect(tools.contains(tool), "Grok's sub-agent tool \(tool) is missing from the profile")
+        }
+        #expect(policy.kept.map(\.name).allSatisfy(tools.contains(_:)),
+                "a tool Grok is told we keep is not in the profile that grants it")
         #expect(profile["name"]?.stringValue == "agents-app")
         #expect(profile["description"]?.stringValue?.isEmpty == false)
         // The allow list says what to keep, so the removals are the argument for the
@@ -128,38 +146,44 @@ struct ToolPolicyTests {
     }
 
     /// Copilot: flags, in order, with every removed name after one `--excluded-tools`.
+    /// The sub-agent tools left it on 2026-09-29; the rival's SQL store did not.
     @Test func copilotSendsFlags() {
         let policy = ToolPolicyCatalog.copilot
         #expect(policy.sessionMeta == nil)
         #expect(policy.launchArguments == ["--disable-mcp-server", "software-factory",
                                            "--disable-builtin-mcps",
                                            "--excluded-tools",
-                                           "task", "list_agents", "read_agent",
-                                           "write_agent", "session_store_sql"])
+                                           "session_store_sql"])
     }
 
     /// Cursor: nothing at all, which is the case worth a test of its own. A runtime
     /// with no lever must be sent no `_meta`, no flags and no files — not an empty one
-    /// of each, which is a different message.
+    /// of each, which is a different message. Nothing is denied and nothing is left
+    /// over, so the briefing has nothing to warn about either.
     @Test func cursorIsSentNothing() {
         let policy = ToolPolicyCatalog.cursor
         #expect(policy.sessionMeta == nil)
         #expect(policy.launchArguments.isEmpty)
         #expect(policy.environmentFiles.isEmpty)
         #expect(policy.removed.isEmpty)
+        #expect(policy.residue.isEmpty)
+        #expect(policy.kept.map(\.name) == ["AskQuestion", "Task", "CreateGoal", "UpdateGoal"])
+        #expect(Briefing.residue(policy.residue) == nil)
     }
 
     /// Codex (047): no `_meta` and no flags, one variable holding the feature switches as
-    /// JSON, the same text every launch, and ChatGPT offered first.
+    /// JSON, the same text every launch, and ChatGPT offered first. `multi_agent` was
+    /// already on (057) and `goals` came back with the rest of the task trackers
+    /// (2026-09-29), so the two that are off are the ones the app has an answer for.
     @Test func codexSendsItsFeatureSwitchesInCodexConfig() throws {
         let policy = ToolPolicyCatalog.codex
         #expect(policy.sessionMeta == nil)
         #expect(policy.launchArguments.isEmpty)
         #expect(policy.environmentFiles.isEmpty)
         #expect(policy.launchEnvironment == ["CODEX_CONFIG":
-            #"{"features":{"apps":false,"default_mode_request_user_input":true,"goals":false,"in_app_local_automation":false,"memories":false,"multi_agent":true,"sleep_tool":false}}"#])
+            #"{"features":{"apps":false,"default_mode_request_user_input":true,"goals":true,"in_app_local_automation":false,"memories":false,"multi_agent":true,"sleep_tool":false}}"#])
         #expect(policy.escalationTool == "request_user_input")
-        #expect(policy.kept.map(\.name) == ["request_user_input"])
+        #expect(policy.kept.map(\.name) == ["request_user_input", "goals"])
         #expect(policy.preferredAuthMethods == ["chat-gpt", "chat-gpt-device-code", "api-key"])
         #expect(ToolPolicyCatalog.claude.launchEnvironment.isEmpty)
     }
@@ -176,17 +200,35 @@ struct ToolPolicyTests {
         #expect(claude["CODEX_CONFIG"] == "the person's own", "and nobody else's launch is touched")
     }
 
-    /// Antigravity (049): a deny list at `_meta.agy.disabledTools`, exactly as the server
-    /// documents it, taking only `start_subagent` and never the question tool.
-    @Test func antigravitySendsADenyListUnderAgy() throws {
+    /// Antigravity (049): its sub-agent tool came back on 2026-09-29, so there is nothing
+    /// left to deny and nothing is sent. Not an empty `disabledTools`: that says we looked
+    /// and had nothing to hide, which is not the same as saying nothing at all.
+    @Test func antigravityIsSentNoMetaWhileItDeniesNothing() {
         let policy = ToolPolicyCatalog.antigravity
-        let meta = try #require(policy.sessionMeta)
-        #expect(meta == .object(["agy": .object(["disabledTools": .array([.string("start_subagent")])])]))
+        #expect(policy.sessionMeta == nil)
+        #expect(policy.removed.isEmpty)
+        #expect(policy.lever == .sessionMetaDenyList(path: ["agy", "disabledTools"]),
+                "the lever stays, for the day a rule comes back")
         #expect(policy.escalationTool == "ask_question")
-        #expect(policy.kept.map(\.name) == ["ask_question"])
+        #expect(policy.kept.map(\.name) == ["ask_question", "start_subagent"])
         #expect(policy.launchArguments.isEmpty)
         #expect(policy.environmentFiles.isEmpty)
         #expect(policy.preferredAuthMethods.first == "oauth-personal", "a Google account first (049 D3)")
+    }
+
+    /// And the lever itself, on a runtime that does have something to deny, at the path
+    /// the server documents ("Clients pass the filter under `_meta.agy`").
+    @Test func aDenyListIsSentOnlyWhenThereIsSomethingInIt() throws {
+        let lever = Lever.sessionMetaDenyList(path: ["agy", "disabledTools"])
+        let denying = ToolPolicy(
+            runtimeID: "imaginary",
+            removed: [RemovedTool(name: "start_subagent", category: .agents)],
+            lever: lever)
+        #expect(denying.sessionMeta == .object(["agy": .object(["disabledTools": .array([.string("start_subagent")])])]))
+
+        let denyingNothing = ToolPolicy(runtimeID: "imaginary", lever: lever)
+        #expect(denyingNothing.sessionMeta == nil)
+        #expect(denyingNothing.launchArguments.isEmpty, "and no empty flag list either")
     }
 
     /// Its home is the daemon's, never `~/.gemini`; a key in the daemon's own environment
@@ -329,23 +371,38 @@ struct ToolPolicyTests {
 
     // MARK: A file named by an argument (046)
 
-    /// Gemini: nothing in `_meta`, no flags of its own, and a policy file whose path follows
-    /// `--policy`, beside its system defaults. One deny rule per category, each saying what
-    /// to use instead.
-    @Test func geminiIsSentAPolicyFile() throws {
+    /// Gemini: nothing in `_meta`, no flags of its own, and no policy file either, because
+    /// there is nothing to deny. `invoke_agent` and the six `tracker_*` tools came back
+    /// with the rest on 2026-09-29, so a file of no rules is not written and `--policy` is
+    /// not passed; the system defaults are untouched, because that file is not a policy.
+    @Test func geminiIsSentNoPolicyFileWhileItDeniesNothing() throws {
         let policy = ToolPolicyCatalog.gemini
         #expect(policy.lever == .file)
         #expect(policy.sessionMeta == nil)
         #expect(policy.launchArguments.isEmpty)
+        #expect(policy.removed.isEmpty)
         #expect(policy.escalationTool == nil)
-        let file = try #require(policy.environmentFiles.first)
-        #expect(policy.environmentFiles.map(\.name) == ["gemini-policy.toml", "gemini-system-defaults.json"])
-        #expect(file.argument == "--policy" && file.variable == nil)
-        #expect(file.contents == """
+        #expect(policy.environmentFiles.map(\.name) == ["gemini-system-defaults.json"])
+        #expect(policy.environmentFiles.allSatisfy { $0.argument == nil })
+        #expect(policy.kept.map(\.name) == ["invoke_agent", "tracker_create_task", "tracker_update_task",
+                                           "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency",
+                                           "tracker_visualize"])
+    }
+
+    /// The generator behind it, on the rules it is written for: one deny rule per category,
+    /// each saying what to use instead, at the top of the priority band. Held on its own
+    /// now that no built-in runtime has a rule to put through it, so the day one comes back
+    /// it is a name in `removed` rather than a rewrite.
+    @Test func aDenyRuleIsWrittenForEachCategoryWithAReason() {
+        #expect(ToolPolicyCatalog.geminiPolicy(removing: [
+            RemovedTool(name: "tracker_create_task", category: .standingArrangements),
+            RemovedTool(name: "tracker_visualize", category: .standingArrangements),
+            RemovedTool(name: "invoke_agent", category: .agents),
+        ]) == """
             # Written by the Agents app. Do not edit: rebuilt on every launch.
 
             [[rule]]
-            toolName = ["tracker_create_task", "tracker_update_task", "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency", "tracker_visualize"]
+            toolName = ["tracker_create_task", "tracker_visualize"]
             decision = "deny"
             priority = 999
             denyMessage = "\(RemitCategory.standingArrangements.instead)"
@@ -367,19 +424,32 @@ struct ToolPolicyTests {
         #expect((settings["context"] as? [String: Any])?["fileName"] as? [String] == ["GEMINI.md", "AGENTS.md"])
     }
 
+    /// A file named by an argument is written, and its path passed after the runtime's own
+    /// arguments. No built-in runtime needs one today — Gemini's only file is named by a
+    /// variable — so the shape is exercised on an imaginary policy, which is what keeping
+    /// it is for.
     @Test func aFileNamedByAnArgumentIsWrittenAndPassed() throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("agents-policy-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let files = RuntimePolicyFiles(locations: StoreLocations(root: root))
 
-        let path = root.appendingPathComponent("runtimes/gemini-policy.toml").path
-        #expect(files.arguments(for: ToolPolicyCatalog.gemini) == ["--policy", path])
-        #expect(try String(contentsOfFile: path, encoding: .utf8) == ToolPolicyCatalog.gemini.environmentFiles[0].contents)
-        // The policy is not also put in the environment; only the system defaults are.
+        let imaginary = ToolPolicy(
+            runtimeID: "imaginary",
+            lever: .file,
+            environmentFiles: [EnvironmentFile(name: "imaginary-policy.toml", contents: "# rules\n",
+                                               argument: "--policy")])
+        let path = root.appendingPathComponent("runtimes/imaginary-policy.toml").path
+        #expect(files.arguments(for: imaginary) == ["--policy", path])
+        #expect(try String(contentsOfFile: path, encoding: .utf8) == "# rules\n")
+        #expect(files.environment(for: imaginary, onto: ["PATH": "/usr/bin"]) == ["PATH": "/usr/bin"],
+                "a file named by an argument is not also put in the environment")
+
+        // Gemini's is named by a variable, and it passes no argument while it has no rules.
         let defaults = root.appendingPathComponent("runtimes/gemini-system-defaults.json").path
         #expect(files.environment(for: ToolPolicyCatalog.gemini, onto: ["PATH": "/usr/bin"])
                 == ["PATH": "/usr/bin", "GEMINI_CLI_SYSTEM_DEFAULTS_PATH": defaults])
+        #expect(files.arguments(for: ToolPolicyCatalog.gemini).isEmpty)
         // Nor does Grok's file turn into an argument.
         #expect(files.arguments(for: ToolPolicyCatalog.grok).isEmpty)
         #expect(files.arguments(for: ToolPolicyCatalog.claude).isEmpty)

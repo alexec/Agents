@@ -26,8 +26,10 @@ Working directory: the agent's folder. Never an `agy` or `agy_acp_server` from t
 
 1. `initialize` (client capabilities as for every runtime). Allow ≥ 30 s (cold ≈ 6–8 s).
 2. **If a key is lent**: `authenticate {"methodId": "gemini-api-key"}` → `{}`.
-3. `session/new {cwd, mcpServers: [<app's MCP server>], _meta: {"agy": {"disabledTools": ["start_subagent"]}}}`
-   — same `_meta` on `session/load` and `session/resume`.
+3. `session/new {cwd, mcpServers: [<app's MCP server>]}` — the same on `session/load` and
+   `session/resume`. There is no `_meta`: `disabledTools` was the only thing this lever ever
+   carried, `start_subagent` came back with the rest on 2026-09-29, and an empty
+   `{"agy": {"disabledTools": []}}` would say we had looked and had nothing to deny.
 4. On `-32000` from step 3: the agent is **Needs signing in**, with `authMethods` from step 1.
    The sheet's **Log in with Google** sends `authenticate {"methodId": "oauth-personal"}` on a
    probe session, then the waiting start repeats from step 3.

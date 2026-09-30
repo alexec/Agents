@@ -45,12 +45,6 @@ public enum ToolPolicyCatalog {
             RemovedTool(name: "Monitor", category: .standingArrangements),
             RemovedTool(name: "RemoteTrigger", category: .standingArrangements),
             RemovedTool(name: "PushNotification", category: .escalation),
-            // `Agent`, `TaskOutput` and `TaskStop` are Claude's own: subagents, and reading
-            // or stopping what it left running. Given back (Alex, 2026-09-26, 057) now the
-            // app shows them as a list with Stop rather than as prose. What stays gone
-            // addresses other agents as peers, which is the app's job.
-            RemovedTool(name: "ListAgents", category: .agents),
-            RemovedTool(name: "SendMessage", category: .agents),
             RemovedTool(name: "ReportFindings", category: .artefacts),
             RemovedTool(name: "DesignSync", category: .artefacts),
             RemovedTool(name: "mcp__claude_ai_Claude_Docs", category: .artefacts),
@@ -63,6 +57,21 @@ public enum ToolPolicyCatalog {
         kept: [
             KeptTool(name: "AskUserQuestion",
                      because: "It is the escalation path: the adapter raises it as a form elicitation, which the daemon holds and the phone can answer."),
+            // Sub-agents, whole: starting one, reading what it left running, stopping it,
+            // and saying something to it. `Agent`, `TaskOutput` and `TaskStop` came back in
+            // 057 so the app could show them as a list with a Stop button; `ListAgents` and
+            // `SendMessage` joined them on 2026-09-29, when sub-agents came back for every
+            // runtime. Addressing an agent as a peer is no longer the app's alone.
+            KeptTool(name: "Agent",
+                     because: "A sub-agent of its own, which the app now shows as a list with Stop (057)."),
+            KeptTool(name: "TaskOutput",
+                     because: "Reading what a sub-agent it started left running, for the same list (057)."),
+            KeptTool(name: "TaskStop",
+                     because: "Stopping one of its own, for the same list (057)."),
+            KeptTool(name: "ListAgents",
+                     because: "Listing its own sub-agents, with the app's (2026-09-29)."),
+            KeptTool(name: "SendMessage",
+                     because: "Saying something to one of its own sub-agents, with the app's (2026-09-29)."),
         ],
         lever: .sessionMetaDenyList(path: ["claudeCode", "options", "disallowedTools"]),
         escalationTool: "AskUserQuestion",
@@ -91,6 +100,11 @@ public enum ToolPolicyCatalog {
     /// documentation says stock profiles inject their enabled optional tools *before*
     /// applying the allowlist, and nothing documented lets a client declare a profile
     /// curated. So they are residue, covered by words.
+    ///
+    /// Sub-agents came back on 2026-09-29, and an allow list is where that costs
+    /// something a deny list would not: the three names below are now in the profile
+    /// because they are wanted, and a fourth tool Grok adds next month still will not
+    /// arrive until someone adds it here.
     public static let grok = ToolPolicy(
         runtimeID: RuntimeCatalog.grok.id,
         removed: [
@@ -98,13 +112,16 @@ public enum ToolPolicyCatalog {
             RemovedTool(name: "scheduler_delete", category: .standingArrangements),
             RemovedTool(name: "scheduler_list", category: .standingArrangements),
             RemovedTool(name: "send_feedback", category: .escalation),
-            RemovedTool(name: "spawn_subagent", category: .agents),
-            RemovedTool(name: "kill_command_or_subagent", category: .agents),
-            RemovedTool(name: "get_command_or_subagent_output", category: .agents),
         ],
         kept: [
             KeptTool(name: "ask_user_question",
                      because: "It is the escalation path: the daemon holds what it raises, and the phone can answer it."),
+            KeptTool(name: "spawn_subagent",
+                     because: "A sub-agent of its own, alongside the app's (2026-09-29)."),
+            KeptTool(name: "kill_command_or_subagent",
+                     because: "Stopping one it started, alongside the app's (2026-09-29)."),
+            KeptTool(name: "get_command_or_subagent_output",
+                     because: "Reading what one it started left running, alongside the app's (2026-09-29)."),
         ],
         residue: [
             ResidualTool(name: "workflow", category: .standingArrangements),
@@ -114,7 +131,9 @@ public enum ToolPolicyCatalog {
             path: ["agentProfile", "tools"],
             keep: ["read_file", "list_dir", "grep", "search_replace", "write",
                    "run_terminal_command", "todo_write", "ask_user_question",
-                   "web_search", "web_fetch", "open_page", "open_page_with_find"],
+                   "web_search", "web_fetch", "open_page", "open_page_with_find",
+                   "spawn_subagent", "kill_command_or_subagent",
+                   "get_command_or_subagent_output"],
             extra: ["name": .string("agents-app"),
                     "description": .string("An agent hosted by the Agents app.")]),
         appToolSchemaDelivery: .sessionRules,
@@ -155,19 +174,24 @@ public enum ToolPolicyCatalog {
     /// tried — `search_code_subagent`, `code_search_subagent`, `subagent`, `search_code`,
     /// `code_search`, `search_agent`, `search_codebase`, `codebase_search`,
     /// `semantic_search` — so nobody needs to re-run that experiment (Research R5). The
-    /// general subagent tool, `task`, does exclude, so the way of spawning work is shut.
+    /// general subagent tool, `task`, used to be excluded too; on 2026-09-29 sub-agents
+    /// came back for every runtime, so the flag is down to one name.
     public static let copilot = ToolPolicy(
         runtimeID: RuntimeCatalog.copilot.id,
         removed: [
-            RemovedTool(name: "task", category: .agents),
-            RemovedTool(name: "list_agents", category: .agents),
-            RemovedTool(name: "read_agent", category: .agents),
-            RemovedTool(name: "write_agent", category: .agents),
             RemovedTool(name: "session_store_sql", category: .artefacts),
         ],
         kept: [
             KeptTool(name: "its own question flow",
                      because: "It is the escalation path: what it raises becomes an elicitation the daemon holds."),
+            KeptTool(name: "task",
+                     because: "A sub-agent of its own, alongside the app's (2026-09-29)."),
+            KeptTool(name: "list_agents",
+                     because: "Listing its own sub-agents, with the app's (2026-09-29)."),
+            KeptTool(name: "read_agent",
+                     because: "Reading what a sub-agent it started left running, with the app's (2026-09-29)."),
+            KeptTool(name: "write_agent",
+                     because: "Saying something to one of its own sub-agents, with the app's (2026-09-29)."),
         ],
         residue: [
             ResidualTool(name: "search_code_subagent", category: .agents),
@@ -185,8 +209,9 @@ public enum ToolPolicyCatalog {
     /// credentials, so pointing Cursor at ours would sign the person out of theirs
     /// (Research R7).
     ///
-    /// So everything conflicting is residue, and the briefing is the whole of the
-    /// defence. This is the runtime the residue line was written for.
+    /// So there is nothing here to remove and nothing left over: sub-agents and goals
+    /// came back on 2026-09-29, which leaves Cursor with no residue at all and the
+    /// briefing with nothing to warn about.
     ///
     /// `AskQuestion` is kept and named: Cursor raises it as `cursor/ask_question`,
     /// which this app draws as a form elicitation the phone can answer. Composer
@@ -197,11 +222,12 @@ public enum ToolPolicyCatalog {
         kept: [
             KeptTool(name: "AskQuestion",
                      because: "It is the escalation path: the daemon holds what it raises, and the phone can answer it."),
-        ],
-        residue: [
-            ResidualTool(name: "Task", category: .agents),
-            ResidualTool(name: "CreateGoal", category: .standingArrangements),
-            ResidualTool(name: "UpdateGoal", category: .standingArrangements),
+            KeptTool(name: "Task",
+                     because: "A sub-agent of its own, alongside the app's (2026-09-29). It cannot be denied either way, and refusing it only stopped Cursor from working."),
+            KeptTool(name: "CreateGoal",
+                     because: "A task list for the turn, which every other runtime keeps (2026-09-29)."),
+            KeptTool(name: "UpdateGoal",
+                     because: "Writing to that same list (2026-09-29)."),
         ],
         lever: .words,
         appToolSchemaDelivery: .firstPrompt,
@@ -223,6 +249,9 @@ public enum ToolPolicyCatalog {
     /// and the app shows them as a list rather than refusing them. Off, it never took the
     /// `collaboration.*` tools away anyway (the model's catalog names them), so they were
     /// residue that every call was refused for.
+    /// `goals` came back on 2026-09-29 with the rest of the task trackers, and is now
+    /// written as `true` rather than left out: the switch is how this file states what it
+    /// wants, and saying so is what the check script reads.
     /// `default_mode_request_user_input` is the opposite of the rest: it lets Codex's
     /// question tool, which the adapter raises as a form elicitation, ask outside plan mode.
     ///
@@ -231,7 +260,6 @@ public enum ToolPolicyCatalog {
         runtimeID: RuntimeCatalog.codex.id,
         removed: [
             RemovedTool(name: "sleep", category: .standingArrangements),
-            RemovedTool(name: "goals", category: .standingArrangements),
             RemovedTool(name: "automations", category: .standingArrangements),
             RemovedTool(name: "memories", category: .artefacts),
             RemovedTool(name: "apps", category: .artefacts),
@@ -239,11 +267,13 @@ public enum ToolPolicyCatalog {
         kept: [
             KeptTool(name: "request_user_input",
                      because: "It is the escalation path: the adapter raises it as a form elicitation, which the daemon holds and the phone can answer."),
+            KeptTool(name: "goals",
+                     because: "Codex's own task list, alongside every other runtime's (2026-09-29)."),
         ],
         lever: .environmentJSON(variable: "CODEX_CONFIG", value: .object([
             "features": .object([
                 "sleep_tool": .bool(false),
-                "goals": .bool(false),
+                "goals": .bool(true),
                 "in_app_local_automation": .bool(false),
                 "memories": .bool(false),
                 "apps": .bool(false),
@@ -264,20 +294,27 @@ public enum ToolPolicyCatalog {
 
     /// Gemini: deny rules in a policy file, handed over with `--policy` (046).
     ///
-    /// Measured against Gemini CLI 0.61.0 on 2026-09-25 (`specs/046-gemini-cli/research.md`
-    /// R5). Two kinds of rival. `invoke_agent` starts Gemini's own subagents
-    /// (`codebase_investigator`, `cli_help`, `generalist`); the six `tracker_*` tools keep a
-    /// task queue of Gemini's own. `write_todos` stays, as Claude's to-do tool stays: a
+    /// Nothing is denied any more. `invoke_agent` starts Gemini's own subagents
+    /// (`codebase_investigator`, `cli_help`, `generalist`) and the six `tracker_*` tools
+    /// keep a task queue of Gemini's own; both came back with the rest on 2026-09-29, and
+    /// with them this file. `write_todos` was always kept, as Claude's to-do tool is: a
     /// list inside the turn, not a standing arrangement.
     ///
-    /// The file adds to the person's own policies rather than replacing them, which is why
-    /// it and not `GEMINI_CLI_SYSTEM_SETTINGS_PATH`: system settings override the person's
-    /// key by key, so their own `tools.exclude` and MCP servers would quietly go. Priority
-    /// is 999, the top of the band Gemini allows (0–999), so a person's own `allow` for the
-    /// same tool does not win inside the app's agents. A deny rule with no `argsPattern`
-    /// takes the tool out of the model's list, not only refuses it: measured on a real
-    /// turn, `invoke_agent` is listed without the file and gone with it (R13). So nothing
-    /// here is residue.
+    /// The lever is still here, and still a file, because the file is what a future deny
+    /// rule needs: it adds to the person's own policies rather than replacing them, which
+    /// is why it was never `GEMINI_CLI_SYSTEM_SETTINGS_PATH` — system settings override
+    /// the person's key by key, so their own `tools.exclude` and MCP servers would
+    /// quietly go. Priority is 999, the top of the band Gemini allows (0–999), so a
+    /// person's own `allow` for the same tool does not win inside the app's agents. A deny
+    /// rule with no `argsPattern` takes the tool out of the model's list, not only refuses
+    /// it: measured on a real turn, `invoke_agent` is listed without the file and gone
+    /// with it (R13). So nothing here is residue.
+    ///
+    /// A file with no rules in it is not written and `--policy` is not passed, rather than
+    /// a deny list of nothing: the same rule as an empty `disabledTools`, and for the same
+    /// reason — an empty policy says we thought about it and had nothing to say, which is
+    /// not the same as saying nothing. A test names the two, so a rule that comes back
+    /// brings the file with it.
     ///
     /// Beside it, system defaults named by `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`, the one
     /// settings file below the person's own: Gemini reads `GEMINI.md` and, from these,
@@ -287,25 +324,41 @@ public enum ToolPolicyCatalog {
     /// `context.fileName` of the person's own replaces this one, as it should. Read off
     /// Gemini CLI 0.61.0's code (`getAllGeminiMdFilenames`, `getGlobalMemoryPaths`).
     public static let gemini: ToolPolicy = {
-        let removed = [
-            RemovedTool(name: "invoke_agent", category: .agents),
-            RemovedTool(name: "tracker_create_task", category: .standingArrangements),
-            RemovedTool(name: "tracker_update_task", category: .standingArrangements),
-            RemovedTool(name: "tracker_get_task", category: .standingArrangements),
-            RemovedTool(name: "tracker_list_tasks", category: .standingArrangements),
-            RemovedTool(name: "tracker_add_dependency", category: .standingArrangements),
-            RemovedTool(name: "tracker_visualize", category: .standingArrangements),
+        let kept = [
+            KeptTool(name: "invoke_agent",
+                     because: "Gemini's own subagents, alongside the app's (2026-09-29)."),
+            KeptTool(name: "tracker_create_task",
+                     because: "Gemini's own task queue, alongside every other runtime's (2026-09-29)."),
+            KeptTool(name: "tracker_update_task",
+                     because: "Writing to that same queue (2026-09-29)."),
+            KeptTool(name: "tracker_get_task",
+                     because: "Reading one of its own tasks (2026-09-29)."),
+            KeptTool(name: "tracker_list_tasks",
+                     because: "Listing its own task queue (2026-09-29)."),
+            KeptTool(name: "tracker_add_dependency",
+                     because: "Its own task queue's own dependencies (2026-09-29)."),
+            KeptTool(name: "tracker_visualize",
+                     because: "Its own task queue's own graph (2026-09-29)."),
         ]
+        // The deny file exists for the rules we have, and there are none today, so it is
+        // left out rather than written empty. Anything that removes a Gemini tool must put
+        // its name back in `removed` below for it to come back.
+        let removed: [RemovedTool] = []
+        var files: [EnvironmentFile] = []
+        if !removed.isEmpty {
+            files.append(EnvironmentFile(name: "gemini-policy.toml",
+                                         contents: geminiPolicy(removing: removed),
+                                         argument: "--policy"))
+        }
+        files.append(EnvironmentFile(name: "gemini-system-defaults.json",
+                                     contents: geminiSystemDefaults,
+                                     variable: "GEMINI_CLI_SYSTEM_DEFAULTS_PATH"))
         return ToolPolicy(
             runtimeID: RuntimeCatalog.gemini.id,
             removed: removed,
+            kept: kept,
             lever: .file,
-            environmentFiles: [
-                EnvironmentFile(name: "gemini-policy.toml", contents: geminiPolicy(removing: removed),
-                                argument: "--policy"),
-                EnvironmentFile(name: "gemini-system-defaults.json", contents: geminiSystemDefaults,
-                                variable: "GEMINI_CLI_SYSTEM_DEFAULTS_PATH"),
-            ],
+            environmentFiles: files,
             readsFilesItself: true,
             authMethodBeforeContinuing: "gemini-api-key")
     }()
@@ -351,9 +404,12 @@ public enum ToolPolicyCatalog {
     /// Its built-in tools are `list_directory`, `search_directory`, `find_file`,
     /// `view_file`, `create_file`, `edit_file`, `run_command`, `ask_question`,
     /// `start_subagent`, `generate_image`, `search_web`, `read_url_content` and `finish`.
-    /// Only `start_subagent` duplicates the app. `ask_question` is the escalation tool: the
-    /// server raises it as `session/request_permission` whose options are the answers, and
-    /// allows it without a "Run ask_question?" prompt of its own.
+    /// `start_subagent` is its sub-agent tool and came back on 2026-09-29, which leaves
+    /// nothing denied — so nothing rides in `_meta` at all, rather than an empty
+    /// `disabledTools`, which would say we had thought about it and found nothing to hide.
+    /// `ask_question` is the escalation tool: the server raises it as
+    /// `session/request_permission` whose options are the answers, and allows it without a
+    /// "Run ask_question?" prompt of its own.
     ///
     /// The `/plan` command writes "an implementation plan artifact" into the server's own
     /// folder under `GEMINI_HOME`. It is a command the person types, not a tool the model
@@ -363,12 +419,11 @@ public enum ToolPolicyCatalog {
     /// server also offers are hidden (`RuntimeLaunchCatalog.hiddenAuthMethods`).
     public static let antigravity = ToolPolicy(
         runtimeID: RuntimeCatalog.antigravity.id,
-        removed: [
-            RemovedTool(name: "start_subagent", category: .agents),
-        ],
         kept: [
             KeptTool(name: "ask_question",
                      because: "It is the escalation path: the server raises it as a permission request whose options are the answers, which the daemon holds and the phone can answer."),
+            KeptTool(name: "start_subagent",
+                     because: "Its own sub-agent tool, alongside the app's (2026-09-29)."),
         ],
         lever: .sessionMetaDenyList(path: ["agy", "disabledTools"]),
         escalationTool: "ask_question",
@@ -378,10 +433,12 @@ public enum ToolPolicyCatalog {
     /// merges over the person's `opencode.json` for this process only (049 D4). Measured
     /// against OpenCode 1.18.33 on 2026-09-28 (research R3).
     ///
-    /// - `tools.task: false` takes OpenCode's sub-agents out of the model's list, not only
-    ///   refuses them: `opencode debug agent build` shows a deny rule, and a real turn no
-    ///   longer lists `task`. Nothing is residue. `todowrite` stays, as Claude's to-do tool
-    ///   stays: a list inside the turn, which OpenCode reports as the plan.
+    /// - `task` is OpenCode's sub-agent tool, and came back on 2026-09-29: the `tools` object
+    ///   that took it out of the model's list is gone with it. For the record, it was a real
+    ///   lever — `opencode debug agent build` showed a deny rule, and a real turn stopped
+    ///   listing `task` — so this is a decision reversed, not a lever that never worked.
+    ///   `todowrite` was always kept, as Claude's to-do tool is: a list inside the turn,
+    ///   which OpenCode reports as the plan.
     /// - `permission`: OpenCode's own default is `"*": "allow"`, so left alone it edits,
     ///   runs commands and fetches without asking. These make it ask, as every other runtime
     ///   does; **Always approve** (061) answers for the person.
@@ -393,8 +450,9 @@ public enum ToolPolicyCatalog {
     /// through the app's own `ask_form`, or ends the turn as needs_answer.
     public static let opencode = ToolPolicy(
         runtimeID: RuntimeCatalog.opencode.id,
-        removed: [
-            RemovedTool(name: "task", category: .agents),
+        kept: [
+            KeptTool(name: "task",
+                     because: "Its own sub-agent tool, alongside the app's (2026-09-29)."),
         ],
         lever: .environmentJSON(variable: "OPENCODE_CONFIG_CONTENT", value: .object([
             "autoupdate": .bool(false),
@@ -404,9 +462,6 @@ public enum ToolPolicyCatalog {
                 "webfetch": .string("ask"),
             ]),
             "share": .string("disabled"),
-            "tools": .object([
-                "task": .bool(false),
-            ]),
         ])),
         preferredAuthMethods: ["opencode-login"])
 
