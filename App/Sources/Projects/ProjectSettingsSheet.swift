@@ -110,7 +110,7 @@ struct ProjectSettingsSheet: View {
                             .lineLimit(1)
                         Spacer()
                         if each == .plugins, waitingPlugins > 0 {
-                            Circle().fill(StateTint.attention.color ?? .orange).frame(width: 7, height: 7)
+                            Circle().fill(StateTint.attention.style(or: .secondary)).frame(width: 7, height: 7)
                                 .accessibilityLabel("Waiting for your OK")
                         }
                     }

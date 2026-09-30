@@ -79,7 +79,7 @@ struct RuntimeChooserAllowanceTests {
         let until = now.addingTimeInterval(1800)
         let allowances = RuntimeAllowances(rows: [row("copilot:sign-in", rateLimitedUntil: until)], at: now)
         #expect(!allowances.isOut("copilot"))
-        let note = try? #require(allowances.rateLimitNote(for: "copilot"))
+        let note = allowances.rateLimitNote(for: "copilot")
         #expect(note?.contains("Rate limited") == true)
         #expect(allowances.rateLimitNote(for: "grok") == nil)
     }
