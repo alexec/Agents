@@ -26,7 +26,12 @@ jobs:
     # The project targets the macOS and iOS 27 SDKs, which only this image has.
     # A preview image while macOS 27 is new; move to macos-27 when it is GA.
     runs-on: xcode-27
-    timeout-minutes: 10
+    # Long enough for the two builds, CodeText and the whole AgentsKit suite. It was
+    # ten minutes, and a run the selector chose as `full` takes longer than that on this
+    # runner: the job was cancelled at the cap with every test before it passing, on
+    # main as well as on a branch (run 36642820605). The selection is what keeps this
+    # small; the cap has to fit the run it lets through.
+    timeout-minutes: 30
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
@@ -191,7 +196,9 @@ jobs:
 
       - name: Test AgentsKit
         if: steps.test-selection.outputs.agentskit != 'skip'
-        timeout-minutes: 10
+        # A filtered run is a few seconds and a full one is over ten minutes, so this is
+        # the full run's budget rather than the filtered one's.
+        timeout-minutes: 25
         env:
           TEST_FILTER: ${{ steps.test-selection.outputs.agentskit_filter }}
           TEST_MODE: ${{ steps.test-selection.outputs.agentskit }}
