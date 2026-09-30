@@ -371,13 +371,16 @@ public actor AgentStore {
         }
         let end = min(before ?? known.count, known.count)
         let start = max(0, end - limit)
-        // Older turn files kept only the last block. Restore the concise context
-        // for the requested page from the transcript, then cache it for this reader.
-        for offset in start..<end where known[offset].concise == nil {
+        // Older turn files kept only the last block, or no outcome (069). Restore both
+        // for the requested page from the transcript, then cache them for this reader.
+        for offset in start..<end where known[offset].concise == nil || known[offset].outcome == nil {
             let turn = known[offset]
             let entries = try reader.page(index, before: turn.end,
                                           limit: turn.end - turn.start).entries
-            known[offset].concise = TurnSummary.of(entries, start: turn.start).concise
+            let fresh = TurnSummary.of(entries, start: turn.start)
+            known[offset].concise = fresh.concise
+            known[offset].outcome = fresh.outcome
+            known[offset].steps = fresh.steps
         }
         if turnCache[agentID] == nil, turnCache.count >= Self.indexedTranscripts {
             turnCache.removeAll(keepingCapacity: true)

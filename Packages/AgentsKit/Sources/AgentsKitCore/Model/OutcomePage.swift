@@ -1,43 +1,116 @@
 import Foundation
 
+/// How much of a turn is drawn (069). The app keeps one of these as the level every turn
+/// starts at; a turn opened or closed by hand holds its own until the chat is left.
+public enum TurnDetail: String, CaseIterable, Codable, Hashable, Sendable {
+    /// The ask, the answers, the reply and how it went.
+    case outcome
+    /// And every step between them, one line each.
+    case steps
+    /// And every call opened, and the agent's thinking.
+    case details
+
+    public var title: String {
+        switch self {
+        case .outcome: return "Outcome"
+        case .steps: return "Steps"
+        case .details: return "Details"
+        }
+    }
+
+    /// What the level shows, said beside it in the menu so nobody has to try all three.
+    public var summary: String {
+        switch self {
+        case .outcome: return "What was asked and how it went"
+        case .steps: return "Every step, one line each"
+        case .details: return "Every call opened, and thinking"
+        }
+    }
+
+    public var showsSteps: Bool { self != .outcome }
+}
+
 /// One turn of a conversation: what the person asked, and everything up to the next ask.
 ///
-/// Drawn concise by default: the ask, every answer, and the latest work. When that work
-/// is a tool call, the text immediately before it is shown too.
+/// Drawn at one of three levels (069). Its outcome — the answers, the reply and how it
+/// went — is drawn at every one; the steps between are a click away.
 public struct ChatTurn: Identifiable, Hashable, Sendable {
     /// The ask's id, or the first item's for what came before any ask.
     public var id: UUID
     public var ask: TranscriptItem?
-    /// Every tool call and text block, in order. Empty for a turn known only by its
+    /// Everything drawn after the ask, in order. Empty for a turn known only by its
     /// summary until its entries are fetched.
-    public var blocks: [TranscriptItem]
-    /// The latest work block, also kept for summaries written by older builds.
-    public var last: TranscriptItem?
-    /// The work and answers visible while this turn is concise, in transcript order.
-    public var concise: [TranscriptItem]
+    public var items: [TranscriptItem]
+    /// A stored turn's outcome and step count, drawn before its entries are in hand.
+    public var storedOutcome: [TranscriptItem]?
+    public var storedStepCount: Int?
     /// Where it sits in the transcript, for a turn known only by its summary.
     public var range: Range<Int>?
 
-    public init(id: UUID, ask: TranscriptItem?, blocks: [TranscriptItem], last: TranscriptItem?,
-                concise: [TranscriptItem]? = nil,
+    public init(id: UUID, ask: TranscriptItem?, items: [TranscriptItem],
+                storedOutcome: [TranscriptItem]? = nil, storedStepCount: Int? = nil,
                 range: Range<Int>? = nil) {
         self.id = id
         self.ask = ask
-        self.blocks = blocks
-        self.last = last
-        self.concise = concise ?? blocks.conciseTurnItems()
+        self.items = items
+        self.storedOutcome = storedOutcome
+        self.storedStepCount = storedStepCount
         self.range = range
     }
 
-    /// A stored summary, drawn before its entries are in hand.
+    /// A stored summary, drawn before its entries are in hand. One written before 069
+    /// has no outcome, and its concise blocks stand in.
     public init(_ summary: TurnSummary) {
+        let outcome = summary.outcome ?? summary.concise ?? summary.last.map { [$0] } ?? []
         self.init(id: summary.id,
                   ask: summary.ask.map(TranscriptItem.entry),
-                  blocks: [],
-                  last: summary.last.map(TranscriptItem.entry),
-                  concise: summary.concise?.map(TranscriptItem.entry)
-                    ?? summary.last.map { [.entry($0)] } ?? [],
+                  items: [],
+                  storedOutcome: outcome.map(TranscriptItem.entry),
+                  storedStepCount: summary.steps,
                   range: summary.start..<summary.end)
+    }
+
+    /// Whether this is a stored turn whose entries have not been fetched.
+    public var isSummaryOnly: Bool { items.isEmpty && range != nil }
+}
+
+/// A turn's items, read for drawing.
+public struct TurnParts: Hashable, Sendable {
+    /// The answers, the reply and how it went, in order.
+    public var outcome: [TranscriptItem]
+    /// How many step lines there are behind the control. Thinking is not counted.
+    public var stepCount: Int
+    /// The latest step, while the turn runs and has said nothing after it.
+    public var live: TranscriptItem?
+
+    /// `items` is everything drawn after the ask. `isLive` is whether the turn is still
+    /// going: its reply is only a reply once nothing follows it.
+    public init(_ items: [TranscriptItem], isLive: Bool) {
+        let shown = items.filter { !$0.isThought }
+        let reply = Self.replyIndex(in: shown, isLive: isLive)
+        var outcome: [TranscriptItem] = []
+        var steps = 0
+        for (index, item) in shown.enumerated() {
+            if index == reply || item.isOutcome {
+                outcome.append(item)
+            } else if case .toolRun(_, let calls) = item {
+                steps += calls.count
+            } else {
+                steps += 1
+            }
+        }
+        self.outcome = outcome
+        self.stepCount = steps
+        self.live = isLive && reply == nil ? shown.last(where: { !$0.isOutcome }) : nil
+    }
+
+    /// The reply: the last thing the agent said. A running turn has one only when
+    /// nothing has been drawn since, which is the reply arriving; before that, what
+    /// it said last was said on the way.
+    static func replyIndex(in items: [TranscriptItem], isLive: Bool) -> Int? {
+        guard let last = items.lastIndex(where: \.isAgentMessage) else { return nil }
+        guard isLive else { return last }
+        return items[(last + 1)...].contains(where: { !$0.isOutcome }) ? nil : last
     }
 }
 
@@ -49,19 +122,26 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     public var start: Int
     public var end: Int
     public var ask: TranscriptEntry?
-    /// The last work block, retained for summaries written by older builds.
+    /// The last work block, retained for clients built before 069.
     public var last: TranscriptEntry?
-    /// Optional so summaries written before concise turns kept context still decode.
+    /// The latest work and its context, retained for clients built before 069.
     public var concise: [TranscriptEntry]?
+    /// The answers, the reply and how it went (069). Nil in a summary written before.
+    public var outcome: [TranscriptEntry]?
+    /// How many step lines the turn has behind its control (069).
+    public var steps: Int?
 
     public init(id: UUID, start: Int, end: Int, ask: TranscriptEntry?, last: TranscriptEntry?,
-                concise: [TranscriptEntry]? = nil) {
+                concise: [TranscriptEntry]? = nil, outcome: [TranscriptEntry]? = nil,
+                steps: Int? = nil) {
         self.id = id
         self.start = start
         self.end = end
         self.ask = ask
         self.last = last
         self.concise = concise
+        self.outcome = outcome
+        self.steps = steps
     }
 
     /// The turn made of these entries, the first at `start` in the transcript.
@@ -70,8 +150,10 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
         let items = TranscriptEntry.display(entries)
         let last = items.last(where: \.isBlock).flatMap(\.concise)
         let concise = items.conciseTurnItems().compactMap(\.concise)
+        let parts = TurnParts(Array(items.dropFirst(ask == nil ? 0 : 1)), isLive: false)
         return TurnSummary(id: ask?.id ?? entries.first?.id ?? UUID(), start: start,
-                           end: start + entries.count, ask: ask, last: last, concise: concise)
+                           end: start + entries.count, ask: ask, last: last, concise: concise,
+                           outcome: parts.outcome.compactMap(\.concise), steps: parts.stepCount)
     }
 
     /// Cut a run of the transcript, the first entry at `start`, into turns. Each ask
@@ -96,9 +178,8 @@ extension Array where Element == TranscriptItem {
         func close() {
             guard let first = current.first else { return }
             let ask = first.isPersonsAsk ? first : nil
-            let blocks = current.filter { $0.isBlock || $0.isUserInput }
-            turns.append(ChatTurn(id: first.id, ask: ask, blocks: blocks,
-                                  last: blocks.last(where: \.isBlock)))
+            turns.append(ChatTurn(id: first.id, ask: ask,
+                                  items: Array(current.dropFirst(ask == nil ? 0 : 1))))
         }
         for item in self {
             if item.isPersonsAsk {
@@ -119,9 +200,30 @@ extension TranscriptItem {
         return false
     }
 
-    /// A tool call or something the agent said: all a turn draws besides the ask. And a
-    /// sandbox that could not start (064), which ends its turn and must be seen to be
-    /// answered, so it is the block a concise turn shows.
+    var isAgentMessage: Bool {
+        if case .entry(let entry) = self, case .agentMessage = entry.kind { return true }
+        return false
+    }
+
+    /// Something that says how the turn went, or the person's own answer: drawn at every
+    /// level (069). A stop, a failure, an error, the agent's report.
+    public var isOutcome: Bool {
+        guard case .entry(let entry) = self else { return false }
+        switch entry.kind {
+        case .elicitationAnswered, .permissionAnswered, .workReported, .sandboxFailure:
+            return true
+        case .stateChanged(let state, _):
+            return state == .stopped
+        case .notice(let notice):
+            return notice.isError
+        default:
+            return false
+        }
+    }
+
+    /// A tool call or something the agent said. And a sandbox that could not start
+    /// (064), which ends its turn and must be seen to be answered. Kept for the
+    /// summaries older clients read.
     public var isBlock: Bool {
         switch self {
         case .toolRun: return true
@@ -161,8 +263,8 @@ extension TranscriptItem {
 }
 
 extension Array where Element == TranscriptItem {
-    /// Keep answers wherever they occurred, plus the latest work and its immediate
-    /// preceding text when the latest work is a tool call.
+    /// The pre-069 concise turn, still written for older clients: answers wherever they
+    /// occurred, plus the latest work and the text before it when that work is a call.
     func conciseTurnItems() -> [TranscriptItem] {
         guard let last = lastIndex(where: \.isBlock) else { return filter(\.isUserInput) }
         var selected = Set([last])
