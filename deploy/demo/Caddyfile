@@ -1,0 +1,5 @@
+# The demo's front door (058, T092): a public certificate for DEMO_DOMAIN, and WebSockets
+# passed through to the one copy.
+{$DEMO_DOMAIN} {
+	reverse_proxy control:8791
+}

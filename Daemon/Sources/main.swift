@@ -5,6 +5,18 @@
 import AgentsKit
 import Foundation
 
+// A review control plane's demo host offers the echo runtime beside the others (T092).
+if let demo = EchoAgent.runtime, CommandLine.arguments.count < 2 || CommandLine.arguments[1] != "acp-echo" {
+    RuntimeCatalog.extra = [demo]
+}
+
+// `agentsd acp-echo`: the demo runtime App Review is given (058, T092), offered only on a
+// host started with AGENTS_TEST_RUNTIME=echo. It answers every prompt by saying it back.
+if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "acp-echo" {
+    await EchoAgent.run()
+    exit(0)
+}
+
 // Run as `agentsd mcp` this is not the daemon at all: it is the MCP server the
 // daemon hands to every agent, started by the runtime the way it starts any stdio MCP
 // server. One binary rather than two, so there is one thing to build, sign and ship.

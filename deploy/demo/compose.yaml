@@ -1,0 +1,89 @@
+# The demo control plane App Review is given (058, T092): one copy, one demo host whose only
+# runtime says back what it is told, and codes that last as long as a review does.
+#
+#   scripts/build-linux-control.sh aarch64 && scripts/build-linux-agentsd.sh   # or x86_64
+#   cp App/Resources/servers/agentsd-linux-* deploy/demo/bin/
+#   DEMO_DOMAIN=demo.example.com docker compose -f deploy/demo/compose.yaml up -d --build
+#   docker compose -f deploy/demo/compose.yaml exec codes cat /codes/device /codes/operator
+#
+# DEMO_DOMAIN must point at this machine, with ports 80 and 443 open: Caddy gets a public
+# certificate for it, so the codes carry no pin. See REVIEW-NOTES.md.
+name: agents-demo
+
+services:
+  control:
+    build:
+      context: ..
+      dockerfile: Containerfile
+    image: agents-control:demo
+    # The named volume is root's; the demo has nothing else on this machine to protect.
+    user: root
+    restart: unless-stopped
+    environment:
+      AGENTS_STORE: file:///data/store
+      AGENTS_CONTROL_URL: https://${DEMO_DOMAIN:?set DEMO_DOMAIN to the name reviewers reach}
+      AGENTS_CONTROL_KEY_FILE: /data/control-key
+      AGENTS_CONTROL_NAME: Agents demo
+    volumes:
+      - data:/data
+
+  # Once the copy has written its settings to the store: a host code for the demo host,
+  # and a device code and an operator code for the reviewer, each good for 60 days and for
+  # one use. Run it again (`docker compose run --rm codes`) for fresh ones.
+  codes:
+    build:
+      context: ..
+      dockerfile: Containerfile
+      target: base
+    image: agents-control:demo-tools
+    user: root
+    depends_on: [control]
+    environment:
+      AGENTS_STORE: file:///data/store
+      AGENTS_CONTROL_KEY_FILE: /data/control-key
+    volumes:
+      - data:/data
+      - codes:/codes
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until /agents-control code --host --minutes 86400 > /codes/host.new 2>/dev/null; do sleep 1; done
+        mv /codes/host.new /codes/host
+        /agents-control code --client device --minutes 86400 > /codes/device
+        /agents-control code --client operator --minutes 86400 > /codes/operator
+        echo "codes written to /codes"
+
+  demo-host:
+    build:
+      context: .
+      dockerfile: Containerfile.host
+    image: agents-demo-host
+    restart: unless-stopped
+    depends_on:
+      codes:
+        condition: service_completed_successfully
+    environment:
+      AGENTS_TEST_RUNTIME: echo
+    volumes:
+      - codes:/codes:ro
+      - host:/home/demo/root
+    # The code's address is the public name; this reaches it on this machine.
+    extra_hosts:
+      - "${DEMO_DOMAIN}:host-gateway"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [control]
+    ports: ["80:80", "443:443"]
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+
+volumes:
+  data:
+  codes:
+  host:
+  caddy:

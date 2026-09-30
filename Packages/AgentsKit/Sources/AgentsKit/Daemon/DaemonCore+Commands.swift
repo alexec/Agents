@@ -1268,6 +1268,8 @@ extension DaemonCore {
     /// an agent to account for a turn they have superseded is noise (FR-023).
     func willAskForOutcome(agentID: UUID, reason: EndedReason?) -> Bool {
         guard reason == .endTurn, let agent = agents[agentID] else { return false }
+        // The review demo's echo (T092) has no tools to report with.
+        if agent.runtimeID == "demo" { return false }
         return agent.state == .finished
             && agent.report == nil
             && !agent.outcomeAsked
