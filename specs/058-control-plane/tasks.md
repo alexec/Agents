@@ -466,6 +466,7 @@ again.
   - the `AGENTS_STORE` switch, so the store configuration is the only one;
   - the Remote's old TLS-PSK path.
 
+- [ ] T107 Before the first App Store submission, and after T106 frees `com.alexecollins.agents`: decide whether the Mac window and the iPhone and iPad app become one app with Universal Purchase (one bundle ID, one listing and purchase). If so, move both to that ID, re-issue the app group, iCloud container, push and keychain entitlements and the App Store profiles, and remove the two unsubmitted records made for T093. Alex agreed the approach on 2026-09-29.
 ---
 
 ## Dependencies
