@@ -77,7 +77,9 @@ struct ToolPolicyTests {
         }
         #expect(RemitCategory.standingArrangements.instead.contains(AppTool.manageWorkflows))
         #expect(RemitCategory.suggestions.instead.contains(AppTool.finishTurn))
-        #expect(!RemitCategory.suggestions.instead.contains(AppTool.suggestPrompts))
+        for retired in AppTool.retiredEndOfTurn {
+            #expect(!RemitCategory.suggestions.instead.contains(retired))
+        }
     }
 
     /// The one tool this feature could break that would matter most. Every runtime the

@@ -34,8 +34,6 @@ if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool c
 | `wait_for_event` | Waits until something happens in this project or on this Mac, such as `agent.finished`, `branch.moved`, `mac.wake` or a `custom.` event, optionally narrowed by details and with a time limit of 1 minute to 24 hours. The call waits up to 45 s; after that the agent can end its turn, which costs nothing, and it is started again when the event happens or the time runs out. One wait per agent; a new one replaces the old. Also lists recent events and every name it can wait for. See [Events](events.md). | The runtime decides. |
 | `cancel_wait` | Stops the agent's wait, so nothing starts it again for it. | The runtime decides. |
 | `publish_event` | Says that something happened, as a `custom.` event such as `custom.build_green`, with a short message and up to 10 details. Agents waiting on it are started and workflows that trigger on it run, and the agent is told which. At most 30 an hour per agent. | The runtime decides. |
-| `suggest_next_prompts` | The older name for the suggestion half of `finish_turn`, kept for conversations started before it. | No. The app answers. |
-| `report_outcome` | The older name for the outcome half of `finish_turn`, kept for conversations started before it. | No. The app answers. |
 
 `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` are given only to an
 agent that you or a workflow started. An agent started by another agent cannot start

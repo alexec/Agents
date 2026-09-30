@@ -485,14 +485,14 @@ struct SuggestedPromptTests {
 
     // MARK: What it looks like in the app
 
-    /// Copilot asks permission before every tool call. Asking whether the app may show
-    /// the app's own suggestions is a question with nothing in it.
+    /// Copilot asks permission before every tool call. Asking whether the app may end
+    /// the turn with the app's own suggestions is a question with nothing in it.
     @Test func thePermissionForOurOwnToolIsAnsweredForYou() async throws {
         let (locations, work) = try temporary()
         var script = FakeACPAgent.Script()
         script.permission = [
-            "toolCall": ["toolCallId": "call-1", "title": "suggest_next_prompts",
-                         "name": "mcp__agents__suggest_next_prompts"],
+            "toolCall": ["toolCallId": "call-1", "title": "finish_turn",
+                         "name": "mcp__agents__finish_turn"],
             "options": .array([
                 ["optionId": "allow", "name": "Allow", "kind": "allow_once"],
                 ["optionId": "reject", "name": "Reject", "kind": "reject_once"],
@@ -537,7 +537,8 @@ struct SuggestedPromptTests {
     }
 
     /// The row above the prompt is what the call looks like. A line in the transcript
-    /// saying it happened would be the same thing twice.
+    /// saying it happened would be the same thing twice. Drawn from a conversation
+    /// that called the retired older name, which still draws the way it did.
     @Test func theCallItselfIsNotDrawnInTheTranscript() {
         let ours = ToolCall(toolCallID: "1", title: "suggest_next_prompts",
                             name: "mcp__agents__suggest_next_prompts")

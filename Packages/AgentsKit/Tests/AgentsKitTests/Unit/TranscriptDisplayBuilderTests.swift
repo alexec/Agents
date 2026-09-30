@@ -20,7 +20,7 @@ struct TranscriptDisplayBuilderTests {
     }
 
     private static func suggestion(_ id: String) -> TranscriptEntry {
-        TranscriptEntry(kind: .toolCall(ToolCall(toolCallID: id, title: "Suggest", name: AppTool.suggestPrompts)))
+        TranscriptEntry(kind: .toolCall(ToolCall(toolCallID: id, title: "Finish", name: AppTool.finishTurn)))
     }
 
     private func message(_ text: String, _ id: String? = "m") -> TranscriptEntry { Self.message(text, id) }
