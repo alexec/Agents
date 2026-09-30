@@ -234,8 +234,9 @@ public enum DaemonAPI {
         /// The person moving an agent into a worktree or back to its project folder, or
         /// taking back a move still waiting for the turn to end (053).
         public static let agentsMove = "agents/move"
-        /// What the MCP helper relays when an agent calls `enter_worktree` or
-        /// `exit_worktree` (053). The caller is the token.
+        /// What an MCP helper begun before 2026-09-29 relays when its agent calls
+        /// `enter_worktree` or `exit_worktree` (053). The caller is the token. Kept for
+        /// those sessions: a move is now asked for on `finish_turn`.
         public static let agentsMoveSelf = "agents/moveSelf"
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
@@ -879,11 +880,15 @@ public enum DaemonAPI {
         /// `park` or `archive`: where the agent asked to be put once the turn is over.
         /// A string, checked at the daemon, and optional for the reason `title` is.
         public var afterwards: String?
+        /// Where the agent asked to move once the turn ends (053). None clears a move
+        /// the agent asked for earlier in the same turn: the last call is the whole
+        /// account of it.
+        public var move: MoveAsk?
 
         public init(token: String, outcome: String, message: String,
                     prompts: [SuggestedPrompt], title: String? = nil,
                     waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
-                    afterwards: String? = nil) {
+                    afterwards: String? = nil, move: MoveAsk? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
@@ -892,6 +897,7 @@ public enum DaemonAPI {
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
             self.afterwards = afterwards
+            self.move = move
         }
     }
 
@@ -2266,7 +2272,21 @@ public enum DaemonAPI {
         }
     }
 
-    /// An agent moving itself (053): what it passed to `enter_worktree` or `exit_worktree`.
+    /// A move asked for on `finish_turn` (053).
+    public struct MoveAsk: Codable, Sendable, Equatable {
+        public var target: MoveTarget
+        public var removeLeft: Bool
+        public var discardChanges: Bool
+
+        public init(target: MoveTarget, removeLeft: Bool = false, discardChanges: Bool = false) {
+            self.target = target
+            self.removeLeft = removeLeft
+            self.discardChanges = discardChanges
+        }
+    }
+
+    /// An agent moving itself (053), from a helper begun before the move rode on
+    /// `finish_turn`: what it passed to the `enter_worktree` or `exit_worktree` it had.
     public struct MoveSelfRequest: Codable, Sendable {
         public var token: String
         public var target: MoveTarget

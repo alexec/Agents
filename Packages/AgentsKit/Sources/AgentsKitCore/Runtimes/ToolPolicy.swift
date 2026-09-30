@@ -62,7 +62,7 @@ public enum RemitCategory: String, Codable, Hashable, Sendable, CaseIterable {
         case .suggestions:
             "Use `\(AppTool.finishTurn)` at the end of the turn."
         case .workingFolder:
-            "Use `\(AppTool.enterWorktree)` or `\(AppTool.exitWorktree)` to change where you work."
+            "Give `worktree` or `leave_worktree` to `\(AppTool.finishTurn)` to change where you work."
         }
     }
 }

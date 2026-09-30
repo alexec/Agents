@@ -17,8 +17,8 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
     // or archiving agents (028). The daemon says so here, when it hands the runtime
     // this server; it refuses the calls as well, so this only keeps the menu honest.
     let managesAgents = !CommandLine.arguments.contains(DaemonCore.noAgentToolsFlag)
-    // Nor, on a runtime that forgets its conversation in another folder, the tools for
-    // moving itself (053).
+    // Nor, on a runtime that forgets its conversation in another folder, the arguments
+    // of `finish_turn` for moving itself (053).
     let movesItself = !CommandLine.arguments.contains(DaemonCore.noMoveToolsFlag)
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: .default)
@@ -53,7 +53,14 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                                 message: message, prompts: prompts,
                                                 title: title, waitingOn: words.waitingOn,
                                                 checkAgainInMinutes: words.checkAgainInMinutes,
-                                                afterwards: words.afterwards?.rawValue),
+                                                afterwards: words.afterwards?.rawValue,
+                                                move: words.move.map {
+                                                    switch $0 {
+                                                    case .move(let target, let removeLeft, let discardChanges):
+                                                        DaemonAPI.MoveAsk(target: target, removeLeft: removeLeft,
+                                                                          discardChanges: discardChanges)
+                                                    }
+                                                }),
                     fallback: "Noted.")
     }) { prompts in
         await relay(DaemonAPI.Method.agentsSuggestPrompts,
@@ -140,14 +147,6 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                DaemonAPI.EventPublishRequest(token: token, name: name, message: message,
                                                              details: details),
                                fallback: "Published.")
-        }
-    } moves: { call in
-        switch call {
-        case .move(let target, let removeLeft, let discardChanges):
-            return await relay(DaemonAPI.Method.agentsMoveSelf,
-                               DaemonAPI.MoveSelfRequest(token: token, target: target, removeLeft: removeLeft,
-                                                         discardChanges: discardChanges),
-                               fallback: "The move is asked for.")
         }
     } sessions: { call in
         // Only ever the caller's own project: the daemon takes it from the token (065).

@@ -483,7 +483,8 @@ struct ToolPolicyTests {
         let names = try #require(meta["claudeCode"]?["options"]?["disallowedTools"]?.arrayValue).compactMap(\.stringValue)
         #expect(names.contains("EnterWorktree"))
         #expect(names.contains("ExitWorktree"))
-        #expect(RemitCategory.workingFolder.instead.contains(AppTool.enterWorktree))
+        #expect(RemitCategory.workingFolder.instead.contains(AppTool.finishTurn))
+        #expect(RemitCategory.workingFolder.instead.contains("leave_worktree"))
     }
 
     /// The relay table (056): Codex's config reads as it did in 047, Claude's relay is

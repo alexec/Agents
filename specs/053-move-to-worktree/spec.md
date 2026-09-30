@@ -162,6 +162,12 @@ not have that tool, and uses the app's move instead.
 - **Claude's own worktrees made before this feature.** These are still listed like any other worktree (030 US2) and never removed by the app. An agent that is in one resumes there.
 - **The agent is on a server (037).** The move works the same way on the server, in the server's copy of the repository.
 
+> **Amended 2026-09-29 (Alex).** `enter_worktree` and `exit_worktree` are gone. An agent asks
+> for a move with the `worktree`, `leave_worktree` and `discard_changes` arguments of
+> `finish_turn` instead (contracts/move.md §1). Where FR-001 to FR-002 and FR-021 below name
+> the two tools, read those arguments. A new worktree is always named by the agent, and a move
+> doesn't go with `needs_answer`, `blocked` or `afterwards`.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements

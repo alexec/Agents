@@ -42,7 +42,7 @@ extension DaemonCore {
     /// What tells the helper to leave the agent tools out.
     public static let noAgentToolsFlag = "--no-agent-tools"
 
-    /// What tells the helper to leave `enter_worktree` and `exit_worktree` out (053).
+    /// What tells the helper to leave `finish_turn`'s move arguments out (053).
     public static let noMoveToolsFlag = "--no-move-tools"
 
     /// The binary the runtime is told to run. The daemon's own: one build, one signature,
@@ -164,18 +164,48 @@ extension DaemonCore {
                 afterwards = after
             }
         }
+        // A move is the agent carrying on somewhere else, so it does not go with an
+        // ending that waits for someone, or with being put down (053).
+        if request.move != nil {
+            let waits = [WorkOutcome.needsAnswer, .blocked].contains(checked.report.outcome)
+            guard !waits, afterwards == nil else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: Self.moveRefusal)
+            }
+        }
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
         // Cleaned again here, not trusted from the helper: the daemon is what writes
         // the record. No title — the goal has not changed, or a helper from an older
         // binary sent none — leaves the name as it was.
         let title = request.title.flatMap(Agent.cleanedTitle)
+        // Last of the checks, since it is the one that writes: a move refused here (a
+        // name it cannot use, a removal that would lose work) refuses the whole call,
+        // and one accepted is kept on the agent for when the turn ends.
+        var moved: String?
+        if let move = request.move {
+            moved = try await askMove(checked.agentID,
+                                      PendingMove(target: move.target, removeLeft: move.removeLeft,
+                                                  discardChanges: move.discardChanges,
+                                                  askedBy: .agent, askedAt: now())).message
+        } else if agents[checked.agentID]?.pendingMove?.askedBy == .agent {
+            // The last call is the whole account of the turn, so one without a move
+            // takes back the move an earlier call asked for. The person's stays.
+            agents[checked.agentID]?.pendingMove = nil
+            await record(.runtimeNote("Move cancelled."), for: checked.agentID)
+        }
         let noted = await land(checked.report, prompts: prompts, title: title,
                                afterwards: afterwards,
-                               on: checked.agent, id: checked.agentID)
+                               on: agents[checked.agentID] ?? checked.agent, id: checked.agentID)
         let asked = afterwards.map { " " + Self.afterTurnNote($0) } ?? ""
         let kept = declinedArchive ? " " + AfterTurn.keptVisible : ""
-        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked + kept
+        let moving = moved.map { " " + $0 } ?? ""
+        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked + kept + moving
     }
+
+    static let moveRefusal = """
+        Nothing was recorded: a move carries you on in the new folder, so it does not go \
+        with needs_answer, blocked or afterwards. End the turn without worktree or \
+        leave_worktree, or with done, nothing_to_do, partly_done or stuck.
+        """
 
     /// The refusals a report can meet, in the order it meets them, each a sentence the
     /// agent reads: a token that no longer speaks for an agent, a word that is not one
