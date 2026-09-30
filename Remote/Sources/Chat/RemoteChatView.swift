@@ -14,6 +14,8 @@ struct RemoteChatView: View {
     @State private var formHeight: CGFloat = 0
     /// The subagent whose steps are open, by its id (057).
     @State private var subagentOnScreen: String?
+    /// The level every turn starts at, chosen from the ··· menu (069).
+    @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -36,6 +38,7 @@ struct RemoteChatView: View {
                 ChatTranscript(agent: agent,
                                items: model.transcriptItems,
                                stored: model.work.turns,
+                               defaultDetail: turnDetail,
                                hasMore: model.work.hasMoreOfTheConversation,
                                entryCount: model.entries.count + model.work.turns.count,
                                isComingBack: model.isComingBack(agent),
@@ -237,10 +240,19 @@ struct RemoteChatView: View {
 /// on the Mac (033); what is left here is what the Mac keeps elsewhere.
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
+    @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
     let agent: Agent
 
     var body: some View {
         Menu {
+            // What every turn starts at, above the chat's own actions (069, frame F).
+            Picker("Turns show", selection: $turnDetail) {
+                ForEach(TurnDetail.allCases, id: \.self) { detail in
+                    Text(detail.title).tag(detail)
+                }
+            }
+            .pickerStyle(.inline)
+            Divider()
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
             if agent.state == .archived {
                 Divider()

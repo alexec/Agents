@@ -1,6 +1,8 @@
 # 069 · Wireframes: Outcome, Steps and Details
 
-**Not approved yet.** These frames are for Alex to look at before anything is built.
+**Approved by Alex, 2026-09-29: frames A–F**, with the recommended answer to each question below
+(state held until the chat is left, phone details in place, live line hidden while steps are
+open). Built on `agents/turn-detail`; see [../spec.md](../spec.md). Not built: ⌘] from frame D.
 
 Source: [wireframes.html](wireframes.html). Open it with `#a` to `#e` to see one frame (E holds both phone frames). The PNGs
 beside it are rendered from it with headless Chrome.

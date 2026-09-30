@@ -35,11 +35,12 @@ Each turn is drawn at one of three levels. The chat no longer cycles through the
 
 ## Requirements
 
-- **FR-001** A turn's **outcome** is its answers, its reply, and every item that says how it went:
+- **FR-001** A turn's **outcome** is its answers to questions, its reply, and every item that says how it went:
   a work report, a stopped state, an error notice, a sandbox failure. It is drawn at every level.
-- **FR-002** The **reply** of a finished turn is its last agent message, wherever it falls. The reply
-  of a running turn is its last agent message only when nothing drawn follows it. Otherwise the
-  latest step is the live line.
+- **FR-002** The **reply** is the run of agent messages at the end of the turn, after its last
+  step; a closing line said after the report joins it. A finished turn that ends on a step has its
+  last agent message as the reply. A running turn with no trailing message has none: its latest
+  step is the live line. The report is drawn last. A permission choice is a step, not an outcome.
 - **FR-003** A turn with steps has one control between the ask and the outcome. It reads
   "N steps" when closed and "Hide steps" when open, with a chevron. N counts each tool call and
   each other step line. Thinking is not counted. A turn with no steps has no control.

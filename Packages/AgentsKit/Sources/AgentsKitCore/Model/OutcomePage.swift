@@ -28,6 +28,9 @@ public enum TurnDetail: String, CaseIterable, Codable, Hashable, Sendable {
     }
 
     public var showsSteps: Bool { self != .outcome }
+
+    /// Where the phone keeps its choice. The Mac scopes its own by root.
+    public static let phoneDefaultsKey = "turnDetail"
 }
 
 /// One turn of a conversation: what the person asked, and everything up to the next ask.
@@ -86,12 +89,15 @@ public struct TurnParts: Hashable, Sendable {
     /// `items` is everything drawn after the ask. `isLive` is whether the turn is still
     /// going: its reply is only a reply once nothing follows it.
     public init(_ items: [TranscriptItem], isLive: Bool) {
-        let shown = items.filter { !$0.isThought }
-        let reply = Self.replyIndex(in: shown, isLive: isLive)
+        let shown = Self.drawn(items, isLive: isLive).filter { !$0.isThought }
+        let reply = Self.reply(in: shown, isLive: isLive)
         var outcome: [TranscriptItem] = []
+        var reports: [TranscriptItem] = []
         var steps = 0
         for (index, item) in shown.enumerated() {
-            if index == reply || item.isOutcome {
+            if item.isReport {
+                reports.append(item)
+            } else if reply.contains(index) || item.isOutcome {
                 outcome.append(item)
             } else if case .toolRun(_, let calls) = item {
                 steps += calls.count
@@ -99,18 +105,32 @@ public struct TurnParts: Hashable, Sendable {
                 steps += 1
             }
         }
-        self.outcome = outcome
+        // The report is the turn's last line, whatever the agent said after it.
+        self.outcome = outcome + reports
         self.stepCount = steps
-        self.live = isLive && reply == nil ? shown.last(where: { !$0.isOutcome }) : nil
+        self.live = isLive && reply.isEmpty ? shown.last(where: { !$0.isOutcome }) : nil
     }
 
-    /// The reply: the last thing the agent said. A running turn has one only when
-    /// nothing has been drawn since, which is the reply arriving; before that, what
-    /// it said last was said on the way.
-    static func replyIndex(in items: [TranscriptItem], isLive: Bool) -> Int? {
-        guard let last = items.lastIndex(where: \.isAgentMessage) else { return nil }
-        guard isLive else { return last }
-        return items[(last + 1)...].contains(where: { !$0.isOutcome }) ? nil : last
+    /// What a turn draws of its items, thinking aside. A passing line — "Picked the
+    /// conversation back up." — is only news while its turn is going; once the turn
+    /// is over it is neither a step nor something standing between the reply and the
+    /// end of the turn.
+    public static func drawn(_ items: [TranscriptItem], isLive: Bool) -> [TranscriptItem] {
+        items.filter { $0.isInTurn && (isLive || !$0.isPassing) }
+    }
+
+    /// The reply: what the agent said at the end, after its last step. Claude often
+    /// says a closing line after its report, and that belongs with the reply rather
+    /// than standing in for it. A finished turn that ended on a step still has its
+    /// last message as the reply; a running one is still on its way.
+    static func reply(in items: [TranscriptItem], isLive: Bool) -> [Int] {
+        var run: [Int] = []
+        for index in items.indices.reversed() {
+            if items[index].isAgentMessage { run.insert(index, at: 0) }
+            else if !items[index].isOutcome { break }
+        }
+        if !run.isEmpty || isLive { return run }
+        return items.lastIndex(where: \.isAgentMessage).map { [$0] } ?? []
     }
 }
 
@@ -195,7 +215,7 @@ extension Array where Element == TranscriptItem {
 }
 
 extension TranscriptItem {
-    var isPersonsAsk: Bool {
+    public var isPersonsAsk: Bool {
         if case .entry(let entry) = self, case .userMessage(_, _, .person) = entry.kind { return true }
         return false
     }
@@ -210,7 +230,9 @@ extension TranscriptItem {
     public var isOutcome: Bool {
         guard case .entry(let entry) = self else { return false }
         switch entry.kind {
-        case .elicitationAnswered, .permissionAnswered, .workReported, .sandboxFailure:
+        // An answer to a question is the person's say in how it went. A permission
+        // choice is a step: "You chose Yes" says nothing about the outcome.
+        case .elicitationAnswered, .workReported, .sandboxFailure:
             return true
         case .stateChanged(let state, _):
             return state == .stopped
@@ -219,6 +241,21 @@ extension TranscriptItem {
         default:
             return false
         }
+    }
+
+    /// Whether a turn draws it at all. A state the turn passed through — working,
+    /// waiting on you — is said by the row and the prompt while it is true, and is not
+    /// a step. A stop is kept: it is how the turn went.
+    public var isInTurn: Bool {
+        if case .entry(let entry) = self, case .stateChanged(let state, _) = entry.kind {
+            return state == .stopped
+        }
+        return true
+    }
+
+    var isReport: Bool {
+        if case .entry(let entry) = self, case .workReported = entry.kind { return true }
+        return false
     }
 
     /// A tool call or something the agent said. And a sandbox that could not start

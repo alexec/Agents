@@ -9,7 +9,7 @@ import SwiftUI
 /// finished subagent can still be read.
 struct BackgroundPane: View {
     @Environment(AppModel.self) private var model
-    @AppStorage(ThinkingDisplay.defaultsKey) private var showsThinking = false
+    @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
     let agent: Agent
     let state: AgentPaneState
 
@@ -22,7 +22,7 @@ struct BackgroundPane: View {
             if let chosen {
                 SubagentStepsView(item: chosen,
                                   entries: model.selection == agent.id ? model.entries : [],
-                                  showsThinking: showsThinking,
+                                  showsThinking: turnDetail == .details,
                                   back: { state.subagent = nil })
             } else if agent.background.isEmpty {
                 VStack(spacing: 8) {
