@@ -18,6 +18,19 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>com.alexecollins.agents.remote.widget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>agents</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
@@ -30,6 +43,10 @@
 	<string>To read the pairing code your Mac shows, so only your own phone or iPad can connect to it.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Alex Collins</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>To hear what you say while you dictate into your prompt.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>To turn what you say into words for your prompt.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>So this can find your Mac on the network you are both on, and show you what your agents are doing.</string>
 	<key>UIApplicationSceneManifest</key>
