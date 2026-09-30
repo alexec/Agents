@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 068: the widget's share of the pair's storage. The app group is the Remote's
+	     own, which this app already holds; nothing here asks for anything else, because
+	     the extension reads one file and holds no key (FR-014, FR-015). -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.alexecollins.agents</string>
+	</array>
+</dict>
+</plist>
