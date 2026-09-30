@@ -163,9 +163,10 @@ public struct ToolCall: Codable, Hashable, Sendable {
         (name ?? title).hasSuffix(AppTool.finishTurn)
     }
 
-    /// Whether this is the older suggestion name, the chips half of `finish_turn`.
-    public var isSuggestingPrompts: Bool {
-        (name ?? title).hasSuffix(AppTool.suggestPrompts)
+    /// Whether this is one of the retired names for a half of `finish_turn`, found in a
+    /// conversation that called them before they went.
+    public var isRetiredEndOfTurn: Bool {
+        AppTool.retiredEndOfTurn.contains { (name ?? title).hasSuffix($0) }
     }
 
     /// Whether this is the app's own show-file tool.
@@ -178,15 +179,9 @@ public struct ToolCall: Codable, Hashable, Sendable {
         (name ?? title).hasSuffix(AppTool.manageWorkflows)
     }
 
-    /// Whether this is the older outcome name, the report half of `finish_turn`.
-    public var isReportingOutcome: Bool {
-        (name ?? title).hasSuffix(AppTool.reportOutcome)
-    }
-
     /// Whether this call is the app's own rather than the agent's work at all.
     public var isTheApps: Bool {
-        isFinishingTurn || isSuggestingPrompts || isShowingFile || isManagingWorkflows
-            || isReportingOutcome
+        isFinishingTurn || isShowingFile || isManagingWorkflows
     }
 
     /// Whether the app may answer the runtime's permission question itself.

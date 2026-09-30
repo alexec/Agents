@@ -37,12 +37,8 @@ enum AppToolPreface {
         "\(AppTool.serverName)__\(tool)"
     }
 
-    /// Older names, still served so a conversation briefed with them can call them,
-    /// and not put in front of a fresh agent.
-    private static let withheld: Set<String> = [AppTool.suggestPrompts, AppTool.reportOutcome]
-
     private static func card(_ tool: JSONValue) -> String? {
-        guard let name = tool["name"]?.stringValue, !withheld.contains(name) else { return nil }
+        guard let name = tool["name"]?.stringValue else { return nil }
         let title = tool["title"]?.stringValue ?? name
         let arguments = tool["inputSchema"].map { fields($0, indent: "  ") } ?? ""
         let body = arguments.isEmpty ? "  (no arguments)" : arguments

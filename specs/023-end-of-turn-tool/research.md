@@ -74,6 +74,12 @@ hurt by a method nobody calls.
 briefed with the old names could still be resumed, which depends on how long records are kept, and
 that is Alex's call. `AppTool` carries a comment with the date the aliases began.
 
+**Gone 2026-09-29**, on Alex's call. Out of `tools/list`, `AppService.handle`, the helper's sinks and
+the permission predicates, so a call by either name is now "No tool called …" and a runtime asks
+before one. What stays: the daemon methods `agents/suggestPrompts` and `agents/reportOutcome`, for a
+helper started from an older build and for the suites that use them to set an ending, and
+`AppTool.retiredEndOfTurn`, so a conversation that called them still draws without them.
+
 ## R6. The briefing line
 
 **Decision**: `Briefing.suggestions` and `Briefing.outcome` are replaced by `Briefing.finish`, first
