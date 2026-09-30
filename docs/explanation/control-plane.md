@@ -28,6 +28,53 @@ it connects out, like a client does.
 So a server you add once is seen by every window and phone, with nothing to set up on each
 one, and who may do what is decided in one place.
 
+Every arrow points the way its connection is made. Everything connects out to the control
+plane, and nothing connects in to a host.
+
+```text
+                      ┌───────────────────────── CLIENTS ──────────────────────────┐
+                      │                                                            │
+                      │   Agents window (Mac)              Agents (iPhone, iPad)   │
+                      │   sandboxed, runs nothing          grant: device           │
+                      │   grant: operator                                          │
+                      └─────────────┬──────────────────────────────┬───────────────┘
+                                    │ wss://, paired by code       │ wss://
+                                    ▼                              ▼
+┌──────────────────────────── CONTROL PLANE (yours) ──────────────────────────────────┐
+│                                                                                     │
+│   optional load balancer, such as Caddy, ending TLS                                 │
+│          │                                                                          │
+│   ┌──────▼───────┐   copies link   ┌──────────────┐     one or more copies:         │
+│   │ copy A       │◄───────────────►│ copy B       │     - a channel for each        │
+│   │              │   to each other │              │       client and host pair      │
+│   └──────┬───────┘                 └──────┬───────┘     - checks the grant on       │
+│          └──────────────┬─────────────────┘               every call                │
+│                         ▼                                                           │
+│              ┌─────────────────────┐   who is paired, with which grant; which       │
+│              │ store: folder or S3 │   hosts there are; codes not yet used;         │
+│              └─────────────────────┘   settings                                     │
+└──────────────▲───────────────────────────────▲──────────────────────────────▲───────┘
+               │ connects out, joined          │ connects out                 │ connects out
+               │ by a host code                │                              │
+┌──────────────┴────────────┐   ┌──────────────┴────────────┐   ┌─────────────┴──────────────┐
+│ HOST: this Mac            │   │ HOST: another Mac         │   │ HOST: a Linux server       │
+│ Agents Host               │   │ Agents Host,              │   │ agentsd, installed over    │
+│  ├ agentsd                │   │ Join one elsewhere        │   │ ssh or by one command      │
+│  ├ agents-control, if the │   │  └ agentsd only           │   │                            │
+│  │ control plane runs here│   │                           │   │                            │
+│  └ agents-relay, optional │   │                           │   │                            │
+│ projects, agents,         │   │ projects, agents,         │   │ projects, agents,          │
+│ runtimes, files, terminals│   │ runtimes                  │   │ runtimes                   │
+└──────────────┬────────────┘   └───────────────────────────┘   └────────────────────────────┘
+               │ agents-relay, optional (not in this build yet)
+               ▼
+     your iCloud mailbox ──► iPhone and iPad away from home, and notifications
+```
+
+Your agents, their conversations, files and terminals, and the runtimes' sign-ins stay on
+the host they belong to. The control plane's store only remembers who is paired and which
+hosts there are.
+
 ## Operators and devices
 
 Each client is paired once, with a code the control plane shows, and is given a grant that
