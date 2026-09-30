@@ -427,8 +427,8 @@ again.
 
 **Independent test**: quickstart Walk 4, step 4.
 
-- [ ] T094 [US9] *Join one elsewhere* in frame L takes a host code and registers only `agentsd` with `--control <code>`. This replaces T062's choice in the window's `ConnectSheet`, which is removed under `AGENTS_STORE`.
-- [ ] T095 [US9] Walk: a second host app under another scratch root joins, and its projects show under their own heading. Record it in `specs/058-control-plane/walks/us9-second-mac.md` (was T063).
+- [x] T094 (built with T054–T059: HostModel.joinElsewhere registers only agentsd, whose launch agent runs --control-network; the store ConnectSheet refuses a host code; walks/us9-second-mac.md) [US9] *Join one elsewhere* in frame L takes a host code and registers only `agentsd` with `--control <code>`. This replaces T062's choice in the window's `ConnectSheet`, which is removed under `AGENTS_STORE`.
+- [x] T095 (walks/us9-second-mac.md: B joined A, only a daemon job, bravo under its own heading in a paired store window, rejoined after a kickstart) [US9] Walk: a second host app under another scratch root joins, and its projects show under their own heading. Record it in `specs/058-control-plane/walks/us9-second-mac.md` (was T063).
 
 ---
 
