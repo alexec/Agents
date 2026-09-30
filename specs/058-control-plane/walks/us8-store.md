@@ -79,9 +79,20 @@ Store Connect API instead.
 - **Fixed:** the demo's turn now ends done. The echo cannot report, so the daemon reports it
   (`askForOutcomeIfSilent`). Checked on the demo host with the rebuilt Linux `agentsd`: the
   next turn ended `done` with nothing asked.
-- **Not fixed (T093a):** with no host on this Mac, the window keeps a THIS MAC heading with a
-  Connecting… row that never goes, and a call after Send goes to `.mac` and fails. The window's
-  main client is still this Mac's host.
+- **T093a, fixed after.** With no host on this Mac the window kept a THIS MAC heading with a
+  Connecting… row that never went. After a draft started it refreshed `.mac`'s agents, and
+  that failed as "Could not reach the helper that runs the agents".
+  - The window now knows whether the control plane lists a host on this Mac (`hasMacHost`).
+    With none, it shows no heading and no row, and makes no `.mac` refresh.
+  - A draft refreshes the host it started on.
+  - An agent not yet listed is looked up on the selected project's host.
+  - Walked on the demo (`t093a-after-send`): only DEMO HOST, and a Send raised nothing; the
+    agent answered, its card saying "Said back what you typed."
+- **Found on the way:** presence went only to this Mac's host. A control plane's other hosts
+  never heard which conversation was open, so their finished turns stayed under Needs you
+  however often they were read. Every host now hears whether the person is here, and the
+  one the open conversation lives on hears which it is. The look that proves it needs the
+  window in front, so it waits for a moment when Alex is away.
 
 ## Step 3: the demo control plane
 

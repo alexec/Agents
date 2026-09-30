@@ -389,6 +389,23 @@ final class AppModel {
     /// Every host the control plane last listed, this Mac's included. Nil when the
     /// window is not its client; empty until the first list arrives (058, R11).
     private(set) var controlPlaneHosts: [DaemonAPI.ControlHost]? = ControlConfig.endpoint == nil ? nil : []
+    /// The control plane's list has arrived at least once, so an empty one means none.
+    private var controlPlaneListed = false
+
+    /// Whether this window has a host on this Mac (058, T093a). Always without a control
+    /// plane, and until its first list arrives; after that, only if it lists `.mac`. A
+    /// control plane of servers alone, the review demo's, has none, and nothing in the
+    /// window waits on one or sends to one.
+    var hasMacHost: Bool {
+        guard let listed = controlPlaneHosts, controlPlaneListed else { return true }
+        return listed.contains { $0.id == .mac }
+    }
+
+    /// Where an agent lives: the host it was listed from, or, for one not yet listed
+    /// (just started, say), the selected project's host when there is no Mac host.
+    private func host(ofAgent id: UUID?) -> HostID {
+        work.agent(id)?.host ?? (hasMacHost ? .mac : selectedProjectHost)
+    }
     /// The name `control/status` last gave, so the away strip can still say it.
     private(set) var controlPlaneName: String?
     /// The control plane's own client has answered. Distinct from `isConnected`, which
@@ -529,7 +546,7 @@ final class AppModel {
     }
 
     private func client(forAgent id: UUID?) -> DaemonClient {
-        client(for: work.agent(id)?.host ?? .mac)
+        client(for: host(ofAgent: id))
     }
 
     /// Where a new agent, a draft, a worktree or a session list for the selected
@@ -1455,6 +1472,7 @@ final class AppModel {
               let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
         else { return }
         controlPlaneHosts = listed
+        controlPlaneListed = true
         controlPlaneName = status.name
         // `.mac` is `client`, already. Every other host, including another machine's
         // home host, gets a client of its own on the same link.
@@ -1477,6 +1495,10 @@ final class AppModel {
                 }
             }
             await refreshServer(id)
+            // Presence starts with this Mac's host; a control plane with none starts it
+            // with its first other host.
+            startPresence()
+            presence?.connected()
         }
         // A host removed from the control plane leaves the window too: its projects and
         // agents are no longer anybody's to show here (FR-014; they carry on where they are).
@@ -1681,6 +1703,7 @@ final class AppModel {
     var elicitationForSelection: ElicitationRequest? { work.elicitation(for: selection) }
 
     func refreshAgents() async {
+        guard hasMacHost else { return }
         await attempt {
             let listed = try await self.client.call(DaemonAPI.Method.agentsList,
                                                     DaemonAPI.ListRequest(),
@@ -1966,8 +1989,19 @@ final class AppModel {
         }
         let reporter = PresenceReporter { [weak self] watching, active in
             guard let self else { return }
-            _ = try? await self.client.call(DaemonAPI.Method.presenceReport,
-                                            DaemonAPI.PresenceReport(watching: watching, active: active))
+            // Every host hears whether the person is here; only the one the open
+            // conversation lives on hears which it is, since that is what marks it read
+            // there (058, T093a). A control plane's hosts used to hear nothing, so their
+            // finished turns stayed under Needs you however often they were opened.
+            let owner = watching.map { self.host(ofAgent: $0) }
+            if self.hasMacHost {
+                _ = try? await self.client.call(DaemonAPI.Method.presenceReport,
+                                                DaemonAPI.PresenceReport(watching: owner == .mac ? watching : nil, active: active))
+            }
+            for (id, server) in self.controlHosts {
+                _ = try? await server.call(DaemonAPI.Method.presenceReport,
+                                           DaemonAPI.PresenceReport(watching: owner == id ? watching : nil, active: active))
+            }
             // Coming to the front is also the moment to drop any banner that has gone
             // stale while nobody was looking.
             if active { await self.refreshAttention() }
@@ -2288,8 +2322,12 @@ final class AppModel {
             // have made a worktree, and it has put an agent in one.
             draftWorktree = nil
             Task { await loadDraftWorktrees() }
-            await refreshAgents()
-            await refreshProjects()
+            if selectedProjectHost == .mac {
+                await refreshAgents()
+                await refreshProjects()
+            } else {
+                await refreshServer(selectedProjectHost)
+            }
             // Deliberately not selected. Saying what you want done is not the same as
             // asking to watch it: the agent appears in the project's list and you stay
             // where you were, free to say the next thing. Starting three pieces of work
@@ -2307,7 +2345,7 @@ final class AppModel {
     @discardableResult
     func send(_ text: String, attachments: [Attachment] = []) async -> Bool {
         guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        let host = work.agent(selection)?.host ?? .mac
+        let host = host(ofAgent: selection)
         if host != .mac {
             guard let carried = await carry(attachments, to: host, for: selection) else { return false }
             let sendID = UUID()

@@ -27,8 +27,12 @@ struct ProjectListView: View {
                 // With no server the list is exactly what it always was: no headings.
                 projectRows(model.liveProjects)
             } else {
-                Section { projectRows(model.liveProjects.filter { $0.host == .mac }) } header: {
-                    HostHeading(host: .mac)
+                // No host on this Mac, as on a control plane of servers alone: no heading
+                // for one (058, T093a).
+                if model.hasMacHost {
+                    Section { projectRows(model.liveProjects.filter { $0.host == .mac }) } header: {
+                        HostHeading(host: .mac)
+                    }
                 }
                 ForEach(model.hosts.servers, id: \.self) { host in
                     Section {
@@ -54,7 +58,7 @@ struct ProjectListView: View {
                 }
             }
 
-            if !model.isConnected, !model.controlPlaneAway {
+            if !model.isConnected, !model.controlPlaneAway, model.hasMacHost {
                 // Said rather than left to look like a quiet afternoon: what is listed
                 // may have moved on, and the window is going back for it by itself.
                 // The control plane being away is the strip's sentence, and the projects
