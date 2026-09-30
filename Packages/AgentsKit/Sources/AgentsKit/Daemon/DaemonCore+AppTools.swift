@@ -45,8 +45,9 @@ extension DaemonCore {
     /// What tells the helper to leave `enter_worktree` and `exit_worktree` out (053).
     public static let noMoveToolsFlag = "--no-move-tools"
 
-    /// The binary the runtime is told to run. The daemon's own path: one build, one
-    /// signature, and no second thing to install or keep in step.
+    /// The binary the runtime is told to run. The daemon's own: one build, one signature,
+    /// and no second thing to install or keep in step. Its copy in the root once the
+    /// daemon has pinned one (`PinnedHelper`), so a rebuild cannot swap it.
     ///
     /// `AGENTS_MCP_HELPER` names it instead, for the live tests, which run inside a
     /// test binary rather than inside the daemon.
@@ -54,10 +55,16 @@ extension DaemonCore {
         if let named = ProcessInfo.processInfo.environment["AGENTS_MCP_HELPER"], !named.isEmpty {
             return named
         }
-        return ProcessInfo.processInfo.arguments.first.map {
-            URL(fileURLWithPath: $0).resolvingSymlinksInPath().path
-        } ?? "agentsd"
+        return pinnedHelper.path ?? ownExecutable?.path ?? "agentsd"
     }
+
+    /// Where this process was started from.
+    static var ownExecutable: URL? {
+        ProcessInfo.processInfo.arguments.first.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
+    }
+
+    /// The copy the daemon pinned when it started, if it did. One daemon to a process.
+    static let pinnedHelper = PinnedHelperPath()
 
     func mintAppToken() -> String {
         UUID().uuidString

@@ -151,6 +151,9 @@ targets:
       # The notification service extension: the banner's words are assembled on the
       # device, from a sealed push (021 T068).
       - target: RemoteNotify
+      # The Home-screen widget (068). Same reason: it is not installed on its own, so it
+      # ships inside this bundle and is versioned with it.
+      - target: RemoteWidget
     info:
       path: Remote/Info.plist
       properties:
@@ -160,6 +163,13 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         NSHumanReadableCopyright: © 2026 Alex Collins
         ITSAppUsesNonExemptEncryption: false
+        # The scheme the Home-screen widget links into (068). One scheme, two links: the
+        # body of the widget and one of its rows.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.alexecollins.agents.remote.widget
+            CFBundleTypeRole: Viewer
+            CFBundleURLSchemes:
+              - agents
         # Shown in the system's own alert the first time the app looks for the Mac.
         NSLocalNetworkUsageDescription: >-
           So this can find your Mac on the network you are both on, and show you what
@@ -243,6 +253,57 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
 
+  # The Home-screen widget (068). It shows the count of sessions that need a person, and
+  # a tap on a row opens that conversation in the Remote. It links AgentsKitCore and
+  # three of the shared views, and nothing else: a widget is handed a file and asked to
+  # draw it, so anything that could reach the daemon or a PTY has no business here.
+  # WidgetKit is loaded on demand and can be killed at any moment, so the provider reads
+  # one small file and goes away again.
+  RemoteWidget:
+    type: app-extension
+    supportedDestinations: [iOS]
+    sources:
+      - path: RemoteWidget/Sources
+      # The three shared files the drawn widget needs: the ground it is drawn on, the
+      # app's one colour for a thing that needs a person, and the type scale. Not the
+      # whole of Shared/UI, which is full of views that are about a conversation.
+      - path: Shared/UI/Paper.swift
+      - path: Shared/UI/StateTint.swift
+      - path: Shared/UI/TypeScale.swift
+      # Listed, not owned. See the note on the Agents target's entitlements.
+      - path: RemoteWidget/RemoteWidget.entitlements
+        buildPhase: none
+    dependencies:
+      - package: AgentsKit
+        product: AgentsKitCore
+    info:
+      path: RemoteWidget/Info.plist
+      properties:
+        CFBundleDisplayName: AgentsWidget
+        CFBundleName: AgentsWidget
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        # No principal class: WidgetKit finds the `@main` widget bundle itself, and
+        # naming one here is the way to get a widget that installs and never draws.
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.remote.widget
+        # The extension's own name has to differ from the app it lives in, and the
+        # display name is what the Home screen shows under the widget in the gallery.
+        PRODUCT_NAME: AgentsWidget
+        CODE_SIGN_ENTITLEMENTS: RemoteWidget/RemoteWidget.entitlements
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: iphoneos iphonesimulator
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        # Refuses the app-only API a widget extension is not allowed to call, so one
+        # cannot be written into this target by accident.
+        APPLICATION_EXTENSION_API_ONLY: YES
+
   # The Mac end of the direct connection: a door onto the daemon for a device on the
   # same network. Started by hand — it has no pairing and no encryption yet.
   # The bridge is an *app-like bundle*, not a tool, and that is 021's T056 (005's T002):
@@ -310,6 +371,14 @@ schemes:
     build:
       targets:
         Remote: all
+    run:
+      config: Debug
+  # On its own, for a widget that will not install and no error worth reading in the
+  # Remote's own build log (068).
+  RemoteWidget:
+    build:
+      targets:
+        RemoteWidget: all
     run:
       config: Debug
   Agents:

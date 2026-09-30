@@ -96,6 +96,9 @@ struct RemoteView: View {
         }
         // Where this device is, told to the Mac on every change (021).
         .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase) }
+        // A tap on the Home-screen widget (068). The one place a URL is taken from
+        // outside the app, so it is checked and dropped rather than acted on by shape.
+        .onOpenURL { model.openedFromTheWidget($0) }
         .task {
             await model.connect()
 #if DEBUG
