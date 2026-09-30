@@ -13,8 +13,33 @@ credentials, so steps 1–2 stop at what can be checked here.
 | The Remote, Release, unsigned (production push needs the distribution profile) | Two Mach-O files, the app and `PlugIns/RemoteNotify.appex/RemoteNotify`, and nothing else. Its Release entitlements are `Remote/Remote-AppStore.entitlements`: production `aps-environment` and iCloud. |
 | The developer build of Agents, as a stand-in archive (the negative case) | The script fails it: `Contents/Helpers/agentsd`, the bridge, debug dylibs, and no sandbox. |
 
-Still Alex's: exporting with the distribution profile, `xcrun altool --validate-app` on both,
-and any upload.
+### Signing and validation (later the same evening, with Alex's go-ahead)
+
+The team key already on this Mac was used: `~/.private_keys`, App Manager. No second key was
+made. Xcode's cloud signing is refused to that role, so the signing was made through the App
+Store Connect API instead.
+
+- **Certificates.** Two, each with its private key made on this Mac and imported into the
+  login keychain; the temporary copies were deleted.
+  - Apple Distribution (`UGRN48USDX`).
+  - Mac Installer Distribution (`JD94BVA7AF`, "3rd Party Mac Developer Installer").
+  - Both valid to 2027-09-30.
+- **The store window's bundle ID** was registered: `com.alexecollins.agents.store`, macOS,
+  "Agents Store". The Remote's two were already registered.
+- **Profiles.** Three App Store profiles, installed for Xcode: "Agents Store App Store", "Agents
+  Remote App Store" and "Agents Remote Notify App Store".
+- **`project.yml`.** Release now signs these three targets manually, with Apple Distribution and
+  those profiles, so an archive carries the entitlements an upload is checked against.
+  - The first export of the unsigned Remote archive had lost them all.
+  - Now it has production push and iCloud, the app group and keychain sharing.
+- **Exports.** Both archives were made again (both still pass `check-store-archive.sh`) and
+  exported for App Store Connect: `Agents.pkg`, signed by the installer certificate, and
+  `Agents.ipa`.
+- **`altool --validate-app`** stopped on both with "Unable to find Apple ID for Bundle ID … create
+  this app in App Store Connect first". There are no app records yet. Making them reserves
+  the names, which is Alex's call.
+
+Still Alex's: the two app records, then validation, and any upload.
 
 ## Step 3: the demo control plane
 
