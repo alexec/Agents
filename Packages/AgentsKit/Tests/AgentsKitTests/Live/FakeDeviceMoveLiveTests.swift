@@ -83,17 +83,47 @@ struct FakeDeviceMoveLiveTests {
         print("fake-device: agents → \(agents.map(\.id))")
 
         guard environment["AGENTS_FAKE_DEVICE_MOVE"] == "again" else { return }
-        let status = try await phone.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
-        print("fake-device: control/status → \(status.name), home host \(status.homeHost?.rawValue ?? "-")")
-        let wrapped = ControlLink { [self] in try await dial(identity: identity, key: psk) }
+        // After the move (058, T085): the old link says where the control plane is now,
+        // once this device has said which it is.
+        let notes = phone.notifications()
+        _ = try? await phone.call(DaemonAPI.Method.surfaceIdentify,
+                                  DaemonAPI.SurfaceIdentification(id: paired.id, name: "Fake iPhone", kind: .iPhone))
+        var moved: DaemonAPI.ControlMoved?
+        let waiting = Task {
+            for await note in notes where note.method == DaemonAPI.Notification.controlMoved {
+                return try? note.params?.decode(DaemonAPI.ControlMoved.self)
+            }
+            return nil
+        }
+        let timeout = Task { try? await Task.sleep(for: .seconds(15)); waiting.cancel() }
+        moved = await waiting.value
+        timeout.cancel()
+        let told = try #require(moved, "the old link never said where the control plane went")
+        print("fake-device: told over the old link: the control plane \(told.name) is at \(told.url)")
+        await phone.disconnect()
+
+        // The new way: a WebSocket to that address, with the pin, as this device, with the
+        // key it paired with the Mac under.
+        let membership = ControlMembership(client: paired.id, controlKey: told.controlKey, addresses: [], name: told.name,
+                                           url: told.url, pin: told.pin)
+        let shared = try key.controlClientKey(controlKey: told.controlKey, client: paired.id)
+        let dial = try ControlCodeUse.clientDial(membership, sharedKey: shared, kind: "iphone",
+                                                 dial: { url, pin in try await WebSocketLink.connect(url, pin: pin) })
+        let wrapped = ControlLink(dial: dial)
+        defer { wrapped.disconnect() }
         let control = DaemonClient(link: wrapped.controlLink)
         try await control.connect(startIfNeeded: false)
+        let status = try await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+        #expect(status.you == paired.id)
+        print("fake-device: over the new wire as itself: control/status → \(status.name), home host \(status.homeHost?.rawValue ?? "-")")
         let hosts = try await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
         print("fake-device: hosts/list → \(hosts.map { "\($0.name) (\($0.id), \($0.state))" })")
-        for host in hosts where host.state == "online" {
+        for host in hosts where host.state == "online" && host.relay != true {
             let there = DaemonClient(link: wrapped.link(for: host.id))
             try await there.connect(startIfNeeded: false)
             print("fake-device: \(host.name) projects → \(try await projects(there))")
+            let agents = try await there.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(), returning: [Agent].self)
+            print("fake-device: \(host.name) agents → \(agents.count)")
         }
     }
 }

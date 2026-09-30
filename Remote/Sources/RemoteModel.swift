@@ -1082,6 +1082,18 @@ final class RemoteModel {
                    let account = try? notification.params?.decode(RuntimeAccount.self) {
                     self.accounts[account.runtimeID] = account
                 }
+                // The Mac's set-up moved to a control plane (058, T085): go there, as
+                // this device, without pairing again.
+                if notification.method == DaemonAPI.Notification.controlMoved, !self.pairedWithControlPlane,
+                   let moved = try? notification.params?.decode(DaemonAPI.ControlMoved.self) {
+                    do {
+                        try RemoteControl.adoptMove(moved, device: self.deviceID)
+                        note("moved: the control plane is now at \(moved.url)")
+                        self.pairedWithControlPlane = true
+                    } catch {
+                        note("moved: could not keep the new address: \(error)")
+                    }
+                }
                 if notification.method == DaemonAPI.Notification.deviceChanged,
                    let change = try? notification.params?.decode(DaemonAPI.DeviceNotification.self),
                    change.id == self.deviceID {

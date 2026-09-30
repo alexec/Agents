@@ -28,7 +28,9 @@ struct HostPaths: Sendable, Equatable {
         if let root = environment[StoreLocations.rootVariable], !root.isEmpty {
             let base = URL(fileURLWithPath: (root as NSString).expandingTildeInPath, isDirectory: true).standardizedFileURL
             scratch = true
-            hostRoot = base.appendingPathComponent("host", isDirectory: true)
+            // An old set-up there (a daemon's root, the way the window kept it) is taken
+            // over where it is, copying nothing (058, T083); otherwise a fresh one beside.
+            hostRoot = Self.isOldSetUp(base) ? base : base.appendingPathComponent("host", isDirectory: true)
             controlHome = base.appendingPathComponent("control", isDirectory: true)
             port = environment["AGENTS_HOST_PORT"].flatMap(Int.init) ?? 18791
             let hash = base.path.utf8.reduce(UInt64(1469598103934665603)) { ($0 ^ UInt64($1)) &* 1099511628211 }
@@ -40,6 +42,14 @@ struct HostPaths: Sendable, Equatable {
             controlHome = support.appendingPathComponent("Agents Control", isDirectory: true)
             port = 8791
             suffix = "standard"
+        }
+    }
+
+    /// A daemon's root from before the control plane: agents, projects or paired devices.
+    static func isOldSetUp(_ root: URL) -> Bool {
+        let files = FileManager.default
+        return ["agents", "projects.json", "devices.json"].contains {
+            files.fileExists(atPath: root.appendingPathComponent($0).path)
         }
     }
 

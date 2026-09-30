@@ -22,6 +22,19 @@ enum RemoteControl {
     private static var membershipFile: URL { folder.appendingPathComponent("control-client.json") }
     private static var keyFile: URL { folder.appendingPathComponent("control-client-key") }
     private static var relayKeyFile: URL { folder.appendingPathComponent("control-relay-key.pub") }
+    /// Present when the membership came from a move (T085): the key is this device's own,
+    /// the one it paired with the Mac under, not `control-client-key`.
+    private static var movedFile: URL { folder.appendingPathComponent("control-client-moved") }
+
+    /// Told over the old link where the control plane is now (058, T085): keep it, as a
+    /// pairing would, with this device's own key, which the move gave the control plane.
+    static func adoptMove(_ moved: DaemonAPI.ControlMoved, device: UUID) throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let membership = ControlMembership(client: device, controlKey: moved.controlKey, addresses: [], name: moved.name,
+                                           url: moved.url, pin: moved.pin)
+        try membership.save(membershipFile)
+        try Data().write(to: movedFile, options: .atomic)
+    }
 
     /// The relay's key, as the control plane named it in `control/status`, over a
     /// connection this device had already proved and checked the pin of. Without it
@@ -66,17 +79,38 @@ enum RemoteControl {
     static func forget() {
         try? FileManager.default.removeItem(at: membershipFile)
         try? FileManager.default.removeItem(at: relayKeyFile)
+        try? FileManager.default.removeItem(at: movedFile)
     }
 
     /// The link the Remote's model is built on while paired with a control plane.
     static func link() -> (any DaemonLink)? {
-        guard let membership, let key = try? ControlAgreement.loadOrMake(file: keyFile),
+        guard let membership else { return nil }
+        if FileManager.default.fileExists(atPath: movedFile.path) { return movedLink(membership) }
+        guard let key = try? ControlAgreement.loadOrMake(file: keyFile),
               let dial = try? ControlCodeUse.clientDial(membership, privateKey: key, kind: kind.rawValue, dial: dial) else {
             return nil
         }
         let relayed: @Sendable () async throws -> any LineTransport = {
             guard let relayKey else { throw RelayTrouble.notPaired }
             return try await ControlCodeUse.relayedDial(membership, privateKey: key, relayKey: relayKey,
+                                                        channel: CloudKitRelayChannel())()
+        }
+        return ControlPlaneLink(dial: dial, relayed: relayed)
+    }
+}
+
+extension RemoteControl {
+    /// A moved device's link: the same, with the key it paired with the Mac under.
+    static func movedLink(_ membership: ControlMembership) -> (any DaemonLink)? {
+        guard let client = membership.client,
+              let key = try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup),
+              let shared = try? key.controlClientKey(controlKey: membership.controlKey, client: client),
+              let dial = try? ControlCodeUse.clientDial(membership, sharedKey: shared, kind: kind.rawValue, dial: dial) else {
+            return nil
+        }
+        let relayed: @Sendable () async throws -> any LineTransport = {
+            guard let relayKey else { throw RelayTrouble.notPaired }
+            return try await ControlCodeUse.relayedDial(membership, sharedKey: shared, sealing: key, relayKey: relayKey,
                                                         channel: CloudKitRelayChannel())()
         }
         return ControlPlaneLink(dial: dial, relayed: relayed)

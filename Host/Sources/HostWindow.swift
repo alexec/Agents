@@ -10,11 +10,13 @@ struct HostWindow: View {
     @Environment(HostModel.self) private var model
     @State private var joinCode = ""
     @State private var confirmingSwitch = false
+    @State private var moving = false
 
     var body: some View {
         @Bindable var model = model
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                if HostMove.offered(model.paths) { MoveStrip(moving: $moving) }
                 thisMac
                 if model.settings.role == .none {
                     firstChoice
@@ -40,6 +42,7 @@ struct HostWindow: View {
         .frame(minWidth: 620, idealWidth: 680, minHeight: 420)
         .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $model.showingPairing) { PairingSheet().environment(model) }
+        .sheet(isPresented: $moving) { MoveSheet().environment(model) }
         .task {
             while !Task.isCancelled {
                 await model.refresh()

@@ -1,3 +1,4 @@
+import AgentsKit
 import AgentsKitCore
 import ControlPlaneKit
 import Foundation
@@ -14,6 +15,7 @@ import Musl
 //   agents-control serve --home DIR [--no-bonjour] [--key-fd N] [--store-credentials-fd N]
 //   agents-control code (--client operator|device | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
+//   agents-control move --from ROOT     an old set-up's devices into this store, once (T084)
 //   agents-control install-script      the script a server runs to become a host
 //   agents-control store check [--store URL]
 //   agents-control store copy --from URL --to URL
@@ -179,6 +181,10 @@ func code() async {
         let minutes = value("--minutes").flatMap(Double.init) ?? ControlCode.lifetime / 60
         let shown = try await codes.issue(purpose, lifetime: minutes * 60)
         print(shown.text)
+        // The line a server runs to join with it (T070), for Agents Host to run over ssh.
+        if arguments.contains("--command"), case .host = purpose {
+            print("command\t" + HostInstallScript.command(url: url, pin: settings.pin, code: shown.text))
+        }
     } catch {
         fail("\(error)")
     }
@@ -211,6 +217,27 @@ func copyStore() async {
     }
 }
 
+/// The move (058, T084): an old root's paired devices become device clients here, with
+/// their own keys, and this Mac's host is the home host. The old root is only read. Then
+/// the servers the old window reached by ssh, one per line, for Agents Host to enrol.
+func move() async {
+    guard let from = value("--from") else { fail("say --from ROOT, the old set-up's folder") }
+    let locations = StoreLocations(root: URL(fileURLWithPath: (from as NSString).expandingTildeInPath, isDirectory: true))
+    let records = ControlRecords(store: store())
+    do {
+        try await records.load()
+        guard await records.settings != nil else {
+            fail("this store has no control plane yet: start one with `agents-control serve` first")
+        }
+        try await ControlMove.prepare(records, from: locations)
+        let devices = ControlRecords.legacyDevices(at: locations.devices)
+        print("moved \(devices.count) devices: \(devices.map(\.name).joined(separator: ", "))")
+        for server in ControlMove.servers(of: locations) { print("server\t\(server.sshName)\t\(server.label)") }
+    } catch {
+        fail("\(error)")
+    }
+}
+
 func list(hosts: Bool) async {
     let records = ControlRecords(store: store())
     do {
@@ -230,6 +257,7 @@ case "serve": await serve()
 case "code": await code()
 case "hosts": await list(hosts: true)
 case "clients": await list(hosts: false)
+case "move": await move()
 case "store" where arguments.dropFirst().first == "check": await checkStore()
 case "store" where arguments.dropFirst().first == "copy": await copyStore()
 case "install-script": print(HostInstallScript.text, terminator: "")

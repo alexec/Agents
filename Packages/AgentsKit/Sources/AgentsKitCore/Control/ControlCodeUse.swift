@@ -49,6 +49,19 @@ public enum ControlCodeUse {
                                  name: code.name, url: code.url, pin: code.pin)
     }
 
+    /// How a moved device dials (T085): with the key it already shares with the control
+    /// plane, derived where its private key lives (a Secure Enclave key cannot leave).
+    public static func clientDial(_ membership: ControlMembership, sharedKey: Data, kind: String,
+                                  dial: @escaping Dial) throws -> @Sendable () async throws -> any LineTransport {
+        guard let text = membership.url, let url = URL(string: text), let client = membership.client else {
+            throw Failure("that membership has no address; it is from the first build")
+        }
+        let credentials = ControlAuth.Credentials(identity: .client(client), key: sharedKey, kind: kind,
+                                                  controlKey: membership.controlKey)
+        let pin = membership.pin
+        return { try await join(url, pin: pin, as: credentials, dial: dial) }
+    }
+
     /// How a paired client dials, every time, as itself.
     public static func clientDial(_ membership: ControlMembership, privateKey: Data, kind: String,
                                   dial: @escaping Dial) throws -> @Sendable () async throws -> any LineTransport {

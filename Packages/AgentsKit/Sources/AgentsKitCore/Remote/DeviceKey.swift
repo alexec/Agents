@@ -72,6 +72,14 @@ public struct DeviceKey: Sendable {
         return DeviceKey(publicKey: key.publicKey.x963Representation, holder: .software(key))
     }
 
+    /// What this key proves to a control plane as client `client` (058, T085): the same
+    /// bytes `ControlAuth.clientKey` derives from a raw key, so a device paired the old
+    /// way, its key perhaps in the Secure Enclave, dials the new way as itself.
+    public func controlClientKey(controlKey: Data, client: UUID) throws -> Data {
+        try sharedKey(with: controlKey, salt: ControlAuth.clientSalt, id: client.uuidString)
+            .withUnsafeBytes { Data($0) }
+    }
+
     /// The secret this key and `peer` share, for `purpose` and `id`: what both ends of a
     /// control plane's link derive their key from (058, ControlKeys).
     public func sharedKey(with peer: Data, salt: String, id: String) throws -> SymmetricKey {

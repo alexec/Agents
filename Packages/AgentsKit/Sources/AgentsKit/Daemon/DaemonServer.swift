@@ -244,6 +244,7 @@ public final class DaemonServer: @unchecked Sendable {
                 DaemonLog.shared.write(binding.pairing == true
                     ? "socket: a connection now carries a device that is pairing"
                     : "socket: a connection now carries device \(binding.id?.uuidString ?? "(not yet named)")")
+                if binding.pairing != true { self.tellMoved(identity.id) }
                 return .success([:])
             }
             // A device naming itself, by saying which it is or announcing its key. On a
@@ -261,6 +262,7 @@ public final class DaemonServer: @unchecked Sendable {
             if method == DaemonAPI.Method.surfaceIdentify,
                let who = try? params?.decode(DaemonAPI.SurfaceIdentification.self) {
                 identity.surface = .device(who.id)
+                if identity.role == .device { self.tellMoved(identity.id) }
             }
             return await handler(identity.context, method, params)
         }
@@ -312,6 +314,18 @@ public final class DaemonServer: @unchecked Sendable {
     /// queue still receives what the daemon said in the order it said it.
     public func broadcast(_ method: String, _ params: JSONValue?) {
         broadcast(method, params, to: { _ in true })
+    }
+
+    /// After a move (058, T085): a device that connects the old way, through the bridge or
+    /// the relay, is told where the control plane is now, once it has said which it is.
+    /// A moment later, so the answer to what it asked goes first.
+    private func tellMoved(_ connection: UUID) {
+        let file = url.deletingLastPathComponent().appendingPathComponent("control-moved.json")
+        guard let data = try? Data(contentsOf: file), let moved = try? JSONValue.parse(data) else { return }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.broadcast(DaemonAPI.Notification.controlMoved, moved, to: { $0.id == connection })
+            DaemonLog.shared.write("socket: told a device where the control plane is now")
+        }
     }
 
     /// Tell only the connections `wanted` picks, in the same order and on the same

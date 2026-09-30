@@ -39,6 +39,8 @@ let package = Package(
         .executableTarget(name: "agents-control", dependencies: [
             "ControlPlaneKit",
             .product(name: "AgentsKitCore", package: "AgentsKit"),
+            // `move` (T084): reads an old set-up's devices and servers.
+            .product(name: "AgentsKit", package: "AgentsKit"),
             .product(name: "NIOSSL", package: "swift-nio-ssl"),
         ]),
         .testTarget(name: "ControlPlaneKitTests", dependencies: [

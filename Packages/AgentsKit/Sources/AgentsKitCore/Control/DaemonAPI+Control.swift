@@ -38,6 +38,8 @@ public extension DaemonAPI.Notification {
     static let controlClientChanged = "control/clientChanged"
     static let controlPairingChanged = "control/pairingChanged"
     static let controlInstallProgress = "control/installProgress"
+    /// To a device on the old way, after the move (058, T085): `ControlMoved`.
+    static let controlMoved = "control/moved"
 }
 
 public extension DaemonAPI {
@@ -191,6 +193,22 @@ public extension DaemonAPI {
             self.client = client
             self.relayed = relayed
             self.through = through
+        }
+    }
+
+    /// `control/moved`: where the control plane is now, told to a device over the old
+    /// bridge link or relay it already trusts. It dials there as itself, with the key it
+    /// paired with, which the move gave the control plane (T084–T085).
+    struct ControlMoved: Codable, Sendable, Hashable {
+        public var url: String
+        public var pin: String?
+        public var controlKey: Data
+        public var name: String
+        public init(url: String, pin: String?, controlKey: Data, name: String) {
+            self.url = url
+            self.pin = pin
+            self.controlKey = controlKey
+            self.name = name
         }
     }
 

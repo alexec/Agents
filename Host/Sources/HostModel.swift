@@ -54,6 +54,10 @@ final class HostModel {
     var pairingGrant: Grant = .operator
     var showingPairing = false
 
+    /// The host code `runHere` made last: what the move tells devices, with its address,
+    /// pin and key (T085).
+    private(set) var lastHostCode: ControlCode?
+
     init() {
         let settings = HostSettings.load(HostPaths.current)
         self.settings = settings
@@ -175,6 +179,7 @@ final class HostModel {
             problem = "The control plane did not start. Its log is at \(paths.controlLog.path)."
             return
         }
+        lastHostCode = ControlCode(text: text)
         busy = "Starting this Mac's host…"
         if !services.hostJoined {
             do { try services.leaveCode(text) } catch { problem = "\(error)"; return }

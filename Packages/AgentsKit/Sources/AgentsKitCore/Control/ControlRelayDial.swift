@@ -17,9 +17,22 @@ public extension ControlCodeUse {
             throw Failure("that membership has no address; it is from the first build")
         }
         let key = try ControlAuth.clientKey(privateKey: privateKey, peer: membership.controlKey, client: client)
+        return try relayedDial(membership, sharedKey: key, sealing: try DeviceKey.software(privateKey: privateKey),
+                               relayKey: relayKey, channel: channel, onTrouble: onTrouble)
+    }
+
+    /// The same for a moved device (T085), whose key may be in the Secure Enclave: the key
+    /// it shares with the control plane, and its own key to seal frames with.
+    static func relayedDial(_ membership: ControlMembership, sharedKey key: Data, sealing: any RelayKey, relayKey: Data,
+                            channel: any RelayChannel,
+                            onTrouble: @escaping @Sendable (RelayTrouble) -> Void = { _ in })
+        throws -> @Sendable () async throws -> any LineTransport {
+        guard let text = membership.url, let url = URL(string: text), let origin = ControlAuth.origin(url),
+              let client = membership.client else {
+            throw Failure("that membership has no address; it is from the first build")
+        }
         let credentials = ControlAuth.Credentials(identity: .client(client), key: key, kind: "relay",
                                                   controlKey: membership.controlKey, relayingFor: client)
-        let sealing = try DeviceKey.software(privateKey: privateKey)
         return {
             let relayed = RelayTransport(channel: channel, device: client, key: sealing, macKey: relayKey,
                                          onTrouble: onTrouble)
