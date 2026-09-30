@@ -20,8 +20,56 @@ struct RuntimeAccountView: View {
     private var account: RuntimeAccount { model.accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID) }
     private var name: String { RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID }
 
-    private var notice: RuntimeLaunch.SignInNotice? {
-        RuntimeLaunchCatalog.launch(for: runtimeID).signInNotice
+    private var launch: RuntimeLaunch { RuntimeLaunchCatalog.launch(for: runtimeID) }
+    private var notice: RuntimeLaunch.SignInNotice? { launch.signInNotice }
+
+    /// Ready or not, a runtime that signs in one provider at a time (049: OpenCode) keeps
+    /// offering the next one.
+    private var offersSignIn: Bool {
+        !account.authMethods.isEmpty && (account.state != .ready || launch.providerSignOutWord != nil)
+    }
+
+    /// How to sign a provider out, for a runtime with no sign-out the app can call.
+    private var providerSignOut: String? {
+        account.authMethods.compactMap(\.terminalCommand).first.flatMap(launch.providerSignOutCommand(from:))
+    }
+
+    /// What servers borrow of this Mac's sign-in, and what stays here and why (049 D7), for a
+    /// runtime whose server runs borrow it. Nil with no servers.
+    private var serversNote: String? {
+        #if AGENTS_STORE
+        // The store window reads no sign-in of this Mac's; Agents Host lends them (058).
+        return nil
+        #else
+        guard !model.hosts.isEmpty, let reading = MacFileSignIn(runtimeID: runtimeID)?.read() else { return nil }
+        if reading.unreadable { return "Servers can’t borrow this Mac’s \(name) sign-in: Agents couldn’t read it." }
+        var said: [String] = []
+        if !reading.lent.isEmpty {
+            said.append("Servers borrow this Mac’s \(Self.names(reading.lent)) \(reading.lent.count == 1 ? "key" : "keys") for each run, and keep nothing.")
+        } else {
+            said.append("Servers use \(name)’s free models until this Mac signs in to a provider with a key.")
+        }
+        if !reading.kept.isEmpty {
+            said.append("\(Self.names(reading.kept)) \(reading.kept.count == 1 ? "stays" : "stay") on this Mac: a browser sign-in renews itself, and a server renewing it would leave this Mac’s copy stale.")
+        }
+        return said.joined(separator: " ")
+        #endif
+    }
+
+    private static func names(_ providers: [String]) -> String {
+        providers.map(providerName).formatted(.list(type: .and))
+    }
+
+    /// How a provider is named, from the id its sign-in file keys it by: the name OpenCode's
+    /// own model menu shows for the common ones, else the id with its first letter raised.
+    static func providerName(_ id: String) -> String {
+        let known = ["anthropic": "Anthropic", "openai": "OpenAI", "github-copilot": "GitHub Copilot",
+                     "google": "Google", "groq": "Groq", "openrouter": "OpenRouter", "xai": "xAI",
+                     "mistral": "Mistral", "deepseek": "DeepSeek", "opencode": "OpenCode Zen",
+                     "amazon-bedrock": "Amazon Bedrock", "azure": "Azure", "vercel": "Vercel"]
+        if let name = known[id] { return name }
+        let words = id.replacingOccurrences(of: "-", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
     }
 
     var body: some View {
@@ -32,7 +80,7 @@ struct RuntimeAccountView: View {
                 .foregroundStyle((account.state == .needsSignIn ? StateTint.failure : .none)
                                     .style(or: .secondary))
 
-            if account.state != .ready, !account.authMethods.isEmpty {
+            if offersSignIn {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(account.orderedAuthMethods, id: \.id) { method in
                         Button(method.name ?? method.id) {
@@ -54,6 +102,16 @@ struct RuntimeAccountView: View {
                         Text(notice.text).appText(.fine).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Link(notice.linkTitle, destination: notice.link).appText(.fine)
+                    }
+                    if let providerSignOut {
+                        Text("To sign a provider out, run \(providerSignOut) in a terminal.")
+                            .appText(.fine).foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let servers = serversNote {
+                        Text(servers).appText(.fine).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }

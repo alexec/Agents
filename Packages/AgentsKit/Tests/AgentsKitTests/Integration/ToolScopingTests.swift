@@ -97,9 +97,9 @@ struct ToolScopingTests {
         #expect(params?["cwd"]?.stringValue == work.standardizedFileURL.path)
     }
 
-    /// And the briefing that goes with it is the one for that runtime. Cursor keeps its
-    /// goal tools, so it is told about them; Claude loses its scheduling tools, so the
-    /// sentence forbidding cron entries is not spent on it.
+    /// And the briefing that goes with it is the one for that runtime. Cursor has nothing
+    /// left over and nothing denied, so it is told nothing about tools; Claude loses its
+    /// scheduling tools, so the sentence forbidding cron entries is not spent on it.
     @Test func theBriefingIsTheOneForThatRuntime() async throws {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher()
@@ -112,7 +112,8 @@ struct ToolScopingTests {
 
         let sent = await launcher.allAgents.first?.promptContent?.arrayValue ?? []
         #expect(sent.last?["text"]?.stringValue == Briefing.text(for: ToolPolicyCatalog.cursor))
-        #expect(sent.last?["text"]?.stringValue?.contains("CreateGoal") == true)
+        #expect(sent.last?["text"]?.stringValue?.contains("CreateGoal") == false,
+                "Cursor's goal tools are its own to use, not residue to be warned about")
     }
 
     /// The other shape making it out of the building. An allow list is a different
@@ -129,6 +130,7 @@ struct ToolScopingTests {
         let params = await launcher.lastAgent?.newSessionParams
         let tools = params?["_meta"]?["agentProfile"]?["tools"]?.arrayValue?.compactMap(\.stringValue)
         #expect(tools?.contains("ask_user_question") == true)
-        #expect(tools?.contains("spawn_subagent") == false)
+        #expect(tools?.contains("spawn_subagent") == true, "Grok's own sub-agents, back since 2026-09-29")
+        #expect(tools?.contains("scheduler_create") == false, "and what is still denied stays out")
     }
 }

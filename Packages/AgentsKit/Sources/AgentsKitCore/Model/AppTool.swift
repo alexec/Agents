@@ -85,16 +85,6 @@ public enum AppTool {
     /// Say that something happened, as a `custom.` event.
     public static let publishEvent = "publish_event"
 
-    // Two for moving this agent itself (053), shaped like Claude Code's own worktree
-    // tools, which are taken away. Offered to every agent: moving yourself is not
-    // managing anyone. Neither name ends with another tool's name.
-
-    /// Move into a new worktree, or one already there, when the turn ends.
-    public static let enterWorktree = "enter_worktree"
-
-    /// Move back to the project folder, keeping or removing the worktree left.
-    public static let exitWorktree = "exit_worktree"
-
     // The older names for the two halves of `finishTurn`, kept since 2026-09-23 (023).
     // The briefing that named them is sent once and lives in the runtime's own
     // history, so a conversation begun before that date and resumed after it calls

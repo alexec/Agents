@@ -108,7 +108,7 @@ struct ControlClientsPage: View {
         if let link, link.relayed {
             let through = link.through ?? "a Mac"
             return ("\(kind) · connected through \(through) (iCloud relay)",
-                    Text("\(kind) · connected through ") + Text(through).fontWeight(.semibold) + Text(" (iCloud relay)"))
+                    Text("\(kind) · connected through \(Text(through).fontWeight(.semibold)) (iCloud relay)"))
         }
         let how: String = if link != nil || isYou {
             "connected directly"

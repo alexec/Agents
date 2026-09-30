@@ -62,9 +62,9 @@ struct AppServiceTests {
         // The four agent tools (028 + park) sit after the workflow tool, before the
         // older names, for an agent that may use them — which is the default.
         // archive_agent is no longer offered. The three lease tools (036) follow
-        // them, for every agent, then the three event tools (042), and the two move
-        // tools (053) after those. The two session tools (065) sit after the agent
-        // tools, for every agent.
+        // them, for every agent, then the three event tools (042). Moving (053) rides on
+        // finish_turn. The two session tools (065) sit after the agent tools, for every
+        // agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
@@ -75,7 +75,6 @@ struct AppServiceTests {
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
                 AppService.publishEventToolName,
-                AppService.enterWorktreeToolName, AppService.exitWorktreeToolName,
                 AppService.toolName, AppService.reportOutcomeToolName])
 
         let finish = tools.first?["inputSchema"]

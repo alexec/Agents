@@ -91,6 +91,13 @@ public enum PersonalDotAgents {
              adopts: false, takesStdioServers: true, pluginHandover: .none,
              appHomeSkillsFolder: "config/skills",
              noInstructions: "Antigravity reads no personal instructions file when the app starts it"),
+        // Measured against OpenCode 1.18.33 (049 research R8): it lists `~/.agents/skills`
+        // itself, and with no `~/.config/opencode/AGENTS.md` of the person's it follows
+        // `~/.claude/CLAUDE.md` — Claude's link to the shared file. So nothing is ever
+        // written in OpenCode's own folders (049 FR-019). Plugins are its own npm packages.
+        Rule(runtimeID: "opencode", configFolder: ".config/opencode", readsSharedSkills: true,
+             skillsFolder: nil, instructionsFile: ".claude/CLAUDE.md",
+             adopts: false, takesStdioServers: true, pluginHandover: .none),
     ]
 
     public static func rule(for runtimeID: String) -> Rule? {

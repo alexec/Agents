@@ -140,7 +140,7 @@ public final class EventStore: @unchecked Sendable {
         if let handle { return handle }
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: locations.events.path) {
-            FileManager.default.createFile(atPath: locations.events.path, contents: nil)
+            _ = FileManager.default.createFile(atPath: locations.events.path, contents: nil)
         }
         let opened = try FileHandle(forWritingTo: locations.events)
         handle = opened

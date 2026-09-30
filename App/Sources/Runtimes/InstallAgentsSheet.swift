@@ -53,12 +53,13 @@ private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
-/// One agent: here and where, being installed, or a way to get it. The same row in the
+/// One agent: here or not here, being installed, or a way to get it. The same row in the
 /// sheet, in Settings ▸ Agent Runtimes and under an empty project list.
 ///
 /// Laid out the way an `AgentRow` is: the state as an icon on the left, the name on the
 /// top line and where it stands on the line under it, so this list reads like every
-/// other list of things in the app.
+/// other list of things in the app. A runtime that is here says nothing further: which
+/// binary it is, and where that binary sits, is the app's business and not the reader's.
 struct RuntimeInstallRow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
@@ -81,10 +82,10 @@ struct RuntimeInstallRow: View {
 
     @ViewBuilder private var detail: some View {
         switch status.availability {
-        case .available(let path, _):
-            Text(path)
-                .appText(.supporting).foregroundStyle(.secondary)
-                .lineLimit(1).truncationMode(.middle)
+        case .available:
+            // Nothing: where the binary sits is the app's business, and the tick beside
+            // the name already says it is here.
+            EmptyView()
         case .installing(let progress):
             Text(progress.map { "\($0)…" } ?? "Starting…")
                 .appText(.supporting).foregroundStyle(.secondary)
@@ -144,10 +145,9 @@ struct RuntimeInstallRow: View {
     /// manifest the app carries; nil for everything else.
     static func downloadNote(for runtimeID: String) -> String? {
         guard let archive = bundledArchives[runtimeID],
-              let platform = archive.manifest.platforms[ArchiveToolset.macPlatform],
+              let platform = archive.manifest.platforms[archive.macPlatformKey],
               platform.knownBroken == nil else { return nil }
-        let vendor = platform.url.host()?.hasSuffix("google.com") == true ? "Google" : (platform.url.host() ?? "")
-        return "\(ArchiveToolset.megabytes(platform.size)) from \(vendor)"
+        return "\(ArchiveToolset.megabytes(platform.size)) from \(ArchiveToolset.vendor(of: archive))"
     }
 
     private static let bundledArchives: [String: ArchiveToolset] = Bundle.main

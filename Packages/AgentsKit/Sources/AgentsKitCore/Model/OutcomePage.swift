@@ -2,9 +2,8 @@ import Foundation
 
 /// One turn of a conversation: what the person asked, and everything up to the next ask.
 ///
-/// Drawn concise by default: the ask, and the last block of the rest. A block is a tool
-/// call or something the agent said; nothing else in a turn is drawn. Clicked, a turn is
-/// drawn normal: the ask and every block in it.
+/// Drawn concise by default: the ask, every answer, and the latest work. When that work
+/// is a tool call, the text immediately before it is shown too.
 public struct ChatTurn: Identifiable, Hashable, Sendable {
     /// The ask's id, or the first item's for what came before any ask.
     public var id: UUID
@@ -12,17 +11,21 @@ public struct ChatTurn: Identifiable, Hashable, Sendable {
     /// Every tool call and text block, in order. Empty for a turn known only by its
     /// summary until its entries are fetched.
     public var blocks: [TranscriptItem]
-    /// The one a concise turn shows.
+    /// The latest work block, also kept for summaries written by older builds.
     public var last: TranscriptItem?
+    /// The work and answers visible while this turn is concise, in transcript order.
+    public var concise: [TranscriptItem]
     /// Where it sits in the transcript, for a turn known only by its summary.
     public var range: Range<Int>?
 
     public init(id: UUID, ask: TranscriptItem?, blocks: [TranscriptItem], last: TranscriptItem?,
+                concise: [TranscriptItem]? = nil,
                 range: Range<Int>? = nil) {
         self.id = id
         self.ask = ask
         self.blocks = blocks
         self.last = last
+        self.concise = concise ?? blocks.conciseTurnItems()
         self.range = range
     }
 
@@ -32,6 +35,8 @@ public struct ChatTurn: Identifiable, Hashable, Sendable {
                   ask: summary.ask.map(TranscriptItem.entry),
                   blocks: [],
                   last: summary.last.map(TranscriptItem.entry),
+                  concise: summary.concise?.map(TranscriptItem.entry)
+                    ?? summary.last.map { [.entry($0)] } ?? [],
                   range: summary.start..<summary.end)
     }
 }
@@ -44,16 +49,19 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     public var start: Int
     public var end: Int
     public var ask: TranscriptEntry?
-    /// The last block, cut down to what a concise turn draws: a tool call keeps its
-    /// description and nothing it produced.
+    /// The last work block, retained for summaries written by older builds.
     public var last: TranscriptEntry?
+    /// Optional so summaries written before concise turns kept context still decode.
+    public var concise: [TranscriptEntry]?
 
-    public init(id: UUID, start: Int, end: Int, ask: TranscriptEntry?, last: TranscriptEntry?) {
+    public init(id: UUID, start: Int, end: Int, ask: TranscriptEntry?, last: TranscriptEntry?,
+                concise: [TranscriptEntry]? = nil) {
         self.id = id
         self.start = start
         self.end = end
         self.ask = ask
         self.last = last
+        self.concise = concise
     }
 
     /// The turn made of these entries, the first at `start` in the transcript.
@@ -61,8 +69,9 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
         let ask = entries.first.flatMap { TranscriptItem.entry($0).isPersonsAsk ? $0 : nil }
         let items = TranscriptEntry.display(entries)
         let last = items.last(where: \.isBlock).flatMap(\.concise)
+        let concise = items.conciseTurnItems().compactMap(\.concise)
         return TurnSummary(id: ask?.id ?? entries.first?.id ?? UUID(), start: start,
-                           end: start + entries.count, ask: ask, last: last)
+                           end: start + entries.count, ask: ask, last: last, concise: concise)
     }
 
     /// Cut a run of the transcript, the first entry at `start`, into turns. Each ask
@@ -87,8 +96,9 @@ extension Array where Element == TranscriptItem {
         func close() {
             guard let first = current.first else { return }
             let ask = first.isPersonsAsk ? first : nil
-            let blocks = current.filter(\.isBlock)
-            turns.append(ChatTurn(id: first.id, ask: ask, blocks: blocks, last: blocks.last))
+            let blocks = current.filter { $0.isBlock || $0.isUserInput }
+            turns.append(ChatTurn(id: first.id, ask: ask, blocks: blocks,
+                                  last: blocks.last(where: \.isBlock)))
         }
         for item in self {
             if item.isPersonsAsk {
@@ -109,17 +119,30 @@ extension TranscriptItem {
         return false
     }
 
-    /// A tool call or something the agent said: all a turn draws besides the ask.
+    /// A tool call or something the agent said: all a turn draws besides the ask. And a
+    /// sandbox that could not start (064), which ends its turn and must be seen to be
+    /// answered, so it is the block a concise turn shows.
     public var isBlock: Bool {
         switch self {
         case .toolRun: return true
         case .entry(let entry):
-            if case .agentMessage = entry.kind { return true }
-            return false
+            switch entry.kind {
+            case .agentMessage, .sandboxFailure: return true
+            default: return false
+            }
         }
     }
 
-    /// This block as a summary keeps it: text whole, a tool call as its last call with
+    /// Answers to questions and permission choices are the person's input mid-turn.
+    public var isUserInput: Bool {
+        guard case .entry(let entry) = self else { return false }
+        switch entry.kind {
+        case .elicitationAnswered, .permissionAnswered: return true
+        default: return false
+        }
+    }
+
+    /// This item as a summary keeps text whole, and a tool run's last call with
     /// only its description.
     var concise: TranscriptEntry? {
         switch self {
@@ -137,6 +160,22 @@ extension TranscriptItem {
     }
 }
 
+extension Array where Element == TranscriptItem {
+    /// Keep answers wherever they occurred, plus the latest work and its immediate
+    /// preceding text when the latest work is a tool call.
+    func conciseTurnItems() -> [TranscriptItem] {
+        guard let last = lastIndex(where: \.isBlock) else { return filter(\.isUserInput) }
+        var selected = Set([last])
+        if last > 0, case .toolRun = self[last],
+           case .entry(let entry) = self[last - 1], case .agentMessage = entry.kind {
+            selected.insert(last - 1)
+        }
+        return enumerated().compactMap { index, item in
+            selected.contains(index) || item.isUserInput ? item : nil
+        }
+    }
+}
+
 extension ToolCall {
     /// What the agent said the call was for, when it said.
     public var describedAs: String? {
@@ -146,5 +185,36 @@ extension ToolCall {
     }
 
     /// The one line a tool call is drawn as in a turn.
-    public var turnLine: String { describedAs ?? "Used a tool" }
+    public var turnLine: String {
+        if let describedAs { return describedAs }
+        if let kind = kind?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !kind.isEmpty {
+            let label: String
+            switch kind {
+            case "read": label = "Read file"
+            case "edit": label = "Edit file"
+            case "delete": label = "Delete file"
+            case "move": label = "Move file"
+            case "search": label = "Search files"
+            case "execute": label = "Run command"
+            case "fetch": label = "Fetch data"
+            case "other": label = Self.readableToolName(name) ?? "Used a tool"
+            default: label = Self.readableToolName(name) ?? Self.readableToolName(kind) ?? "Used a tool"
+            }
+            if let name = Self.readableToolName(name), !label.localizedCaseInsensitiveContains(name) {
+                return "\(label) (\(name))"
+            }
+            return label
+        }
+        return Self.readableToolName(name) ?? "Used a tool"
+    }
+
+    private static func readableToolName(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let words = value
+            .replacingOccurrences(of: "([a-z0-9])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "[_./-]+", with: " ", options: .regularExpression)
+            .split(whereSeparator: \.isWhitespace)
+        guard !words.isEmpty else { return nil }
+        return words.map { $0.capitalized }.joined(separator: " ")
+    }
 }

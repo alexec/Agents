@@ -80,6 +80,8 @@ final class AppModel {
     var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
     /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
     private(set) var clientPermissions = ClientPermissionSettings()
+    /// Each runtime's command sandbox default (064).
+    private(set) var sandboxSettings = SandboxSettings()
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
     /// said — and for ever against one too old to know the method, which is drawn the
@@ -128,6 +130,7 @@ final class AppModel {
             guard showsSpending, showsSpending != oldValue else { return }
             showsResources = false
             showsEvents = false
+            showsRuntimes = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -145,6 +148,7 @@ final class AppModel {
             guard showsResources, showsResources != oldValue else { return }
             showsSpending = false
             showsEvents = false
+            showsRuntimes = false
             selection = nil
             openWorkflow = nil
         }
@@ -157,6 +161,23 @@ final class AppModel {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
             showsResources = false
+            showsRuntimes = false
+            selection = nil
+            openWorkflow = nil
+        }
+    }
+
+    /// Whether the window is showing Runtimes: each runtime and where its allowance
+    /// stands (065). A page like Events, and not persisted for the same reason.
+    ///
+    /// It used to be in Settings, which is where a control belongs. What it says is
+    /// the state of the machine, and it changes without anybody touching a setting.
+    var showsRuntimes = false {
+        didSet {
+            guard showsRuntimes, showsRuntimes != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
             selection = nil
             openWorkflow = nil
         }
@@ -192,12 +213,18 @@ final class AppModel {
         showsResources = true
     }
 
+    /// Runtimes, from the prompt bar's warning about starting on one that is out.
+    func showRuntimes() {
+        showsRuntimes = true
+    }
+
     /// An agent's chat, from the Resources page or a capsule naming its holder: its
     /// own project first, as a banner does, so the sidebar and the page agree.
     func openAgent(_ agentID: UUID) {
         showsSpending = false
         showsResources = false
         showsEvents = false
+        showsRuntimes = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         } else if let gone = work.tombstones[agentID] {
@@ -223,7 +250,7 @@ final class AppModel {
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
         get {
-            showsEvents ? .events : showsResources ? .resources
+            showsEvents ? .events : showsResources ? .resources : showsRuntimes ? .runtimes
                 : showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project)
         }
         set {
@@ -234,11 +261,14 @@ final class AppModel {
                 showResources()
             case .events:
                 showEvents()
+            case .runtimes:
+                showRuntimes()
             case .project(let key):
                 showsSpending = false
                 showsResources = false
                 showsEvents = false
-                    showProject(key)
+                showsRuntimes = false
+                showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
                 // come and go — must not empty the detail column. Nothing is picked
@@ -348,6 +378,11 @@ final class AppModel {
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
+    /// The next agent's own sandbox choice (064). Nil follows its runtime's default.
+    var draftSandbox: SandboxChoice? { didSet { draftSandboxRefusal = nil } }
+    /// Why the last start of a new agent did not happen, when its sandbox is why (064):
+    /// shown over the prompt with **Start without sandbox**.
+    var draftSandboxRefusal: DaemonAPI.SandboxWillNotStart?
     /// Folders beyond the working one, and MCP servers, for the agent about to start.
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
@@ -705,7 +740,7 @@ final class AppModel {
     /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
     /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
-        try? await client.call(DaemonAPI.Method.workflowsRun,
+        _ = try? await client.call(DaemonAPI.Method.workflowsRun,
                                DaemonAPI.WorkflowRequest(folder: summary.folder,
                                                          workflowID: summary.workflowID))
     }
@@ -713,7 +748,7 @@ final class AppModel {
     /// Put one away, or bring it back. The person's answer to a workflow an agent
     /// wrote, which is what makes writing one not need asking first.
     func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async {
-        try? await client.call(DaemonAPI.Method.workflowsArchive,
+        _ = try? await client.call(DaemonAPI.Method.workflowsArchive,
                                DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
                                                                 workflowID: summary.workflowID,
                                                                 archived: archived))
@@ -973,6 +1008,43 @@ final class AppModel {
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
             _ = try? await client(for: host.id).call(DaemonAPI.Method.clientPermissionsSet, settings,
                                                      returning: ClientPermissionSettings.self)
+        }
+    }
+
+    /// One agent's own sandbox choice, nil to follow its runtime's default (064).
+    /// The agent comes back by `agent/changed`, as for any other change to it.
+    func setAgentSandbox(_ agentID: UUID, _ choice: SandboxChoice?) async {
+        _ = await attempt {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsSetSandbox,
+                                                           DaemonAPI.SetSandboxRequest(agentID: agentID, choice: choice))
+        }
+    }
+
+    /// The sandbox card's answer (064, FR-007a): only this agent is changed.
+    func answerSandbox(_ agentID: UUID, carryOn: Bool) async {
+        _ = await attempt {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsAnswerSandbox,
+                                                           DaemonAPI.AnswerSandboxRequest(agentID: agentID, carryOn: carryOn))
+        }
+    }
+
+    func refreshSandboxSettings() async {
+        guard let settings = try? await client.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
+                                                    returning: SandboxSettings.self) else { return }
+        sandboxSettings = settings
+    }
+
+    /// Save a runtime's sandbox default and copy it to every connected server (064): each
+    /// server applies it to the runtimes installed there, as the Mac does.
+    func setSandboxDefault(_ choice: SandboxChoice, for runtimeID: String) async {
+        let wanted = sandboxSettings.setting(choice, for: runtimeID)
+        sandboxSettings = wanted
+        guard let saved = try? await client.call(DaemonAPI.Method.sandboxSet, wanted,
+                                                 returning: SandboxSettings.self) else { return }
+        sandboxSettings = saved
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.sandboxSet, saved,
+                                                     returning: SandboxSettings.self)
         }
     }
 
@@ -1355,6 +1427,10 @@ final class AppModel {
             guard let settings = try? params?.decode(ClientPermissionSettings.self) else { return }
             clientPermissions = settings
 
+        case DaemonAPI.Notification.sandboxChanged:
+            guard let settings = try? params?.decode(SandboxSettings.self) else { return }
+            sandboxSettings = settings
+
         default:
             break
         }
@@ -1413,6 +1489,9 @@ final class AppModel {
         }
         hosts.toolsetWanted = { [weak self] id, runtimeID in
             guard let self else { return false }
+            // One that works with no sign-in goes wherever this Mac has it (049: OpenCode's free
+            // models); on an "own sign-in only" server too, since nothing is lent to install it.
+            if RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn != nil { return self.hasOnThisMac(runtimeID) }
             guard !(self.hosts.host(id)?.ownSignInOnly ?? false) else { return false }
             // A key in Settings, or this Mac's own sign-in relayed (047).
             #if AGENTS_STORE
@@ -1441,14 +1520,14 @@ final class AppModel {
             let control = DaemonClient(link: controlLink.controlLink)
             while !Task.isCancelled {
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(3))) != nil {
-                    await self?.controlPlaneDidAnswer()
+                    self?.controlPlaneDidAnswer()
                     await self?.syncControlHosts(control)
                     for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
                         await self?.syncControlHosts(control)
                     }
-                    if !Task.isCancelled { await self?.controlPlaneWent() }
+                    if !Task.isCancelled { self?.controlPlaneWent() }
                 } else if !Task.isCancelled {
-                    await self?.controlPlaneWent()
+                    self?.controlPlaneWent()
                 }
                 try? await Task.sleep(for: .seconds(2))
             }
@@ -1509,6 +1588,12 @@ final class AppModel {
         }
     }
 
+    /// Whether this Mac's own runtime is installed and can start (049: what puts OpenCode on
+    /// its servers).
+    func hasOnThisMac(_ runtimeID: String) -> Bool {
+        runtimes.first { $0.id == runtimeID }?.availability.isAvailable ?? false
+    }
+
     private func receivedFromServer(_ host: HostID, _ method: String, _ params: JSONValue?) async {
         // What is about the whole of a daemon rather than its work is the Mac's alone in
         // the model: a server's spending is kept beside it, and a server's wakefulness,
@@ -1534,6 +1619,8 @@ final class AppModel {
                 if refused.lent { credentials.markRefused(refused.runtime) }
                 // This Mac's own sign-in was refused through the relay (056): sign in here.
                 if refused.relayed == true { signInRuntimeID = refused.runtime }
+                // A key this Mac's sign-in file lent (049): its sheet names the command.
+                if refused.borrowed == true { signInRuntimeID = refused.runtime }
             }
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
@@ -1591,6 +1678,9 @@ final class AppModel {
         // And Cursor/Grok permission mode (061).
         _ = try? await server.call(DaemonAPI.Method.clientPermissionsSet, clientPermissions,
                                    returning: ClientPermissionSettings.self)
+        // And each runtime's sandbox default (064).
+        _ = try? await server.call(DaemonAPI.Method.sandboxSet, sandboxSettings,
+                                   returning: SandboxSettings.self)
         // And what the Mac knows of the plans it relays (052, R6): a server's Codex
         // spends the Mac's ChatGPT plan, so the Mac's word that it is out is the server's.
         if let allowances = work.runtimeAllowances {
@@ -1650,6 +1740,7 @@ final class AppModel {
         async let cost: Void = refreshCostState()
         async let retention: Void = refreshRetentionState()
         async let clientPermissions: Void = refreshClientPermissions()
+        async let sandbox: Void = refreshSandboxSettings()
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
@@ -1659,7 +1750,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates)
+                   transcript, runtimeStates, sandbox)
         #if DEBUG
         openFromLaunchArguments()
         #endif
@@ -2314,7 +2405,8 @@ final class AppModel {
                                              draftID: draftID,
                                              additionalDirectories: draftFolders,
                                              mcpServers: draftServers,
-                                             worktree: draftWorktree)
+                                             worktree: draftWorktree,
+                                             sandbox: draftSandbox)
         do {
             _ = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
@@ -2332,7 +2424,13 @@ final class AppModel {
             // asking to watch it: the agent appears in the project's list and you stay
             // where you were, free to say the next thing. Starting three pieces of work
             // in a row should not mean coming back twice.
+            draftSandboxRefusal = nil
             return true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.sandboxWillNotStart {
+            // Said over the prompt, which keeps what was typed, with the way on (064).
+            draftSandboxRefusal = try? error.data?.decode(DaemonAPI.SandboxWillNotStart.self)
+            if draftSandboxRefusal == nil { fail(error, on: selectedProjectHost) }
+            return false
         } catch {
             fail(error, on: selectedProjectHost)
             return false
@@ -2791,6 +2889,7 @@ final class AppModel {
         }
     }
 
+    @discardableResult
     private func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
         do {
             try await work()

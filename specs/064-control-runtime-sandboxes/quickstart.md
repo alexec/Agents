@@ -15,20 +15,18 @@ Record the commands, results and any live check that could not run at the end of
 2. Run the ClientPermission, ToolPolicy, PoolSwitch and ContinueWith suites, then the full suite. The suite is flaky under load; compare several runs against main before blaming the branch.
 3. Build both Xcode schemes and the Linux gate. Run `scripts/docs.sh check`.
 
-## 2. Probes (research R9)
+## 2. Routes (research R9)
 
-On a scratch root:
-- Run `sandbox/probe` for Grok, Cursor, Copilot and Gemini on the Mac.
-- Run it on the devbox through the test-servers skill.
-- Record each `SandboxProbe` here.
-- For Claude, try the R7 `_meta` route. For Codex, capture its sandbox startup error on the devbox as a fixture.
-- A runtime that does not confirm stays **Runtime controlled**. Note it here and in `docs/reference/runtimes.md`.
+There is no probe in the app (Alex, 2026-09-29). Re-measure a route with
+`scripts/sandbox-probe.sh <runtime> <label> [--arg …] [--env …] [--meta …] [--mode …]`
+whenever a runtime changes, and compare with research R9. Copilot's `--sandbox` and
+`--no-sandbox` are to be measured once its quota resets.
 
 ## 3. Mac, on a scratch app (run-app skill)
 
 1. **Settings ▸ Agent Runtimes**:
    - Every runtime shows **Command sandbox** set to **As configured by runtime**, with its explanation.
-   - Antigravity shows **Unavailable** with the FR-013 reason.
+   - Cursor and Copilot show **Runtime controlled**, Antigravity and OpenCode **No sandbox**, each with why; Gemini has no **On**.
    - Codex's Off says approval prompts turn off too.
 2. **Grok default Off**:
    - Start a Grok agent. The launch in `daemon.log` has `--sandbox off`.
@@ -57,7 +55,7 @@ On a scratch root:
 4. **Continue without sandbox**:
    - Repeat the failure, then choose **Continue without sandbox**.
    - The override becomes Off, the mode Full access, and the original task resumes without retyping. That is at most three actions (SC-005).
-5. **No recovery when Off is unavailable**: with Off unavailable (stale probe), the card gives the reason and has no Continue button.
+5. **No recovery without an Off route**: a runtime with no Off route shows the card with the reason and no Continue button.
 6. **Ordinary denial**: an ordinary command denied inside a working Grok or Cursor sandbox shows a normal tool failure and no card (SC-004).
 7. **New agent**: if the failure happens at `session/new` of a new agent, the form keeps the prompt and **Start without sandbox** works.
 
@@ -72,4 +70,40 @@ Stop scratch processes by pid, then remove the scratch roots and fixtures copied
 
 ## Results
 
-_Not run yet._
+**2026-09-29, branch `agents/work-github-issue-40`.**
+
+Automated:
+- `swift test --filter Sandbox`: 30 tests in 5 suites pass (settings, catalog, detector against
+  every fixture, launch, recovery), three runs in a row.
+- Full suite (2,865 tests) under load: 27 failures, 26 of which pass when rerun alone; the one
+  left, `noCallSiteNamesAStateColourItself`, names `App/Sources/Projects/ProjectSettingsSheet.swift:113`,
+  which this branch does not touch (main's, from 909b1004).
+- Both Xcode schemes (Agents for macOS, Remote for the generic iOS simulator) build; the Linux
+  gate (`scripts/build-linux-agentsd.sh --check`) passes; `scripts/docs.sh check` is clean.
+
+Live, on scratch roots (the app itself run inside an outer `sandbox-exec`, so every runtime's
+own Seatbelt fails to nest, as in research R11), built from 0a22385c/d8b892c0:
+- **Claude, On**: the command failed with `sandbox_apply: Operation not permitted`; the turn ran
+  to its end; the agent stopped `sandboxFailed` with the card (recovery offered, 0 commands
+  counted); nothing was written outside. **Continue without sandbox**: override Off, the prompt
+  sent again, the same command wrote outside the project, the state reads Sandbox off.
+- **Codex, as configured (its mode)**: the failure showed only in its reply, and was recognised
+  there; **Continue without sandbox** set Full access and the command wrote outside.
+- **Grok, On**: the start was refused with `sandboxWillNotStart` and Grok's own words ("Refusing
+  to start with its protections missing"), `offOffered: true`; the start with the sandbox Off
+  went ahead (and then stopped on Grok's spent balance, which is Grok's).
+- Found and fixed on the way: ToolSearch and the app's own `finish_turn` counted as work done;
+  a Gemini whose sandbox is on had no deadline at all and would have waited for ever.
+- **Screenshot**: the card from a real Claude failure, waiting, with **Keep stopped**,
+  **Continue without sandbox** and the pill reading **Sandbox on**: `look/8-card-real-failure.png`.
+- **Server (devbox, Linux ARM64, the branch's Linux agentsd)**: Claude's default set **On** in
+  Settings reached the server (`sandbox/state` there: `claude: on`). A new Claude agent there
+  was refused with `sandboxWillNotStart` and Claude's own words ("Sandbox required but
+  unavailable … bubblewrap (bwrap) not installed, socat not installed"), `offOffered: true`.
+  The same start with `sandbox: off` started with **Sandbox off** and, its permission
+  answered, wrote outside its project. The details came back wrapped as `string("…")`; fixed
+  to take the error's text (the server walked still ran the earlier build).
+- **Not walked**: **Start without sandbox** over a new chat's prompt on screen. It needs typing
+  into the front window while Alex was using the Mac; the refusal it answers is proven above
+  over the socket on the Mac and the server.
+

@@ -124,17 +124,37 @@ struct AgentCard: View {
                 .help(AgentsModel.carryOnHelp(for: agent))
             }
             // Here rather than over the chat, as on the Mac: the chat is for reading.
-            if agent.state != .archived {
+            if let action = agent.parkAction {
                 Button {
-                    Task { await model.archive(agent.id) }
+                    Task { await model.perform(action, on: agent.id) }
                 } label: {
-                    Label("Archive", systemImage: "archivebox")
+                    Label(ParkWords.label(action), systemImage: ParkWords.symbol(action))
                 }
                 .disabled(model.isStale)
+                .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
+            }
+            if agent.state != .archived {
+                archiveButton
+            }
+        }
+        // As a row in Mail: a swipe uncovers Archive, and a long one archives. The page
+        // is a `swipeActionsContainer`.
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if agent.state != .archived {
+                archiveButton.tint(.gray)
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var archiveButton: some View {
+        Button {
+            Task { await model.archive(agent.id) }
+        } label: {
+            Label("Archive", systemImage: "archivebox")
+        }
+        .disabled(model.isStale)
     }
 
     /// Whether the Mac is bringing this chat back by itself after a restart.

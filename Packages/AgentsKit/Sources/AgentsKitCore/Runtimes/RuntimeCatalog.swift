@@ -28,6 +28,13 @@ import Foundation
 /// `gemini` found on the PATH, because its ACP surface moves between releases. It speaks
 /// ACP itself with `--acp`. The version is `App/Resources/toolsets/gemini/manifest.json`'s
 /// (0.61.0 when this was written), and a test holds the two together.
+///
+/// OpenCode (049) has Cursor's trap twice over. Two programs are called `opencode`: SST's,
+/// now `anomalyco/opencode`, which speaks ACP as `opencode acp`, and the archived Go agent
+/// of the same name (continued as Charm's Crush), still on Macs from its Homebrew tap, with no
+/// `acp` at all. The vendor's installer also lands in `~/.opencode/bin`, which the login
+/// shell never searches. So `opencode` is never looked up: only the app's own copy, the
+/// pinned release program for this Mac from GitHub, is run, by its full path.
 public enum RuntimeCatalog {
     public static let claude = Runtime(
         id: "claude",
@@ -97,7 +104,20 @@ public enum RuntimeCatalog {
         installPage: URL(string: "https://antigravity.google/docs/ide/extensions")!,
         usesAppCopyOnly: true)
 
-    public static var builtIn: [Runtime] { [claude, grok, copilot, cursor, codex, gemini, antigravity] + extra }
+    /// OpenCode (049): SST's open-source agent, one program per platform from its GitHub
+    /// releases, signed in to any of its providers or none (its Zen models are free). The
+    /// app's settings for it are passed at launch; see `ToolPolicyCatalog.opencode`.
+    public static let opencode = Runtime(
+        id: "opencode",
+        name: "OpenCode",
+        executable: "opencode",
+        arguments: ["acp"],
+        install: .toolset(runtimeID: "opencode"),
+        installPage: URL(string: "https://opencode.ai/docs/")!,
+        usesAppCopyOnly: true)
+
+    /// `builtIn[0]` is the default runtime, so a new one is appended.
+    public static var builtIn: [Runtime] { [claude, grok, copilot, cursor, codex, gemini, antigravity, opencode] + extra }
 
     /// Runtimes a host adds for itself at start-up, before anything reads the catalog: the
     /// demo runtime of a review control plane (058, T092). Empty everywhere else.
@@ -108,7 +128,8 @@ public enum RuntimeCatalog {
     /// them (053). Measured, not assumed, by `RuntimeMoveLiveTests` through each ACP
     /// adapter (research R3, 2026-09-26): Claude, Copilot, Cursor and Codex did; Grok
     /// answers "Path not found", because it files sessions by folder. Gemini and
-    /// Antigravity are left out until measured. A runtime not here is never offered the
+    /// Antigravity are left out until measured. OpenCode loads its conversation in a new
+    /// folder but keeps working in the old one (049, research R9), so it is left out too. A runtime not here is never offered the
     /// move tools, and cannot be moved, so nobody loses a conversation to a move.
     public static let carriesConversationAcrossFolders: Set<String> = ["claude", "copilot", "cursor", "codex"]
 

@@ -62,7 +62,7 @@ public enum RemitCategory: String, Codable, Hashable, Sendable, CaseIterable {
         case .suggestions:
             "Use `\(AppTool.finishTurn)` at the end of the turn."
         case .workingFolder:
-            "Use `\(AppTool.enterWorktree)` or `\(AppTool.exitWorktree)` to change where you work."
+            "Give `worktree` or `leave_worktree` to `\(AppTool.finishTurn)` to change where you work."
         }
     }
 }
@@ -340,7 +340,11 @@ public struct ToolPolicy: Hashable, Sendable {
     public var sessionMeta: JSONValue? {
         switch lever {
         case .sessionMetaDenyList(let path):
-            Self.nesting(.array(removed.map { .string($0.name) }), at: path, beside: [:])
+            // Nothing to deny is not a message. An empty list says the client thought
+            // about tools and had none to hide, which is a different thing from saying
+            // nothing at all, and a runtime we have nothing to hide from gets the
+            // nothing — as it always has.
+            removed.isEmpty ? nil : Self.nesting(.array(removed.map { .string($0.name) }), at: path, beside: [:])
         case .sessionMetaAllowList(let path, let keep, let extra):
             Self.nesting(.array(keep.map(JSONValue.string)), at: path, beside: extra)
         case .launchArguments, .environmentJSON, .file, .words:

@@ -16,32 +16,20 @@ Stored as a string. An unknown value decodes as `runtime`, so it never widens ac
 
 | Field | Type | Notes |
 |---|---|---|
-| `defaults` | `[RuntimeID: SandboxChoice]` | A missing key means `runtime` (FR-003c, SC-006) |
-| `probes` | `[RuntimeID: SandboxProbe]` | Results for this host only; never pushed to servers |
+| `defaults` | `[RuntimeID: SandboxChoice]` | A missing key means `runtime` (FR-003c, SC-006). A choice the catalog does not offer for that runtime is dropped on save |
 
-A missing or corrupt file is treated as empty. A corrupt file is set aside, as `ClientPermissionStore` does. The Mac pushes `defaults` to connected servers; each server keeps its own `probes`.
+A missing file is empty; an unreadable one is set aside, as `ClientPermissionStore` does. The Mac pushes it to connected servers. There is no probe result: routes are the catalog's (research R9, Alex 2026-09-29).
 
-## SandboxProbe
-
-| Field | Type | Notes |
-|---|---|---|
-| `version` | String | Runtime or toolset version probed |
-| `host` | `mac` / `linux` | |
-| `off`, `on` | `confirmed` / `rejected` / `noDifference` | |
-| `policyForced` | Bool | A vendor policy requires sandboxing |
-| `probedAt` | Date | |
-
-When `version` differs from the installed version, the probe is stale and counts as unconfirmed.
-
-## SandboxCapability (derived, not stored)
+## SandboxCatalog.Entry (code, not stored)
 
 | Field | Notes |
 |---|---|
-| `choices` | The actionable subset of `runtime`, `on`, `off`. `runtime` is always present except for Antigravity |
-| `unavailableReason` | Unverified integration, policy, stale probe or unsupported host |
-| `route` | `.arguments`, `.environment`, `.mode`, `.meta` or `.none`, from `SandboxCatalog` |
-| `couplesApprovals` | True for Codex only |
-| `explanation` | Wording for Settings and menus (FR-014) |
+| `route` | `.arguments(on:off:)` (Grok), `.environment(on:off:)` (Gemini, On nil), `.claudeMeta`, `.codexMode`, `.fixed(SandboxState)` |
+| `measuredOn` | The version the route was measured on |
+| `why` | The sentence for a runtime with no choice, or a choice it lacks |
+| `failurePatterns` | Setup-failure text from the fixtures, never a bare "Operation not permitted" |
+| `readsReply` | Codex: a failed sandbox shows only in the reply |
+| `hangsWhenOn` | Gemini: a sandbox that is on never answers `initialize` |
 
 ## Agent (new fields)
 
@@ -56,10 +44,9 @@ Both are added to `CodingKeys`, `init(from:)` and `encode`. Older records decode
 
 | Field | Type | Notes |
 |---|---|---|
-| `state` | `on` / `off` / `runtimeControlled` / `unavailable` | What the header capsule shows |
+| `state` | `on` / `off` / `runtimeControlled` / `none` | What the capsule shows (`none`: No sandbox) |
 | `requested` | `SandboxChoice` | After resolution |
-| `reason` | String? | For example "limited by the agent that started it", "blocked by policy", "unverified for agy_acp_server 1.2.1" |
-| `appliedAt` | Date | The spawn it came from |
+| `reason` | String? | For example "Limited by the agent that started it" |
 
 For Codex under `runtime`, `state` is read from the mode: `agent-full-access` means `off`; otherwise `on`.
 
@@ -70,7 +57,7 @@ For Codex under `runtime`, `state` is read from the mode: `agent-full-access` me
 | `runtimeID` | RuntimeID | |
 | `detail` | String | The matched text, trimmed. Shown under "Show error details" |
 | `recoveryOffered` | Bool | Off is actionable for this runtime and host |
-| `unavailableReason` | String? | Why recovery is not offered |
+| `hang` | Bool | Gemini never answered; the card's words are the app's |
 | `completedToolCalls` | Int | Nonzero means recovery sends a continuation instead of the prompt |
 | `resolution` | `pending` / `keptStopped` / `continued` | The card turns into a plain note once resolved |
 
@@ -80,7 +67,7 @@ A new `sandboxFailed` value. It ends the turn, leaves the agent stopped and wait
 
 ## Rules
 
-- A resolved `off` needs `off` in `capability.choices`. Otherwise the choice becomes `runtime` and the state is `unavailable` with a reason (FR-008).
+- A resolved choice must be in `SandboxCatalog.choices` for the runtime; otherwise it becomes `runtime` (FR-002, FR-008).
 - Codex: `sandboxOverride == .off` ⇔ the mode is `agent-full-access`. Setting either updates the other (FR-005a–c).
 - Helper: if the caller's `effectiveSandbox.state == .on`, the helper's resolved choice cannot be `off` (R10).
 - A change to a default or override never touches a live process. It applies at the next spawn (FR-012).

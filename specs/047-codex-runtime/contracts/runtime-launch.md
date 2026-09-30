@@ -42,9 +42,15 @@ The login environment (`LoginShellPath.environment()`), as for every runtime, pl
 | `CODEX_HOME`, `CODEX_PATH` | never set by the app | never set by the app |
 
 ```json
-{"features":{"multi_agent":false,"memories":false,"apps":false,"goals":false,
-             "default_mode_request_user_input":true}}
+{"features":{"apps":false,"default_mode_request_user_input":true,"goals":true,
+             "in_app_local_automation":false,"memories":false,"multi_agent":true,
+             "sleep_tool":false}}
 ```
+
+`multi_agent` and `goals` are `true` because Codex's own sub-agents and its own task list are
+tools the app no longer takes away (057 for the sub-agents, 2026-09-29 for the goals). The
+sub-agents arrive as their own sessions and the app draws them; the goals do not, because the app
+reads no runtime's goal metadata — Codex keeps the tool and the app says nothing about it.
 
 If the adapter rejects the config, it fails the session open with a message naming
 `CODEX_CONFIG` (R5). That surfaces as the agent's ending sentence and is caught by the
@@ -52,8 +58,9 @@ live test.
 
 ## ACP
 
-- `initialize`: the app's existing client capabilities. The app does not advertise the
-  JetBrains AIR, goal or native-subagent extensions, so the adapter keeps them off.
+- `initialize`: the app's existing client capabilities, which since 057 advertise JetBrains'
+  `asyncTasks` and `nativeSubagentSessions` — the two that carry a subagent's own updates — so
+  the adapter is free to use them. It does not advertise, and does not read, a goal extension.
 - `session/new`: `cwd`, `mcpServers` = the app's MCP server (stdio), as for the others.
 - Unsigned: error `-32000` "Authentication required", which becomes `needsSignIn`.
 - Sign-in: `authenticate {methodId}` with `chat-gpt` (browser), `chat-gpt-device-code`

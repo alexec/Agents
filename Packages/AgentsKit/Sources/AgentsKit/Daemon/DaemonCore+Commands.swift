@@ -16,14 +16,18 @@ extension DaemonCore {
     public func options(_ request: DaemonAPI.OptionsRequest,
                         connection: UUID? = nil) async throws -> DaemonAPI.OptionsResponse {
         let draftID = UUID()
+        // As the runtime's default would have it: an override chosen in the form after
+        // this makes the start let the draft go (064).
+        let sandbox = resolveSandbox(runtimeID: request.runtimeID, override: nil, starter: nil).choice
         let pending = Task { [self] in
             try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
-                                   mcpServers: request.mcpServers)
+                                   mcpServers: request.mcpServers, sandbox: sandbox)
         }
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
                                 mcpServers: request.mcpServers,
                                 personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
                                 pending: pending,
+                                sandbox: sandbox,
                                 connection: connection)
         let key = OptionCache.key(runtimeID: request.runtimeID, cwd: request.cwd,
                                   mcpServers: request.mcpServers)
@@ -241,7 +245,9 @@ extension DaemonCore {
         // They are read once, when the session is made, so reusing a session that
         // never heard about a server would attach it in name only.
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
+        let sandbox = resolveSandbox(runtimeID: request.runtimeID, override: request.sandbox, starter: starter)
         let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == cwd
+                                     && $0.sandbox == sandbox.choice
                                      && $0.mcpServers == request.mcpServers
                                      && $0.personalServers == PersonalDotAgents.mcpStamp(home: locations.personalHome)
                                      && $0.managesAgents == (starter == nil) ? $0 : nil }
@@ -260,7 +266,8 @@ extension DaemonCore {
             if let draft { Task { [self] in await endDraft(draft) } }
             let made = try await freshSession(runtimeID: request.runtimeID, cwd: cwd,
                                               mcpServers: request.mcpServers,
-                                              managesAgents: starter == nil)
+                                              managesAgents: starter == nil,
+                                              sandbox: sandbox.choice)
             session = made.session
             sessionID = made.sessionID
             appToken = made.appToken
@@ -274,7 +281,8 @@ extension DaemonCore {
                           cwd: cwd,
                           title: Agent.fallbackTitle(from: request.prompt),
                           runtimeSessionID: sessionID,
-                          startOptions: request.startOptions,
+                          startOptions: codexStartOptions(request.startOptions, runtimeID: request.runtimeID,
+                                                          choice: sandbox.choice),
                           advertisedOptions: await session.options,
                           availableCommands: await session.commands,
                           additionalDirectories: request.additionalDirectories,
@@ -295,6 +303,7 @@ extension DaemonCore {
                           chainDepth: chainDepth,
                           worktree: placed?.worktree,
                           startRequestID: request.requestID)
+        agent.sandboxOverride = request.sandbox
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
         // so an agent stranded in it by a failed write would keep `isHoldingAgents`
@@ -327,7 +336,8 @@ extension DaemonCore {
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
 
-        await session.apply(request.startOptions)
+        await noteRefused(await session.apply(agent.startOptions), agentID: agent.id)
+        noteEffectiveSandbox(agentID: agent.id, choice: sandbox.choice, reason: sandbox.reason)
         agent = agents[agent.id] ?? agent
         changed(agent)
 
@@ -378,7 +388,8 @@ extension DaemonCore {
     /// will not take without an agent ever existing to be refused on.
     func freshSession(runtimeID: String, cwd: URL,
                               mcpServers: [MCPServer] = [],
-                              managesAgents: Bool = true) async throws -> MadeSession {
+                              managesAgents: Bool = true,
+                              sandbox: SandboxChoice = .runtime) async throws -> MadeSession {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "There is no runtime called \(runtimeID).")
@@ -404,11 +415,13 @@ extension DaemonCore {
         var launched: ACPSession?
         do {
             let session = try LentEnvironment.$value.withValue(lent) {
-                try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+                try LaunchSandbox.$value.withValue(sandbox) {
+                    try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+                }
             }
             launched = session
             await hearAuthStatus(from: session, runtimeID: runtimeID)
-            let handshake = try await session.initialize()
+            let handshake = try await initializeWatchingForHang(session, runtimeID: runtimeID, choice: sandbox)
             // Recorded here rather than after the session is made, because the reason
             // to have it is the case where making the session fails: what comes back
             // then is "needs signing in", and the ways to sign in are in the handshake.
@@ -419,14 +432,33 @@ extension DaemonCore {
                                                capabilities: handshake.agentCapabilities?.mcpCapabilities)
             let result = try await session.newSession(cwd: cwd,
                                                       mcpServers: servers,
-                                                      meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
+                                                      meta: sessionMeta(runtimeID: runtimeID, cwd: cwd,
+                                                                        sandbox: sandbox))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
         } catch {
+            // Its sandbox first (064): read before the process is ended, while its last
+            // words are still to hand.
+            let sandboxFailure = isSandboxHang(error)
+                ? SandboxWords.cardBody(runtimeID: runtimeID, name: runtime.name, hang: true)
+                : await sandboxStartFailure(runtimeID: runtimeID, error: error, session: launched)
             // A runtime that would not make a session is still a running process.
             await launched?.end(gracePeriod: .seconds(1))
+            if let sandboxFailure {
+                throw Self.sandboxWillNotStart(runtime: runtime, detail: sandboxFailure)
+            }
             throw startFailure(error, runtime: runtime, runtimeID: runtimeID)
         }
+    }
+
+    /// A runtime that would not start because of its sandbox (064), said so the form can
+    /// keep the prompt and offer **Start without sandbox**.
+    static func sandboxWillNotStart(runtime: Runtime, detail: String) -> JSONRPCError {
+        let data = DaemonAPI.SandboxWillNotStart(runtimeID: runtime.id, detail: detail,
+                                                 offOffered: SandboxCatalog.canTurnOff(runtime.id))
+        return JSONRPCError(code: DaemonAPI.Failure.sandboxWillNotStart,
+                            message: SandboxWords.cardTitle(runtime.name) + ".",
+                            data: try? JSONValue.encoding(data))
     }
 
     /// What a runtime that would not make a session is said to have done.
@@ -456,6 +488,8 @@ extension DaemonCore {
     /// is how Claude says a sign-in has expired (the same test 043 uses on servers).
     static func signInReason(_ error: any Error) -> String? {
         switch error {
+        case let error as JSONRPCError where unsignedProvider(error) != nil:
+            return "it isn’t signed in to \(unsignedProvider(error) ?? "that provider")"
         case let error as JSONRPCError where error.isAuthRequired || isAuthenticationFailure(error):
             return error.message
         case ACPSessionError.needsSignIn:
@@ -511,7 +545,7 @@ extension DaemonCore {
         try await enqueue(request, first: true)
     }
 
-    private func enqueue(_ request: DaemonAPI.PromptRequest, first: Bool) async throws {
+    func enqueue(_ request: DaemonAPI.PromptRequest, first: Bool) async throws {
         guard var agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
@@ -883,9 +917,14 @@ extension DaemonCore {
         await syncCodexPlugins(before: agent.runtimeID)
         linkGeminiProjectPlugins(runtimeID: agent.runtimeID, cwd: agent.cwd)
         let session: ACPSession
+        // Resolved at every pick-up, which is every turn: a changed default or override
+        // applies from the next turn and never mid-command (064, FR-012).
+        let sandbox = resolveSandbox(for: agent)
         do {
             session = try LentEnvironment.$value.withValue(lent) {
-                try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+                try LaunchSandbox.$value.withValue(sandbox.choice) {
+                    try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+                }
             }
         } catch {
             runtimeFailed(agentID: agent.id)
@@ -893,12 +932,22 @@ extension DaemonCore {
         }
         await hearAuthStatus(from: session, runtimeID: runtime.id)
         do {
-            return try await connect(session, runtime: runtime, for: agent)
+            return try await connect(session, runtime: runtime, for: agent, sandbox: sandbox)
         } catch {
+            // Its sandbox first (064), read while the process's last words are to hand.
+            let sandboxFailure = isSandboxHang(error)
+                ? SandboxWords.cardBody(runtimeID: runtime.id, name: runtime.name, hang: true)
+                : await sandboxStartFailure(runtimeID: runtime.id, error: error, session: session)
             // Nothing holds a session that never made it into `live`, and a process
             // left behind here is a runtime nobody will ever end.
             dropAppTokens(for: agent.id)
             await session.end(gracePeriod: .seconds(1))
+            if let sandboxFailure {
+                // Stopped with the card; what was queued stays queued (FR-007a).
+                await recordSandboxFailure(agentID: agent.id, detail: sandboxFailure, hang: isSandboxHang(error))
+                await move(agent.id, on: .sandboxWouldNotStart)
+                throw Self.sandboxWillNotStart(runtime: runtime, detail: sandboxFailure)
+            }
             runtimeFailed(agentID: agent.id)
             // The same refusal a new agent gets, with the ways to sign in, so a window
             // shows the sign-in rather than the protocol's error. Said to every window
@@ -912,8 +961,9 @@ extension DaemonCore {
         }
     }
 
-    private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent) async throws -> ACPSession {
-        let handshake = try await session.initialize()
+    private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent,
+                         sandbox: (choice: SandboxChoice, reason: String?)) async throws -> ACPSession {
+        let handshake = try await initializeWatchingForHang(session, runtimeID: agent.runtimeID, choice: sandbox.choice)
         // Picked back up with what `~/.agents` holds now, not what it held at the start (054).
         reconcileHome()
 
@@ -929,7 +979,7 @@ extension DaemonCore {
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).
-        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd)
+        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd, sandbox: sandbox.choice)
 
         // Only what this start learns is carried across the awaits below. The rest of
         // the record is read again at the end: a start takes seconds, and a prompt
@@ -983,8 +1033,11 @@ extension DaemonCore {
         // preview, which starts nothing (052, US5).
         remember(OptionCache.Entry(options: refreshed, commands: commands),
                  for: OptionCache.key(runtimeID: updated.runtimeID, cwd: updated.cwd, mcpServers: updated.mcpServers))
+        updated.startOptions = codexStartOptions(updated.startOptions, runtimeID: updated.runtimeID,
+                                                 choice: sandbox.choice)
         changed(updated)
-        await session.apply(updated.startOptions)
+        await noteRefused(await session.apply(updated.startOptions), agentID: agent.id)
+        noteEffectiveSandbox(agentID: agent.id, choice: sandbox.choice, reason: sandbox.reason)
         live[agent.id] = session
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
@@ -1163,6 +1216,14 @@ extension DaemonCore {
             }
         }
         _ = retrying
+        // A command whose sandbox could not be set up (064, FR-006a): the turn ran to its
+        // end, and the agent stops there with the card.
+        if let runtimeID = agents[agentID]?.runtimeID,
+           let failed = sandboxFailure(in: result.evidence, runtimeID: runtimeID) {
+            await recordSandboxFailure(agentID: agentID, detail: failed.detail,
+                                       completedToolCalls: failed.completedToolCalls)
+            reason = .sandboxFailed
+        }
         if crossedItsLimit {
             // The limit is what this agent stopped for, whatever the turn's own
             // reason was. Said in the app's voice and with the figure it actually
@@ -1314,13 +1375,27 @@ extension DaemonCore {
         // transport threw is for whoever is debugging the runtime, not for the
         // person reading the conversation.
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
+        // Its sandbox first (064): a runtime that fell over because it could not set one up.
+        let evidence = await live[agentID]?.turnEvidence ?? TurnEvidence()
+        if let runtimeID = agents[agentID]?.runtimeID,
+           let detail = await sandboxStartFailure(runtimeID: runtimeID, error: error, session: live[agentID])
+                ?? sandboxFailure(in: evidence, runtimeID: runtimeID)?.detail {
+            await recordSandboxFailure(agentID: agentID, detail: detail)
+            await move(agentID, on: .turnEnded(.sandboxFailed))
+            await releaseRuntime(for: agentID)
+            await applyPendingMove(agentID)
+            return
+        }
         let refused = credentialRefusal(agentID: agentID, error: error)
         let signIn = refused == nil ? Self.signInReason(error) : nil
         let limit = refused == nil && signIn == nil ? recognise(agentID: agentID, error: error) : .none
         if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
+            let signInCommand = RuntimeLaunchCatalog.launch(for: refused.runtime).lentSignIn?.signInCommand ?? ""
             await record(.runtimeNote(refused.relayed == true
                 ? "\(runtimeName) on this Mac needs signing in again."
+                : refused.borrowed == true
+                ? "A provider refused the key this Mac lent \(runtimeName). Sign in to it again on the Mac with \(signInCommand), then send again."
                 : refused.lent
                 ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Agent Runtimes."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
@@ -1636,7 +1711,37 @@ extension DaemonCore {
 
     // MARK: Options and permissions
 
-    public func setOption(_ request: DaemonAPI.SetOptionRequest) async throws -> [ConfigOption] {
+    /// Say which remembered choices a runtime would not take as the agent started, rather
+    /// than let the conversation run on something else unannounced. A model of a provider
+    /// the runtime is not signed in to (049: OpenCode) is a sign-in, and the sheet is
+    /// offered. Each refused choice is forgotten, so the menu shows what is in use.
+    func noteRefused(_ refused: [ACPSession.RefusedOption], agentID: UUID) async {
+        guard !refused.isEmpty, var agent = agents[agentID] else { return }
+        let runtime = RuntimeCatalog.runtime(id: agent.runtimeID)
+        let name = runtime?.name ?? agent.runtimeID
+        for refusal in refused {
+            let choice = refusal.value.stringValue ?? refusal.id
+            // Forgotten either way, so a choice refused once is said once, not every start.
+            agent.startOptions.values.removeValue(forKey: refusal.id)
+            if let error = refusal.error as? JSONRPCError, let provider = Self.unsignedProvider(error) {
+                await record(.runtimeNote("\(name) isn’t signed in to \(provider), so it can’t use \(choice). "
+                                          + "Sign it in from the runtime menu, then pick the model again."), for: agentID)
+                askForSignIn(runtimeID: agent.runtimeID, agentID: agentID)
+            } else {
+                await record(.runtimeNote("\(name) wouldn’t take \(choice) for \(refusal.id), so it kept its own."),
+                             for: agentID)
+            }
+        }
+        changed(agent)
+    }
+
+    public func setOption(_ request: DaemonAPI.SetOptionRequest,
+                          fromSandbox: Bool = false) async throws -> [ConfigOption] {
+        // Codex's mode is its sandbox (064, FR-005c): a mode picked by hand is that agent's
+        // sandbox choice as well. One picked by the sandbox menu already set it.
+        if request.optionID == "mode", !fromSandbox {
+            followCodexMode(request.value, agentID: request.agentID)
+        }
         guard let session = live[request.agentID] else {
             // Nothing is running, so the choice is remembered and applied when the
             // agent is next picked up.
@@ -1650,7 +1755,16 @@ extension DaemonCore {
             await record(.optionChanged(id: request.optionID, value: request.value), for: request.agentID)
             return []
         }
-        let options = try await session.setOption(id: request.optionID, value: request.value)
+        let options: [ConfigOption]
+        do {
+            options = try await session.setOption(id: request.optionID, value: request.value)
+        } catch let error as JSONRPCError where Self.unsignedProvider(error) != nil {
+            // A model of a provider the runtime is not signed in to (049, OpenCode): said
+            // as a sign-in, with the sheet, not as the protocol's "invalid params".
+            guard let agent = agents[request.agentID], let runtime = RuntimeCatalog.runtime(id: agent.runtimeID) else { throw error }
+            askForSignIn(runtimeID: runtime.id, agentID: request.agentID)
+            throw signInNeeded(runtime: runtime, because: Self.signInReason(error) ?? error.message)
+        }
         if var agent = agents[request.agentID] {
             agent.advertisedOptions = options
             agent.startOptions.values[request.optionID] = request.value

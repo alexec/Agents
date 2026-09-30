@@ -234,8 +234,9 @@ public enum DaemonAPI {
         /// The person moving an agent into a worktree or back to its project folder, or
         /// taking back a move still waiting for the turn to end (053).
         public static let agentsMove = "agents/move"
-        /// What the MCP helper relays when an agent calls `enter_worktree` or
-        /// `exit_worktree` (053). The caller is the token.
+        /// What an MCP helper begun before 2026-09-29 relays when its agent calls
+        /// `enter_worktree` or `exit_worktree` (053). The caller is the token. Kept for
+        /// those sessions: a move is now asked for on `finish_turn`.
         public static let agentsMoveSelf = "agents/moveSelf"
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
@@ -268,6 +269,8 @@ public enum DaemonAPI {
         /// daemon answered `credentialWanted`. Held in memory and dropped when the
         /// connection closes; a daemon without `--serve` refuses it (043, D5).
         public static let credentialsLend = "credentials/lend"
+        /// A window lends this Mac's own file sign-in for one runtime (049: OpenCode's).
+        public static let credentialsLendSignIn = "credentials/lendSignIn"
         /// The folders at a path, before there is any project or agent to scope it to:
         /// what the window browses to choose a server folder as a project (037).
         public static let filesBrowse = "files/browse"
@@ -299,6 +302,13 @@ public enum DaemonAPI {
         /// Cursor and Grok permission mode (061). Control only.
         public static let clientPermissionsState = "clientPermissions/state"
         public static let clientPermissionsSet = "clientPermissions/set"
+        /// Each runtime's command sandbox default (064). Reading is also the phone's, for
+        /// "Use runtime default (Off)"; setting is the Mac's alone.
+        public static let sandboxState = "sandbox/state"
+        public static let sandboxSet = "sandbox/set"
+        /// One agent's override (nil clears it), and the card's recovery (064).
+        public static let agentsSetSandbox = "agents/setSandbox"
+        public static let agentsAnswerSandbox = "agents/answerSandbox"
         /// Every runtime's state (065, US4), and the person saying one is back.
         public static let runtimesAllowances = "runtimes/allowances"
         public static let runtimesMarkAvailable = "runtimes/markAvailable"
@@ -398,6 +408,8 @@ public enum DaemonAPI {
         public static let costChanged = "cost/changed"
         /// Cursor and Grok permission mode changed (061).
         public static let clientPermissionsChanged = "clientPermissions/changed"
+        /// A runtime's sandbox default changed (064).
+        public static let sandboxChanged = "sandbox/changed"
         /// `RuntimeAllowances`, whenever a runtime's state changes (065). Debounced to
         /// one a second.
         public static let runtimesAllowancesChanged = "runtimes/allowancesChanged"
@@ -651,12 +663,16 @@ public enum DaemonAPI {
         /// on the way back try again without starting the work twice. `nil` from
         /// callers that do not retry.
         public var requestID: UUID?
+        /// The new agent's own sandbox choice (064). Nil follows the runtime's default.
+        public var sandbox: SandboxChoice?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
                     startOptions: StartOptions = .none, draftID: UUID? = nil,
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
-                    worktree: WorktreeChoice? = nil, requestID: UUID? = nil) {
+                    worktree: WorktreeChoice? = nil, requestID: UUID? = nil,
+                    sandbox: SandboxChoice? = nil) {
+            self.sandbox = sandbox
             self.worktree = worktree
             self.runtimeID = runtimeID
             self.cwd = cwd
@@ -684,6 +700,7 @@ public enum DaemonAPI {
             mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
             worktree = try c.decodeIfPresent(WorktreeChoice.self, forKey: .worktree)
             requestID = try c.decodeIfPresent(UUID.self, forKey: .requestID)
+            sandbox = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandbox)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.
@@ -863,11 +880,15 @@ public enum DaemonAPI {
         /// `park` or `archive`: where the agent asked to be put once the turn is over.
         /// A string, checked at the daemon, and optional for the reason `title` is.
         public var afterwards: String?
+        /// Where the agent asked to move once the turn ends (053). None clears a move
+        /// the agent asked for earlier in the same turn: the last call is the whole
+        /// account of it.
+        public var move: MoveAsk?
 
         public init(token: String, outcome: String, message: String,
                     prompts: [SuggestedPrompt], title: String? = nil,
                     waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
-                    afterwards: String? = nil) {
+                    afterwards: String? = nil, move: MoveAsk? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
@@ -876,6 +897,7 @@ public enum DaemonAPI {
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
             self.afterwards = afterwards
+            self.move = move
         }
     }
 
@@ -1162,6 +1184,38 @@ public enum DaemonAPI {
         public init(agentID: UUID, ceiling: Cost?) {
             self.agentID = agentID
             self.ceiling = ceiling
+        }
+    }
+
+    /// What comes with `sandboxWillNotStart` (064).
+    public struct SandboxWillNotStart: Codable, Sendable, Hashable {
+        public var runtimeID: String
+        public var detail: String
+        public var offOffered: Bool
+        public init(runtimeID: String, detail: String, offOffered: Bool) {
+            self.runtimeID = runtimeID
+            self.detail = detail
+            self.offOffered = offOffered
+        }
+    }
+
+    /// One agent's sandbox override (064). `choice: nil` clears it (FR-003b).
+    public struct SetSandboxRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var choice: SandboxChoice?
+        public init(agentID: UUID, choice: SandboxChoice?) {
+            self.agentID = agentID
+            self.choice = choice
+        }
+    }
+
+    /// The sandbox card's answer (064): carry on without the sandbox, or keep stopped.
+    public struct AnswerSandboxRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var carryOn: Bool
+        public init(agentID: UUID, carryOn: Bool) {
+            self.agentID = agentID
+            self.carryOn = carryOn
         }
     }
 
@@ -1593,6 +1647,10 @@ public enum DaemonAPI {
     public enum Failure {
         public static let runtimeNotFound = -32001
         public static let runtimeWillNotStart = -32002
+        /// The runtime would not start because its command sandbox could not be set up
+        /// (064). Its data is `SandboxWillNotStart`: the form keeps the prompt and offers
+        /// **Start without sandbox** when `offOffered`.
+        public static let sandboxWillNotStart = -32061
         public static let sessionGone = -32003
         public static let folderGone = -32004
         public static let noSuchAgent = -32005
@@ -2229,7 +2287,21 @@ public enum DaemonAPI {
         }
     }
 
-    /// An agent moving itself (053): what it passed to `enter_worktree` or `exit_worktree`.
+    /// A move asked for on `finish_turn` (053).
+    public struct MoveAsk: Codable, Sendable, Equatable {
+        public var target: MoveTarget
+        public var removeLeft: Bool
+        public var discardChanges: Bool
+
+        public init(target: MoveTarget, removeLeft: Bool = false, discardChanges: Bool = false) {
+            self.target = target
+            self.removeLeft = removeLeft
+            self.discardChanges = discardChanges
+        }
+    }
+
+    /// An agent moving itself (053), from a helper begun before the move rode on
+    /// `finish_turn`: what it passed to the `enter_worktree` or `exit_worktree` it had.
     public struct MoveSelfRequest: Codable, Sendable {
         public var token: String
         public var target: MoveTarget
@@ -2552,11 +2624,16 @@ public extension DaemonAPI {
         /// Runtimes whose sign-in this window would relay but cannot now, and why (056), so
         /// a server can say "not signed in" or "couldn't read it". Absent from older windows.
         public var notRelayed: [String: SignInWanted.Reason]?
+        /// Runtimes whose file sign-in this window can lend from its Mac (049: OpenCode), so a
+        /// start there asks for it first. Absent from older windows.
+        public var signIns: [String]?
 
-        public init(runtimes: [String], ownSignInOnly: Bool, notRelayed: [String: SignInWanted.Reason]? = nil) {
+        public init(runtimes: [String], ownSignInOnly: Bool, notRelayed: [String: SignInWanted.Reason]? = nil,
+                    signIns: [String]? = nil) {
             self.runtimes = runtimes
             self.ownSignInOnly = ownSignInOnly
             self.notRelayed = notRelayed
+            self.signIns = signIns
         }
     }
 
@@ -2612,6 +2689,24 @@ public extension DaemonAPI {
         }
     }
 
+    /// `credentials/lendSignIn` (049): the lendable part of this Mac's file sign-in for one
+    /// runtime, as the text of the file. Empty for nothing to lend, so a start that asked goes
+    /// on without. Prints as a provider count only.
+    struct SignInLend: Codable, Hashable, Sendable, CustomStringConvertible, CustomReflectable {
+        public var runtime: String
+        public var content: String
+        public var providers: Int
+
+        public var description: String { "SignInLend(\(runtime), \(providers) providers)" }
+        public var customMirror: Mirror { Mirror(self, children: ["runtime": runtime, "providers": providers]) }
+
+        public init(runtime: String, content: LentSignInContent?) {
+            self.runtime = runtime
+            self.content = content?.reveal() ?? ""
+            self.providers = content?.providers ?? 0
+        }
+    }
+
     /// `credentials/refused` (043): which agent stopped, and whether it was the token this
     /// window lent (`lent`) or the server's own sign-in that was refused.
     struct CredentialRefused: Codable, Hashable, Sendable {
@@ -2621,12 +2716,16 @@ public extension DaemonAPI {
         /// The refused sign-in was this Mac's own, relayed (056): signing in on the Mac is
         /// the remedy, not Settings. Absent from older daemons.
         public var relayed: Bool?
+        /// The refused key was one this Mac's sign-in file lent (049: OpenCode's): replacing
+        /// it on the Mac is the remedy. Absent from older daemons.
+        public var borrowed: Bool?
 
-        public init(agentID: UUID, runtime: String, lent: Bool, relayed: Bool? = nil) {
+        public init(agentID: UUID, runtime: String, lent: Bool, relayed: Bool? = nil, borrowed: Bool? = nil) {
             self.agentID = agentID
             self.runtime = runtime
             self.lent = lent
             self.relayed = relayed
+            self.borrowed = borrowed
         }
     }
 
@@ -2688,7 +2787,7 @@ public extension DaemonAPI {
     // MARK: Retiring archived agents (051)
 
     /// `retention/state`, and what `retention/changed` carries.
-    public struct RetentionState: Codable, Hashable, Sendable {
+    struct RetentionState: Codable, Hashable, Sendable {
         public var settings: RetentionSettings
         public var archivedCount: Int
         public var archivedBytes: Int
@@ -2706,7 +2805,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct RetentionSetRequest: Codable, Sendable {
+    struct RetentionSetRequest: Codable, Sendable {
         public var settings: RetentionSettings
         /// Without it, a change that would retire agents at once is only described.
         public var confirmed: Bool
@@ -2718,7 +2817,7 @@ public extension DaemonAPI {
     }
 
     /// How much retiring would free.
-    public struct RetirePreview: Codable, Hashable, Sendable {
+    struct RetirePreview: Codable, Hashable, Sendable {
         public var count: Int
         public var bytes: Int
         /// Some of them may turn out to be held when the time comes, which a preview
@@ -2732,7 +2831,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct RetentionSetResult: Codable, Sendable {
+    struct RetentionSetResult: Codable, Sendable {
         public var applied: Bool
         /// When not applied: what it would retire.
         public var wouldRetire: RetirePreview?
@@ -2746,7 +2845,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct RetireRequest: Codable, Sendable {
+    struct RetireRequest: Codable, Sendable {
         public var agentID: UUID
         public var confirmed: Bool
 
@@ -2756,7 +2855,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct RetiredRequest: Codable, Sendable {
+    struct RetiredRequest: Codable, Sendable {
         /// The most one answer carries.
         public static let limitCeiling = 200
 
@@ -2771,7 +2870,7 @@ public extension DaemonAPI {
         }
     }
 
-    public struct AgentRemovedNotification: Codable, Sendable {
+    struct AgentRemovedNotification: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
     }

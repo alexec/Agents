@@ -44,6 +44,54 @@ struct ClientPermissionTests {
         return (core, launcher)
     }
 
+    /// OpenCode's own three answers, as 1.18.33 sends them (049 research R3).
+    private func openCodePermission(command: String) -> JSONValue {
+        .object([
+            "toolCall": .object([
+                "toolCallId": .string("call-1"), "title": .string(command), "kind": .string("execute"),
+                "status": .string("pending"), "rawInput": .object(["command": .string(command)]),
+            ]),
+            "options": .array([
+                .object(["optionId": .string("once"), "kind": .string("allow_once"), "name": .string("Allow once")]),
+                .object(["optionId": .string("always"), "kind": .string("allow_always"), "name": .string("Always allow")]),
+                .object(["optionId": .string("reject"), "kind": .string("reject_once"), "name": .string("Reject")]),
+            ]),
+        ])
+    }
+
+    @Test func openCodeAlwaysApproveAnswersOnceWithoutACard() async throws {
+        let (_, work, locations) = try sandbox()
+        #expect(ClientPermissionSettings.supports("opencode"))
+        let (core, launcher) = try await core(locations: locations, permission: openCodePermission(command: "ls"),
+                                              settings: .init(opencode: .alwaysApprove))
+        let id = try await core.start(.init(runtimeID: "opencode", cwd: work, prompt: "run ls"))
+        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
+        let outcome = await launcher.lastAgent?.permissionOutcome
+        #expect(outcome?["outcome"]?["optionId"]?.stringValue == "once", "once, so switching back to Ask still asks")
+        let page = try await core.transcript(.init(agentID: id))
+        #expect(!page.entries.contains { if case .permissionAsked = $0.kind { return true } else { return false } })
+    }
+
+    @Test func openCodeAsksByDefault() async throws {
+        let (_, work, locations) = try sandbox()
+        let (core, _) = try await core(locations: locations, permission: openCodePermission(command: "ls"),
+                                       settings: .init(cursor: .alwaysApprove, grok: .alwaysApprove))
+        let id = try await core.start(.init(runtimeID: "opencode", cwd: work, prompt: "run ls"))
+        await eventually("the card is held") { await core.agent(id)?.state == .waitingOnUser }
+        let page = try await core.transcript(.init(agentID: id))
+        #expect(page.entries.contains { if case .permissionAsked = $0.kind { return true } else { return false } },
+                "Cursor's and Grok's choices are not OpenCode's")
+    }
+
+    /// A file saved before OpenCode was known (061's two keys) still loads, and asks for it.
+    @Test func settingsSavedBeforeOpenCodeStillLoad() throws {
+        let old = try JSONDecoder().decode(ClientPermissionSettings.self,
+                                           from: Data(#"{"cursor":"alwaysApprove","grok":"default"}"#.utf8))
+        #expect(old == .init(cursor: .alwaysApprove, grok: .default, opencode: .default))
+        #expect(old.setting(.alwaysApprove, for: "opencode").opencode == .alwaysApprove)
+        #expect(old.setting(.alwaysApprove, for: "claude") == old)
+    }
+
     @Test func alwaysApproveAllowsEditWithoutAsking() async throws {
         let (_, work, locations) = try sandbox()
         let file = work.appendingPathComponent("notes.txt")

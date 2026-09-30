@@ -32,12 +32,12 @@ struct ControlMoveTests {
 
         try await ControlMove.prepare(control: control, from: locations)
 
-        let clients = await try records(control).clients
+        let clients = try await records(control).clients
         #expect(clients.count == 1)
         #expect(clients[0].id == phone.id)
         #expect(clients[0].publicKey == phone.publicKey)
         #expect(clients[0].grant == .device)
-        #expect(await try records(control).settings?.homeHost == .mac)
+        #expect(try await records(control).settings?.homeHost == .mac)
         // The old root is only read.
         #expect(DeviceStore(locations: locations).load().map(\.id) == [phone.id])
     }
@@ -47,9 +47,9 @@ struct ControlMoveTests {
         defer { try? FileManager.default.removeItem(at: control.deletingLastPathComponent()) }
         try DeviceStore(locations: locations).save([device("iPad")])
         try await ControlMove.prepare(control: control, from: locations)
-        let first = await try records(control).clients
+        let first = try await records(control).clients
         try await ControlMove.prepare(control: control, from: locations)
-        #expect(await try records(control).clients == first)
+        #expect(try await records(control).clients == first)
     }
 
     @Test func aControlRootWithClientsOfItsOwnIsRefused() async throws {

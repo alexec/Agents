@@ -77,6 +77,9 @@ extension TranscriptEntry.Kind {
         case "poolSwitch", "settingsChanged":
             guard let record = try? payload["_0"]?.decode(SwitchRecord.self) else { return nil }
             return name == "poolSwitch" ? .poolSwitch(record) : .settingsChanged(record)
+        case "sandboxFailure":
+            guard let record = try? payload["_0"]?.decode(SandboxFailureRecord.self) else { return nil }
+            return .sandboxFailure(record)
         case "handoff":
             return .handoff(markdown: payload["markdown"]?.stringValue ?? "",
                             characters: payload["characters"]?.intValue ?? 0)
@@ -159,6 +162,8 @@ extension TranscriptEntry.Kind {
             return ["poolSwitch": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
         case .settingsChanged(let record):
             return ["settingsChanged": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
+        case .sandboxFailure(let record):
+            return ["sandboxFailure": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
         case .handoff(let markdown, let characters):
             return ["handoff": ["markdown": .string(markdown), "characters": .int(characters)]]
         case .unrecognised(let raw):

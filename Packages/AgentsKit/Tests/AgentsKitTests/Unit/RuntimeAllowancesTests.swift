@@ -17,7 +17,7 @@ struct RuntimeAllowancesTests {
     @Test func anOutRuntimeIsWarnedAboutWithTheProvidersTime() {
         let rows = RuntimeAllowances(rows: [row("claude:sign-in", out: true, until: now.addingTimeInterval(3600)),
                                             row("codex:sign-in")], at: now)
-        let sentence = try? #require(rows.startingOnOut("claude"))
+        let sentence = rows.startingOnOut("claude")
         #expect(sentence?.hasPrefix("Claude is out. Its provider says it resets at ") == true)
         #expect(sentence?.contains("Codex") == false, "no other runtime is offered")
     }
@@ -37,6 +37,60 @@ struct RuntimeAllowancesTests {
     @Test func aKeyedRowKnowsItsRuntime() {
         #expect(row("gemini:geminiAPIKey").runtimeID == "gemini")
         #expect(AllowanceState.runtimeID(of: "claude:sign-in") == "claude")
+    }
+}
+
+/// What a chooser makes of a runtime's row, on the Mac and on the phone alike: which
+/// run it belongs in, and what it says under the name. Both choosers ask the same
+/// questions of the same numbers, so the answers live here once (065).
+@Suite("A chooser reading what each runtime's allowance says")
+struct RuntimeChooserAllowanceTests {
+    private let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func row(_ key: String, out: Bool = false, rateLimitedUntil: Date? = nil) -> RuntimeAllowances.Row {
+        var state = AllowanceState(credentialKey: key, entryID: UUID(), since: now)
+        if out { state.markOut(.allowanceSpent, until: now.addingTimeInterval(3600), payment: .allowance(label: nil), now: now, from: .typedFailure) }
+        if let rateLimitedUntil { state.rateLimited(now: now, retryAt: rateLimitedUntil) }
+        return RuntimeAllowances.Row(credentialKey: key, state: state)
+    }
+
+    @Test func aSpentPlanPutsTheRuntimeInTheOutRun() {
+        let allowances = RuntimeAllowances(rows: [row("claude:sign-in", out: true), row("grok:sign-in")], at: now)
+        #expect(allowances.isOut("claude"))
+        #expect(!allowances.isOut("grok"))
+        #expect(allowances.isOut("cursor") == false, "a runtime nothing has happened to is not out")
+    }
+
+    @Test func oneCredentialOutIsEnoughToPutTheRuntimeInTheOutRun() {
+        let allowances = RuntimeAllowances(rows: [row("claude:sign-in", out: true),
+                                                  row("claude:apiKey", out: true)], at: now)
+        #expect(allowances.isOut("claude"))
+    }
+
+    @Test func anOutRuntimeSaysWhatIsWrongWithItUnderTheName() {
+        let allowances = RuntimeAllowances(rows: [row("claude:sign-in", out: true)], at: now)
+        #expect(allowances.note(for: "claude")?.hasPrefix("Out · reset ") == true)
+        #expect(allowances.note(for: "grok") == nil)
+    }
+
+    /// A rate limit is a throttle, not a spent plan: the runtime can still take a turn,
+    /// so it stays in the available run, but it is not nothing to say.
+    @Test func aRateLimitIsNeitherOutNorSilent() {
+        let until = now.addingTimeInterval(1800)
+        let allowances = RuntimeAllowances(rows: [row("copilot:sign-in", rateLimitedUntil: until)], at: now)
+        #expect(!allowances.isOut("copilot"))
+        let note = allowances.rateLimitNote(for: "copilot")
+        #expect(note?.contains("Rate limited") == true)
+        #expect(allowances.rateLimitNote(for: "grok") == nil)
+    }
+
+    /// A rate limit that has run out is a reading, not a change, and must not go on
+    /// claiming to be one.
+    @Test func aRateLimitThatHasRunOutSaysNothing() {
+        let until = now.addingTimeInterval(-1)
+        let allowances = RuntimeAllowances(rows: [row("copilot:sign-in", rateLimitedUntil: until)], at: now)
+        #expect(allowances.rateLimitNote(for: "copilot") == nil)
+        #expect(!allowances.isOut("copilot"))
     }
 }
 

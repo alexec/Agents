@@ -26,6 +26,22 @@ public struct RuntimeLaunch: Hashable, Sendable {
     public var turnNoticePattern: String?
     /// Words the sign-in sheet shows beside some of the runtime's own sign-in methods.
     public var signInNotice: SignInNotice?
+    /// Whether the handshake asks for the runtime's sign-in command the older way,
+    /// `clientCapabilities._meta["terminal-auth"]` (049: OpenCode names its command only then).
+    public var asksForTerminalAuthCommand: Bool = false
+    /// For a runtime whose sign-in adds one provider at a time and works with none (049:
+    /// OpenCode's free models): the sign-in stays on the sheet while it is ready, and the
+    /// sheet names how to sign a provider out — the sign-in command with its last word
+    /// swapped for this one — since the runtime has no sign-out over ACP.
+    public var providerSignOutWord: String? = nil
+    /// The Mac's sign-in a server run of this runtime borrows (049 D7: OpenCode's `auth.json`).
+    public var lentSignIn: LentFileSignIn? = nil
+
+    /// The command that signs a provider out, from the command that signs one in.
+    public func providerSignOutCommand(from signIn: String) -> String? {
+        guard let providerSignOutWord, let space = signIn.lastIndex(of: " ") else { return nil }
+        return signIn[..<space] + " " + providerSignOutWord
+    }
 
     public struct SignInNotice: Hashable, Sendable {
         /// Quoted as it is.
@@ -45,7 +61,9 @@ public struct RuntimeLaunch: Hashable, Sendable {
 
     public init(runtimeID: String, environment: [String: String?] = [:], hiddenAuthMethods: [String] = [],
                 turnErrorPrefix: String? = nil, turnErrorPrefixes: [String] = [],
-                turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil) {
+                turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil,
+                asksForTerminalAuthCommand: Bool = false, providerSignOutWord: String? = nil,
+                lentSignIn: LentFileSignIn? = nil) {
         self.runtimeID = runtimeID
         self.environment = environment
         self.hiddenAuthMethods = hiddenAuthMethods
@@ -53,6 +71,9 @@ public struct RuntimeLaunch: Hashable, Sendable {
             : turnErrorPrefix.map { [$0] } ?? []
         self.turnNoticePattern = turnNoticePattern
         self.signInNotice = signInNotice
+        self.asksForTerminalAuthCommand = asksForTerminalAuthCommand
+        self.providerSignOutWord = providerSignOutWord
+        self.lentSignIn = lentSignIn
     }
 
     /// What a turn's own words say about how it failed, when they start with one of
@@ -107,11 +128,12 @@ public struct RuntimeLaunch: Hashable, Sendable {
     }
 
     /// The folders `environment` names under `<root>`, which the daemon makes (0700)
-    /// before launch: a runtime whose home is missing may refuse to start or make it
-    /// world-readable.
+    /// before launch: a runtime whose home or temporary folder is missing may refuse to
+    /// start or make it world-readable.
     public func folders(root: String) -> [String] {
         environment.compactMap { name, value in
-            guard name.hasSuffix("_HOME"), let value, value.hasPrefix(Self.rootPlaceholder) else { return nil }
+            guard name.hasSuffix("_HOME") || name == "TMPDIR", let value,
+                  value.hasPrefix(Self.rootPlaceholder) else { return nil }
             return value.replacingOccurrences(of: Self.rootPlaceholder, with: root)
         }
         .sorted()
@@ -172,7 +194,39 @@ public enum RuntimeLaunchCatalog {
         // ACP sends this notice without a trailing newline, before any error chunks.
         turnNoticePattern: #"^Info: Disabled tools: [a-z_][a-z_0-9]*(?:, [a-z_][a-z_0-9]*)*"#)
 
-    public static let builtIn: [RuntimeLaunch] = [antigravity, copilot, cursor]
+    /// OpenCode (049, research R3, R7).
+    ///
+    /// - `OPENCODE_DISABLE_AUTOUPDATE`, `OPENCODE_DISABLE_SHARE`: the same as the inline
+    ///   config's `autoupdate` and `share`, as switches that a person's own config cannot
+    ///   turn back on.
+    /// - `OPENCODE_AUTH_CONTENT` removed: on the Mac, OpenCode uses its own sign-in in the
+    ///   person's home (D3). A server run is lent the Mac's through this variable, set after
+    ///   this by the lending (D7), never from a stray one in the daemon's environment.
+    /// - `OPENCODE_ENABLE_QUESTION_TOOL` removed: questions go through the app's `ask_form`.
+    /// - `TMPDIR` of its own: at the start of every turn OpenCode walks its temporary folder,
+    ///   and a Mac's per-user one can hold close to a million entries. Measured on this Mac on
+    ///   2026-09-29: 40 s before the first word with `/var/folders/…/T/`, 2 s with an empty
+    ///   folder, the same model and prompt otherwise (research R11).
+    public static let opencode = RuntimeLaunch(
+        runtimeID: "opencode",
+        environment: [
+            "TMPDIR": "<root>/runtimes/opencode/tmp",
+            "OPENCODE_DISABLE_AUTOUPDATE": "1",
+            "OPENCODE_DISABLE_SHARE": "1",
+            "OPENCODE_AUTH_CONTENT": nil,
+            "OPENCODE_ENABLE_QUESTION_TOOL": nil,
+        ],
+        // Without it OpenCode offers "Login with opencode" and no command (R6).
+        asksForTerminalAuthCommand: true,
+        // `opencode auth login` adds a provider; `opencode auth logout` takes one away.
+        providerSignOutWord: "logout",
+        // A server run borrows the Mac's keys (D7). `oauth` entries rotate and stay (R7).
+        lentSignIn: LentFileSignIn(variable: "OPENCODE_AUTH_CONTENT", dataHomeVariable: "XDG_DATA_HOME",
+                                   dataHomePath: "opencode/auth.json",
+                                   defaultPath: ".local/share/opencode/auth.json",
+                                   lendableTypes: ["api", "wellknown"], signInCommand: "opencode auth login"))
+
+    public static let builtIn: [RuntimeLaunch] = [antigravity, copilot, cursor, opencode]
 
     /// Nothing extra for a runtime that is not listed.
     public static func launch(for runtimeID: String) -> RuntimeLaunch {

@@ -42,6 +42,14 @@ import Testing
 ///   Copilot's `chrome-devtools` tools were present on one run and absent on the next with
 ///   the same flag passed both times.
 ///
+/// - **2026-09-29**, expectations rewritten and **not yet re-taken.** Sub-agents came
+///   back for every runtime, so what each case asserts moved: Claude keeps `Agent`,
+///   `ListAgents`, `SendMessage`, `TaskOutput` and `TaskStop`; Grok's profile names
+///   `spawn_subagent`, `kill_command_or_subagent` and `get_command_or_subagent_output`;
+///   Copilot's flag is down to `session_store_sql`. The next `AGENTS_LIVE=1` run is what
+///   establishes those against the real runtimes, and whatever it finds goes in
+///   research.md R13 the way the last drift did.
+////
 // Serialised: four runtimes at once is four models and four sets of output interleaved,
 // which is a report nobody can read.
 @Suite("Live: what a scoped runtime will admit to having", .serialized,
@@ -142,39 +150,45 @@ struct RuntimeToolScopingLiveTests {
 
     // MARK: US1 — the schedule lands in the app
 
-    @Test func claudeLosesItsOwnSchedulingAndAgentTools() async throws {
+    @Test func claudeLosesItsOwnSchedulingAndKeepsItsSubagents() async throws {
         let answer = try await inventory(of: RuntimeCatalog.claude, policy: ToolPolicyCatalog.claude)
         check(answer,
-              gone: ["Workflow", "CronCreate", "ScheduleWakeup", "ListAgents", "ReportFindings"],
+              gone: ["Workflow", "CronCreate", "ScheduleWakeup", "ReportFindings"],
               // `AskUserQuestion` first, because it is the one thing this feature could
-              // break that would matter more than anything it fixes.
-              present: ["AskUserQuestion", "Bash", "Read", "Edit", "Write"])
+              // break that would matter more than anything it fixes. Then its own
+              // sub-agents, which came back on 2026-09-29 and are asserted here so a
+              // later Claude that drops them says so in this failure rather than in an
+              // agent's complaint.
+              present: ["AskUserQuestion", "Agent", "ListAgents", "SendMessage", "TaskOutput", "TaskStop",
+                        "Bash", "Read", "Edit", "Write"])
     }
 
     /// Grok is the case where the residue is asserted as *present*, which reads like a
     /// test of somebody else's bug and is deliberate: the day Grok lets the allowlist
     /// strip `workflow`, this fails, and the policy gets a line moved out of `residue`
-    /// rather than a line quietly left wrong.
-    @Test func grokLosesItsSchedulerAndSubagentsAndKeepsItsWorkflowTool() async throws {
+    /// rather than a line quietly left wrong. For an allow list the sub-agents have to
+    /// be asserted as present too, because unlisted means unavailable (R6).
+    @Test func grokLosesItsSchedulerAndKeepsItsSubagentsAndWorkflowTool() async throws {
         let answer = try await inventory(of: RuntimeCatalog.grok, policy: ToolPolicyCatalog.grok)
         check(answer,
-              gone: ["scheduler_create", "scheduler_delete", "scheduler_list",
-                     "spawn_subagent", "send_feedback"],
-              present: ["ask_user_question", "read_file", "grep", "run_terminal_command", "write",
-                        "workflow", "monitor"])
+              gone: ["scheduler_create", "scheduler_delete", "scheduler_list", "send_feedback"],
+              present: ["ask_user_question", "spawn_subagent", "kill_command_or_subagent",
+                        "get_command_or_subagent_output", "read_file", "grep",
+                        "run_terminal_command", "write", "workflow", "monitor"])
     }
 
     // MARK: US2, US3, US4 — the rival server goes whole
 
     /// One flag closes an escalation queue, a suggestion tool and an artefact store at
-    /// once, because all three are on the same server.
-    @Test func copilotLosesItsRivalServerAndItsSubagents() async throws {
+    /// once, because all three are on the same server. Its own sub-agents are the app's
+    /// business now too, so the flag is down to the store (2026-09-29).
+    @Test func copilotLosesItsRivalServerAndKeepsItsSubagents() async throws {
         let answer = try await inventory(of: RuntimeCatalog.copilot, policy: ToolPolicyCatalog.copilot)
         check(answer,
               gone: ["software-factory", "escalation_raise", "prompt_suggest", "output_list",
-                     "github-mcp-server",
-                     "task", "list_agents", "read_agent", "write_agent", "session_store_sql"],
-              present: ["bash", "view", "apply_patch"])
+                     "github-mcp-server", "session_store_sql"],
+              present: ["task", "list_agents", "read_agent", "write_agent",
+                        "bash", "view", "apply_patch"])
     }
 
     /// The artefact half, which is the one that could have taken too much: the person's
@@ -200,7 +214,7 @@ struct RuntimeToolScopingLiveTests {
 
         // The session started at all, which is the whole claim.
         #expect(!answer.isEmpty, "the session did not start, or the agent said nothing")
-        check(answer, gone: ["list_agents", "session_store_sql"], present: ["bash"])
+        check(answer, gone: ["session_store_sql"], present: ["bash", "task"])
     }
 }
 

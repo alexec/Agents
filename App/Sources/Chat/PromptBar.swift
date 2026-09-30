@@ -112,6 +112,9 @@ struct PromptBar: View {
                     MentionList(mentions: mentions, selected: selectedMention, choose: accept)
                         .transition(.opacity)
                 }
+                if agent == nil, let refusal = model.draftSandboxRefusal {
+                    sandboxRefusal(refusal)
+                }
                 field
                 options
             }
@@ -275,12 +278,29 @@ struct PromptBar: View {
 
                 SelectCapsule(name: "Runtime",
                               title: model.draftRuntimeID.map(runtimeName) ?? "Runtime") { dismiss in
-                    ForEach(model.availableRuntimes) { status in
-                        SelectChoice(title: status.runtime.name,
-                                     description: signInNote(status.runtime.id),
-                                     isChosen: status.runtime.id == model.draftRuntimeID) {
-                            chooseRuntime(status.runtime.id)
-                            dismiss()
+                    ScrollingChoices {
+                        if !outRuntimes.isEmpty {
+                            SelectGroupHeading(title: "Available")
+                        }
+                        ForEach(availableRuntimes) { status in
+                            SelectChoice(title: status.runtime.name,
+                                         description: rateLimitNote(status.runtime.id) ?? signInNote(status.runtime.id),
+                                         isChosen: status.runtime.id == model.draftRuntimeID) {
+                                chooseRuntime(status.runtime.id)
+                                dismiss()
+                            }
+                        }
+                        if !outRuntimes.isEmpty {
+                            Divider().padding(.vertical, 4)
+                            SelectGroupHeading(title: "Out")
+                            ForEach(outRuntimes) { status in
+                                SelectChoice(title: status.runtime.name,
+                                             description: outNote(status.runtime.id),
+                                             isChosen: status.runtime.id == model.draftRuntimeID) {
+                                    chooseRuntime(status.runtime.id)
+                                    dismiss()
+                                }
+                            }
                         }
                     }
                     Divider().padding(.vertical, 4)
@@ -698,6 +718,7 @@ struct PromptBar: View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 permissionOptions(shown)
+                sandboxCapsule(shown)
                 Spacer(minLength: 16)
                 otherOptions(shown)
                 // What it has used, beside how it thinks.
@@ -754,6 +775,34 @@ struct PromptBar: View {
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
         ForEach(shown.filter(\.isAboutPermission)) { option in
             OptionMenu(option: option, chosen: binding(for: option))
+        }
+    }
+
+    /// The command sandbox, beside the mode it is so often mistaken for (064, FR-004).
+    @ViewBuilder
+    private func sandboxCapsule(_ shown: [ConfigOption]) -> some View {
+        if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
+            let mode = shown.first { $0.id == "mode" }.flatMap { binding(for: $0).wrappedValue?.stringValue }
+            SandboxCapsule(runtimeID: runtimeID,
+                           override: agent == nil ? model.draftSandbox : agent?.sandboxOverride,
+                           runtimeDefault: model.sandboxSettings.choice(for: runtimeID),
+                           codexMode: mode,
+                           effective: agent?.effectiveSandbox,
+                           isWorking: agent?.state == .running) { choice in
+                if let agent {
+                    Task { await model.setAgentSandbox(agent.id, choice) }
+                } else {
+                    model.draftSandbox = choice
+                    // Codex's sandbox is its mode (FR-005a): the draft's mode follows.
+                    if runtimeID == RuntimeCatalog.codex.id, let option = shown.first(where: { $0.id == "mode" }) {
+                        switch choice {
+                        case .off: model.draftChosen[option.id] = .string("agent-full-access")
+                        case .on where mode == "agent-full-access": model.draftChosen[option.id] = .string("read-only")
+                        default: break
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -814,6 +863,32 @@ struct PromptBar: View {
     private var willQueue: Bool {
         guard let agent else { return false }
         return PromptWords.willQueue(agent)
+    }
+
+    /// A new agent's runtime would not start because of its sandbox (064): what it said,
+    /// and **Start without sandbox**, which sends what is typed again with this agent Off.
+    private func sandboxRefusal(_ refusal: DaemonAPI.SandboxWillNotStart) -> some View {
+        let name = RuntimeCatalog.runtime(id: refusal.runtimeID)?.name ?? refusal.runtimeID
+        return HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(SandboxWords.cardTitle(name)).appText(.fine).fontWeight(.semibold)
+                Text(refusal.detail.split(separator: "\n").first.map(String.init) ?? "")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .help(refusal.detail)
+            }
+            Spacer()
+            if refusal.offOffered {
+                Button(SandboxWords.startWithout) {
+                    model.draftSandbox = .off
+                    send()
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func send() {
@@ -880,6 +955,43 @@ struct PromptBar: View {
         let account = model.accounts[runtimeID]
         if account?.state == .needsSignIn { return "Needs signing in" }
         return account?.signedInAs?.label
+    }
+
+    /// The runtimes to pick from, in two runs: those that can take a turn now, and those
+    /// whose allowance is spent (065). An out runtime is still here and still pickable,
+    /// because a chat on it takes the message and the runtime says no until its plan is
+    /// back. Grouping it away would hide the only way back to it once it recovers.
+    ///
+    /// A server's runtimes are left in one run: the allowance below is the Mac's own, so
+    /// splitting by it would label a server's runtime with the Mac's state. Runtimes is
+    /// where the Mac's own standing is read.
+    private var splitsByAllowance: Bool { model.selectedProjectHost == .mac }
+
+    private var availableRuntimes: [RuntimeStatus] {
+        guard splitsByAllowance else { return model.availableRuntimes }
+        return model.availableRuntimes.filter { !isOut($0.id) }
+    }
+
+    private var outRuntimes: [RuntimeStatus] {
+        guard splitsByAllowance else { return [] }
+        return model.availableRuntimes.filter { isOut($0.id) }
+    }
+
+    private func isOut(_ runtimeID: String) -> Bool {
+        model.runtimeAllowances?.isOut(runtimeID) == true
+    }
+
+    /// A rate limit is not an out runtime: the runtime can still take a turn, and
+    /// `isUsable` says so. It is a throttle, though, and one row in the available run
+    /// that says nothing about it reads as no throttle at all.
+    private func rateLimitNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.rateLimitNote(for: runtimeID)
+    }
+
+    /// What is wrong with it, under the name. It says nothing about another runtime:
+    /// there is no order to take one from (065).
+    private func outNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.note(for: runtimeID)
     }
 
     private func runtimeName(_ id: String) -> String {

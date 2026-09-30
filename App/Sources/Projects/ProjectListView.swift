@@ -78,6 +78,7 @@ struct ProjectListView: View {
             Section("Activity") {
                 EventsRow().tag(SidebarItem.events)
                 ResourcesRow().tag(SidebarItem.resources)
+                RuntimesRow().tag(SidebarItem.runtimes)
                 SpendingRow(selection: $selection).tag(SidebarItem.spending)
             }
         }

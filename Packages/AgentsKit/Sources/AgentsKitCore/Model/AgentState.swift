@@ -114,6 +114,9 @@ public enum AgentEvent: Hashable, Sendable {
     /// its own reason.
     case archivedByAgent
     case unarchivedByUser
+    /// Its runtime would not start because its command sandbox could not be set up
+    /// (064): an agent between turns, or one still starting, stops with the card.
+    case sandboxWouldNotStart
 }
 
 /// What happens to an agent's ending when an event is applied.
@@ -260,6 +263,13 @@ extension AgentState {
             return Transition(next: .stopped, endedReason: .set(.stoppedByAgent),
                               clearsPickUpCount: true)
         case (_, .stoppedWaitingByAgent):
+            return nil
+
+        case (.starting, .sandboxWouldNotStart), (.running, .sandboxWouldNotStart),
+             (.waitingOnUser, .sandboxWouldNotStart), (.finished, .sandboxWouldNotStart),
+             (.stopped, .sandboxWouldNotStart):
+            return Transition(next: .stopped, endedReason: .set(.sandboxFailed), clearsPickUpCount: true)
+        case (_, .sandboxWouldNotStart):
             return nil
 
         case (.starting, .processDied), (.running, .processDied), (.waitingOnUser, .processDied):

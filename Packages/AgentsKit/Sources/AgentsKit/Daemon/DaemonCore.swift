@@ -323,6 +323,10 @@ public actor DaemonCore {
 
     lazy var clientPermissionStore = ClientPermissionStore(locations: locations)
     lazy var clientPermissions = clientPermissionStore.load()
+    lazy var sandboxStore = SandboxSettingsStore(locations: locations)
+    lazy var sandboxSettings = sandboxStore.load()
+    /// How long Gemini may take to answer its handshake while its sandbox may be on (R6).
+    var sandboxHangDeadline: Duration = .seconds(90)
 
     // MARK: Each runtime's allowance (052, 065)
 
@@ -482,6 +486,9 @@ public actor DaemonCore {
     var credentialOffers: [UUID: DaemonAPI.CredentialsOffer] = [:]
     /// What each connection has lent, in memory only, dropped when it closes (043, R6).
     var lentCredentials: [UUID: [String: Secret]] = [:]
+    /// The Mac's file sign-ins each connection has lent (049: OpenCode's), in memory only,
+    /// dropped when it closes. No providers means it was asked and had none to lend.
+    var lentSignIns: [UUID: [String: LentSignInContent]] = [:]
     /// Sign-in relays the windows connected here offered (047), by connection.
     var relayOffers: [UUID: [String: DaemonAPI.RelayOffer]] = [:]
     /// One gate per forwarded relay socket, started on the first offer of it.
@@ -502,6 +509,11 @@ public actor DaemonCore {
     var macLent: [String: Secret] = [:]
     /// Whether this server has a sign-in of its own for a runtime. Replaced in tests.
     var hasOwnSignIn: @Sendable (String) -> Bool = { ServerSignIn.exists(runtimeID: $0) }
+    /// This server's own sign-in file for a runtime that borrows the Mac's (049), which a lent
+    /// run keeps the lendable part of. Replaced in tests.
+    var ownSignInFile: @Sendable (LentFileSignIn) -> Data? = { signIn in
+        try? Data(contentsOf: signIn.file(home: ServerSignIn.home, environment: LoginShellPath.environment()))
+    }
     /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
     var quitRequested = false
     /// The last few hundred sends that carried a `sendID`, and what each came to (037).
@@ -583,6 +595,9 @@ public actor DaemonCore {
         /// Fixed when the session is made, so a draft made for an agent that may not
         /// start others cannot be used for one that may, or the other way round.
         var managesAgents = true
+        /// The sandbox choice its runtime was started with (064). A start that resolves to
+        /// another cannot use it: the choice is fixed when the process starts.
+        var sandbox: SandboxChoice = .runtime
         /// The connection that asked for it (029). `nil` for a draft the daemon made
         /// for itself — a workflow's — which no connection going can orphan.
         var connection: UUID?
@@ -773,6 +788,7 @@ public actor DaemonCore {
     /// reason a daemon killed mid-turn still leaves something true behind.
     func record(_ kind: TranscriptEntry.Kind, for agentID: UUID, subagentID: String? = nil) async {
         let entry = TranscriptEntry(kind: kind, subagentID: subagentID)
+        if case .userMessage(_, _, .person) = kind { clearWaitingSandbox(agentID: agentID) }
         try? await store.append(entry, for: agentID)
         if var agent = agents[agentID] {
             agent.lastActivityAt = entry.at
@@ -1178,7 +1194,7 @@ public actor DaemonCore {
             let runtimeID = agents[agentID]?.runtimeID
             let reviewsClientSide = runtimeID.map(ClientPermissionSettings.supports) == true
             // Our own tool, answered by us. Nobody is asked whether the app may show
-            // the app's own suggestions. Cursor and Grok keep only the turn-ending
+            // the app's own suggestions. Cursor, Grok and OpenCode keep only the turn-ending
             // ones automatic (061): workflows, agents, leases and publishing still ask.
             if let option = reviewsClientSide
                 ? autoAllowedTurnTool(request)
@@ -1199,7 +1215,7 @@ public actor DaemonCore {
                 await record(.runtimeNote(refusal.note), for: agentID)
                 return
             }
-            // Always-approve for Cursor and Grok (061): answer once, before any card or
+            // Always-approve for Cursor, Grok and OpenCode (061, 049): answer once, before any card or
             // attention event. Prefer allow_once so switching back to Default still asks.
             // Pending cards already on screen are never touched.
             if reviewsClientSide,
@@ -1362,23 +1378,29 @@ public struct ProcessSessionLauncher: SessionLauncher {
             try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
         }
+        // The command sandbox asked for (064): Grok's before its own arguments, as its
+        // flags go before `agent stdio`; Gemini's over every other variable.
+        let sandbox = LaunchSandbox.additions(runtimeID: runtime.id, choice: LaunchSandbox.value)
         return try ACPSession.launch(executable: URL(fileURLWithPath: path),
-                                     arguments: runtime.arguments + policy.launchArguments
+                                     arguments: sandbox.arguments + runtime.arguments + policy.launchArguments
                                          + RuntimePolicyFiles(locations: locations).arguments(for: policy),
                                      cwd: cwd,
                                      environment: Self.environment(for: policy, locations: locations,
                                                                    onto: LoginShellPath.environment(),
-                                                                   onServer: onServer),
+                                                                   onServer: onServer)
+                                         .merging(sandbox.environment) { _, sandbox in sandbox },
                                      capabilities: Self.capabilities(for: policy),
                                      launch: RuntimeLaunchCatalog.launch(for: runtime.id),
                                      authMethodBeforeContinuing: policy.authMethodBeforeContinuing)
     }
 
     /// What the app offers a runtime at the handshake: everything it can serve, less file
-    /// reading for a runtime that must read files itself (046: Gemini).
+    /// reading for a runtime that must read files itself (046: Gemini), plus the older
+    /// terminal sign-in flag for a runtime that needs it (049: OpenCode).
     static func capabilities(for policy: ToolPolicy) -> ACP.ClientCapabilities {
         var capabilities = ACP.ClientCapabilities.app
         if policy.readsFilesItself { capabilities.readTextFile = false }
+        capabilities.terminalAuthMeta = RuntimeLaunchCatalog.launch(for: policy.runtimeID).asksForTerminalAuthCommand
         return capabilities
     }
 

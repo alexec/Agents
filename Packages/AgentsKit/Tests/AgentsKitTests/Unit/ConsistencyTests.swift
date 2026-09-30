@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-/// The three rules 018 wrote down, as checks that fail when somebody writes a literal
+/// The rules the specs wrote down, as checks that fail when somebody writes a literal
 /// instead of using the shared definition.
 ///
 /// Source scans, because neither app has a test target: `App/Sources`, `Remote/Sources`
@@ -422,4 +422,105 @@ struct ConsistencyTests {
             \(violations.sorted().joined(separator: "\n"))
             """)
     }
+
+    // MARK: 6. Privacy strings (048)
+
+    /// A request for a protected resource, and the key that has to be in the Info.plist
+    /// of every app that makes it. Asking with no such key is not a warning and not a
+    /// refusal: the system ends the app on the spot, which is the crash in #48. The
+    /// prompt in `Shared/UI` asks for the microphone and for speech recognition, the
+    /// Mac had both strings written down, and the phone had neither — so pressing the
+    /// microphone button on a real iPhone killed the Remote, and nothing until then
+    /// could tell you.
+    private static let protectedResources: [(call: String, key: String, what: String)] = [
+        ("AVCaptureDevice.requestAccess(for: .audio)", "NSMicrophoneUsageDescription", "the microphone"),
+        ("AVCaptureDevice.requestAccess(for: .video)", "NSCameraUsageDescription", "the camera"),
+        ("SFSpeechRecognizer.requestAuthorization", "NSSpeechRecognitionUsageDescription", "speech recognition"),
+    ]
+
+    /// The apps that have an Info.plist to be missing a string from, and the sources
+    /// each one compiles. `Shared/UI` is in both, deliberately: the phone runs the same
+    /// prompt as the Mac, so it asks for the same things.
+    private static let appTargets: [(name: String, plist: String, sources: [String])] = [
+        ("Agents", "App/Info.plist", ["App/Sources", "Shared/UI"]),
+        ("Remote", "Remote/Info.plist", ["Remote/Sources", "Shared/UI"]),
+    ]
+
+    @Test func everyAppThatAsksForAProtectedResourceSaysWhyInItsOwnWords() throws {
+        // XcodeGen writes each Info.plist from the properties in `project.yml`, so both
+        // have to agree: a string in the plist and not in the yml is written straight
+        // back out again on the next generate, and the app loses it where it matters.
+        let project = try String(contentsOf: Self.root.appending(path: "project.yml"), encoding: .utf8)
+        var asked: [String: String] = [:]
+        var violations: [String] = []
+
+        for target in Self.appTargets {
+            let plist = try Self.usageStrings(inPlistAt: Self.root.appending(path: target.plist))
+            for source in try Self.sources(under: target.sources) {
+                for (index, line) in source.lines.enumerated() {
+                    for resource in Self.resourcesAskedFor(in: line) {
+                        asked[resource.key] = Self.at(source, index)
+                        if !plist.contains(resource.key) {
+                            violations.append("""
+                                \(target.name) asks for \(resource.what) at \
+                                \(Self.at(source, index)), and \(target.plist) has no \
+                                \(resource.key)
+                                """)
+                        } else if !project.contains("\(resource.key):") {
+                            violations.append("""
+                                \(resource.key) is in \(target.plist) but not in project.yml, \
+                                so XcodeGen would write it out again
+                                """)
+                        }
+                    }
+                }
+            }
+        }
+
+        #expect(asked["NSMicrophoneUsageDescription"] != nil
+                && asked["NSSpeechRecognitionUsageDescription"] != nil, """
+                Nothing was found asking for the microphone or for speech recognition. The \
+                scan has stopped matching the code it is for, so it would pass on a build \
+                that still crashes (#48).
+                """)
+        #expect(violations.isEmpty, """
+            An app asks for a protected resource with no usage string, and the system \
+            terminates an app that does that rather than showing anything. Write the \
+            sentence the person reads on the permission alert into the target's \
+            `info.properties` in project.yml, worded for where the app runs.
+            \(violations.sorted().joined(separator: "\n"))
+            """)
+    }
+
+    /// The resources a line asks for, with any trailing comment cut off first: a line
+    /// that names a call while explaining why it is there is not making it.
+    private static func resourcesAskedFor(in line: String) -> [(call: String, key: String, what: String)] {
+        let code = Self.code(line)
+        return protectedResources.filter { code.contains($0.call) }
+    }
+
+    @Test func theProtectedResourceScanCatchesWhatItIsFor() {
+        #expect(Self.resourcesAskedFor(in: "        await AVCaptureDevice.requestAccess(for: .audio)").map(\.key)
+                == ["NSMicrophoneUsageDescription"])
+        #expect(Self.resourcesAskedFor(in: "        await AVCaptureDevice.requestAccess(for: .video)").map(\.key)
+                == ["NSCameraUsageDescription"])
+        #expect(Self.resourcesAskedFor(in: "            SFSpeechRecognizer.requestAuthorization { status in").map(\.key)
+                == ["NSSpeechRecognitionUsageDescription"])
+        #expect(Self.resourcesAskedFor(in: "    let format = input.outputFormat(forBus: 0)").isEmpty)
+        // A comment that names the call is not a call.
+        #expect(Self.resourcesAskedFor(in: "        // await AVCaptureDevice.requestAccess(for: .audio)").isEmpty)
+    }
+
+    /// The usage-description keys in an Info.plist. Parsed rather than grepped, so a
+    /// plist that stopped being a plist fails the test instead of passing it.
+    private static func usageStrings(inPlistAt url: URL) throws -> [String] {
+        let data = try Data(contentsOf: url)
+        let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
+        guard let keys = plist as? [String: Any] else {
+            throw PlistShape.unexpected(url.lastPathComponent)
+        }
+        return keys.keys.filter { $0.hasSuffix("UsageDescription") }
+    }
+
+    private enum PlistShape: Error { case unexpected(String) }
 }

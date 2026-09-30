@@ -63,6 +63,18 @@ With the device grant, the iPhone and iPad can, on any host:
 - see what an agent holds or waits for (see [Leases on shared resources](leases.md)), and
   what has been spent.
 
+## The widget does not reach your agents at all
+
+The Home-screen widget is the exception, and worth knowing about. It is a small program
+that iOS loads only when it is about to draw one, and throws away the moment it is done, so
+it is never given a connection to anything. What it draws is a small file your app writes
+whenever the number changes, which the widget reads and shows.
+
+In practice that means the widget is the one thing on the device that works with the app
+shut: it is showing you what the app last knew, not what your hosts know now. When the app
+is shut and something starts waiting, the widget keeps showing the number it had, and
+says how long ago it was updated. Tapping it opens the app, which catches up.
+
 ## What stays with an operator
 
 Some things need the operator grant, which a Mac window has. They are refused for a device
@@ -121,5 +133,7 @@ on, with the device grant. See [Move an existing set-up across](../how-to/move-a
 - [Connect a window or phone](../how-to/connect-a-window-or-phone.md), for pairing.
 - [Answer a question or a permission request](../how-to/answer-a-question.md), for the
   card on every device.
+- [See what needs you from your Home screen](../how-to/see-what-needs-you-from-your-home-screen.md),
+  for putting that count on the Home screen.
 - [Statuses and groups](../reference/statuses.md), for what each line at the top of the
   phone means.

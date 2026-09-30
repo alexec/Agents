@@ -17,4 +17,7 @@ enum SidebarItem: Hashable {
     case resources
     /// What happened, and what came of it (042).
     case events
+    /// Each runtime and where its allowance stands (065). Status, not a control, so it
+    /// is here rather than in Settings.
+    case runtimes
 }

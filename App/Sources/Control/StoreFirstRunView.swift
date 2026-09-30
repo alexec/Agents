@@ -39,8 +39,7 @@ struct FirstRunView: View {
     private var choice: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Where should your agents run?").appText(.title).fontWeight(.semibold)
-            (Text("This window is where you work with your agents. They run on a ") + Text("control plane").bold()
-             + Text(" you own: on this Mac, on another Mac, or on a server. Your iPhone and iPad connect to it too."))
+            Text("This window is where you work with your agents. They run on a \(Text("control plane").bold()) you own: on this Mac, on another Mac, or on a server. Your iPhone and iPad connect to it too.")
                 .appText(.reading).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 16) {

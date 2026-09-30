@@ -1,0 +1,4 @@
+touch: /fixture/codex-agent/outside/written-84148bcc: Operation not permitted
+touch_exit=1
+curl: (6) Could not resolve host: example.com
+curl_exit=6

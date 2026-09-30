@@ -1,0 +1,1 @@
+[31mGEMINI_SANDBOX is true but failed to determine command for sandbox; install docker or podman or specify command in GEMINI_SANDBOX[0m

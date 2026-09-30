@@ -61,13 +61,25 @@ extension AppModel {
                                                      DaemonAPI.MacPathRequest(path: url.path(percentEncoded: false), app: app)) }
         #else
         if let app, let application = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app)
-            ?? NSWorkspace.shared.fullPath(forApplication: app).map(URL.init(fileURLWithPath:)) {
+            ?? Self.application(named: app) {
             NSWorkspace.shared.open([url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
         } else {
             NSWorkspace.shared.open(url)
         }
         #endif
     }
+
+    #if !AGENTS_STORE
+    /// An app by its name, where apps are kept: what `fullPath(forApplication:)` did.
+    private static func application(named name: String) -> URL? {
+        let file = name.hasSuffix(".app") ? name : name + ".app"
+        let folders = ["/Applications", "/Applications/Utilities", "/System/Applications",
+                       "/System/Applications/Utilities",
+                       FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path]
+        return folders.map { URL(fileURLWithPath: $0).appendingPathComponent(file) }
+            .first { FileManager.default.fileExists(atPath: $0.path) }
+    }
+    #endif
 
     /// Terminal, on this Mac's host.
     func openTerminal(at url: URL? = nil, on host: HostID = .mac) {

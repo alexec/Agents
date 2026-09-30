@@ -4,6 +4,11 @@
 # is this file detached (`--restart`), because the session it quits is usually the
 # one that started it.
 #
+# The real app runs from a copy in ~/Applications/AgentsLive/<sha>-<time>/, never
+# from build/DD. Every build in the main checkout writes over build/DD, and a
+# running app whose files change fails its own signature check: the daemon then
+# calls the window, the bridge and every agent's helper a stranger.
+#
 #   ship.sh                 everything
 #   ship.sh --no-build      reuse build/DD and build/DD-ios as they are
 #   ship.sh --no-devices    skip the iPhone/iPad
@@ -13,15 +18,15 @@
 set -u
 setopt pipefail
 
-restart() { # repo sha window bridge delay
-  local REPO=$1 SHA=$2 W=$3 B=$4 DELAY=${5:-20}
+restart() { # live-folder sha window bridge delay
+  local LIVE=$1 SHA=$2 W=$3 B=$4 DELAY=${5:-20}
   exec >> /tmp/main-restart-all-$SHA.log 2>&1
   echo "$(date) start"
   sleep $DELAY
   local ROOT="$HOME/Library/Application Support/Agents"
   local LOCK="$ROOT/daemon.lock"
-  local MACAPP=$REPO/build/DD/Build/Products/Debug/Agents.app
-  local BRIDGEAPP=$REPO/build/DD/Build/Products/Debug/agents-bridge.app
+  local MACAPP=$LIVE/Agents.app
+  local BRIDGEAPP=$LIVE/agents-bridge.app
   local -a CLEAN
   CLEAN=(env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" SHELL=/bin/zsh TMPDIR="$TMPDIR"
     PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin LANG=en_US.UTF-8)
@@ -34,7 +39,7 @@ restart() { # repo sha window bridge delay
   esac
   if [[ $W != 0 ]]; then
     case "$(ps -o command= -p $W)" in
-      "$MACAPP/Contents/MacOS/Agents") ;;
+      */Agents.app/Contents/MacOS/Agents) ;;
       *) echo "window $W is no longer the real window; stop"; exit 1 ;;
     esac
     echo "quitting window $W"
@@ -58,13 +63,22 @@ restart() { # repo sha window bridge delay
 
   if [[ $B != 0 ]]; then
     case "$(ps -o command= -p $B)" in
-      "$BRIDGEAPP/Contents/MacOS/agents-bridge")
+      */build/DD/Build/Products/Debug/agents-bridge.app/Contents/MacOS/agents-bridge|$HOME/Applications/AgentsLive/*/agents-bridge.app/Contents/MacOS/agents-bridge)
         kill -TERM $B; for i in {1..25}; do kill -0 $B 2>/dev/null || break; sleep 0.2; done ;;
       *) echo "bridge $B is not main's build; leaving it and not starting another"; echo "$(date) done"; exit 0 ;;
     esac
   fi
   $CLEAN AGENTS_ROOT="$ROOT" open -n -g --stderr /tmp/bridge-$SHA.log --stdout /tmp/bridge-$SHA.log "$BRIDGEAPP"
   sleep 8; echo "bridge: $(ps -axww -o pid=,command= | grep '[a]gents-bridge.app/Contents/MacOS/agents-bridge')"
+
+  # Earlier copies nothing runs from any more. The daemon keeps its own copy of the
+  # helper in the root, so no agent needs these.
+  local old
+  for old in $HOME/Applications/AgentsLive/*(N/); do
+    [[ $old == $LIVE ]] && continue
+    if ps -axww -o command= | grep -F -q "$old/"; then echo "keeping $old: still running"; continue; fi
+    echo "removing $old"; rm -rf "$old"
+  done
   echo "$(date) done"
 }
 
@@ -216,14 +230,27 @@ if (( MAC )); then
     echo "another session's restart is already pending: $(ps -axww -o command= | grep -E '[s]hip\.sh --restart|[m]ain-restart-all-')" >&2
     echo "not queueing a second one" >&2; exit 1
   fi
+  # The real window: a live copy, or main's build/DD from before ship.sh made copies.
+  REALWINDOW="^ *[0-9]+ ($HOME/Applications/AgentsLive/[^/]+/Agents.app|$MACAPP)/Contents/MacOS/Agents$"
   # A window with no --root that is not main's build would grab the real root when the daemon restarts.
-  STRAY=$(ps -axww -o pid=,command= | grep -E '/Contents/MacOS/Agents$' | grep -v " $MACAPP/Contents/MacOS/Agents$")
+  STRAY=$(ps -axww -o pid=,command= | grep -E '/Contents/MacOS/Agents$' | grep -v -E "$REALWINDOW")
   if [[ -n $STRAY ]]; then
     echo "other builds are attached to the real root; ask Alex before quitting them:" >&2
     echo "$STRAY" >&2; exit 1
   fi
-  W=$(ps -axww -o pid=,command= | grep -E "^ *[0-9]+ $MACAPP/Contents/MacOS/Agents$" | awk '{print $1}' | head -1)
+  W=$(ps -axww -o pid=,command= | grep -E "$REALWINDOW" | awk '{print $1}' | head -1)
   B=$(ps -axww -o pid=,command= | grep '[a]gents-bridge.app/Contents/MacOS/agents-bridge' | awk '{print $1}' | head -1)
-  nohup ${0:A} --restart "$REPO" "$SHA" "${W:-0}" "${B:-0}" $DELAY >/dev/null 2>&1 &!
+  # A folder of its own each time, never written again: what is running is never
+  # what a build or a later ship is writing.
+  LIVE=$HOME/Applications/AgentsLive/$SHA-$(date +%Y%m%d-%H%M%S)
+  mkdir -p $LIVE.partial
+  ditto $MACAPP $LIVE.partial/Agents.app && ditto $BRIDGEAPP $LIVE.partial/agents-bridge.app \
+    && codesign --verify --deep --strict $LIVE.partial/Agents.app 2>/dev/null \
+    && ! codesign -dv $LIVE.partial/Agents.app/Contents/Helpers/agentsd 2>&1 | grep -q 'TeamIdentifier=not set' \
+    || { echo "build/DD is not signed by the team (built with CODE_SIGNING_ALLOWED=NO?); rebuild it without --no-build" >&2
+         rm -rf $LIVE.partial; exit 1; }
+  mv $LIVE.partial $LIVE
+  echo "$(date +%T) installed $LIVE"
+  nohup ${0:A} --restart "$LIVE" "$SHA" "${W:-0}" "${B:-0}" $DELAY >/dev/null 2>&1 &!
   echo "$(date +%T) Mac relaunch scheduled in ${DELAY}s (window ${W:-none}, bridge ${B:-none}); log /tmp/main-restart-all-$SHA.log"
 fi

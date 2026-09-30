@@ -59,6 +59,9 @@ public struct TurnResult: Sendable {
     /// the result because the update that brought it and the turn's answer arrive by two
     /// different roads, and the answer can get there first.
     public var rateLimit: RateLimitInfo?
+    /// What the turn's commands printed and what it said (064, R11), for a sandbox that
+    /// could not be set up part way through it.
+    public var evidence = TurnEvidence()
 
     public init(reason: EndedReason?, rawStopReason: String?, usage: TurnUsage? = nil,
                 runtimeError: RuntimeLaunch.TurnError? = nil, failure: SessionFailure? = nil,
@@ -90,6 +93,9 @@ public enum ACPSessionError: Error, Sendable {
 /// Works over any line transport, so the tests drive it with a fake agent in the same
 /// process and never need a network, a credential or a real CLI.
 public actor ACPSession {
+    /// The last `standardErrorKept` characters of the runtime's stderr (064).
+    private(set) var recentStandardError = ""
+
     private let connection: JSONRPCConnection
     private let process: RuntimeProcess?
     private let box = SessionBox()
@@ -132,6 +138,8 @@ public actor ACPSession {
     /// The agent's words in the turn under way, only while `launch` has a
     /// `turnErrorPrefix` to look for in them, and only the start of them.
     private var turnText = ""
+    /// This turn's finished tool calls and words, bounded (064).
+    private(set) var turnEvidence = TurnEvidence()
     /// Whether a `session/prompt` is out, so a failure reported alongside it belongs to
     /// the turn rather than to the session at large (052).
     private var turnInFlight = false
@@ -192,12 +200,18 @@ public actor ACPSession {
     private let events: AsyncStream<ACPSessionEvent>
     private let eventsContinuation: AsyncStream<ACPSessionEvent>.Continuation
 
+    /// The file this session's runtime was started from, when the app started it: a sign-in
+    /// command that names it by its bare name is pointed back at it.
+    let program: URL?
+
     public init(transport: any LineTransport,
                 process: RuntimeProcess? = nil,
+                program: URL? = nil,
                 capabilities: ACP.ClientCapabilities = .none,
                 launch: RuntimeLaunch? = nil,
                 authMethodBeforeContinuing: String? = nil) {
         let box = self.box
+        self.program = program
         self.capabilities = capabilities
         self.launch = launch
         self.authMethodBeforeContinuing = authMethodBeforeContinuing
@@ -226,7 +240,10 @@ public actor ACPSession {
             "clientCapabilities": capabilities.wire,
         ]
         let result = try await connection.call(ACP.Method.initialize, params)
-        let decoded = try result.decode(ACP.InitializeResult.self)
+        var decoded = try result.decode(ACP.InitializeResult.self)
+        if let program {
+            decoded.authMethods = decoded.authMethods?.map { $0.naming(program: program) }
+        }
         initializeResult = decoded
         guard decoded.speaksOurVersion else {
             throw ACPSessionError.unsupportedProtocolVersion(decoded.protocolVersion ?? 0)
@@ -483,6 +500,7 @@ public actor ACPSession {
             "prompt": blocks.wire,
         ]
         turnText = ""
+        turnEvidence = TurnEvidence()
         turnFailure = nil
         turnRateLimit = nil
         turnInFlight = true
@@ -500,12 +518,14 @@ public actor ACPSession {
         if let answered = SessionFailure.from(meta: result["_meta"]) {
             failure = failure?.superseded(by: answered) ?? answered
         }
-        return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
-                          rawStopReason: raw,
-                          usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]),
-                          runtimeError: launch?.turnError(in: turnText),
-                          failure: failure,
-                          rateLimit: turnRateLimit)
+        var turn = TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
+                              rawStopReason: raw,
+                              usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]),
+                              runtimeError: launch?.turnError(in: turnText),
+                              failure: failure,
+                              rateLimit: turnRateLimit)
+        turn.evidence = turnEvidence
+        return turn
     }
 
     /// What the turn consumed, where the runtime said. Read from the raw value rather
@@ -644,12 +664,25 @@ public actor ACPSession {
     }
 
     /// Apply everything the user chose in the start form, in one go.
-    public func apply(_ startOptions: StartOptions) async {
-        for (id, value) in startOptions.values {
+    /// Applies each remembered choice, and returns the ones the runtime refused.
+    @discardableResult
+    public func apply(_ startOptions: StartOptions) async -> [RefusedOption] {
+        var refused: [RefusedOption] = []
+        for (id, value) in startOptions.values.sorted(by: { $0.key < $1.key }) {
             // One option a runtime has since stopped offering must not stop an agent
-            // starting, so a refusal here is noted and passed over.
-            _ = try? await setOption(id: id, value: value)
+            // starting, so a refusal here is handed back to be noted, and passed over.
+            do { _ = try await setOption(id: id, value: value) } catch {
+                refused.append(RefusedOption(id: id, value: value, error: error))
+            }
         }
+        return refused
+    }
+
+    /// A remembered choice the runtime would not take when the agent started.
+    public struct RefusedOption: Sendable {
+        public var id: String
+        public var value: JSONValue
+        public var error: any Error
     }
 
     /// The user's answer to a question the agent is blocked on. `nil` cancels it.
@@ -738,7 +771,7 @@ public actor ACPSession {
         guard notificationTask == nil else { return }
         notificationTask = Task { [weak self] in
             guard let self else { return }
-            for await notification in await self.connection.incomingNotifications() {
+            for await notification in self.connection.incomingNotifications() {
                 await self.receive(notification.method, notification.params)
             }
             // Nothing more is coming, so a marker that has not arrived never will.
@@ -814,6 +847,7 @@ public actor ACPSession {
                case .agentMessage(_, let text, _) = kind {
                 turnText += text
             }
+            if !isReplaying, turnInFlight { turnEvidence.take(kind) }
             eventsContinuation.yield(.entry(kind))
         case .options(let options):
             self.options = options
@@ -1093,7 +1127,20 @@ public actor ACPSession {
     }
 
     func note(standardError: String) {
+        recentStandardError = String((recentStandardError + standardError).suffix(Self.standardErrorKept))
         eventsContinuation.yield(.standardError(standardError))
+    }
+
+    /// How much of what the runtime printed to stderr is kept (064): enough for the lines a
+    /// runtime says before it exits, such as Grok refusing to start without its sandbox.
+    static let standardErrorKept = 8 * 1024
+
+    /// The last of the runtime's stderr, after giving a process that has just failed a
+    /// moment to finish saying why: its words arrive on their own pipe, and can land just
+    /// after the failure they explain.
+    public func standardErrorTail(settling: Duration = .milliseconds(300)) async -> String {
+        if settling > .zero { try? await Task.sleep(for: settling) }
+        return recentStandardError
     }
 
     func noteExit(status: Int32) {
@@ -1134,5 +1181,36 @@ final class SessionBox: @unchecked Sendable {
 
     func note(standardError: String) async {
         await current?.note(standardError: standardError)
+    }
+}
+
+/// What one turn's commands printed and what it said, kept while it runs (064, R11): where
+/// a sandbox that could not be set up shows up, since the runtime carries on after it.
+public struct TurnEvidence: Sendable, Hashable {
+    /// Each finished tool call's output, and whether it completed doing work: a command
+    /// or an edit, not a search or the app's own tools, which change nothing to repeat.
+    public var outputs: [(didWork: Bool, text: String)] = []
+    public var reply = ""
+    private var seen: Set<String> = []
+
+    public init() {}
+
+    public static func == (a: TurnEvidence, b: TurnEvidence) -> Bool {
+        a.reply == b.reply && a.outputs.map(\.text) == b.outputs.map(\.text)
+    }
+    public func hash(into hasher: inout Hasher) { hasher.combine(reply) }
+
+    mutating func take(_ kind: TranscriptEntry.Kind) {
+        switch kind {
+        case .toolCall(let call), .toolCallUpdate(let call):
+            guard call.status == "completed" || call.status == "failed",
+                  let id = call.toolCallID, seen.insert(id).inserted, outputs.count < 200 else { return }
+            let changes = ["execute", "edit", "delete", "move"].contains(call.kind ?? "")
+            outputs.append((call.status == "completed" && changes, String(call.printedText.suffix(8 * 1024))))
+        case .agentMessage(_, let text, _):
+            reply = String((reply + text).suffix(8 * 1024))
+        default:
+            break
+        }
     }
 }

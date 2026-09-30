@@ -30,7 +30,12 @@ the line it printed.
 
 It refuses unless the main checkout (found from the script's own path, so a
 worktree copy works too) is on `main`. It builds there, into `build/DD` and
-`build/DD-ios`, and never edits, stashes, or checks anything out. Logs are
+`build/DD-ios`, and never edits, stashes, or checks anything out. The Mac app and
+bridge are then copied to `~/Applications/AgentsLive/<sha>-<time>/` and the real app
+runs from there, never from `build/DD`: any build in the main checkout writes over
+`build/DD`, and a running app whose files change fails its own signature check, so
+the daemon calls its window, bridge and helpers strangers. It refuses a build that
+is not signed by the team. Copies nothing runs from are removed after the relaunch. Logs are
 `/tmp/ship-app-<sha>/`. The Mac relaunch is the same script, detached, because
 it quits this session's daemon. It checks every pid's command line before
 signalling it, and it never kills by pattern. Its log is
@@ -48,7 +53,7 @@ fails on a locked device, but the install still counts.
 This session may end when the daemon quits. When it comes back, the relaunch
 log must contain all of these:
 
-- `new daemon N: …/build/DD/…/agentsd`
+- `new daemon N: …/AgentsLive/<sha>-<time>/…/agentsd`
 - `CLAUDE vars: 0`
 - a `window:` line
 - a `bridge:` line

@@ -40,6 +40,8 @@ something particular done.
   iPhone or iPad, or a notification.
 - [Send a prompt while an agent is working](send-while-an-agent-works.md): let it wait
   its turn, or put it into the running turn with **Send now**.
+- [See what needs you from your Home screen](see-what-needs-you-from-your-home-screen.md):
+  the number of sessions waiting on you, and a tap that opens one.
 - [Watch an agent's background work](watch-background-work.md): the shells and
   subagents it runs in the background, their output, and **Stop**.
 - [Use a shell in an agent's folder](use-a-shell.md): the Terminal pane, one shell to a

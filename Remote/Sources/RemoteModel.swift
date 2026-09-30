@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import WidgetKit
 import AgentsKitCore
 import Foundation
 import Observation
@@ -403,6 +404,10 @@ final class RemoteModel {
     private(set) var startOptions: [ConfigOption] = []
     /// What has been chosen, by option id. Sent as the start's options.
     private(set) var startChosen: [String: JSONValue] = [:]
+    /// The new agent's own sandbox choice (064). Nil follows its runtime's default.
+    var startSandbox: SandboxChoice?
+    /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
+    private(set) var sandboxSettings = SandboxSettings()
     private(set) var startChoicesState: StartChoicesState = .loading
     /// Why the last Send did not start anything, in one sentence. Shown in the sheet
     /// rather than as the app's alert, which a sheet would hide.
@@ -435,6 +440,9 @@ final class RemoteModel {
             startRuntimeID = work.defaultRuntimeID(available: availableRuntimeIDs)
         }
         await loadStartChoices()
+        // The runtime menu groups by what the Mac's allowances say, so it needs them
+        // before it is opened, not after whoever happens to visit the Runtimes page.
+        await refreshRuntimeAllowances()
     }
 
     /// Put the sheet away. Its runtime is let go; what was typed is the keeper's.
@@ -476,6 +484,7 @@ final class RemoteModel {
     func chooseRuntime(_ runtimeID: String) async {
         guard runtimeID != startRuntimeID else { return }
         startRuntimeID = runtimeID
+        startSandbox = nil
         startRefusal = nil
         await loadStartChoices()
     }
@@ -602,7 +611,7 @@ final class RemoteModel {
         let request = DaemonAPI.StartRequest(
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
-            worktree: startWorktree, requestID: retrying ?? UUID())
+            worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox)
         return await send(start: request)
     }
 
@@ -620,6 +629,12 @@ final class RemoteModel {
             // Send is a fresh start.
             unsettledStart = nil
             startRefusal = refused.message
+            // Its sandbox would not start (064): what it said, and the way on.
+            if refused.code == DaemonAPI.Failure.sandboxWillNotStart,
+               let why = try? refused.data?.decode(DaemonAPI.SandboxWillNotStart.self) {
+                startRefusal = refused.message + " " + (why.detail.split(separator: "\n").first.map(String.init) ?? "")
+                    + (why.offOffered ? " Set Sandbox to Off to start without it." : "")
+            }
             return false
         } catch {
             startRefusal = "Your Mac stopped answering before it said whether the agent started. "
@@ -1051,6 +1066,9 @@ final class RemoteModel {
                 // Anything the shared model does not claim is the Mac's own — shells,
                 // terminals — and a remote has no business with it.
                 _ = self.work.apply(notification.method, notification.params)
+                if Self.attentionNotifications.contains(notification.method) {
+                    self.publishAttention()
+                }
                 if notification.method == DaemonAPI.Notification.attentionChanged,
                    let change = try? notification.params?.decode(DaemonAPI.AttentionNotification.self) {
                     await self.notifier.apply(change, me: .device(self.deviceID))
@@ -1074,6 +1092,10 @@ final class RemoteModel {
                 if notification.method == DaemonAPI.Notification.filesChanged,
                    let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
                     self.files.apply(change)
+                }
+                if notification.method == DaemonAPI.Notification.sandboxChanged,
+                   let settings = try? notification.params?.decode(SandboxSettings.self) {
+                    self.sandboxSettings = settings
                 }
                 if notification.method == DaemonAPI.Notification.runtimeChanged {
                     await self.refreshRuntimes()
@@ -1170,9 +1192,12 @@ final class RemoteModel {
         await refreshWorkflows()
         await refreshRuntimes()
         await refreshModes()
+        await refreshSandboxSettings()
         await settleUnsettledStart()
         await loadTranscript()
         settleSelection()
+        // Once the counts have landed, so the widget's number is this refresh's number.
+        publishAttention()
         if let pendingOpen { open(pendingOpen) }
     }
 
@@ -1186,6 +1211,9 @@ final class RemoteModel {
             Task {
                 await cameToTheFront()
                 await refreshAttention()
+                // A silent push is best effort, so a need that moved while the app was
+                // shut may have been missed; the model is now as true as it can be.
+                publishAttention()
             }
         }
     }
@@ -1263,6 +1291,8 @@ final class RemoteModel {
             return
         }
         guard let pushed = CloudKitMailbox.pushed(from: userInfo) else { return }
+        // A need has moved here or away, which is the one thing the widget counts.
+        publishAttention()
         if pushed.withdrawn || pushed.envelope == nil {
             notifier.withdraw(pushed.token)
             return
@@ -1310,6 +1340,73 @@ final class RemoteModel {
         default:
             return nil
         }
+    }
+
+    // MARK: The Home-screen widget (068)
+
+    /// Write the file the widget reads, and redraw it if what it says has changed.
+    ///
+    /// A widget cannot reach the daemon. WidgetKit loads the extension on demand and
+    /// kills it without warning, so what it is given has to be something that is already
+    /// on disk, and this is the only writer of it (FR-014). Built from the model the
+    /// Remote already holds, so the number on the Home screen is the number the Dock
+    /// badge shows: the same sum over the same live projects.
+    ///
+    /// A push is also what tells the app something moved, so this runs on those too
+    /// rather than waiting for the person to open the app.
+    func publishAttention() {
+        guard AttentionSnapshotStore.write(AttentionSnapshot.make(model: work, at: Date())) else { return }
+        WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
+    }
+
+    /// The notifications that can move the number. The Mac sends a great deal more than
+    /// this — a shell printing, a file changing, a runtime's status — and a widget does
+    /// not redraw for any of those.
+    private static let attentionNotifications: Set<String> = [
+        DaemonAPI.Notification.agentChanged,
+        DaemonAPI.Notification.projectChanged,
+        DaemonAPI.Notification.attentionChanged,
+        DaemonAPI.Notification.agentPermission,
+        DaemonAPI.Notification.agentElicitation,
+    ]
+
+    /// A tap on the widget: `agents://attention` for the body, `agents://agent/<id>` for
+    /// a row.
+    ///
+    /// A body is showing one number over several projects, so it goes to the first
+    /// project with something waiting, and to the projects page when nothing is waiting
+    /// or the app was launched cold and has not heard about any projects yet. A row
+    /// names one agent, and `open(_:)` already knows how to get there.
+    func openedFromTheWidget(_ url: URL) {
+        switch AttentionLink.parse(url) {
+        case .agent(let id):
+            open(id)
+            // A row drawn a few minutes ago can name a session that has gone since, and
+            // a tap that names nothing left must not look like a tap that did nothing.
+            // `open` has kept the id, so the conversation still opens if the agents are
+            // merely late; a project is shown until then.
+            if work.agent(id) == nil { showTheFirstProjectNeedingYou() }
+        case .attention:
+            showTheFirstProjectNeedingYou()
+        case nil:
+            break
+        }
+    }
+
+    /// The projects page, with the first project that has somebody waiting already open.
+    private func showTheFirstProjectNeedingYou() {
+        openWorkflow = nil
+        selection = nil
+        selectedProject = work.liveProjects.first(where: needsYou)?.project.folder
+    }
+
+    /// Whether anything in a project is waiting on a person: the same sum the widget
+    /// shows, asked of one project. Counted from this model's own grouping, which is the
+    /// one that knows whether a person has looked at an agent, and not the counts the
+    /// daemon sent.
+    private func needsYou(_ summary: DaemonAPI.ProjectSummary) -> Bool {
+        let counts = work.counts(in: summary.project.folder)
+        return (counts[.needsAttention] ?? 0) + (counts[.blocked] ?? 0) > 0
     }
 
     private func identify() async {
@@ -1561,6 +1658,38 @@ final class RemoteModel {
         guard let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
                                                  returning: DaemonAPI.RememberedModes.self) else { return }
         work.replaceRememberedModes(modes)
+    }
+
+    /// A Mac too old to know the method leaves every runtime as configured, which is
+    /// what it does.
+    private func refreshSandboxSettings() async {
+        guard let settings = try? await client.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
+                                                    returning: SandboxSettings.self) else { return }
+        sandboxSettings = settings
+    }
+
+    /// One agent's own sandbox choice from the phone (064); nil follows the default.
+    func setAgentSandbox(_ agentID: UUID, _ choice: SandboxChoice?) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsSetSandbox,
+                                  DaemonAPI.SetSandboxRequest(agentID: agentID, choice: choice))
+        } catch {
+            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+        }
+    }
+
+    /// The sandbox card's answer, from the phone (064, FR-007a).
+    func answerSandbox(_ agentID: UUID, carryOn: Bool) async {
+        do {
+            try await client.call(DaemonAPI.Method.agentsAnswerSandbox,
+                                  DaemonAPI.AnswerSandboxRequest(agentID: agentID, carryOn: carryOn))
+        } catch {
+            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+        }
     }
 
     private func refreshRuntimes() async {
@@ -1848,6 +1977,10 @@ final class RemoteModel {
     func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
     func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+    /// Park or unpark, whichever `Agent.parkAction` offers (040). From the card's menu.
+    func perform(_ action: ParkAction, on agentID: UUID) async {
+        await act(action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark, agentID)
+    }
 
     private func act(_ method: String, _ agentID: UUID) async {
         guard !isStale else {

@@ -24,7 +24,7 @@ struct ReachDots: View {
     }
 
     static func letter(_ runtimeID: String) -> String {
-        ["claude": "C", "codex": "X", "grok": "G", "cursor": "U", "copilot": "P", "gemini": "M", "antigravity": "A"][runtimeID]
+        ["claude": "C", "codex": "X", "grok": "G", "cursor": "U", "copilot": "P", "gemini": "M", "antigravity": "A", "opencode": "O"][runtimeID]
             ?? String(runtimeID.prefix(1)).uppercased()
     }
 

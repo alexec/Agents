@@ -44,7 +44,7 @@ struct InterruptionTests {
 
         // On its own task, as a window's request is: `prompt` waits for the start,
         // and the stop has to be able to arrive while it does.
-        Task { try await core.prompt(.init(agentID: id, text: "second")) }
+        _ = Task { try await core.prompt(.init(agentID: id, text: "second")) }
         await eventually("the runtime is on its way") { launcher.launchCount == 2 }
         try await core.stop(id)
 

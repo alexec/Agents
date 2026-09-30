@@ -91,6 +91,11 @@ extension DaemonCore {
                 try lendCredential(request, connection: connection)
                 return .success([:])
 
+            case DaemonAPI.Method.credentialsLendSignIn:
+                let request = try require(params, as: DaemonAPI.SignInLend.self)
+                try lendSignIn(request, connection: connection)
+                return .success([:])
+
             case DaemonAPI.Method.filesWrite:
                 let request = try require(params, as: DaemonAPI.FilesWriteRequest.self)
                 return .success(try JSONValue.encoding(try writeAttachment(request)))
@@ -485,6 +490,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.SetOptionRequest.self)
                 return .success(try JSONValue.encoding(try await setOption(request)))
 
+            case DaemonAPI.Method.agentsSetSandbox:
+                let request = try require(params, as: DaemonAPI.SetSandboxRequest.self)
+                return .success(try JSONValue.encoding(try await setSandbox(request)))
+
+            case DaemonAPI.Method.agentsAnswerSandbox:
+                let request = try require(params, as: DaemonAPI.AnswerSandboxRequest.self)
+                return .success(try JSONValue.encoding(try await answerSandbox(request)))
+
             case DaemonAPI.Method.agentsSetCeiling:
                 let request = try require(params, as: DaemonAPI.SetCeilingRequest.self)
                 return .success(try JSONValue.encoding(try await setCeiling(request)))
@@ -498,19 +511,19 @@ extension DaemonCore {
             // already in place heard no broadcast, and would otherwise say nothing
             // about it until the verdict next moved (024 T037).
             case DaemonAPI.Method.wakeState:
-                return .success(try JSONValue.encoding(await wakeState()))
+                return .success(try JSONValue.encoding(wakeState()))
 
             case DaemonAPI.Method.wakeSettings:
-                return .success(try JSONValue.encoding(await readWakeSettings()))
+                return .success(try JSONValue.encoding(readWakeSettings()))
 
             case DaemonAPI.Method.wakeSet:
                 let settings = try require(params, as: WakeSettings.self)
-                return .success(try JSONValue.encoding(await setWakeSettings(settings)))
+                return .success(try JSONValue.encoding(setWakeSettings(settings)))
 
             // Retiring archived agents (051). The two writes are the person's; the
             // role table keeps devices and agents to the reads.
             case DaemonAPI.Method.retentionState:
-                return .success(try JSONValue.encoding(await retentionState()))
+                return .success(try JSONValue.encoding(retentionState()))
 
             case DaemonAPI.Method.retentionSet:
                 let request = try require(params, as: DaemonAPI.RetentionSetRequest.self)
@@ -522,7 +535,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.agentsRetired:
                 let request = try require(params, as: DaemonAPI.RetiredRequest.self)
-                return .success(try JSONValue.encoding(await retiredTombstones(request)))
+                return .success(try JSONValue.encoding(retiredTombstones(request)))
 
             case DaemonAPI.Method.clientPermissionsState:
                 return .success(try JSONValue.encoding(clientPermissionState()))
@@ -530,6 +543,13 @@ extension DaemonCore {
             case DaemonAPI.Method.clientPermissionsSet:
                 let settings = try require(params, as: ClientPermissionSettings.self)
                 return .success(try JSONValue.encoding(try setClientPermissions(settings)))
+
+            case DaemonAPI.Method.sandboxState:
+                return .success(try JSONValue.encoding(sandboxSettings))
+
+            case DaemonAPI.Method.sandboxSet:
+                let settings = try require(params, as: SandboxSettings.self)
+                return .success(try JSONValue.encoding(try setSandboxSettings(settings)))
 
             case DaemonAPI.Method.runtimesAllowances:
                 // Someone is looking at the runtimes: ask what is left, behind the answer.

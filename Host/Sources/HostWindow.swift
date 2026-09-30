@@ -175,7 +175,7 @@ struct HostWindow: View {
             Circle().fill(model.controlRunning ? Color.green : Color.orange).frame(width: 9, height: 9)
             VStack(alignment: .leading, spacing: 2) {
                 if model.controlRunning {
-                    (Text("Running at ") + Text(model.controlURL).font(.system(.body, design: .monospaced)))
+                    Text("Running at \(Text(model.controlURL).font(.system(.body, design: .monospaced)))")
                 } else {
                     Text(model.busy ?? "Not running")
                 }

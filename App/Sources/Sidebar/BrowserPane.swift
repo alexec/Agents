@@ -234,7 +234,7 @@ private struct WebViewHost: NSViewRepresentable {
         // Only the four schemes, and visibly refused otherwise.
         func webView(_ webView: WKWebView,
                      decidePolicyFor navigationAction: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+                     decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
             switch BrowserPolicy.decide(navigationAction.request.url) {
             case .allow:
                 decisionHandler(.allow)
@@ -248,7 +248,7 @@ private struct WebViewHost: NSViewRepresentable {
         // than silently dropped, so the user is not left waiting for a file.
         func webView(_ webView: WKWebView,
                      decidePolicyFor navigationResponse: WKNavigationResponse,
-                     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+                     decisionHandler: @escaping @MainActor (WKNavigationResponsePolicy) -> Void) {
             guard navigationResponse.canShowMIMEType else {
                 holder.failure = "This pane shows web pages. It does not download files."
                 decisionHandler(.cancel)
@@ -262,7 +262,7 @@ private struct WebViewHost: NSViewRepresentable {
                      requestMediaCapturePermissionFor origin: WKSecurityOrigin,
                      initiatedByFrame frame: WKFrameInfo,
                      type: WKMediaCaptureType,
-                     decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+                     decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
             decisionHandler(.prompt)
         }
 

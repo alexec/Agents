@@ -112,6 +112,11 @@ public enum ACP {
         /// with `end_turn` and the failure under `_meta`, and a client that does not read
         /// it would call the turn done.
         public var sessionFailures: Bool
+        /// `_meta["terminal-auth"]`, the older spelling of `auth.terminal`. Only for a runtime
+        /// that needs it to name its sign-in command (049: OpenCode, research R6); never in
+        /// `.app`, because Claude's adapter then adds a terminal command to every method and
+        /// the app would stop signing Claude in itself (measured 2026-09-29).
+        public var terminalAuthMeta: Bool = false
 
         public init(readTextFile: Bool = false,
                     writeTextFile: Bool = false,
@@ -191,11 +196,14 @@ public enum ACP {
             if backgroundTasks { air.append("asyncTasks") }
             if subagentSessions { air.append("nativeSubagentSessions") }
             if sessionFailures { air.append("sessionFailure") }
+            var meta: [String: JSONValue] = [:]
             if !air.isEmpty {
                 // Version 1 is the only one either adapter reads, and each checks for
                 // `>= 1`, so this is the floor rather than a guess.
-                caps["_meta"] = ["jetbrains": ["air": ["version": 1, "capabilities": .array(air)]]]
+                meta["jetbrains"] = ["air": ["version": 1, "capabilities": .array(air)]]
             }
+            if terminalAuthMeta { meta["terminal-auth"] = .bool(true) }
+            if !meta.isEmpty { caps["_meta"] = .object(meta) }
             return .object(caps)
         }
     }
@@ -299,6 +307,21 @@ public enum ACP {
         public var description: String?
         public var _meta: JSONValue?
 
+        /// The same method with a terminal command that names the runtime's program by its
+        /// bare name pointed at `program`, the file the app actually started. OpenCode
+        /// names itself `opencode` (049 research R6), and an `opencode` looked up on the
+        /// person's PATH may be another program altogether (the name trap), so the sheet
+        /// hands over the app's own copy by its full path. Any other command is left alone.
+        public func naming(program: URL) -> AuthMethod {
+            guard case .object(var meta) = _meta, case .object(var auth) = meta["terminal-auth"],
+                  auth["command"]?.stringValue == program.lastPathComponent else { return self }
+            auth["command"] = .string(program.path)
+            meta["terminal-auth"] = .object(auth)
+            var method = self
+            method._meta = .object(meta)
+            return method
+        }
+
         /// Copilot puts the command that fixes it in `_meta.terminal-auth`, which is
         /// worth showing verbatim rather than inventing advice of our own.
         public var terminalCommand: String? {
@@ -306,7 +329,15 @@ public enum ACP {
             let command = auth["command"]?.stringValue
             let args = auth["args"]?.arrayValue?.compactMap(\.stringValue) ?? []
             guard let command else { return nil }
-            return ([command] + args).joined(separator: " ")
+            return ([command] + args).map(Self.shellWord).joined(separator: " ")
+        }
+
+        /// A word as a shell reads it back: as it is when it is plain, single-quoted when it
+        /// is not, so a path under "Application Support" pastes into Terminal whole.
+        static func shellWord(_ word: String) -> String {
+            let plain = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_./=:@%+,")
+            guard !word.isEmpty, word.unicodeScalars.contains(where: { !plain.contains($0) }) else { return word.isEmpty ? "''" : word }
+            return "'" + word.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
         }
 
         /// What the runtime says about this method, minus any sentence telling the user

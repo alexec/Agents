@@ -11,6 +11,10 @@ as a dev server or a long test run, or hand part of the work to a subagent of it
 Each one is listed over the prompt while it runs, and you can read it, or stop a shell,
 without stopping the agent.
 
+Only Claude and Codex report what they start, so only their work shows in this list. When
+another runtime starts a subagent of its own, the agent is running it and this list stays
+empty; you can still read the agent's own account of it in the conversation.
+
 ## Before you start
 
 - An agent on a runtime that tells the app about its background work: today Claude and

@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: Why an agent in the app loses its runtime's own scheduler, subagents and report tools, what it keeps, and why your own setup is untouched.
+description: Why an agent in the app loses its runtime's own scheduler, report and document-store tools, what it keeps, and why your own setup is untouched.
 ---
 
 # Why agents' own tools are taken away
@@ -48,12 +48,14 @@ Nothing the work itself needs is touched. Reading, searching, editing and writin
 running commands, planning, and keeping a to-do list all stay. So does searching and
 reading the web, where the runtime has it.
 
-A runtime's own subagents and background commands stay too, where the app can show them.
-Claude and Codex tell the app about each one as it starts and ends, so each appears in a
-list over the prompt, with **Stop** for a background command, and ends with the turn that
-started it (see [Watch an agent's background work](../how-to/watch-background-work.md)). What
-is taken away is the part that reaches other agents as peers: Claude's tools for listing
-agents and sending them messages.
+A runtime's own subagents and background commands stay too, and every runtime that has
+them keeps them: starting one, listing them, reading what they printed, and stopping one.
+Claude and Codex are the two that also tell the app about each one as it starts and ends, so
+each appears in a list over the prompt, with **Stop** for a background command, and ends with
+the turn that started it (see [Watch an agent's background work](../how-to/watch-background-work.md)).
+The others use their own, and the app does not draw them. A runtime's own task list or
+tracker stays for the same reason, so an agent can keep track of a job in the way its
+runtime does that.
 
 The runtime's tool for asking you a question also stays, on purpose. When an agent asks
 you something that way, the app holds the question and shows it to you as a card, on the
@@ -66,31 +68,39 @@ The runtimes do not all offer the same way to take a tool away, so the app uses 
 each one has.
 
 - **Claude** takes a list of tools to deny for each session. It loses its schedulers,
-  monitors and workflows, its push notifications, its tools for listing and messaging other
-  agents, its own worktree tools, its report tools, and connectors that store documents. It
-  keeps its subagents and its tools for reading and stopping background work, which the
-  app shows. Other connectors you have set up are left alone.
+  monitors and workflows, its push notifications, its own worktree tools, its report tools,
+  and connectors that store documents. It keeps its subagents — starting, listing,
+  messaging, reading and stopping them — and its tools for reading and stopping background
+  work, which the app shows. Other connectors you have set up are left alone.
 - **Grok** takes a list of the tools to keep for each session, plus a settings file the
-  app writes inside its own folder. It loses its scheduler, its feedback tool and its
-  subagents. Two of its tools, `workflow` and `monitor`, cannot be removed this way, so the
-  agent is told in its briefing not to use them. Grok keeps its question tool too, but
-  that tool has no way to reach the app, so Grok asks by ending its turn with the question
-  as its summary, and waits for your reply. Grok also hides this app's own tools behind a
-  search, so each Grok session is handed those tools by name, with their arguments, and
-  told to call them directly.
-- **Copilot** takes options when it starts. It loses its subagents and its session store,
-  and the app does not attach Copilot's built-in MCP servers to its sessions.
-- **Cursor** has no way to take a tool away. Its three conflicting tools stay, and the
-  agent's briefing names them and says what to use instead. The first briefing points
-  Cursor directly to the Agents app's MCP tools, whose schemas are available from the
-  server.
+  app writes inside its own folder. It loses its scheduler and its feedback tool, and keeps
+  its subagents and its to-do list. Two of its tools, `workflow` and `monitor`, cannot be
+  removed this way, so the agent is told in its briefing not to use them. Grok keeps its
+  question tool too, but that tool has no way to reach the app, so Grok asks by ending its
+  turn with the question as its summary, and waits for your reply. Grok also hides this
+  app's own tools behind a search, so each Grok session is handed those tools by name, with
+  their arguments, and told to call them directly.
+- **Copilot** takes options when it starts. It keeps its subagents and loses its session
+  store, and the app does not attach Copilot's built-in MCP servers to its sessions.
+- **Cursor** has no way to take a tool away, and nothing left to take away: its subagent
+  tool and its two goal tools are the app's business now too, so they are used. The first
+  briefing points Cursor directly to the Agents app's MCP tools, whose schemas are available
+  from the server.
 - **Codex** takes feature switches in a variable set only for the sessions the app starts.
-  It loses its sleep tool, its long-running goals, its automations, its memories and its
-  ChatGPT connectors. Its sub-agents are switched on, and the app shows them as it does
+  It loses its sleep tool, its automations, its memories and its ChatGPT connectors. Its
+  sub-agents and its goals are switched on, and the app shows the sub-agents as it does
   Claude's. Its question tool stays, and its questions reach you as a card.
-- **Gemini** loses its own subagents and task tracker.
-- **Antigravity** takes a list of tools to deny for each session. It loses its tool for
-  starting subagents; its question tool stays, and its questions reach you as a card.
+- **Gemini** keeps its own subagents and task tracker, so it is sent no policy file at all.
+- **Antigravity** takes a list of tools to deny for each session, and has nothing left in
+  it, so it is sent no list; its question tool stays, and its questions reach you as a card.
+- **OpenCode** takes its own settings in a variable set only for the sessions the app
+  starts, laid over your `opencode.json` for that process. It keeps its subagent tool and
+  its to-do list, as Claude's and Gemini's do. Sharing a conversation to OpenCode's website
+  and self-update are switched off, as switches your own settings cannot turn back on. Left
+  to itself OpenCode asks for nothing, so the app makes it ask before editing files, running
+  commands and fetching web pages, unless you choose **Always-approve** for it in
+  **Settings ▸ Agent Runtimes**. Its own question tool is off, so its questions come through
+  the app's and reach you as a card.
 
 Where a tool can only be named in the briefing, the agent is being asked, not stopped.
 That is weaker, and the app says so rather than pretending otherwise.

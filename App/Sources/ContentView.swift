@@ -55,7 +55,7 @@ struct ContentView: View {
     }
 
     private var isShowingActivity: Bool {
-        model.showsEvents || model.showsResources || model.showsSpending
+        model.showsEvents || model.showsResources || model.showsRuntimes || model.showsSpending
     }
 
     /// The projects column, the same in both layouts.
@@ -97,6 +97,8 @@ struct ContentView: View {
             EventsView().paperGround()
         } else if model.showsResources {
             ResourcesView().paperGround()
+        } else if model.showsRuntimes {
+            RuntimesView().paperGround()
         } else if model.showsSpending {
             SpendingView().paperGround()
         } else if let id = model.openWorkflow {

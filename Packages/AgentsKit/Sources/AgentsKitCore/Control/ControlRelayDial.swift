@@ -12,7 +12,7 @@ public extension ControlCodeUse {
                             channel: any RelayChannel,
                             onTrouble: @escaping @Sendable (RelayTrouble) -> Void = { _ in })
         throws -> @Sendable () async throws -> any LineTransport {
-        guard let text = membership.url, let url = URL(string: text), let origin = ControlAuth.origin(url),
+        guard let text = membership.url, let url = URL(string: text), ControlAuth.origin(url) != nil,
               let client = membership.client else {
             throw Failure("that membership has no address; it is from the first build")
         }

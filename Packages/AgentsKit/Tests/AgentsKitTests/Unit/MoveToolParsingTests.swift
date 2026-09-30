@@ -3,82 +3,79 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// What `enter_worktree` and `exit_worktree` make of their arguments before the daemon
-/// hears them (053, contracts/move.md §1).
-@Suite("The move tools' arguments")
+/// What `finish_turn`'s move arguments make of themselves before the daemon hears them
+/// (053, contracts/move.md §1).
+@Suite("The move arguments")
 struct MoveToolParsingTests {
-    private func read(_ name: String, _ arguments: JSONValue?) -> Result<AppService.MoveCall, AppService.AgentCallProblem>? {
-        AppService.moveCall(named: "mcp__agents__" + name, arguments)
+    private func read(_ arguments: JSONValue?) -> Result<AppService.MoveCall?, AppService.AgentCallProblem> {
+        AppService.moveCall(arguments)
     }
 
-    private func refusal(_ result: Result<AppService.MoveCall, AppService.AgentCallProblem>?) -> String? {
+    private func refusal(_ result: Result<AppService.MoveCall?, AppService.AgentCallProblem>) -> String? {
         if case .failure(let problem) = result { return problem.message }
         return nil
     }
 
-    @Test func enteringWithNothingMakesANewWorktreeNamedFromTheTitle() throws {
-        #expect(try read("enter_worktree", nil)?.get() == .move(target: .newWorktree(name: nil), removeLeft: false, discardChanges: false))
-        #expect(try read("enter_worktree", [:])?.get() == .move(target: .newWorktree(name: nil), removeLeft: false, discardChanges: false))
+    @Test func noMoveArgumentsAskForNoMove() throws {
+        #expect(try read(nil).get() == nil)
+        #expect(try read(["outcome": "done", "message": "Done."]).get() == nil)
+        #expect(try read(["worktree": "  "]).get() == nil, "a blank name is no name")
     }
 
     @Test func aNameMakesANewOneAndAPathEntersOneThere() throws {
-        #expect(try read("enter_worktree", ["name": "fix-login"])?.get()
+        #expect(try read(["worktree": "fix-login"]).get()
                 == .move(target: .newWorktree(name: "fix-login"), removeLeft: false, discardChanges: false))
-        #expect(try read("enter_worktree", ["path": "/tmp/repo/.agents/worktrees/x"])?.get()
+        #expect(try read(["worktree": "/tmp/repo/.agents/worktrees/x"]).get()
                 == .move(target: .existing(URL(filePath: "/tmp/repo/.agents/worktrees/x", directoryHint: .isDirectory)),
                          removeLeft: false, discardChanges: false))
     }
 
-    @Test func nameAndPathTogetherOrARelativePathAreRefused() {
-        #expect(refusal(read("enter_worktree", ["name": "a", "path": "/tmp/b"])) == "Nothing was moved: give name for a new worktree or path for one already there, not both.")
-        #expect(refusal(read("enter_worktree", ["path": "worktrees/b"])) == "Nothing was moved: path has to be an absolute path, starting at /.")
+    @Test func enteringAndLeavingTogetherAreRefused() {
+        #expect(refusal(read(["worktree": "a", "leave_worktree": "keep"]))
+                == "Nothing was recorded: give worktree to move into one, or leave_worktree to go back to the project folder, not both.")
     }
 
-    @Test func exitingNeedsAnAction() {
-        #expect(refusal(read("exit_worktree", nil)) == "Nothing was moved: action has to be keep or remove.")
-        #expect(refusal(read("exit_worktree", ["action": "delete"])) == "Nothing was moved: action has to be keep or remove.")
+    @Test func leavingNeedsKeepOrRemove() {
+        #expect(refusal(read(["leave_worktree": "delete"])) == "Nothing was recorded: leave_worktree has to be keep or remove.")
     }
 
     @Test func keepAndRemoveBothGoBackToTheProjectFolder() throws {
-        #expect(try read("exit_worktree", ["action": "keep"])?.get() == .move(target: .projectFolder, removeLeft: false, discardChanges: false))
-        #expect(try read("exit_worktree", ["action": "remove"])?.get() == .move(target: .projectFolder, removeLeft: true, discardChanges: false))
-        #expect(try read("exit_worktree", ["action": "remove", "discard_changes": true])?.get()
+        #expect(try read(["leave_worktree": "keep"]).get() == .move(target: .projectFolder, removeLeft: false, discardChanges: false))
+        #expect(try read(["leave_worktree": "remove"]).get() == .move(target: .projectFolder, removeLeft: true, discardChanges: false))
+        #expect(try read(["leave_worktree": "remove", "discard_changes": true]).get()
                 == .move(target: .projectFolder, removeLeft: true, discardChanges: true))
     }
 
     @Test func discardingGoesOnlyWithRemove() {
-        #expect(refusal(read("exit_worktree", ["action": "keep", "discard_changes": true])) == "Nothing was moved: discard_changes only goes with action remove.")
+        let words = "Nothing was recorded: discard_changes only goes with leave_worktree remove."
+        #expect(refusal(read(["leave_worktree": "keep", "discard_changes": true])) == words)
+        #expect(refusal(read(["worktree": "a", "discard_changes": true])) == words)
+        #expect(refusal(read(["discard_changes": true])) == words)
     }
 
-    @Test func otherToolsAreNotMoves() {
-        #expect(read("finish_turn", nil) == nil)
-        #expect(read("EnterWorktree", nil) == nil, "Claude's own is not ours")
-    }
-
-    /// The app tells tools apart by the end of their names, so no name may end with another.
-    @Test func noToolNameEndsWithAnother() {
-        let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.startAgent,
-                     AppTool.stopAgent, AppTool.archiveAgent, AppTool.listMyAgents, AppTool.leaseResource,
-                     AppTool.listResources, AppTool.waitForEvent, AppTool.cancelWait,
-                     AppTool.publishEvent,
-                     AppTool.suggestPrompts, AppTool.reportOutcome]
-        for move in [AppTool.enterWorktree, AppTool.exitWorktree] {
-            for other in names + [AppTool.enterWorktree, AppTool.exitWorktree] where other != move {
-                #expect(!move.hasSuffix(other) && !other.hasSuffix(move), "\(move) and \(other)")
-            }
+    /// The move rides on the call that ends the turn: there are no tools of its own.
+    @Test func finishTurnCarriesTheMoveForEveryAgent() {
+        let listed = AppService.tools(managesAgents: false)
+        let names = listed.compactMap { $0["name"]?.stringValue }
+        #expect(!names.contains("enter_worktree") && !names.contains("exit_worktree"))
+        let finish = listed.first { $0["name"]?.stringValue == AppTool.finishTurn }
+        for key in AppService.movingArguments {
+            #expect(finish?["inputSchema"]?["properties"]?[key] != nil, "\(key)")
         }
-    }
-
-    @Test func bothAreListedForEveryAgent() async throws {
-        let listed = AppService.tools(managesAgents: false).compactMap { $0["name"]?.stringValue }
-        #expect(listed.contains(AppTool.enterWorktree) && listed.contains(AppTool.exitWorktree))
+        #expect(finish?["description"]?.stringValue?.contains("leave_worktree") == true)
     }
 
     /// Not for an agent on a runtime that would forget its conversation in another folder.
-    @Test func neitherIsListedWhenTheRuntimeCannotMove() {
-        let listed = AppService.tools(managesAgents: true, movesItself: false).compactMap { $0["name"]?.stringValue }
-        #expect(!listed.contains(AppTool.enterWorktree) && !listed.contains(AppTool.exitWorktree))
-        #expect(listed.contains(AppTool.finishTurn))
+    @Test func noMoveIsOfferedWhenTheRuntimeCannotMove() {
+        let listed = AppService.tools(managesAgents: true, movesItself: false)
+        let finish = listed.first { $0["name"]?.stringValue == AppTool.finishTurn }
+        for key in AppService.movingArguments {
+            #expect(finish?["inputSchema"]?["properties"]?[key] == nil, "\(key)")
+        }
+        #expect(finish?["inputSchema"]?["properties"]?["outcome"] != nil)
+        let description = finish?["description"]?.stringValue ?? ""
+        #expect(!description.contains("worktree"))
+        #expect(description.hasSuffix("It is how you end."))
     }
 
     /// Measured, 2026-09-26: these carried their conversation into another folder; Grok did not.

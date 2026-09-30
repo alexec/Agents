@@ -136,7 +136,7 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         return authorised ?? false
     }
 
-    private static let log = Logger(subsystem: "com.alexecollins.agents", category: "notifier")
+    private nonisolated static let log = Logger(subsystem: "com.alexecollins.agents", category: "notifier")
 
     // MARK: UNUserNotificationCenterDelegate
 

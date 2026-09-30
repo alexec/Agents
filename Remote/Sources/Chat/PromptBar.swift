@@ -454,6 +454,15 @@ struct PromptBar: View {
                 ForEach(shown.filter(\.isAboutPermission)) { option in
                     OptionMenu(option: option, chosen: binding(for: option))
                 }
+                // The command sandbox, beside the mode, as on the Mac (064).
+                SandboxCapsule(runtimeID: agent.runtimeID,
+                               override: agent.sandboxOverride,
+                               runtimeDefault: model.sandboxSettings.choice(for: agent.runtimeID),
+                               codexMode: agent.startOptions.values["mode"]?.stringValue,
+                               effective: agent.effectiveSandbox,
+                               isWorking: agent.state == .running) { choice in
+                    Task { await model.setAgentSandbox(agent.id, choice) }
+                }
                 Spacer(minLength: 16)
                 let others = shown.filter { !$0.isAboutPermission }
                 if !others.isEmpty {

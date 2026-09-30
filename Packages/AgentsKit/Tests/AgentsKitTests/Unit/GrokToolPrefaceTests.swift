@@ -21,8 +21,8 @@ struct GrokToolPrefaceTests {
         #expect(rules.contains("permission-mode: plan"))
         #expect(!rules.contains(AppTool.suggestPrompts))
         #expect(!rules.contains(AppTool.reportOutcome))
-        #expect(!rules.contains(AppTool.enterWorktree))
-        #expect(!rules.contains(AppTool.exitWorktree))
+        // Grok cannot carry its conversation into another folder (053).
+        #expect(!rules.contains("leave_worktree"))
     }
 
     @Test func aHelperIsNotToldHowToStartAnAgent() {

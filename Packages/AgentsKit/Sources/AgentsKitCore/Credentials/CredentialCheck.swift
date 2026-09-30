@@ -1,5 +1,4 @@
 #if canImport(Security)
-import AgentsKitCore
 import Foundation
 
 /// Asking the provider whether a credential works, when it is saved (043, FR-011, R9):

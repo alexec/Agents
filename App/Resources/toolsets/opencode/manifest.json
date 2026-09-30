@@ -1,0 +1,72 @@
+{
+  "kind": "archive",
+  "minFreeBytes": 500000000,
+  "platforms": {
+    "darwin-aarch64": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "24b12873e605b3db3387cb355f43ba7451cd6065c180d8c188663337d2eeb553",
+      "size": 46317276,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-darwin-arm64.zip"
+    },
+    "darwin-x86_64": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "90c7e7d9ffa0d8691ca0f15b42a7b89b72e17a4d26074b9ef06559ff87b221ec",
+      "size": 48506384,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-darwin-x64.zip"
+    },
+    "darwin-x86_64-baseline": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "61fd2f89695c0fc75053737189e489d490bc4bdccd9dbfd78c6532101df9e9fa",
+      "size": 48506384,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-darwin-x64-baseline.zip"
+    },
+    "linux-aarch64": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "c63486624621924bf43be5c01abd252885661a734814224f6d70188a33aea858",
+      "size": 60445510,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-linux-arm64.tar.gz"
+    },
+    "linux-aarch64-musl": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "916e4ca40cdd43025b7741a6c60cd1141b8622a8531e2eebdffcfd3e41f56907",
+      "size": 62565070,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-linux-arm64-musl.tar.gz"
+    },
+    "linux-x86_64": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "e546123213ae47909a4268692aa4b94950d011afe9cac9938753a2194f1c16d5",
+      "size": 60628669,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-linux-x64.tar.gz"
+    },
+    "linux-x86_64-baseline": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "440ca65423e99505cf285f8660684503cc54f6f9e6b64cfcd11bf412369be6d5",
+      "size": 60628670,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-linux-x64-baseline.tar.gz"
+    },
+    "linux-x86_64-baseline-musl": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "73e9b259761fca92c8480a078c09c1e911baf2621b60046b95aa12b9dd8e9f60",
+      "size": 62995223,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-linux-x64-baseline-musl.tar.gz"
+    },
+    "linux-x86_64-musl": {
+      "arguments": [],
+      "command": "opencode",
+      "sha256": "56636216a0b6595339ffdd5e2c885e6ea68a854f880720120e8cfa71172042c2",
+      "size": 62994730,
+      "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.33/opencode-linux-x64-musl.tar.gz"
+    }
+  },
+  "runtimeID": "opencode",
+  "source": "github:anomalyco/opencode@v1.18.33",
+  "version": "1.18.33"
+}

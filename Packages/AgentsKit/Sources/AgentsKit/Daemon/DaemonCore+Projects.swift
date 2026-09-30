@@ -194,7 +194,13 @@ extension DaemonCore {
     /// `managesAgents` is false for an agent another agent started. Grok's rules name
     /// only the tools that session's server will offer, so a helper is not told how to
     /// call `start_agent`.
-    func sessionMeta(runtimeID: String, cwd: URL, managesAgents: Bool = true) -> JSONValue? {
+    func sessionMeta(runtimeID: String, cwd: URL, managesAgents: Bool = true,
+                     sandbox: SandboxChoice = .runtime) -> JSONValue? {
+        Self.merging(scopingMeta(runtimeID: runtimeID, cwd: cwd, managesAgents: managesAgents),
+                     LaunchSandbox.meta(runtimeID: runtimeID, choice: sandbox))
+    }
+
+    private func scopingMeta(runtimeID: String, cwd: URL, managesAgents: Bool) -> JSONValue? {
         let plugins = approvedPluginFolders(for: cwd)
         DotAgents.refreshPlugins(for: cwd, approved: plugins)
         // The person's own plugins after the project's (054, R12), for the runtimes that

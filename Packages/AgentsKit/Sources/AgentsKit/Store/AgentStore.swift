@@ -242,7 +242,7 @@ public actor AgentStore {
         let url = locations.transcript(agentID)
         try FileManager.default.createDirectory(at: locations.agent(agentID), withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(atPath: url.path, contents: nil)
+            _ = FileManager.default.createFile(atPath: url.path, contents: nil)
         }
         let handle = try FileHandle(forUpdating: url)
         let end = try handle.seekToEnd()
@@ -369,12 +369,20 @@ public actor AgentStore {
                 openStart = next
             }
         }
+        let end = min(before ?? known.count, known.count)
+        let start = max(0, end - limit)
+        // Older turn files kept only the last block. Restore the concise context
+        // for the requested page from the transcript, then cache it for this reader.
+        for offset in start..<end where known[offset].concise == nil {
+            let turn = known[offset]
+            let entries = try reader.page(index, before: turn.end,
+                                          limit: turn.end - turn.start).entries
+            known[offset].concise = TurnSummary.of(entries, start: turn.start).concise
+        }
         if turnCache[agentID] == nil, turnCache.count >= Self.indexedTranscripts {
             turnCache.removeAll(keepingCapacity: true)
         }
         turnCache[agentID] = known
-        let end = min(before ?? known.count, known.count)
-        let start = max(0, end - limit)
         return TurnsPage(turns: Array(known[start..<end]), firstTurn: start, openStart: openStart)
     }
 
@@ -391,7 +399,7 @@ public actor AgentStore {
     private func appendTurns(_ turns: [TurnSummary], for agentID: UUID) throws {
         let url = locations.turns(agentID)
         if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(atPath: url.path, contents: nil)
+            _ = FileManager.default.createFile(atPath: url.path, contents: nil)
         }
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }

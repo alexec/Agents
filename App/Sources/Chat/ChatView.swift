@@ -27,6 +27,11 @@ struct ChatView: View {
             if let agent {
                 ZStack(alignment: .bottom) {
                     Transcript(agent: agent, bottomInset: formHeight)
+                        // What was exchanged, a swipe away, as on the phone.
+                        .swipeToShowPane(show: {
+                            frame.pane = .artifacts
+                            if !frame.isOpen, SidebarFrame.fits(inWindowOf: frame.windowWidth) { frame.open() }
+                        }, hide: { frame.isOpen = false })
                         // Over the chat rather than in the toolbar, whose trailing end
                         // is above the sidebar whenever the sidebar is open. The
                         // transcript scrolls on under it, as it does under the prompt.
@@ -89,7 +94,17 @@ struct ChatView: View {
                 guard let agent = model.selectedAgent else { return }
                 Task { await BackgroundOutput.open(item, of: agent, model: model) }
             },
-            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
+            continueWithoutSandbox: sandboxAnswer(carryOn: true),
+            keepStopped: sandboxAnswer(carryOn: false),
+            waitingSandbox: agent?.pendingSandboxFailure)
+    }
+
+    /// The sandbox card's answer for the open agent (064).
+    private func sandboxAnswer(carryOn: Bool) -> (@MainActor () async -> Void)? {
+        guard let id = agent?.id, agent?.pendingSandboxFailure != nil else { return nil }
+        let model = model
+        return { await model.answerSandbox(id, carryOn: carryOn) }
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.

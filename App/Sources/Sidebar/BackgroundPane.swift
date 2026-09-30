@@ -84,7 +84,7 @@ enum BackgroundOutput {
         }
         // Async because this function already is: the synchronous open is not the one
         // a concurrent context is offered.
-        try? await NSWorkspace.shared.open([local],  // store-ok: a copy in the app's own temporary folder
+        _ = try? await NSWorkspace.shared.open([local],  // store-ok: a copy in the app's own temporary folder
                                             withApplicationAt: URL(fileURLWithPath: "/System/Applications/TextEdit.app"),
                                             configuration: NSWorkspace.OpenConfiguration())
     }

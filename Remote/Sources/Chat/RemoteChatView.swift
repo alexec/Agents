@@ -51,6 +51,16 @@ struct RemoteChatView: View {
             }
             form
         }
+        // Right to left across the chat brings what was exchanged in from that side, as
+        // the Mac's two-finger swipe does. Left to right stays the system's Back.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 30)
+                .onEnded { drag in
+                    guard let agent, drag.translation.width < -80,
+                          abs(drag.translation.width) > abs(drag.translation.height) * 2 else { return }
+                    model.panes.state(for: agent.id).show(.exchanged)
+                }
+        )
         .environment(\.chatActions, actions)
         .navigationTitle(agent?.title ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)
@@ -205,7 +215,21 @@ struct RemoteChatView: View {
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },
-            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) })
+            turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
+            continueWithoutSandbox: sandboxAnswer(carryOn: true),
+            keepStopped: sandboxAnswer(carryOn: false),
+            waitingSandbox: waitingSandbox)
+    }
+
+    /// The open agent's sandbox card, while it waits (064).
+    private var waitingSandbox: SandboxFailureRecord? {
+        model.selection.flatMap { model.agent($0) }?.pendingSandboxFailure
+    }
+
+    private func sandboxAnswer(carryOn: Bool) -> (@MainActor () async -> Void)? {
+        guard waitingSandbox != nil, let id = model.selection else { return nil }
+        let model = model
+        return { await model.answerSandbox(id, carryOn: carryOn) }
     }
 }
 
@@ -303,7 +327,7 @@ private struct OfferedFileStrip: View {
             Image(systemName: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            (Text("Wants you to see ") + Text(file.name).fontWeight(.semibold))
+            Text("Wants you to see \(Text(file.name).fontWeight(.semibold))")
                 .appText(.supporting)
                 .lineLimit(1)
                 .truncationMode(.middle)

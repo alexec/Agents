@@ -35,8 +35,8 @@ out.
 
 ## See which runtimes are out
 
-1. Open **Settings ▸ Agent Runtimes** and pick a runtime.
-2. Under **Allowance**, read where it stands: **Available**, **Rate limited · trying again at
+1. Open **Runtimes**, under Activity. Every runtime is on it, whether or not it is on this Mac.
+2. Read where each one stands: **Available**, **Rate limited · trying again at
    02:21**, **Out · reset 07:00 · checking after 09:00**, **Out since 22:27 · checking after
    02:27** or **Credit used up · checking after 02:27**.
 3. Where the runtime says so, a second line shows what is left of its plan: **28% left this
@@ -48,6 +48,10 @@ runtime is out.
 
 A new chat about to start on a runtime that is out says so above the prompt: **Claude is out.
 The app checks it again at 02:27.** You can still send.
+
+The runtime chooser above the prompt is in two runs, so you can see this before you pick. A
+runtime that is out is under **Out**, with the same line under its name, and you can still
+choose it. A new chat you start on one begins there.
 
 ## Continue the work in a new chat
 
@@ -70,7 +74,7 @@ read-only mode, asked to reply "OK". If it answers, the runtime is back. A provi
 is shown, but the runtime is not treated as back until a check or a turn works.
 
 If you know it is back sooner, because you bought more credit or a new month started, choose
-**Mark available** under **Allowance**, or swipe the runtime on the phone. If you were wrong, it
+**Mark available** on the **Runtimes** page, or swipe the runtime on the phone. If you were wrong, it
 costs one refused turn, and it is marked out again.
 
 ## On servers

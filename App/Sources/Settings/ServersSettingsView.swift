@@ -37,7 +37,7 @@ struct ServersSettingsView: View {
             } header: {
                 Text("Servers")
             } footer: {
-                Text("Servers are reached with your own ssh setup. Nothing on them listens on a network port. Claude and Codex on a server use this Mac’s own sign-ins, through this Mac; nothing of them is written on a server.")
+                Text("Servers are reached with your own ssh setup. Nothing on them listens on a network port. Claude and Codex on a server use this Mac’s own sign-ins, through this Mac, and OpenCode borrows this Mac’s provider keys for each run; nothing of them is written on a server.")
             }
             .paperListRow()
         }
@@ -74,7 +74,9 @@ private struct ServerLine: View {
             ForEach(ServerBinaries.serverRuntimes.filter { $0 != RuntimeCatalog.claude.id }, id: \.self) { runtimeID in
                 Text(model.hosts.toolsetLine(host.id, runtimeID: runtimeID,
                                              hasCredential: model.credentials.record(runtimeID) != nil
-                                                 || SignInRelays.canRelay(runtimeID)))
+                                                 || SignInRelays.canRelay(runtimeID)
+                                                 || (RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn != nil
+                                                     && model.hasOnThisMac(runtimeID))))
                     .appText(.fine).foregroundStyle(.secondary)
             }
             if isChosen {
@@ -140,8 +142,7 @@ private struct RemoveServerSheet: View {
             let projects = model.liveProjects.filter { $0.host == host }.count
             Group {
                 if let live, live > 0 {
-                    Text("\(live == 1 ? "1 agent is" : "\(live) agents are") running on \(label) and will be stopped. ")
-                        + Text(projectsLine(projects))
+                    Text("\(live == 1 ? "1 agent is" : "\(live) agents are") running on \(label) and will be stopped. \(projectsLine(projects))")
                 } else {
                     Text(projectsLine(projects))
                 }

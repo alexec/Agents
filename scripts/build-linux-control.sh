@@ -13,7 +13,9 @@ swift=~/Library/Developer/Toolchains/swift-$swift_version-RELEASE.xctoolchain/us
 out=$root/deploy/bin
 mkdir -p $out
 typeset -A docker=(x86_64 amd64 aarch64 arm64)
-for arch in ${@:-aarch64 x86_64}; do
+arches=("$@")
+(( $#arches )) || arches=(aarch64 x86_64)
+for arch in $arches; do
     print "building agents-control for $arch-linux…"
     $swift build --package-path $root/Packages/ControlPlane -c release \
         --swift-sdk $arch-swift-linux-musl --product agents-control -Xswiftc -gnone -Xlinker -s

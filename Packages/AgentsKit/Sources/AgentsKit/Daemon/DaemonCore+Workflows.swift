@@ -597,13 +597,15 @@ extension DaemonCore {
     private func settled(_ settings: WorkflowSettings, folder: URL, runtime: Runtime,
                          prompt: String, managesAgents: Bool) async throws -> DaemonAPI.StartRequest {
         let draftID = UUID()
+        // A workflow's agent follows the runtime's default (064, FR-011).
+        let sandbox = resolveSandbox(runtimeID: runtime.id, override: nil, starter: nil).choice
         let pending = Task { [self] in
             try await freshSession(runtimeID: runtime.id, cwd: folder, mcpServers: [],
-                                   managesAgents: managesAgents)
+                                   managesAgents: managesAgents, sandbox: sandbox)
         }
         let draft = Draft(runtimeID: runtime.id, cwd: folder,
                           mcpServers: [], personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
-                          pending: pending, managesAgents: managesAgents)
+                          pending: pending, managesAgents: managesAgents, sandbox: sandbox)
         drafts[draftID] = draft
 
         let made: DaemonCore.MadeSession
@@ -834,6 +836,7 @@ extension DaemonCore {
     /// obeys every other rule — the run in flight, the ceilings, the archive —
     /// returning the refusal on the summary rather than swallowing it. Somebody is
     /// watching when they tap this, so being told why matters more here than anywhere.
+    @discardableResult
     public func runWorkflow(_ request: DaemonAPI.WorkflowRequest) async throws -> WorkflowSummary {
         guard let workflow = workflow(request.workflowID, in: request.folder) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,

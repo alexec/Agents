@@ -5,17 +5,18 @@ import AgentsKitCore
 import Foundation
 
 /// A runtime the vendor ships as a signed archive, installed on this Mac (049): Google's
-/// Antigravity ACP server.
+/// Antigravity ACP server, and OpenCode.
 ///
 /// `MacToolsetInstaller`'s shape without Node or npm: the archive for this Mac is
-/// downloaded from the vendor, checked against the SHA-256 the app carries, unpacked with
-/// `ditto`, given `bin/<shim>`, marked whole with `ok` last, moved into place and made
+/// downloaded from the vendor, checked against the size and SHA-256 the app carries, unpacked
+/// with `ditto` (zip) or `tar` (`.tar.gz`), given `bin/<shim>`, marked whole with `ok` last, moved into place and made
 /// `current`. The folder layout is the same, so discovery, **Update** and `tidy` treat it
 /// like any other toolset.
 public struct MacArchiveInstaller: Sendable {
     public var toolset: ArchiveToolset
     /// `StoreLocations.tools`.
     public var tools: URL
+    /// The manifest key to install: this Mac's most specific one unless a test says otherwise.
     public var platform: String
     public var environment: [String: String]
     /// Free bytes where `tools` lives. A parameter so tests can say "none".
@@ -23,12 +24,12 @@ public struct MacArchiveInstaller: Sendable {
 
     public init(toolset: ArchiveToolset,
                 tools: URL,
-                platform: String = ArchiveToolset.macPlatform,
+                platform: String? = nil,
                 environment: [String: String] = LoginShellPath.installEnvironment(),
                 freeBytes: @escaping @Sendable (URL) -> Int64? = MacArchiveInstaller.volumeFreeBytes) {
         self.toolset = toolset
         self.tools = tools
-        self.platform = platform
+        self.platform = platform ?? toolset.macPlatformKey
         self.environment = environment
         self.freeBytes = freeBytes
     }
@@ -42,11 +43,14 @@ public struct MacArchiveInstaller: Sendable {
     /// This Mac's archive, or why there is none it can use.
     public var available: Result<ArchiveToolset.Platform, MacToolsetInstaller.Failure> {
         guard let entry = toolset.manifest.platforms[platform] else {
-            return .failure(.unavailable("Google publishes no \(runtimeName) for this Mac."))
+            return .failure(.unavailable("\(vendor) publishes no \(runtimeName) for this Mac."))
         }
         if let broken = entry.knownBroken { return .failure(.unavailable(broken)) }
         return .success(entry)
     }
+
+    /// Who publishes it, from where it is downloaded: "Google", "GitHub", or the host.
+    public var vendor: String { ArchiveToolset.vendor(of: toolset) }
 
     /// Install, and make it `current`. Returns the shim's path.
     @discardableResult
@@ -87,19 +91,24 @@ public struct MacArchiveInstaller: Sendable {
 
         let total = ArchiveToolset.megabytes(entry.size)
         progress("Downloading \(runtimeName) (\(total))")
-        let archive = part.appendingPathComponent("archive.zip")
+        let tarGz = entry.format == .tarGz
+        let archive = part.appendingPathComponent(tarGz ? "archive.tar.gz" : "archive.zip")
         try await ArchiveDownload.fetch(entry.url, to: archive) { written in
             progress("Downloading \(runtimeName): \(ArchiveToolset.megabytes(written)) of \(total)")
         }
 
         progress("Checking the download")
-        guard try MacToolsetInstaller.sha256(of: archive) == entry.sha256.lowercased() else {
+        let size = (try? fm.attributesOfItem(atPath: archive.path)[.size] as? Int64) ?? -1
+        guard size == entry.size, try MacToolsetInstaller.sha256(of: archive) == entry.sha256.lowercased() else {
             throw MacToolsetInstaller.Failure.checksum
         }
 
         progress("Unpacking \(runtimeName)")
-        let unzip = try await InstallStep(executable: "/usr/bin/ditto",
-                                          arguments: ["-x", "-k", archive.path, part.path],
+        // Unpacked by the app, not a browser, so nothing is quarantined and an ad-hoc signed
+        // program (OpenCode's, research R1) runs without a Gatekeeper prompt.
+        let unzip = try await InstallStep(executable: tarGz ? "/usr/bin/tar" : "/usr/bin/ditto",
+                                          arguments: tarGz ? ["-xzf", archive.path, "-C", part.path]
+                                                           : ["-x", "-k", archive.path, part.path],
                                           environment: environment).run()
         guard unzip.status == 0 else {
             if unzip.output.contains("No space left on device") { throw MacToolsetInstaller.Failure.noSpace }

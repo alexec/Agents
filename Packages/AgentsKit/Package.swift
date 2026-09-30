@@ -34,7 +34,7 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0"),
     ],
     targets: [
-        .target(name: "AgentsKitCore"),
+        .target(name: "AgentsKitCore", swiftSettings: [.treatAllWarnings(as: .error)]),
         .target(
             name: "ControlDial",
             dependencies: [
@@ -63,7 +63,8 @@ let package = Package(
                 "AgentsKitCore",
                 "CShims",
                 "ControlDial",
-            ]),
+            ],
+            swiftSettings: [.treatAllWarnings(as: .error)]),
         // Three one-line C wrappers the Linux build of `agentsd` needs, because Swift
         // cannot call a variadic C function there (037). The Mac uses them too, so there
         // is one path rather than two.
@@ -77,6 +78,7 @@ let package = Package(
         .testTarget(
             name: "AgentsKitTests",
             dependencies: ["LinuxControlDial", "ControlDial", "AgentsKit", "AgentsKitCore",
-                           .product(name: "SwiftTerm", package: "SwiftTerm")]),
+                           .product(name: "SwiftTerm", package: "SwiftTerm")],
+            swiftSettings: [.treatAllWarnings(as: .error)]),
     ]
 )

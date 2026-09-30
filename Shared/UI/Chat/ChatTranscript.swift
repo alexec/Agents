@@ -105,8 +105,8 @@ struct ChatTranscript: View {
                     }
                     // Folded once by the model as each entry lands, not here on every
                     // redraw: a reply arrives several chunks a second.
-                    // Each turn concise — the ask and its last block — until its block
-                    // is clicked, and then every block of it.
+                    // Each turn starts with its ask, answers, and latest work until a
+                    // block is clicked to show every step.
                     ForEach(rows) { turn in
                         TurnView(turn: turn,
                                  detail: turnViews[turn.id] ?? .concise,

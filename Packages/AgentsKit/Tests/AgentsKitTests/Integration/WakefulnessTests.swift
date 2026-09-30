@@ -456,7 +456,7 @@ struct WakefulnessTests {
         let core = try core(working(for: .seconds(5)), locations: locations,
                             power: FakePowerSource.mains, wakefulness: wake)
 
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
         await eventually("the Mac is being held awake") { wake.isHolding }
 
         await core.shutDown()

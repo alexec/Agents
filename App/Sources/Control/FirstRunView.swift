@@ -33,8 +33,7 @@ struct FirstRunView: View {
     private var choice: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Where should your agents run?").appText(.title).fontWeight(.semibold)
-            (Text("Agents runs your agents on a ") + Text("control plane").bold()
-             + Text(": a small program on a machine you own. This window, your iPhone and your iPad all connect to it, and it reaches every Mac and server your agents work on."))
+            Text("Agents runs your agents on a \(Text("control plane").bold()): a small program on a machine you own. This window, your iPhone and your iPad all connect to it, and it reaches every Mac and server your agents work on.")
                 .appText(.reading).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let host = model.hostOnlyOf {
@@ -234,9 +233,7 @@ struct RunHereProgress: View {
                 Text(failure).appText(.supporting).tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            (Text("Two background items appear under Login Items: ") + Text("Agents").bold()
-             + Text(" (your agents on this Mac) and ") + Text("Agents Control").bold()
-             + Text(". Turning either off stops your agents being reachable."))
+            Text("Two background items appear under Login Items: \(Text("Agents").bold()) (your agents on this Mac) and \(Text("Agents Control").bold()). Turning either off stops your agents being reachable.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
