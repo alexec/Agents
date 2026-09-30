@@ -122,7 +122,8 @@ struct SandboxLaunchTests {
         try await core.prompt(.init(agentID: id, text: "second"))
         await eventually("the runtime was started again") { launcher.launchCount > before }
         await letGo(core, id)
-        #expect(claudeSandbox(await launcher.lastAgent?.continuedSessionParams) == .bool(true))
+        // The launch that took "second", not whatever the app asked after it.
+        #expect(claudeSandbox(await launcher.allAgents[before].continuedSessionParams) == .bool(true))
     }
 
     @Test func codexOffStartsInFullAccessAndAModeChoiceIsTheAgentsOwn() async throws {
