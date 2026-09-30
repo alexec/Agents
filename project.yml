@@ -299,6 +299,10 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
+      # The App Store archive (058, T089): production push and iCloud. Uploading is Alex's.
+      configs:
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Remote/Remote-AppStore.entitlements
 
   # Opens the sealed headline in a loud push and puts the words in the banner, on
   # the device (021 T068). Links AgentsKitCore only, as the Remote does.
@@ -529,6 +533,9 @@ schemes:
         AgentsStore: all
     run:
       config: Debug
+    # The Mac App Store archive (058, T089), checked by scripts/check-store-archive.sh.
+    archive:
+      config: Release
   agents-bridge:
     build:
       targets:
@@ -547,6 +554,8 @@ schemes:
         Remote: all
     run:
       config: Debug
+    archive:
+      config: Release
   Agents:
     build:
       targets:
