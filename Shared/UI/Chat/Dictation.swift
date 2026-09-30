@@ -160,16 +160,19 @@ final class Dictation {
                               permission: .microphone)
             return
         }
-        listen()
+        await listen()
     }
 
-    private func listen() {
+    private func listen() async {
         guard let recogniser, recogniser.isAvailable else {
             problem = Problem(message: "Speech recognition is not available for \(Locale.current.identifier).")
             return
         }
         do {
-            try openMicrophone()
+            try await openMicrophone()
+        } catch let noInput as NoAudioInput {
+            self.problem = Problem(message: noInput.message)
+            return
         } catch {
             problem = Problem(message: "The microphone would not start: \(error.localizedDescription)")
             return
@@ -178,8 +181,15 @@ final class Dictation {
         listenForAnUtterance(with: recogniser)
     }
 
+    /// The input node would not say what it was listening to, so there was nothing to
+    /// hang a tap on. It carries its own sentence: everything else AVFoundation refuses
+    /// is caught below and described from the error it arrived with.
+    private struct NoAudioInput: Error {
+        var message: String { "The microphone would not start: there was no audio input to read." }
+    }
+
     /// The microphone, opened once and left open for as long as dictation is on.
-    private func openMicrophone() throws {
+    private func openMicrophone() async throws {
         guard !engine.isRunning else { return }
         #if os(iOS)
         // A phone shares one audio route between everything on it, and the microphone
@@ -199,12 +209,29 @@ final class Dictation {
         }
 
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
+        guard let format = await Self.aFormatToListenIn(from: input) else { throw NoAudioInput() }
         input.removeTap(onBus: 0)
         // The throwing tap that replaced the old one in 27 reaches Swift only by its refined name.
         try input.__installTap(onBus: 0, bufferSize: 1_024, format: format, error: (), block: tap)
         engine.prepare()
         try engine.start()
+    }
+
+    /// A format the input node will really produce, waited for.
+    ///
+    /// A node that has just been woken — a session only now made active, or an engine
+    /// started a second time in this app's life — can report zero hertz and no channels
+    /// for a moment. A tap installed with that is an Objective-C exception rather than a
+    /// Swift error, so nothing in this file can catch it and the app is gone. Waiting a
+    /// moment for the route to settle costs nothing when the format is already good,
+    /// which is the case every other time.
+    private nonisolated static func aFormatToListenIn(from input: AVAudioNode) async -> AVAudioFormat? {
+        for _ in 0..<20 {
+            let format = input.outputFormat(forBus: 0)
+            if format.sampleRate > 0, format.channelCount > 0 { return format }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return nil
     }
 
     /// One utterance: everything said between two pauses.
