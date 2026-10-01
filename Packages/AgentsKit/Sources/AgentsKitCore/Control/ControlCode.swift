@@ -129,6 +129,17 @@ public extension DaemonAPI {
             self.expires = expires
             self.command = command
         }
+
+        /// What `devices/startPairing` answered, as the code to show: a control plane's
+        /// device code, or the bridge code of a Mac of the first build (until T106).
+        public init(pairingReply reply: JSONValue) throws {
+            if let shown = try? reply.decode(Self.self) {
+                self = shown
+            } else {
+                let code = try reply.decode(PairingCode.self)
+                self.init(text: code.text, expires: code.expires)
+            }
+        }
     }
 
     /// `clients/announce`, on a pairing connection.

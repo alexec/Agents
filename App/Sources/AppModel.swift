@@ -706,9 +706,12 @@ final class AppModel {
 
     /// Settings ▸ Devices ▸ Pair a Device (security review, Phase 3): a code for the
     /// phone to scan, good for five minutes or one device.
-    func startPairing() async throws -> DaemonAPI.PairingCode {
-        try await client.call(DaemonAPI.Method.devicesStartPairing, Optional<String>.none,
-                              returning: DaemonAPI.PairingCode.self)
+    ///
+    /// A control plane answers with its own device code (058, `ControlCodeShown`); a Mac
+    /// of the first build, with its bridge code. The phone reads either from the QR.
+    func startPairing() async throws -> DaemonAPI.ControlCodeShown {
+        try DaemonAPI.ControlCodeShown(pairingReply: try await client.call(DaemonAPI.Method.devicesStartPairing,
+                                                                           Optional<String>.none))
     }
 
     /// The pairing sheet closed: the code it showed stops working at once.

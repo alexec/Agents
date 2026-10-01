@@ -1,6 +1,4 @@
 import AgentsKitCore
-import CoreImage
-import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 /// The code a phone scans to pair (security review, Phase 3).
@@ -12,7 +10,7 @@ import SwiftUI
 struct PairDeviceSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @State private var code: DaemonAPI.PairingCode?
+    @State private var code: DaemonAPI.ControlCodeShown?
     @State private var problem: String?
     @State private var paired: Device?
     @State private var known: Set<UUID> = []
@@ -83,32 +81,5 @@ struct PairDeviceSheet: View {
         let seconds = max(0, Int(expires.timeIntervalSince(now)))
         if seconds == 0 { return "This code has run out. Close this and pair again." }
         return String(format: "Good for %d:%02d", seconds / 60, seconds % 60)
-    }
-}
-
-/// A QR code, drawn sharp at any size: one pixel per module from Core Image, scaled up
-/// without smoothing.
-private struct QRCode: View {
-    let text: String
-
-    var body: some View {
-        if let image {
-            Image(decorative: image, scale: 1)
-                .interpolation(.none)
-                .resizable()
-                .aspectRatio(1, contentMode: .fit)
-                .padding(10)
-                // A code is read dark on light, whatever the theme.
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private var image: CGImage? {
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data(text.utf8)
-        filter.correctionLevel = "M"
-        guard let output = filter.outputImage else { return nil }
-        return CIContext().createCGImage(output, from: output.extent)
     }
 }

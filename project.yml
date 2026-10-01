@@ -504,6 +504,8 @@ targets:
     supportedDestinations: [macOS]
     sources:
       - path: Host/Sources
+      # The pairing sheet's QR code, drawn as the window draws it.
+      - path: App/Sources/Settings/QRCode.swift
       - path: Host/AgentsHost.entitlements
         buildPhase: none
       # The two launch agents Run it here registers (T055). SMAppService reads them from

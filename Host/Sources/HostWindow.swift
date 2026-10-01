@@ -308,6 +308,13 @@ struct PairingSheet: View {
             .pickerStyle(.segmented)
             .onChange(of: model.pairingGrant) { Task { await model.makeCode() } }
             if let code = model.pairing {
+                if code.grant == .device {
+                    // What the Remote's Scan the Code reads; the text below is for Paste.
+                    QRCode(text: code.text)
+                        .frame(width: 220, height: 220)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel("Pairing code to scan")
+                }
                 Text(code.text)
                     .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
                     .padding(10).frame(maxWidth: .infinity, alignment: .leading)
@@ -315,7 +322,7 @@ struct PairingSheet: View {
                     .accessibilityLabel("Pairing code")
                 Text(code.grant == .operator
                      ? "Paste it into Agents under Connect to a control plane. It works once, for five minutes, and lets that window do everything."
-                     : "Type it into the Remote on the iPhone or iPad. It works once, for five minutes. A device can answer and watch; it can't change who may do what.")
+                     : "In Agents on the iPhone or iPad, tap Scan the Code and point it at this, or copy the text and tap Paste there. It works once, for five minutes. A device can answer and watch; it can't change who may do what.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 ProgressView().controlSize(.small)

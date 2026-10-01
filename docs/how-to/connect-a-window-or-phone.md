@@ -53,9 +53,14 @@ always pairs an operator.
    The device is paired as a **Device**, and lists the projects on every host, each under
    its host's heading.
 
-Without a camera to hand, use Agents Host instead: click **Pair a Window or Phone…**,
-choose **An iPhone or iPad**, and click **Copy**. Get the text to the device (Universal
-Clipboard does it), then tap **Paste** in Agents on the device.
+On the Mac that runs Agents Host, you can also get the code from Agents Host itself: click
+**Pair a Window or Phone…**, choose **An iPhone or iPad**, and scan the code it shows.
+Without a camera to hand, click **Copy** there instead. Get the text to the device
+(Universal Clipboard does it), then tap **Paste** in Agents on the device.
+
+An iPhone or iPad whose Agents predates the control plane can't read these codes. It says
+**That isn't a pairing code from Agents on your Mac.** Install the current Agents on it
+first.
 
 ### Change what a client may do
 
