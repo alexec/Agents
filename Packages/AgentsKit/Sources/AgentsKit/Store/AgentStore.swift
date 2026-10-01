@@ -233,7 +233,14 @@ public actor AgentStore {
         let handle = try appendHandle(for: agentID)
         var line = try StoreCoding.encoder.encode(entry)
         line.append(0x0A)
-        try handle.write(contentsOf: line)
+        do {
+            try handle.write(contentsOf: line)
+        } catch {
+            // A full disk can take part of the line. Kept, the handle would glue the next
+            // entry to the fragment and lose both; let go, the next open ends it (073).
+            closeTranscript(for: agentID)
+            throw error
+        }
     }
 
     public func appendAll(_ entries: [TranscriptEntry], for agentID: UUID) throws {
