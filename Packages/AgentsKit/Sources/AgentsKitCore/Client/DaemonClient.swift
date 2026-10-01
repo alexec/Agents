@@ -36,7 +36,9 @@ public actor DaemonClient {
         self.link = link
     }
 
-    public var isConnected: Bool { connection != nil }
+    /// A connection that ended is not one: a host client the control plane dropped would
+    /// otherwise look connected, never be dialled again, and fail every call (#62).
+    public var isConnected: Bool { connection.map { !$0.isClosed } ?? false }
 
     /// Connect, starting the far end if nothing answers and there is anything to start.
     public func connect(startIfNeeded: Bool = true, timeout: Duration = .seconds(8)) async throws {

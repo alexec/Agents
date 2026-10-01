@@ -20,6 +20,8 @@ struct FilesPane: View {
     @State private var problems: [String: String] = [:]
     @State private var probe: FileProbe?
     @State private var fileProblem: String?
+    /// The file is not there (as against not read): a Markdown page then keeps what it had.
+    @State private var fileGone = false
     @State private var touched = TouchedPaths()
     /// Which stretch of whose conversation `touched` has folded, by position in the
     /// whole transcript. Entries outside it — new at the end, or an earlier page in
@@ -30,6 +32,8 @@ struct FilesPane: View {
     /// Which re-listing of each folder is the current one, so a slower earlier read
     /// landing after a later one does not put the older listing on screen.
     @State private var listingRequests: [String: Int] = [:]
+    /// Folders with a read on its way, so one waiting for its parent is asked for once.
+    @State private var reading: Set<String> = []
     /// The file `probe` was read from, so a file opened from elsewhere is loaded once
     /// and not once for every pass.
     @State private var loaded: URL?
@@ -48,7 +52,8 @@ struct FilesPane: View {
     /// Where a file the pane will not draw is, when Finder here cannot show it: nil for
     /// this Mac's host, whose files the window reveals and opens through it.
     private var elsewhere: String? { model.isOnThisMac(agent.host) ? nil : model.hosts.label(agent.host) }
-    private var serverChanges: Int { server.changeCount(agentID: agent.id, folder: folder) }
+    /// Anything changed under the agent's folders: the tree shows more than the top one.
+    private var serverChanges: Int { server.anyChange[agent.id] ?? 0 }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,6 +76,12 @@ struct FilesPane: View {
             reloadListings(inBackground: true)
             if let openFile = state.openFile { reloadFile(openFile) }
         }
+        // The host is back on a new connection: whatever is open is read again, and a
+        // folder that said it could not be read gets another go (#62).
+        .onChange(of: server.reconnections) {
+            reloadListings(inBackground: true)
+            if let openFile = state.openFile { reloadFile(openFile) }
+        }
         .onChange(of: model.entries.count) { refreshTouched() }
         // The agent moved to another folder (053): the pane goes with it, from the top,
         // and stops watching the one it left.
@@ -86,6 +97,7 @@ struct FilesPane: View {
             probe = nil
             listings = [:]
             problems = [:]
+            reading = []
             reloadListings()
             startWatching()
         }
@@ -114,6 +126,7 @@ struct FilesPane: View {
                     loaded = nil
                     probe = nil
                     fileProblem = nil
+                    fileGone = false
                 } label: {
                     Label("Back", systemImage: "chevron.left")
                         .labelStyle(.iconOnly)
@@ -145,7 +158,7 @@ struct FilesPane: View {
     @ViewBuilder
     private var listingView: some View {
         if let problem = problems[Self.key(root)] {
-            Gone(message: problem)
+            Gone(message: problem) { reloadListing(of: root) }
         } else if listings[Self.key(root)] != nil {
             List {
                 ForEach(treeLines) { line in
@@ -157,6 +170,16 @@ struct FilesPane: View {
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                             .padding(.leading, indent(depth))
+                    case .problem(let folder, let words, let depth):
+                        HStack(spacing: 8) {
+                            Text(words)
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                            Button("Try Again") { reloadListing(of: folder) }
+                                .appText(.fine)
+                                .buttonStyle(.link)
+                        }
+                        .padding(.leading, indent(depth))
                     }
                 }
             }
@@ -171,11 +194,14 @@ struct FilesPane: View {
     private enum TreeLine: Identifiable {
         case entry(DirectoryEntry, depth: Int)
         case note(id: String, String, depth: Int)
+        /// A folder that could not be read, with a way to try again.
+        case problem(URL, String, depth: Int)
 
         var id: String {
             switch self {
             case .entry(let entry, _): entry.url.absoluteString
             case .note(let id, _, _): id
+            case .problem(let folder, _, _): "problem:\(FilesPane.key(folder))"
             }
         }
     }
@@ -187,7 +213,7 @@ struct FilesPane: View {
         func add(_ folder: URL, depth: Int) {
             let key = Self.key(folder)
             if let problem = problems[key] {
-                lines.append(.note(id: "problem:\(key)", problem, depth: depth))
+                lines.append(.problem(folder, problem, depth: depth))
                 return
             }
             guard let listing = listings[key] else {
@@ -211,16 +237,17 @@ struct FilesPane: View {
     /// The folders on screen: the top, and every open one whose parents are open too.
     /// Only these are read again when the disk changes.
     private var visibleFolders: [URL] {
-        var folders = [root]
-        func add(_ folder: URL) {
-            for entry in listings[Self.key(folder)]?.entries ?? []
-            where entry.isDirectory && state.expanded.contains(Self.key(entry.url)) {
-                folders.append(entry.url)
-                add(entry.url)
-            }
+        FileTree.visibleFolders(root: root, expanded: state.expanded, listings: listings)
+    }
+
+    /// Every open folder on screen that has nothing to show and no read on its way: one
+    /// opened before its parent had been read, as when the pane is drawn afresh with
+    /// folders still open, or a file deep in the tree is revealed (#62).
+    private func readUnread() {
+        for folder in FileTree.unread(root: root, expanded: state.expanded, listings: listings,
+                                      problems: Set(problems.keys), reading: reading) {
+            reloadListing(of: folder)
         }
-        add(root)
-        return folders
     }
 
     private func indent(_ depth: Int) -> CGFloat { CGFloat(depth) * 14 }
@@ -269,7 +296,7 @@ struct FilesPane: View {
 
     @ViewBuilder
     private func fileView(_ url: URL) -> some View {
-        if isMarkdown(url), fileProblem != nil || probe?.kind.isText == true {
+        if isMarkdown(url), (fileProblem != nil && (fileGone || probe != nil)) || probe?.kind.isText == true {
             // Markdown reads as a page, and the page is live: it follows the file as
             // the agent writes it (022). A line an agent named no longer forces the
             // source view — the page has a passage for every line, and goes to the
@@ -305,7 +332,7 @@ struct FilesPane: View {
                 }
             }
         } else if let fileProblem {
-            Gone(message: fileProblem)
+            Gone(message: fileProblem) { reloadFile(url) }
         } else if let probe {
             switch probe.kind {
             case .text:
@@ -378,11 +405,7 @@ struct FilesPane: View {
     }
 
     /// A path as the tree keys it: no trailing slash, whichever way the URL was made.
-    private static func key(_ url: URL) -> String {
-        var path = url.standardizedFileURL.path(percentEncoded: false)
-        while path.count > 1, path.hasSuffix("/") { path.removeLast() }
-        return path
-    }
+    fileprivate static func key(_ url: URL) -> String { FileTree.key(url) }
 
     private static func isInside(_ url: URL, _ folder: URL) -> Bool {
         let path = key(url), top = key(folder)
@@ -412,18 +435,24 @@ struct FilesPane: View {
         let key = Self.key(folder)
         let request = (listingRequests[key] ?? 0) + 1
         listingRequests[key] = request
+        reading.insert(key)
         let server = server
         let agentID = agent.id
         Task {
             let read: Result<DirectoryListing, any Error>
             do { read = .success(try await server.list(agentID: agentID, folder: folder)) }
             catch { read = .failure(error) }
+            // A slower earlier read landing after a later one is dropped. The later one
+            // always ends, with a listing or a sentence: `RemoteFiles` gives up on a
+            // read nobody answers.
             guard request == listingRequests[key] else { return }
+            reading.remove(key)
             if case .failure(let error) = read {
                 listings[key] = nil
                 problems[key] = RemoteFiles.describe(error, name: folder.lastPathComponent)
             } else {
                 show(read, of: folder)
+                readUnread()
             }
         }
     }
@@ -450,13 +479,15 @@ struct FilesPane: View {
                 guard let fresh = Self.probe(reading) else { return }
                 // The watch is on the whole folder, so a build writing beside this file
                 // lands here too. Unchanged bytes are not news.
-                if let probe, probe.prefix == fresh.prefix, probe.size == fresh.size { fileProblem = nil; return }
+                if let probe, probe.prefix == fresh.prefix, probe.size == fresh.size { fileProblem = nil; fileGone = false; return }
                 probe = fresh
                 fileProblem = nil
+                fileGone = false
             } catch {
                 // A Markdown page keeps what it last had (022); source has nothing to
                 // keep that the listing does not say better.
-                if !(RemoteFiles.isGone(error) && isMarkdown(url)) { probe = nil }
+                fileGone = RemoteFiles.isGone(error)
+                if !(fileGone && isMarkdown(url)) { probe = nil }
                 fileProblem = RemoteFiles.describe(error, name: url.lastPathComponent)
             }
         }
@@ -510,6 +541,8 @@ struct FilesPane: View {
 /// What a pane says when the thing it was showing has gone.
 private struct Gone: View {
     let message: String
+    /// Try Again, for a read that failed rather than a thing that is gone.
+    var retry: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 6) {
@@ -520,6 +553,10 @@ private struct Gone: View {
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            if let retry {
+                Button("Try Again", action: retry)
+                    .padding(.top, 4)
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

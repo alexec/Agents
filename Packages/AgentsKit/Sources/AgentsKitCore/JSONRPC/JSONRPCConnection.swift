@@ -35,6 +35,9 @@ public actor JSONRPCConnection {
         self.notificationsContinuation = c
     }
 
+    /// The connection has ended, from either side, and will carry nothing again.
+    public nonisolated var isClosed: Bool { closed.isSet }
+
     /// Everything the other side sent that was not a reply to us.
     public nonisolated func incomingNotifications() -> AsyncStream<(method: String, params: JSONValue?)> {
         notifications

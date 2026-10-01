@@ -56,6 +56,14 @@ struct FilesPane: View {
         .onChange(of: state.openFile.map { model.files.changeCount(agentID: agent.id, folder: $0.deletingLastPathComponent()) }) {
             Task { await reopen(inBackground: true) }
         }
+        // The Mac is back on a new connection: what is shown is read again, whichever
+        // folder it is in, and a read that failed while it was gone gets another go (#62).
+        .onChange(of: model.files.reconnections) {
+            Task {
+                await relist(inBackground: true)
+                await reopen(inBackground: true)
+            }
+        }
         .sheet(isPresented: $state.showingChanges) {
             if let file = state.openFile {
                 NavigationStack {
@@ -115,7 +123,7 @@ struct FilesPane: View {
         case .reading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         case .problem(let message):
-            Said(message: message, symbol: "questionmark.folder")
+            Said(message: message, symbol: "questionmark.folder") { Task { await relist() } }
         case .listing(let listing):
             let touched = model.touchedPaths(for: agent.id)
             List {
@@ -174,7 +182,7 @@ struct FilesPane: View {
         case .reading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         case .problem(let message):
-            Said(message: message, symbol: "doc.questionmark")
+            Said(message: message, symbol: "doc.questionmark") { Task { await reopen() } }
         case .other(let description):
             Said(message: "\(description). It can't be shown here.", symbol: "doc")
         case .image(let box, let describedAs, _):
@@ -371,6 +379,8 @@ final class ZoomingPictureView: UIScrollView, UIScrollViewDelegate {
 private struct Said: View {
     let message: String
     let symbol: String
+    /// Try Again, for a read that failed.
+    var retry: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 6) {
@@ -382,6 +392,10 @@ private struct Said: View {
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            if let retry {
+                Button("Try Again", action: retry)
+                    .padding(.top, 4)
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

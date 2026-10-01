@@ -14,6 +14,9 @@ import Observation
 @Observable
 public final class RemoteFiles {
     private let client: DaemonClient
+    /// How long a read is waited on before it is given up as not answered (#62). A reply
+    /// lost between host, control plane and window would otherwise be waited on for good.
+    private let patience: Duration
 
     /// The Mac answered a `files/*` request with "no such method": it predates the panes.
     /// The phone falls back to what it could do before, and says the Mac needs updating
@@ -34,25 +37,32 @@ public final class RemoteFiles {
 
     private var watched: Set<DaemonAPI.FilesWatchRequest> = []
 
-    public init(client: DaemonClient) {
+    public init(client: DaemonClient, patience: Duration = .seconds(10)) {
         self.client = client
+        self.patience = patience
     }
 
     // MARK: Reading
 
     public func list(agentID: UUID, folder: URL) async throws -> DirectoryListing {
-        try await asking {
-            try await client.call(DaemonAPI.Method.filesList,
-                                  DaemonAPI.FilesListRequest(agentID: agentID, folder: folder.path),
-                                  returning: DirectoryListing.self)
+        let client = client
+        return try await asking {
+            try await Self.answered(within: patience) {
+                try await client.call(DaemonAPI.Method.filesList,
+                                      DaemonAPI.FilesListRequest(agentID: agentID, folder: folder.path),
+                                      returning: DirectoryListing.self)
+            }
         }
     }
 
     public func read(agentID: UUID, path: String, known: FileStamp? = nil) async throws -> FileReading {
-        try await asking {
-            try await client.call(DaemonAPI.Method.filesRead,
-                                  DaemonAPI.FilesReadRequest(agentID: agentID, path: path, knownStamp: known),
-                                  returning: FileReading.self)
+        let client = client
+        return try await asking {
+            try await Self.answered(within: patience) {
+                try await client.call(DaemonAPI.Method.filesRead,
+                                      DaemonAPI.FilesReadRequest(agentID: agentID, path: path, knownStamp: known),
+                                      returning: FileReading.self)
+            }
         }
     }
 
@@ -62,7 +72,7 @@ public final class RemoteFiles {
     public func watch(agentID: UUID, folder: URL) async {
         let request = DaemonAPI.FilesWatchRequest(agentID: agentID, folder: folder.path)
         guard watched.insert(request).inserted else { return }
-        _ = try? await asking { try await client.call(DaemonAPI.Method.filesWatch, request) }
+        await askToWatch(request)
     }
 
     public func unwatch(agentID: UUID, folder: URL) async {
@@ -75,9 +85,7 @@ public final class RemoteFiles {
     public func reconnected() async {
         macLacksPanes = false
         reconnections += 1
-        for request in watched {
-            _ = try? await asking { try await client.call(DaemonAPI.Method.filesWatch, request) }
-        }
+        for request in watched { await askToWatch(request) }
         // Everything shown may have changed while nobody was listening.
         for agentID in Set(watched.map(\.agentID)) { anyChange[agentID, default: 0] += 1 }
         for request in watched { changes[Self.key(request.agentID, request.folder), default: 0] += 1 }
@@ -96,6 +104,13 @@ public final class RemoteFiles {
         changes[Self.key(agentID, Self.standard(folder.path))] ?? 0
     }
 
+    private func askToWatch(_ request: DaemonAPI.FilesWatchRequest) async {
+        let client = client
+        _ = try? await asking {
+            try await Self.answered(within: patience) { try await client.call(DaemonAPI.Method.filesWatch, request) }
+        }
+    }
+
     // MARK: Words
 
     /// What to say when a read failed, in the Mac's words where it gave some.
@@ -104,7 +119,37 @@ public final class RemoteFiles {
             if error.code == DaemonAPI.Failure.fileGone { return "\(name) is gone." }
             return error.message
         }
+        if error is NoAnswer { return "\(name) took too long to read." }
         return "\(name) could not be read. Your Mac may not be answering."
+    }
+
+    /// A read the host did not answer in time.
+    public struct NoAnswer: Error, Sendable {}
+
+    public static func isNoAnswer(_ error: any Error) -> Bool { error is NoAnswer }
+
+    /// `work`'s answer, or `NoAnswer` once `patience` is up, whichever comes first.
+    ///
+    /// Not a task group: a call waiting on a reply does not hear cancellation, and a group
+    /// waits for every child before it returns, so it would wait for the lost reply too.
+    /// The call left behind ends when its connection does.
+    private static func answered<T: Sendable>(within patience: Duration,
+                                              _ work: @escaping @Sendable () async throws -> T) async throws -> T {
+        let settled = ManagedAtomicFlag()
+        return try await withCheckedThrowingContinuation { continuation in
+            let timer = Task {
+                try? await Task.sleep(for: patience)
+                if settled.set() { continuation.resume(throwing: NoAnswer()) }
+            }
+            Task {
+                let result: Result<T, any Error>
+                do { result = .success(try await work()) } catch { result = .failure(error) }
+                if settled.set() {
+                    timer.cancel()
+                    continuation.resume(with: result)
+                }
+            }
+        }
     }
 
     public static func isGone(_ error: any Error) -> Bool {

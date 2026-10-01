@@ -200,6 +200,21 @@ struct ControlRouterTests {
         #expect(window.lines.contains { $0.contains("\(DaemonAPI.Failure.noSuchHost)") })
     }
 
+    /// An uplink that has ended but is not yet dropped takes no request: the client is
+    /// told, rather than waiting on an answer that will never come (#62).
+    @Test func aRequestTheUplinkWillNotTakeIsRefusedNotLost() async throws {
+        let router = ControlRouter(handler: StubControl(), homeHost: home)
+        let (ours, theirs) = PairedTransport.pair()
+        await router.attachHost(server, transport: ours)
+        let window = await connectClient(router, client(.operator))
+        await eventually { await router.channels(of: server).count == 1 }
+        ours.close()
+        try window.request(1, DaemonAPI.Method.filesList, host: server)
+        await eventually { !window.lines.isEmpty }
+        #expect(window.lines.first?.contains("\(DaemonAPI.Failure.hostOffline)") == true)
+        theirs.close()
+    }
+
     @Test func aBareLineIsTheHomeHostsAndItsReplyComesBackBare() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, home)
