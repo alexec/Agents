@@ -113,14 +113,39 @@ struct ConnectionRoleTests {
         defer { close(fd) }
 
         for method in [DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.agentsStartHelper,
+                       DaemonAPI.Method.agentsStopHelper, DaemonAPI.Method.agentsParkHelper,
+                       DaemonAPI.Method.agentsListHelpers,
                        DaemonAPI.Method.leasesLease, DaemonAPI.Method.eventsWait] {
             #expect(errorCode(await ask(fd, method)) == nil, "\(method)")
         }
         for method in [DaemonAPI.Method.permissionsAnswer, DaemonAPI.Method.agentsStart,
                        DaemonAPI.Method.agentsSetOption, DaemonAPI.Method.workflowsRun,
-                       DaemonAPI.Method.shellInput, DaemonAPI.Method.credentialsLend] {
+                       DaemonAPI.Method.shellInput, DaemonAPI.Method.credentialsLend,
+                       DaemonAPI.Method.projectsSetHelperLimits] {
             #expect(errorCode(await ask(fd, method)) == DaemonAPI.Failure.notPermitted, "\(method)")
         }
+    }
+
+    /// A ceiling something can raise for itself is not a ceiling (#64): an agent, and a
+    /// workflow's agent with it, may not set its project's helper limits, and neither
+    /// may a phone. Refused at the socket, so the daemon never hears the request; only
+    /// an operator's connection — the Mac's window — reaches it.
+    @Test func onlyAnOperatorSetsTheHelperLimits() async throws {
+        let request = #"{"folder":"file:///tmp/p","limits":{"running":10,"notArchived":20}}"#
+        for role in [ConnectionRole.agent, .device, .pairing, .stranger] {
+            let path = path()
+            let heard = Heard()
+            let server = try server(role, at: path, heard: heard)
+            defer { server.stop() }
+            let fd = connect(path)
+            defer { close(fd) }
+            #expect(errorCode(await ask(fd, DaemonAPI.Method.projectsSetHelperLimits, request))
+                    == DaemonAPI.Failure.notPermitted, "\(role)")
+            #expect(!heard.all.contains(DaemonAPI.Method.projectsSetHelperLimits), "\(role)")
+        }
+        #expect(ConnectionRole.control.allows(DaemonAPI.Method.projectsSetHelperLimits))
+        #expect(Grant.operator.allows(DaemonAPI.Method.projectsSetHelperLimits))
+        #expect(!Grant.device.allows(DaemonAPI.Method.projectsSetHelperLimits))
     }
 
     /// Transcripts and terminal output go by as notifications; only a window hears them.
@@ -299,8 +324,26 @@ struct ConnectionRoleTests {
         #expect(policy.summary.hasPrefix("not signed by a team"))
     }
 
+    /// Every method `agentsd mcp` relays is one an agent's connection may call. A tool
+    /// relayed and not allowed is a tool the agent is offered and always refused —
+    /// `park_agent` was, with "agents/parkHelper is not open to this connection" (#64).
+    /// Read from the sources, since the helper is an executable no test can import.
+    @Test func everyMethodTheHelperRelaysIsOpenToIt() throws {
+        let package = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let helper = try String(contentsOf: package.appending(path: "../../Daemon/Sources/main.swift"), encoding: .utf8)
+        let roles = try String(contentsOf: package.appending(path: "Sources/AgentsKitCore/Daemon/ConnectionRole.swift"),
+                               encoding: .utf8)
+        let allowed = roles.components(separatedBy: "public static let deviceMethods")[0]
+        let relayed = helper.matches(of: /relay\(DaemonAPI\.Method\.(\w+)/).map { String($0.output.1) }
+        #expect(relayed.count >= 16)
+        for name in Set(relayed) {
+            #expect(allowed.contains("DaemonAPI.Method.\(name),"), "\(name) is relayed but not open to an agent")
+        }
+    }
+
     @Test func aHelperMayCallEveryToolItRelaysAndOnlyThose() {
-        #expect(ConnectionRole.agentMethods.count == 20)
+        #expect(ConnectionRole.agentMethods.count == 21)
         #expect(ConnectionRole.agent.allows(DaemonAPI.Method.agentsAskForm))
         #expect(ConnectionRole.stranger.allows(DaemonAPI.Method.daemonStatus))
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.filesBrowse))

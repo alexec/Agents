@@ -168,7 +168,8 @@ struct ProjectSettingsSheet: View {
     }
 }
 
-/// The project itself: its name, where it is, and what it has cost.
+/// The project itself: its name, where it is, what it has cost, and how many agents its
+/// agents may start (#64).
 private struct ProjectGeneralPane: View {
     @Environment(AppModel.self) private var model
 
@@ -202,6 +203,22 @@ private struct ProjectGeneralPane: View {
                     }
                     row("Machine") { Text(model.hosts.label(summary.host)) }
                     row("Spent") { spent(summary) }
+                    row("Helpers running") {
+                        helperLimit(\.running, in: summary, default: HelperLimit.defaultRunning,
+                                    upTo: min(HelperLimit.maximumRunning, summary.helperLimits.notArchived))
+                    }
+                    row("Helpers not archived") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            helperLimit(\.notArchived, in: summary, default: HelperLimit.defaultNotArchived,
+                                        upTo: HelperLimit.maximumNotArchived,
+                                        from: summary.helperLimits.running)
+                            Text("How many agents that other agents started may be running at once, and how "
+                                 + "many may be kept until you archive them. Agents can't change these.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
                 .appText(.supporting)
                 Divider().padding(.vertical, 20)
@@ -222,6 +239,26 @@ private struct ProjectGeneralPane: View {
                 .gridColumnAlignment(.trailing)
             value()
         }
+    }
+
+    /// One helper limit (#64) as a menu of the numbers it may be, its default marked and
+    /// choosing it putting the project back to the default.
+    private func helperLimit(_ key: WritableKeyPath<HelperLimits, Int?>, in summary: DaemonAPI.ProjectSummary,
+                             default standard: Int, upTo maximum: Int, from minimum: Int = 1) -> some View {
+        let kept = summary.project.helperLimits ?? HelperLimits()
+        let current = kept[keyPath: key] ?? standard
+        return Picker("", selection: Binding(get: { current }, set: { chosen in
+            var limits = kept
+            limits[keyPath: key] = chosen == standard ? nil : chosen
+            Task { await model.setHelperLimits(limits, for: summary.key) }
+        })) {
+            ForEach(Array(Swift.min(minimum, current)...Swift.max(maximum, current)), id: \.self) { number in
+                Text(number == standard ? "\(number) (default)" : "\(number)").tag(number)
+            }
+        }
+        .labelsHidden()
+        .fixedSize()
+        .disabled(model.hosts.isOffline(summary.host))
     }
 
     /// What this project has cost, in words that say how sure the figure is.

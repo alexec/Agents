@@ -22,10 +22,10 @@ if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool c
 | `show_file` | Opens a file in the files pane beside the conversation, at a line. A Markdown file opens as a page that follows the agent's edits. The file must be inside the folders the agent was given. If you are reading another conversation, it waits until you open this one. | No. The app answers. |
 | `manage_workflows` | Lists, reads, writes and removes this project's workflows. A workflow an agent writes or changes appears on the project page straight away, waiting for your OK: it does not run until you click **Approve**, and you can archive it instead. See [Workflow triggers and actions](workflows.md). | No. The app answers. |
 | `ask_form` | Asks you a question or a short form and waits for your answer. Reaches you on the Mac or on your phone. Used when the runtime has no working ask tool of its own, or when that tool never reaches the model. | No. The app answers. |
-| `start_agent` | Starts another agent in this project with a prompt of its own, marked as started by this agent. It can choose the runtime, model, a permission mode no looser than its own, and whether to work in the project folder, a new worktree, an existing worktree or a branch. At most five agents started by agents can exist in a project at once, until one is archived. | The runtime decides. |
-| `stop_agent` | Stops an agent this agent started, as your **Stop** would. | The runtime decides. |
-| `park_agent` | Parks an agent this agent started, as your **Park** would. If it is still working, it finishes its turn first. It stays listed under **Parked** and keeps its place until you archive it. | The runtime decides. |
-| `list_my_agents` | Lists the agents this agent started that are not archived, what each is doing and last said, and how many of the five places are in use. | The runtime decides. |
+| `start_agent` | Starts another agent in this project with a prompt of its own, marked as started by this agent. It can choose the runtime, model, a permission mode no looser than its own, and whether to work in the project folder, a new worktree, an existing worktree or a branch. It is refused if the project would go over either of its two helper limits, how many may be running and how many may exist not yet archived (3 and 5 unless you set them in **Project Settings ▸ General**), and the refusal says which and names the agents holding it. | The runtime decides. |
+| `stop_agent` | Stops an agent this agent started, as your **Stop** would. That frees its running place; it keeps its not-archived place until you archive it. | The runtime decides. |
+| `park_agent` | Parks an agent this agent started, as your **Park** would. If it is still working, it finishes its turn first. It stays listed under **Parked**. Parking frees its running place; it keeps its not-archived place until you archive it. | The runtime decides. |
+| `list_my_agents` | Lists the agents this agent started that are not archived, what each is doing and last said, and how many of the project's running and not-archived places are in use, such as "2 of 3 running, 4 of 5 not archived". | The runtime decides. |
 | `list_sessions` | Lists the sessions in this project, most recent first, its own included: each one's id, title, runtime, status and what it last said. Nothing from another project. | No. The app answers. |
 | `read_session` | Reads one session in this project, by its id or exact title: what you asked, what the agent said, the tools it ran and the files they touched, what it said of how the work went, and its plan as it last stood. A long one keeps the first request and the latest turns and says how many were left out. Reading it changes nothing. A title used twice, a retired session, or one not in this project is refused in words. Used when you ask an agent to continue another session's work. | No. The app answers. |
 | `lease_resource` | Takes a turn with something only one agent should use at a time: a simulator, a browser, the screen, or anything it names. Waits up to 45 seconds if someone else holds it, then keeps the agent's place in line. A lease lasts 30 minutes unless the agent asks for up to 240, and calling it again extends it. | The runtime decides. |
@@ -43,7 +43,14 @@ person-owned label; the whole `finish_turn` call is refused if it tries. See
 
 `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` are given only to an
 agent that you or a workflow started. An agent started by another agent cannot start
-agents of its own. Only you can archive an agent. `list_sessions` and `read_session` are
+agents of its own. Only you can archive an agent.
+
+A helper counts as **running** while it is working, waiting on a question or permission,
+starting, or waiting to carry on by itself: blocked on other agents or a time, waiting on
+events, or waiting for an allowance. Finished, stopped, parked and archived helpers don't.
+So a lead that stops or parks a helper whose part is done frees a running place at once; the
+helper's not-archived place stays taken until you archive it. Both limits are yours alone to
+change: the tools only read them. `list_sessions` and `read_session` are
 given to every agent, including one another agent started.
 
 ## See also

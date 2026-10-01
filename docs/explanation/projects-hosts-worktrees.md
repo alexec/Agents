@@ -157,7 +157,7 @@ The folder is the only difference: yours is `~/.agents`, the project's is its `.
 its instructions are `AGENTS.md` at the top of the project. Because that folder is committed,
 a skill added there reaches everyone who clones the project; one added in **Settings ▸ Shared**
 is yours alone. A worktree has its own `.agents`, so a change there stays on that branch until
-it is merged. On a server, Project Settings shows only **General**. See
+it is merged. **General** also holds the project's two limits on agents that other agents start: how many may be running (3 unless you change it) and how many may be kept until you archive them (5). See [Agent tools](../reference/agent-tools.md). On a server, Project Settings shows only **General**. See
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
 
 A project's MCP servers live in `.agents/mcp.json`, on that same page. The file is committed, so it names each secret as `${NAME}` and never
