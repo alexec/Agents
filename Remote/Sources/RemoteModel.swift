@@ -1839,8 +1839,8 @@ final class RemoteModel {
             return
         }
         do {
-            try await client.call(DaemonAPI.Method.agentsUnqueue,
-                                  DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
+            let request = DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id)
+            try await client(for: request).call(DaemonAPI.Method.agentsUnqueue, request)
         } catch {
             problem = "That did not reach your Mac."
         }
@@ -1854,8 +1854,8 @@ final class RemoteModel {
             return
         }
         do {
-            try await client.call(DaemonAPI.Method.agentsStopBackground,
-                                  DaemonAPI.StopBackgroundRequest(agentID: agentID, itemID: item.id))
+            let request = DaemonAPI.StopBackgroundRequest(agentID: agentID, itemID: item.id)
+            try await client(for: request).call(DaemonAPI.Method.agentsStopBackground, request)
         } catch {
             problem = "That did not reach your Mac."
         }
@@ -1868,8 +1868,8 @@ final class RemoteModel {
             return
         }
         do {
-            try await client.call(DaemonAPI.Method.agentsSendNow,
-                                  DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
+            let request = DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id)
+            try await client(for: request).call(DaemonAPI.Method.agentsSendNow, request)
         } catch {
             problem = "That did not reach your Mac."
         }
@@ -1892,7 +1892,10 @@ final class RemoteModel {
             return
         }
         do {
-            try await client.call(method, DaemonAPI.AgentRequest(agentID: agentID))
+            // To the agent's own host: one on another of the control plane's hosts is not
+            // the home host's to stop, park or archive (073).
+            let request = DaemonAPI.AgentRequest(agentID: agentID)
+            try await client(for: request).call(method, request)
         } catch {
             problem = "That did not reach your Mac."
         }
