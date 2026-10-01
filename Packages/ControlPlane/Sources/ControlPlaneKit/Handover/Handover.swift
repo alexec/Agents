@@ -32,6 +32,7 @@ public enum Handover {
         public static let unfreeze = "handover/unfreeze"
         public static let forward = "handover/forward"
         public static let take = "handover/take"
+        public static let stop = "handover/stop"
         public static let list = "store/list"
         public static let get = "store/get"
         public static let put = "store/put"
@@ -155,6 +156,13 @@ public enum Handover {
             await service.methods.setFrozen(false)
             service.phase.set(.serving)
             service.log("unfrozen: the handover was called off")
+            return try JSONValue.encoding(await status(service))
+
+        case Method.stop:
+            // Stop Forwarding (frames T and Y): anyone still to hear pairs again.
+            guard phase == .forwarding else { throw refuse("This copy isn't forwarding.") }
+            service.forwardingUntil.set(Date())
+            service.log("forwarding stopped")
             return try JSONValue.encoding(await status(service))
 
         case Method.forward:

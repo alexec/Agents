@@ -261,7 +261,20 @@ func handover() async {
     let key = privateKey()
     // `self` is the copy serving this store, at the address and pin its settings say:
     // Agents Host's own, whose pin it never has to work out.
+    // With --home (Agents Host's copy), the address and pin `serve --home` gives itself, so
+    // a copy started empty to receive is reachable too (T127). Otherwise its settings say.
     func own() async -> (String, String?) {
+        if let home {
+            let port = value("--port").flatMap(Int.init) ?? 8791
+            let text = environment["AGENTS_CONTROL_URL"] ?? "https://\(localHost()):\(port)"
+            guard let url = URL(string: text) else { fail("\(text) is not an address") }
+            do {
+                let made = try SelfSigned.make(in: home.appendingPathComponent("tls", isDirectory: true), name: url.host ?? "agents")
+                return (text, made.pin)
+            } catch {
+                fail("this Mac's certificate: \(error)")
+            }
+        }
         let records = ControlRecords(store: store())
         guard (try? await records.load()) != nil, let settings = await records.settings, let url = settings.url else {
             fail("this store has no control plane yet")
@@ -277,8 +290,12 @@ func handover() async {
             fail("couldn't reach \(text) as this control plane: \(error)")
         }
     }
-    func endpoints() -> [ControlEndpoint] {
-        guard let url = value("--endpoint") else { fail("say --endpoint https://… [--endpoint-pin PIN]") }
+    func endpoints() async -> [ControlEndpoint] {
+        guard let url = value("--endpoint") else { fail("say --endpoint https://… (or self) [--endpoint-pin PIN]") }
+        if url == "self" {
+            let (mine, pin) = await own()
+            return [ControlEndpoint(url: mine, pin: pin)]
+        }
         return [ControlEndpoint(url: url, pin: value("--endpoint-pin"))]
     }
     func show(_ result: JSONValue) {
@@ -303,10 +320,10 @@ func handover() async {
             show(try await link("--at", pin: "--pin").call(Handover.Method.status))
         case "announce":
             show(try await link("--at", pin: "--pin").call(Handover.Method.announce,
-                                                          ["endpoint": try JSONValue.encoding(endpoints()[0])]))
+                                                          ["endpoint": try JSONValue.encoding(await endpoints()[0])]))
         case "forward":
             // 30 days at most, the copy's own rule; --days for fewer.
-            var params: [String: JSONValue] = ["endpoints": try JSONValue.encoding(endpoints())]
+            var params: [String: JSONValue] = ["endpoints": try JSONValue.encoding(await endpoints())]
             if let days = value("--days").flatMap(Double.init) {
                 params["until"] = try JSONValue.encoding(Date().addingTimeInterval(days * 24 * 3600))
             }
@@ -315,6 +332,7 @@ func handover() async {
         case "unfreeze": show(try await link("--at", pin: "--pin").call(Handover.Method.unfreeze))
         case "withdraw": show(try await link("--at", pin: "--pin").call(Handover.Method.withdraw))
         case "take": show(try await link("--at", pin: "--pin").call(Handover.Method.take))
+        case "stop": show(try await link("--at", pin: "--pin").call(Handover.Method.stop))
         case "copy":
             // Either end a copy (https://…, over its handover session) or a store this
             // machine opens (file://…, s3://…).
@@ -327,7 +345,7 @@ func handover() async {
             print("copied \(report.copied) records (left out \(report.skipped) leases and copies, which are rebuilt)")
         default:
             fail("""
-            usage: agents-control handover status|freeze|unfreeze|withdraw|take --at URL [--pin PIN] [--json]
+            usage: agents-control handover status|freeze|unfreeze|withdraw|take|stop --at URL [--pin PIN] [--json]
                    agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN] [--days N]
             (URL may be `self`: the copy serving this store, at the address and pin its settings say)
                    agents-control handover copy --from URL|STORE [--from-pin PIN] --to URL|STORE [--to-pin PIN]

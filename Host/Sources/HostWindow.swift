@@ -13,6 +13,8 @@ struct HostWindow: View {
     @State private var moving = false
     @State private var movingMachine = false
     @State private var confirmingStop = false
+    @State private var returning = false
+    @State private var confirmingReturnStop = false
 
     var body: some View {
         @Bindable var model = model
@@ -46,6 +48,12 @@ struct HostWindow: View {
         .sheet(isPresented: $model.showingPairing) { PairingSheet().environment(model) }
         .sheet(isPresented: $moving) { MoveSheet().environment(model) }
         .sheet(isPresented: $movingMachine) { MachineMoveSheet().environment(model) }
+        .sheet(isPresented: $returning) { MachineReturnSheet().environment(model) }
+        .confirmationDialog("Stop forwarding?", isPresented: $confirmingReturnStop) {
+            Button("Stop Forwarding", role: .destructive) { Task { await model.stopReturnForwarding() } }
+        } message: {
+            Text(returnStopMessage)
+        }
         .confirmationDialog("Stop forwarding?", isPresented: $confirmingStop) {
             Button("Stop Forwarding", role: .destructive) { Task { await model.stopForwarding() } }
         } message: {
@@ -163,6 +171,10 @@ struct HostWindow: View {
                 } else if model.settings.role == .runHere && !pickingJoin {
                     running
                     Divider()
+                    if let place = model.settings.returnedFrom {
+                        returnRow(place)
+                        Divider()
+                    }
                     storeRows
                 } else {
                     row {
@@ -211,7 +223,8 @@ struct HostWindow: View {
                 Text(movedLine).font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Run It Here Again…") {}.disabled(true).help("Not in this build yet")
+            // Frame U: the way back (T127).
+            Button("Run It Here Again…") { returning = true }.disabled(model.busy != nil)
         }
         if let until = model.settings.forwardingUntil {
             Divider()
@@ -226,6 +239,48 @@ struct HostWindow: View {
                 Button("Stop Forwarding…") { confirmingStop = true }
             }
         }
+    }
+
+    // MARK: Came back (frame Y)
+
+    private func returnRow(_ place: String) -> some View {
+        let name = URL(string: place)?.host ?? place
+        return row {
+            Circle().fill(model.returnForwardingDone ? Color.green : Color.orange).frame(width: 9, height: 9)
+            VStack(alignment: .leading, spacing: 2) {
+                if model.returnForwardingDone {
+                    Text("Everyone has heard. You can take \(name) down.")
+                } else {
+                    Text("\(name) forwards here\(model.settings.returnForwardingUntil.map { " until \($0.formatted(date: .long, time: .omitted))" } ?? "")")
+                    Text(returnLine(name)).font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer()
+            if model.returnForwardingDone {
+                Button("Dismiss") { model.dismissReturn() }
+            } else {
+                Button("Stop Forwarding…") { confirmingReturnStop = true }
+            }
+        }
+    }
+
+    private func returnLine(_ name: String) -> String {
+        guard let left = model.returnForwarding?.stillToHear, !left.isEmpty else { return "Then you can take that machine down." }
+        let names = left.map { member in
+            var said = member.id == HostID.mac.rawValue ? "This Mac" : member.name
+            if member.online != true, let seen = member.lastSeen {
+                said += ", last connected \(seen.formatted(.relative(presentation: .named)))"
+            }
+            return said
+        }
+        return "\(left.count) still to hear: \(names.joined(separator: "; ")). Then you can take that machine down."
+    }
+
+    private var returnStopMessage: String {
+        let left = model.returnForwarding?.stillToHear.map(\.name) ?? []
+        guard !left.isEmpty else { return "Everyone has heard where the control plane went." }
+        return "\(ListFormatter.localizedString(byJoining: left)) will need pairing again."
     }
 
     private var movedLine: String {

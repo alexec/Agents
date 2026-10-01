@@ -110,6 +110,7 @@ final class HostModel {
             hosts = nil
         }
         await readForwarding()
+        await readReturnForwarding()
         await countWork()
     }
 
@@ -247,6 +248,81 @@ final class HostModel {
         settings.forwardingUntil = nil
         settings.save(paths)
         forwarding = nil
+    }
+
+    // MARK: Run it here again (T127, frames V–Y)
+
+    /// The other machine, while it forwards members that haven't heard the control plane
+    /// came back, as this Mac's copy sees them (they report here now).
+    private(set) var returnForwarding: HandoverStatus?
+
+    /// This Mac's copy, ready to receive: forwarding stops, the store from before the move
+    /// is kept aside, and the copy starts empty. Returns the name it was kept under.
+    func prepareReturn() async -> String? {
+        await services.unregister(.control)
+        for _ in 0..<20 where await services.running(.control) != nil { try? await Task.sleep(for: .milliseconds(250)) }
+        settings.forwardingUntil = nil
+        var aside: String?
+        if FileManager.default.fileExists(atPath: paths.folderStore.path) {
+            let day = Date().formatted(.iso8601.year().month().day())
+            let name = "store-before-\(day)-\(Int(Date().timeIntervalSince1970) % 100_000)"
+            if (try? FileManager.default.moveItem(at: paths.folderStore, to: paths.controlHome.appendingPathComponent(name))) != nil {
+                aside = name
+            }
+        }
+        settings.store = .thisMac
+        settings.receiving = true
+        settings.save(paths)
+        _ = await start(.control)
+        return aside
+    }
+
+    /// Cancelled before this Mac took over: its empty copy stops again.
+    func undoReturn() async {
+        await services.unregister(.control)
+        settings.receiving = false
+        settings.save(paths)
+    }
+
+    /// The control plane is back: it runs here, and `place` forwards until `until`.
+    func returned(from place: String, forwardingUntil until: Date?) {
+        settings.role = .runHere
+        settings.movedTo = nil
+        settings.movedAt = nil
+        settings.forwardingUntil = nil
+        settings.receiving = false
+        settings.returnedFrom = place
+        settings.returnForwardingUntil = until
+        settings.save(paths)
+        Task { await refresh() }
+    }
+
+    private func readReturnForwarding() async {
+        guard settings.returnedFrom != nil, settings.role == .runHere, controlRunning else { returnForwarding = nil; return }
+        returnForwarding = await HandoverTool.status(["--at", "self"], model: self)
+    }
+
+    /// Whether the other machine has nobody left to tell, or its forwarding has ended.
+    var returnForwardingDone: Bool {
+        if let until = settings.returnForwardingUntil, until < Date() { return true }
+        return returnForwarding.map { $0.stillToHear.isEmpty } ?? false
+    }
+
+    /// Stop Forwarding (frame Y): the other machine stops now. Anyone still to hear pairs again.
+    func stopReturnForwarding() async {
+        guard let place = settings.returnedFrom else { return }
+        let stopped = await HandoverTool.run(["stop", "--at", place], model: self)
+        if !stopped.ok { problem = stopped.problem; return }
+        settings.returnForwardingUntil = Date()
+        settings.save(paths)
+    }
+
+    /// The row goes: the other machine can be taken down.
+    func dismissReturn() {
+        settings.returnedFrom = nil
+        settings.returnForwardingUntil = nil
+        settings.save(paths)
+        returnForwarding = nil
     }
 
     func restartControl() async {

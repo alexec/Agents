@@ -34,6 +34,22 @@ struct HandoverStatus: Codable, Equatable {
     var stillToHear: [Member] { members.filter { !$0.knows(epoch) } }
 }
 
+/// `agents-control handover …` with this Mac's key on a descriptor, and its home and port,
+/// so `self` is this Mac's own copy even before it holds any records (T127).
+@MainActor
+enum HandoverTool {
+    static func run(_ arguments: [String], model: HostModel) async -> ControlTool.Result {
+        await ControlTool.run(["handover"] + arguments + ["--home", model.paths.controlHome.path, "--port", String(model.paths.port)],
+                              paths: model.paths, settings: model.settings)
+    }
+
+    static func status(_ arguments: [String], model: HostModel) async -> HandoverStatus? {
+        let read = await run(["status"] + arguments + ["--json"], model: model)
+        guard read.ok else { return nil }
+        return try? JSONDecoder().decode(HandoverStatus.self, from: Data(read.output.utf8))
+    }
+}
+
 /// Move to Another Machine… (058, T126, frames P–S): this Mac's control plane handed over
 /// to a copy elsewhere, with every window, phone and server following without pairing
 /// again. Each step is one `agents-control handover` run with the key on a descriptor.
@@ -73,7 +89,7 @@ final class MachineMove {
     var checked: Bool { [answers, trusted, holdsKey, empty].allSatisfy { $0 == .yes } }
 
     private func handover(_ arguments: [String]) async -> ControlTool.Result {
-        await ControlTool.run(["handover"] + arguments, paths: model.paths, settings: model.settings)
+        await HandoverTool.run(arguments, model: model)
     }
 
     private var place: String { address.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -249,14 +265,14 @@ struct MachineMoveSheet: View {
             Text("Move the control plane to another machine").font(.title3.weight(.semibold))
             Text("Your windows, phones and servers stay paired, and this Mac stays a host. Agents keep working while it moves.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            stepTitle("1 · Give the other machine this control plane's key")
-            numbered(1) {
+            Self.stepTitle("1 · Give the other machine this control plane's key")
+            Self.numbered(1) {
                 Text("Save the key, and copy it to the other machine as \(Text("deploy/secrets/control-key").font(.system(.body, design: .monospaced))).")
                 Text("Anyone who has it can pose as your control plane. Delete your copy once it's there.")
                     .font(.callout).foregroundStyle(.secondary)
                 Button("Save Key…") { move.saveKey() }.padding(.top, 2)
             }
-            numbered(2) {
+            Self.numbered(2) {
                 Text("Start the control plane there, empty, waiting for this one:")
                 Text("AGENTS_CONTROL_RECEIVE=1 docker compose \\\n  -f deploy/compose.public.yaml up -d")
                     .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
@@ -264,7 +280,7 @@ struct MachineMoveSheet: View {
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
                 Text("See Run the control plane in the cloud.").font(.callout).foregroundStyle(.secondary)
             }
-            buttons {
+            Self.buttons {
                 Spacer()
                 Button("Cancel") { dismiss() }
                 Button("Continue") { move.step = .check }.keyboardShortcut(.defaultAction)
@@ -272,7 +288,7 @@ struct MachineMoveSheet: View {
 
         case .check:
             Text("Move the control plane to another machine").font(.title3.weight(.semibold))
-            stepTitle("2 · Where is it?")
+            Self.stepTitle("2 · Where is it?")
             HStack {
                 TextField("https://agents.example.com", text: $move.address)
                     .textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced))
@@ -280,12 +296,12 @@ struct MachineMoveSheet: View {
                     .onSubmit { Task { await move.check() } }
                 Button("Check") { Task { await move.check() } }.disabled(move.address.isEmpty || move.checking)
             }
-            tick(move.answers, "It answers")
-            tick(move.trusted, "Its certificate is publicly trusted", note: "So no pin is needed, and it renews itself.")
-            tick(move.holdsKey, "It holds this control plane's key")
-            tick(move.empty, "It's empty, and waiting for this one")
-            problemLine(move.problem)
-            buttons {
+            Self.tick(move.answers, "It answers")
+            Self.tick(move.trusted, "Its certificate is publicly trusted", note: "So no pin is needed, and it renews itself.")
+            Self.tick(move.holdsKey, "It holds this control plane's key")
+            Self.tick(move.empty, "It's empty, and waiting for this one")
+            Self.problemLine(move.problem)
+            Self.buttons {
                 Button("Back") { move.step = .key }
                 Spacer()
                 Button("Cancel") { dismiss() }
@@ -295,17 +311,17 @@ struct MachineMoveSheet: View {
 
         case .told:
             Text("Move the control plane to another machine").font(.title3.weight(.semibold))
-            stepTitle("3 · Tell everyone where it's going")
+            Self.stepTitle("3 · Tell everyone where it's going")
             Text("Everything that's paired now knows \(Text(move.address).font(.system(.body, design: .monospaced))) as well as this Mac.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            whoKnows(move.status)
+            Self.whoKnows(move.status)
             if let status = move.status {
                 let knowing = status.members.count - status.stillToHear.count
                 Text("\(knowing) of \(status.members.count) know. You can move now, or wait for the rest.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            problemLine(move.problem)
-            buttons {
+            Self.problemLine(move.problem)
+            Self.buttons {
                 Button("Withdraw") { Task { await move.withdraw() } }
                 Spacer()
                 Button("Cancel") { Task { await move.cancel(); dismiss() } }
@@ -314,13 +330,13 @@ struct MachineMoveSheet: View {
 
         case .moving:
             Text("Moving to \(URL(string: move.address)?.host ?? move.address)…").font(.title3.weight(.semibold))
-            stage(move.stages[0], "Holding records still", note: "Pairing and changes wait. Agents keep working.")
-            stage(move.stages[1], move.copied ?? "Copying records")
-            stage(move.stages[2], "\(URL(string: move.address)?.host ?? "It") takes over")
-            stage(move.stages[3], "This Mac's host and relay go there")
-            stage(move.stages[4], "This Mac sends anyone still coming here on to it")
-            problemLine(move.problem)
-            buttons {
+            Self.stage(move.stages[0], "Holding records still", note: "Pairing and changes wait. Agents keep working.")
+            Self.stage(move.stages[1], move.copied ?? "Copying records")
+            Self.stage(move.stages[2], "\(URL(string: move.address)?.host ?? "It") takes over")
+            Self.stage(move.stages[3], "This Mac's host and relay go there")
+            Self.stage(move.stages[4], "This Mac sends anyone still coming here on to it")
+            Self.problemLine(move.problem)
+            Self.buttons {
                 Spacer()
                 if move.stages.contains(.failed) {
                     Button("Close") { dismiss() }
@@ -333,11 +349,11 @@ struct MachineMoveSheet: View {
 
     // MARK: Pieces
 
-    private func stepTitle(_ text: String) -> some View {
+    static func stepTitle(_ text: String) -> some View {
         Text(text.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
     }
 
-    private func numbered(_ n: Int, @ViewBuilder _ content: () -> some View) -> some View {
+    static func numbered(_ n: Int, @ViewBuilder _ content: () -> some View) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text("\(n)").font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
                 .frame(width: 18, height: 18).background(Circle().fill(Color.accentColor.opacity(0.15)))
@@ -346,7 +362,7 @@ struct MachineMoveSheet: View {
     }
 
     @ViewBuilder
-    private func tick(_ state: MachineMove.Tick, _ label: String, note: String? = nil) -> some View {
+    static func tick(_ state: MachineMove.Tick, _ label: String, note: String? = nil) -> some View {
         HStack(alignment: .top, spacing: 10) {
             switch state {
             case .yes: Image(systemName: "checkmark").foregroundStyle(.green)
@@ -366,7 +382,7 @@ struct MachineMoveSheet: View {
     }
 
     @ViewBuilder
-    private func stage(_ state: MachineMove.Stage, _ label: String, note: String? = nil) -> some View {
+    static func stage(_ state: MachineMove.Stage, _ label: String, note: String? = nil) -> some View {
         HStack(alignment: .top, spacing: 10) {
             switch state {
             case .done: Image(systemName: "checkmark").foregroundStyle(.green)
@@ -383,7 +399,7 @@ struct MachineMoveSheet: View {
     }
 
     @ViewBuilder
-    private func whoKnows(_ status: HandoverStatus?) -> some View {
+    static func whoKnows(_ status: HandoverStatus?, learnsFrom: String = "this Mac") -> some View {
         if let status {
             VStack(spacing: 0) {
                 ForEach(status.members) { member in
@@ -401,7 +417,7 @@ struct MachineMoveSheet: View {
                                 Text("Update it first, or add it again afterwards").font(.caption).foregroundStyle(.secondary)
                             } else {
                                 Text("Not yet").foregroundStyle(.secondary)
-                                Text("Learns it from this Mac when it next connects").font(.caption).foregroundStyle(.secondary)
+                                Text("Learns it from \(learnsFrom) when it next connects").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                         .frame(width: 250, alignment: .leading)
@@ -433,14 +449,14 @@ struct MachineMoveSheet: View {
     }
 
     @ViewBuilder
-    private func problemLine(_ problem: String?) -> some View {
+    static func problemLine(_ problem: String?) -> some View {
         if let problem {
             Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func buttons(@ViewBuilder _ content: () -> some View) -> some View {
+    static func buttons(@ViewBuilder _ content: () -> some View) -> some View {
         HStack { content() }.padding(.top, 6)
     }
 }

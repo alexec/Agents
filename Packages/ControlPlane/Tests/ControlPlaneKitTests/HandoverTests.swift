@@ -163,6 +163,10 @@ extension ControlServiceTests {
         #expect(until.timeIntervalSinceNow <= Handover.longestForwarding + 5)
         #expect(until.timeIntervalSinceNow > Handover.longestForwarding - 60)
 
+        // Stop Forwarding ends it now (frames T and Y).
+        let stopped = try await handover.call(Handover.Method.stop).decode(Handover.Status.self)
+        #expect((stopped.forwardingUntil ?? .distantFuture) <= Date())
+
         // Past its date, a member is turned away rather than told.
         old.service.forwardingUntil.set(Date().addingTimeInterval(-1))
         await #expect(throws: ControlAuth.Refusal.self) {

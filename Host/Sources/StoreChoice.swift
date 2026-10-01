@@ -20,6 +20,12 @@ struct HostSettings: Codable, Sendable, Equatable {
     var movedTo: String?
     var movedAt: Date?
     var forwardingUntil: Date?
+    /// Run It Here Again (T127, frames V–Y): this Mac's copy starts empty, to receive the
+    /// control plane back; and afterwards, where it came back from and until when that
+    /// machine forwards.
+    var receiving: Bool?
+    var returnedFrom: String?
+    var returnForwardingUntil: Date?
 
     private static func key(_ paths: HostPaths) -> String { "hostSettings.\(paths.suffix)" }
 
