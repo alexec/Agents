@@ -8,6 +8,11 @@ import SwiftUI
 ///
 /// In a diff, `changed` ranges sit on a neutral wash, stronger than the line's own, over
 /// the syntax colour rather than instead of it (FR-009, FR-011).
+///
+/// No accessibility label of its own: the row it sits in is the one element, and says
+/// what the line is. A label here, on a `Text` that selectable text backs with an AppKit
+/// view, sent the first accessibility query round between the two until the stack ran
+/// out (#71, and the diff rows before it).
 struct CodeLine: View {
     let text: Substring
     let spans: [CodeSpan]
@@ -16,8 +21,6 @@ struct CodeLine: View {
     var body: some View {
         Text(text.isEmpty ? AttributedString(" ") : styled)
             .appText(.code)
-            // Read as the code, not as its colours.
-            .accessibilityLabel(String(text))
     }
 
     private var styled: AttributedString {
