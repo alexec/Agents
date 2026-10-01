@@ -363,9 +363,6 @@ final class AppModel {
     /// repository until the daemon says otherwise, which keeps the chooser hidden.
     private(set) var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var draftWorktreesGeneration = 0
-    /// The branch each project folder is on, for the chat's folder chip. Missing until
-    /// asked, and for a folder in no repository.
-    private(set) var projectFolderBranches: [URL: String] = [:]
     /// Each open agent's project's worktrees, for the Worktree choice on its page (053).
     /// Asked when the page opens and after each move, never polled.
     private(set) var agentWorktrees: [URL: DaemonAPI.WorktreesListResponse] = [:]
@@ -594,7 +591,6 @@ final class AppModel {
     }
 
     var permissionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
-    var permissionForSelection: PermissionRequest? { work.permission(for: selection) }
 
     /// What a new agent can be started with, on the machine it would start on: the
     /// selected project's (037). A server's runtimes are the ones installed there.
@@ -1823,14 +1819,6 @@ final class AppModel {
         }
     }
 
-    /// A project's servers, for its page (060, frame D). Nil when they could not be read,
-    /// so the section keeps what it last had.
-    func projectMCPServers(_ folder: URL) async -> DaemonAPI.MCPListAnswer? {
-        try? await client.call(DaemonAPI.Method.mcpList,
-                               DaemonAPI.MCPListRequest(destination: .project(folder: folder.path)),
-                               returning: DaemonAPI.MCPListAnswer.self)
-    }
-
     func mcpServers(at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPListAnswer? {
         try? await client.call(DaemonAPI.Method.mcpList,
                                DaemonAPI.MCPListRequest(destination: destination),
@@ -2172,17 +2160,6 @@ final class AppModel {
             moveProblems[agent.id] = "Could not move: \(error.localizedDescription)"
         }
         await loadAgentWorktrees(of: agent)
-    }
-
-    /// Ask which branch an agent's project folder is on. Asked when its chat opens and
-    /// when its turn ends, since someone may have checked out another branch meanwhile.
-    func loadProjectFolderBranch(of agent: Agent) async {
-        guard agent.worktree == nil else { return }
-        let folder = agent.projectFolder
-        let answer = try? await client(forAgent: agent.id).call(DaemonAPI.Method.worktreesList,
-                                            DaemonAPI.WorktreesListRequest(folder: folder),
-                                            returning: DaemonAPI.WorktreesListResponse.self)
-        projectFolderBranches[folder] = answer?.projectFolderBranch
     }
 
     /// A session has to exist before its options do, so choosing a folder and a

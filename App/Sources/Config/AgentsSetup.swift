@@ -55,23 +55,6 @@ struct AgentsSetupPage<Content: View>: View {
     }
 }
 
-/// The four things both Settings ▸ Shared and a project's configuration page set up.
-struct AgentsSetupView: View {
-    var place: AgentsPlace
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text(place.explainer)
-                .appText(.fine).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            AgentsInstructionsSection(place: place)
-            AgentsSkillsSection(place: place)
-            ProjectMCPSection(place: place)
-            AgentsPluginsSection(place: place)
-        }
-    }
-}
-
 // MARK: - Instructions
 
 struct AgentsInstructionsSection: View {

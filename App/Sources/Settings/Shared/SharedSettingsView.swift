@@ -237,32 +237,3 @@ struct SharedFact: View {
         }
     }
 }
-
-/// What each runtime does with one thing, a line each, in the detail panes.
-struct SharedReachList: View {
-    let runtimes: [DaemonAPI.RuntimeName]
-    let reach: [String: DaemonAPI.Reach]
-
-    var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-            ForEach(runtimes) { runtime in
-                if let each = reach[runtime.id] {
-                    GridRow(alignment: .firstTextBaseline) {
-                        Text(runtime.name).foregroundStyle(.secondary)
-                        Text(Self.line(each)).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-    }
-
-    static func line(_ reach: DaemonAPI.Reach) -> String {
-        switch reach {
-        case .gets(let note): "✓ \(note)"
-        case .ownCopy(let path): "uses its own copy in \(SharedFiles.tilde(path))"
-        case .leftOut(let note): "✗ \(note)"
-        case .noWay(let note): "✗ \(note)"
-        case .unchecked(let note): "? \(note ?? "not checked yet")"
-        }
-    }
-}
