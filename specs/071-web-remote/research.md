@@ -535,14 +535,21 @@ driven without the screen. That is what lets the layout walk come early and be r
   - SVG files show only as `<img src="blob:…">` made from the bytes, which browsers render
     with scripts off and no external loads.
   - Pictures go through the same `blob:` path.
-- **A build-time lint** (`Web/test/lint-dist.mjs`, run by `npm run check` and by the CI web
-  job) fails if `dist/app.js` contains any of:
-  - `innerHTML`, `outerHTML`, `insertAdjacentHTML` or `document.write`;
-  - `eval(` or `new Function`;
-  - `dangerouslySetInnerHTML`;
-  - an `http://` or `https://` URL other than an allowlist (the licence comments).
+- **A build-time lint** (`Web/test/lint.mjs`, run by `npm run check` and by the CI web job).
+  As built in T008, it splits in two, because Preact's own bundle holds an `innerHTML`
+  assignment, reached only through `dangerouslySetInnerHTML`.
+  - **Our source, `Web/src`,** may not contain:
+    - `innerHTML`, `outerHTML`, `insertAdjacentHTML` or `document.write`;
+    - `dangerouslySetInnerHTML`, `DOMParser` or `createContextualFragment`;
+    - `eval(`, `new Function`, or a timer given a string;
+    - any `http://` or `https://` address.
 
-  It also checks that `index.html` has no inline script or style.
+    So Preact's `innerHTML` is never reached. Chrome's `trusted-types 'none'` would refuse it
+    at run time as well.
+  - **The built files, `Web/dist`,** may not contain `eval(`, `new Function` or an address
+    outside an allowlist. The allowlist is the W3C namespace names Preact uses, plus licence
+    comments. `index.html` may have no inline script, style or handler, and no reference off
+    this origin.
 - **Logging.** `Web/src/log.ts` is the only console writer. It takes a fixed event name and an
   error code, never a value. The wire client never logs lines, codes, keys or MACs.
   - A test runs the wire client against a fake server with `console` spied, and fails if any

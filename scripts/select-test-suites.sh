@@ -3,7 +3,13 @@
 #
 # Package source changes run co-changed, named test suites when available, and the
 # full package suite when no test suite changed alongside the source. Test-only edits
-# also filter to named suites. Unrecognized changes run both package suites.
+# also filter to named suites. Unrecognized changes run every package suite.
+#
+# The web remote (071): WebTypes runs on any change to AgentsKitCore's source, to the
+# generator or to Web/, so a protocol type changed in Swift without regenerating fails.
+# ControlPlane runs on any change to it or to AgentsKit, which it links. A change under
+# Web/ alone runs AgentsKit's two suites that hold Web/ to Swift: the dist manifest and
+# the key vectors. CI's web job checks the rest of Web/ with Node, on every run.
 #
 # Usage: scripts/select-test-suites.sh <base-commit> >> "$GITHUB_OUTPUT"
 set -euo pipefail
@@ -11,12 +17,16 @@ set -euo pipefail
 base=${1:-}
 agentskit=skip
 codetext=skip
+webtypes=skip
+controlplane=skip
 agentskit_filter=
 codetext_filter=
 
 full_both() {
 	agentskit=full
 	codetext=full
+	webtypes=run
+	controlplane=run
 	agentskit_filter=
 	codetext_filter=
 }
@@ -32,6 +42,7 @@ else
 		unknown=false
 		agentskit_touched=false
 		codetext_touched=false
+		web_touched=false
 		agentskit_source_touched=false
 		codetext_source_touched=false
 		agentskit_full_required=false
@@ -68,10 +79,27 @@ else
 				Packages/AgentsKit/Sources/*|Daemon/*)
 					agentskit_touched=true
 					agentskit_source_touched=true
+					controlplane=run
+					[[ "$path" == Packages/AgentsKit/Sources/AgentsKitCore/* ]] && webtypes=run
 					;;
 				Packages/AgentsKit/*)
 					agentskit_touched=true
 					agentskit_full_required=true
+					controlplane=run
+					;;
+				Packages/WebTypes/*)
+					webtypes=run
+					;;
+				Packages/ControlPlane/*)
+					controlplane=run
+					;;
+				Web/*)
+					webtypes=run
+					agentskit_touched=true
+					if ! $web_touched; then
+						agentskit_suites+=(WebDistManifestTests ControlAgreementVectorTests)
+						web_touched=true
+					fi
 					;;
 				Packages/CodeText/Tests/*)
 					codetext_touched=true
@@ -96,7 +124,7 @@ else
 					codetext_full_required=true
 					;;
 				# These areas cannot affect either SwiftPM package's tests.
-				App/*|Remote/*|RemoteNotify/*|RemoteWidget/*|Shared/UI/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
+				App/*|Remote/*|RemoteNotify/*|RemoteWidget/*|Shared/UI/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
 					;;
 				*)
 					# Root config, CI, scripts, or a new area may change test behavior.
@@ -148,4 +176,6 @@ fi
 	printf 'agentskit_filter=%s\n' "$agentskit_filter"
 	printf 'codetext=%s\n' "$codetext"
 	printf 'codetext_filter=%s\n' "$codetext_filter"
+	printf 'webtypes=%s\n' "$webtypes"
+	printf 'controlplane=%s\n' "$controlplane"
 } >> "${GITHUB_OUTPUT:-/dev/stdout}"

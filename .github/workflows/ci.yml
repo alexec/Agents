@@ -243,3 +243,59 @@ jobs:
           else
             swift test --skip-build --package-path Packages/AgentsKit
           fi
+
+  # The web remote's generator and the control plane (071, research R6), in a job of their
+  # own so they never press on the test job's time cap. WebTypes holds the checked-in
+  # Web/src/protocol/generated.ts to the Swift source: a protocol type changed without
+  # regenerating fails here. ControlPlane links AgentsKit, so it runs on changes to either.
+  packages:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Select test suites for changed files
+        id: test-selection
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base="$BASE_SHA"
+          if [[ -z "$base" && -n "$DEFAULT_BRANCH" ]]; then
+            base=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD || true)
+          fi
+          bash scripts/select-test-suites.sh "$base" >> "$GITHUB_OUTPUT"
+
+      - name: Generated types are fresh
+        if: steps.test-selection.outputs.webtypes != 'skip'
+        run: swift test --package-path Packages/WebTypes
+
+      - name: Test ControlPlane
+        if: steps.test-selection.outputs.controlplane != 'skip'
+        timeout-minutes: 20
+        run: swift test --package-path Packages/ControlPlane
+
+  # The web remote's checked-in build (071, D7, research R8): built with the pinned Node, it
+  # must be byte for byte what is committed, so building Agents from source never needs Node.
+  # Also tsc, the lint that keeps agent output inert, the licence list and the web tests.
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: Web
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: Web/.node-version
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - name: Web/dist and generated.ts are what this source builds
+        run: git diff --exit-code -- dist src/protocol/generated.ts

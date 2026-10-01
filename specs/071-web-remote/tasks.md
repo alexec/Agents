@@ -55,7 +55,7 @@ starts until T002 is written up.
   - **`localhost` is not a secure context in a browser:** flip the canonical origin to `http://127.0.0.1:<port>` in research R2/R3/R5, contracts/loopback-listener.md, contracts/browser-auth.md and the spec's FR-004/FR-005/edge case. Tell Alex in the turn's ending.
   - **Vectors differ:** fix the byte handling in the spike until they match. Nothing goes on until they do.
   - **Persistence fails in Safari or Chrome, or neither can keep a non-extractable key:** stop, and ask Alex with the question tool. Pairing again after each restart breaks US1 scenario 4.
-- [ ] T003 Rebase onto main once 058 T106 and T042 have merged (they are on `agents/do-058-s-t106`), and check with `git merge-base` that the rebase landed on this branch.
+- [ ] T003 (2026-10-01: T106 not merged, `Bridge/` still on main; Phase 2 went ahead on main as allowed below; ControlPlane's 52 tests pass) Rebase onto main once 058 T106 and T042 have merged (they are on `agents/do-058-s-t106`), and check with `git merge-base` that the rebase landed on this branch.
   - Confirm that `Bridge/`, `DirectLink`, `SocketLink` spawning, `LinkTLS`, `AwayLink` and the `AGENTS_STORE` compile condition are gone.
   - Run `swift test --package-path Packages/ControlPlane`. It must pass before Phase 3.
   - If T106 has not merged by then, start Phase 2 on main as it is. Phase 2's files (`Packages/ControlPlane`, `ControlDial.swift`, `ControlAuth.swift`, `Grant.swift`) are not ones T106 removes.
@@ -67,25 +67,25 @@ starts until T002 is written up.
 **Purpose**: the `Web/` app, the generator package and the checks that keep checked-in files in
 step with their sources, before any feature code.
 
-- [ ] T004 [P] Create the `Web/` skeleton, as plan.md's structure and research R8/R9.
+- [x] T004 (8e4afe60: preact 11.0.0, @preact/signals 2.11.3, markdown-it 15.0.2, esbuild 0.28.2, typescript 7.0.2; same bytes from any path) [P] Create the `Web/` skeleton, as plan.md's structure and research R8/R9.
   - `package.json`, with exact versions of `preact`, `@preact/signals`, `markdown-it`, `esbuild` and `typescript`, and the scripts `build`, `check` and `test`.
   - `package-lock.json`, `.node-version` (the Node in use here, v26.8.2), and `tsconfig.json` (`strict`, `noUnusedLocals`, `noUncheckedIndexedAccess`, ES2022).
   - `build.mjs`. It checks the Node version, builds deterministically with fixed names and no source maps, copies `index.html` and `assets/`, and writes `dist/MANIFEST` (data-model.md).
   - `index.html`, with no inline script or style, and a `src/main.tsx` that renders "Agents".
   - Run `npm ci --ignore-scripts && npm run build`, and check in `Web/dist/`.
-- [ ] T005 [P] Add `.gitattributes` entries marking `Web/dist/**` and `Web/src/protocol/generated.ts` as `linguist-generated=true -diff`, and add `Web/node_modules/` to `.gitignore`.
-- [ ] T006 [P] Add `WebDistManifestTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WebDistManifestTests.swift`, as research R8 check 1. It finds the repository root from `#filePath`, hashes the source inputs and `dist` outputs with CryptoKit, and compares them with `Web/dist/MANIFEST`. It fails with a message for each case: a stale build, a hand-edited `dist`, or an added or missing file. To prove it, assert against a copy of the tree in a temporary folder (memory: never mutate source to prove a test).
-- [ ] T007 [P] Create the `Packages/WebTypes` package.
+- [x] T005 (8e4afe60) [P] Add `.gitattributes` entries marking `Web/dist/**` and `Web/src/protocol/generated.ts` as `linguist-generated=true -diff`, and add `Web/node_modules/` to `.gitignore`.
+- [x] T006 (8e4afe60; uses ControlAgreement.sha256, so no CryptoKit; dotfiles skipped on both sides) [P] Add `WebDistManifestTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WebDistManifestTests.swift`, as research R8 check 1. It finds the repository root from `#filePath`, hashes the source inputs and `dist` outputs with CryptoKit, and compares them with `Web/dist/MANIFEST`. It fails with a message for each case: a stale build, a hand-edited `dist`, or an added or missing file. To prove it, assert against a copy of the tree in a temporary folder (memory: never mutate source to prove a test).
+- [x] T007 (38ac390d: swift-syntax 604.0.0 for Swift 6.4; GeneratedIsFreshTests brought forward from T021, holding a header-only generated.ts) [P] Create the `Packages/WebTypes` package.
   - `Package.swift`: macOS 27, swift-syntax pinned to the toolchain's version, `.treatAllWarnings(as: .error)`.
   - `Sources/WebTypesKit/` with an empty emitter, and `Sources/agents-webtypes/main.swift` taking `--root <repo>` and `--check`.
   - `Tests/WebTypesTests/`.
-- [ ] T008 [P] Add `Web/test/lint-dist.mjs`, as research R12. It fails on `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval(`, `new Function` or `dangerouslySetInnerHTML` in `dist/app.js`, on any `http(s)://` outside an allowlist, and on inline script or style in `dist/index.html`. Also add a licence check over `package-lock.json` that allows MIT, ISC, BSD and Apache only. Wire both into `npm run check`.
-- [ ] T009 Write `scripts/web.sh` with these subcommands:
+- [x] T008 (8e4afe60, as `Web/test/lint.mjs` and `licences.mjs`: the sink ban is on `Web/src`, because Preact's bundle holds `innerHTML` behind `dangerouslySetInnerHTML` (research R12); PSF-2.0 allowed, for argparse, which markdown-it uses only on its command line) [P] Add `Web/test/lint-dist.mjs`, as research R12. It fails on `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval(`, `new Function` or `dangerouslySetInnerHTML` in `dist/app.js`, on any `http(s)://` outside an allowlist, and on inline script or style in `dist/index.html`. Also add a licence check over `package-lock.json` that allows MIT, ISC, BSD and Apache only. Wire both into `npm run check`.
+- [x] T009 Write `scripts/web.sh` with these subcommands:
   - `types`: `swift run --package-path Packages/WebTypes agents-webtypes --root .`;
   - `build`: `cd Web && npm ci --ignore-scripts && npm run build`;
   - `check`: the WebTypes freshness test and `WebDistManifestTests`, then, if Node is present, `npm run check`, `npm test`, `npm run build` and `git diff --exit-code Web/dist Web/src/protocol/generated.ts`;
   - `test`: `npm test`.
-- [ ] T010 CI, in `.github/workflows/ci.yml` and `scripts/select-test-suites.sh`:
+- [x] T010 (a `packages` job on xcode-27 for WebTypes and ControlPlane, apart from `test` and its 30-minute cap; a `web` job on ubuntu-latest; the selector outputs `webtypes` and `controlplane`, and `Web/` changes select WebDistManifestTests and ControlAgreementVectorTests; not yet run on GitHub) CI, in `.github/workflows/ci.yml` and `scripts/select-test-suites.sh`:
   - run `swift test --package-path Packages/ControlPlane` and `swift test --package-path Packages/WebTypes` (neither runs in CI today);
   - make the selector choose WebTypes on any change under `Packages/AgentsKit/Sources/AgentsKitCore/`, `Packages/WebTypes/` or `Web/`;
   - add a `web` job on `ubuntu-latest` with `actions/setup-node`, reading `Web/.node-version`, that runs `npm ci --ignore-scripts`, `npm run check`, `npm test` and `npm run build`, then `git diff --exit-code Web/dist Web/src/protocol/generated.ts`.
