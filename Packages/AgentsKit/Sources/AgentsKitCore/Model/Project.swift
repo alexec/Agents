@@ -23,6 +23,9 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// purpose: reading it as anything else would either lay out step 1 again, putting
     /// back what the person deleted, or fail `projects.json`, which holds every project.
     public var layoutVersion: Int?
+    /// The person's own helper limits (#64). Nil is the defaults. Written only by
+    /// `projects/setHelperLimits`, which only an operator may call.
+    public var helperLimits: HelperLimits?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
@@ -65,12 +68,14 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     private static let standardized = Mutex<[String: URL]>([:])
 
     public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(),
-                laidOutAt: Date? = nil, layoutVersion: Int? = nil, unknownFields: [String: JSONValue] = [:]) {
+                laidOutAt: Date? = nil, layoutVersion: Int? = nil, helperLimits: HelperLimits? = nil,
+                unknownFields: [String: JSONValue] = [:]) {
         self.folder = Self.standardize(folder)
         self.archivedAt = archivedAt
         self.addedAt = addedAt
         self.laidOutAt = laidOutAt
         self.layoutVersion = layoutVersion
+        self.helperLimits = helperLimits
         self.unknownFields = unknownFields
     }
 
@@ -81,6 +86,8 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         addedAt = try c.decode(Date.self, forKey: .addedAt)
         laidOutAt = try c.decodeIfPresent(Date.self, forKey: .laidOutAt)
         layoutVersion = try c.decodeIfPresent(Int.self, forKey: .layoutVersion)
+        // A setting this build cannot read is the defaults, not a project that fails to load.
+        helperLimits = (try? c.decodeIfPresent(HelperLimits.self, forKey: .helperLimits)) ?? nil
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         unknownFields = [:]
         if let extra = try? decoder.container(keyedBy: AnyKey.self) {
@@ -97,6 +104,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         try c.encode(addedAt, forKey: .addedAt)
         try c.encodeIfPresent(laidOutAt, forKey: .laidOutAt)
         try c.encodeIfPresent(layoutVersion, forKey: .layoutVersion)
+        try c.encodeIfPresent(helperLimits, forKey: .helperLimits)
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
             for (key, value) in unknownFields {
@@ -106,7 +114,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case folder, archivedAt, addedAt, laidOutAt, layoutVersion
+        case folder, archivedAt, addedAt, laidOutAt, layoutVersion, helperLimits
     }
 
     struct AnyKey: CodingKey {

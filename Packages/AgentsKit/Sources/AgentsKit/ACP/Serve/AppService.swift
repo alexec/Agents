@@ -1097,8 +1097,9 @@ public actor AppService {
     /// Start an agent in this project (028).
     ///
     /// The description carries the limits because the agent needs them before it
-    /// calls, not in a refusal after: this project only, five at once across the
-    /// project, and only the person frees a place by archiving. And the restraint,
+    /// calls, not in a refusal after: this project only, two limits across the project
+    /// that the person sets, and only the person frees a not-archived place. No number
+    /// is written here: the limits are the project's own, and a result says them. And the restraint,
     /// as the workflow tool carries its own — an agent told it can start agents will
     /// start agents.
     static let startAgentTool: JSONValue = [
@@ -1111,11 +1112,15 @@ public actor AppService {
             person's list of agents, marked as started by you. The person can open it, \
             talk to it, stop it, park it or archive it at any time.
 
-            At most five agents started by agents can exist in this project at once, \
-            counting every agent here, and stopped, parked or finished ones still count. \
-            Only the person can archive one to free its place. Use list_my_agents to see \
-            yours and how many places are in use. Stop one with stop_agent, or park one \
-            with park_agent, when its part is done; it keeps its place until they archive it.
+            This project has two limits on agents started by agents, counting every agent \
+            here, which only the person sets (in Project Settings): how many may be \
+            running — working, waiting on a question, or waiting to carry on by \
+            itself — and how many may exist not yet archived, where stopped, parked and \
+            finished ones still count. A start that would break either is refused, \
+            saying which. Use list_my_agents to see yours and how many places of each \
+            are in use. Stop one with stop_agent, or park one with park_agent, when its \
+            part is done: that frees its running place, and it keeps its other place \
+            until the person archives it.
 
             Start one only when part of the work can genuinely run alongside the rest. \
             Do not start one for work you could simply do yourself. The agent you \
@@ -1183,8 +1188,8 @@ public actor AppService {
         "title": "Stop an agent you started",
         "description": """
             Stop an agent you started with start_agent, as the person's own Stop would. \
-            It stays in the list with its conversation, and keeps its place until it is \
-            archived. Only agents you started can be stopped this way; not yourself, \
+            It stays in the list with its conversation. Stopping frees its running \
+            place; it keeps its not-archived place until it is archived. Only agents you started can be stopped this way; not yourself, \
             and not anyone else's.
             """,
         "inputSchema": agentIDSchema,
@@ -1196,8 +1201,9 @@ public actor AppService {
         "description": """
             Park an agent you started with start_agent, as the person's own Park would: \
             put it down to come back to later. If it is still working, the turn finishes \
-            first and it parks when that ends. It stays in the list under Parked, and \
-            keeps its place until it is archived. Only agents you started can be parked \
+            first and it parks when that ends. It stays in the list under Parked. Parking \
+            frees its running place; it keeps its not-archived place until it is \
+            archived. Only agents you started can be parked \
             this way; not yourself (set afterwards to park on finish_turn), and not \
             anyone else's.
             """,
@@ -1210,8 +1216,9 @@ public actor AppService {
         "title": "List the agents you started",
         "description": """
             The agents you started with start_agent that have not been archived: each \
-            one's id, what it is doing, what it last said, and its labels with owners. Also how \
-            many of this project's three places are in use.
+            one's id, what it is doing, what it last said, and its labels with owners. Also \
+            how many of this project's running and not-archived places are in use, out \
+            of the limits the person set.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
     ]

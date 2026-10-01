@@ -6,8 +6,8 @@ import Testing
 /// An agent starting, stopping, archiving and listing agents of its own (028).
 ///
 /// What this suite holds is the boundary: the new agent always lands in the caller's
-/// own project, a project never holds more than five agents started by agents however
-/// the requests arrive, an agent touches only the agents it started, and an agent
+/// own project, a project never holds more agents started by agents than its two limits
+/// allow however the requests arrive, an agent touches only the agents it started, and an agent
 /// another agent started has none of it. Every refusal is checked for its words as
 /// well as its effect, because the calling agent reads them.
 @Suite("Agents started by agents", .timeLimit(.minutes(1)))
@@ -111,7 +111,8 @@ struct HelperAgentTests {
         #expect(Project.standardize(helper.cwd) == work)
         #expect(helper.startedByAgent == lead)
         #expect(started.note.contains("(id \(started.agentID.uuidString))"))
-        #expect(started.note.contains("1 of 5 places in this project are now in use."))
+        #expect(started.note.contains("This project now has "))
+        #expect(started.note.contains(" of 3 running, 1 of 5 not archived."))
     }
 
     @Test func itsChatOpensWithWhoStartedIt() async throws {
@@ -250,7 +251,13 @@ struct HelperAgentTests {
         #expect(await core.inheritedMode(from: caller, runtime: "grok") == nil)
     }
 
-    // MARK: The limits (US2)
+    // MARK: The limits (US2, #64)
+
+    /// The person lets as many run as may be kept, so a test about the not-archived
+    /// limit is not cut short by the running one while fake turns are still going.
+    private func runningUpToFive(_ core: DaemonCore, _ folder: URL) async throws {
+        _ = try await core.setHelperLimits(.init(folder: folder, limits: HelperLimits(running: 5)))
+    }
 
     @Test func aSixthIsRefusedAndTheFiveAreNamed() async throws {
         let (locations, root) = try temporary()
@@ -258,6 +265,7 @@ struct HelperAgentTests {
         let core = try await makeCore(locations, FakeLauncher())
         let (_, first) = try await caller(core, in: work)
         let (_, second) = try await caller(core, in: work, title: "Other")
+        try await runningUpToFive(core, work)
         _ = try await start(core, first, "Alpha")
         _ = try await start(core, second, "Beta")
         _ = try await start(core, first, "Gamma")
@@ -267,7 +275,9 @@ struct HelperAgentTests {
         let error = await refusal { _ = try await start(core, second, "Zeta") }
         let message = error?.message ?? ""
         #expect(error?.code == DaemonAPI.Failure.notYours)
-        #expect(message.hasPrefix("Nothing was started: this project already has 5 agents started by agents"))
+        #expect(message.hasPrefix("Nothing was started: this project already has 5 of 5 agents started by agents not yet archived"))
+        #expect(message.contains("Only the person can archive one to free that place."))
+        #expect(message.hasSuffix("The person sets these limits in Project Settings."))
         for name in ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"] { #expect(message.contains(name), "names \(name)") }
         #expect(await core.allAgents().count == 7)
     }
@@ -277,6 +287,7 @@ struct HelperAgentTests {
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher())
         let (_, token) = try await caller(core, in: work)
+        try await runningUpToFive(core, work)
         let alpha = try await start(core, token, "Alpha")
         _ = try await start(core, token, "Beta")
         _ = try await start(core, token, "Gamma")
@@ -303,6 +314,7 @@ struct HelperAgentTests {
         let there = try project(root, "web")
         let core = try await makeCore(locations, FakeLauncher())
         let (_, elsewhere) = try await caller(core, in: there)
+        try await runningUpToFive(core, there)
         for name in ["A", "B", "C", "D", "E"] { _ = try await start(core, elsewhere, name) }
         let (_, token) = try await caller(core, in: here)
 
@@ -319,6 +331,7 @@ struct HelperAgentTests {
             slow.handshakeDelay = .milliseconds(150)
             let core = try await makeCore(locations, FakeLauncher(script: slow))
             let (_, token) = try await caller(core, in: work)
+            try await runningUpToFive(core, work)
 
             let results = await withTaskGroup(of: Bool.self) { group in
                 for index in 0..<6 {
@@ -333,6 +346,125 @@ struct HelperAgentTests {
             #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 5)
             #expect(await core.reservedStarts[work, default: 0] == 0)
         }
+    }
+
+    /// The reserved-start race against the running limit: every start overlaps, so
+    /// each is weighed with the others' reservations and none has made its agent yet.
+    @Test func sixAtOnceRunExactlyThree() async throws {
+        for _ in 0..<10 {
+            let (locations, root) = try temporary()
+            let work = try project(root)
+            var slow = FakeACPAgent.Script()
+            slow.handshakeDelay = .milliseconds(150)
+            slow.turnDelay = .seconds(5)
+            let core = try await makeCore(locations, FakeLauncher(script: slow))
+            let (_, token) = try await caller(core, in: work)
+
+            let results = await withTaskGroup(of: String?.self) { group in
+                for index in 0..<6 {
+                    group.addTask {
+                        do {
+                            _ = try await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Part \(index)")) }
+                            return nil
+                        } catch let error as JSONRPCError { return error.message } catch { return "\(error)" }
+                    }
+                }
+                return await group.reduce(into: [String?]()) { $0.append($1) }
+            }
+
+            #expect(results.filter { $0 == nil }.count == 3)
+            for refused in results.compactMap({ $0 }) {
+                #expect(refused.contains("of 3 agents started by agents running"), "\(refused)")
+            }
+            #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 3)
+            #expect(await core.reservedStarts[work, default: 0] == 0)
+        }
+    }
+
+    @Test func aFourthRunningIsRefusedAndTheThreeAreNamed() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, longTurns())
+        let (_, token) = try await caller(core, in: work)
+        for name in ["Alpha", "Beta", "Gamma"] { _ = try await start(core, token, name) }
+
+        let error = await refusal { _ = try await start(core, token, "Delta") }
+        let message = error?.message ?? ""
+        #expect(error?.code == DaemonAPI.Failure.notYours)
+        #expect(message.hasPrefix("Nothing was started: this project already has 3 of 3 agents started by agents running"))
+        for name in ["Alpha", "Beta", "Gamma"] { #expect(message.contains(name), "names \(name)") }
+        #expect(message.contains("park_agent or stop_agent"))
+        #expect(!message.contains("not yet archived"), "only the limit it would break")
+        #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 3)
+    }
+
+    /// A blocked helper the app will carry on by itself holds a running place; a lead
+    /// parking it gives that place back, and its not-archived place stays taken.
+    @Test func aWaitingHelperRunsUntilItsLeadParksIt() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher())
+        let (_, token) = try await caller(core, in: work)
+        var helpers: [UUID] = []
+        for name in ["Alpha", "Beta", "Gamma"] {
+            let id = try await start(core, token, name)
+            helpers.append(id)
+            _ = await eventually("\(name) settled") {
+                let agent = await core.agent(id)
+                let released = await core.live[id] == nil
+                return agent?.outcomeAsked == true && agent?.state.holdsRuntime == false && released
+            }
+            // Blocked on a time an hour off: the app will check again by itself.
+            var agent = try #require(await core.agent(id))
+            agent.report = WorkReport(outcome: .blocked, message: "Waiting on the build", at: Date(),
+                                      block: Block(checkAgainAt: Date().addingTimeInterval(3600)))
+            await core.changed(agent)
+        }
+
+        let error = await refusal { _ = try await start(core, token, "Delta") }
+        #expect(error?.message.contains("3 of 3 agents started by agents running") == true)
+
+        let parked = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: helpers[0].uuidString)) }
+        #expect(parked.hasSuffix("This project now has 2 of 3 running, 3 of 5 not archived."))
+        _ = try await start(core, token, "Delta")
+    }
+
+    @Test func thePersonsSettingTakesEffectAtTheNextStartAndIsKept() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, longTurns())
+        let (_, token) = try await caller(core, in: work)
+        let summary = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(running: 1, notArchived: 2)))
+        #expect(summary.project.helperLimits == HelperLimits(running: 1, notArchived: 2))
+        #expect(summary.helperLimits == (1, 2))
+
+        let first = try await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Alpha")) }
+        #expect(first.note.hasSuffix("This project now has 1 of 1 running, 1 of 2 not archived."))
+        let error = await refusal { _ = try await start(core, token, "Beta") }
+        #expect(error?.message.contains("1 of 1 agents started by agents running") == true)
+
+        // Read back by a daemon started again on the same root.
+        let again = try await makeCore(locations, FakeLauncher())
+        #expect(await again.projectSummary(for: work)?.project.helperLimits == HelperLimits(running: 1, notArchived: 2))
+
+        // Back to the defaults keeps no setting at all.
+        let reset = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits()))
+        #expect(reset.project.helperLimits == nil)
+        #expect(reset.helperLimits == (3, 5))
+    }
+
+    @Test func aSettingPastTheHardMaximumIsRefusedAndNothingChanges() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher())
+        _ = try await caller(core, in: work)
+
+        for limits in [HelperLimits(running: 11), HelperLimits(notArchived: 21), HelperLimits(running: 0),
+                       HelperLimits(running: 4, notArchived: 3)] {
+            let error = await refusal { _ = try await core.setHelperLimits(.init(folder: work, limits: limits)) }
+            #expect(error?.code == JSONRPCError.invalidParams, "\(limits)")
+        }
+        #expect(await core.projectSummary(for: work)?.project.helperLimits == nil)
     }
 
     @Test func anAgentAnotherAgentStartedCannotStartOne() async throws {
@@ -518,7 +650,8 @@ struct HelperAgentTests {
         #expect(parked.parking?.isParked == true)
         #expect(parked.group(wantsEyes: false) == .parked)
         #expect(note.hasPrefix("Parked "))
-        #expect(note.contains("keeps its place until it is archived"))
+        #expect(note.contains("freeing its running place; it keeps its other place until it is archived."))
+        #expect(note.hasSuffix("This project now has 0 of 3 running, 1 of 5 not archived."))
     }
 
     @Test func parkingOneThatIsWorkingLetsTheTurnFinishThenParksIt() async throws {
@@ -531,7 +664,7 @@ struct HelperAgentTests {
 
         let note = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: helper.uuidString)) }
 
-        #expect(note.hasSuffix("will park when its turn ends."))
+        #expect(note.hasSuffix("will park when its turn ends, freeing its running place then."))
         guard case .whenTurnEnds = await core.agent(helper)?.parking else {
             Issue.record("expected the helper to be marked")
             return
@@ -624,7 +757,8 @@ struct HelperAgentTests {
         let list = try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
 
         let lines = list.split(separator: "\n").map(String.init)
-        #expect(lines.first == "2 of 5 places in this project are in use.")
+        #expect(lines.first?.hasPrefix("This project has ") == true)
+        #expect(lines.first?.hasSuffix(" running, 2 of 5 not archived.") == true)
         #expect(list.contains("- \(mine.uuidString): \u{201C}Alpha\u{201D} — finished"))
         #expect(!list.contains(theirs.uuidString))
     }
@@ -636,7 +770,7 @@ struct HelperAgentTests {
         let (_, token) = try await caller(core, in: work)
 
         #expect(try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
-                == "You have not started any agents that are still here. 0 of 5 places in this project are in use.")
+                == "You have not started any agents that are still here. This project has 0 of 3 running, 0 of 5 not archived.")
     }
 }
 

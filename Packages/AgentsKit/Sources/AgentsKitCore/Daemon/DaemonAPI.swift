@@ -173,6 +173,10 @@ public enum DaemonAPI {
         public static let projectsAdd = "projects/add"
         public static let projectsArchive = "projects/archive"
         public static let projectsUnarchive = "projects/unarchive"
+        /// The person setting a project's two helper limits (#64). An operator's alone:
+        /// in neither `ConnectionRole.agentMethods` nor `deviceMethods`, so no agent, no
+        /// workflow and no phone can raise a ceiling over agents.
+        public static let projectsSetHelperLimits = "projects/setHelperLimits"
         /// Clone a Git URL into the home folder and add it (027). Answers when the
         /// project exists, which for a big repository is minutes: the window shows the
         /// clone from `clone/changed`, not from waiting on this.
@@ -451,6 +455,17 @@ public enum DaemonAPI {
         public init(folder: URL) { self.folder = folder }
     }
 
+    /// A project's helper limits as the person set them (#64). A nil limit is its
+    /// default; both nil puts the project back to the defaults.
+    public struct SetHelperLimitsRequest: Codable, Sendable {
+        public var folder: URL
+        public var limits: HelperLimits
+        public init(folder: URL, limits: HelperLimits) {
+            self.folder = folder
+            self.limits = limits
+        }
+    }
+
     /// A Git URL, as pasted (027).
     public struct CloneRequest: Codable, Sendable {
         public var url: String
@@ -521,6 +536,10 @@ public enum DaemonAPI {
         public var id: URL { project.folder }
         public var folder: URL { project.folder }
         public var key: ProjectKey { ProjectKey(host: host, folder: project.folder) }
+        /// The helper limits enforced here (#64): the person's, or the defaults.
+        public var helperLimits: (running: Int, notArchived: Int) {
+            (project.helperLimits ?? HelperLimits()).effective
+        }
 
         enum CodingKeys: String, CodingKey {
             case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents

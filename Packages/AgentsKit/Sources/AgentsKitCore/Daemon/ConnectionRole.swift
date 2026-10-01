@@ -25,7 +25,9 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// Anything else of this account: whether the daemon is there, and no more.
     case stranger
 
-    /// What a helper relays, one per app tool, and nothing a window does.
+    /// What a helper relays, one per app tool, and nothing a window does. Not
+    /// `projects/setHelperLimits`: an agent reads its project's helper limits in its
+    /// tools' results and never sets them (#64).
     public static let agentMethods: Set<String> = Set<String>([
         DaemonAPI.Method.agentsFinishTurn,
         DaemonAPI.Method.agentsSuggestPrompts,
@@ -35,6 +37,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsManageWorkflows,
         DaemonAPI.Method.agentsStartHelper,
         DaemonAPI.Method.agentsStopHelper,
+        DaemonAPI.Method.agentsParkHelper,
         DaemonAPI.Method.agentsListHelpers,
         DaemonAPI.Method.agentsListSessions,
         DaemonAPI.Method.agentsReadSession,
@@ -53,7 +56,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// `install`, `setProvider` and `disableProvider`, `files/browse` and `files/write`, `daemon/quit`,
     /// `hosts/*`, `devices/list` and `forget`, `relay/register`, `mailbox/carry`,
     /// `workflows/approve`, `plugins/list` and `approve`, `projects/add` and `clone`,
-    /// `sessions/*`, and every agent tool.
+    /// `sessions/*`, `projects/setHelperLimits` (the phone reads a project's helper limits
+    /// in `projects/list`; setting them is the Mac's), and every agent tool.
     public static let deviceMethods: Set<String> = Set<String>([
         DaemonAPI.Method.projectsList,
         DaemonAPI.Method.agentsList,

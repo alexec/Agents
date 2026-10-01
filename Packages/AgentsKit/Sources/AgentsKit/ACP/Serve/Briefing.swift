@@ -96,12 +96,14 @@ public enum Briefing {
     /// Only for an agent that has the tools: one another agent started is not told
     /// about tools it was never given. The restraint is the second sentence, for the
     /// reason the workflow line gives — an agent told it can start agents will start
-    /// agents — and the limit is said here as well as in the tool's description so it
-    /// is known before the first call rather than learned from a refusal.
+    /// agents — and the limits are said here as well as in the tool's description so
+    /// they are known before the first call rather than learned from a refusal. Without
+    /// their numbers, which are the project's and can change mid-conversation (#64).
     public static let helpers = """
-        If a piece of the work can go on alongside the rest, you can start up to five \
-        agents in this project with \(AppTool.startAgent), and stop or park them when \
-        their part is done. Do not start one for work you could simply do yourself.
+        If a piece of the work can go on alongside the rest, you can start agents in \
+        this project with \(AppTool.startAgent), up to the limits the person set on how \
+        many may run and how many may be kept, and stop or park them when their part is \
+        done. Do not start one for work you could simply do yourself.
         """
 
     /// Take turns with what only one agent can use at a time (036 FR-015). Every

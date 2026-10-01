@@ -1123,6 +1123,21 @@ final class AppModel {
         }
     }
 
+    /// The person's helper limits for a project (#64). Through the window only: the
+    /// daemon refuses the method to agents and phones.
+    func setHelperLimits(_ limits: HelperLimits, for key: ProjectKey) async {
+        do {
+            var summary = try await client(for: key.host).call(
+                DaemonAPI.Method.projectsSetHelperLimits,
+                DaemonAPI.SetHelperLimitsRequest(folder: key.folder, limits: limits),
+                returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            upsert(summary)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
     private func callProject(_ method: String, _ key: ProjectKey,
                              then: ((DaemonAPI.ProjectSummary) -> Void)? = nil) async {
         do {

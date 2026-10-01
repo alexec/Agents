@@ -121,8 +121,19 @@ struct AgentToolsServiceTests {
     @Test func theStartDescriptionCarriesTheLimits() {
         let description = AppService.startAgentTool["description"]?.stringValue ?? ""
         #expect(description.contains("this project"))
-        #expect(description.contains("five"))
-        #expect(description.contains("Only the person can archive"))
+        #expect(description.contains("two limits"))
+        #expect(description.contains("only the person sets"))
         #expect(description.contains("alongside the rest"))
+    }
+
+    /// No helper tool says how many: the project's limits are in each result (#64).
+    @Test func noHelperToolHardCodesANumber() {
+        for tool in [AppService.startAgentTool, AppService.stopAgentTool, AppService.parkAgentTool,
+                     AppService.listMyAgentsTool] {
+            let description = tool["description"]?.stringValue ?? ""
+            for number in ["three", "five", " 3 ", " 5 "] {
+                #expect(!description.contains(number), "\(tool["name"]?.stringValue ?? "?") says \(number)")
+            }
+        }
     }
 }

@@ -200,6 +200,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await unarchiveProject(request.folder)))
 
+            case DaemonAPI.Method.projectsSetHelperLimits:
+                let request = try require(params, as: DaemonAPI.SetHelperLimitsRequest.self)
+                return .success(try JSONValue.encoding(try setHelperLimits(request)))
+
             case DaemonAPI.Method.workflowsList:
                 let request = try decode(params, as: DaemonAPI.WorkflowsListRequest.self) ?? .init()
                 return .success(try JSONValue.encoding(allWorkflows(in: request.folder)))

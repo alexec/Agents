@@ -289,12 +289,17 @@ struct BriefingTests {
 
     // MARK: Agents of its own (028)
 
-    @Test func anAgentThatMayStartAgentsIsToldSoAndHowMany() {
+    /// Told there are limits the person set, and never a number: the numbers are the
+    /// project's and can change mid-conversation (#64).
+    @Test func anAgentThatMayStartAgentsIsToldSoAndThatThePersonSetsTheLimits() {
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy)
             #expect(text.contains(Briefing.helpers), "\(policy.runtimeID)")
             #expect(text.contains(AppTool.startAgent))
-            #expect(text.contains("five"))
+        }
+        #expect(Briefing.helpers.contains("the limits the person set"))
+        for number in ["three", "five", "3", "5"] {
+            #expect(!Briefing.helpers.contains(number), "\(number)")
         }
     }
 

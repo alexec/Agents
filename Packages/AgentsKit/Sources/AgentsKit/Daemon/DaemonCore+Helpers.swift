@@ -6,7 +6,9 @@ import Foundation
 /// helper process only relays. What makes it safe is what the caller cannot say. It
 /// names no folder, because its project is its own; it can only touch agents whose
 /// `startedByAgent` is itself; and every agent another agent started, across a whole
-/// project, shares `HelperLimit.perProject` places. An agent another agent started
+/// project, is weighed against the project's two `HelperLimit`s — how many may run, and
+/// how many may be there not archived — which the person sets and no agent can. An
+/// agent another agent started
 /// has none of this — it is not offered the tools, and it is refused here if it calls
 /// them anyway.
 ///
@@ -27,16 +29,8 @@ extension DaemonCore {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: "Nothing was started: say what the agent is to do.")
         }
-        let inUse = HelperLimit.placesInUse(in: folder, agents: agents.values,
-                                            reserved: reservedStarts[folder, default: 0])
-        guard inUse < HelperLimit.perProject else {
-            let names = HelperLimit.helpers(in: folder, agents: agents.values)
-                .map { "\u{201C}\($0.title ?? "Untitled")\u{201D}" }
-            let naming = names.isEmpty ? "" : " — " + names.joined(separator: ", ")
-            throw JSONRPCError(
-                code: DaemonAPI.Failure.notYours,
-                message: "Nothing was started: this project already has \(HelperLimit.perProject) "
-                    + "agents started by agents\(naming). The person archives one to free its place.")
+        if let full = helperLimitRefusal(in: folder) {
+            throw JSONRPCError(code: DaemonAPI.Failure.notYours, message: "Nothing was started: \(full)")
         }
         // A mode it names may be its own or stricter, never looser: otherwise an agent
         // kept on a short lead starts one on none and hands it the work.
@@ -78,10 +72,8 @@ extension DaemonCore {
         let title = agents[agentID]?.title ?? "Untitled"
         // Counted with the new agent and without its reservation, which the `defer`
         // has not yet let go of.
-        let now = HelperLimit.placesInUse(in: folder, agents: agents.values,
-                                          reserved: reservedStarts[folder, default: 1] - 1)
         var note = "Started \u{201C}\(title)\u{201D} (id \(agentID.uuidString)). "
-            + "\(now) of \(HelperLimit.perProject) places in this project are now in use."
+            + "This project now has \(helperPlaces(in: folder, reservationsToIgnore: 1))."
         if let worktree = agents[agentID]?.worktree {
             note += " It is working in worktree \(worktree.name)"
                 + (worktree.branch.map { " on \($0)." } ?? ".")
@@ -150,7 +142,8 @@ extension DaemonCore {
             return "\u{201C}\(title)\u{201D} had already stopped; nothing changed."
         }
         try await stop(target.id, by: .agent(caller.id))
-        return "Stopped \u{201C}\(title)\u{201D}. It keeps its place until it is archived."
+        return "Stopped \u{201C}\(title)\u{201D}, freeing its running place; it keeps its other place "
+            + "until it is archived. This project now has \(helperPlaces(in: target.projectFolder))."
     }
 
     public func parkHelper(_ request: DaemonAPI.HelperRequest) throws -> String {
@@ -165,9 +158,10 @@ extension DaemonCore {
         let inFlight = target.state.hasTurnInFlight
         try park(target.id)
         if inFlight {
-            return "\u{201C}\(title)\u{201D} will park when its turn ends."
+            return "\u{201C}\(title)\u{201D} will park when its turn ends, freeing its running place then."
         }
-        return "Parked \u{201C}\(title)\u{201D}. It keeps its place until it is archived."
+        return "Parked \u{201C}\(title)\u{201D}, freeing its running place; it keeps its other place "
+            + "until it is archived. This project now has \(helperPlaces(in: target.projectFolder))."
     }
 
     // MARK: Listing
@@ -175,9 +169,7 @@ extension DaemonCore {
     public func listHelpers(_ request: DaemonAPI.ListHelpersRequest) throws -> String {
         let caller = try helperCaller(token: request.token, refusing: "Nothing was listed")
         let folder = caller.projectFolder
-        let inUse = HelperLimit.placesInUse(in: folder, agents: agents.values,
-                                            reserved: reservedStarts[folder, default: 0])
-        let places = "\(inUse) of \(HelperLimit.perProject) places in this project are in use."
+        let places = "This project has \(helperPlaces(in: folder))."
         let mine = HelperLimit.helpers(in: folder, agents: agents.values)
             .filter { $0.startedByAgent == caller.id }
         guard !mine.isEmpty else {
@@ -207,6 +199,54 @@ extension DaemonCore {
             return "stopped" + why + said
         case .archived: return "archived"
         }
+    }
+
+    // MARK: The limits
+
+    /// Agents being brought back after a restart: running, though their record has not
+    /// caught up yet.
+    private var comingBack: Set<UUID> { resuming.union(interrupted.keys) }
+
+    /// "2 of 3 running, 4 of 5 not archived": the project's places as a tool result
+    /// says them, with its own limits. Reserved starts count in both, since each will
+    /// be a running helper the moment it is made.
+    func helperPlaces(in folder: URL, reservationsToIgnore: Int = 0) -> String {
+        let limits = helperLimits(in: folder)
+        let reserved = max(0, reservedStarts[folder, default: 0] - reservationsToIgnore)
+        let running = HelperLimit.running(in: folder, agents: agents.values, reserved: reserved,
+                                          comingBack: comingBack)
+        let kept = HelperLimit.placesInUse(in: folder, agents: agents.values, reserved: reserved)
+        return "\(running) of \(limits.running) running, \(kept) of \(limits.notArchived) not archived"
+    }
+
+    /// Why one more helper cannot start in this project, naming the limit it would
+    /// break and the helpers holding it; nil when it can. Both limits are said when
+    /// both are full, since only one way out frees both.
+    private func helperLimitRefusal(in folder: URL) -> String? {
+        let limits = helperLimits(in: folder)
+        let reserved = reservedStarts[folder, default: 0]
+        let quoted: ([Agent]) -> String = { held in
+            held.isEmpty ? "" : " — " + held.map { "\u{201C}\($0.title ?? "Untitled")\u{201D}" }
+                .joined(separator: ", ")
+        }
+        let starting = reserved == 0 ? "" : " (\(reserved) still starting)"
+        var full: [String] = []
+        let kept = HelperLimit.helpers(in: folder, agents: agents.values)
+        if kept.count + reserved >= limits.notArchived {
+            full.append("this project already has \(kept.count + reserved) of \(limits.notArchived) "
+                + "agents started by agents not yet archived\(quoted(kept))\(starting). "
+                + "Only the person can archive one to free that place.")
+        }
+        let running = HelperLimit.runningHelpers(in: folder, agents: agents.values, comingBack: comingBack)
+        if running.count + reserved >= limits.running {
+            full.append("this project already has \(running.count + reserved) of \(limits.running) "
+                + "agents started by agents running\(quoted(running))\(starting). "
+                + "Park or stop one of yours with \(AppTool.parkAgent) or \(AppTool.stopAgent) when its part is done, "
+                + "or wait for one to finish.")
+        }
+        guard !full.isEmpty else { return nil }
+        return full.joined(separator: " And ")
+            + " The person sets these limits in Project Settings."
     }
 
     // MARK: Who may

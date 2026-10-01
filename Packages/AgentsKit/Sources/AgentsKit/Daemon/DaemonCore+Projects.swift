@@ -263,6 +263,41 @@ extension DaemonCore {
         return summary
     }
 
+    /// The person setting a project's two helper limits (#64). Only an operator's
+    /// connection reaches this: `ConnectionRole` keeps it from agents and devices.
+    ///
+    /// Refused outside the hard maximums rather than clamped, so the person reads what
+    /// was kept rather than finding out later. Lowering a limit below what is in use
+    /// stops nothing: it refuses the next start until enough have finished or been
+    /// archived.
+    public func setHelperLimits(_ request: DaemonAPI.SetHelperLimitsRequest) throws -> DaemonAPI.ProjectSummary {
+        let standardized = Project.standardize(request.folder)
+        // The derived record when none was kept, so its `addedAt` stays its oldest agent's.
+        guard let derived = projectSummary(for: standardized)?.project else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
+                               message: "\(standardized.path) is not a project.")
+        }
+        if let problem = request.limits.problem {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: problem)
+        }
+        var records = projectRecords()
+        var record = records[standardized] ?? derived
+        record.helperLimits = request.limits.orNilIfDefault
+        records[standardized] = record
+        saveProjectRecords(records)
+        guard let summary = projectSummary(for: standardized) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
+                               message: "\(standardized.path) is not a project.")
+        }
+        broadcast(DaemonAPI.Notification.projectChanged, summary)
+        return summary
+    }
+
+    /// The helper limits enforced in a project: the person's, or the defaults.
+    func helperLimits(in folder: URL) -> (running: Int, notArchived: Int) {
+        (projectRecords()[Project.standardize(folder)]?.helperLimits ?? HelperLimits()).effective
+    }
+
     /// Bring one back. Succeeds whether or not the folder is still there: the agents
     /// and their transcripts are the point, and `exists` says the rest.
     public func unarchiveProject(_ folder: URL) async throws -> DaemonAPI.ProjectSummary {
