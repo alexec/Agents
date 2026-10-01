@@ -373,6 +373,32 @@ code.
 Remote (S2 covered a LAN address, which ATS treats the same), and `tailscale serve` in
 front of the copy. This Mac has no Tailscale.
 
+**Decision (Alex, 2026-10-01): no Tailscale the person installs.** Tailscale is worth
+using only if it is embedded in the apps. The two ways above are not built. The rule about
+the two kinds of address stands for any other extra address.
+
+**Embedding, assessed (not planned).** Tailscale's `libtailscale` has a Swift package,
+TailscaleKit, for macOS and iOS. It runs a tailnet node inside the app's own process, with
+no network extension and no VPN slot. URLSession traffic goes through it via a loopback
+proxy in a `URLSessionConfiguration`, and only that session's traffic. What it would cost:
+- *Every device still needs a Tailscale account,* through an interactive sign-in or an auth
+  key. Owning the tailnet ourselves would be a service we run, which FR-002 rules out (005
+  research rejected embedding for the same reason). This is what doesn't go away.
+- *A Go framework in each app* (tens of MB), built in a Go toolchain we don't have yet.
+  Upstream it is pre-production: "functional (though somewhat incomplete)", frameworks
+  unsigned.
+- *Only while the app runs.* A suspended Remote drops off the tailnet, so notifications
+  still need APNs and a Mac host.
+- *The far end has to be on the tailnet too:* Agents Host, or a sidecar beside a cloud
+  control plane. Linux hosts would need it as well, and embedding there means C bindings in
+  a static musl Swift build.
+
+What it buys is a direct route to a Mac that sits behind NAT with no public address.
+A cloud control plane at a public address (R15, #61) already gives every device and host a
+route that only dials out, with no account and no extra framework. So embedding isn't
+worth its cost unless there's a set-up we want without a cloud machine and with full speed
+away from home, which the iCloud relay (R10) can't give.
+
 ## R9 — The host download: an app outside the Store
 
 **Decision**: **Agents Host.app**, signed with Developer ID and notarized, shipped as a disk
