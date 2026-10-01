@@ -1,6 +1,13 @@
-// The web remote's entry point (spec 071). Phase 2 renders a name only; pairing (US1) and the
-// three columns (US2) arrive in later tasks.
+// The web remote's entry point (spec 071).
 import { render } from "preact";
+import { App } from "./App";
+import { Session } from "./session";
 
+const session = new Session();
 const root = document.getElementById("app");
-if (root) render(<main><h1>Agents</h1></main>, root);
+if (root) render(<App session={session} />, root);
+session.start();
+// A tab coming back into view tries again at once (contracts/browser-auth.md, "Closing").
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") session.link.retryNow();
+});

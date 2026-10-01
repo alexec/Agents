@@ -15,3 +15,111 @@ body {
 ::selection {
   background: var(--paper-selection);
 }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.prominent {
+  background: var(--paper-ink);
+  color: var(--paper-ground);
+  border-color: var(--paper-ink);
+}
+
+/* Frame E: pairing, and nothing else. */
+.pairing {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.pairing-card {
+  width: min(440px, 100%);
+}
+
+.pairing-card h1 {
+  font-size: 20px;
+  margin: 0 0 12px;
+}
+
+.pairing-card p {
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.pairing-card textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 72px;
+  resize: vertical;
+  font: 12px var(--font-mono);
+  color: var(--paper-ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card);
+  padding: 8px 10px;
+}
+
+.pairing-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 14px;
+}
+
+.pairing-error {
+  color: var(--tint-failure);
+}
+
+.pairing-forgotten {
+  background: var(--paper-well);
+  border-radius: var(--radius-card);
+  padding: 8px 12px;
+}
+
+.pairing-note {
+  opacity: 0.65;
+  font-size: 12px;
+}
+
+/* Until the three columns: who this browser is, and what the hosts hold. */
+.paired {
+  padding: 24px;
+  max-width: 640px;
+}
+
+.paired h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  margin: 18px 0 6px;
+}
+
+.paired ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.identity {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--paper-rule);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  opacity: 0.85;
+}

@@ -63,7 +63,7 @@ export const forgottenCode = 4403;
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 
 /** Lines from a socket, as the exchange reads them. */
-class Lines implements LineSocket {
+export class Lines implements LineSocket {
   private queue: string[] = [];
   private waiting: { resolve: (line: string) => void; reject: (error: Error) => void } | null = null;
   private closed: Error | null = null;

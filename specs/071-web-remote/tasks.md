@@ -198,14 +198,14 @@ either side.
 
   Add a `WebSignatures` row, then regenerate (`scripts/web.sh types`).
 - [x] T029 (`ReasonedClose`, adopted by the WebSocket transport and `PrefixReader`; `ControlRecords.wasForgotten`; one older test now expects `forgotten`, which the Remote already treats as `unknown`) [US1] Make `router.forgetClient` (`ControlRouter.swift`) close every session of the forgotten client with WebSocket close code 4403 and reason `forgotten`, on every copy (`clientForgotten` broadcast). Make a tombstoned client's next `auth` answer `refused: forgotten`. Test both in `ControlServiceTests`, with forgetting within 2 s (FR-014, SC-007).
-- [ ] T030 [US1] Build the pairing screen, `Web/src/views/Pairing.tsx` (frame E):
+- [x] T030 (frame E's words: "Ask for a new one"; walked in headless Chrome against the real agents-control) [US1] Build the pairing screen, `Web/src/views/Pairing.tsx` (frame E):
   - a paste field and nothing else;
   - the refusal words from contracts/browser-auth.md;
   - "This browser isn't supported", naming Safari and Chrome;
   - no private-window note: T002 found Chrome cannot tell one apart, so the how-to carries it;
   - no code in any URL;
   - focus on the field.
-- [ ] T031 [US1] Build `Web/src/App.tsx`'s start-up:
+- [x] T031 (`session.ts` holds the page's state; walked: restart keeps the key, two tabs, Forget This Browser… clears IndexedDB, the other tab hears 4403) [US1] Build `Web/src/App.tsx`'s start-up:
   - no key: pairing;
   - a key: connect;
   - forgotten (4403, `refused`, or a `BroadcastChannel` from another tab): **This browser was forgotten** (frame F, second half), then delete the key and show pairing;
