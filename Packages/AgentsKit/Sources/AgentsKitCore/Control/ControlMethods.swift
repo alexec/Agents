@@ -176,6 +176,7 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.hostsLendSignIn,
         DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
         DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget, DaemonAPI.Method.clientsConnections,
+        DaemonAPI.Method.clientsForgetSelf,
         DaemonAPI.Method.devicesList, DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesStopPairing,
         DaemonAPI.Method.devicesForget,
     ]
@@ -184,6 +185,7 @@ public actor ControlMethods: ControlHandling {
     /// operator's.
     static let anyGrant: Set<String> = [
         DaemonAPI.Method.ping, DaemonAPI.Method.controlStatus, DaemonAPI.Method.hostsList,
+        DaemonAPI.Method.clientsForgetSelf,
     ]
 
     public nonisolated func handles(_ method: String) -> Bool {
@@ -274,6 +276,13 @@ public actor ControlMethods: ControlHandling {
             }
             try await forget(id)
             await hooks.changed(ControlEvent(kind: .clientForgotten, subject: id.uuidString, at: Date(),
+                                             by: caller.client.uuidString))
+            return [:]
+        case DaemonAPI.Method.clientsForgetSelf:
+            // Only itself, and the last operator still can't (058 FR-016). The reply goes
+            // before the sockets close, so the caller hears it was done.
+            try await forget(caller.client, closingAfter: .milliseconds(200))
+            await hooks.changed(ControlEvent(kind: .clientForgotten, subject: caller.client.uuidString, at: Date(),
                                              by: caller.client.uuidString))
             return [:]
         case DaemonAPI.Method.hostsStartEnroll:
@@ -383,10 +392,11 @@ public actor ControlMethods: ControlHandling {
 
     // MARK: Helpers
 
-    private func forget(_ id: UUID) async throws {
+    private func forget(_ id: UUID, closingAfter delay: Duration? = nil) async throws {
         try await records.forget(id)
         let changed = await records.clients
         Task {
+            if let delay { try? await Task.sleep(for: delay) }
             await router?.forgetClient(id)
             await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
                                            ["client": .string(id.uuidString), "removed": true], operatorsOnly: true)

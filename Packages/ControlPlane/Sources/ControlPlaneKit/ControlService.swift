@@ -516,6 +516,8 @@ public final class ControlService: @unchecked Sendable {
             // that cannot be read says so; "unknown" would have the device forget its
             // pairing over a hiccup (#81).
             if await records.client(id) == nil { try await readAgain() }
+            // A browser hears it was forgotten, and deletes its key (071 FR-014).
+            if await records.client(id) == nil, await records.wasForgotten(id) { throw ControlAuth.Refusal(.forgotten) }
             guard let client = await records.client(id), !client.publicKey.isEmpty else { throw ControlAuth.Refusal(.unknown) }
             return (try ControlAuth.clientKey(privateKey: privateKey, peer: client.publicKey, client: id),
                     Admitted(client: client))

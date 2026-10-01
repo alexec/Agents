@@ -38,12 +38,17 @@ public final class WebSocketLineTransport: LineTransport, @unchecked Sendable {
     public func lines() -> AsyncThrowingStream<String, any Error> { stream }
 
     public func close() {
+        close(.normalClosure, reason: "")
+    }
+
+    private func close(_ code: WebSocketErrorCode, reason: String) {
         let masked = isClient
         let channel = self.channel
         channel.eventLoop.execute {
             guard channel.isActive else { return }
-            var data = channel.allocator.buffer(capacity: 2)
-            data.write(webSocketErrorCode: .normalClosure)
+            var data = channel.allocator.buffer(capacity: 2 + reason.utf8.count)
+            data.write(webSocketErrorCode: code)
+            data.writeString(reason)
             let frame = WebSocketFrame(fin: true, opcode: .connectionClose, maskKey: masked ? .random() : nil, data: data)
             channel.writeAndFlush(frame).whenComplete { _ in channel.close(promise: nil) }
         }
@@ -56,6 +61,13 @@ public final class WebSocketLineTransport: LineTransport, @unchecked Sendable {
 
     /// The address at the other end, for the log.
     public var remote: String { channel.remoteAddress?.description ?? "?" }
+}
+
+extension WebSocketLineTransport: ReasonedClose {
+    /// Closes with `code` (4000–4999 are the application's) and a short reason.
+    public func close(code: UInt16, reason: String) {
+        close(WebSocketErrorCode(codeNumber: Int(code)), reason: reason)
+    }
 }
 
 public struct WebSocketClosed: Error, Sendable, CustomStringConvertible {

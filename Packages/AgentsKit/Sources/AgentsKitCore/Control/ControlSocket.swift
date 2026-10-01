@@ -56,6 +56,10 @@ public final class PrefixReader: LineTransport, @unchecked Sendable {
     public func close() { base.close() }
 }
 
+extension PrefixReader: ReasonedClose {
+    public func close(code: UInt16, reason: String) { base.close(code: code, reason: reason) }
+}
+
 public extension ControlAuth {
     /// Who a peer is, what it is called when the socket opens, and the key it proves.
     struct Credentials: Sendable {

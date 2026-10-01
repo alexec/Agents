@@ -527,7 +527,12 @@ public actor ControlRouter {
     }
 
     /// Ends a session: its channels are closed on every host, then its transport.
-    public func detachClient(_ id: UUID) {
+    /// The close code a forgotten client's sockets end with (071 contracts/browser-auth.md).
+    public static let forgottenCloseCode: UInt16 = 4403
+
+    public func detachClient(_ id: UUID) { detachClient(id, closing: nil) }
+
+    private func detachClient(_ id: UUID, closing code: UInt16?) {
         guard let session = clients.removeValue(forKey: id) else { return }
         let client = session.caller.client
         if !clients.values.contains(where: { $0.caller.client == client }) {
@@ -537,7 +542,7 @@ public actor ControlRouter {
             hosts[host]?.channels[channel] = nil
             try? hosts[host]?.transport.write(line: ControlWire.close(channel))
         }
-        session.transport.close()
+        if let code { session.transport.close(code: code, reason: "forgotten") } else { session.transport.close() }
         noteLink(client)
     }
 
@@ -585,8 +590,9 @@ public actor ControlRouter {
     }
 
     /// `clients/forget`: every session of that client, at once (FR-008).
+    /// Every session of a forgotten client ends, each told why with 4403 (FR-014).
     public func forgetClient(_ client: UUID) {
-        for id in sessions(of: client) { detachClient(id) }
+        for id in sessions(of: client) { detachClient(id, closing: Self.forgottenCloseCode) }
     }
 
     /// `clients/setGrant`: the next call is judged by the new grant, and every channel is

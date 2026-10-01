@@ -253,6 +253,21 @@ struct ControlRouterTests {
         a.stop(); b.stop()
     }
 
+    /// Each of a forgotten client's sockets is told why it closes, so a browser deletes its
+    /// key at once (071 FR-014); a client that merely leaves is closed plainly.
+    @Test func aForgottenClientsSocketsCloseWith4403() async throws {
+        let router = ControlRouter(handler: StubControl(), homeHost: home)
+        let browser = client(.device)
+        let tabs = [ClosingRecorder(), ClosingRecorder()]
+        for tab in tabs { await router.attachClient(browser, transport: tab) }
+        let other = ClosingRecorder()
+        let session = await router.attachClient(client(.device), transport: other)
+        await router.forgetClient(browser.id)
+        #expect(tabs.map(\.closes) == [[4403], [4403]])
+        await router.detachClient(session)
+        #expect(other.closes == [nil])
+    }
+
     @Test func channelNumbersAreNeverUsedTwiceOnOneUplink() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)
@@ -309,4 +324,19 @@ struct ControlRouterTests {
         #expect(remote.lines[1].contains(DaemonAPI.Method.credentialsLend))
         host.stop()
     }
+}
+
+/// A client transport that remembers how it was closed: nil for plainly, else the code.
+final class ClosingRecorder: LineTransport, ReasonedClose, @unchecked Sendable {
+    private let base: PairedTransport
+    private let lock = NSLock()
+    private var closed: [UInt16?] = []
+
+    init() { base = PairedTransport.pair().0 }
+
+    var closes: [UInt16?] { lock.withLock { closed } }
+    func write(line: String) throws {}
+    func lines() -> AsyncThrowingStream<String, any Error> { base.lines() }
+    func close() { lock.withLock { closed.append(nil) } }
+    func close(code: UInt16, reason: String) { lock.withLock { closed.append(code) } }
 }

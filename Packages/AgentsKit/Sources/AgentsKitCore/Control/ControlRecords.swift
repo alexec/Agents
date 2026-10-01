@@ -75,6 +75,8 @@ public actor ControlRecords {
     public var clients: [ClientRecord] { clientsHeld.values.map(\.record).sorted { $0.paired < $1.paired } }
     public var hosts: [HostRecord] { hostsHeld.values.map(\.record).sorted { $0.id.rawValue < $1.id.rawValue } }
     public func client(_ id: UUID) -> ClientRecord? { clientsHeld[id]?.record }
+    /// Forgotten, and its tombstone still kept (seven days): refused as `forgotten`, not `unknown`.
+    public func wasForgotten(_ id: UUID) -> Bool { tombstones[Self.clientKey(id)] != nil }
     public func host(_ id: HostID) -> HostRecord? { hostsHeld[id]?.record }
     public var settings: ControlSettings? { settingsHeld?.record }
 

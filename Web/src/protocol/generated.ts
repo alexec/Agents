@@ -1380,6 +1380,7 @@ export interface Methods {
   "attention/pending": { params: Empty; result: AttentionPending };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
+  "clients/forgetSelf": { params: Empty; result: Empty };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
@@ -1430,6 +1431,7 @@ export const MethodTarget = {
   "attention/pending": "host",
   "changes/file": "host",
   "changes/list": "host",
+  "clients/forgetSelf": "control",
   "control/status": "control",
   "cost/state": "host",
   "elicitations/answer": "host",

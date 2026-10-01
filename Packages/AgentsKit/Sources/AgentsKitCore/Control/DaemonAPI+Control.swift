@@ -26,6 +26,8 @@ public extension DaemonAPI.Method {
     static let clientsAnnounce = "clients/announce"
     static let clientsSetGrant = "clients/setGrant"
     static let clientsForget = "clients/forget"
+    /// A client forgets itself, whatever its grant, and only itself (071 FR-015).
+    static let clientsForgetSelf = "clients/forgetSelf"
     /// How each client reaches the control plane now (frame N, T080).
     static let clientsConnections = "clients/connections"
 

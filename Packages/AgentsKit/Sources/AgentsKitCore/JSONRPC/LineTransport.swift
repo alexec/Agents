@@ -11,6 +11,19 @@ public protocol LineTransport: Sendable {
     func close()
 }
 
+/// A transport that can say why it closes: a WebSocket's close code and reason. The control
+/// plane closes a forgotten client with 4403, so a browser knows at once (071).
+public protocol ReasonedClose: Sendable {
+    func close(code: UInt16, reason: String)
+}
+
+public extension LineTransport {
+    /// Closes with `code` where the transport can say it, and plainly where it can't.
+    func close(code: UInt16, reason: String) {
+        if let reasoned = self as? any ReasonedClose { reasoned.close(code: code, reason: reason) } else { close() }
+    }
+}
+
 /// A transport over two file descriptors.
 ///
 /// Reading is done on a thread of its own rather than with `FileHandle.bytes`, because

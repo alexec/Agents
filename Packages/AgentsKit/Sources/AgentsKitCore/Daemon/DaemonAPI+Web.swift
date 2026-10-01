@@ -93,6 +93,7 @@ public extension DaemonAPI {
                 // The control plane's own
                 Row(Method.controlStatus, params: Empty.self, result: ControlStatus.self, kind: .controlRequest),
                 Row(Method.hostsList, params: Empty.self, result: [ControlHost].self, kind: .controlRequest),
+                Row(Method.clientsForgetSelf, params: Empty.self, result: Empty.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),

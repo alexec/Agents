@@ -191,13 +191,13 @@ either side.
 
 **Independent Test**: quickstart.md §2.
 
-- [ ] T028 [US1] Add `clients/forgetSelf`:
+- [x] T028 (open to any grant through `ControlMethods.anyGrant`; the store's rule refuses a forget that would leave no operator, so a set-up needs one, which it always has) [US1] Add `clients/forgetSelf`:
   - a method constant in `Packages/AgentsKit/Sources/AgentsKitCore/Control/DaemonAPI+Control.swift`;
   - its handler in `ControlMethods`, which any paired client may call, forgets only the caller, and refuses `lastOperator`;
   - a reply before the close.
 
   Add a `WebSignatures` row, then regenerate (`scripts/web.sh types`).
-- [ ] T029 [US1] Make `router.forgetClient` (`ControlRouter.swift`) close every session of the forgotten client with WebSocket close code 4403 and reason `forgotten`, on every copy (`clientForgotten` broadcast). Make a tombstoned client's next `auth` answer `refused: forgotten`. Test both in `ControlServiceTests`, with forgetting within 2 s (FR-014, SC-007).
+- [x] T029 (`ReasonedClose`, adopted by the WebSocket transport and `PrefixReader`; `ControlRecords.wasForgotten`; one older test now expects `forgotten`, which the Remote already treats as `unknown`) [US1] Make `router.forgetClient` (`ControlRouter.swift`) close every session of the forgotten client with WebSocket close code 4403 and reason `forgotten`, on every copy (`clientForgotten` broadcast). Make a tombstoned client's next `auth` answer `refused: forgotten`. Test both in `ControlServiceTests`, with forgetting within 2 s (FR-014, SC-007).
 - [ ] T030 [US1] Build the pairing screen, `Web/src/views/Pairing.tsx` (frame E):
   - a paste field and nothing else;
   - the refusal words from contracts/browser-auth.md;

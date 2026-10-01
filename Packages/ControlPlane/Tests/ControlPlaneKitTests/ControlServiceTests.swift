@@ -201,7 +201,8 @@ struct ControlServiceTests {
                                            try JSONValue.encoding(DaemonAPI.ClientRequest(client: phoneID)))
         await eventually { await running.service.router.sessions(of: phoneID).isEmpty }
         phone.disconnect()
-        await #expect(throws: ControlAuth.Refusal(.unknown)) {
+        // `forgotten` while the tombstone is kept, rather than `unknown` (071 FR-014).
+        await #expect(throws: ControlAuth.Refusal(.forgotten)) {
             _ = try await join(running.url, phoneCredentials)
         }
     }

@@ -192,4 +192,101 @@ struct BrowserClientTests {
         #expect(clients.count == 1)
         #expect(clients.allSatisfy { $0.kind == .browser })
     }
+
+    // MARK: Forgetting (FR-014, FR-015)
+
+    /// Sends a control plane method on a joined socket and reads its reply.
+    func ask(_ reader: PrefixReader, _ method: String, id: Int = 9) async throws -> JSONRPCMessage {
+        try reader.write(line: ControlWire.wrap(host: nil, message: JSONRPCCodec.encode(.request(id: .number(id), method: method,
+                                                                                                     params: nil))))
+        // A reply from the control plane itself is {"m": …}, with no "h".
+        guard let line = try await reader.next(within: 10),
+              let message = try JSONValue.parse(Data(line.utf8))["m"] else {
+            throw ControlService.Failure("no reply to \(method)")
+        }
+        return try JSONRPCCodec.decode(line: String(decoding: try JSONEncoder().encode(message), as: UTF8.self))
+    }
+
+    /// Whether the socket ends within `seconds`.
+    func ends(_ reader: PrefixReader, within seconds: Double) async -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            do {
+                guard try await reader.next(within: deadline.timeIntervalSinceNow) != nil else { return true }
+            } catch {
+                return true
+            }
+        }
+        return false
+    }
+
+    @Test func aBrowserForgetsItselfAndIsThenRefusedAsForgotten() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        _ = try await operatorWindow(running)
+        let (id, credentials) = try await pairBrowser(running)
+        let tab = try await joinWeb(running, credentials)
+        let other = try await joinWeb(running, credentials)
+        guard case .success = try await ask(tab, DaemonAPI.Method.clientsForgetSelf) else {
+            Issue.record("forgetSelf was not answered with success"); return
+        }
+        #expect(await ends(tab, within: 2))
+        #expect(await ends(other, within: 2))
+        #expect(await running.service.records.client(id) == nil)
+        #expect(await refusal { try await joinWeb(running, credentials) } == .forgotten)
+    }
+
+    /// A window paired as an operator: a set-up always has one, and the store refuses to
+    /// forget anything that would leave none (058 FR-016).
+    func operatorWindow(_ running: Running) async throws -> UUID {
+        let (window, link, _) = try await base.pairedClient(at: running.tls,
+            code: try await running.service.codes.issue(.client(.operator)).text)
+        link.disconnect()
+        return window
+    }
+
+    @Test func theLastOperatorCannotForgetItself() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        let (id, credentials) = try await pairBrowser(running, grant: .operator)
+        let tab = try await joinWeb(running, credentials)
+        defer { tab.close() }
+        guard case .failure(_, let error) = try await ask(tab, DaemonAPI.Method.clientsForgetSelf) else {
+            Issue.record("the last operator forgot itself"); return
+        }
+        #expect(error.code == DaemonAPI.Failure.lastOperator)
+        #expect(await running.service.records.client(id) != nil)
+    }
+
+    @Test func forgettingFromSettingsCutsTheBrowserOffWithinTwoSeconds() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        let (window, _, _) = try await base.pairedClient(at: running.tls,
+            code: try await running.service.codes.issue(.client(.operator)).text)
+        let (id, credentials) = try await pairBrowser(running)
+        let tab = try await joinWeb(running, credentials)
+        let started = Date()
+        _ = try await running.service.methods.handle(
+            method: DaemonAPI.Method.clientsForget, params: ["client": .string(id.uuidString)],
+            from: .init(session: UUID(), client: window, grant: .operator, kind: .mac))
+        #expect(await ends(tab, within: 2))
+        #expect(Date().timeIntervalSince(started) < 2)
+        #expect(await refusal { try await joinWeb(running, credentials) } == .forgotten)
+    }
+
+    @Test func forgetSelfIsOpenToADeviceAndOnlyForgetsItself() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        _ = try await operatorWindow(running)
+        let (first, _) = try await pairBrowser(running)
+        let (second, credentials) = try await pairBrowser(running)
+        let tab = try await joinWeb(running, credentials)
+        let reply = try await ask(tab, DaemonAPI.Method.clientsForgetSelf)
+        guard case .success = reply else {
+            Issue.record("a device could not forget itself: \(reply)"); return
+        }
+        await eventually { await running.service.records.client(second) == nil }
+        #expect(await running.service.records.client(first) != nil)
+    }
 }
+
