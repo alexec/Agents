@@ -13,8 +13,9 @@ Server projects can be labeled from the Mac. iPhone and iPad show Mac projects o
 
 ## Add labels
 
-Labels are edited in one field at the top of a session's chat, on the Mac, iPhone
-and iPad, and in the same kind of field before you start a new session. Type a
+On the Mac, labels are edited in one field in the row above the prompt, beside the
+folder and **Reach** for a new session and beside the worktree for an open one. On
+iPhone and iPad the field is at the top of the chat and in the new-session sheet. Type a
 label and press comma, or Return, to add it; a pasted `perf, ui` adds both. As
 you type, labels already used in the project are offered: on the Mac in a list
 under the field, on iPhone and iPad as chips after it. Suggestions come from

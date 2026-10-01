@@ -90,7 +90,6 @@ struct PromptBar: View {
         GlassEffectContainer(spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
                 whereAndWhat
-                if agent == nil { labelDraft }
                 atItsLimit
                 startingOnOut
                 if !attachments.isEmpty {
@@ -226,10 +225,15 @@ struct PromptBar: View {
         HStack(alignment: agent == nil ? .center : .top, spacing: 12) {
             if let agent {
                 VStack(alignment: .leading, spacing: 8) {
-                    // Where it works, and the way to move it (053).
-                    if let place = agentPlace(agent) {
-                        place
-                }
+                    // Where it works, and the way to move it (053), with its labels
+                    // beside it, as a new session has them beside its folder and reach.
+                    HStack(alignment: .top, spacing: 12) {
+                        if let place = agentPlace(agent) {
+                            place
+                        }
+                        SessionLabelEditor(agent: agent)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
                 PromptHeader(agent: agent,
                              leaseStatus: model.work.leaseStatus(of: agent.id),
                              openLease: { model.showResources(at: $0) },
@@ -265,6 +269,8 @@ struct PromptBar: View {
                     worktreeChooser
                 }
                 reachButton
+                labelDraft
+                    .fixedSize(horizontal: true, vertical: false)
 
                 Spacer(minLength: 8)
 
