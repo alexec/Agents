@@ -66,7 +66,7 @@ stays while anyone is still to hear, and goes by itself once everyone has.
 
 # The way back: Run It Here Again… (T127)
 
-**For Alex's approval.** Frames U–Y, the same sheet the other way: the control plane comes
+**Approved by Alex 2026-10-01**, as drawn. Frames U–Y, the same sheet the other way: the control plane comes
 back from the cloud machine to this Mac, and every window, phone and server follows without
 pairing again.
 
