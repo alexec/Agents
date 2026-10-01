@@ -108,6 +108,10 @@ struct LocalServices {
             arguments = [paths.agentsd.path, "--control-network"]
             variables = [StoreLocations.rootVariable: paths.hostRoot.path, "PATH": path]
         }
+        #if DEBUG
+        // A walk's stand-in for a public root (#61, Pebble), for the host to follow a move.
+        if let root = environment["AGENTS_TEST_TRUST_ROOT"] { variables["AGENTS_TEST_TRUST_ROOT"] = root }
+        #endif
         guard FileManager.default.isExecutableFile(atPath: arguments[0]) else {
             return .failed("This copy of Agents Host has no \(URL(fileURLWithPath: arguments[0]).lastPathComponent) in it.")
         }
