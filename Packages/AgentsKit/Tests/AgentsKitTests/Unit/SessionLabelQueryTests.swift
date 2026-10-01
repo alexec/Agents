@@ -30,6 +30,15 @@ struct SessionLabelQueryTests {
         #expect(SessionLabelQuery("label:\"LONG TASK\"").matches(item))
     }
 
+    @Test func workflowsMatchByNameAndNeverByLabel() {
+        let nightly = WorkflowSummary(workflow: Workflow(workflowID: "nightly", folder: URL(filePath: "/work/api"),
+                                                         name: "Nightly build"))
+        #expect(SessionLabelQuery("night").matches(nightly))
+        #expect(SessionLabelQuery("").matches(nightly))
+        #expect(!SessionLabelQuery("parser").matches(nightly))
+        #expect(!SessionLabelQuery("label:perf").matches(nightly))
+    }
+
     @Test func twoHundredSessionsStayCheap() {
         let all = (0..<200).map { index in
             agent("Session \(index)", labels: index.isMultiple(of: 50) ? ["perf"] : ["other"])

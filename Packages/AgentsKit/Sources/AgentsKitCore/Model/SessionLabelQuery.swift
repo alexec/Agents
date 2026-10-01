@@ -32,4 +32,13 @@ public struct SessionLabelQuery: Hashable, Sendable {
         return [agent.title, agent.report?.message].compactMap { $0 }
             .contains { $0.localizedCaseInsensitiveContains(text) }
     }
+
+    /// A workflow by its name and what it is. Workflows carry no labels, so a query
+    /// that asks for one leaves every workflow out.
+    public func matches(_ summary: WorkflowSummary) -> Bool {
+        guard label == nil else { return false }
+        guard !text.isEmpty else { return true }
+        return [summary.workflow.name, summary.workflow.summary]
+            .contains { $0.localizedCaseInsensitiveContains(text) }
+    }
 }

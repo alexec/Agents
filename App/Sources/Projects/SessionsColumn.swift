@@ -4,6 +4,13 @@ import AgentsKit
 #endif
 import SwiftUI
 
+/// A row in the middle column: a session or a workflow. One list, one selection, so
+/// the arrow keys, ⌘-click and ⌫ go through both alike.
+enum ColumnPick: Hashable {
+    case session(UUID)
+    case workflow(Workflow.ID)
+}
+
 /// The middle column: the selected project's sessions, as a list you move through.
 ///
 /// A list rather than a stack of cards, so the Mac's own ways through a list work on
@@ -18,9 +25,10 @@ struct SessionsColumn: View {
 
     @AppStorage("showsArchivedAgents") private var showsArchived = false
     @State private var query = ""
-    /// What the list has highlighted — one or several (⌘-click). Drives bulk Archive;
-    /// `selection` is still the one chat the right-hand column is reading.
-    @State private var picked: Set<UUID> = []
+    /// What the list has highlighted — one or several (⌘-click), sessions and workflows
+    /// alike. Drives bulk Archive; `selection` and `model.openWorkflow` are still the one
+    /// thing the right-hand column is reading.
+    @State private var picked: Set<ColumnPick> = []
 
     /// Enough archived chats to find last week's; the rest are on the phone's archive
     /// and in Events. A list of every chat ever is the thing projects replaced.
@@ -29,7 +37,7 @@ struct SessionsColumn: View {
     var body: some View {
         List(selection: $picked) {
             // Two groups: the sessions, archived ones folded at their foot, then the
-            // workflows. Not while searching, which is a search of the sessions.
+            // workflows. A search narrows both.
             if model.selectedProjectSummary != nil {
                 Section {
                     // The same headings the project page draws, one step down.
@@ -54,9 +62,7 @@ struct SessionsColumn: View {
                     heading("Sessions", count: liveCount)
                 }
             }
-            if query.isEmpty {
-                ProjectWorkSections(folder: model.selectedProject)
-            }
+            ProjectWorkSections(folder: model.selectedProject, query: query)
         }
         .listStyle(.sidebar)
         .onChange(of: query) {
@@ -68,12 +74,12 @@ struct SessionsColumn: View {
             if model.selectedProjectSummary == nil {
                 EmptyState.noProject
             } else if !hasAny, !query.isEmpty {
-                ContentUnavailableView("No matching sessions",
+                ContentUnavailableView("No matches",
                                        systemImage: "bubble.left.and.bubble.right",
-                                       description: Text("No session matches “\(query)”."))
+                                       description: Text("No session or workflow matches “\(query)”."))
             }
         }
-        // ⌫ archives every highlighted session that is not already archived (one or many).
+        // ⌫ archives everything highlighted that is not already archived (one or many).
         .onDeleteCommand { archivePicked() }
         // The window's title is this column's: the worktree this build came from, then
         // whatever the right-hand side is reading. The primary checkout is "main".
@@ -101,7 +107,7 @@ struct SessionsColumn: View {
                 ToolbarSpacer(.fixed)
                 ToolbarItem {
                     Button("Archive \(picked.count)") { archivePicked() }
-                        .help("Archive the highlighted sessions")
+                        .help("Archive the highlighted sessions and workflows")
                 }
             }
             if model.selection != nil, model.openWorkflow == nil {
@@ -112,15 +118,14 @@ struct SessionsColumn: View {
             }
         }
         .onChange(of: picked) { _, ids in applyPicked(ids) }
-        // A workflow opened is what the right-hand side reads now, so no session stays
-        // lit or names the window.
-        .onChange(of: model.openWorkflow) { _, id in
-            guard id != nil else { return }
-            picked = []
-            selection = nil
-        }
+        // A workflow opened is what the right-hand side reads now, so it is the row lit
+        // and no session names the window.
+        .onChange(of: model.openWorkflow) { _, id in applyOpenWorkflow(id) }
         .onChange(of: selection) { _, id in applySelection(id) }
-        .onAppear { applySelection(selection) }
+        .onAppear {
+            applySelection(selection)
+            applyOpenWorkflow(model.openWorkflow)
+        }
     }
 
     private func newSession() {
@@ -130,39 +135,75 @@ struct SessionsColumn: View {
         requests.focusPrompt()
     }
 
-    /// One pick opens that chat; several keep the open chat only if it is among them.
-    private func applyPicked(_ ids: Set<UUID>) {
-        switch ids.count {
+    /// One pick opens that chat or that workflow's page; several keep what is open only
+    /// if it is among them.
+    private func applyPicked(_ picks: Set<ColumnPick>) {
+        switch picks.count {
         case 0:
             break
         case 1:
-            if selection != ids.first { selection = ids.first }
+            switch picks.first {
+            case .session(let id):
+                if selection != id { selection = id }
+            case .workflow(let id):
+                if model.openWorkflow != id { model.openWorkflow = id }
+            case nil:
+                break
+            }
         default:
-            if let current = selection, !ids.contains(current) { selection = nil }
+            if let current = selection, !picks.contains(.session(current)) { selection = nil }
+            if let open = model.openWorkflow, !picks.contains(.workflow(open)) { model.openWorkflow = nil }
         }
     }
 
     /// Opening a chat from the menu or Go replaces a multi-pick with that one row.
     private func applySelection(_ id: UUID?) {
         if let id {
-            if picked.count <= 1 || !picked.contains(id) { picked = [id] }
-        } else if picked.count == 1 {
+            if picked.count <= 1 || !picked.contains(.session(id)) { picked = [.session(id)] }
+        } else if picked.count == 1, case .session = picked.first {
+            picked = []
+        }
+    }
+
+    /// The same for a workflow opened from anywhere: the banner, Go, its own page.
+    private func applyOpenWorkflow(_ id: Workflow.ID?) {
+        if let id {
+            selection = nil
+            if picked.count <= 1 || !picked.contains(.workflow(id)) { picked = [.workflow(id)] }
+        } else if picked.count == 1, case .workflow = picked.first {
             picked = []
         }
     }
 
     private func archivePicked() {
-        let ids = picked.isEmpty ? Set(selection.map { [$0] } ?? []) : picked
-        let toArchive = ids.filter { id in
-            model.agents.first(where: { $0.id == id })?.state != .archived
+        var picks = picked
+        if picks.isEmpty {
+            if let selection { picks = [.session(selection)] }
+            else if let open = model.openWorkflow { picks = [.workflow(open)] }
         }
-        guard !toArchive.isEmpty else { return }
+        let workflows = model.workflows(in: model.selectedProject)
+        var sessions: [UUID] = []
+        var flows: [WorkflowSummary] = []
+        for pick in picks {
+            switch pick {
+            case .session(let id):
+                if model.agents.first(where: { $0.id == id })?.state != .archived { sessions.append(id) }
+            case .workflow(let id):
+                if let summary = workflows.first(where: { $0.id == id }), !summary.isArchived { flows.append(summary) }
+            }
+        }
+        guard !sessions.isEmpty || !flows.isEmpty else { return }
         Task {
-            for id in toArchive {
+            for id in sessions {
                 await model.archive(id, andLeave: false)
             }
-            if let open = selection, toArchive.contains(open) { selection = nil }
-            picked.subtract(toArchive)
+            for summary in flows {
+                await model.setWorkflowArchived(summary, true)
+            }
+            if let open = selection, sessions.contains(open) { selection = nil }
+            if let open = model.openWorkflow, flows.contains(where: { $0.id == open }) { model.openWorkflow = nil }
+            picked.subtract(sessions.map(ColumnPick.session))
+            picked.subtract(flows.map { ColumnPick.workflow($0.id) })
         }
     }
 
@@ -172,7 +213,7 @@ struct SessionsColumn: View {
             // clip that second line once it arrives.
             .padding(.vertical, 6)
             .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-            .tag(agent.id)
+            .tag(ColumnPick.session(agent.id))
             // The list's own swipe, in place of the cards' hand-built one.
             .swipeActions(edge: .trailing) {
                 if agent.state == .archived {
@@ -247,7 +288,7 @@ struct SessionsColumn: View {
     private var hasAny: Bool {
         AgentGroup.allCases.contains {
             !matching(model.agents(in: model.selectedProjectKey, group: $0)).isEmpty
-        }
+        } || model.workflows(in: model.selectedProject).contains(where: SessionLabelQuery(query).matches)
     }
 }
 
@@ -258,7 +299,7 @@ private struct SessionSearchField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSSearchField {
         let field = NSSearchField()
-        field.placeholderString = "Search sessions"
+        field.placeholderString = "Search sessions and workflows"
         field.sendsSearchStringImmediately = true
         field.delegate = context.coordinator
         return field
