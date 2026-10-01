@@ -92,8 +92,11 @@ restart() { # live-folder sha switch delay
   # Agents Host: the new bundle in place of the old, then launchd starts each job again
   # from it. Its window, if open, is reopened on the new build.
   local HOSTUI=0
-  ps -axww -o pid=,command= | grep -F "$HOSTAPP_AT/Contents/MacOS/Agents Host" | grep -v -- --launch-control |
-    while read -r pid cmd; do echo "quitting Agents Host window $pid"; HOSTUI=1; kill -TERM $pid; done
+  # By exact command line: a grep for the path would find the grep itself.
+  ps -axww -o pid=,command= | while read -r pid cmd; do
+    [[ $cmd == "$HOSTAPP_AT/Contents/MacOS/Agents Host" ]] || continue
+    echo "quitting Agents Host window $pid"; HOSTUI=1; kill -TERM $pid
+  done
   if [[ -d $HOSTAPP_AT ]]; then
     mkdir -p $HOME/Applications/AgentsLive
     mv "$HOSTAPP_AT" "$HOME/Applications/AgentsLive/host-before-$SHA-$(date +%H%M%S).app"
