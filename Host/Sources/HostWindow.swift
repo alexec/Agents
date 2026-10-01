@@ -89,6 +89,21 @@ struct HostWindow: View {
                 }
             }
             .padding(16)
+            if model.settings.role == .runHere {
+                Divider()
+                // The web remote (071 FR-002): on unless turned off, and only ever on loopback.
+                Toggle(isOn: Binding(get: { model.settings.servesWebRemote },
+                                     set: { on in Task { await model.setServeWebRemote(on) } })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Serve Agents to browsers on this Mac")
+                        Text("At \(model.webRemoteAddress), for a browser on this Mac only.")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .disabled(model.busy != nil)
+                .padding(16)
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("This Mac")
@@ -426,14 +441,24 @@ struct PairingSheet: View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 14) {
             Text("Pair a Window or Phone").font(.title3.weight(.semibold))
-            Picker("For", selection: $model.pairingGrant) {
-                Text("A window on a Mac").tag(Grant.operator)
-                Text("An iPhone or iPad").tag(Grant.device)
+            Picker("For", selection: $model.pairingTarget) {
+                Text("A window on a Mac").tag(HostModel.PairingTarget.window)
+                Text("An iPhone or iPad").tag(HostModel.PairingTarget.phone)
+                Text("A browser on this Mac").tag(HostModel.PairingTarget.browser)
             }
             .pickerStyle(.segmented)
-            .onChange(of: model.pairingGrant) { Task { await model.makeCode() } }
+            .onChange(of: model.pairingTarget) { Task { await model.makeCode() } }
+            if model.pairingTarget == .browser {
+                // Chosen first, and a device unless chosen otherwise (071 FR-012, frame E).
+                Picker("It may", selection: $model.browserGrant) {
+                    Text("what a phone can (Device)").tag(Grant.device)
+                    Text("do everything (Operator)").tag(Grant.operator)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: model.browserGrant) { Task { await model.makeCode() } }
+            }
             if let code = model.pairing {
-                if code.grant == .device {
+                if code.target == .phone {
                     // What the Remote's Scan the Code reads; the text below is for Paste.
                     QRCode(text: code.text)
                         .frame(width: 220, height: 220)
@@ -445,9 +470,7 @@ struct PairingSheet: View {
                     .padding(10).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                     .accessibilityLabel("Pairing code")
-                Text(code.grant == .operator
-                     ? "Paste it into Agents under Connect to a control plane. It works once, for five minutes, and lets that window do everything."
-                     : "In Agents on the iPhone or iPad, tap Scan the Code and point it at this, or copy the text and tap Paste there. It works once, for five minutes. A device can answer and watch; it can't change who may do what.")
+                Text(instructions(for: code))
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 ProgressView().controlSize(.small)
@@ -465,5 +488,16 @@ struct PairingSheet: View {
         .padding(20)
         .frame(width: 520)
         .task { await model.makeCode() }
+    }
+
+    private func instructions(for code: HostModel.PairingCode) -> String {
+        switch code.target {
+        case .window:
+            "Paste it into Agents under Connect to a control plane. It works once, for five minutes, and lets that window do everything."
+        case .phone:
+            "In Agents on the iPhone or iPad, tap Scan the Code and point it at this, or copy the text and tap Paste there. It works once, for five minutes. A device can answer and watch; it can't change who may do what."
+        case .browser:
+            "Paste it into Agents in a browser on this Mac, at localhost. It works once, for five minutes."
+        }
     }
 }

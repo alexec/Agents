@@ -8,6 +8,7 @@ struct ControlClientsPage: View {
     @State private var forgettingClient: ClientRecord?
     @State private var pairingDevice = false
     @State private var pairingMac = false
+    @State private var pairingBrowser = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -20,6 +21,7 @@ struct ControlClientsPage: View {
             HStack(spacing: 8) {
                 Button("Pair a Device…") { pairingDevice = true }.buttonStyle(.paper)
                 Button("Pair a Mac…") { pairingMac = true }.buttonStyle(.paper)
+                Button("Pair a Browser…") { pairingBrowser = true }.buttonStyle(.paper)
             }
             Text("Forgetting cuts a client off at once, directly and through the relay. To use it again, pair it again.")
                 .appText(.supporting).foregroundStyle(.secondary)
@@ -27,6 +29,7 @@ struct ControlClientsPage: View {
         }
         .sheet(isPresented: $pairingDevice) { PairDeviceSheet(control: control) }
         .sheet(isPresented: $pairingMac) { CodeSheet(control: control, purpose: .mac).paperSheet() }
+        .sheet(isPresented: $pairingBrowser) { CodeSheet(control: control, purpose: .browser).paperSheet() }
         .confirmationDialog(forgettingClient.map { "Forget \($0.name)?" } ?? "",
                             isPresented: Binding(get: { forgettingClient != nil }, set: { if !$0 { forgettingClient = nil } }),
                             titleVisibility: .visible, presenting: forgettingClient) { client in

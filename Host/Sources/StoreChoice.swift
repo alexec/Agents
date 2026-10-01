@@ -26,6 +26,10 @@ struct HostSettings: Codable, Sendable, Equatable {
     var receiving: Bool?
     var returnedFrom: String?
     var returnForwardingUntil: Date?
+    /// Serve Agents to browsers on this Mac (071 FR-002). Absent in settings saved before it,
+    /// which is on, as it is by default.
+    var serveWebRemote: Bool?
+    var servesWebRemote: Bool { serveWebRemote ?? true }
 
     private static func key(_ paths: HostPaths) -> String { "hostSettings.\(paths.suffix)" }
 

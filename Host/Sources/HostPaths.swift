@@ -18,6 +18,8 @@ struct HostPaths: Sendable, Equatable {
     /// `agents-control serve --home`: its certificate, key file (scratch only) and store.
     let controlHome: URL
     let port: Int
+    /// The web remote's loopback port (071): 8792, or off 8792 for a scratch set-up.
+    let webPort: Int
     /// Short, and the same for every process of one set-up: the launcher reads the app's
     /// settings under it.
     let suffix: String
@@ -33,6 +35,7 @@ struct HostPaths: Sendable, Equatable {
             hostRoot = Self.isOldSetUp(base) ? base : base.appendingPathComponent("host", isDirectory: true)
             controlHome = base.appendingPathComponent("control", isDirectory: true)
             port = environment["AGENTS_HOST_PORT"].flatMap(Int.init) ?? 18791
+            webPort = environment["AGENTS_HOST_WEB_PORT"].flatMap(Int.init) ?? 18792
             let hash = base.path.utf8.reduce(UInt64(1469598103934665603)) { ($0 ^ UInt64($1)) &* 1099511628211 }
             suffix = String(String(hash, radix: 16).suffix(8))
         } else {
@@ -41,6 +44,7 @@ struct HostPaths: Sendable, Equatable {
             let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             controlHome = support.appendingPathComponent("Agents Control", isDirectory: true)
             port = 8791
+            webPort = 8792
             suffix = "standard"
         }
     }
@@ -67,5 +71,7 @@ struct HostPaths: Sendable, Equatable {
 
     var helpers: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers", isDirectory: true) }
     var agentsControl: URL { helpers.appendingPathComponent("agents-control") }
+    /// The built web remote, Web/dist, copied in by project.yml as a folder (071 research R8).
+    var webRemote: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/dist", isDirectory: true) }
     var agentsd: URL { helpers.appendingPathComponent("agentsd") }
 }

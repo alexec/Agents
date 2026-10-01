@@ -388,6 +388,10 @@ targets:
         optional: true
       - path: App/Resources/toolsets
         type: folder
+      # The web remote (071), built and checked in: copied as it is, so building Agents Host
+      # needs no Node. agents-control serves only what its MANIFEST lists.
+      - path: Web/dist
+        type: folder
     dependencies:
       - package: AgentsKit
         product: AgentsKit

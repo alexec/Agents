@@ -132,6 +132,12 @@ enum ControlLauncher {
             if paths.scratch, ProcessInfo.processInfo.environment["AGENTS_HOST_BONJOUR"] != "1" { arguments.append("--no-bonjour") }
             // Empty, for the control plane to come back to (T127); once it has, it serves.
             if settings.receiving == true { arguments.append("--receive") }
+            // The web remote, on loopback only, unless the person turned it off (071 FR-002).
+            if settings.servesWebRemote {
+                arguments += ["--web", paths.webRemote.path, "--web-port", String(paths.webPort)]
+            } else {
+                arguments.append("--no-web")
+            }
             let planned = try ControlTool.plan(arguments, paths: paths, settings: settings)
             for (target, data) in planned.secrets {
                 var ends: [Int32] = [0, 0]

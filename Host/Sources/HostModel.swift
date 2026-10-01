@@ -49,9 +49,25 @@ final class HostModel {
         let id = UUID()
         var text: String
         var grant: Grant
+        var target: PairingTarget
+    }
+
+    /// What the code is for: each says what it may do, and a browser's is chosen (071 FR-012).
+    enum PairingTarget: Hashable {
+        case window, phone, browser
     }
     var pairing: PairingCode?
-    var pairingGrant: Grant = .operator
+    var pairingTarget: PairingTarget = .window
+    /// A browser on this Mac is a device unless the person says otherwise.
+    var browserGrant: Grant = .device
+
+    var pairingGrant: Grant {
+        switch pairingTarget {
+        case .window: .operator
+        case .phone: .device
+        case .browser: browserGrant
+        }
+    }
     var showingPairing = false
 
     /// The host code `runHere` made last: what the move tells devices, with its address,
@@ -325,6 +341,20 @@ final class HostModel {
         returnForwarding = nil
     }
 
+    // MARK: The web remote (071)
+
+    /// Serve Agents to browsers on this Mac, or stop (071 FR-002): the control plane starts
+    /// again with or without its loopback listener.
+    func setServeWebRemote(_ on: Bool) async {
+        guard settings.servesWebRemote != on else { return }
+        settings.serveWebRemote = on
+        settings.save(paths)
+        await restartControl()
+    }
+
+    /// Where the web remote is, while it is served.
+    var webRemoteAddress: String { "http://localhost:\(paths.webPort)" }
+
     func restartControl() async {
         busy = "Restarting…"
         defer { busy = nil }
@@ -425,13 +455,14 @@ final class HostModel {
     func makeCode() async {
         pairing = nil
         let grant = pairingGrant
+        let target = pairingTarget
         let made = await ControlTool.run(["code", "--client", grant.rawValue, "--home", paths.controlHome.path],
                                          paths: paths, settings: settings)
         guard made.ok, let text = made.output.split(separator: "\n").last.map(String.init) else {
             problem = made.problem.isEmpty ? "No code could be made." : made.problem
             return
         }
-        pairing = PairingCode(text: text, grant: grant)
+        pairing = PairingCode(text: text, grant: grant, target: target)
     }
 }
 

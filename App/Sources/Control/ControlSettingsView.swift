@@ -267,26 +267,39 @@ struct ControlHostsPage: View {
 /// same sheet for a host's code. A new code each time the grant changes, replacing the
 /// last, so only the code on screen works.
 struct CodeSheet: View {
-    enum Purpose { case mac, host }
+    /// A browser is a client like a Mac, on this Mac only, and a device unless chosen (071, frame E).
+    enum Purpose { case mac, browser, host }
 
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
     let purpose: Purpose
-    @State private var grant: Grant = .operator
+    @State private var grant: Grant
+
+    init(control: ControlSettingsModel, purpose: Purpose) {
+        self.control = control
+        self.purpose = purpose
+        _grant = State(initialValue: purpose == .browser ? .device : .operator)
+    }
     @State private var shown: DaemonAPI.ControlCodeShown?
     /// Who was there when the code was made, so whoever it lets in can be named.
     @State private var before: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(purpose == .mac ? "Pair a Mac" : "Add a host by code").appText(.reading).fontWeight(.semibold)
-            if purpose == .mac {
+            Text(title).appText(.reading).fontWeight(.semibold)
+            if purpose != .host {
                 HStack {
                     Text("It may")
                     Spacer()
                     Picker("It may", selection: $grant) {
-                        Text("do everything (Operator)").tag(Grant.operator)
-                        Text("what a phone can (Device)").tag(Grant.device)
+                        // A browser offers the safer choice first, and starts on it (071 FR-012).
+                        if purpose == .browser {
+                            Text("what a phone can (Device)").tag(Grant.device)
+                            Text("do everything (Operator)").tag(Grant.operator)
+                        } else {
+                            Text("do everything (Operator)").tag(Grant.operator)
+                            Text("what a phone can (Device)").tag(Grant.device)
+                        }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
@@ -339,6 +352,14 @@ struct CodeSheet: View {
         .onDisappear { Task { await control.stopCodes() } }
     }
 
+    private var title: String {
+        switch purpose {
+        case .mac: "Pair a Mac"
+        case .browser: "Pair a Browser"
+        case .host: "Add a host by code"
+        }
+    }
+
     /// The hosts or clients there are now, by id.
     private var members: Set<String> {
         purpose == .host ? Set(control.hosts.map(\.id.rawValue)) : Set(control.clients.map(\.id.uuidString))
@@ -359,6 +380,8 @@ struct CodeSheet: View {
         switch purpose {
         case .mac:
             return "On the other Mac, open Agents, choose Connect to a control plane and paste this. \(time)"
+        case .browser:
+            return "Paste it into Agents in a browser on this Mac, at localhost. \(time)"
         case .host:
             return "On the other machine, start its agents with agentsd --control-code and this code. \(time)"
         }
