@@ -12,6 +12,7 @@ import SwiftUI
 /// than this disk, with the same page and the same one exception.
 struct FilesPane: View {
     @Environment(AppModel.self) private var model
+    @Environment(SidebarFrame.self) private var frame
     let agent: Agent
     let state: AgentPaneState
 
@@ -42,6 +43,12 @@ struct FilesPane: View {
     @State private var folderEvents = 0
     /// The file the person just chose from a row of the tree, which is in view already.
     @State private var chosenFromRow: URL?
+    /// What the Changes pane lists, by path, so a changed file shows its status and
+    /// counts here too, and a folder what changed under it (#63).
+    @State private var changes = ChangeTree.Index()
+    /// Bumped when the list could have changed; asking is keyed on it, so a burst of
+    /// folder events collapses into one ask.
+    @State private var changesRevision = 0
 
     private var folder: URL { state.folder ?? agent.cwd }
 
@@ -81,6 +88,7 @@ struct FilesPane: View {
         // The host says `files/changed` when the folder changes.
         .onChange(of: serverChanges) {
             folderEvents += 1
+            changesRevision += 1
             reloadListings(inBackground: true)
             if let openFile = state.openFile { reloadFile(openFile) }
         }
@@ -91,6 +99,15 @@ struct FilesPane: View {
             if let openFile = state.openFile { reloadFile(openFile) }
         }
         .onChange(of: model.entries.count) { refreshTouched() }
+        // Hidden panes are kept alive, so this one only asks while it is shown.
+        .task(id: ChangesAsk(shown: frame.pane == .files, revision: changesRevision)) {
+            guard frame.pane == .files else { return }
+            // A moment's pause, so the folder events of one save are one ask.
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await fetchChanges()
+        }
+        .onChange(of: agent.state) { changesRevision += 1 }
         // The agent moved to another folder (053): the pane goes with it, from the top,
         // and stops watching the one it left.
         .onChange(of: agent.cwd) { old, new in
@@ -288,44 +305,40 @@ struct FilesPane: View {
     }
 
     private func row(_ entry: DirectoryEntry, depth: Int) -> some View {
-        let isOpen = entry.isDirectory && state.expanded.contains(Self.key(entry.url))
-        let isMarked = !entry.isDirectory && state.place.marked == Self.key(entry.url)
-        return Button {
+        let key = Self.key(entry.url)
+        let isOpen = entry.isDirectory && state.expanded.contains(key)
+        let isMarked = !entry.isDirectory && state.place.marked == key
+        let action = {
             if entry.isDirectory {
                 toggle(folder: entry.url)
             } else {
                 open(file: entry.url)
             }
-        } label: {
-            HStack(spacing: 6) {
-                // The same width for a file as a folder's chevron, so names line up.
-                Image(systemName: "chevron.right")
-                    .appText(.fine)
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(isOpen ? 90 : 0))
-                    .opacity(entry.isDirectory ? 1 : 0)
-                    .frame(width: 10)
-                Image(systemName: entry.isDirectory ? (isOpen ? "folder.fill" : "folder") : "doc")
-                    .foregroundStyle(entry.isDirectory ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                Text(entry.name)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                if touched.contains(entry.url) {
-                    // What the agent touched since it started (FR-013). The point of
-                    // the pane: its work is findable without reading the conversation.
-                    Image(systemName: "circle.fill")
-                        // Decorative: a dot sized to the row, not text (FR-015).
-                        .font(.system(size: 6))
-                        .foregroundStyle(.tint)
-                        .help("The agent changed this")
-                }
-                Spacer()
-            }
-            .padding(.leading, indent(depth))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .accessibilityValue(entry.isDirectory ? (isOpen ? "Expanded" : "Collapsed") : "")
+        return Group {
+            if entry.isDirectory {
+                // A folder holding changes says how much changed under it, closed or
+                // open, so the agent's work deep in the tree can still be found (#63).
+                let totals = changes.folders[key]
+                FileTreeRow(name: entry.name, kind: .folder(open: isOpen), depth: depth,
+                            label: totals.map { "\(entry.name), folder, \(ChangeWords.label($0))" }
+                                ?? "\(entry.name), folder",
+                            added: totals?.added, removed: totals?.removed, action: action)
+            } else if let file = changes.files[key] {
+                // What the agent changed since it started (FR-013), in the same square
+                // and colour as the Changes pane: its work is findable without reading
+                // the conversation.
+                FileTreeRow(changed: file, name: entry.name, depth: depth, action: action)
+            } else if touched.contains(entry.url) {
+                // Touched in the conversation, before the list has caught up with it.
+                FileTreeRow(name: entry.name, kind: .file(.modified), depth: depth,
+                            label: "\(entry.name), changed", help: "The agent changed this",
+                            action: action)
+            } else {
+                FileTreeRow(name: entry.name, kind: .file(nil), depth: depth, label: entry.name,
+                            action: action)
+            }
+        }
         // The file last open, so Back shows where it is (#66).
         .accessibilityAddTraits(isMarked ? .isSelected : [])
         .listRowBackground(Group {
@@ -335,6 +348,28 @@ struct FilesPane: View {
                     .padding(.horizontal, 10)
             }
         })
+    }
+
+    private struct ChangesAsk: Equatable {
+        var shown: Bool
+        var revision: Int
+    }
+
+    /// The Changes pane's list, keyed as this tree keys its rows. git answers with the
+    /// folder's real path (`/private/tmp/…`), the tree with the one the agent was given.
+    private func fetchChanges() async {
+        guard let list = try? await model.changes(for: agent.id) else { return }
+        let shown = Self.key(agent.cwd)
+        let real = Self.key(agent.cwd.resolvingSymlinksInPath())
+        let files = list.files.map { file in
+            var file = file
+            if real != shown, file.path.hasPrefix(real + "/") {
+                file.path = shown + file.path.dropFirst(real.count)
+            }
+            return file
+        }
+        let index = ChangeTree.Index(files)
+        if index != changes { changes = index }
     }
 
     // MARK: One file
@@ -572,6 +607,8 @@ struct FilesPane: View {
     /// lets the oldest entries of a long conversation go, and the agent still touched
     /// what they say it touched.
     private func refreshTouched() {
+        let before = touched
+        defer { if touched != before { changesRevision += 1 } }
         let entries = model.entries
         let from = model.work.firstEntryIndex
         let to = from + entries.count
