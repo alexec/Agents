@@ -65,3 +65,28 @@ beside it are rendered from it with headless Chrome.
   one file, reached from Files, and Files is browsed one folder at a time, not as a tree. So the
   Remote has no tree to change. Its Files rows can take the status squares once the phone asks
   for the Changes list as well. That is a separate step, and the phone's look is Alex's.
+
+## The walk (2026-10-01)
+
+I ran the build on a scratch root with run-app. A real Claude agent made these changes in a
+seeded repository: one edit, one new file it staged, a `git rm`, a `git mv` with an edit,
+another edit, and a new file it didn't stage. After that I changed `README.md` and staged a
+new `Top.swift` by hand, so the Files pane's top level would show those statuses too.
+`changes/list` returned each of `modified`, `added`, `deleted`, `renamed` (with its
+`oldPath`) and `untracked`. The renamed file's whole-file diff marked only its edited
+heading. The shots below are from that window and match frames A, B and D.
+
+| Shot | Matches |
+|---|---|
+| [changes-light](walk/changes-light.png) | A: folded `App/Sources/Sidebar`, the long path cut at the front, all five squares, folder totals |
+| [changes-dark](walk/changes-dark.png) | B |
+| [files-light](walk/files-light.png), [files-dark](walk/files-dark.png) | D: folder totals on closed folders; changed, added and untracked files in their squares |
+
+These weren't seen on screen: clicking a file to open the diff, the rename's hover text, and
+VoiceOver. The scratch run had no Accessibility permission, so nothing could be pressed. The
+labels and hover text are covered by `ChangeTreeTests`. Both panes keep the List's row
+separators, which the frames left out.
+
+**A limit git sets:** a rename made with plain `mv`, rather than `git mv`, is a deletion plus an
+untracked file until it is staged. git can't pair a tracked file with one it doesn't track,
+and the pane never writes the index.
