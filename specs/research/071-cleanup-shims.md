@@ -157,8 +157,8 @@ Removed: `archive_agent` and `afterwards: archive`; the 052 pool's dead words, p
 accessors and file paths; six error codes nothing raises (numbers noted as retired);
 `agent/plan`; test hooks no test uses; `AgentWorktree.issue` (GitHub's Ready issues);
 the Mac's unused swipe-to-archive; `AgentsSetupView`, `SharedReachList` and a handful of
-unused model members; `seed-archived.swift --legacy`. Main's test target also did not
-compile (070's test passed a `sink:` that 84519ec8 removed); fixed first.
+unused model members; `seed-archived.swift --legacy`. Main's test target did not compile when
+this started (070's test passed a `sink:` that 84519ec8 removed); main fixed it in d24caf86.
 
 Kept on purpose:
 
