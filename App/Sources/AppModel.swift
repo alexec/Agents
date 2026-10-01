@@ -2408,7 +2408,7 @@ final class AppModel {
                                              worktree: draftWorktree,
                                              sandbox: draftSandbox)
         do {
-            _ = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            let id = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
             // Back to the project folder, and the list fetched again: the start may
             // have made a worktree, and it has put an agent in one.
@@ -2420,10 +2420,9 @@ final class AppModel {
             } else {
                 await refreshServer(selectedProjectHost)
             }
-            // Deliberately not selected. Saying what you want done is not the same as
-            // asking to watch it: the agent appears in the project's list and you stay
-            // where you were, free to say the next thing. Starting three pieces of work
-            // in a row should not mean coming back twice.
+            // Gone to, as the phone does: what you just asked for is what you want to
+            // see start. Once the list has it, so the chat opens on a row that is there.
+            selection = id
             draftSandboxRefusal = nil
             return true
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.sandboxWillNotStart {

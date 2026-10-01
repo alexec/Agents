@@ -18,8 +18,9 @@ struct FilesPane: View {
     let agent: Agent
     let state: AgentPaneState
 
-    @State private var listing: DirectoryListing?
-    @State private var problem: String?
+    /// Every folder read so far, by path: the top, and each one opened in the tree.
+    @State private var listings: [String: DirectoryListing] = [:]
+    @State private var problems: [String: String] = [:]
     @State private var probe: FileProbe?
     @State private var fileProblem: String?
     #if !AGENTS_STORE
@@ -32,9 +33,9 @@ struct FilesPane: View {
     @State private var touchedAgent: UUID?
     @State private var touchedFrom = 0
     @State private var touchedTo = 0
-    /// Which re-listing is the current one, so a slower earlier read landing after a
-    /// later one does not put the older listing on screen.
-    @State private var listingRequest = 0
+    /// Which re-listing of each folder is the current one, so a slower earlier read
+    /// landing after a later one does not put the older listing on screen.
+    @State private var listingRequests: [String: Int] = [:]
     /// The file `probe` was read from, so a file opened from elsewhere is loaded once
     /// and not once for every pass.
     @State private var loaded: URL?
@@ -43,6 +44,10 @@ struct FilesPane: View {
     @State private var folderEvents = 0
 
     private var folder: URL { state.folder ?? agent.cwd }
+
+    /// The top of the tree: the agent's folder, with whatever was asked for inside it
+    /// opened down to; or, for something outside it, that folder on its own.
+    private var root: URL { Self.isInside(folder, agent.cwd) ? agent.cwd : folder }
 
     /// A host's folder is read through that host (037). Nil for the one on this Mac,
     /// which is read straight off the disk (058, R11).
@@ -79,7 +84,7 @@ struct FilesPane: View {
         // A server says `files/changed` where FSEvents would have told this Mac.
         .onChange(of: serverChanges) {
             folderEvents += 1
-            reloadListing(inBackground: true)
+            reloadListings(inBackground: true)
             if let openFile = state.openFile { reloadFile(openFile) }
         }
         .onChange(of: model.entries.count) { refreshTouched() }
@@ -89,12 +94,21 @@ struct FilesPane: View {
             guard old != new else { return }
             if let server { Task { await server.unwatch(agentID: agent.id, folder: old) } }
             state.folder = new
+            state.expanded = []
             state.openFile = nil
             state.openLine = nil
             loaded = nil
             probe = nil
-            reloadListing()
+            listings = [:]
+            problems = [:]
+            reloadListings()
             startWatching()
+        }
+        // A file opened from elsewhere — the chat, a permission card — names its folder,
+        // and the tree opens down to it so Back finds it in place.
+        .onChange(of: state.folder) {
+            reveal()
+            reloadListings()
         }
         // The agent can open a file here as well as the user (`show_file`), and when
         // it does, this pane is already on screen and has already run its task.
@@ -120,17 +134,18 @@ struct FilesPane: View {
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
-            } else if folder != agent.cwd {
+            } else if root != agent.cwd {
                 Button {
-                    open(folder: folder.deletingLastPathComponent())
+                    state.folder = nil
                 } label: {
-                    Label("Up", systemImage: "chevron.up")
+                    Label("The agent's folder", systemImage: "house")
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
+                .help("The agent's folder")
             }
 
-            Text(state.openFile?.lastPathComponent ?? folder.lastPathComponent)
+            Text(state.openFile?.lastPathComponent ?? root.lastPathComponent)
                 .appText(.reading).fontWeight(.medium)
                 .lineLimit(1)
                 .truncationMode(.head)
@@ -144,17 +159,20 @@ struct FilesPane: View {
 
     @ViewBuilder
     private var listingView: some View {
-        if let problem {
+        if let problem = problems[Self.key(root)] {
             Gone(message: problem)
-        } else if let listing {
+        } else if listings[Self.key(root)] != nil {
             List {
-                ForEach(listing.entries) { entry in
-                    row(entry)
-                }
-                if listing.isTruncated {
-                    Text("\(listing.omitted) more, not shown")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
+                ForEach(treeLines) { line in
+                    switch line {
+                    case .entry(let entry, let depth):
+                        row(entry, depth: depth)
+                    case .note(_, let words, let depth):
+                        Text(words)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, indent(depth))
+                    }
                 }
             }
             .listStyle(.inset)
@@ -164,16 +182,82 @@ struct FilesPane: View {
         }
     }
 
-    private func row(_ entry: DirectoryEntry) -> some View {
-        Button {
+    /// One line of the tree, as the list draws it.
+    private enum TreeLine: Identifiable {
+        case entry(DirectoryEntry, depth: Int)
+        case note(id: String, String, depth: Int)
+
+        var id: String {
+            switch self {
+            case .entry(let entry, _): entry.url.absoluteString
+            case .note(let id, _, _): id
+            }
+        }
+    }
+
+    /// The tree, flattened top to bottom: each open folder's entries under it, one
+    /// step in. A folder opened before it has been read says so on a line of its own.
+    private var treeLines: [TreeLine] {
+        var lines: [TreeLine] = []
+        func add(_ folder: URL, depth: Int) {
+            let key = Self.key(folder)
+            if let problem = problems[key] {
+                lines.append(.note(id: "problem:\(key)", problem, depth: depth))
+                return
+            }
+            guard let listing = listings[key] else {
+                lines.append(.note(id: "reading:\(key)", "Reading…", depth: depth))
+                return
+            }
+            for entry in listing.entries {
+                lines.append(.entry(entry, depth: depth))
+                if entry.isDirectory, state.expanded.contains(Self.key(entry.url)) {
+                    add(entry.url, depth: depth + 1)
+                }
+            }
+            if listing.isTruncated {
+                lines.append(.note(id: "omitted:\(key)", "\(listing.omitted) more, not shown", depth: depth))
+            }
+        }
+        add(root, depth: 0)
+        return lines
+    }
+
+    /// The folders on screen: the top, and every open one whose parents are open too.
+    /// Only these are read again when the disk changes.
+    private var visibleFolders: [URL] {
+        var folders = [root]
+        func add(_ folder: URL) {
+            for entry in listings[Self.key(folder)]?.entries ?? []
+            where entry.isDirectory && state.expanded.contains(Self.key(entry.url)) {
+                folders.append(entry.url)
+                add(entry.url)
+            }
+        }
+        add(root)
+        return folders
+    }
+
+    private func indent(_ depth: Int) -> CGFloat { CGFloat(depth) * 14 }
+
+    private func row(_ entry: DirectoryEntry, depth: Int) -> some View {
+        let isOpen = entry.isDirectory && state.expanded.contains(Self.key(entry.url))
+        return Button {
             if entry.isDirectory {
-                open(folder: entry.url)
+                toggle(folder: entry.url)
             } else {
                 open(file: entry.url)
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: entry.isDirectory ? "folder" : "doc")
+                // The same width for a file as a folder's chevron, so names line up.
+                Image(systemName: "chevron.right")
+                    .appText(.fine)
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    .opacity(entry.isDirectory ? 1 : 0)
+                    .frame(width: 10)
+                Image(systemName: entry.isDirectory ? (isOpen ? "folder.fill" : "folder") : "doc")
                     .foregroundStyle(entry.isDirectory ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 Text(entry.name)
                     .lineLimit(1)
@@ -188,15 +272,12 @@ struct FilesPane: View {
                         .help("The agent changed this")
                 }
                 Spacer()
-                if entry.isDirectory {
-                    Image(systemName: "chevron.right")
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                }
             }
+            .padding(.leading, indent(depth))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityValue(entry.isDirectory ? (isOpen ? "Expanded" : "Collapsed") : "")
     }
 
     // MARK: One file
@@ -270,13 +351,13 @@ struct FilesPane: View {
 
     private func start() async {
         refreshTouched()
-        // Deliberately not `open(folder:)`, which clears the open file: the pane is
-        // arriving, not being navigated. When the agent asked for a file the sidebar
+        // The open file is left alone: the pane is arriving, not being navigated. When the agent asked for a file the sidebar
         // was usually shut, so this is the first pass and the file it named is sitting
         // in `state` waiting to be read. Clearing it here showed the folder instead,
         // which looked like `show_file` having done nothing at all.
         state.folder = folder
-        reloadListing()
+        reveal()
+        reloadListings()
         // Not `open(file:)` either, for the same reason at one remove: that treats the
         // file as the user's own choice and throws away the line the agent named.
         if let openFile = state.openFile { reloadFile(openFile) }
@@ -301,20 +382,53 @@ struct FilesPane: View {
                 // Off the main actor: a folder of thousands of entries is thousands
                 // of stat calls, and a build writing beside the pane fires this
                 // every fifth of a second.
-                reloadListing(inBackground: true)
+                reloadListings(inBackground: true)
                 if let openFile = state.openFile { reloadFile(openFile) }
             }
         }
         #endif
     }
 
-    private func open(folder url: URL) {
-        state.folder = url
-        state.openFile = nil
-        state.openLine = nil
-        probe = nil
-        fileProblem = nil
-        reloadListing()
+    /// Open a folder in place, or close it. Opening reads it again even when it was
+    /// read before: what it held then may not be what it holds now.
+    private func toggle(folder url: URL) {
+        let key = Self.key(url)
+        if state.expanded.contains(key) {
+            state.expanded.remove(key)
+        } else {
+            state.expanded.insert(key)
+            reloadListing(of: url, inBackground: listings[key] != nil)
+        }
+    }
+
+    /// Open every folder between the agent's and the one asked for.
+    private func reveal() {
+        let top = Self.key(agent.cwd), target = Self.key(folder)
+        guard target != top, target.hasPrefix(top + "/") else { return }
+        var url = agent.cwd
+        for part in target.dropFirst(top.count + 1).split(separator: "/") {
+            url = url.appending(path: String(part), directoryHint: .isDirectory)
+            state.expanded.insert(Self.key(url))
+        }
+    }
+
+    /// A path as the tree keys it: no trailing slash, whichever way the URL was made.
+    private static func key(_ url: URL) -> String {
+        var path = url.standardizedFileURL.path(percentEncoded: false)
+        while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        return path
+    }
+
+    private static func isInside(_ url: URL, _ folder: URL) -> Bool {
+        let path = key(url), top = key(folder)
+        return path == top || path.hasPrefix(top + "/")
+    }
+
+    /// Every folder on screen, read again.
+    private func reloadListings(inBackground: Bool = false) {
+        for folder in visibleFolders {
+            reloadListing(of: folder, inBackground: inBackground)
+        }
     }
 
     private func open(file url: URL) {
@@ -325,22 +439,24 @@ struct FilesPane: View {
         reloadFile(url)
     }
 
-    /// Read the folder now, or — for a change the disk reported rather than one the
+    /// Read a folder now, or — for a change the disk reported rather than one the
     /// person made — on another thread, with the old listing kept up until the new
     /// one is in hand. Opening a folder stays on this thread so it appears in the
     /// same frame as the click.
-    private func reloadListing(inBackground: Bool = false) {
-        listingRequest += 1
+    private func reloadListing(of folder: URL, inBackground: Bool = false) {
+        let key = Self.key(folder)
+        let request = (listingRequests[key] ?? 0) + 1
+        listingRequests[key] = request
         if let server {
-            let folder = folder, request = listingRequest, agentID = agent.id
+            let agentID = agent.id
             Task {
                 let read: Result<DirectoryListing, any Error>
                 do { read = .success(try await server.list(agentID: agentID, folder: folder)) }
                 catch { read = .failure(error) }
-                guard request == listingRequest else { return }
+                guard request == listingRequests[key] else { return }
                 if case .failure(let error) = read {
-                    listing = nil
-                    problem = RemoteFiles.describe(error, name: folder.lastPathComponent)
+                    listings[key] = nil
+                    problems[key] = RemoteFiles.describe(error, name: folder.lastPathComponent)
                 } else {
                     show(read, of: folder)
                 }
@@ -352,37 +468,35 @@ struct FilesPane: View {
             show(Result { try DirectoryReader.read(folder) }, of: folder)
             return
         }
-        let folder = folder
-        let request = listingRequest
         Task {
             let read = await Task.detached(priority: .userInitiated) {
                 Result { try DirectoryReader.read(folder) }
             }.value
-            // The pane moved on — to another folder, or to a later read — while this
-            // one was reading.
-            guard request == listingRequest else { return }
+            // A later read of the same folder was asked for while this one was reading.
+            guard request == listingRequests[key] else { return }
             show(read, of: folder)
         }
         #endif
     }
 
     private func show(_ read: Result<DirectoryListing, any Error>, of folder: URL) {
+        let key = Self.key(folder)
         switch read {
         case .success(let fresh):
-            listing = fresh
-            problem = nil
+            if listings[key] != fresh { listings[key] = fresh }
+            problems[key] = nil
         #if !AGENTS_STORE
         case .failure(DirectoryReader.Failure.gone):
             // Never leave contents on screen that cannot be vouched for (FR-016).
-            listing = nil
-            problem = "\(folder.lastPathComponent) is not there any more."
+            listings[key] = nil
+            problems[key] = "\(folder.lastPathComponent) is not there any more."
         case .failure(DirectoryReader.Failure.notReadable):
-            listing = nil
-            problem = "\(folder.lastPathComponent) cannot be opened."
+            listings[key] = nil
+            problems[key] = "\(folder.lastPathComponent) cannot be opened."
         #endif
         case .failure:
-            listing = nil
-            problem = "\(folder.lastPathComponent) could not be read."
+            listings[key] = nil
+            problems[key] = "\(folder.lastPathComponent) could not be read."
         }
     }
 
