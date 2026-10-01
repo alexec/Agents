@@ -1,3 +1,4 @@
+import AgentsKitCore
 import AVFoundation
 import Foundation
 #if os(iOS)
@@ -88,16 +89,10 @@ final class Dictation {
     private var task: SFSpeechRecognitionTask?
     private var onText: ((String) -> Void)?
 
-    /// The words that are already settled: what was in the field when this run of
-    /// dictation started, and every utterance finished since. What the recogniser is
-    /// hearing now is added to this rather than put in its place.
-    private var base = ""
-
-    /// What goes between `base` and what is being said now. A space to begin with,
-    /// because what was typed and the sentence being spoken after it are one thought;
-    /// a blank line afterwards, because stopping to draw breath and carrying on is a
-    /// new one.
-    private var separator = " "
+    /// What dictation has put in the field: what was there when this run started,
+    /// every utterance settled since, and the one being heard now. A pause that starts
+    /// a fresh utterance settles the last one first, so nothing said is lost (#69).
+    private var text = DictationText(startingWith: "")
 
     /// Which run of dictation we are on. The recogniser can deliver a last result
     /// after it has been stopped, and that result belongs to the run that is over: it
@@ -120,9 +115,8 @@ final class Dictation {
 
     func start(appendingTo base: String, onText: @escaping (String) -> Void) {
         guard !isListening else { return }
-        self.base = base
+        text = DictationText(startingWith: base)
         self.onText = onText
-        separator = " "
         emptyUtterances = 0
         run += 1
         problem = nil
@@ -240,7 +234,7 @@ final class Dictation {
     /// replaces what the last one said rather than adding to it — which is right within
     /// an utterance and wrong between two. When it decides an utterance is over it
     /// stops, and anything said afterwards belongs to a request that has not been made
-    /// yet, so a new one is made here and what was heard is settled into `base` first.
+    /// yet, so a new one is made here once what was heard is settled into `text`.
     private func listenForAnUtterance(with recogniser: SFSpeechRecognizer) {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -266,17 +260,14 @@ final class Dictation {
 
     private func heard(_ spoken: String?, endsTheUtterance over: Bool) {
         let said = spoken ?? ""
-        if !said.isEmpty { onText?(base + (base.isEmpty ? "" : separator) + said) }
+        // An utterance that ends with an error carries no words, but what it showed
+        // before still counts: it is settled, not lost.
+        let hadWords = !said.isEmpty || !text.hearing.isEmpty
+        let shown = text.heard(said, final: over)
+        if !said.isEmpty || over { onText?(shown) }
         guard over else { return }
 
-        if said.isEmpty {
-            emptyUtterances += 1
-        } else {
-            emptyUtterances = 0
-            base += (base.isEmpty ? "" : separator) + said
-            // From here on, a pause is a paragraph.
-            separator = "\n\n"
-        }
+        emptyUtterances = hadWords ? 0 : emptyUtterances + 1
 
         task = nil
         request = nil
