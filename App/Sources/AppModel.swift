@@ -1257,10 +1257,14 @@ final class AppModel {
             listen()
             // A new connection watches nothing; what the files pane was watching is asked
             // for again, and what it shows is read again (#62).
-            await serverFilesByHost[.mac]?.reconnected()
             startPresence()
             presence?.connected()
-            await refreshEverything()
+            // With a deadline on each call: this runs inside the reconnect loop, and a reply
+            // lost to the host restarting held the loop, and the window, for good (073).
+            await DaemonClient.$patience.withValue(.seconds(20)) {
+                await serverFilesByHost[.mac]?.reconnected()
+                await refreshEverything()
+            }
             // Servers the control plane reaches are its clients. HostSet is the old
             // path, and it stays only while this window has no control plane (R7).
             if controlLink == nil { startHosts() }

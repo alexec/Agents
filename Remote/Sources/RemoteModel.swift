@@ -848,6 +848,9 @@ final class RemoteModel {
         }
     }
 
+    /// How long each call that catches up after connecting is given.
+    static let catchUpPatience = Duration.seconds(20)
+
     private func tryOnce() async -> Bool {
         do {
             try await client.connect(startIfNeeded: false)
@@ -856,13 +859,20 @@ final class RemoteModel {
             problem = nil
             backOff = .seconds(1)
             listen()
-            await announce()
-            await identify()
+            // Each call here with a deadline: this runs inside the reconnect loop, and a
+            // reply lost to a Mac restarting left the loop, and so the app, waiting for
+            // good while it looked connected (073).
+            await DaemonClient.$patience.withValue(Self.catchUpPatience) {
+                await announce()
+                await identify()
+            }
             startPresence()
             presence?.connected()
             if link == .relayed { relayTrouble = nil }
-            await files.reconnected()
-            await refreshEverything()
+            await DaemonClient.$patience.withValue(Self.catchUpPatience) {
+                await files.reconnected()
+                await refreshEverything()
+            }
             watchOtherHosts()
             return true
         } catch {
