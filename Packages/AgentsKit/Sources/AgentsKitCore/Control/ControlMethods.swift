@@ -200,7 +200,23 @@ public actor ControlMethods: ControlHandling {
         }
     }
 
+    /// Frozen for a handover (R16): records are not to change until it is done.
+    public private(set) var frozen = false
+    public func setFrozen(_ value: Bool) { frozen = value }
+
+    /// What changes records, refused while frozen.
+    private static let writes: Set<String> = [
+        DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsUpdate,
+        DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay, DaemonAPI.Method.hostsLendSignIn,
+        DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget,
+        DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesForget,
+    ]
+
     private func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
+        if frozen, Self.writes.contains(method) {
+            throw JSONRPCError(code: DaemonAPI.Failure.storeUnavailable,
+                               message: "The control plane is moving to another machine. Nothing was changed; try again in a minute.")
+        }
         guard Self.anyGrant.contains(method) || caller.grant == .operator else {
             throw JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                message: "\(method) is not open to this client (\(caller.grant.rawValue)).")

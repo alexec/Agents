@@ -30,11 +30,15 @@ public final class ControlService: @unchecked Sendable {
         public var peerURL: URL?
         /// How often a copy beats and looks for the others; shorter in tests.
         public var copyBeat: TimeInterval = CopyRecord.beatEvery
+        /// Start empty, for a handover to fill (R16): no settings made, every member
+        /// refused, only the copy handing over answered, until it says take over.
+        public var receive = false
 
         public init(store: any ControlStore, privateKey: Data, url: URL, pin: String? = nil, tls: NIOSSLContext? = nil,
                     bind: String = "0.0.0.0", port: Int, name: String, machineID: String = "", version: String = ControlPlaneKit.version,
-                    peerURL: URL? = nil) {
+                    peerURL: URL? = nil, receive: Bool = false) {
             self.peerURL = peerURL
+            self.receive = receive
             self.store = store
             self.privateKey = privateKey
             self.url = url
@@ -68,12 +72,15 @@ public final class ControlService: @unchecked Sendable {
     private var server: (any Channel)?
     private var refresher: Task<Void, Never>?
     private let readiness = Readiness()
-    private let sockets = Sockets()
+    let sockets = Sockets()
     /// What this copy has told its relay host for each need (T097).
     let desk = NoticeDesk()
+    /// Where this copy is in a handover (R16): serving, receiving, frozen or forwarding.
+    let phase: PhaseBox
 
     public init(_ configuration: Configuration) throws {
         self.configuration = configuration
+        phase = PhaseBox(configuration.receive ? .receiving : .serving)
         publicKey = try ControlAgreement.publicKey(privateKey: configuration.privateKey)
         guard let origin = ControlAuth.origin(configuration.url) else {
             throw Failure("\(configuration.url) is not an address clients can dial")
@@ -112,6 +119,63 @@ public final class ControlService: @unchecked Sendable {
         } catch let error as StoreError {
             throw Failure("the store can't be used: \(error)")
         }
+        if phase.now == .receiving {
+            // A copy a move will fill (R16): an empty store, nothing made in it yet.
+            if try await store.get(ControlRecords.settingsKey) != nil {
+                throw Failure("this store already holds a control plane's records; a copy that receives starts on an empty one")
+            }
+            // Ready for the copy handing over, which may come through a load balancer.
+            await readiness.set(true)
+        } else {
+            try await takeUp()
+        }
+        let configuration = self.configuration
+        let servers = ServerFiles.folder()
+        let bootstrap = ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+            .serverChannelOption(ChannelOptions.backlog, value: 256)
+            .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+            .childChannelInitializer { [weak self, readiness] channel in
+                let service = self
+                return ControlWebSocketServer.configure(channel, tls: configuration.tls, reply: { head in
+                    let path = head.uri.split(separator: "?").first.map(String.init) ?? ""
+                    switch path {
+                    case "/healthz": return PlainReply(.ok, text: "ok\n")
+                    case "/readyz":
+                        return readiness.now ? PlainReply(.ok, text: "ready\n")
+                            : PlainReply(.serviceUnavailable, text: "the store can't be reached\n")
+                    // A server installs itself from here (T070): the script, then the host.
+                    case "/v1/install.sh":
+                        return PlainReply(.ok, Data(HostInstallScript.text.utf8), contentType: "text/x-shellscript")
+                    case let served where served.hasPrefix("/v1/servers/"):
+                        guard let data = ServerFiles.read(String(served.dropFirst("/v1/servers/".count)), in: servers) else {
+                            return PlainReply(.notFound, text: "this control plane has no such file\n")
+                        }
+                        return PlainReply(.ok, data)
+                    default: return PlainReply(.notFound, text: "not here\n")
+                    }
+                }, opened: { socket in
+                    guard let service else { return socket.close() }
+                    service.sockets.add(socket)
+                    Task { await service.accept(socket) }
+                })
+            }
+        let channel = try await bootstrap.bind(host: configuration.bind, port: configuration.port).get()
+        server = channel
+        refresher = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                await self?.refresh()
+            }
+        }
+        let port = channel.localAddress?.port ?? configuration.port
+        log("listening on \(configuration.bind):\(port) for \(configuration.url.absoluteString)\(phase.now == .receiving ? ", receiving a move" : "")")
+        if phase.now != .receiving { await mesh?.start() }
+        return port
+    }
+
+    /// The store's records taken up, and everything that runs on them: done at start, or
+    /// when a receiving copy takes over at the end of a move (R16).
+    func takeUp() async throws {
         let configuration = self.configuration
         let publicKey = self.publicKey
         let made = try await records.settings {
@@ -178,47 +242,6 @@ public final class ControlService: @unchecked Sendable {
             Task { await mesh?.broadcast(PeerWire.link(client: client, relayed: relayed)) }
         }
 
-        let servers = ServerFiles.folder()
-        let bootstrap = ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
-            .serverChannelOption(ChannelOptions.backlog, value: 256)
-            .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
-            .childChannelInitializer { [weak self, readiness] channel in
-                let service = self
-                return ControlWebSocketServer.configure(channel, tls: configuration.tls, reply: { head in
-                    let path = head.uri.split(separator: "?").first.map(String.init) ?? ""
-                    switch path {
-                    case "/healthz": return PlainReply(.ok, text: "ok\n")
-                    case "/readyz":
-                        return readiness.now ? PlainReply(.ok, text: "ready\n")
-                            : PlainReply(.serviceUnavailable, text: "the store can't be reached\n")
-                    // A server installs itself from here (T070): the script, then the host.
-                    case "/v1/install.sh":
-                        return PlainReply(.ok, Data(HostInstallScript.text.utf8), contentType: "text/x-shellscript")
-                    case let served where served.hasPrefix("/v1/servers/"):
-                        guard let data = ServerFiles.read(String(served.dropFirst("/v1/servers/".count)), in: servers) else {
-                            return PlainReply(.notFound, text: "this control plane has no such file\n")
-                        }
-                        return PlainReply(.ok, data)
-                    default: return PlainReply(.notFound, text: "not here\n")
-                    }
-                }, opened: { socket in
-                    guard let service else { return socket.close() }
-                    service.sockets.add(socket)
-                    Task { await service.accept(socket) }
-                })
-            }
-        let channel = try await bootstrap.bind(host: configuration.bind, port: configuration.port).get()
-        server = channel
-        refresher = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                await self?.refresh()
-            }
-        }
-        let port = channel.localAddress?.port ?? configuration.port
-        log("listening on \(configuration.bind):\(port) for \(configuration.url.absoluteString)")
-        await mesh?.start()
-        return port
     }
 
     /// Stops listening and drops every connection, as a copy that stopped would: its
@@ -234,6 +257,7 @@ public final class ControlService: @unchecked Sendable {
 
     /// The backstop for changes another copy made (R4), and the readiness probe's answer.
     func refresh() async {
+        guard phase.now != .receiving else { return }
         do {
             try await methods.refresh()
             for host in await methods.knownHosts { await router.know(host) }
@@ -272,6 +296,10 @@ public final class ControlService: @unchecked Sendable {
             await router.forgetHost(HostID(rawValue: event.subject))
         case .clientPaired, .hostEnrolled, .hostMoved:
             for host in await methods.knownHosts { await router.know(host) }
+        case .endpointsChanged:
+            // Another copy announced where the control plane answers (R16): members here
+            // reconnect, and their `ok` gives them the list.
+            sockets.closeAll()
         }
         await syncRelays()
         log("applied \(event.kind.rawValue) \(event.subject) from another copy")
@@ -322,13 +350,23 @@ public final class ControlService: @unchecked Sendable {
             // A peer copy dials the address copies reach each other at, and proves that.
             // Anyone else may have dialled any place the control plane answers (R16).
             let settings = await methods.controlSettings
-            let bound = auth.id.hasPrefix("x:") ? [peerOrigin ?? origin] : Self.origins(origin, settings)
+            let peerCopy = auth.id.hasPrefix("x:") && !auth.id.hasPrefix("x:" + Handover.prefix)
+            let bound = peerCopy ? [peerOrigin ?? origin] : Self.origins(origin, settings)
             let (identity, mac) = try await ControlAuth.verify(auth, serverNonce: serverNonce, origins: bound) { identity in
                 let (key, who) = try await self.key(for: identity)
                 admitted = who
                 return key
             }
             guard let admitted else { throw ControlAuth.Refusal(.unknown) }
+            // In a handover (R16): a receiving copy answers only the copy filling it, and
+            // no code is used while records can't be written.
+            switch (phase.now, identity) {
+            case (.receiving, .copy): break
+            case (.receiving, _): throw ControlAuth.Refusal(.unknown)
+            case (.frozen, .pairing), (.frozen, .enrolling), (.forwarding, .pairing), (.forwarding, .enrolling):
+                throw ControlAuth.Refusal(.unknown)
+            default: break
+            }
             // A device through `agents-relay` (T096): the exchange is its own, end to end,
             // and it says it came that way, for itself only.
             let relayed = auth.kind == "relay"
@@ -351,6 +389,9 @@ public final class ControlService: @unchecked Sendable {
                 default: break
                 }
             }
+            // A forwarding copy's `ok` gave the new list; that is all it has to say.
+            if phase.now == .forwarding, case .client = identity { reader.close(); return }
+            if phase.now == .forwarding, case .host = identity { reader.close(); return }
             switch identity {
             case .client:
                 guard let client = admitted.client else { throw ControlAuth.Refusal(.unknown) }
@@ -361,6 +402,10 @@ public final class ControlService: @unchecked Sendable {
                 await hostArrived(host, reader)
             case .pairing(let id), .enrolling(let id):
                 await announce(reader, code: id)
+            case .copy(let id) where id.hasPrefix(Handover.prefix):
+                // Not a member: announcing or forwarding leaves it open.
+                sockets.keepOpen(socket)
+                await Handover.session(reader, service: self)
             case .copy(let id):
                 guard let mesh else { throw ControlAuth.Refusal(.unknown) }
                 await mesh.accepted(id, transport: reader)
@@ -573,6 +618,11 @@ final class Sockets: @unchecked Sendable {
 
     func closeAll() {
         for socket in lock.withLock({ Array(open.values) }) { socket.close() }
+    }
+
+    /// Left out of `closeAll`: a handover's own session.
+    func keepOpen(_ socket: WebSocketLineTransport) {
+        _ = lock.withLock { open.removeValue(forKey: ObjectIdentifier(socket)) }
     }
 }
 

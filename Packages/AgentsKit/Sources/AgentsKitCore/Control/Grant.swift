@@ -282,6 +282,8 @@ public struct CopyRecord: Codable, Hashable, Sendable {
 public struct ControlEvent: Codable, Hashable, Sendable {
     public enum Kind: String, Codable, Sendable {
         case clientForgotten, grantChanged, clientPaired, hostEnrolled, hostRemoved, hostMoved
+        /// The control plane's endpoints changed (R16): members reconnect for the list.
+        case endpointsChanged
     }
     public var kind: Kind
     public var subject: String
