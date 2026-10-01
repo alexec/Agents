@@ -11,8 +11,8 @@ struct GeneratorTests {
     @Test func everyInputExistsAndParses() throws {
         let files = try Generator(root: Self.repo).parse()
         #expect(files.contains { $0.path.hasSuffix("AgentsKitCore/Daemon/DaemonAPI.swift") })
-        #expect(files.contains { $0.path.hasSuffix("AgentsKitCore/Control/Grant.swift") })
-        #expect(files.contains { $0.path.contains("AgentsKitCore/Model/") })
+        #expect(files.contains { $0.path.hasSuffix("AgentsKitCore/Daemon/DaemonAPI+Web.swift") })
+        #expect(files.contains { $0.path.hasSuffix("AgentsKitCore/Hosts/Host.swift") })
         for file in files { #expect(!file.syntax.hasError, "\(file.path) does not parse") }
     }
 

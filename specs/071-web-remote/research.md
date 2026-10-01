@@ -310,7 +310,7 @@ origin, the kind and one method are new.
   | `Bool` | `boolean` |
   | `UUID`, `URL` | `string` (branded `UUID` and `URLString`) |
   | `Data` | `string` (base64, branded `Base64`) |
-  | `Date` | from the wire encoder's strategy, which T013 confirms on `DaemonClient`'s encoder; emitted as a branded `WireDate` |
+  | `Date` | `number`, seconds since 2001-01-01 (the wire's plain `JSONEncoder`, confirmed in T017), branded `WireDate` |
   | `T?` | `key?: T` |
   | `[T]`, `Set<T>` | `T[]` |
   | `[String: T]` | `Record<string, T>` |

@@ -130,9 +130,9 @@ wire client. Every story needs them.
 
 ### Generated types (research R6, contracts/generated-types.md)
 
-- [ ] T017 Confirm how the daemon wire encodes `Date` and `Data`: find the `JSONEncoder` that `DaemonServer` and `DaemonClient` use. Write the answer into contracts/generated-types.md's mapping (`WireDate`).
-- [ ] T018 Write `WebSignatures` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Web.swift`. It has a row for every method and notification in data-model.md's lists, with the exact `DaemonAPI.Method` and `Notification` constants and their params and result types, read from the handlers in `DaemonCore`. Add `WebSignaturesTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/`: every `hostRequest` is in `ConnectionRole.deviceMethods`, `controlRequest`s are limited to the control plane's device-grant methods, and no method appears twice (FR-016).
-- [ ] T019 Write the generator in `Packages/WebTypes/Sources/WebTypesKit/`:
+- [x] T017 (a plain JSONEncoder: Date is seconds since 2001-01-01, Data base64, UUID upper case; contracts/generated-types.md) Confirm how the daemon wire encodes `Date` and `Data`: find the `JSONEncoder` that `DaemonServer` and `DaemonClient` use. Write the answer into contracts/generated-types.md's mapping (`WireDate`).
+- [x] T018 (56 rows, as `DaemonAPI.WebSignatures`; `DaemonAPI.Empty` added; ad-hoc results are `JSONValue`; `daemon/ping` left out, since a control plane passes it to the home host; `ControlMethods.anyGrant` made internal for the test) Write `WebSignatures` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Web.swift`. It has a row for every method and notification in data-model.md's lists, with the exact `DaemonAPI.Method` and `Notification` constants and their params and result types, read from the handlers in `DaemonCore`. Add `WebSignaturesTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/`: every `hostRequest` is in `ConnectionRole.deviceMethods`, `controlRequest`s are limited to the control plane's device-grant methods, and no method appears twice (FR-016).
+- [x] T019 (reads the whole AgentsKitCore tree; reads plain keyed `encode(to:)` bodies, so `Agent` needs no override; 18 emitter tests) Write the generator in `Packages/WebTypes/Sources/WebTypesKit/`:
   - parse the input files with `SwiftParser`;
   - resolve the roots from `WebSignatures` (read as syntax);
   - walk the reachable stored properties;
@@ -141,8 +141,8 @@ wire client. Every story needs them.
   - stop on each failure mode in the contract.
 
   Add emitter unit tests for each mapping-table row and each failure mode in `Packages/WebTypes/Tests/WebTypesTests/EmitterTests.swift`.
-- [ ] T020 Write overrides for every type the generator stops on (a custom coder, of which `DaemonAPI.swift` has 29 in all), in `Packages/WebTypes/Overrides/<Type>.ts`. For each, add a Swift-encoded sample to `Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/web/overrides/<Type>.json`, its sample is written by T042, which comes later; until then the override is checked only by `tsc`. If this list grows past about 15 types, stop and ask Alex whether some should get synthesized coders instead.
-- [ ] T021 Generate `Web/src/protocol/generated.ts`. Add `GeneratedIsFreshTests` in `Packages/WebTypes/Tests/WebTypesTests/`: it runs the generator in-process on the working tree, compares the output byte for byte, and fails with `scripts/web.sh types` and the first differing line. Write `Web/src/protocol/methods.ts`: a typed `call<M extends keyof Methods>(host, method, params)`.
+- [x] T020 (12 overrides; a hand-written `init(from:)` alone needs none; their fixtures wait for T042, as planned) Write overrides for every type the generator stops on (a custom coder, of which `DaemonAPI.swift` has 29 in all), in `Packages/WebTypes/Overrides/<Type>.ts`. For each, add a Swift-encoded sample to `Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/web/overrides/<Type>.json`, its sample is written by T042, which comes later; until then the override is checked only by `tsc`. If this list grows past about 15 types, stop and ask Alex whether some should get synthesized coders instead.
+- [x] T021 (1,613 lines; `tsc` clean; plus `protocol/dates.ts`) Generate `Web/src/protocol/generated.ts`. Add `GeneratedIsFreshTests` in `Packages/WebTypes/Tests/WebTypesTests/`: it runs the generator in-process on the working tree, compares the output byte for byte, and fails with `scripts/web.sh types` and the first differing line. Write `Web/src/protocol/methods.ts`: a typed `call<M extends keyof Methods>(host, method, params)`.
 
 ### The web app's wire client
 

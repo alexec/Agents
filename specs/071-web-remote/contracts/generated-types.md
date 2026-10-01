@@ -5,15 +5,38 @@ Research R6. The generator is `Packages/WebTypes` (`agents-webtypes`). Its outpu
 
 ## Inputs
 
-- **Files:** `Packages/AgentsKit/Sources/AgentsKitCore/` `Daemon/DaemonAPI*.swift`,
-  `Control/DaemonAPI+Control.swift`, `Control/Grant.swift`, `Control/ControlAuth.swift`, and
-  `Model/**/*.swift`. The list is a constant in the generator. Adding a file is a code change,
-  reviewed like any other.
-- **Roots:** every `params` and `result` type in `WebSignatures.rows`, every
-  `DaemonAPI.Method` and `DaemonAPI.Notification` constant named there, `DaemonAPI.Failure`,
-  and the `Hello`, `Auth`, `OK` and `Refused` lines of `ControlAuth`.
-- **Overrides:** `Packages/WebTypes/Overrides/<SwiftTypeName>.ts`, each one an exported type
-  of that name.
+As built in T019:
+- **Files:** every Swift file under `Packages/AgentsKit/Sources/AgentsKitCore`. A wire type
+  may be declared anywhere in the module (`HostID` is in `Hosts/Host.swift`), so a hand-kept
+  list would miss one.
+- **Roots:** every `params` and `result` type in `DaemonAPI.WebSignatures.rows`
+  (`Daemon/DaemonAPI+Web.swift`), the method and notification strings they name, and the
+  `DaemonAPI.Failure` codes.
+- **Hand-written encoders:** a type with only a hand-written `init(from:)` is generated from
+  its stored properties, because its encoder is synthesized and its decoder only reads that
+  shape leniently. A type with a hand-written `encode(to:)` is read from that body when the
+  body is the plain keyed kind:
+  - one container keyed by an enum;
+  - `encode` or `encodeIfPresent` per key;
+  - a key written only under an `if`, `switch` or loop, or with `encodeIfPresent`, is
+    optional;
+  - each value's type comes from the property encoded, or the property named like the key;
+  - containers keyed by `AnyKey` pass unknown fields through and are ignored.
+
+  `Agent` is read this way. Anything else needs an override.
+- **Overrides:** `Packages/WebTypes/Overrides/<TypeScriptName>.ts`. Each is one of:
+  - TypeScript, with an optional `// uses: A, B.C` line naming the Swift types it mentions,
+    so that they are generated too;
+  - `// as synthesized` (optionally `, defaults optional` and `// passthrough: <case>`), for
+    an encoder written by hand that writes Swift's synthesized shape;
+  - `// as: <SwiftType>`, for an encoder that delegates to another type (a private `Stored`).
+
+  An override for a type with no hand-written encoder, or one the generator can read itself,
+  or one nothing reaches, fails.
+- **Twelve overrides as built:** `ConfigOption`, `ContentBlock`, `FileReading`, `GitView`,
+  `NeedID`, `ResourceName`, `Retirement`, `RuntimeAvailability` (as synthesized), `Surface`,
+  `ToolCallContent`, `TranscriptEntryKind` (as synthesized, defaults optional, passthrough
+  `unrecognised`) and `WorkflowTrigger` (as `Stored`). Each gets a Swift-encoded fixture in T042.
 
 ## Output shape
 
@@ -22,7 +45,7 @@ Research R6. The generator is `Packages/WebTypes` (`agents-webtypes`). Its outpu
 // Regenerate: scripts/web.sh types
 export type UUID = string & { readonly __brand: "UUID" };
 export type Base64 = string & { readonly __brand: "Base64" };
-export type WireDate = /* per T013 */;
+export type WireDate = number & { readonly __brand: "WireDate" };  // seconds since 2001-01-01T00:00:00Z
 export interface Agent { id: UUID; title?: string; /* … */ }
 export type AgentStatus = "running" | "idle" | /* … */;
 export type Entry = { kind: "text"; text: string } | /* tagged per Swift synthesized Codable */;
@@ -40,13 +63,33 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
 - `Methods` and `Notifications` hold only the rows in `WebSignatures`, so the web app cannot
   call a method the table does not list.
 
+## The wire's encoding (T017)
+
+Requests, results and notifications are encoded by `JSONValue.encoding` and decoded by
+`JSONValue.decode` (`AgentsKitCore/JSONRPC/JSONValue.swift`). Both use a plain `JSONEncoder()`
+and `JSONDecoder()`, with no strategies, so:
+
+| Swift | On the wire | TypeScript |
+|---|---|---|
+| `Date` | a number: seconds since 2001-01-01T00:00:00Z (Foundation's reference date), not 1970 | `WireDate` (a branded `number`), with `fromWireDate`/`toWireDate` in `protocol/dates.ts` |
+| `Data` | standard base64, with padding | `Base64` |
+| `UUID` | upper-case string | `UUID` |
+| `URL` | its absolute string | `URLString` |
+| `[String: T]`, `[Int: T]` | an object (`Int` keys become strings) | `Record<string, T>` |
+| `[K: T]` for any other `K` (`UUID`, an enum) | **a flat array of alternating keys and values** | refused by the generator unless an override says so |
+
+The control plane's own records (`ControlRecords.encoder`) use a different date strategy. They
+reach the browser only inside replies, re-encoded by `JSONValue.encoding`, so the table above
+holds for everything on the wire.
+
 ## Failure modes, all non-zero exits with a message naming file and line
 
 | Case | Message |
 |---|---|
 | A type reachable from a root is not in the input files | `<Type> is used by <Owner>.<field> but not declared in the files read` |
-| A type has a hand-written `init(from:)` or `encode(to:)` and no override | `<Type> has a custom coder; add Overrides/<Type>.ts and a fixture` |
-| An override exists for a type with no custom coder, or for no type at all | `Overrides/<Type>.ts is not needed` |
+| A type has a hand-written `encode(to:)` the generator can't read, and no override | `<Type> has a hand-written encode(to:) the generator can't read; add Overrides/<Name>.ts and a fixture` |
+| An override exists for a type with no hand-written encoder, one the generator reads itself, or nothing reached | `Overrides/<Name>.ts is not needed: …` |
+| A dictionary keyed by something other than `String`, `Int` or a `CodingKeyRepresentable` type | `… goes on the wire as an array of keys and values` |
 | A Swift type the mapping table does not cover (a generic, a tuple, a closure) | `<Owner>.<field>: <SwiftType> has no TypeScript form` |
 | `--check` and the output differs from the file on disk | `generated.ts is stale; run scripts/web.sh types` and the first differing line |
 

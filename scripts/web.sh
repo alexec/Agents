@@ -43,14 +43,17 @@ check)
 	swift run --package-path Packages/WebTypes agents-webtypes --root "$root" --check
 	swift test --package-path Packages/AgentsKit --filter 'WebDistManifestTests|ControlAgreementVectorTests'
 	if have_node; then
+		# What is on disk now, then what this source builds: they must be the same bytes.
+		before=$(find Web/dist Web/src/protocol/generated.ts -type f -exec shasum -a 256 {} + | sort)
 		cd Web
 		npm ci --ignore-scripts --no-audit --no-fund
 		npm run check
 		npm test
 		npm run build
 		cd "$root"
-		git diff --exit-code -- Web/dist Web/src/protocol/generated.ts ||
-			{ echo "web.sh: Web/dist is not what this source builds; commit the rebuilt files" >&2; exit 1; }
+		after=$(find Web/dist Web/src/protocol/generated.ts -type f -exec shasum -a 256 {} + | sort)
+		[ "$before" = "$after" ] ||
+			{ echo "web.sh: Web/dist was not what this source builds; it is now, so commit the rebuilt files" >&2; exit 1; }
 	else
 		echo "web.sh: no Node here; checked the manifest only (CI's web job rebuilds with Node)" >&2
 	fi

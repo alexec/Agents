@@ -182,7 +182,7 @@ public actor ControlMethods: ControlHandling {
 
     /// Anyone connected may ask these. Everything else of the control plane's is an
     /// operator's.
-    private static let anyGrant: Set<String> = [
+    static let anyGrant: Set<String> = [
         DaemonAPI.Method.ping, DaemonAPI.Method.controlStatus, DaemonAPI.Method.hostsList,
     ]
 
