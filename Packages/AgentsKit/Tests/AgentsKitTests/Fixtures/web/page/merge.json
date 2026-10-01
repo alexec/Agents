@@ -1,0 +1,95 @@
+[
+  {
+    "expected" : {
+      "merged" : {
+        "passageIndex" : 2,
+        "text" : "# Notes\n\nFirst paragraph.\n\nSecond, edited.\n\nThird.\n"
+      }
+    },
+    "input" : {
+      "base" : "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n",
+      "edited" : "Second, edited.",
+      "mine" : 2,
+      "theirs" : "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n"
+    },
+    "name" : "theirs untouched"
+  },
+  {
+    "expected" : {
+      "merged" : {
+        "passageIndex" : 2,
+        "text" : "# Notes\n\nFirst paragraph.\n\nSecond, edited.\n\nThird.\n\nFourth.\n"
+      }
+    },
+    "input" : {
+      "base" : "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n",
+      "edited" : "Second, edited.",
+      "mine" : 2,
+      "theirs" : "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n\nFourth.\n"
+    },
+    "name" : "they appended"
+  },
+  {
+    "expected" : {
+      "collided" : {
+        "passageIndex" : 2,
+        "text" : "# Notes\n\nFirst paragraph.\n\nSecond, mine.\n\nThird.\n",
+        "theirs" : "Second, theirs."
+      }
+    },
+    "input" : {
+      "base" : "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n",
+      "edited" : "Second, mine.",
+      "mine" : 2,
+      "theirs" : "# Notes\n\nFirst paragraph.\n\nSecond, theirs.\n\nThird.\n"
+    },
+    "name" : "they changed the same passage"
+  },
+  {
+    "expected" : {
+      "collided" : {
+        "passageIndex" : 2,
+        "text" : "# Notes\n\nFirst paragraph.\n\nSecond, mine.\n\nThird.\n",
+        "theirs" : ""
+      }
+    },
+    "input" : {
+      "base" : "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n",
+      "edited" : "Second, mine.",
+      "mine" : 2,
+      "theirs" : "# Notes\n\nFirst paragraph.\n\nThird.\n"
+    },
+    "name" : "they deleted my passage"
+  },
+  {
+    "expected" : {
+      "collided" : {
+        "passageIndex" : 0,
+        "text" : "First, mine.",
+        "theirs" : ""
+      }
+    },
+    "input" : {
+      "base" : "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n",
+      "edited" : "First, mine.",
+      "mine" : 1,
+      "theirs" : ""
+    },
+    "name" : "they emptied the file"
+  },
+  {
+    "expected" : {
+      "merged" : {
+        "passageIndex" : 2,
+        "text" : "# Notes\n\nNew above.\n\nFirst, mine.\n\nSecond paragraph.\n\nThird.\n"
+      }
+    },
+    "input" : {
+      "base" : "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n",
+      "edited" : "First, mine.",
+      "mine" : 1,
+      "theirs" : "# Notes\n\nNew above.\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n"
+    },
+    "name" : "my passage moved down"
+  }
+]

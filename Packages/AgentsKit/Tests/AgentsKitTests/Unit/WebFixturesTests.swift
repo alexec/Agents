@@ -634,6 +634,64 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: page/
+
+    static func passage(_ passage: Passage) -> JSONValue {
+        .object(["source": .string(passage.source), "lines": .array([.int(passage.lines.lowerBound), .int(passage.lines.upperBound)]),
+                 "separator": .string(passage.separator), "isHeading": .bool(passage.isHeading)])
+    }
+
+    /// A live page's passages (`Passage.split`, `join`, `index(containing:in:)`) and the merge
+    /// of what the person typed with what the agent wrote meanwhile (`PassageMerge.apply`).
+    @Test func page() throws {
+        let documents: [(String, String)] = [
+            ("empty", ""),
+            ("blank only", "\n\n"),
+            ("two paragraphs", "# Title\n\nOne line.\nTwo lines.\n"),
+            ("no final newline", "First.\n\n\nSecond."),
+            ("leading blank lines", "\n\nAfter blanks.\n"),
+            ("a fence with blank lines", "Before.\n\n```swift\nlet a = 1\n\nlet b = 2\n```\n\nAfter.\n"),
+            ("a tilde fence left open", "~~~\ncode\n\nstill code\n"),
+            ("setext and front matter", "---\ntitle: x\n---\n\nHeading\n=======\n\nText\n---\n"),
+            ("heading needs a space", "#Not a heading\n\n###### Six\n\n####### Seven\n"),
+        ]
+        let cases = documents.map { Case(name: $0.0, input: .object(["text": .string($0.1)])) }
+        try pin("page/passages.json", cases) { input in
+            let text = input["text"]!.stringValue!
+            let passages = Passage.split(text)
+            return .object([
+                "passages": .array(passages.map(Self.passage)),
+                "roundTrip": .bool(Passage.join(passages) == text),
+                "lineIndex": .array((0...12).map { line in Passage.index(containing: line, in: passages).map(JSONValue.int) ?? .null }),
+            ])
+        }
+
+        let base = "# Notes\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n"
+        let merges: [(String, String, Int, String)] = [
+            ("theirs untouched", base, 2, "Second, edited."),
+            ("they appended", base + "\nFourth.\n", 2, "Second, edited."),
+            ("they changed the same passage", "# Notes\n\nFirst paragraph.\n\nSecond, theirs.\n\nThird.\n", 2, "Second, mine."),
+            ("they deleted my passage", "# Notes\n\nFirst paragraph.\n\nThird.\n", 2, "Second, mine."),
+            ("they emptied the file", "", 1, "First, mine."),
+            ("my passage moved down", "# Notes\n\nNew above.\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird.\n", 1, "First, mine."),
+        ]
+        let mergeCases = merges.map { name, theirs, index, edited in
+            Case(name: name, input: .object(["base": .string(base), "theirs": .string(theirs),
+                                             "mine": .int(index), "edited": .string(edited)]))
+        }
+        try pin("page/merge.json", mergeCases) { input in
+            let base = input["base"]!.stringValue!
+            let mine = Passage.split(base)[input["mine"]!.intValue!]
+            switch PassageMerge.apply(base: base, theirs: input["theirs"]!.stringValue!, mine: mine,
+                                      edited: input["edited"]!.stringValue!) {
+            case .merged(let text, let index):
+                return .object(["merged": .object(["text": .string(text), "passageIndex": .int(index)])])
+            case .collided(let text, let index, let theirs):
+                return .object(["collided": .object(["text": .string(text), "passageIndex": .int(index), "theirs": .string(theirs)])])
+            }
+        }
+    }
+
     // MARK: overrides/
 
     /// A Swift-encoded sample of every case of each type whose TypeScript is hand-written

@@ -1,0 +1,373 @@
+[
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "passages" : [
+
+      ],
+      "roundTrip" : true
+    },
+    "input" : {
+      "text" : ""
+    },
+    "name" : "empty"
+  },
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "passages" : [
+
+      ],
+      "roundTrip" : false
+    },
+    "input" : {
+      "text" : "\n\n"
+    },
+    "name" : "blank only"
+  },
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "passages" : [
+        {
+          "isHeading" : true,
+          "lines" : [
+            1,
+            1
+          ],
+          "separator" : "\n\n",
+          "source" : "# Title"
+        },
+        {
+          "isHeading" : false,
+          "lines" : [
+            3,
+            4
+          ],
+          "separator" : "\n",
+          "source" : "One line.\nTwo lines."
+        }
+      ],
+      "roundTrip" : true
+    },
+    "input" : {
+      "text" : "# Title\n\nOne line.\nTwo lines.\n"
+    },
+    "name" : "two paragraphs"
+  },
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "passages" : [
+        {
+          "isHeading" : false,
+          "lines" : [
+            1,
+            1
+          ],
+          "separator" : "\n\n\n",
+          "source" : "First."
+        },
+        {
+          "isHeading" : false,
+          "lines" : [
+            4,
+            4
+          ],
+          "separator" : "",
+          "source" : "Second."
+        }
+      ],
+      "roundTrip" : true
+    },
+    "input" : {
+      "text" : "First.\n\n\nSecond."
+    },
+    "name" : "no final newline"
+  },
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "passages" : [
+        {
+          "isHeading" : false,
+          "lines" : [
+            1,
+            3
+          ],
+          "separator" : "\n",
+          "source" : "\n\nAfter blanks."
+        }
+      ],
+      "roundTrip" : true
+    },
+    "input" : {
+      "text" : "\n\nAfter blanks.\n"
+    },
+    "name" : "leading blank lines"
+  },
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2
+      ],
+      "passages" : [
+        {
+          "isHeading" : false,
+          "lines" : [
+            1,
+            1
+          ],
+          "separator" : "\n\n",
+          "source" : "Before."
+        },
+        {
+          "isHeading" : false,
+          "lines" : [
+            3,
+            7
+          ],
+          "separator" : "\n\n",
+          "source" : "```swift\nlet a = 1\n\nlet b = 2\n```"
+        },
+        {
+          "isHeading" : false,
+          "lines" : [
+            9,
+            9
+          ],
+          "separator" : "\n",
+          "source" : "After."
+        }
+      ],
+      "roundTrip" : true
+    },
+    "input" : {
+      "text" : "Before.\n\n```swift\nlet a = 1\n\nlet b = 2\n```\n\nAfter.\n"
+    },
+    "name" : "a fence with blank lines"
+  },
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "passages" : [
+        {
+          "isHeading" : false,
+          "lines" : [
+            1,
+            4
+          ],
+          "separator" : "\n",
+          "source" : "~~~\ncode\n\nstill code"
+        }
+      ],
+      "roundTrip" : true
+    },
+    "input" : {
+      "text" : "~~~\ncode\n\nstill code\n"
+    },
+    "name" : "a tilde fence left open"
+  },
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "passages" : [
+        {
+          "isHeading" : false,
+          "lines" : [
+            1,
+            3
+          ],
+          "separator" : "\n\n",
+          "source" : "---\ntitle: x\n---"
+        },
+        {
+          "isHeading" : true,
+          "lines" : [
+            5,
+            6
+          ],
+          "separator" : "\n\n",
+          "source" : "Heading\n======="
+        },
+        {
+          "isHeading" : true,
+          "lines" : [
+            8,
+            9
+          ],
+          "separator" : "\n",
+          "source" : "Text\n---"
+        }
+      ],
+      "roundTrip" : true
+    },
+    "input" : {
+      "text" : "---\ntitle: x\n---\n\nHeading\n=======\n\nText\n---\n"
+    },
+    "name" : "setext and front matter"
+  },
+  {
+    "expected" : {
+      "lineIndex" : [
+        null,
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "passages" : [
+        {
+          "isHeading" : false,
+          "lines" : [
+            1,
+            1
+          ],
+          "separator" : "\n\n",
+          "source" : "#Not a heading"
+        },
+        {
+          "isHeading" : true,
+          "lines" : [
+            3,
+            3
+          ],
+          "separator" : "\n\n",
+          "source" : "###### Six"
+        },
+        {
+          "isHeading" : false,
+          "lines" : [
+            5,
+            5
+          ],
+          "separator" : "\n",
+          "source" : "####### Seven"
+        }
+      ],
+      "roundTrip" : true
+    },
+    "input" : {
+      "text" : "#Not a heading\n\n###### Six\n\n####### Seven\n"
+    },
+    "name" : "heading needs a space"
+  }
+]

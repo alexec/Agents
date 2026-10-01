@@ -5,8 +5,8 @@ import { batch, signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
-  WorkflowSummary, Attachment, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse,
+  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
+  StartRequest, UUID, WorktreesListResponse, FileStamp,
 } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { describe } from "./errors";
@@ -59,6 +59,11 @@ export class Work {
   readonly firstEntryIndex = signal(0);
   readonly hasMoreBefore = signal(false);
 
+  /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
+  readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
+  /** The last folders said to have changed, for a pane watching them (`files/changed`). */
+  readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; at: number } | null>(null);
+
   /** The latest correction to a new agent's form, for the form holding that draft. */
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
   /** The mode last chosen for each runtime, by host (029). */
@@ -105,6 +110,16 @@ export class Work {
       case "agents/draftOptions":
         this.draftOptions.value = params as DraftOptionsNotification;
         return true;
+      case "agent/showFile": {
+        const note = params as ShowFileNotification;
+        this.shownFile.value = { host, agentID: note.agentID, path: note.file.path, line: note.file.line, at: Date.now() };
+        return true;
+      }
+      case "files/changed": {
+        const note = params as FilesChangedNotification;
+        this.filesChanged.value = { host, agentID: note.agentID, folders: note.folders, at: Date.now() };
+        return true;
+      }
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
         return true;
@@ -441,6 +456,37 @@ export class Store extends Work {
   async perform(host: string, agentID: string,
                 action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<void> {
     await this.act(action, { agentID: agentID as UUID }, host);
+  }
+
+  // MARK: Files, changes and live pages (071 US4)
+
+  listFiles(host: string, agentID: string, folder: string) {
+    return this.link.call("files/list", { agentID: agentID as UUID, folder }, host);
+  }
+
+  readFile(host: string, agentID: string, path: string, knownStamp?: FileStamp) {
+    return this.link.call("files/read", { agentID: agentID as UUID, path, ...(knownStamp ? { knownStamp } : {}) }, host);
+  }
+
+  watchFolder(host: string, agentID: string, folder: string): void {
+    void this.link.call("files/watch", { agentID: agentID as UUID, folder }, host).catch(() => {});
+  }
+
+  unwatchFolder(host: string, agentID: string, folder: string): void {
+    void this.link.call("files/unwatch", { agentID: agentID as UUID, folder }, host).catch(() => {});
+  }
+
+  changes(host: string, agentID: string) {
+    return this.link.call("changes/list", { agentID: agentID as UUID }, host);
+  }
+
+  changedFile(host: string, agentID: string, path: string) {
+    return this.link.call("changes/file", { agentID: agentID as UUID, path, whole: false }, host);
+  }
+
+  /** What the person typed on a live page, written to the file as the window writes it. */
+  async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
+    return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
   }
 
   /** Mark as Unread / Mark as Read (#70). */
