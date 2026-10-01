@@ -255,7 +255,7 @@ while layout is cheap to change. Depth waits for Alex's look.
   - at every width, the prompt and the cards slot pinned and never covered (FR-019, US6).
 - [x] T038 (and the link counts a hung control plane down at the missed heartbeat, rather than waiting on the close handshake) [P] [US7] Draw the two lost states as static views in `Web/src/views/Banner.tsx`, from frame F: **Can't reach the control plane**, with the columns greyed and the prompt disabled but holding its text; and **This browser was forgotten**. The connection logic comes in Phase 8.
 - [x] T039 (walks/layout.md: every width and both F states, six fixes found and made) [US2] Rebuild `Web/dist`. Run the layout walk with `Web/test/walk/layout.mjs` (quickstart §3), on a scratch root seeded with 3 projects and 12 sessions, at 1600, 1440, 1000 and 390, plus both frame F states. Put each screenshot beside its frame in `specs/071-web-remote/walks/layout.md`, fix what differs, and walk again.
-- [ ] T040 [US2] **Gate.** Ask Alex with the question tool to look at `walks/layout.md`. Depth starts when he says the layout is right. Make his changes here, before Phase 6.
+- [x] T040 (Alex, 2026-10-01: "Right, build depth") [US2] **Gate.** Ask Alex with the question tool to look at `walks/layout.md`. Depth starts when he says the layout is right. Make his changes here, before Phase 6.
 
 **Checkpoint**: the layout matches frames A–F at every width, and Alex has looked.
 
