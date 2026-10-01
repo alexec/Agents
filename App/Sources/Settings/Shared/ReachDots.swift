@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// One dot per installed runtime, in the rule table's order (C Claude · X Codex · G Grok ·

@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// One agent on a project page: what it is, and what it is doing.
@@ -243,11 +240,7 @@ struct AgentRow: View {
 
     private func refreshWorktree() async {
         guard let worktree = agent.worktree else { worktreeGone = false; return }
-        if model.readsDisk(of: agent.host) {
-            worktreeGone = !FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))  // store-ok: readsDisk(of:) is false in the store window
-        } else {
-            worktreeGone = await !model.pathIsThere(worktree.root, on: agent.host)
-        }
+        worktreeGone = await !model.pathIsThere(worktree.root, on: agent.host)
     }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.

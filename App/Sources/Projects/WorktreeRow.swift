@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// Every worktree of the project's repository, and the way to be done with the app's

@@ -12,8 +12,6 @@
 # build/DD-store: every build in the main checkout writes over that.
 #
 #   ship.sh                 everything
-#   ship.sh --switch        once (058, T105a): the developer window's own control plane
-#                           and host make way for Agents Host's
 #   ship.sh --no-build      reuse build/DD-host, build/DD-store and build/DD-ios as they are
 #   ship.sh --no-devices    skip the iPhone/iPad
 #   ship.sh --no-mac        skip the Mac
@@ -24,11 +22,9 @@ setopt pipefail
 
 HOSTAPP_AT=$HOME/Applications/"Agents Host.app"
 ROOT="$HOME/Library/Application Support/Agents"
-CONTROL_HOME="$HOME/Library/Application Support/Agents Control"
 GUI=gui/$(id -u)
-# Agents Host's two jobs, and the developer window's from before the switch.
+# Agents Host's two jobs.
 HOST_JOBS=(com.alexecollins.agentshost.control com.alexecollins.agentshost.daemon)
-WINDOW_JOBS=(com.alexecollins.agents.control com.alexecollins.agents.host com.alexecollins.agents.hostonly)
 STORE_ID=com.alexecollins.agents.store
 
 loaded() { launchctl print $GUI/$1 >/dev/null 2>&1 }
@@ -44,8 +40,8 @@ live_apps() {
     done
 }
 
-restart() { # live-folder sha switch delay
-  local LIVE=$1 SHA=$2 SWITCH=$3 DELAY=${4:-20}
+restart() { # live-folder sha delay
+  local LIVE=$1 SHA=$2 DELAY=${3:-20}
   exec >> /tmp/main-restart-all-$SHA.log 2>&1
   echo "$(date) start"
   sleep $DELAY
@@ -53,41 +49,6 @@ restart() { # live-folder sha switch delay
   CLEAN=(env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" SHELL=/bin/zsh TMPDIR="$TMPDIR"
     PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin LANG=en_US.UTF-8)
   local pid cmd j
-
-  if (( SWITCH )); then
-    # Only the bundle that registered a job may unregister it: the running developer
-    # window's own copy is asked to, and launchd stops the bridge-hosted control plane
-    # and the daemon with them. Agents are left running.
-    local OLDBUNDLE
-    live_apps com.alexecollins.agents | head -1 | read -r pid OLDBUNDLE
-    if [[ -z ${OLDBUNDLE:-} ]]; then echo "no developer window running to let its jobs go; stop"; exit 1; fi
-    echo "quitting developer window $pid"
-    kill -TERM $pid; for i in {1..50}; do kill -0 $pid 2>/dev/null || break; sleep 0.2; done
-    # The running copy predates --remove-services, so this build takes its place, at the
-    # same path macOS registered the jobs from.
-    echo "unregistering the window's jobs from $OLDBUNDLE"
-    rm -rf "$OLDBUNDLE" && ditto "$LIVE/developer/Agents.app" "$OLDBUNDLE"
-    "$OLDBUNDLE/Contents/MacOS/Agents" --remove-services
-    for i in {1..75}; do any_loaded $WINDOW_JOBS || break; sleep 0.2; done
-    if any_loaded $WINDOW_JOBS; then
-      # Stopped now, but macOS may start them again at the next login: Alex turns
-      # "Agents" off under System Settings ▸ General ▸ Login Items.
-      echo "UNREGISTER FAILED; booting the window's jobs out instead"
-      for j in $WINDOW_JOBS; do loaded $j && launchctl bootout $GUI/$j; done
-      sleep 2
-      if any_loaded $WINDOW_JOBS; then echo "the window's jobs are still loaded; stop"; exit 1; fi
-    fi
-    rm -rf "$LIVE/developer"
-    # ship.sh's own bridges from before: the stuck one that never got 8790, and any other.
-    ps -axww -o pid=,command= | grep -E "^ *[0-9]+ $HOME/Applications/AgentsLive/[^/]+/agents-bridge.app/Contents/MacOS/agents-bridge$" |
-      while read -r pid cmd; do echo "quitting bridge $pid"; kill -TERM $pid; done
-    # The bridge-hosted control plane's folder. Agents Host's control plane starts afresh
-    # in the same place; the old one is kept beside it.
-    if [[ -d $CONTROL_HOME ]]; then
-      echo "moving $CONTROL_HOME aside"
-      mv "$CONTROL_HOME" "$CONTROL_HOME (bridge $(date +%Y%m%d-%H%M%S))"
-    fi
-  fi
 
   # Agents Host: the new bundle in place of the old, then launchd starts each job again
   # from it. Its window, if open, is reopened on the new build.
@@ -106,7 +67,7 @@ restart() { # live-folder sha switch delay
   for j in $HOST_JOBS; do
     if loaded $j; then launchctl kickstart -k $GUI/$j && echo "restarted $j"; fi
   done
-  if (( SWITCH || HOSTUI )) || ! any_loaded $HOST_JOBS; then
+  if (( HOSTUI )) || ! any_loaded $HOST_JOBS; then
     $CLEAN open "$HOSTAPP_AT"
     echo "opened Agents Host"
   fi
@@ -131,7 +92,6 @@ restart() { # live-folder sha switch delay
     fi
   done
   echo "window: $(ps -axww -o pid=,command= | grep -E "^ *[0-9]+ $LIVE/Agents.app/Contents/MacOS/Agents$")"
-  (( SWITCH )) && echo "SWITCH: in Agents Host, Run it here (allow it under Login Items), Move Across…, then pair the window, iPhone and iPad"
 
   # Earlier copies nothing runs from any more. The daemon keeps its own copy of the
   # helper in the root, so no agent needs these.
@@ -150,14 +110,13 @@ if [[ ${1:-} == --restart ]]; then
   exit
 fi
 
-BUILD=1 DEVICES=1 MAC=1 DELAY=20 SWITCH=0
+BUILD=1 DEVICES=1 MAC=1 DELAY=20
 typeset -a ONLY
 while (( $# )); do
   case $1 in
     --no-build) BUILD=0 ;;
     --no-devices) DEVICES=0 ;;
     --no-mac) MAC=0 ;;
-    --switch) SWITCH=1 ;;
     --device) ONLY+=$2; shift ;;
     --now) DELAY=3 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
@@ -179,21 +138,6 @@ IOSAPP=$REPO/build/DD-ios/Build/Products/Debug-iphoneos/Agents.app
 echo "main $SHA  logs $LOGS"
 if [[ -n $(git -C "$REPO" --no-optional-locks status --porcelain --untracked-files=no) ]]; then
   echo "note: main checkout has uncommitted changes; the build includes them"
-fi
-
-# Which set-up this Mac has. The developer window's own jobs mean the switch has not
-# happened: refuse without --switch, since shipping either way would leave two control
-# planes wanting 8791 and one root.
-if (( MAC )); then
-  if any_loaded $WINDOW_JOBS; then
-    if (( ! SWITCH )); then
-      echo "the developer window still runs this Mac's control plane and host ($(for j in $WINDOW_JOBS; do loaded $j && print -n "$j "; done))." >&2
-      echo "ship.sh --switch moves them to Agents Host, once. Ask Alex first: he has to press Run it here and pair his devices again." >&2
-      exit 1
-    fi
-  elif (( SWITCH )); then
-    echo "nothing to switch: the developer window runs no jobs" >&2; exit 1
-  fi
 fi
 
 # Any build run from inside the main checkout, rather than from a live copy or a
@@ -223,13 +167,11 @@ run() { # name, then the command; quiet unless it fails
 XFLAGS=(-skipPackagePluginValidation -skipMacroValidation)
 if (( BUILD )); then
   # Sequential on purpose: the schemes share SwiftPM state. Each Mac app has build data
-  # of its own: the window and the developer window are both Agents.app.
+  # of its own.
   run xcodegen xcodegen generate
   if (( MAC )); then
     run build-host xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
     run build-window xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-store $XFLAGS build
-    # Only to let the developer window's jobs go (see --restart).
-    (( SWITCH )) && run build-developer xcodebuild -scheme Agents -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build
   fi
   if (( DEVICES )); then
     run build-ios xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DD-ios -allowProvisioningUpdates $XFLAGS build
@@ -296,13 +238,8 @@ if (( MAC )); then
     && ! codesign -dv "$LIVE.partial/Agents Host.app/Contents/Helpers/agentsd" 2>&1 | grep -q 'TeamIdentifier=not set' \
     || { echo "the Mac builds are not signed by the team (built with CODE_SIGNING_ALLOWED=NO?); rebuild without --no-build" >&2
          rm -rf $LIVE.partial; exit 1; }
-  if (( SWITCH )); then
-    DEVAPP=$REPO/build/DD/Build/Products/Debug/Agents.app
-    [[ -d $DEVAPP ]] || { echo "no developer window build in $REPO/build/DD" >&2; rm -rf $LIVE.partial; exit 1; }
-    ditto $DEVAPP $LIVE.partial/developer/Agents.app
-  fi
   mv $LIVE.partial $LIVE
   echo "$(date +%T) staged $LIVE"
-  nohup ${0:A} --restart "$LIVE" "$SHA" $SWITCH $DELAY >/dev/null 2>&1 &!
+  nohup ${0:A} --restart "$LIVE" "$SHA" $DELAY >/dev/null 2>&1 &!
   echo "$(date +%T) Mac relaunch scheduled in ${DELAY}s; log /tmp/main-restart-all-$SHA.log"
 fi

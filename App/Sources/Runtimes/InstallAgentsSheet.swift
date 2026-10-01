@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// Offered once at start-up when an agent is missing (048): every agent the app knows,

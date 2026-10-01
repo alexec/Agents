@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// Across the top of a chat whose server has gone (037, wireframes/mac-offline.svg).

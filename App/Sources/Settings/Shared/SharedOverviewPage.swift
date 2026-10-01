@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// Frame A: what every agent gets, in one grid of kinds by runtimes, and under it every

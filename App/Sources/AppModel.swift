@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import Foundation
 import Observation
 
@@ -408,12 +405,7 @@ final class AppModel {
 
     /// This Mac's host: through the control plane when the window has one (058). Set
     /// once more when first run chooses one.
-    #if AGENTS_STORE
     private var client = ControlConfig.macClient()
-    #else
-    private var client = ControlConfig.endpoint.flatMap(ControlConfig.link).map { DaemonClient(link: $0.link(for: .mac)) }
-        ?? DaemonClient()
-    #endif
     /// The one connection to the control plane every host's client is carried on (058).
     private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
     /// Every host the control plane has besides this Mac's, each with a client of its own
@@ -451,9 +443,6 @@ final class AppModel {
     /// No control plane and nothing of the old way: the window asks how to work, and
     /// starts nothing until it is told (058, FR-017).
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
-    /// The control plane this Mac's agents run for, when that is all it does here (US7).
-    private(set) var hostOnlyOf: String? = ControlConfig.hostOnly?.name
-    func becameHost(of name: String) { hostOnlyOf = name }
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
     /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
@@ -483,9 +472,9 @@ final class AppModel {
         controlLink.map { DaemonClient(link: $0.controlLink) }
     }
 
-    /// The host on this Mac, when there is one. `.mac` when the window has no control plane.
+    /// The host on this Mac, when there is one. `.mac` until the window has a control plane.
     var thisMacHostID: HostID? {
-        ThisMacHost.resolve(controlPlaneHosts, controlPlaneIsHere: ControlConfig.root != nil)
+        ThisMacHost.resolve(controlPlaneHosts)
     }
 
     /// Whether this window may read `host`'s folders off this disk (058, R11).
@@ -518,11 +507,6 @@ final class AppModel {
         case .remote(let membership):
             return HostProblem.controlPlaneUnreachable(name: membership.name,
                                                        address: membership.url ?? membership.addresses.first ?? "no address")
-        #if !AGENTS_STORE
-        case .local(let root):
-            let name = controlPlaneName ?? Foundation.Host.current().localizedName ?? "this Mac"
-            return HostProblem.controlPlaneUnreachable(name: name, address: SharedFiles.tilde(root.path))
-        #endif
         case nil:
             return nil
         }
@@ -546,12 +530,9 @@ final class AppModel {
         return agents.first { $0.host == host && Project.standardize($0.projectFolder) == wanted }?.id
     }
 
-    /// The text of a file. This Mac's is read here; another host's is `files/read` (R11).
+    /// The text of a file, from its host: `files/read`, or `files/readText` with no agent (R11).
     func textFile(at url: URL, on host: HostID, agentID: UUID?) async -> String? {
-        if readsDisk(of: host) { return try? String(contentsOf: url, encoding: .utf8) }  // store-ok: readsDisk(of:) is false in the store window
-        #if AGENTS_STORE
         if agentID == nil { return await readText(url, on: host) }
-        #endif
         guard let agentID else { return nil }
         guard let reading = try? await serverFiles(host).read(agentID: agentID,
                                                               path: url.path(percentEncoded: false)) else { return nil }
@@ -559,12 +540,9 @@ final class AppModel {
         return nil
     }
 
-    /// Whether a path is there. This Mac's is asked of the disk. Another host's is
-    /// `files/browse`, and a host that cannot be asked is left as still there.
+    /// Whether a path is there: `files/browse` on its host, and a host that cannot be
+    /// asked is left as still there.
     func pathIsThere(_ url: URL, on host: HostID) async -> Bool {
-        if readsDisk(of: host) {
-            return FileManager.default.fileExists(atPath: url.path(percentEncoded: false))  // store-ok: readsDisk(of:) is false in the store window
-        }
         if controlPlaneAway || hosts.isOffline(host) { return true }
         do {
             _ = try await client(for: host).call(DaemonAPI.Method.filesBrowse,
@@ -684,51 +662,6 @@ final class AppModel {
     // MARK: Workflows
 
     func workflows(in folder: URL?) -> [WorkflowSummary] { work.workflows(in: folder) }
-
-    // MARK: Paired devices (021)
-
-    /// The paired devices, announced first. Read by the Devices pane. Refreshed on
-    /// connect and kept by `device/changed`.
-    private(set) var devices: [Device] = []
-
-    func refreshDevices() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.devicesList, Optional<String>.none,
-                                                  returning: [Device].self) else { return }
-        devices = listed
-    }
-
-    private func deviceChanged(_ change: DaemonAPI.DeviceNotification) {
-        devices.removeAll { $0.id == change.id }
-        guard change.removed != true, let device = change.device else { return }
-        devices.append(device)
-        devices.sort { $0.announcedAt < $1.announcedAt }
-    }
-
-    /// Settings ▸ Devices ▸ Pair a Device (security review, Phase 3): a code for the
-    /// phone to scan, good for five minutes or one device.
-    ///
-    /// A control plane answers with its own device code (058, `ControlCodeShown`); a Mac
-    /// of the first build, with its bridge code. The phone reads either from the QR.
-    func startPairing() async throws -> DaemonAPI.ControlCodeShown {
-        try DaemonAPI.ControlCodeShown(pairingReply: try await client.call(DaemonAPI.Method.devicesStartPairing,
-                                                                           Optional<String>.none))
-    }
-
-    /// The pairing sheet closed: the code it showed stops working at once.
-    func stopPairing() async {
-        _ = try? await client.call(DaemonAPI.Method.devicesStopPairing, Optional<String>.none)
-    }
-
-    /// Settings ▸ Devices ▸ Forget (046): the device stops reaching this Mac, at home
-    /// and away, until it is paired again with a new code.
-    func forgetDevice(_ id: UUID) async {
-        do {
-            try await client.call(DaemonAPI.Method.devicesForget, DaemonAPI.DeviceForget(id: id))
-            devices.removeAll { $0.id == id }
-        } catch {
-            problem = describe(error)
-        }
-    }
 
     func refreshWorkflows() async {
         do {
@@ -1250,24 +1183,6 @@ final class AppModel {
     /// Step two of the move: the window's own daemon quits, leaving its agents to be
     /// picked up by the host that replaces it, and the window does not start another.
     /// A turn in flight refuses the quit, and nothing has changed.
-    #if !AGENTS_STORE
-    func letTheOldDaemonGo() async throws {
-        holdingForMove = true
-        do {
-            _ = try await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: false))
-        } catch let error as JSONRPCError {
-            holdingForMove = false
-            throw MoveAcross.Failure("an agent is working. Let its turn finish, then try again. (\(error.message))")
-        }
-        await client.disconnect()
-        let lock = StoreLocations.default.lock
-        for _ in 0..<60 where FileManager.default.fileExists(atPath: lock.path) {
-            // The lock file stays; the lock is a flock held while the daemon lives.
-            guard DaemonLock(at: lock).map({ $0.release(); return true }) == nil else { return }
-            try? await Task.sleep(for: .milliseconds(250))
-        }
-    }
-    #endif
 
     /// The move stopped before the window adopted the control plane: back to the old way.
     func resumeTheOldWay() async {
@@ -1278,18 +1193,6 @@ final class AppModel {
 
     /// First run has a control plane (058): from here the window is its client, and
     /// this Mac's host is reached through it.
-    #if !AGENTS_STORE
-    func adoptControlPlane(root: URL) async {
-        ControlConfig.save(root)
-        holdingForMove = false
-        moved = true
-        for id in hosts.handOver() {
-            work.replaceProjects([], from: id)
-            work.replaceAgents([], from: id)
-        }
-        await adopt(.local(root))
-    }
-    #endif
 
     /// First run has paired with a control plane elsewhere (058, frame C).
     func adopt(_ endpoint: ControlConfig.Endpoint) async {
@@ -1386,11 +1289,6 @@ final class AppModel {
         }
 
         switch method {
-        case DaemonAPI.Notification.deviceChanged:
-            // The Mac's own, like the shells: a phone is never told about other phones.
-            guard let change = try? params?.decode(DaemonAPI.DeviceNotification.self) else { return }
-            deviceChanged(change)
-
         case DaemonAPI.Notification.shellOutput:
             // Read rather than decoded: this one arrives whenever a shell prints, and
             // the general path would re-encode every byte of it here on the main
@@ -1481,15 +1379,6 @@ final class AppModel {
                 return await model.answerCredentialWanted(wanted, on: id)
             }
         }
-        hosts.claudeWanted = { [weak self] id in
-            guard let self else { return false }
-            // This Mac's own Claude sign-in, relayed (056).
-            #if AGENTS_STORE
-            return false
-            #else
-            return SignInRelays.canRelay(RuntimeCatalog.claude.id) && !(self.hosts.host(id)?.ownSignInOnly ?? false)
-            #endif
-        }
         hosts.toolsetWanted = { [weak self] id, runtimeID in
             guard let self else { return false }
             // One that works with no sign-in goes wherever this Mac has it (049: OpenCode's free
@@ -1497,11 +1386,7 @@ final class AppModel {
             if RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn != nil { return self.hasOnThisMac(runtimeID) }
             guard !(self.hosts.host(id)?.ownSignInOnly ?? false) else { return false }
             // A key in Settings, or this Mac's own sign-in relayed (047).
-            #if AGENTS_STORE
             return self.credentials.record(runtimeID) != nil
-            #else
-            return self.credentials.record(runtimeID) != nil || SignInRelays.canRelay(runtimeID)
-            #endif
         }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)
@@ -1735,7 +1620,6 @@ final class AppModel {
         async let runtimes: Void = refreshRuntimes()
         async let accounts: Void = refreshAccounts()
         async let workflows: Void = refreshWorkflows()
-        async let devices: Void = refreshDevices()
         async let permissions: Void = refreshPermissions()
         async let elicitations: Void = refreshElicitations()
         async let attention: Void = refreshAttention()
@@ -1751,7 +1635,7 @@ final class AppModel {
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
-        _ = await (runtimes, accounts, workflows, devices, permissions,
+        _ = await (runtimes, accounts, workflows, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox)
         #if DEBUG
@@ -2966,10 +2850,6 @@ final class AppModel {
         }
         if let error = error as? DaemonClient.ConnectError {
             switch error {
-            case .noHelper(let lookedIn):
-                return "The helper that runs the agents is missing. Looked in \(lookedIn.joined(separator: ", "))."
-            case .couldNotStartHelper(let reason):
-                return "The helper would not start: \(reason)"
             case .couldNotConnect:
                 return "Could not reach the helper that runs the agents."
             case .socketPathTooLong(let path):

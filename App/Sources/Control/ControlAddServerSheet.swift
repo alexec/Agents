@@ -1,6 +1,3 @@
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AgentsKitCore
 import AppKit
 import SwiftUI

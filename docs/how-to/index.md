@@ -73,8 +73,6 @@ something particular done.
 ### Servers
 
 - [Add a server](add-a-server.md): make a Linux server a host of your control plane.
-- [Add a Linux server](add-a-linux-server.md): the earlier app's way, over ssh from the
-  Mac.
 
 ### Automation
 

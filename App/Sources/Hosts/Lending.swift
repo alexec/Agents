@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import Foundation
 
 /// A server asked for a credential this window has none of (043, FR-015): asked of the
@@ -70,26 +67,9 @@ extension AppModel {
     func credentialOffer(_ id: HostID) -> DaemonAPI.CredentialsOffer {
         let ownOnly = hosts.host(id)?.ownSignInOnly ?? false
         let runtimes = ownOnly ? [] : ServerCredentials.runtimes.filter { credentials.record($0) != nil }
-        // What this Mac would relay and cannot now, so the server can say why (056).
-        var notRelayed: [String: DaemonAPI.SignInWanted.Reason] = [:]
-        #if !AGENTS_STORE
-        // The store window relays no sign-in: Agents Host does, on its Mac (T091).
-        if !ownOnly {
-            for runtimeID in SignInRelays.relayed {
-                if let why = SignInRelays.whyNotRelayed(runtimeID) { notRelayed[runtimeID] = why }
-            }
-        }
-        // This Mac's sign-in files a server run can borrow (049: OpenCode's), named only
-        // when there is something in them to lend. Read again when a start asks.
-        let signIns = ownOnly ? [] : ServerBinaries.serverRuntimes.filter {
-            MacFileSignIn(runtimeID: $0)?.read().lendable != nil
-        }
-        #else
-        let signIns: [String] = []
-        #endif
-        return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly,
-                                          notRelayed: notRelayed.isEmpty ? nil : notRelayed,
-                                          signIns: signIns.isEmpty ? nil : signIns)
+        // The window relays no sign-in and lends no sign-in file: Agents Host does, on its
+        // Mac (T091).
+        return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly, notRelayed: nil, signIns: nil)
     }
 
     /// A server's daemon wants a credential to start a runtime (043, R6). Lends the one in
@@ -99,13 +79,6 @@ extension AppModel {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false) else { return false }
         // A sign-in this Mac relays, to a server of the control plane (T091).
         if let relayed = await relaySignInThroughControl(wanted, to: id) { return relayed }
-        #if !AGENTS_STORE
-        // This Mac's sign-in file (049): read now, so a provider signed in to since the
-        // server connected is lent too. With nothing in it the start goes on without.
-        if let file = MacFileSignIn(runtimeID: wanted.runtime) {
-            return await hosts.lendSignIn(id, runtime: wanted.runtime, file.read().lendable)
-        }
-        #endif
         if credentials.secretToLend(wanted.runtime) == nil {
             let saved = await withCheckedContinuation { answer in
                 tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: hosts.label(id), answer: answer)
@@ -118,13 +91,7 @@ extension AppModel {
         if let lent = await lendThroughControl(id, runtime: wanted.runtime, secret: secret, offered: wanted.offered) {
             return lent
         }
-        #if AGENTS_STORE
         return false
-        #else
-        // The offer made on connect did not name a runtime there was no credential for.
-        if !wanted.offered { await hosts.offerCredentials(id) }
-        return await hosts.lend(id, runtime: wanted.runtime, secret)
-        #endif
     }
 
     /// What this Mac's own agents are lent (046, D3): Gemini's key, which is the only way

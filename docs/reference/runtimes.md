@@ -43,7 +43,7 @@ In every column:
   server itself. Claude and Codex sign in there through this Mac's own sign-ins, Gemini with
   the key in Settings, and OpenCode borrows the provider keys it is signed in with on this Mac,
   for each run. See
-  [Add a Linux server](../how-to/add-a-linux-server.md).
+  [Add a server](../how-to/add-a-server.md).
 
 ## What the app shows from a runtime
 

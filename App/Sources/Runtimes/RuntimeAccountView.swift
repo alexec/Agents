@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// Whether a runtime can be used, and what to do when it cannot.
@@ -37,23 +34,8 @@ struct RuntimeAccountView: View {
     /// What servers borrow of this Mac's sign-in, and what stays here and why (049 D7), for a
     /// runtime whose server runs borrow it. Nil with no servers.
     private var serversNote: String? {
-        #if AGENTS_STORE
         // The store window reads no sign-in of this Mac's; Agents Host lends them (058).
         return nil
-        #else
-        guard !model.hosts.isEmpty, let reading = MacFileSignIn(runtimeID: runtimeID)?.read() else { return nil }
-        if reading.unreadable { return "Servers can’t borrow this Mac’s \(name) sign-in: Agents couldn’t read it." }
-        var said: [String] = []
-        if !reading.lent.isEmpty {
-            said.append("Servers borrow this Mac’s \(Self.names(reading.lent)) \(reading.lent.count == 1 ? "key" : "keys") for each run, and keep nothing.")
-        } else {
-            said.append("Servers use \(name)’s free models until this Mac signs in to a provider with a key.")
-        }
-        if !reading.kept.isEmpty {
-            said.append("\(Self.names(reading.kept)) \(reading.kept.count == 1 ? "stays" : "stay") on this Mac: a browser sign-in renews itself, and a server renewing it would leave this Mac’s copy stale.")
-        }
-        return said.joined(separator: " ")
-        #endif
     }
 
     private static func names(_ providers: [String]) -> String {

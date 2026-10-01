@@ -1,16 +1,11 @@
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AgentsKitCore
 import SwiftUI
 
 // MARK: - F · Clients
 
 struct ControlClientsPage: View {
-    @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
     @State private var forgettingClient: ClientRecord?
-    @State private var forgettingDevice: Device?
     @State private var pairingDevice = false
     @State private var pairingMac = false
 
@@ -21,19 +16,6 @@ struct ControlClientsPage: View {
                     if index > 0 { Divider() }
                     clientRow(client)
                 }
-                // Phones paired today still reach this Mac's host straight through the
-                // bridge; they move onto the control plane with US4, and get a grant then.
-                // Only those the control plane has not met yet: one that has connected
-                // since is its client, listed above with a grant of its own.
-                ForEach(model.devices.filter { device in !control.clients.contains { $0.id == device.id } }) { device in
-                    Divider()
-                    ControlRow(dot: .none, title: device.name, detail: deviceLine(device)) {
-                        HStack(spacing: 8) {
-                            grantPicker(.device) { _ in }.disabled(true)
-                            Button("Forget…") { forgettingDevice = device }.buttonStyle(.paper)
-                        }
-                    }
-                }
             }
             HStack(spacing: 8) {
                 Button("Pair a Device…") { pairingDevice = true }.buttonStyle(.paper)
@@ -43,8 +25,7 @@ struct ControlClientsPage: View {
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .task { await model.refreshDevices() }
-        .sheet(isPresented: $pairingDevice) { PairDeviceSheet() }
+        .sheet(isPresented: $pairingDevice) { PairDeviceSheet(control: control) }
         .sheet(isPresented: $pairingMac) { CodeSheet(control: control, purpose: .mac).paperSheet() }
         .confirmationDialog(forgettingClient.map { "Forget \($0.name)?" } ?? "",
                             isPresented: Binding(get: { forgettingClient != nil }, set: { if !$0 { forgettingClient = nil } }),
@@ -53,14 +34,6 @@ struct ControlClientsPage: View {
             Button("Cancel", role: .cancel) {}
         } message: { _ in
             Text("It is cut off at once, at home and away, until it is paired again.")
-        }
-        .confirmationDialog(forgettingDevice.map { "Forget \($0.name)?" } ?? "",
-                            isPresented: Binding(get: { forgettingDevice != nil }, set: { if !$0 { forgettingDevice = nil } }),
-                            titleVisibility: .visible, presenting: forgettingDevice) { device in
-            Button("Forget", role: .destructive) { Task { await model.forgetDevice(device.id) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("It stops reaching this Mac, at home and away, until you pair it again.")
         }
     }
 
@@ -118,11 +91,5 @@ struct ControlClientsPage: View {
             "paired \(client.paired.formatted(.relative(presentation: .named)))"
         }
         return ("\(kind) · \(how)", Text("\(kind) · \(how)"))
-    }
-
-    private func deviceLine(_ device: Device) -> String {
-        var parts = [device.kind == .iPad ? "iPad" : "iPhone", "paired to this Mac’s agents"]
-        if let seen = device.lastSeenAt { parts.append("seen \(seen.formatted(.relative(presentation: .named)))") }
-        return parts.joined(separator: " · ")
     }
 }

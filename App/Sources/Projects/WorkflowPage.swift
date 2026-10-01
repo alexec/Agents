@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// One workflow, opened up.
@@ -560,17 +557,9 @@ struct WorkflowPage: View {
         WorkflowPaths.url(for: workflow.workflowID, in: workflow.folder)
     }
 
-    /// This Mac's file is read here. Another host's is `files/read`, scoped to an agent
-    /// in that project (058, R11). With no such agent there is nothing to scope it to.
+    /// The file as its host reads it (058, R11), this Mac's included.
     private func readRaw(_ workflow: Workflow) async -> String? {
-        let file = url(workflow)
-        let host = model.selectedProjectHost
-        if model.readsDisk(of: host) { return try? String(contentsOf: file, encoding: .utf8) }  // store-ok: readsDisk(of:) is false in the store window
-        #if AGENTS_STORE
-        return await model.readText(file, on: host)
-        #else
-        return await model.textFile(at: file, on: host, agentID: model.anAgent(in: workflow.folder, on: host))
-        #endif
+        await model.readText(url(workflow), on: model.selectedProjectHost)
     }
 
     /// When it next runs and what happened last, as one sentence. The row's third line,

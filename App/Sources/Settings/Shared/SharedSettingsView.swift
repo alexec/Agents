@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AppKit
 import SwiftUI
 
@@ -125,19 +122,11 @@ enum SharedFiles {
     @MainActor static var onThisMacsHost: ((URL, _ reveal: Bool) -> Void)?
 
     @MainActor static func reveal(_ path: String) {
-        #if AGENTS_STORE
         onThisMacsHost?(URL(filePath: path), true)
-        #else
-        NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: path)])
-        #endif
     }
 
     @MainActor static func open(_ path: String) {
-        #if AGENTS_STORE
         onThisMacsHost?(URL(filePath: path), false)
-        #else
-        NSWorkspace.shared.open(URL(filePath: path))
-        #endif
     }
 
     static func tilde(_ path: String) -> String {

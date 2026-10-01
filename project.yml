@@ -58,98 +58,10 @@ packages:
     url: https://github.com/apple/swift-nio-ssl.git
     from: 2.29.0
 targets:
-  Agents:
-    type: application
-    supportedDestinations: [macOS]
-    sources:
-      - path: App/Sources
-      - path: App/Resources
-        excludes:
-          - servers
-          - toolsets
-      # The Linux agentsd a server is given (037), built by
-      # scripts/build-linux-agentsd.sh. A folder, so it lands as Resources/servers/ and
-      # not loose; optional, because it is a build output and not in git.
-      - path: App/Resources/servers
-        type: folder
-        optional: true
-      # What this Mac (048) and a server (043) download to run a runtime the app installs:
-      # Node's checksums and the package's npm lock, one folder per runtime, pinned by
-      # scripts/update-toolset.sh. A folder, so the files keep their names under
-      # Resources/toolsets/<runtime>/.
-      - path: App/Resources/toolsets
-        type: folder
-      # Compiled into the Remote as well. The two apps shared no view code before
-      # this, which is how they came to draw the same state in three colours and the
-      # same block kind at two sizes; the definitions both must agree on live here.
-      - path: Shared/UI
-      # Listed, not owned. An `entitlements:` key here would make XcodeGen the author
-      # of the file and rewrite it from this one on every generate — and with nothing
-      # under the key to write, what it writes is an empty plist. The project is not in
-      # git and `xcodegen generate` is the first thing a fresh clone runs, so the day
-      # the app needed a capability was the day that silently took it away again.
-      # `CODE_SIGN_ENTITLEMENTS` below is what actually signs it in.
-      - path: App/Agents.entitlements
-        buildPhase: none
-      # The two launch agents Run one on this Mac registers (058, R5). SMAppService
-      # reads them from here and nowhere else.
-      - path: App/LaunchAgents
-        buildPhase:
-          copyFiles:
-            destination: wrapper
-            subpath: Contents/Library/LaunchAgents
-    dependencies:
-      - package: AgentsKit
-      - package: SwiftTerm
-      - package: CodeText
-      # The helper goes in the bundle, so there is one thing to build, one thing to
-      # sign, and nothing for anyone to install.
-      - target: agentsd
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
-      # The control plane (058), in the bundle for the same reason: Run one on this Mac
-      # has nothing to download.
-      - target: agents-bridge
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
-    info:
-      path: App/Info.plist
-      properties:
-        CFBundleDisplayName: Agents
-        CFBundleName: Agents
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        LSApplicationCategoryType: public.app-category.developer-tools
-        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        NSHumanReadableCopyright: © 2026 Alex Collins
-        # Shown in the system's own alert, so written for the person reading it at
-        # that moment. Both are asked for the first time dictation is used, never at
-        # launch.
-        NSMicrophoneUsageDescription: >-
-          So you can say what you want done instead of typing it.
-        NSSpeechRecognitionUsageDescription: >-
-          So what you say becomes the words in the prompt. It is recognised on this Mac
-          where this Mac can do it.
-        ITSAppUsesNonExemptEncryption: false
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents
-        CODE_SIGN_ENTITLEMENTS: App/Agents.entitlements
-        PRODUCT_NAME: Agents
-        SDKROOT: macosx
-        SUPPORTED_PLATFORMS: macosx
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        ENABLE_PREVIEWS: YES
-        GENERATE_INFOPLIST_FILE: NO
-        ENABLE_HARDENED_RUNTIME: YES
-  # The App Store window (058, research R12): the same sources as Agents, built with
-  # AGENTS_STORE, sandboxed, and linking AgentsKitCore only, as the Remote does. It
-  # carries no helpers, no Linux programs and no install scripts: Agents Host runs the
-  # agents, and the window reaches them through the control plane. Its own bundle id
-  # while the developer window exists, so a walk never shares the real app's defaults.
+  # The Mac window (058, research R12): the App Store app, sandboxed, and linking
+  # AgentsKitCore only, as the Remote does. It carries no helpers, no Linux programs and
+  # no install scripts: Agents Host runs the agents, and the window reaches them through
+  # the control plane. The developer window it was built beside went in T106.
   AgentsStore:
     type: application
     supportedDestinations: [macOS]
@@ -161,23 +73,20 @@ targets:
         basedOnDependencyAnalysis: false
     sources:
       - path: App/Sources
-        excludes:
-          # The window's own hosts, ssh and launch agents: the control plane's and
-          # Agents Host's now (T049b, T049c).
-          - Hosts/HostSet.swift
-          - Hosts/AddServerFlow.swift
-          - Hosts/AddServerSheet.swift
-          - Hosts/RebuiltServerSheet.swift
-          - Hosts/SignInRelays.swift
-          - Hosts/WindowFiles.swift
-          - Control/LocalServices.swift
-          - Control/MoveAcross.swift
-          - Settings/ServersSettingsView.swift
       - path: App/Resources
         excludes:
           - servers
           - toolsets
+      # Compiled into the Remote as well. The two apps shared no view code before
+      # this, which is how they came to draw the same state in three colours and the
+      # same block kind at two sizes; the definitions both must agree on live here.
       - path: Shared/UI
+      # Listed, not owned. An `entitlements:` key here would make XcodeGen the author
+      # of the file and rewrite it from this one on every generate — and with nothing
+      # under the key to write, what it writes is an empty plist. The project is not in
+      # git and `xcodegen generate` is the first thing a fresh clone runs, so the day
+      # the app needed a capability was the day that silently took it away again.
+      # `CODE_SIGN_ENTITLEMENTS` below is what actually signs it in.
       - path: App/Agents-Store.entitlements
         buildPhase: none
     dependencies:
@@ -218,11 +127,8 @@ targets:
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) AGENTS_STORE"
         # The gate reads the sources, which a sandboxed script phase may not.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
-        # While US1 is under way: see every error, not the first file's (S5).
-        OTHER_SWIFT_FLAGS: "$(inherited) -Xfrontend -continue-building-after-errors"
       # The App Store archive (058, T089, T093): Apple Distribution and the App Store profile
       # made for it, so the archive carries the entitlements an upload is checked against.
       configs:
@@ -239,9 +145,9 @@ targets:
     sources:
       - path: Remote/Sources
       - path: Remote/Resources
-      # The same files the Mac compiles. See the note on the Agents target.
+      # The same files the Mac compiles. See the note on the AgentsStore target.
       - path: Shared/UI
-      # Listed, not owned. See the note on the Agents target's entitlements.
+      # Listed, not owned. See the note on the AgentsStore target's entitlements.
       - path: Remote/Remote.entitlements
         buildPhase: none
     dependencies:
@@ -386,7 +292,7 @@ targets:
       - path: Shared/UI/Paper.swift
       - path: Shared/UI/StateTint.swift
       - path: Shared/UI/TypeScale.swift
-      # Listed, not owned. See the note on the Agents target's entitlements.
+      # Listed, not owned. See the note on the AgentsStore target's entitlements.
       - path: RemoteWidget/RemoteWidget.entitlements
         buildPhase: none
     dependencies:
@@ -420,56 +326,16 @@ targets:
         # cannot be written into this target by accident.
         APPLICATION_EXTENSION_API_ONLY: YES
 
-  # The Mac end of the direct connection: a door onto the daemon for a device on the
-  # same network. Started by hand — it has no pairing and no encryption yet.
-  # The bridge is an *app-like bundle*, not a tool, and that is 021's T056 (005's T002):
-  # only a bundle with an embedded provisioning profile can hold the iCloud
-  # entitlement, and the daemon must not — `agentsd` gains no network code. The
-  # bundle has no principal class, storyboard or delegate; `main.swift` is the whole
-  # program, exactly as it was when this was a `tool`. Per Apple DTS.
-  agents-bridge:
-    type: application
-    supportedDestinations: [macOS]
-    sources:
-      - path: Bridge/Sources
-      # Listed, not owned, for the reason given on the Agents target's entitlements.
-      - path: Bridge/agents-bridge.entitlements
-        buildPhase: none
-    dependencies:
-      - package: AgentsKit
-    info:
-      path: Bridge/Info.plist
-      properties:
-        CFBundleName: agents-bridge
-        CFBundleDisplayName: Agents Bridge
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        # No Dock tile and no menu bar: nothing here is a window.
-        LSUIElement: true
-        LSBackgroundOnly: true
-        ITSAppUsesNonExemptEncryption: false
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.bridge
-        PRODUCT_NAME: agents-bridge
-        CODE_SIGN_ENTITLEMENTS: Bridge/agents-bridge.entitlements
-        GENERATE_INFOPLIST_FILE: NO
-        ENABLE_HARDENED_RUNTIME: YES
-        SDKROOT: macosx
-        SUPPORTED_PLATFORMS: macosx
-        SKIP_INSTALL: YES
-
   # agents-relay (058, T096): the bridge's relay and mailbox, cut down to a helper of
   # Agents Host that carries devices to the control plane through iCloud. Signed as the
-  # bridge, with its iCloud container (Alex's choice: nothing new in the developer
-  # account), so it must not run beside the old bridge's mailbox on one Mac.
+  # bridge was, with its iCloud container (Alex's choice: nothing new in the developer
+  # account).
   agents-relay:
     type: application
     supportedDestinations: [macOS]
     sources:
       - path: Host/Relay/Sources
-      - path: Bridge/agents-bridge.entitlements
+      - path: Host/Relay/agents-relay.entitlements
         buildPhase: none
     dependencies:
       - package: AgentsKit
@@ -488,7 +354,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.bridge
         PRODUCT_NAME: agents-relay
-        CODE_SIGN_ENTITLEMENTS: Bridge/agents-bridge.entitlements
+        CODE_SIGN_ENTITLEMENTS: Host/Relay/agents-relay.entitlements
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
         SDKROOT: macosx
@@ -515,8 +381,8 @@ targets:
           copyFiles:
             destination: wrapper
             subpath: Contents/Library/LaunchAgents
-      # What this Mac's host gives a server and downloads for a runtime (037, 048), as
-      # the Agents target carries them until the developer window goes (T106).
+      # What this Mac's host gives a server and downloads for a runtime (037, 048):
+      # scripts/build-linux-agentsd.sh and scripts/update-toolset.sh write them here.
       - path: App/Resources/servers
         type: folder
         optional: true
@@ -621,12 +487,6 @@ schemes:
     # The Mac App Store archive (058, T089), checked by scripts/check-store-archive.sh.
     archive:
       config: Release
-  agents-bridge:
-    build:
-      targets:
-        agents-bridge: all
-    run:
-      config: Debug
   agents-relay:
     build:
       targets:
@@ -649,14 +509,3 @@ schemes:
         RemoteWidget: all
     run:
       config: Debug
-  Agents:
-    build:
-      targets:
-        Agents: all
-    run:
-      config: Debug
-    test:
-      config: Debug
-      targets:
-        # These also run with plain `swift test` from Packages/AgentsKit.
-        - package: AgentsKit/AgentsKitTests

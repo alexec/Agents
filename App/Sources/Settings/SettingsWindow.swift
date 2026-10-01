@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AppKit
 import SwiftUI
 
@@ -107,12 +104,6 @@ struct SettingsWindow: View {
         case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
-        case .devices: FormColumn { DevicesPane() }
-        #if AGENTS_STORE
-        case .servers: EmptyView()
-        #else
-        case .servers: FormColumn { ServersSettingsView() }
-        #endif
         case .controlPlane:
             if let control { ControlSettingsView(control: control, page: $controlPage) }
         }
@@ -124,7 +115,7 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: String, Hashable, CaseIterable {
-    case general, runtimes, shared, spending, devices, servers, controlPlane
+    case general, runtimes, shared, spending, controlPlane
 
     var title: String {
         switch self {
@@ -132,8 +123,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
-        case .devices: "Devices"
-        case .servers: "Servers"
         case .controlPlane: "Control plane"
         }
     }
@@ -144,20 +133,15 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
-        case .devices: "iphone"
-        case .servers: "server.rack"
         case .controlPlane: "point.3.connected.trianglepath.dotted"
         }
     }
 
     /// General on its own; the panes about agents; Shared, drawn as a heading over its
-    /// pages; the ways in from elsewhere.
-    ///
-    /// With a control plane, Devices and Servers fold into its one group (058, frame D):
-    /// its hosts are the servers and its clients the devices.
+    /// pages; the control plane, whose hosts are the servers and whose clients are the
+    /// devices (058, frame D).
     static var groups: [[SettingsPane]] {
-        let ways: [SettingsPane] = ControlConfig.endpoint == nil ? [.devices, .servers] : [.controlPlane]
-        return [[.general], [.runtimes, .spending], [.shared], ways]
+        [[.general], [.runtimes, .spending], [.shared], [.controlPlane]]
     }
 }
 
@@ -211,7 +195,6 @@ private final class SettingsGrowView: NSView {
         }
     }
 }
-
 
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
 /// picker keeps it beside its label in a window sized for Shared's list and detail.

@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AppKit
 import SwiftUI
 
@@ -75,12 +72,6 @@ struct ContentView: View {
                 Text("Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Control plane ▸ Hosts.")
             }
             // A known server with a new key: rebuilt, or not what it says (043).
-            #if !AGENTS_STORE
-            .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
-                                 set: { model.hosts.rebuiltAsk = $0 })) { host in
-                RebuiltServerSheet(host: host).paperSheet()
-            }
-            #endif
             // Agents missing at start-up, offered once each (048). Closed any way at
             // all, what was missing counts as offered.
             .sheet(isPresented: $model.isOfferingInstall,
@@ -135,9 +126,6 @@ struct ContentView: View {
         // (058, frame I). Above the columns, not an inset: a split view's columns run
         // under an inset and hide their first rows behind it.
         VStack(spacing: 0) {
-        #if !AGENTS_STORE
-        if model.offersMoveAcross { MoveAcrossStrip(offering: $offeringMove) }
-        #endif
         if model.controlPlaneAway { ControlAwayStrip() }
         Group {
             if model.needsFirstRun {
@@ -169,14 +157,10 @@ struct ContentView: View {
             }
         }
         }
-        #if !AGENTS_STORE
-        .sheet(isPresented: $offeringMove) { MoveAcrossSheet().paperSheet() }
-        #endif
         .environment(frame)
         .environment(requests)
         .environment(sidebarStates)
         .environment(webHolders)
-        #if AGENTS_STORE
         // A file a chat links to is on its host: that host opens it (058, US1). Links to
         // the web are the window's own.
         .environment(\.openURL, OpenURLAction { url in
@@ -184,7 +168,6 @@ struct ContentView: View {
             model.open(url, on: model.selectedProjectHost)
             return .handled
         })
-        #endif
         .task { await model.stayConnected() }
         // No tabs: the only way left to a second window, and a second window would be a
         // mirror of the first, because what is selected lives on the one model.
