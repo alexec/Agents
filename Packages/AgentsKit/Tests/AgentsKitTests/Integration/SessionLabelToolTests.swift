@@ -19,7 +19,7 @@ struct SessionLabelToolTests {
                                  finishTurn: { _, _, _, _, words in
                                      await calls.record(words)
                                      return .shown("Recorded")
-                                 }, sink: { _ in .refused("not expected") },
+                                 },
                                  agents: { call in
                                      await calls.record(call)
                                      return .shown("Started")
