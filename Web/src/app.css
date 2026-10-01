@@ -1,3 +1,17 @@
-/* The web remote's styles. The Paper palette arrives in T026 (theme/paper.css). */
-:root { color-scheme: light dark; font-family: system-ui, -apple-system, sans-serif; }
-body { margin: 0; }
+/* The web remote's styles: the Paper palette, then the page. */
+@import "./theme/paper.css";
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper-ground);
+  color: var(--paper-ink);
+  font-family: var(--font-text);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--paper-selection);
+}

@@ -1,11 +1,9 @@
 // The wire's dates count from 2001, as Swift's do (contracts/generated-types.md).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
+import { load } from "./load.mjs";
 
-const { outputFiles } = await build({ entryPoints: ["src/protocol/dates.ts"], bundle: true, format: "esm", write: false,
-  absWorkingDir: new URL("..", import.meta.url).pathname });
-const { fromWireDate, toWireDate } = await import("data:text/javascript," + encodeURIComponent(outputFiles[0].text));
+const { fromWireDate, toWireDate } = await load("src/protocol/dates.ts");
 
 test("zero is 2001-01-01, and a date round-trips", () => {
   assert.equal(fromWireDate(0).toISOString(), "2001-01-01T00:00:00.000Z");

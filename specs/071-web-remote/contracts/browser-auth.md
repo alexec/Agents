@@ -23,9 +23,9 @@ The code text is unchanged:
 // server
 {"ok":{"mac":"<HMAC(codeKey(secret), "s"|T)>","grant":"device"}}     // browser verifies, else stops
 // browser: make the key, store it, read it back, check extractable === false
-{"m":{"jsonrpc":"2.0","id":1,"method":"clients/announce","params":{"id":"<uuid>","publicKey":"<b64 X9.63>","name":"Safari","kind":"browser"}}}
-// server
-{"m":{"jsonrpc":"2.0","id":1,"result":{"client":{…ClientRecord, "name":"Safari on Alex's MacBook","kind":"browser"…},"controlKey":"…","grant":"device"}}}
+{"jsonrpc":"2.0","id":1,"method":"clients/announce","params":{"id":"<UUID>","publicKey":"<base64 X9.63>","name":"Safari","kind":"browser"}}
+// server: a bare JSON-RPC line on a code's socket, not wrapped in {"m": …} (ControlService.announce)
+{"jsonrpc":"2.0","id":1,"result":{"client":"<UUID>","grant":"device"}}
 // server closes; the browser reconnects as c:<uuid>
 ```
 
@@ -78,7 +78,7 @@ As built in T012:
 |---|---|
 | code `4403`, reason `forgotten` | Forgotten. Delete the key, tell other tabs, show **This browser was forgotten**. |
 | `refused: forgotten` or `refused: unknown` on `c:` | The same. |
-| Any other close, error or ping timeout | Down. Grey out, keep the draft, reconnect with backoff (1, 2, 4, 8, then 10 s at most, plus jitter up to 20%; SC-009 needs at most 5 s once the server is back, so the cap is 10 s and a `visibilitychange` to visible retries at once). |
+| Any other close, error, or no answer to the `control/status` sent every 5 s within 3 s | Down. Grey out, keep the draft, reconnect with backoff (1, 2, 4, 8, then 10 s at most, plus jitter up to 20%; SC-009 needs at most 5 s once the server is back, so the cap is 10 s and a `visibilitychange` to visible retries at once). |
 
 The control plane sends `4403` to every session of a client when `clients/forget` or
 `clients/forgetSelf` forgets it, on any copy (058's broadcast `clientForgotten`). This is new

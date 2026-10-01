@@ -146,7 +146,7 @@ wire client. Every story needs them.
 
 ### The web app's wire client
 
-- [ ] T022 [P] Write `Web/src/wire/keys.ts`, as research R4 and data-model.md:
+- [x] T022 (plus `wire/bytes.ts` and `wire/code.ts`; the BroadcastChannel between tabs moves to T031, where the page uses it) [P] Write `Web/src/wire/keys.ts`, as research R4 and data-model.md:
   - `storage.persist()`, then `generateKey` (non-extractable);
   - the client id made with `crypto.randomUUID().toUpperCase()` (spike S1);
   - IndexedDB `agents`/`key`/`self`;
@@ -156,8 +156,8 @@ wire client. Every story needs them.
   - a `BroadcastChannel("agents")` carrying `paired` and `forgotten`.
 
   Unit-test the crypto in `Web/test/keys.test.mjs` with Node's WebCrypto. IndexedDB is covered by the walks.
-- [ ] T023 [P] Write `Web/src/wire/auth.ts`: both exchanges in contracts/browser-auth.md, the `hello.control` checks, the refusal words and the code parser. Test in `Web/test/auth.test.mjs` against `Web/test/vectors.json`, and against a fake server in the test, for each refusal, a wrong control key and an unparseable code.
-- [ ] T024 Write `Web/src/wire/link.ts`:
+- [x] T023 (8 tests; the browser's code and key proofs match Swift's bytes; `clients/announce` is a bare JSON-RPC line, contract corrected) [P] Write `Web/src/wire/auth.ts`: both exchanges in contracts/browser-auth.md, the `hello.control` checks, the refusal words and the code parser. Test in `Web/test/auth.test.mjs` against `Web/test/vectors.json`, and against a fake server in the test, for each refusal, a wrong control key and an unparseable code.
+- [x] T024 (9 tests; the heartbeat is `control/status`, since a control plane passes `daemon/ping` to its home host; `surface/identify` per host moves to the page, T036) Write `Web/src/wire/link.ts`:
   - one socket per tab to `ws://<location.host>/v1/connect`;
   - auth, then `{h, m}` lines with the page's own request ids;
   - notifications dispatched by method;
@@ -168,8 +168,8 @@ wire client. Every story needs them.
   - `surface/identify` on open.
 
   Test in `Web/test/link.test.mjs` with a fake server.
-- [ ] T025 [P] Write `Web/src/log.ts`, the only console writer: a fixed event name and an error code. Add `Web/test/secrets.test.mjs`, which runs pairing and a prompt through `link.ts` against the fake server with `console` spied, and fails if any argument holds the code, key bytes or message text (SC-008, FR-033).
-- [ ] T026 [P] Write `Web/src/theme/paper.css`: the Paper palette and corner radii from `Shared/UI/Paper.swift`, and the state tints from `Shared/UI/StateTint.swift`, as CSS variables under `prefers-color-scheme` light and dark (FR-020). No web fonts: the system font stack.
+- [x] T025 [P] Write `Web/src/log.ts`, the only console writer: a fixed event name and an error code. Add `Web/test/secrets.test.mjs`, which runs pairing and a prompt through `link.ts` against the fake server with `console` spied, and fails if any argument holds the code, key bytes or message text (SC-008, FR-033).
+- [x] T026 [P] Write `Web/src/theme/paper.css`: the Paper palette and corner radii from `Shared/UI/Paper.swift`, and the state tints from `Shared/UI/StateTint.swift`, as CSS variables under `prefers-color-scheme` light and dark (FR-020). No web fonts: the system font stack.
 - [ ] T027 Walk tooling. Write `Web/test/walk/cdp.mjs`, a dependency-free CDP client on Node's built-in `WebSocket`, to:
   - launch and quit headless Chrome on a profile;
   - open a URL and set the viewport;

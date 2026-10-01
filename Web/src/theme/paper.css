@@ -1,0 +1,56 @@
+/* The Paper palette (071 FR-020): the Mac window's own, from Shared/UI/Paper.swift and
+   Shared/UI/StateTint.swift. Light and dark follow the system, as the window does. Keep the
+   values in step with those files; nothing else in the web remote names a colour. */
+
+:root {
+  color-scheme: light dark;
+
+  /* The page every column sits on. */
+  --paper-ground: #fbf9f4;
+  /* The projects column, one shade deeper. */
+  --paper-sidebar: #f3f0e8;
+  /* What floats: the prompt bar, cards, menus. */
+  --paper-raised: #ffffff;
+  /* What is set into the page: code, your own message. */
+  --paper-well: #f1ede4;
+  /* A row under the pointer, a picked item. */
+  --paper-wash: #ece7db;
+  /* Hairlines between rows, and round raised things. */
+  --paper-rule: #e2dccf;
+  /* Text, and the prominent button's fill. */
+  --paper-ink: #1f1d1a;
+  --paper-selection: #e4dcc8;
+  /* Soft and short: paper lifted a little off the desk. */
+  --paper-shadow: rgb(59 47 30 / 10%);
+
+  /* The three tints, and only Needs you is drawn in colour in a list (FR-018). */
+  --tint-attention: #c2410c;
+  --tint-failure: #b42318;
+  --tint-vouched: #3b7a4a;
+
+  --radius-control: 7px;
+  --radius-card: 10px;
+  --radius-floating: 16px;
+
+  /* The system's own fonts; nothing is loaded from anywhere (FR-034). */
+  --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper-ground: #1c1b19;
+    --paper-sidebar: #161513;
+    --paper-raised: #262421;
+    --paper-well: #2a2825;
+    --paper-wash: #2f2c28;
+    --paper-rule: #3a3733;
+    --paper-ink: #ece7dc;
+    --paper-selection: #3a3630;
+    --paper-shadow: rgb(0 0 0 / 10%);
+
+    --tint-attention: #f08a4b;
+    --tint-failure: #f07b6e;
+    --tint-vouched: #7fbf8e;
+  }
+}

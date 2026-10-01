@@ -1,0 +1,318 @@
+// The browser's one socket to the control plane (071 contracts/browser-auth.md, research R4/R5).
+// One per tab: it proves the key, then carries 058's client lines, {"h", "m"} both ways, with
+// the page's own request ids. It reconnects by itself with backoff, and notices a hung socket
+// with a `control/status` every few seconds.
+import { log } from "../log";
+import type { Method, Params, Result } from "../protocol/methods";
+import { targetOf } from "../protocol/methods";
+import { type Admitted, connect, type LineSocket, Refused, WrongControlPlane } from "./auth";
+import { type KeyRecord, type KeyStore, UnsupportedBrowser } from "./keys";
+
+export type LinkState =
+  | { kind: "connecting" }
+  | { kind: "open"; grant: "operator" | "device"; name: string }
+  | { kind: "down"; since: number }
+  | { kind: "unpaired" }
+  | { kind: "forgotten" }
+  | { kind: "wrongControlPlane" }
+  | { kind: "unsupported" };
+
+/** A JSON-RPC error from a host or the control plane. */
+export class CallFailed extends Error {
+  constructor(readonly code: number, message: string) {
+    super(message);
+  }
+}
+
+/** The socket dropped before the answer came. */
+export class LinkDown extends Error {
+  constructor() {
+    super("can't reach the control plane");
+  }
+}
+
+/** What a browser WebSocket gives; a fake one in the tests. */
+export interface SocketLike {
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  onopen: ((event: unknown) => void) | null;
+  onmessage: ((event: { data: unknown }) => void) | null;
+  onclose: ((event: { code: number; reason: string }) => void) | null;
+  onerror: ((event: unknown) => void) | null;
+}
+
+export interface LinkOptions {
+  /** The page's own WebSocket: ws, the page's host, /v1/connect. */
+  url: string;
+  /** The page's own origin (location.origin): what every proof is bound to. */
+  origin: string;
+  keys: KeyStore;
+  open?: (url: string) => SocketLike;
+  /** Seconds before each retry; the last repeats. Jitter up to 20% is added. */
+  backoff?: number[];
+  /** How often to check the socket, and how long to wait for the answer. */
+  heartbeat?: { every: number; within: number };
+  random?: () => number;
+  /** The exchange; the real one unless a test stands in for it. */
+  authenticate?: (socket: LineSocket, record: KeyRecord, origin: string) => Promise<Admitted>;
+}
+
+/** Close code the control plane sends a forgotten client (contracts/browser-auth.md). */
+export const forgottenCode = 4403;
+
+type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
+
+/** Lines from a socket, as the exchange reads them. */
+class Lines implements LineSocket {
+  private queue: string[] = [];
+  private waiting: { resolve: (line: string) => void; reject: (error: Error) => void } | null = null;
+  private closed: Error | null = null;
+
+  constructor(private socket: SocketLike) {}
+
+  push(line: string): void {
+    if (this.waiting) {
+      const waiting = this.waiting;
+      this.waiting = null;
+      waiting.resolve(line);
+    } else {
+      this.queue.push(line);
+    }
+  }
+
+  end(error: Error): void {
+    this.closed = error;
+    this.waiting?.reject(error);
+    this.waiting = null;
+  }
+
+  send(line: string): void {
+    this.socket.send(line);
+  }
+
+  next(timeoutMs = 15_000): Promise<string> {
+    const queued = this.queue.shift();
+    if (queued !== undefined) return Promise.resolve(queued);
+    if (this.closed) return Promise.reject(this.closed);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting = null;
+        reject(new LinkDown());
+      }, timeoutMs);
+      this.waiting = {
+        resolve: (line) => { clearTimeout(timer); resolve(line); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+      };
+    });
+  }
+
+  close(code?: number, reason?: string): void {
+    this.socket.close(code, reason);
+  }
+}
+
+export class Link {
+  private options: Required<Omit<LinkOptions, "open">> & { open: (url: string) => SocketLike };
+  private socket: SocketLike | null = null;
+  private stopped = true;
+  private attempt = 0;
+  private retry: ReturnType<typeof setTimeout> | null = null;
+  private beat: ReturnType<typeof setInterval> | null = null;
+  private nextID = 1;
+  private pending = new Map<number, Pending>();
+  private stateListeners = new Set<(state: LinkState) => void>();
+  private noticeListeners = new Set<(method: string, params: unknown, host: string | null) => void>();
+  state: LinkState = { kind: "connecting" };
+
+  constructor(options: LinkOptions) {
+    this.options = {
+      backoff: [1, 2, 4, 8, 10],
+      heartbeat: { every: 5_000, within: 3_000 },
+      random: Math.random,
+      authenticate: connect,
+      open: (url) => new WebSocket(url) as unknown as SocketLike,
+      ...options,
+    };
+  }
+
+  onState(listener: (state: LinkState) => void): () => void {
+    this.stateListeners.add(listener);
+    return () => this.stateListeners.delete(listener);
+  }
+
+  /** Every notification, with the host it came from (null for the control plane's own). */
+  onNotification(listener: (method: string, params: unknown, host: string | null) => void): () => void {
+    this.noticeListeners.add(listener);
+    return () => this.noticeListeners.delete(listener);
+  }
+
+  private set(state: LinkState): void {
+    this.state = state;
+    for (const listener of this.stateListeners) listener(state);
+  }
+
+  start(): void {
+    this.stopped = false;
+    void this.dial();
+  }
+
+  stop(): void {
+    this.stopped = true;
+    this.clearTimers();
+    this.socket?.close(1000, "");
+    this.socket = null;
+  }
+
+  /** Try again now: the tab came back into view, or the person asked. */
+  retryNow(): void {
+    if (this.stopped || this.state.kind !== "down") return;
+    if (this.retry) clearTimeout(this.retry);
+    this.retry = null;
+    void this.dial();
+  }
+
+  /** Sends `method` to `host`, or to the control plane for its own methods. */
+  call<M extends Method>(method: M, params: Params<M>, host?: string): Promise<Result<M>> {
+    if (this.state.kind !== "open" || !this.socket) return Promise.reject(new LinkDown());
+    const id = this.nextID++;
+    const message = { jsonrpc: "2.0", id, method, params };
+    const line = targetOf(method) === "host"
+      ? JSON.stringify({ h: host ?? "mac", m: message })
+      : JSON.stringify({ m: message });
+    return new Promise<Result<M>>((resolve, reject) => {
+      this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      this.socket?.send(line);
+    });
+  }
+
+  private clearTimers(): void {
+    if (this.retry) clearTimeout(this.retry);
+    if (this.beat) clearInterval(this.beat);
+    this.retry = null;
+    this.beat = null;
+  }
+
+  private async dial(): Promise<void> {
+    this.clearTimers();
+    let record;
+    try {
+      record = await this.options.keys.load();
+    } catch (error) {
+      if (error instanceof UnsupportedBrowser) {
+        log("link.unsupported");
+        return this.set({ kind: "unsupported" });
+      }
+      throw error;
+    }
+    if (!record) return this.set({ kind: "unpaired" });
+    if (this.state.kind !== "down") this.set({ kind: "connecting" });
+    log("link.connecting");
+
+    const socket = this.options.open(this.options.url);
+    this.socket = socket;
+    const lines = new Lines(socket);
+    let authed = false;
+    socket.onmessage = (event) => {
+      const line = String(event.data);
+      if (authed) this.heard(line);
+      else lines.push(line);
+    };
+    socket.onerror = () => {};
+    socket.onclose = (event) => {
+      lines.end(new LinkDown());
+      if (this.socket !== socket) return;
+      this.socket = null;
+      this.failPending();
+      if (event.code === forgottenCode) return void this.forgotten();
+      if (authed || this.state.kind === "connecting" || this.state.kind === "down") this.down();
+    };
+    socket.onopen = async () => {
+      try {
+        const admitted = await this.options.authenticate(lines, record, this.options.origin);
+        authed = true;
+        this.attempt = 0;
+        log("link.open");
+        this.set({ kind: "open", grant: admitted.grant, name: admitted.name });
+        this.startHeartbeat();
+      } catch (error) {
+        if (error instanceof Refused && (error.reason === "forgotten" || error.reason === "unknown")) {
+          log("link.refused", error.reason);
+          this.socket = null;
+          socket.close(1000, "");
+          return void this.forgotten();
+        }
+        if (error instanceof WrongControlPlane) {
+          log("link.wrongControlPlane");
+          this.socket = null;
+          socket.close(1000, "");
+          return this.set({ kind: "wrongControlPlane" });
+        }
+        if (error instanceof Refused) log("link.refused", error.reason);
+        socket.close(1000, "");
+      }
+    };
+  }
+
+  private heard(line: string): void {
+    let frame: { h?: string; m?: { id?: number; result?: unknown; error?: { code: number; message: string }; method?: string; params?: unknown } };
+    try {
+      frame = JSON.parse(line);
+    } catch {
+      return;
+    }
+    const message = frame.m;
+    if (!message) return;
+    if (typeof message.id === "number" && (message.result !== undefined || message.error)) {
+      const pending = this.pending.get(message.id);
+      if (!pending) return;
+      this.pending.delete(message.id);
+      if (message.error) {
+        log("call.failed", message.error.code);
+        pending.reject(new CallFailed(message.error.code, message.error.message));
+      } else {
+        pending.resolve(message.result);
+      }
+      return;
+    }
+    if (typeof message.method === "string") {
+      for (const listener of this.noticeListeners) listener(message.method, message.params, frame.h ?? null);
+    }
+  }
+
+  private startHeartbeat(): void {
+    const { every, within } = this.options.heartbeat;
+    this.beat = setInterval(() => {
+      const socket = this.socket;
+      if (!socket) return;
+      const timer = setTimeout(() => socket.close(4000, "no answer"), within);
+      this.call("control/status", {} as Params<"control/status">).then(() => clearTimeout(timer), () => {});
+    }, every);
+  }
+
+  private failPending(): void {
+    for (const pending of this.pending.values()) pending.reject(new LinkDown());
+    this.pending.clear();
+  }
+
+  private down(): void {
+    this.clearTimers();
+    if (this.state.kind !== "down") {
+      log("link.down");
+      this.set({ kind: "down", since: Date.now() });
+    }
+    if (this.stopped) return;
+    const steps = this.options.backoff;
+    const base = steps[Math.min(this.attempt, steps.length - 1)]!;
+    this.attempt++;
+    const delay = base * 1000 * (1 + 0.2 * this.options.random());
+    this.retry = setTimeout(() => void this.dial(), delay);
+  }
+
+  private async forgotten(): Promise<void> {
+    this.clearTimers();
+    this.stopped = true;
+    log("link.forgotten");
+    await this.options.keys.forget();
+    this.set({ kind: "forgotten" });
+  }
+}
