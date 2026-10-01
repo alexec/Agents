@@ -12,6 +12,7 @@ import SwiftUI
 /// Read-only, as the Mac's is (FR-016). Nothing here can create, rename or delete.
 struct FilesPane: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.openURL) private var openURL
     let agent: Agent
 
     private enum Listed: Equatable {
@@ -117,6 +118,9 @@ struct FilesPane: View {
                 .lineLimit(1)
                 .truncationMode(.head)
             Spacer(minLength: 8)
+            if let file = state.openFile, canDrawPage(file) {
+                pageControls(file)
+            }
             if let file = state.openFile, !ChangesView.changes(to: file.path, in: model.entries).isEmpty {
                 Button("What the agent did") { state.showingChanges = true }
                     .appText(.fine)
@@ -126,6 +130,48 @@ struct FilesPane: View {
         .buttonStyle(.borderless)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    /// An HTML file's two ways of being read (#67), as on the Mac: the page or its
+    /// source, one choice for the pane; and, on the page, whether it may run scripts.
+    @ViewBuilder
+    private func pageControls(_ url: URL) -> some View {
+        @Bindable var state = state
+        if !state.htmlShowsSource {
+            Toggle(isOn: Binding(get: { state.scriptsAllowed.contains(url.path) },
+                                 set: { allowed in
+                                     if allowed { state.scriptsAllowed.insert(url.path) } else { state.scriptsAllowed.remove(url.path) }
+                                 })) {
+                Label("Allow scripts", systemImage: "curlybraces")
+                    .labelStyle(.iconOnly)
+            }
+            .toggleStyle(.button)
+            .accessibilityHint(state.scriptsAllowed.contains(url.path)
+                               ? "Scripts run on this page, with no network"
+                               : "Scripts are off on this page")
+        }
+        Picker("Show", selection: $state.htmlShowsSource) {
+            Text("Page").tag(false)
+            Text("Source").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+    }
+
+    /// An HTML file read whole: one cut at the read limit is source only, never half a page.
+    private func canDrawPage(_ url: URL) -> Bool {
+        guard HTMLPageScope.isHTML(url), case .text(_, let isTruncated, _, _) = opened else { return false }
+        return !isTruncated
+    }
+
+    /// Where a link the person tapped on a page goes. Never into the file view itself.
+    private func follow(_ link: HTMLPageScope.LinkDecision) {
+        switch link {
+        case .openFile(let path): state.open(file: URL(filePath: path), line: nil)
+        case .openOutside(let url): openURL(url)
+        case .stay, .ignore: break
+        }
     }
 
     // MARK: The folder
@@ -221,6 +267,17 @@ struct FilesPane: View {
             Said(message: "\(description). It can't be shown here.", symbol: "doc")
         case .image(let box, let describedAs, _):
             Picture(image: box.image, description: describedAs)
+        case .text(let text, _, _, _) where canDrawPage(url) && !state.htmlShowsSource:
+            // HTML reads as a page (#67), reloaded in place as the file or anything
+            // beside it changes. What the page may do is decided in `HTMLPage`.
+            let files = model.files
+            let agentID = agent.id
+            HTMLPage(text: text, path: url.path,
+                     scope: HTMLPageScope(file: url, agentFolder: agent.cwd),
+                     allowsScripts: state.scriptsAllowed.contains(url.path),
+                     folderEvent: files.anyChange[agent.id] ?? 0,
+                     read: { try await files.read(agentID: agentID, path: $0) },
+                     follow: follow)
         case .text(let text, let isTruncated, let size, _):
             VStack(spacing: 0) {
                 if isTruncated {

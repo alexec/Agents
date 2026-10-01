@@ -157,6 +157,11 @@ final class AgentPaneState {
     /// asked for this file by line; nil whenever the user opened it themselves, which
     /// is why it is cleared beside `openFile` rather than left to go stale.
     var openLine: Int?
+    /// An HTML file shows its source rather than its page (#67). One choice for the
+    /// pane, kept as files are opened and closed; `show_file` puts the page back.
+    var htmlShowsSource = false
+    /// HTML files the person let run scripts, by path. Off for every other file.
+    var scriptsAllowed: Set<String> = []
     var browserURL: URL?
     /// The file open in the Changes pane, and which edit to bring into view. Nil is
     /// the list.

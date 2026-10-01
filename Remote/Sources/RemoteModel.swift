@@ -776,7 +776,10 @@ final class RemoteModel {
         if macLacksPanes {
             fileOnScreen = file.path
         } else {
-            panes.state(for: agentID).open(file: file.url, line: file.line)
+            let state = panes.state(for: agentID)
+            // An agent showing a page means the page (#67).
+            if HTMLPageScope.isHTML(file.url) { state.htmlShowsSource = false }
+            state.open(file: file.url, line: file.line)
         }
     }
 

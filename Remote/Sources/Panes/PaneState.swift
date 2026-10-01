@@ -50,6 +50,11 @@ final class PaneState {
     var scrollAnchor: [String: Int] = [:]
     /// "What the agent did" is over the open file.
     var showingChanges = false
+    /// An HTML file shows its source rather than its page (#67). One choice for the
+    /// pane; an agent's `show_file` puts the page back.
+    var htmlShowsSource = false
+    /// HTML files the person let run scripts, by path. Off for every other file.
+    var scriptsAllowed: Set<String> = []
 
     /// Open a pane, remembering it as the one to come back to.
     func show(_ pane: Pane) {
