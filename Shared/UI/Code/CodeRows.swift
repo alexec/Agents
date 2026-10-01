@@ -134,9 +134,9 @@ private struct DiffRowView: View {
                 .opacity(row.kind == .removed ? 0.62 : 1)
                 .fontWeight(row.kind == .added ? .semibold : nil)
         }
-        // One element per line, read as "Added: …" or "Removed: …". A second label laid
-        // over `CodeLine`'s own sent AppKit's accessibility into a stack overflow when the
-        // row was queried (walked 2026-09-25), so the row speaks for its children.
+        // One element per line, read as "Added: …" or "Removed: …". A label laid over one
+        // `CodeLine` used to carry sent AppKit's accessibility into a stack overflow when
+        // the row was queried (walked 2026-09-25), so the row speaks for its children.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityAddTraits(.isStaticText)

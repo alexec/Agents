@@ -138,11 +138,21 @@ private struct FileLineRow: View {
             CodeLine(text: content, spans: document?.spans(line: number - 1) ?? [])
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // One element per line, read as "Line 12: …". Left to its two texts, the line's
+        // text sat under selection's AppKit view, and querying it after the file changed
+        // on disk overflowed the stack (#71).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(.isStaticText)
         .appText(.code)
         .padding(.horizontal, 10)
         .padding(.vertical, 1)
         .background(named ? AnyShapeStyle(.tint.opacity(0.18)) : AnyShapeStyle(.clear))
         // On appearing, and again when the document arrives after the row did.
         .task(id: document.map(ObjectIdentifier.init)) { document?.appear(line: number - 1) }
+    }
+
+    private var label: String {
+        content.allSatisfy(\.isWhitespace) ? "Line \(number), blank" : "Line \(number): \(content)"
     }
 }
