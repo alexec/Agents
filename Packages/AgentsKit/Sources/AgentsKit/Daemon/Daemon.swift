@@ -20,18 +20,13 @@ public final class Daemon: @unchecked Sendable {
     private let control: Control?
     private var uplink: ControlUplink?
 
-    /// Where a host's control plane is, and which host it is there.
+    /// How this host joins its control plane: over a WebSocket, as the control plane
+    /// names it, with a host code the first time.
     public struct Control: Sendable {
-        /// The control plane's local socket, for a host on the same Mac; nil for one
-        /// reached over the network.
-        public var socket: URL?
-        public var host: HostID
         public var name: String?
-        /// A host code to enrol with, over the network, when this root has not yet.
+        /// A host code to enrol with, when this root has not yet.
         public var code: String?
-        public init(socket: URL?, host: HostID, name: String? = nil, code: String? = nil) {
-            self.socket = socket
-            self.host = host
+        public init(name: String? = nil, code: String? = nil) {
             self.name = name
             self.code = code
         }
@@ -180,20 +175,9 @@ public final class Daemon: @unchecked Sendable {
         DaemonLog.shared.write("listening on \(locations.socket.path)")
         if let control {
             let name = control.name ?? Host.current().localizedName ?? "A Mac"
-            let hello = DaemonAPI.HostHello(host: control.host, version: Self.version, platform: Self.platform,
+            let hello = DaemonAPI.HostHello(host: .mac, version: Self.version, platform: Self.platform,
                                             machineID: MachineID.current, name: name)
-            if let socket = control.socket?.path {
-                let uplink = ControlUplink(server: server, hello: hello) {
-                    FDTransport(socket: try connectUnixSocket(path: socket))
-                }
-                self.uplink = uplink
-                await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
-                await lendAndBorrowSignIns(through: uplink)
-                uplink.start()
-                DaemonLog.shared.write("uplink: a host of the control plane at \(socket), as \(control.host)")
-            } else {
-                await joinOverTheNetwork(control, server: server, hello: hello)
-            }
+            await join(control, server: server, hello: hello)
         }
         // Last, and on purpose. Picking an agent back up starts a runtime and sends it
         // a prompt, and both of those belong in front of a window that can watch them
@@ -222,51 +206,22 @@ public final class Daemon: @unchecked Sendable {
         await core.setTunnelOpener { runtime in try await uplink.openTunnel(runtime: runtime) }
     }
 
-    /// A host of a control plane elsewhere (058, T021): enrolled once with a host code,
-    /// then dialled with its own key, kept beside it in this root.
-    private func joinOverTheNetwork(_ control: Control, server: DaemonServer, hello: DaemonAPI.HostHello) async {
-        // A version 2 code, or a membership made from one, goes over the WebSocket, on a
-        // Mac and on Linux alike (058 re-plan). The first build's codes keep their path
-        // until it is removed.
+    /// A host of a control plane (058, T021): enrolled once with a version 2 host code,
+    /// given or left in the root by Agents Host, then dialled over the WebSocket with its
+    /// own key, on a Mac and on Linux alike.
+    private func join(_ control: Control, server: DaemonServer, hello: DaemonAPI.HostHello) async {
         let kept = ControlMembership.load(locations.controlHostMembership)
-        let code = (control.code ?? takeLeftCode()).flatMap(ControlCode.init(text:))
-        if kept?.url != nil || (kept == nil && code?.url != nil) {
-            await joinOverWebSocket(code: kept == nil ? code : nil, server: server, hello: hello)
+        if let kept, kept.url == nil {
+            // The first build's TLS-PSK membership: that wire is gone (T042).
+            DaemonLog.shared.write("uplink: this host's membership is from before the control plane's WebSocket; enrol it again with a new host code")
             return
         }
-        #if canImport(Network) && canImport(CryptoKit)
-        let membershipFile = locations.controlHostMembership
-        do {
-            let key = try DeviceKey.load(file: locations.controlHostKey)
-            var membership = ControlMembership.load(membershipFile)
-            if membership == nil, let text = control.code {
-                guard let code = ControlCode(text: text) else {
-                    DaemonLog.shared.write("uplink: that is not a host code")
-                    return
-                }
-                let joined = try await ControlDialling.enroll(code, announce: DaemonAPI.HostAnnounce(
-                    publicKey: key.publicKey, name: hello.name ?? "A Mac", platform: hello.platform,
-                    version: hello.version, machineID: hello.machineID))
-                try joined.save(membershipFile)
-                membership = joined
-                DaemonLog.shared.write("uplink: enrolled with \(joined.name) as \(joined.host?.rawValue ?? "?")")
-            }
-            guard let membership else {
-                DaemonLog.shared.write("uplink: no control plane to join; start with --control-code")
-                return
-            }
-            let uplink = ControlUplink(server: server, hello: hello, dial: ControlDialling.hostDial(membership, key: key))
-            self.uplink = uplink
-            await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
-            await lendAndBorrowSignIns(through: uplink)
-            uplink.start()
-            DaemonLog.shared.write("uplink: a host of \(membership.name) over the network, as \(membership.host?.rawValue ?? "?")")
-        } catch {
-            DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
+        let code = (control.code ?? takeLeftCode()).flatMap(ControlCode.init(text:))
+        if kept == nil, let code, code.url == nil {
+            DaemonLog.shared.write("uplink: that host code is from before the control plane's WebSocket; ask for a new one")
+            return
         }
-        #else
-        DaemonLog.shared.write("uplink: this build cannot reach a control plane over the network")
-        #endif
+        await joinOverWebSocket(code: kept == nil ? code : nil, server: server, hello: hello)
     }
 
     /// A code Agents Host left in the root, taken once: it is spent by the first join.

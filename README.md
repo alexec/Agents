@@ -48,13 +48,13 @@ The schemes:
 | `AgentsStore` | the App Store window: sandboxed, no helpers, reaches everything through a control plane |
 | `AgentsHost` | Agents Host, carrying `agentsd`, `agents-control` and `agents-relay` |
 | `Remote` | the iPhone and iPad app |
-| `Agents` | the developer window, which still starts a daemon of its own (see below); it goes once everyone has moved across |
 
 From the command line:
 
 ```sh
 xcodebuild -scheme AgentsStore -destination 'platform=macOS' -skipPackagePluginValidation build
 xcodebuild -scheme AgentsHost -destination 'platform=macOS' -skipPackagePluginValidation build
+xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build
 swift test --package-path Packages/AgentsKit
 swift test --package-path Packages/ControlPlane
 ```
@@ -82,57 +82,48 @@ control plane. Agents Host carries it at `Contents/Helpers/agentsd` and register
 macOS as a launch agent, so it runs with every window closed, starts at login, and never
 exits for being idle. On a Linux server the same daemon lives in `~/.agents-server`.
 
-The developer window (the `Agents` scheme) still carries its own `agentsd` and starts it in
-a session of its own, as the app did before the control plane. That daemon exits by itself
-once it is holding no agents and no window is connected. The rest of this section is about
-that daemon, and about the root every daemon keeps.
+The rest of this section is about the root every daemon keeps.
 
 ```sh
-# Is it running?
-pgrep -fl agentsd
+# Is it running? (Agents Host's launch agent)
+launchctl print gui/$(id -u)/com.alexecollins.agentshost.daemon | grep -E 'state|pid'
 
 # Everything it owns
 ls ~/Library/Application\ Support/Agents/
-#   daemon.sock   the app connects here
+#   daemon.sock   agents' own tools connect here (agentsd mcp)
 #   daemon.lock   flock, held by the one daemon
 #   daemon.log    what it has been doing
 #   agents/<uuid>/agent.json        the record, written whole on every change
 #   agents/<uuid>/transcript.jsonl  appended as things happen, never rewritten
 #   projects.json                   only what a folder cannot tell us: archived, added
 
-# By hand, without the app
-./build/DD/Build/Products/Debug/Agents.app/Contents/Helpers/agentsd
+# By hand, as a host of a control plane, on a root of its own
+AGENTS_ROOT=/tmp/agents-branch "./build/DD-host/Build/Products/Debug/Agents Host.app/Contents/Helpers/agentsd" \
+  --control-code '<host code>'
 ```
 
 Nothing is stored anywhere else, and the daemon is the only writer. To start again from
-nothing, quit the app, `pkill -f agentsd`, and delete that directory.
+nothing, stop Agents Host's jobs (its window's Stop, or `launchctl bootout` of both), and
+delete that directory.
 
 ## A second copy, beside the first
 
 That directory is also the daemon's identity: the lock it holds, the socket it answers
-on and the agents it owns all hang off it. Point a window at a different one and it is a
-different daemon, with its own agents, which is how a build from a branch is run beside
-the ordinary app without either disturbing the other.
+on and the agents it owns all hang off it. Point a host at a different one
+(`AGENTS_ROOT`) and it is a different host, with its own agents. Give it a control plane
+of its own too (`agents-control serve --home <folder>`, with `AGENTS_CONTROL_URL` and
+`--port`), pair a window with that one, and a build from a branch runs beside the
+ordinary set-up without either disturbing the other.
 
-```sh
-open -n path/to/Agents.app --args --root /tmp/agents-branch
-```
-
-`--root` first, `AGENTS_ROOT` second, and the ordinary place when neither is given.
-`--root` exists because it is what survives `open`: macOS passes a second copy of a
-bundle its arguments and not its environment. The window hands the path to the daemon it
-starts, and that daemon hands it to every MCP helper it gives an agent, so the whole
-chain agrees without anybody guessing.
-
-The window says which one it is in the title of its projects column, when it is not the
-ordinary one. Keep the path short: a Unix socket may be named with 104 bytes and no
-more, and a root nested a few folders deep will say so rather than fail quietly.
+Keep the path short: a Unix socket may be named with 104 bytes and no more, and a root
+nested a few folders deep will say so rather than fail quietly.
 
 That is also how an agent working on this repository tries its own change: the `run-app`
-skill under `.agents/skills` (linked from `.claude/skills`) builds, launches a copy on a
-root of its own, drives it over that root's socket — every method the window has —
-screenshots the window without taking the screen off you, and stops the window and its
-daemon afterwards. Nothing it does reaches the agents you are running.
+skill under `.agents/skills` (linked from `.claude/skills`) builds, starts a control plane
+and a host on a root of its own, pairs a window with them (its pairing kept apart from
+yours with `--walk`), drives the host over that root's socket — every method the window
+has — screenshots the window without taking the screen off you, and stops all three
+afterwards. Nothing it does reaches the agents you are running.
 
 ## What the app does with a runtime
 

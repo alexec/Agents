@@ -19,7 +19,9 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// person's, and one they deleted is not put back.
     public var laidOutAt: Date?
     /// Which layout it was given (`DotAgents.version`). Nil with `laidOutAt` set is the
-    /// first, from before the layout had a version.
+    /// first, from before the layout had a version (09-25). Kept past the #58 cut-off on
+    /// purpose: reading it as anything else would either lay out step 1 again, putting
+    /// back what the person deleted, or fail `projects.json`, which holds every project.
     public var layoutVersion: Int?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a

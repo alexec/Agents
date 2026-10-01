@@ -104,7 +104,7 @@ this Mac also signs them in on your Linux servers: their requests go through thi
 OpenCode on a server borrows the providers this Mac signed in to with a key; a browser
 sign-in such as ChatGPT stays on this Mac, and the sheet says which. For any other runtime on
 a server, sign in on the server itself; see
-[Add a Linux server](add-a-linux-server.md).
+[Add a server](add-a-server.md).
 
 ## If it doesn't work
 
@@ -120,4 +120,4 @@ a server, sign in on the server itself; see
 
 - [Runtimes](../reference/runtimes.md)
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md)
-- [Add a Linux server](add-a-linux-server.md)
+- [Add a server](add-a-server.md)

@@ -47,7 +47,7 @@ struct TurnView: View {
     private var items: [TranscriptItem] { turn.isSummaryOnly ? (fetched ?? []) : turn.items }
     private var parts: TurnParts? { isWaitingForEntries ? nil : TurnParts(items, isLive: isLive) }
     private var outcome: [TranscriptItem] { parts?.outcome ?? turn.storedOutcome ?? [] }
-    /// Nil for a summary written before 069, whose steps are not counted.
+    /// Nil for a summary written before 069 (after the #58 cut-off), whose steps are not counted.
     private var stepCount: Int? { parts?.stepCount ?? turn.storedStepCount }
     /// Open, the steps are drawn in order above the outcome; thinking only at Details.
     private var steps: [TranscriptItem] {
@@ -222,11 +222,6 @@ private struct EntryRow: View {
         case .toolCall(let call), .toolCallUpdate(let call):
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
             Text(call.line).appText(.reading).foregroundStyle(.secondary)
-
-        case .plan(let raw):
-            // The shape 001 stored. Read into entries where it can be.
-            PlanView(plan: Plan(planID: nil,
-                                entries: (raw["entries"]?.arrayValue ?? []).compactMap(PlanEntry.init(wire:))))
 
         case .planUpdated(let plan):
             PlanView(plan: plan)

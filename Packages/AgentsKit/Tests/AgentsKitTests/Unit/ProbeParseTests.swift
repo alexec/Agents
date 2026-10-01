@@ -46,13 +46,6 @@ struct ProbeParseTests {
         #expect(try ServerInstaller.parseProbe(Self.bare).toolsetID(for: "codex") == nil)
     }
 
-    @Test func factsFromBefore047StillSayClaudesToolset() throws {
-        var facts = try ServerInstaller.parseProbe(Self.devbox)
-        facts.toolsetIDs = [:]
-        let old = try JSONDecoder().decode(ServerFacts.self, from: try JSONEncoder().encode(facts))
-        #expect(old.toolsetID(for: "claude") == "dcc7e847c9890e9d")
-        #expect(old.toolsetID(for: "codex") == nil)
-    }
 
     @Test func aBareServerHasCurlAndNothingElse() throws {
         let facts = try ServerInstaller.parseProbe(Self.bare)

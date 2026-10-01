@@ -44,14 +44,9 @@ public struct SuggestedPrompt: Codable, Hashable, Sendable, Identifiable {
                   prompt: String(prompt.prefix(Self.promptLimit)))
     }
 
-    public static func list(in value: JSONValue?) -> [SuggestedPrompt] {
-        Array((value?.arrayValue ?? []).compactMap(SuggestedPrompt.init(wire:)).prefix(limit))
-    }
-
-    /// What `finish_turn` carries: the one, or failing that the first of the list a
-    /// conversation briefed before 031 still sends. The one wins where both came.
-    public static func next(one: JSONValue?, orFirstOf many: JSONValue?) -> [SuggestedPrompt] {
-        if let one, let prompt = SuggestedPrompt(wire: one) { return [prompt] }
-        return list(in: many)
+    /// What `finish_turn` carries in `next_prompt`. The list conversations were briefed
+    /// with before 031 (`next_prompts`) is no longer read.
+    public static func next(_ one: JSONValue?) -> [SuggestedPrompt] {
+        one.flatMap(SuggestedPrompt.init(wire:)).map { [$0] } ?? []
     }
 }

@@ -14,9 +14,6 @@ struct AgentsApp: App {
     @State private var frame = SidebarFrame()
 
     init() {
-        #if !AGENTS_STORE
-        if CommandLine.arguments.contains(LocalServices.removeFlag) { LocalServices.removeAndExit() }
-        #endif
     }
 
     var body: some Scene {

@@ -37,7 +37,8 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
         // An outcome this version no longer has — a pull-request refusal from before
-        // GitHub support was removed — is forgotten rather than losing the whole state.
+        // GitHub support was removed (09-28, after the #58 cut-off) — is forgotten
+        // rather than losing the whole state. Also how a newer build's outcome reads.
         lastOutcome = (try? c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)) ?? nil
         lastCausingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .lastCausingEvent)
         approvedDigest = try c.decodeIfPresent(String.self, forKey: .approvedDigest)

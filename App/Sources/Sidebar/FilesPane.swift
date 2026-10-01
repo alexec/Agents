@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// The agent's folder, and what is in it.
@@ -23,9 +20,6 @@ struct FilesPane: View {
     @State private var problems: [String: String] = [:]
     @State private var probe: FileProbe?
     @State private var fileProblem: String?
-    #if !AGENTS_STORE
-    @State private var watch: FolderWatch?
-    #endif
     @State private var touched = TouchedPaths()
     /// Which stretch of whose conversation `touched` has folded, by position in the
     /// whole transcript. Entries outside it — new at the end, or an earlier page in
@@ -49,20 +43,12 @@ struct FilesPane: View {
     /// opened down to; or, for something outside it, that folder on its own.
     private var root: URL { Self.isInside(folder, agent.cwd) ? agent.cwd : folder }
 
-    /// A host's folder is read through that host (037). Nil for the one on this Mac,
-    /// which is read straight off the disk (058, R11).
-    #if AGENTS_STORE
-    /// The store window reads every host's files through the host, this Mac's included.
-    private var onThisMac: Bool { false }
-    #else
-    private var onThisMac: Bool { model.isOnThisMac(agent.host) }
-    #endif
-    private var server: RemoteFiles? { onThisMac ? nil : model.serverFiles(agent.host) }
-    private var serverLabel: String? { onThisMac ? nil : model.hosts.label(agent.host) }
+    /// Every host's folder is read through that host (037), this Mac's included (058, R11).
+    private var server: RemoteFiles { model.serverFiles(agent.host) }
     /// Where a file the pane will not draw is, when Finder here cannot show it: nil for
-    /// this Mac's host, whose files the store window reveals and opens through it.
+    /// this Mac's host, whose files the window reveals and opens through it.
     private var elsewhere: String? { model.isOnThisMac(agent.host) ? nil : model.hosts.label(agent.host) }
-    private var serverChanges: Int { server?.changeCount(agentID: agent.id, folder: folder) ?? 0 }
+    private var serverChanges: Int { server.changeCount(agentID: agent.id, folder: folder) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -76,12 +62,10 @@ struct FilesPane: View {
         }
         .task(id: agent.id) { await start() }
         .onDisappear {
-            #if !AGENTS_STORE
-            watch?.stop(); watch = nil
-            #endif
-            if let server { Task { await server.unwatch(agentID: agent.id, folder: agent.cwd) } }
+            let server = server
+            Task { await server.unwatch(agentID: agent.id, folder: agent.cwd) }
         }
-        // A server says `files/changed` where FSEvents would have told this Mac.
+        // The host says `files/changed` when the folder changes.
         .onChange(of: serverChanges) {
             folderEvents += 1
             reloadListings(inBackground: true)
@@ -92,7 +76,8 @@ struct FilesPane: View {
         // and stops watching the one it left.
         .onChange(of: agent.cwd) { old, new in
             guard old != new else { return }
-            if let server { Task { await server.unwatch(agentID: agent.id, folder: old) } }
+            let server = server
+            Task { await server.unwatch(agentID: agent.id, folder: old) }
             state.folder = new
             state.expanded = []
             state.openFile = nil
@@ -336,7 +321,7 @@ struct FilesPane: View {
                     }
                 }
             case .image(let description):
-                ImageFile(url: url, probe: probe, description: description, server: serverLabel,
+                ImageFile(url: url, probe: probe, description: description,
                           elsewhere: elsewhere, host: agent.host)
             case .binary(let description):
                 // Its bytes are never shown (FR-014). What is shown is the way out.
@@ -365,28 +350,8 @@ struct FilesPane: View {
     }
 
     private func startWatching() {
-        #if !AGENTS_STORE
-        watch?.stop()
-        #endif
-        if let server {
-            Task { await server.watch(agentID: agent.id, folder: agent.cwd) }
-            return
-        }
-        #if !AGENTS_STORE
-        // The watch is on the agent's whole folder, but the pane only re-reads the
-        // directory it is showing and the file it has open. FSEvents coalesces, so a
-        // build writing thousands of files is a handful of events, not thousands.
-        watch = FolderWatch(root: agent.cwd) { _ in
-            Task { @MainActor in
-                folderEvents += 1
-                // Off the main actor: a folder of thousands of entries is thousands
-                // of stat calls, and a build writing beside the pane fires this
-                // every fifth of a second.
-                reloadListings(inBackground: true)
-                if let openFile = state.openFile { reloadFile(openFile) }
-            }
-        }
-        #endif
+        let server = server
+        Task { await server.watch(agentID: agent.id, folder: agent.cwd) }
     }
 
     /// Open a folder in place, or close it. Opening reads it again even when it was
@@ -447,36 +412,20 @@ struct FilesPane: View {
         let key = Self.key(folder)
         let request = (listingRequests[key] ?? 0) + 1
         listingRequests[key] = request
-        if let server {
-            let agentID = agent.id
-            Task {
-                let read: Result<DirectoryListing, any Error>
-                do { read = .success(try await server.list(agentID: agentID, folder: folder)) }
-                catch { read = .failure(error) }
-                guard request == listingRequests[key] else { return }
-                if case .failure(let error) = read {
-                    listings[key] = nil
-                    problems[key] = RemoteFiles.describe(error, name: folder.lastPathComponent)
-                } else {
-                    show(read, of: folder)
-                }
-            }
-            return
-        }
-        #if !AGENTS_STORE
-        guard inBackground else {
-            show(Result { try DirectoryReader.read(folder) }, of: folder)
-            return
-        }
+        let server = server
+        let agentID = agent.id
         Task {
-            let read = await Task.detached(priority: .userInitiated) {
-                Result { try DirectoryReader.read(folder) }
-            }.value
-            // A later read of the same folder was asked for while this one was reading.
+            let read: Result<DirectoryListing, any Error>
+            do { read = .success(try await server.list(agentID: agentID, folder: folder)) }
+            catch { read = .failure(error) }
             guard request == listingRequests[key] else { return }
-            show(read, of: folder)
+            if case .failure(let error) = read {
+                listings[key] = nil
+                problems[key] = RemoteFiles.describe(error, name: folder.lastPathComponent)
+            } else {
+                show(read, of: folder)
+            }
         }
-        #endif
     }
 
     private func show(_ read: Result<DirectoryListing, any Error>, of folder: URL) {
@@ -485,15 +434,6 @@ struct FilesPane: View {
         case .success(let fresh):
             if listings[key] != fresh { listings[key] = fresh }
             problems[key] = nil
-        #if !AGENTS_STORE
-        case .failure(DirectoryReader.Failure.gone):
-            // Never leave contents on screen that cannot be vouched for (FR-016).
-            listings[key] = nil
-            problems[key] = "\(folder.lastPathComponent) is not there any more."
-        case .failure(DirectoryReader.Failure.notReadable):
-            listings[key] = nil
-            problems[key] = "\(folder.lastPathComponent) cannot be opened."
-        #endif
         case .failure:
             listings[key] = nil
             problems[key] = "\(folder.lastPathComponent) could not be read."
@@ -502,44 +442,23 @@ struct FilesPane: View {
 
     private func reloadFile(_ url: URL) {
         loaded = url
-        if let server {
-            let agentID = agent.id
-            Task {
-                do {
-                    let reading = try await server.read(agentID: agentID, path: url.path(percentEncoded: false))
-                    guard let fresh = Self.probe(reading) else { return }
-                    if let probe, probe.prefix == fresh.prefix, probe.size == fresh.size { fileProblem = nil; return }
-                    probe = fresh
-                    fileProblem = nil
-                } catch {
-                    if !(RemoteFiles.isGone(error) && isMarkdown(url)) { probe = nil }
-                    fileProblem = RemoteFiles.describe(error, name: url.lastPathComponent)
-                }
-            }
-            return
-        }
-        do {
-            let fresh = try FileProbe.read(url)
-            // The watch is on the whole folder, so a build writing beside this file
-            // lands here too. Unchanged bytes are not news: the page would diff two
-            // equal texts and find nothing, but it need not be asked to.
-            if let probe, probe.prefix == fresh.prefix, probe.size == fresh.size {
+        let server = server
+        let agentID = agent.id
+        Task {
+            do {
+                let reading = try await server.read(agentID: agentID, path: url.path(percentEncoded: false))
+                guard let fresh = Self.probe(reading) else { return }
+                // The watch is on the whole folder, so a build writing beside this file
+                // lands here too. Unchanged bytes are not news.
+                if let probe, probe.prefix == fresh.prefix, probe.size == fresh.size { fileProblem = nil; return }
+                probe = fresh
                 fileProblem = nil
-                return
+            } catch {
+                // A Markdown page keeps what it last had (022); source has nothing to
+                // keep that the listing does not say better.
+                if !(RemoteFiles.isGone(error) && isMarkdown(url)) { probe = nil }
+                fileProblem = RemoteFiles.describe(error, name: url.lastPathComponent)
             }
-            probe = fresh
-            fileProblem = nil
-        } catch FileProbe.Failure.gone {
-            // A Markdown page keeps what it last had (022); source has nothing to
-            // keep that the listing does not say better.
-            if !isMarkdown(url) { probe = nil }
-            fileProblem = "\(url.lastPathComponent) is not there any more."
-        } catch FileProbe.Failure.notReadable {
-            probe = nil
-            fileProblem = "\(url.lastPathComponent) cannot be read."
-        } catch {
-            probe = nil
-            fileProblem = "\(url.lastPathComponent) could not be read."
         }
     }
 

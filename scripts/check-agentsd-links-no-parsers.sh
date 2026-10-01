@@ -14,7 +14,7 @@ if print -r -- $block | grep -q 'CodeText'; then
   print -u2 "agentsd lists CodeText in project.yml"; exit 1
 fi
 
-binary=${1:-$(ls -d $root/build/DD/Build/Products/*/Agents.app/Contents/Helpers/agentsd(N) | head -1)}
+binary=${1:-$(ls -d $root/build/DD*/Build/Products/*/"Agents Host.app"/Contents/Helpers/agentsd(N) | head -1)}
 if [[ -n $binary && -f $binary ]]; then
   if nm $binary 2>/dev/null | grep -qE 'tree_sitter_|ts_parser_'; then
     print -u2 "$binary has tree-sitter symbols"; exit 1

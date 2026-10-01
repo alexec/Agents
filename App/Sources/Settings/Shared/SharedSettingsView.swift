@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AppKit
 import SwiftUI
 
@@ -125,19 +122,11 @@ enum SharedFiles {
     @MainActor static var onThisMacsHost: ((URL, _ reveal: Bool) -> Void)?
 
     @MainActor static func reveal(_ path: String) {
-        #if AGENTS_STORE
         onThisMacsHost?(URL(filePath: path), true)
-        #else
-        NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: path)])
-        #endif
     }
 
     @MainActor static func open(_ path: String) {
-        #if AGENTS_STORE
         onThisMacsHost?(URL(filePath: path), false)
-        #else
-        NSWorkspace.shared.open(URL(filePath: path))
-        #endif
     }
 
     static func tilde(_ path: String) -> String {
@@ -245,35 +234,6 @@ struct SharedFact: View {
                 .appText(code ? .code : .reading)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
-/// What each runtime does with one thing, a line each, in the detail panes.
-struct SharedReachList: View {
-    let runtimes: [DaemonAPI.RuntimeName]
-    let reach: [String: DaemonAPI.Reach]
-
-    var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-            ForEach(runtimes) { runtime in
-                if let each = reach[runtime.id] {
-                    GridRow(alignment: .firstTextBaseline) {
-                        Text(runtime.name).foregroundStyle(.secondary)
-                        Text(Self.line(each)).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-    }
-
-    static func line(_ reach: DaemonAPI.Reach) -> String {
-        switch reach {
-        case .gets(let note): "✓ \(note)"
-        case .ownCopy(let path): "uses its own copy in \(SharedFiles.tilde(path))"
-        case .leftOut(let note): "✗ \(note)"
-        case .noWay(let note): "✗ \(note)"
-        case .unchecked(let note): "? \(note ?? "not checked yet")"
         }
     }
 }

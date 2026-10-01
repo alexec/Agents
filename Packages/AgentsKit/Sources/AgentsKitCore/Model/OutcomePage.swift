@@ -62,7 +62,7 @@ public struct ChatTurn: Identifiable, Hashable, Sendable {
     }
 
     /// A stored summary, drawn before its entries are in hand. One written before 069
-    /// has no outcome, and its concise blocks stand in.
+    /// has no outcome, and its concise blocks stand in: 069 is after the #58 cut-off.
     public init(_ summary: TurnSummary) {
         let outcome = summary.outcome ?? summary.concise ?? summary.last.map { [$0] } ?? []
         self.init(id: summary.id,
@@ -142,9 +142,10 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     public var start: Int
     public var end: Int
     public var ask: TranscriptEntry?
-    /// The last work block, retained for clients built before 069.
+    /// The last work block, retained for clients built before 069 (after the #58
+    /// cut-off of 051).
     public var last: TranscriptEntry?
-    /// The latest work and its context, retained for clients built before 069.
+    /// The latest work and its context, retained for clients built before 069, likewise.
     public var concise: [TranscriptEntry]?
     /// The answers, the reply and how it went (069). Nil in a summary written before.
     public var outcome: [TranscriptEntry]?

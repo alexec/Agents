@@ -11,7 +11,7 @@ struct RemoteApp: App {
     /// For pushes only. See `PushDelegate`.
     @UIApplicationDelegateAdaptor(PushDelegate.self) private var push
 
-    /// The real Mac, found on the network it is on, unless `-fake` says otherwise.
+    /// The real control plane, unless `-fake` says otherwise.
     ///
     /// Nothing above this line knows which it got. That was the point of making the
     /// fake a `DaemonLink` rather than a fake model: the whole app moved from canned
@@ -21,16 +21,14 @@ struct RemoteApp: App {
     /// conversation long enough to page, neither of which a real Mac reliably has when
     /// somebody wants to look at a screen.
     ///
-    /// The real one is two links (046): the Mac's own network when the phone is on it,
-    /// and the relay through iCloud when it is not.
-    ///
-    /// Paired with a control plane (058, US5), it is the control plane's address instead.
+    /// The real one is the control plane this phone paired with (058, US5): its address,
+    /// and the relay through iCloud when the address cannot be reached. Until it pairs,
+    /// there is nothing to reach.
     @State private var model = RemoteModel(link: RemoteApp.link())
 
     static func link() -> any DaemonLink {
         if ProcessInfo.processInfo.arguments.contains("-fake") { return FakeDaemon() }
-        if let control = RemoteControl.link() { return control }
-        return AwayLink(device: RemoteModel.deviceID, key: try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup))
+        return RemoteControl.link() ?? NotPairedLink()
     }
 
     var body: some Scene {

@@ -8,8 +8,7 @@ import UIKit
 ///
 /// What the phone says on this connection goes to the control plane's home host, as it
 /// did to the Mac; `RemoteModel` reaches every other host over a second connection
-/// wrapped by `ControlLink`. The first build's TLS link to a Mac's bridge (`AwayLink`)
-/// stays only for a Mac that has not moved yet (until T112).
+/// wrapped by `ControlLink`. The first build's TLS link to a Mac's bridge went in T106.
 ///
 /// Away from anywhere that reaches the control plane's address, it goes through
 /// `agents-relay` in the person's iCloud instead (T077), with the same key exchange end
@@ -23,18 +22,9 @@ enum RemoteControl {
     private static var keyFile: URL { folder.appendingPathComponent("control-client-key") }
     private static var relayKeyFile: URL { folder.appendingPathComponent("control-relay-key.pub") }
     /// Present when the membership came from a move (T085): the key is this device's own,
-    /// the one it paired with the Mac under, not `control-client-key`.
+    /// the one it paired with the Mac under, not `control-client-key`. Kept for a device
+    /// moved that way (FR-038); nothing tells a device of a move now the bridge is gone.
     private static var movedFile: URL { folder.appendingPathComponent("control-client-moved") }
-
-    /// Told over the old link where the control plane is now (058, T085): keep it, as a
-    /// pairing would, with this device's own key, which the move gave the control plane.
-    static func adoptMove(_ moved: DaemonAPI.ControlMoved, device: UUID) throws {
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let membership = ControlMembership(client: device, controlKey: moved.controlKey, addresses: [], name: moved.name,
-                                           url: moved.url, pin: moved.pin)
-        try membership.save(membershipFile)
-        try Data().write(to: movedFile, options: .atomic)
-    }
 
     /// The relay's key, as the control plane named it in `control/status`, over a
     /// connection this device had already proved and checked the pin of. Without it
@@ -201,4 +191,10 @@ struct ControlPlaneLink: DaemonLink {
         func set(_ reason: ControlAuth.Reason) { lock.withLock { self.reason = reason } }
         func take() -> ControlAuth.Reason? { lock.withLock { defer { reason = nil }; return reason } }
     }
+}
+
+/// The Remote before it has paired: nothing to dial, so it asks for a code.
+struct NotPairedLink: DaemonLink {
+    func transport() async throws -> any LineTransport { throw RelayTrouble.notPaired }
+    func start() async throws {}
 }

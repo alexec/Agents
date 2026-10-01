@@ -25,7 +25,7 @@ struct ParkingRecordTests {
         #expect(try StoreCoding.decoder.decode(Agent.self, from: written).parking == nil)
     }
 
-    @Test(arguments: [AfterTurn.park, .archive])
+    @Test(arguments: [AfterTurn.park])
     func anAskToBePutAwaySurvivesBeingSaved(_ after: AfterTurn) throws {
         var agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp"))
         agent.afterTurn = after

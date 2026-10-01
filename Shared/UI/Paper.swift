@@ -34,11 +34,10 @@ enum Paper {
     static let rule = Color(light: 0xE2DCCF, dark: 0x3A3733)
     static let ink = Color(light: 0x1F1D1A, dark: 0xECE7DC)
 
-    /// Corner radii: control (chips, rail), card (rows, wells), floating (prompt, sheets).
+    /// Corner radii: control (chips, rail), card (rows, wells).
     enum Radius {
         static let control: CGFloat = 7
         static let card: CGFloat = 10
-        static let floating: CGFloat = 16
     }
 
     /// The shadow under a raised thing. Soft and short: paper lifted a little off the

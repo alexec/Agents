@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// Choose a folder on a server as a project (037, wireframes/mac-new-project.svg B).

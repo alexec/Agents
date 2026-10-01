@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AppKit
 import SwiftUI
 
@@ -23,9 +20,6 @@ struct ImageFile: View {
     /// would not: an agent regenerating a chart writes to the same name.
     let probe: FileProbe
     let description: String
-    /// The server the file is on, when it is not this Mac (037). Its picture is drawn
-    /// from the bytes the server sent, and there is nowhere here to open it.
-    var server: String? = nil
     /// For the way out when it cannot be drawn: see `OpenElsewhere`.
     var elsewhere: String? = nil
     var host: HostID = .mac
@@ -60,7 +54,8 @@ struct ImageFile: View {
             }
         }
         .task(id: probe) {
-            let loaded = server == nil ? NSImage(contentsOf: url) : NSImage(data: probe.prefix)  // store-ok: server is never nil in the store window: the host read it
+            // Drawn from the bytes the host sent (037, 058).
+            let loaded = NSImage(data: probe.prefix)
             image = loaded
             failed = loaded == nil
         }

@@ -250,7 +250,8 @@ extension DaemonCore {
 
     // MARK: Waits left from 052 (US4)
 
-    /// A wait saved by an older build: cleared at launch and never resumed (065). The
+    /// A wait saved by a 052 build: cleared at launch and never resumed (065). Kept while
+    /// 052 is after the #58 cut-off (051). The
     /// chat stays where it ended; the note it already has says why.
     func clearAllowanceWaitsLeftFromBefore() {
         for (id, agent) in agents where agent.allowanceWait != nil {

@@ -1,20 +1,22 @@
 import Foundation
 import Testing
+@testable import AgentsKit
 @testable import AgentsKitCore
 
-/// What 043 adds to a server's record, and that a `hosts.json` from before it still reads.
+/// What 043 adds to a server's record. A `hosts.json` from before it is past the cut-off
+/// (#58): it does not read, and is set aside rather than written over.
 @Suite("A server's record after 043")
 struct HostRecordTests {
     /// A host as 037 wrote it: today's encoding with every key 043 added taken out.
-    static func from037() throws -> Data {
+    static func from037(keeping kept: Set<String> = []) throws -> Data {
         var host = try ServerHost(sshName: "devbox")
         host.trustedFingerprint = "SHA256:abc"
         host.facts = ServerFacts(system: "Linux", architecture: .aarch64, home: "/home/agents", freeBytes: 1000,
                                  installedVersion: "0.1.0+1", installedSHA256: "ff", streamLocalForwarding: true)
         var hosts = HostList()
         try hosts.add(host)
-        let added: Set<String> = ["ownSignInOnly", "knownProjects", "libc", "downloader", "toolsetID",
-                                  "hasNpx", "hasOwnClaudeSignIn"]
+        let added = Set(["ownSignInOnly", "knownProjects", "libc", "downloader", "toolsetID",
+                         "hasNpx", "hasOwnClaudeSignIn"]).subtracting(kept)
         func strip(_ value: Any) -> Any {
             if let object = value as? [String: Any] {
                 return object.filter { !added.contains($0.key) }.mapValues(strip)
@@ -29,18 +31,36 @@ struct HostRecordTests {
         return stripped
     }
 
-    @Test func aHostsFileFrom037StillReads() throws {
-        let hosts = try JSONDecoder().decode(HostList.self, from: Self.from037())
+    @Test func aHostsFileFrom037DoesNotRead() throws {
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(HostList.self, from: Self.from037())
+        }
+    }
+
+    @Test func anUnreadableHostsFileIsSetAsideNotWrittenOver() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appending(path: "HostRecordTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appending(path: "hosts.json")
+        let old = try Self.from037()
+        try old.write(to: file)
+
+        #expect(HostStore(file: file).load().all.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: file.path), "moved, so a save cannot write over it")
+        let aside = try #require(try FileManager.default.contentsOfDirectory(atPath: folder.path)
+            .first { $0.hasPrefix("hosts.json.unreadable-") })
+        #expect(try Data(contentsOf: folder.appending(path: aside)) == old)
+    }
+
+    /// Facts are asked again on every connect: facts this build cannot read cost the
+    /// facts, never the server.
+    @Test func factsFromBefore043CostOnlyTheFacts() throws {
+        let hosts = try JSONDecoder().decode(HostList.self,
+                                             from: Self.from037(keeping: ["ownSignInOnly", "knownProjects"]))
         let host = try #require(hosts.all.first)
         #expect(host.sshName == "devbox")
-        #expect(host.ownSignInOnly == false)
-        #expect(host.knownProjects.isEmpty)
-        let facts = try #require(host.facts)
-        #expect(facts.installedSHA256 == "ff")
-        #expect(facts.libc == .unknown)
-        #expect(facts.toolsetID == nil)
-        #expect(facts.downloader == nil)
-        #expect(!facts.hasNpx && !facts.hasOwnClaudeSignIn)
+        #expect(host.facts == nil)
     }
 
     @Test func theNewFieldsSurviveARoundTrip() throws {

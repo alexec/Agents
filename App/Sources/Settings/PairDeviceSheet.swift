@@ -1,21 +1,25 @@
 import AgentsKitCore
-import CoreImage
-import CoreImage.CIFilterBuiltins
 import SwiftUI
 
-/// The code a phone scans to pair (security review, Phase 3).
+/// The code a phone scans to pair with the control plane (058, US5): a device code, good
+/// for five minutes and one device.
 ///
-/// It holds this Mac's key and a secret good for five minutes or one device. The sheet
-/// asks for a fresh one each time it opens and lets it go when it closes, so a code is
-/// only ever working while somebody is looking at it. It closes itself on the device
-/// that used it appearing in the list.
+/// The sheet asks for a fresh one each time it opens and lets it go when it closes, so a
+/// code is only ever working while somebody is looking at it. It says who paired once a
+/// client the control plane did not have before appears.
 struct PairDeviceSheet: View {
-    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @State private var code: DaemonAPI.PairingCode?
+    let control: ControlSettingsModel
+    @State private var shown: DaemonAPI.ControlCodeShown?
     @State private var problem: String?
-    @State private var paired: Device?
-    @State private var known: Set<UUID> = []
+    /// Who was there when the code was made, so whoever it lets in can be named.
+    @State private var before: Set<UUID> = []
+
+    /// The client that arrived since the code was made: the code let it in, and is spent.
+    private var paired: ClientRecord? {
+        guard shown != nil else { return nil }
+        return control.clients.first { !before.contains($0.id) }
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -24,19 +28,20 @@ struct PairDeviceSheet: View {
             if let paired {
                 Label("\(paired.name) is paired", systemImage: "checkmark.circle")
                     .appText(.reading)
-                Text("It can reach this Mac at home and away.")
+                Text("It reaches your agents through the control plane, as a Device.")
                     .foregroundStyle(.secondary)
-            } else if let code {
-                Text("Open Agents on your iPhone or iPad, on this Wi-Fi, and scan this code.")
+            } else if let shown {
+                Text("Open Agents on your iPhone or iPad and scan this code.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     // Wrapped, not cut short: the sheet is narrow and this is the instruction.
                     .fixedSize(horizontal: false, vertical: true)
-                QRCode(text: code.text)
+                QRCode(text: shown.text)
                     .frame(width: 220, height: 220)
                     .accessibilityLabel("Pairing code")
+                    .accessibilityValue(shown.text)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(remaining(until: code.expires, now: context.date))
+                    Text(remaining(until: shown.expires, now: context.date))
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -58,57 +63,16 @@ struct PairDeviceSheet: View {
         .padding(24)
         .frame(width: 380)
         .task {
-            known = Set(model.devices.map(\.id))
-            do {
-                code = try await model.startPairing()
-            } catch let error as JSONRPCError {
-                problem = error.message
-            } catch {
-                problem = "Couldn't make a pairing code: \(error.localizedDescription)"
-            }
+            before = Set(control.clients.map(\.id))
+            shown = await control.startCode(forHost: false, grant: .device)
+            if shown == nil { problem = control.problem ?? "Couldn't make a pairing code." }
         }
-        .onChange(of: model.devices) { _, devices in
-            // The device that used the code: the one not here when the sheet opened.
-            if paired == nil, let new = devices.first(where: { !known.contains($0.id) }) {
-                paired = new
-                code = nil
-            }
-        }
-        .onDisappear {
-            if paired == nil { Task { await model.stopPairing() } }
-        }
+        .onDisappear { Task { await control.stopCodes() } }
     }
 
     private func remaining(until expires: Date, now: Date) -> String {
         let seconds = max(0, Int(expires.timeIntervalSince(now)))
         if seconds == 0 { return "This code has run out. Close this and pair again." }
         return String(format: "Good for %d:%02d", seconds / 60, seconds % 60)
-    }
-}
-
-/// A QR code, drawn sharp at any size: one pixel per module from Core Image, scaled up
-/// without smoothing.
-private struct QRCode: View {
-    let text: String
-
-    var body: some View {
-        if let image {
-            Image(decorative: image, scale: 1)
-                .interpolation(.none)
-                .resizable()
-                .aspectRatio(1, contentMode: .fit)
-                .padding(10)
-                // A code is read dark on light, whatever the theme.
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private var image: CGImage? {
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data(text.utf8)
-        filter.correctionLevel = "M"
-        guard let output = filter.outputImage else { return nil }
-        return CIContext().createCGImage(output, from: output.extent)
     }
 }

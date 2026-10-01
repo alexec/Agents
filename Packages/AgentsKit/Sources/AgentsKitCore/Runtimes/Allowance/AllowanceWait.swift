@@ -22,6 +22,4 @@ public struct AllowanceWait: Codable, Hashable, Sendable {
         self.blocks = blocks
         self.from = from
     }
-
-    public func isDue(now: Date) -> Bool { resumeAt <= now }
 }

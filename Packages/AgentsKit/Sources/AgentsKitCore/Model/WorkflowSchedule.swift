@@ -56,18 +56,6 @@ public struct WorkflowSchedule: Codable, Hashable, Sendable {
         self.days = days
     }
 
-    /// Lenient about the two range minutes, for the reason `Workflow` is lenient about
-    /// `settings`: a schedule from an older daemon has neither, and means the whole of
-    /// both hours by it.
-    public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        minutes = try c.decode(Set<Int>.self, forKey: .minutes)
-        hours = try c.decode(ClosedRange<Int>.self, forKey: .hours)
-        startMinute = try c.decodeIfPresent(Int.self, forKey: .startMinute) ?? 0
-        endMinute = try c.decodeIfPresent(Int.self, forKey: .endMinute) ?? 30
-        days = try c.decode(Set<Weekday>.self, forKey: .days)
-    }
-
     /// Whether a given moment is one this schedule names.
     ///
     /// Seconds are not looked at: the caller decides which window of time it is asking

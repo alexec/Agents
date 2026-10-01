@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import Foundation
 import Observation
 
@@ -30,17 +27,11 @@ final class ServerCredentials {
     @ObservationIgnored private let checker: CredentialCheck
 
     init(locations: StoreLocations, checker: CredentialCheck = CredentialCheck()) {
-        #if AGENTS_STORE
         // The container is the window's own folder.
         store = CredentialStore(locations: locations, fileRoot: nil)
-        #else
-        WindowFiles.prepare()
-        let files = WindowFiles.support.standardizedFileURL
-        let root = locations.root.standardizedFileURL
-        store = CredentialStore(locations: locations, fileRoot: files.path == root.path ? nil : files)
-        #endif
         self.checker = checker
         // A Claude token from before 056 (or 047's OpenAI key) is lent to nothing now.
+        // Kept while 056 is after the #58 cut-off (051).
         store.forgetKindsNoLongerTaken()
         records = store.records()
     }

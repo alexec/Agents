@@ -30,10 +30,4 @@ extension EmptyState {
                    systemImage: "folder")
     }
 
-    /// The project's folder was moved or deleted outside the app.
-    static var missingFolder: EmptyState {
-        EmptyState(title: "Folder is missing",
-                   detail: "Put it back, or archive this project.",
-                   systemImage: "exclamationmark.triangle")
-    }
 }

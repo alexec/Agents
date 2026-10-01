@@ -12,7 +12,9 @@ checks or write a watcher around it. Say in your report that you shipped it.
 .claude/skills/ship-app/scripts/ship.sh
 ```
 
-`--no-mac` installs the iPhone and iPad only. `--no-devices --no-build` only
+`--no-mac` installs the iPhone and iPad only. `--no-linux` skips rebuilding the Linux
+hosts (`scripts/build-linux-agentsd.sh`, into `App/Resources/servers`), which the build
+otherwise does first, since Agents Host carries them and a stale one cannot join. `--no-devices --no-build` only
 relaunches the Mac. `--device <UDID>` (repeatable) picks one device. `--now`
 relaunches the Mac after 3s instead of 20s.
 
@@ -43,19 +45,13 @@ back, the log must show:
 - both `com.alexecollins.agentshost.*` jobs with pids and `CLAUDE vars: 0`;
 - a `window:` line.
 
-## The switch (058, T105a), once
+## Since the switch
 
-If the developer window's own jobs (`com.alexecollins.agents.control` / `.host`) are
-still loaded, the script stops and says so. `--switch` moves them across, and **only with
-Alex's go-ahead**. He has to press Run it here, approve Login Items, press Move Across…
-and pair the window, iPhone and iPad again. Until he does, nothing hosts agents. The
-switch:
-1. quits the developer window, puts a fresh developer build over its copy (the running one
-   predates the flag), and runs `Agents --remove-services` from it, which unregisters its
-   jobs. If they stay loaded, it boots them out, and Alex turns Agents off under Login Items;
-2. stops the old `agents-bridge` copies;
-3. moves `~/Library/Application Support/Agents Control` aside;
-4. installs and opens Agents Host and the new window.
+The developer window and its own jobs (`com.alexecollins.agents.control` / `.host`) are
+gone: T105a moved this Mac to Agents Host on 2026-09-30, and T106 removed that window
+and the bridge. If `launchctl print gui/$(id -u)/com.alexecollins.agents.control` still
+finds a job, it is a leftover: ask Alex before booting it out, and turn "Agents" off
+under Login Items.
 
 ## Devices
 

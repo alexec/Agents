@@ -6,14 +6,12 @@ import Foundation
 /// arrives. Reconnecting after the window died is the same three steps, which is why
 /// there is no special case for it.
 ///
-/// It does not know what it is connected over. The Mac hands it a Unix socket and the
-/// means to start the helper; a phone hands it a mailbox. Everything below this line
+/// It does not know what it is connected over. A helper on the Mac hands it a Unix
+/// socket; the apps hand it a control plane's WebSocket. Everything below this line
 /// is the same either way, which is the whole reason a remote is not a protocol
 /// change.
 public actor DaemonClient {
     public enum ConnectError: Error, Sendable {
-        case noHelper(lookedIn: [String])
-        case couldNotStartHelper(String)
         case couldNotConnect
         /// A root so deep that the socket inside it cannot be addressed. Only ever
         /// seen by somebody who named the root themselves.

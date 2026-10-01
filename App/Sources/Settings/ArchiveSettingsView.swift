@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// Settings ▸ General ▸ Archived agents (051): how long archived agents are kept, and how

@@ -68,20 +68,6 @@ struct TranscriptReader {
         index.scanned = index.lineEnds.last ?? 0
     }
 
-    var count: Int {
-        get throws {
-            var index = Index()
-            try extend(&index)
-            return index.count
-        }
-    }
-
-    func page(before: Int?, limit: Int) throws -> TranscriptPage {
-        var index = Index()
-        try extend(&index)
-        return try page(index, before: before, limit: limit)
-    }
-
     /// A page out of an index that is already up to date.
     func page(_ index: Index, before: Int?, limit: Int) throws -> TranscriptPage {
         let total = index.count

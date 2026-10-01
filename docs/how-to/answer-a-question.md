@@ -97,5 +97,5 @@ sandbox, turned on in its settings, stops it answering the app.
   before you answered. The conversation says **Nobody answered this question before the
   agent ended.** Send a prompt telling it to carry on.
 - **No notification on the iPhone or iPad.** Check that notifications are allowed for the
-  app on the device. On the Mac, **Settings ▸ Devices** lists each paired device and
-  whether it can show notifications.
+  app on the device. On the Mac, **Settings ▸ Control plane ▸ Clients** lists each
+  paired device.

@@ -1,15 +1,22 @@
 ---
 name: run-app
-description: Build, launch and drive this Mac app (Agents) on a scratch daemon of its own, so a change can be seen working without touching the real daemon or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Daemon/, Bridge/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`.
+description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Daemon/, Remote/, Packages/AgentsKit or Packages/ControlPlane needs proving beyond `swift test`.
 ---
 
 # Run and test this app
 
-The window is one thing and the agents are another: `agentsd` owns them, and the
-root it is pointed at *is* its identity — its lock, its socket, its agents. Two
-roots are two daemons that know nothing of each other. That is the whole basis
-of this skill: you get a daemon of your own, so nothing you do reaches the
-user's agents, and nothing of theirs reaches yours.
+The window is one thing and the agents are another. Since 058 there are three
+pieces, as on the real Mac:
+- **this Mac's host**, `agentsd`, owns the agents. The root it is pointed at *is* its
+  identity: its lock, its socket, its agents;
+- **the control plane**, `agents-control`, which the host dials out to;
+- **the window**, the sandboxed App Store build (`AgentsStore`), a client of the control
+  plane like the phone. It starts nothing.
+
+That is the whole basis of this skill: you get all three of your own, so nothing you
+do reaches the user's agents, and nothing of theirs reaches yours. The helpers come
+out of a scratch build of Agents Host; Agents Host itself is not run (its launch
+agents are the real Mac's).
 
 **Test your own change. Do not hand the user a list of steps to walk.** Almost
 everything the window can do, the socket can do too, with no screen involved.
@@ -21,7 +28,7 @@ genuinely visual — and say what you already saw.
 ```sh
 S=.claude/skills/run-app/scripts
 
-# 1. build and launch on a fresh root (prints ROOT, APP_PID, DAEMON_PID)
+# 1. build and launch on a fresh root (prints ROOT, APP_PID, DAEMON_PID, CONTROL_PID, CONTROL_URL)
 eval "$($S/launch.sh --slug mychange)"        # /tmp/run-mychange
 
 # 2. give it something to work in — you may create scratch projects freely
@@ -40,35 +47,41 @@ $S/shot.sh $ROOT /tmp/run-mychange-1.png        # then Read the png
 $S/stop.sh $ROOT
 ```
 
-`launch.sh` builds with `xcodegen generate` and
-`xcodebuild -scheme Agents -destination 'platform=macOS' -configuration Debug
--derivedDataPath build/DD -skipPackagePluginValidation`. Skip the build with
-`--no-build` when nothing has changed since the last one. The build log is at
-`/tmp/run-<slug>-build.log`.
+`launch.sh` builds with `xcodegen generate`, then `xcodebuild -scheme AgentsHost`
+and `-scheme AgentsStore`, one after the other, into the one `build/DD`, with `-skipPackagePluginValidation`. Skip the build with `--no-build` when
+nothing has changed since the last one. The build log is at
+`/tmp/run-<slug>-build.log`. Then it:
+1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
+   no Bonjour (its log is `$ROOT/control/control.log`);
+2. starts `agentsd --control-code <host code>` on `$ROOT`, as Agents Host's launch agent
+   would, with this session's `CLAUDE_*` and `AGENTS_*` taken out of its environment;
+3. opens the window with `AGENTS_CONTROL=<operator code>` and `--walk run-<slug>`: it
+   pairs by itself, into `walks/run-<slug>/` in its container, so it never touches the
+   user's own window's pairing, which lives in the same container.
 
-A bare root opens on "Where should your agents run?" (058) and starts no daemon
-until somebody answers. `launch.sh` seeds the root with an empty `projects.json`,
-which keeps it on the old way: the window starts `agentsd` on the root itself.
-To walk the first-run screen or Run One Here, pass `--first-run`. It leaves the
-root bare, prints `DAEMON_PID=none`, and doesn't wait for a socket. Run One Here
-then starts the control plane and host as launchd jobs, with their plists in
-`$ROOT/control`.
+`--no-window` leaves the window out, for work the socket proves on its own.
+`--first-run` opens the window unpaired, on frame K, and prints `PAIR_CODE` to paste
+into **Connect…**. To walk Agents Host itself, open a scratch build of it with
+`AGENTS_ROOT=$ROOT` (its plists and jobs are the root's, and `stop.sh` boots them out). Make
+more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client device
+--home $ROOT/control`, where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents
+Host.app`.
 
 ## Rules that are not optional
 
-1. **Never `pkill -f agentsd`, never `killall Agents`.** This session is hosted
-   by the user's own Agents app and its daemon. The only daemon you may kill is
-   the pid in *your* root's `daemon.lock`, which is what `stop.sh` does.
+1. **Never `pkill -f agentsd` or `agents-control`, never `killall Agents`.** This
+   session is hosted by the user's own Agents Host and its daemon. The only helpers
+   you may kill are the pids in *your* root's `daemon.lock` and
+   `control/control.pid`, which is what `stop.sh` does.
 2. **Always stop what you started**, including when the test failed or you are
    about to hand back. A left-behind window and daemon are the user's problem to
    find. `stop.sh $ROOT` removes the root too; `stop.sh $ROOT --keep` leaves it
-   for reading and still stops the processes. It also boots out the launchd
-   jobs Run One Here made for this root, before it kills anything. They are
-   KeepAlive, so a daemon killed first is started again at once.
-3. **Launch with `env -i`** — `launch.sh` does. `open` hands this session's
-   environment to the app, and the `CLAUDE_*` variables in it reach every
-   runtime the daemon starts; an agent started that way stops authenticating
-   the moment this session ends.
+   for reading and still stops the processes.
+3. **Keep this session out of what you start** — `launch.sh` does. `open` hands
+   this session's environment to the app, and the `CLAUDE_*` variables in it reach
+   every runtime the daemon starts; an agent started that way stops authenticating
+   the moment this session ends. The window is opened with `env -i`; the host keeps
+   the rest of the environment, because a runtime started with none cannot sign in.
 4. **Keep the root short.** A Unix socket may be named with 104 bytes and no
    more, and the socket is `<root>/daemon.sock`. `/tmp/run-<slug>` is the shape, and `/tmp/ag-*` is not: the live tests in
    `AgentsKitTests` keep their own temporary roots there.
@@ -79,8 +92,8 @@ then starts the control plane and host as launchd jobs, with their plists in
 
 ## Driving it without the screen
 
-`rpc.py` speaks the daemon's JSON-RPC — one object per line over the socket, the
-same protocol the window speaks. Every method is in
+`rpc.py` speaks the host's JSON-RPC — one object per line over its socket, the
+same protocol the window speaks through the control plane. Every method is in
 `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`; read
 `Method` and `Notification` there rather than guessing.
 
@@ -124,8 +137,9 @@ c.call("permissions/answer", {"permissionID": note["params"]["id"],
 
 This is how a daemon-side change is proved: state on the record, an entry in the
 transcript, a notification that arrived, a file on disk. `$ROOT/daemon.log` has
-what it was doing; `$ROOT/agents/<uuid>/agent.json` and `transcript.jsonl` are
-the record itself and are plain to `cat`.
+what it was doing (an `uplink:` line says it joined the control plane);
+`$ROOT/agents/<uuid>/agent.json` and `transcript.jsonl` are the record itself and
+are plain to `cat`. `$ROOT/control/control.log` is the control plane's side.
 
 A runtime the daemon starts inherits your scratch root, so an agent you start
 this way is real: it costs money and it edits files. Point it at `$ROOT/work`,
@@ -181,5 +195,20 @@ done.
 
 ## Two windows on one root
 
-Don't. One root is one daemon and one window's worth of state. If you need a
-second surface, launch a second root with another slug and stop both.
+Don't. One root is one host, one control plane and one window's pairing. If you need
+a second surface, launch a second root with another slug and stop both. The windows
+share one container and its defaults (the bundle id is the real window's), so a
+walk can still move the user's own window's sidebar or selected project; the
+pairing is the one thing kept apart.
+
+## The Remote
+
+The Remote is built for the generic simulator only, never booted here:
+
+```sh
+xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath build/DD -skipPackagePluginValidation build
+```
+
+A fake device (`FakeDeviceLiveTests`) stands in for a phone against a scratch
+control plane; the phone's look is the user's.

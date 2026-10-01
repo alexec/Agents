@@ -105,10 +105,6 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
             return await relay(DaemonAPI.Method.agentsParkHelper,
                                DaemonAPI.HelperRequest(token: token, agentID: agentID),
                                fallback: "Parked.")
-        case .archive(let agentID):
-            return await relay(DaemonAPI.Method.agentsArchiveHelper,
-                               DaemonAPI.HelperRequest(token: token, agentID: agentID),
-                               fallback: "Archived.")
         case .list:
             return await relay(DaemonAPI.Method.agentsListHelpers,
                                DaemonAPI.ListHelpersRequest(token: token),
@@ -207,10 +203,8 @@ let toolsetsFolder: URL? = {
 
 let daemon: Daemon
 do {
-    let control: Daemon.Control? = if let socket = commandLine.controlSocket {
-        Daemon.Control(socket: URL(fileURLWithPath: socket), host: commandLine.hostID, name: commandLine.hostName)
-    } else if commandLine.controlNetwork {
-        Daemon.Control(socket: nil, host: commandLine.hostID, name: commandLine.hostName, code: commandLine.controlCode)
+    let control: Daemon.Control? = if commandLine.controlNetwork {
+        Daemon.Control(name: commandLine.hostName, code: commandLine.controlCode)
     } else {
         nil
     }

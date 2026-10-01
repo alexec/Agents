@@ -85,24 +85,6 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
         self.settings = settings
     }
 
-    /// Lenient about `settings` for the reason `WorkflowSummary` is lenient about
-    /// `isArchived`: a daemon and a window of different vintages should disagree about
-    /// a field, not fail. A `Workflow` is sent whole inside a `WorkflowSummary`, so an
-    /// older daemon omitting this key would otherwise cost the newer window every
-    /// workflow in the project rather than one line of its description.
-    public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        workflowID = try c.decode(String.self, forKey: .workflowID)
-        folder = try c.decode(URL.self, forKey: .folder)
-        name = try c.decode(String.self, forKey: .name)
-        triggers = try c.decode([WorkflowTrigger].self, forKey: .triggers)
-        mode = try c.decode(WorkflowMode.self, forKey: .mode)
-        prompt = try c.decode(String.self, forKey: .prompt)
-        problem = try c.decodeIfPresent(WorkflowProblem.self, forKey: .problem)
-        unknownFields = try c.decodeIfPresent([String: JSONValue].self, forKey: .unknownFields) ?? [:]
-        settings = try c.decodeIfPresent(WorkflowSettings.self, forKey: .settings) ?? WorkflowSettings()
-    }
-
     /// A file name turned into something worth reading: `morning-build-check` becomes
     /// `Morning build check`.
     public static func defaultName(for workflowID: String) -> String {
@@ -205,21 +187,6 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
     public var workflowID: String { workflow.workflowID }
-
-    /// Lenient about `isArchived` for the same reason `WorkflowState` is: a window and
-    /// a daemon of different vintages should disagree about a flag, not fail.
-    public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        workflow = try c.decode(Workflow.self, forKey: .workflow)
-        isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
-        overLimit = try c.decodeIfPresent(WorkflowLimit.self, forKey: .overLimit)
-        nextFireAt = try c.decodeIfPresent(Date.self, forKey: .nextFireAt)
-        lastOutcome = try c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)
-        isRunning = try c.decodeIfPresent(Bool.self, forKey: .isRunning) ?? false
-        causingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .causingEvent)
-        causingEventName = try c.decodeIfPresent(String.self, forKey: .causingEventName)
-        awaitingApproval = try c.decodeIfPresent(WorkflowApproval.self, forKey: .awaitingApproval)
-    }
 
     public init(workflow: Workflow, isArchived: Bool = false,
                 overLimit: WorkflowLimit? = nil, nextFireAt: Date? = nil,

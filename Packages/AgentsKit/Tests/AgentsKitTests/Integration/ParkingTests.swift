@@ -136,7 +136,8 @@ struct ParkingTests {
         #expect(agent.report?.outcome == .needsAnswer, "the report is kept for when it comes back")
         let project = await core.allProjects().first { Project.standardize($0.folder) == work }
         #expect(project?.needsInput == false)
-        #expect(project?.counts[.parked] == nil, "left out of the counts an older phone reads")
+        #expect(project?.counts[.parked] == 1)
+        #expect(project?.counts[.needsAttention] == nil, "parked, not waiting on the person")
     }
 
     @Test func parkedSurvivesTheDaemonGoingAway() async throws {

@@ -1,6 +1,3 @@
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AgentsKitCore
 import Network
 import SwiftUI
@@ -26,11 +23,7 @@ struct ConnectSheet: View {
     private var isHostCode: Bool { if case .host = parsed?.purpose { true } else { false } }
 
     private var hostCodeWords: String {
-        #if AGENTS_STORE
         "This is a code for a host. Give it to Agents Host on the Mac or server that should run the agents. To connect this window, use a code from Pair a Mac."
-        #else
-        "This is a code for a host. This Mac will run agents for \(parsed?.name ?? "that control plane"), and keep running them with this window closed. This window won’t be connected to it; for that, use a code from Pair a Mac."
-        #endif
     }
 
     var body: some View {
@@ -87,15 +80,9 @@ struct ConnectSheet: View {
                 } else {
                     Button("Cancel") { dismiss() }
                     if connecting { ProgressView().controlSize(.small) }
-                    #if AGENTS_STORE
                     Button("Connect") { connect() }
                         .keyboardShortcut(.defaultAction)
                         .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || connecting || isHostCode)
-                    #else
-                    Button(isHostCode ? "Run a Host Here" : "Connect") { connect() }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || connecting)
-                    #endif
                 }
             }
         }
@@ -111,9 +98,6 @@ struct ConnectSheet: View {
             return
         }
         if case .host = parsed.purpose {
-            #if !AGENTS_STORE
-            runHostHere(parsed)
-            #endif
             return
         }
         connecting = true
@@ -130,25 +114,6 @@ struct ConnectSheet: View {
         }
     }
 }
-
-#if !AGENTS_STORE
-extension ConnectSheet {
-    private func runHostHere(_ parsed: ControlCode) {
-        connecting = true
-        answer = nil
-        Task {
-            do {
-                let membership = try await ControlConfig.runHostHere(with: parsed, services: .forThisWindow)
-                model.becameHost(of: membership.name)
-                joined = membership.name
-            } catch {
-                answer = "\(error)"
-            }
-            connecting = false
-        }
-    }
-}
-#endif
 
 /// Control planes advertising themselves on this network, by name.
 @MainActor

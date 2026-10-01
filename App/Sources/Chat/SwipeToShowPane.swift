@@ -5,8 +5,7 @@ import SwiftUI
 /// exchanged; left to right, and it goes again.
 ///
 /// The phone's swipe, on a trackpad. AppKit sends it as scroll events, read here as
-/// `SwipeToArchive` reads them over a card: sideways and kept going, not the page
-/// wandering while it is scrolled. A code block or table that scrolls sideways itself
+/// sideways and kept going, not the page wandering while it is scrolled. A code block or table that scrolls sideways itself
 /// keeps its own gesture.
 ///
 /// Watched for as long as the chat is on screen, and taken only when they land on it:

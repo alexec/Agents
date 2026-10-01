@@ -30,9 +30,8 @@ public enum AppTool {
     public static let askForm = "ask_form"
 
     // Four that act on other agents (028): start one in this project, and stop, park
-    // or list the ones this agent started. archive_agent is still a name a transcript
-    // or older conversation may carry, but it is no longer offered — only the person
-    // archives. Never offered to an agent another agent started.
+    // or list the ones this agent started. Only the person archives. Never offered to
+    // an agent another agent started.
 
     /// Start an agent in the caller's own project.
     public static let startAgent = "start_agent"
@@ -42,9 +41,6 @@ public enum AppTool {
 
     /// Park an agent the caller started, to come back to later.
     public static let parkAgent = "park_agent"
-
-    /// Archive an agent the caller started, which gives its place back.
-    public static let archiveAgent = "archive_agent"
 
     /// The agents the caller started that are still here, and the places in use.
     public static let listMyAgents = "list_my_agents"
@@ -96,7 +92,7 @@ public enum AppTool {
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
-        archiveAgent, listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
+        listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, publishEvent, listSessions, readSession,
     ]
 

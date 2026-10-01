@@ -19,6 +19,8 @@ agent started and finished from the phone without going back to the Mac.
 
 - You have finished [Your first agent](first-agent.md), so your Mac has a project with an
   agent in it.
+- Agents Host runs on your Mac, and the Agents window is paired with it. See
+  [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
 - Your iPhone and your Mac are on the same Wi-Fi network.
 - You have Xcode and a free Apple developer account, so that Xcode can put an app on
   your own phone.
@@ -36,27 +38,26 @@ The first time, Xcode asks you to pick a team for signing. Pick your own. Your p
 also ask you to trust the developer, under **Settings ▸ General ▸ VPN & Device
 Management**.
 
-You should see Agents open on your phone and say it is looking for your Mac.
+You should see Agents open on your phone and say **Connect to your agents**.
 
-## 2. Open the door on your Mac
+## 2. Show a code on your Mac
 
-The phone reaches the Mac through a small helper, `agents-bridge`, that you start
-yourself and stop when you are done. In Xcode, choose the **agents-bridge** scheme with
-**My Mac** as the destination, and choose **Product ▸ Run**.
+The phone reaches your agents through your control plane, the one Agents Host runs on
+your Mac. Only a device you have paired can reach it, and you pair it once, by scanning a
+code.
 
-You should see the phone say **Pair with your Mac**.
+In the Agents window on your Mac, open **Settings ▸ Control plane**, click **Show** beside
+**Clients**, and click **Pair a Device…**.
+
+You should see a code to scan, good for five minutes.
 
 ## 3. Pair the phone
 
-Only a device you have paired can reach the Mac, and you pair it once, by scanning a code.
+On your phone, tap **Scan the Code** and point the camera at the code. The first time, the
+phone asks to use the camera; allow it.
 
-1. On your Mac, open **Agents ▸ Settings ▸ Devices** and choose **Pair a Device…**. A code
-   appears, good for five minutes.
-2. On your phone, tap **Scan the Code** and point the camera at it. The first time, the
-   phone asks to use the camera; allow it.
-
-You should see the Mac say your phone **is paired**, and the phone show **Projects**, with
-the project you made in the first tutorial.
+You should see your phone listed under **Clients** on the Mac, as a **Device**, and the
+phone show **Projects**, with the project you made in the first tutorial.
 
 ## 4. Find your first agent
 
@@ -107,18 +108,11 @@ to say next. On the Mac, the same agent shows the same conversation.
 
 ## 7. Take it with you
 
-Leave your Mac's Wi‑Fi: turn Wi‑Fi off on the phone, or walk out of range, and keep the
-conversation open. Within a few seconds a line appears at the top:
-
-> **Away** — slower, through iCloud
-
-The conversation carries on. Send another prompt and it arrives, only a little later than
-at home, and a question the agent asks can be answered from here. Tap **Terminal**
-and it says **Needs the same network as your Mac**; it opens by itself when you are back.
-Turn Wi‑Fi on again and the line goes.
-
-This works because the phone paired with your Mac in step 3, which also gave it what it
-needs to reach the Mac through iCloud. Your Mac needs to stay awake with the bridge running.
+Away from home, the phone reaches the control plane at its address when it can. When it
+cannot, because the control plane is on your Mac at home, it can go through the relay
+instead, through your own iCloud account, and says **Away — slower, through iCloud**. In
+this build Agents Host cannot switch the relay on yet; see
+[How the phone and iPad reach your agents](../explanation/phone-and-ipad.md#at-home-and-away).
 
 ## Where next
 

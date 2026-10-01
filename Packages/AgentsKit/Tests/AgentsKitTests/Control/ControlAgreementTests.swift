@@ -45,10 +45,8 @@ struct ControlAgreementTests {
                     == derived.withUnsafeBytes { Data($0) })
         }
         let secret = Data((0..<32).map { UInt8($0 &+ 1) })
-        let code = ControlCode(purpose: .host, controlKey: Data([0x04]) + Data(repeating: 2, count: 64),
-                               secret: secret, addresses: ["127.0.0.1:1"], name: "t")
-        #expect(ControlAgreement.codeIdentity(secret: secret, host: true) == ControlKeys.codeIdentity(code))
-        let codeKey = ControlKeys.codeKey(secret)
+        let codeKey = HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: secret),
+                                             salt: Data("agents-control-code-v1".utf8), info: Data(), outputByteCount: 32)
         #expect(ControlAgreement.codeKey(secret) == codeKey.withUnsafeBytes { Data($0) })
         #expect(ControlAgreement.sha256(secret) == Data(SHA256.hash(data: secret)))
     }

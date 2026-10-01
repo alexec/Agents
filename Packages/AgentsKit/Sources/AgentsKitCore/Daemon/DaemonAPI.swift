@@ -45,10 +45,6 @@ public enum DaemonAPI {
         /// window and every phone offers the same one first (029). The whole map: it is
         /// a handful of entries, and a client holding a copy needs all of it.
         public static let modesRemembered = "modes/remembered"
-        /// Modes a window remembered before the daemon did. Fills gaps only: a runtime
-        /// the daemon already has a mode for keeps it, so an old window's memory can
-        /// never overwrite a choice made since on another device (029).
-        public static let modesImport = "modes/import"
         /// Where the person is, told by every surface when it comes to the front, goes
         /// behind, changes conversation, or sees input after a quiet spell (021 FR-011).
         /// No timestamp is accepted: the daemon stamps arrival with its own clock.
@@ -156,9 +152,10 @@ public enum DaemonAPI {
         /// Letting one agent carry on past the per-agent limit, or giving it a
         /// tighter ceiling of its own. The reader's call, never an agent's.
         public static let agentsSetCeiling = "agents/setCeiling"
-        /// Not the app's to call. This is how the MCP server we hand to every agent
-        /// gets what the agent passed it back to the agent's own record. Since 023
-        /// the older door for the chips half of `agentsFinishTurn`.
+        /// Not the app's to call. Since 023 the older door for the chips half of
+        /// `agentsFinishTurn`; the helper stopped relaying it when the tool names were
+        /// retired (09-29). Kept for a helper binary from before then, which is after the
+        /// #58 cut-off (051).
         public static let agentsSuggestPrompts = "agents/suggestPrompts"
         /// Nor this one. Another of that MCP server's tools: the agent asking that a
         /// file be put in front of the user.
@@ -201,13 +198,12 @@ public enum DaemonAPI {
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
-        /// `stop_agent`, `park_agent`, `archive_agent` or `list_my_agents` (028). The
+        /// `stop_agent`, `park_agent` or `list_my_agents` (028). The
         /// caller is the token, and the token alone decides the project and what it
         /// may touch.
         public static let agentsStartHelper = "agents/startHelper"
         public static let agentsStopHelper = "agents/stopHelper"
         public static let agentsParkHelper = "agents/parkHelper"
-        public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
         /// `list_sessions` and `read_session` (065): the caller's project, read only.
         public static let agentsListSessions = "agents/listSessions"
@@ -243,7 +239,8 @@ public enum DaemonAPI {
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
         /// about whether the work is finished. Since 023 the older door for the
-        /// outcome half of `agentsFinishTurn`.
+        /// outcome half of `agentsFinishTurn`, kept like `agentsSuggestPrompts` above
+        /// for a helper from before 09-29 (#58).
         public static let agentsReportOutcome = "agents/reportOutcome"
         /// Both of those at once (023): the one call that ends a turn, relayed by the
         /// helper when an agent calls `finish_turn`. The two above stay for the older
@@ -316,7 +313,7 @@ public enum DaemonAPI {
         public static let runtimesMarkAvailable = "runtimes/markAvailable"
         /// What another daemon learned about a shared allowance (052, R6): the Mac's
         /// window carries it between the Mac and each server. The name is 052's, kept so
-        /// an older server still hears it.
+        /// an older server still hears it: renaming it buys nothing (#58).
         public static let poolApplyAllowances = "pool/applyAllowances"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
@@ -348,7 +345,6 @@ public enum DaemonAPI {
         /// The window answers it with the sign-in sheet rather than an error.
         public static let signInNeeded = "runtime/signInNeeded"
         public static let agentUsage = "agent/usage"
-        public static let agentPlan = "agent/plan"
         public static let agentElicitation = "agent/elicitation"
         public static let agentTerminalOutput = "agent/terminalOutput"
         /// An agent has asked that a file be shown. Unlike a suggested prompt, which
@@ -549,9 +545,8 @@ public enum DaemonAPI {
             self.unmeasuredAgents = unmeasuredAgents
         }
 
-        /// An older daemon sends neither new field. Both default rather than fail, so
-        /// the response degrades to silence — no figure at all — never to a wrong
-        /// number.
+        /// Written by hand for `counts` alone, which a newer daemon may key by a group
+        /// this build has not heard of.
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             project = try c.decode(Project.self, forKey: .project)
@@ -565,9 +560,9 @@ public enum DaemonAPI {
             for (name, count) in try c.decode([String: Int].self, forKey: .counts) {
                 if let group = AgentGroup(rawValue: name) { counts[group] = count }
             }
-            costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
-            unmeasuredAgents = try c.decodeIfPresent(Int.self, forKey: .unmeasuredAgents) ?? 0
-            retiredCount = try c.decodeIfPresent(Int.self, forKey: .retiredCount) ?? 0
+            costToDate = try c.decode([String: Decimal].self, forKey: .costToDate)
+            unmeasuredAgents = try c.decode(Int.self, forKey: .unmeasuredAgents)
+            retiredCount = try c.decode(Int.self, forKey: .retiredCount)
         }
     }
 
@@ -778,9 +773,8 @@ public enum DaemonAPI {
             self.sendID = sendID
         }
 
-        /// An older app sends only the text, so attachments are optional on the way in.
-        /// A remote built before 014 sends no origin, and its prompts are the person's,
-        /// which is correct.
+        /// Attachments and origin are optional on the way in: a caller that sends only the
+        /// text means a prompt of the person's with nothing attached.
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             agentID = try c.decode(UUID.self, forKey: .agentID)
@@ -1345,8 +1339,9 @@ public enum DaemonAPI {
         public var agentID: UUID
         /// Nil when the question has been answered and is no longer waiting.
         public var request: PermissionRequest?
-        /// Identifies a single withdrawn question. Nil supports older daemons
-        /// and an explicit withdrawal of all questions for an agent.
+        /// Identifies a single withdrawn question. Every withdrawal this daemon sends
+        /// carries one; nil is a daemon from before 09-27 withdrawing them all, kept
+        /// because that is after the #58 cut-off (051).
         public var requestID: UUID?
         public init(agentID: UUID, request: PermissionRequest?, requestID: UUID? = nil) {
             self.agentID = agentID
@@ -1548,7 +1543,8 @@ public enum DaemonAPI {
         public var scrollback: Data
         public var dropped: Int
         public var startedAt: Date
-        /// Where the shell was started. Nil from an older daemon (053).
+        /// Where the shell was started. Nil from a daemon before 053, which is after the
+        /// #58 cut-off (051), so it stays optional.
         public var folder: URL?
 
         public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
@@ -1690,6 +1686,10 @@ public enum DaemonAPI {
     }
 
     public enum Failure {
+        // Retired: nothing raises these any more, and they are not to be given out again:
+        // -32006 (a prompt to a working agent), -32019 (already answered), -32020 (no
+        // such device), -32021 (no such need), -32037 (credential refused, now a
+        // notification), -32046 (stop the turn first, 052).
         public static let runtimeNotFound = -32001
         public static let runtimeWillNotStart = -32002
         /// The runtime would not start because its command sandbox could not be set up
@@ -1705,9 +1705,6 @@ public enum DaemonAPI {
         /// Retire now on an agent that is not archived, or that something still holds
         /// (051). The message is the reason.
         public static let retireRefused = -32051
-        /// No longer raised: a prompt sent to a working agent waits its turn rather
-        /// than being refused. The number is kept so an older window still reads it.
-        public static let alreadyRunning = -32006
         /// The user's login shell is missing, or the agent's folder has gone (FR-024).
         public static let shellWillNotStart = -32010
         /// A restart was asked for on a shell that is still running.
@@ -1747,28 +1744,12 @@ public enum DaemonAPI {
         /// waits on that agent's queue, because losing what somebody typed because a
         /// budget was reached would be the worst possible reading of "control cost".
         public static let dayLimitReached = -32018
-        /// A question that was already settled — by another device, by the Mac, or by
-        /// the agent giving up on it. Raised instead of `noSuchAgent`, which is what a
-        /// second answer used to be told and which reads as though the agent had gone.
-        ///
-        /// 013's tasks proposed -32018 for this. Feature 010 took that number first,
-        /// so it is -32019 here and `noSuchDevice` is -32020. The file already carries
-        /// one collision at -32010; it does not need a second.
-        public static let alreadyAnswered = -32019
-        /// A device id that is not in the store — never paired, or revoked since.
-        public static let noSuchDevice = -32020
-        /// A need id that is not outstanding — met, or never existed (021).
-        public static let noSuchNeed = -32021
         /// A daemon asked to quit while a turn is in flight (037).
         public static let busy = -32040
-        /// A chat asked to move to another runtime while its turn is running (052, US5).
-        public static let stopTheTurnFirst = -32046
         /// A server daemon had to start a runtime for this request and has no sign-in to
         /// start it with. Nothing was started, so the same request (same `sendID`) can be
         /// sent again after `credentials/lend` (043). `data`: `runtime`, `offered`.
         public static let credentialWanted = -32036
-        /// The provider refused the credential a runtime was started with (043, FR-016).
-        public static let credentialRefused = -32037
         /// `credentials/lend` to a daemon that is not a server's (043, D5).
         public static let notAServer = -32038
         /// `credentials/lend` for a runtime this connection did not offer, or on a
@@ -1941,11 +1922,6 @@ public enum DaemonAPI {
     /// Keyed by runtime id. What `modes/remembered` answers and `modes/changed` carries.
     public typealias RememberedModes = [String: JSONValue]
 
-    public struct ModesImportRequest: Codable, Sendable {
-        public var modes: RememberedModes
-        public init(modes: RememberedModes) { self.modes = modes }
-    }
-
     public struct RememberedOptionsRequest: Codable, Sendable {
         public var runtimeID: String
         public var cwd: URL
@@ -2014,7 +1990,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// What an agent passes to `stop_agent`, `park_agent` or `archive_agent`. The id
+    /// What an agent passes to `stop_agent` or `park_agent`. The id
     /// is a string so one that is not a UUID is refused in words rather than failing
     /// to decode.
     public struct HelperRequest: Codable, Sendable {
@@ -2538,8 +2514,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// `device/changed`: the whole record, or that it was forgotten (046). A build from
-    /// before 046 finds no `device` in a removal and decodes nothing, which is ignoring it.
+    /// `device/changed`: the whole record, or that it was forgotten (046).
     public struct DeviceNotification: Codable, Sendable, Hashable {
         public var id: UUID
         public var device: Device?
@@ -2571,7 +2546,8 @@ public enum DaemonAPI {
     /// What `devices/announce` answers: the device's record, as it always was, with the
     /// Mac's relay key beside its fields when a bridge has registered one (046). The one
     /// object is both, so a phone from before 046 decodes the record and keeps `macKey`
-    /// among the fields it does not know.
+    /// among the fields it does not know. Kept past the #58 cut-off: the flat shape is
+    /// the protocol now, and the bridge path it travels is 058 T106/T042's to replace.
     public struct AnnounceReply: Codable, Sendable, Hashable {
         public var device: Device
         public var macKey: Data?

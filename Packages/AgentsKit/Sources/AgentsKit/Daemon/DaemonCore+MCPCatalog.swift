@@ -3,10 +3,6 @@ import Foundation
 
 /// Searching the MCP Registry and adding servers (060, contracts/mcp-methods.md).
 extension DaemonCore {
-    func useForMCPRegistry(session: URLSession, endpoints: MCPRegistryEndpoints) {
-        mcpRegistrySession = session
-        mcpRegistryEndpoints = endpoints
-    }
 
     var mcpRegistry: MCPRegistry {
         MCPRegistry(session: mcpRegistrySession, endpoints: mcpRegistryEndpoints)

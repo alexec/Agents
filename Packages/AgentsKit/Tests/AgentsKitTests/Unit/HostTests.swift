@@ -68,10 +68,9 @@ struct HostTests {
         #expect(ProjectKey(stored: key.stored) == key)
     }
 
-    @Test func aBarePathIsThisMacs() {
-        let key = ProjectKey(stored: "/Users/alex/src/api")
-        #expect(key?.host == .mac)
-        #expect(key?.folder.path == "/Users/alex/src/api")
+    /// What a window kept before servers (037) is past the cut-off (#58): no project.
+    @Test func aBarePathIsNoProject() {
+        #expect(ProjectKey(stored: "/Users/alex/src/api") == nil)
     }
 
     @Test func theSamePathOnTwoHostsIsTwoProjects() {

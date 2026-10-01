@@ -28,8 +28,6 @@ final class RemoteModel {
     private(set) var link: RemoteLink = .direct
     /// What is getting in the relay's way, when anything is (046, FR-014).
     private(set) var relayTrouble: RelayTrouble?
-    /// Whether this device holds the Mac's relay key, so it can reach the Mac from away.
-    private(set) var hasMacKey = AwayLink.macKey != nil
     private(set) var lastHeardFrom: Date?
     private(set) var problem: String?
 
@@ -99,10 +97,6 @@ final class RemoteModel {
         return fresh
     }
 
-    /// The two links, when this is the real app rather than the fake (046).
-    @ObservationIgnored private let away: AwayLink?
-    @ObservationIgnored private var watchingLink: Task<Void, Never>?
-    @ObservationIgnored private var watchdog: Task<Void, Never>?
 
     /// The link the Mac is reached by, kept so a second connection can be made over it
     /// to a control plane's other hosts (058, US4).
@@ -123,21 +117,11 @@ final class RemoteModel {
         client = DaemonClient(link: link)
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
-        away = link as? AwayLink
         // The oldest of a long conversation go from the page as it runs on; what they
         // say the agent touched is kept with the rest of the history read for Files.
         work.onTrimmed = { [weak self] dropped in
             guard let self, let agentID = work.watching else { return }
             for entry in dropped { touchedEarlier[agentID, default: TouchedPaths()].absorb(entry) }
-        }
-        guard let away else { return }
-        self.link = away.chooser.link
-        away.onTrouble { [weak self] trouble in
-            Task { @MainActor in self?.heard(trouble) }
-        }
-        let links = away.chooser.links()
-        watchingLink = Task { [weak self] in
-            for await link in links { self?.link = link }
         }
     }
 
@@ -145,10 +129,8 @@ final class RemoteModel {
     /// the terminal, the live page and files behind "needs the same network".
     var isAway: Bool { link == .relayed }
 
-    /// Nothing to reach the Mac with, near or far: never paired, or forgotten by the
-    /// Mac (FR-009). Since the security review's Phase 3 the direct link is locked with
-    /// the Mac's key too, so this is true at home as well as away.
-    var needsPairing: Bool { (away != nil && !hasMacKey && !isConnected) || forgottenByControlPlane }
+    /// Nothing to reach the control plane with: never paired, or forgotten (FR-009).
+    var needsPairing: Bool { baseLink is NotPairedLink || forgottenByControlPlane }
 
     /// The control plane refused this device's key: forgotten, or never known (058, US5).
     private(set) var forgottenByControlPlane = false
@@ -163,19 +145,14 @@ final class RemoteModel {
 
     private(set) var pairing: Pairing = .idle
 
-    /// Pair with the Mac whose code was just scanned (security review, Phase 3).
-    ///
-    /// The code carries the Mac's key and a one-time secret. The secret locks a
-    /// connection that may do one thing, announce this device, and the Mac's key is kept
-    /// from the code, never from the reply: a Mac that cannot finish the handshake was
-    /// not the one on the screen.
     /// Set once this phone has paired with a control plane: the app makes a new model on
     /// that link (058, US5).
     private(set) var pairedWithControlPlane = false
 
+    /// Pair with the control plane whose device code was just scanned (058, US5):
+    /// announced over its WebSocket.
     func pair(scanned text: String) async {
-        // A control plane's device code (058, US5): announced over its WebSocket.
-        if let control = ControlCode(text: text) {
+        if let control = ControlCode(text: text), control.url != nil {
             guard case .client = control.purpose else {
                 pairing = .failed("That code is for adding a host, not a phone.")
                 return
@@ -194,80 +171,11 @@ final class RemoteModel {
             }
             return
         }
-        guard let code = DaemonAPI.PairingCode(text: text) else {
-            pairing = .failed("That isn't a pairing code from Agents on your Mac.")
-            return
-        }
-        guard let key else {
-            pairing = .failed("This \(UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone") has no key to pair with.")
-            return
-        }
-        pairing = .pairing
-        do {
-            let link = NetworkLink(howLongToLook: .seconds(10), name: code.name) {
-                (LinkKey.pairingIdentity(code.secret), LinkKey.pairing(code.secret))
-            }
-            let transport = try await link.transport()
-            let connection = JSONRPCConnection(transport: transport)
-            await connection.start()
-            let announced = await Result {
-                try await connection.call(
-                    DaemonAPI.Method.devicesAnnounce,
-                    try JSONValue.encoding(DaemonAPI.DeviceAnnouncement(id: deviceID, publicKey: key.publicKey,
-                                                                        name: UIDevice.current.name, kind: kind)))
-            }
-            await connection.close()
-            let reply = try announced.get().decode(DaemonAPI.AnnounceReply.self)
-            if let told = reply.macKey, told != code.macKey {
-                pairing = .failed("That Mac answered with a different key from its code, so it wasn't paired.")
-                return
-            }
-            AwayLink.keepMacKey(code.macKey)
-            AwayLink.keepMacName(code.name)
-            hasMacKey = true
-            thisDevice = reply.device
-            pairing = .paired
-            note("pairing: paired with \(code.name)")
-            await reconnectNow()
-        } catch NetworkLink.Failure.noMacOnThisNetwork {
-            pairing = .failed("Couldn't find \(code.name) on this Wi-Fi. Pair on the same network as your Mac.")
-        } catch let error as JSONRPCError {
-            pairing = .failed(error.message)
-        } catch {
-            note("pairing: failed: \(error)")
-            pairing = .failed("Your Mac didn't take that code. It may have run out: show a new one and scan again.")
-        }
+        pairing = .failed("That isn't a pairing code from your control plane. Show a new one in Settings ▸ Control plane and scan it again.")
     }
 
     func forgetPairingOutcome() {
         pairing = .idle
-    }
-
-    /// Start looking for the Mac again now, not at the end of a backed-off wait.
-    private func reconnectNow() async {
-        reconnecting?.cancel()
-        reconnecting = nil
-        await connect()
-    }
-
-    private func heard(_ trouble: RelayTrouble) {
-        switch trouble {
-        case .forgotten, .notPaired:
-            AwayLink.keepMacKey(nil)
-            hasMacKey = false
-            relayTrouble = nil
-        case .slowedDown(let seconds):
-            guard seconds > 3 else { return }
-            relayTrouble = trouble
-            Task { [weak self] in
-                try? await Task.sleep(for: .seconds(seconds + 2))
-                if case .slowedDown = self?.relayTrouble { self?.relayTrouble = nil }
-            }
-        case .noICloud, .iCloudFull:
-            relayTrouble = trouble
-        case .macNotAnswering, .gap:
-            break
-        }
     }
 
     /// Put what the person typed on a page on disk, through the daemon, which is the one
@@ -706,23 +614,6 @@ final class RemoteModel {
         _ = await send(start: request)
     }
 
-    // MARK: The project's worktrees (030)
-
-    /// The branch each project folder is on, for the chat's folder chip, as the Mac
-    /// shows it. Missing until asked, and for a folder in no repository.
-    private(set) var projectFolderBranches: [URL: String] = [:]
-
-    /// Asked when a chat opens and when its turn ends, since someone may have checked
-    /// out another branch meanwhile. Never polled.
-    func loadProjectFolderBranch(of agent: Agent) async {
-        guard agent.worktree == nil else { return }
-        let folder = agent.projectFolder
-        let answer = try? await client.call(DaemonAPI.Method.worktreesList,
-                                            DaemonAPI.WorktreesListRequest(folder: folder),
-                                            returning: DaemonAPI.WorktreesListResponse.self)
-        projectFolderBranches[folder] = answer?.projectFolderBranch
-    }
-
     private func startRefusalBeforeSending(in folder: URL) -> String? {
         if isStale { return "Your Mac is not answering, so nothing was started." }
         guard let summary = work.project(folder) else { return nil }
@@ -781,7 +672,6 @@ final class RemoteModel {
 
     /// The question the open conversation is blocked on, if it still is.
     var questionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
-    var questionForSelection: PermissionRequest? { work.permission(for: selection) }
 
     /// The form it is blocked on instead, if it is one of those.
     ///
@@ -966,14 +856,11 @@ final class RemoteModel {
             problem = nil
             backOff = .seconds(1)
             listen()
-            // Before anything is asked over it, so a link that goes quiet now is let go
-            // rather than holding this attempt, and every later one, for ever.
-            watchTheLink()
             await announce()
             await identify()
             startPresence()
             presence?.connected()
-            if link == .relayed || away?.chooser.link == .relayed { relayTrouble = nil }
+            if link == .relayed { relayTrouble = nil }
             await files.reconnected()
             await refreshEverything()
             watchOtherHosts()
@@ -1147,18 +1034,6 @@ final class RemoteModel {
                    let account = try? notification.params?.decode(RuntimeAccount.self) {
                     self.accounts[account.runtimeID] = account
                 }
-                // The Mac's set-up moved to a control plane (058, T085): go there, as
-                // this device, without pairing again.
-                if notification.method == DaemonAPI.Notification.controlMoved, !self.pairedWithControlPlane,
-                   let moved = try? notification.params?.decode(DaemonAPI.ControlMoved.self) {
-                    do {
-                        try RemoteControl.adoptMove(moved, device: self.deviceID)
-                        note("moved: the control plane is now at \(moved.url)")
-                        self.pairedWithControlPlane = true
-                    } catch {
-                        note("moved: could not keep the new address: \(error)")
-                    }
-                }
                 if notification.method == DaemonAPI.Notification.deviceChanged,
                    let change = try? notification.params?.decode(DaemonAPI.DeviceNotification.self),
                    change.id == self.deviceID {
@@ -1174,32 +1049,7 @@ final class RemoteModel {
     private func lostTouch() async {
         isConnected = false
         listening = nil
-        watchdog?.cancel()
-        away?.chooser.lost()
         await connect()
-    }
-
-    /// Leaving home, noticed (046, R8): a direct link whose Wi‑Fi went does not always
-    /// fail, it can go quiet. So while on it the Mac is asked every five seconds and given
-    /// three to answer; one that does not is let go, and the reconnect finds the relay.
-    /// The relay goes quiet too — a Mac asleep, iCloud unreachable — and is asked the
-    /// same, with the patience a round trip through iCloud needs.
-    private func watchTheLink() {
-        watchdog?.cancel()
-        guard let away else { return }
-        let client = client
-        watchdog = Task {
-            while !Task.isCancelled {
-                let relayed = away.chooser.link == .relayed
-                try? await Task.sleep(for: relayed ? .seconds(20) : .seconds(5))
-                guard !Task.isCancelled else { return }
-                if await !client.answers(within: relayed ? .seconds(20) : .seconds(3)) {
-                    // Closed by `answers`; the listener hears it and reconnects.
-                    await client.disconnect()
-                    return
-                }
-            }
-        }
     }
 
     /// A call that changes something, sent so that it happens once even if the link
@@ -1281,11 +1131,6 @@ final class RemoteModel {
                                              name: UIDevice.current.name, kind: kind),
                 returning: DaemonAPI.AnnounceReply.self)
             thisDevice = reply.device
-            // The Mac's key comes from the pairing code and nowhere else (security
-            // review, Phase 3). One that disagrees is only said, never kept.
-            if let macKey = reply.macKey, macKey != AwayLink.macKey {
-                note("pairing: the Mac answered with a key other than the one paired with")
-            }
             note("pairing: announced as \(deviceID)")
         } catch {
             note("pairing: announce failed: \(error)")
@@ -1310,7 +1155,7 @@ final class RemoteModel {
             }
             // The relay's wake-up (046): a push when the Mac writes to this device's
             // zone, so a relayed session looks at once. Polling still works without it.
-            if hasMacKey || RemoteControl.relayKey != nil {
+            if RemoteControl.relayKey != nil {
                 do {
                     try await CloudKitRelayChannel().subscribe(device: deviceID)
                     note("relay: subscribed")
@@ -1329,10 +1174,8 @@ final class RemoteModel {
     /// decides nothing about where the need belongs.
     func receivedPush(_ userInfo: [AnyHashable: Any]) async {
         note("push: \(userInfo)")
-        if CloudKitRelayChannel.isRelayPush(userInfo) {
-            away?.poke()
-            return
-        }
+        // The relay's wake-up: a relayed session polls, so there is nothing to poke.
+        if CloudKitRelayChannel.isRelayPush(userInfo) { return }
         guard let pushed = CloudKitMailbox.pushed(from: userInfo) else { return }
         // A need has moved here or away, which is the one thing the widget counts.
         publishAttention()

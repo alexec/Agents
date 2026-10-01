@@ -19,9 +19,16 @@ struct ControlMoveTests {
     }
 
     func records(_ control: URL) async throws -> ControlRecords {
-        let records = ControlRecords(store: ControlPlane.store(root: control))
+        let records = ControlRecords(store: FolderStore(root: control.appendingPathComponent("store", isDirectory: true)))
         try await records.load()
         return records
+    }
+
+    /// What `agents-control move` does: the copy's store, with settings of its own.
+    func prepare(_ control: URL, from locations: StoreLocations) async throws {
+        let records = try await records(control)
+        _ = try await records.settings(orMake: { ControlSettings(name: "Studio", machineID: "test") })
+        try await ControlMove.prepare(records, from: locations)
     }
 
     @Test func pairedDevicesBecomeDeviceClientsWithTheirOwnKeys() async throws {
@@ -30,7 +37,7 @@ struct ControlMoveTests {
         let phone = device("Alex's iPhone")
         try DeviceStore(locations: locations).save([phone])
 
-        try await ControlMove.prepare(control: control, from: locations)
+        try await prepare(control, from: locations)
 
         let clients = try await records(control).clients
         #expect(clients.count == 1)
@@ -46,9 +53,9 @@ struct ControlMoveTests {
         let (locations, control) = try roots()
         defer { try? FileManager.default.removeItem(at: control.deletingLastPathComponent()) }
         try DeviceStore(locations: locations).save([device("iPad")])
-        try await ControlMove.prepare(control: control, from: locations)
+        try await prepare(control, from: locations)
         let first = try await records(control).clients
-        try await ControlMove.prepare(control: control, from: locations)
+        try await prepare(control, from: locations)
         #expect(try await records(control).clients == first)
     }
 
@@ -57,7 +64,7 @@ struct ControlMoveTests {
         defer { try? FileManager.default.removeItem(at: control.deletingLastPathComponent()) }
         try await records(control).save(ClientRecord(id: UUID(), name: "Studio", kind: .mac,
                                                      publicKey: Data([1]), grant: .operator, paired: Date()))
-        await #expect(throws: ControlMove.Refusal.alreadyUsed) { try await ControlMove.prepare(control: control, from: locations) }
+        await #expect(throws: ControlMove.Refusal.alreadyUsed) { try await prepare(control, from: locations) }
     }
 
     @Test func theWindowsServersAreKeptRenamedNotDeleted() throws {
@@ -113,7 +120,7 @@ struct ControlMoveTests {
         try await records(control).save(ClientRecord(id: UUID(), name: "Studio", kind: .mac,
                                                      publicKey: Data([1]), grant: .operator, paired: Date()))
 
-        await #expect(throws: ControlMove.Refusal.alreadyUsed) { try await ControlMove.prepare(control: control, from: locations) }
+        await #expect(throws: ControlMove.Refusal.alreadyUsed) { try await prepare(control, from: locations) }
 
         #expect(try FileManager.default.contentsOfDirectory(atPath: locations.root.path).sorted() == before)
         #expect(try Data(contentsOf: locations.devices) == devicesBefore)

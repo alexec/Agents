@@ -7,7 +7,9 @@ import Foundation
 /// test exhausts it: a state that fell through would be an agent the user cannot see.
 public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case needsAttention
-    /// Legacy wire value, retained so an older project summary still decodes.
+    /// Never assigned since groups were simplified (0ca8ebc5, 09-26). Kept because that
+    /// is after the #58 cut-off (051): a daemon from before it still counts sessions
+    /// here, and the badge and the widget add them to Needs you.
     case blocked
     /// Waiting on something the app watches — agents, a time, events — and will carry
     /// on by itself when it comes. Nobody has to do anything.
@@ -34,8 +36,8 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         }
     }
 
-    /// The groups shown in the panel. Archived is revealed on demand.
-    /// The legacy Blocked value is decoded but no longer assigned to a session.
+    /// The groups shown in the panel. Archived is revealed on demand. Blocked is not
+    /// one: see the case.
     public static let live: [AgentGroup] = [.needsAttention, .waiting, .running, .finished, .stopped, .parked]
 
     /// Place a session by what happens next. Questions, unread endings, unresolved

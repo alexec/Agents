@@ -50,8 +50,7 @@ struct AppServiceTests {
         // The one call that ends a turn first, the ones that act mid-turn after it.
         // The two older names for its halves are gone (023 R5).
         // The four agent tools (028 + park) sit after the workflow tool, for an agent
-        // that may use them — which is the default.
-        // archive_agent is no longer offered. The three lease tools (036) follow
+        // that may use them — which is the default. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042). Moving (053) rides on
         // finish_turn. The two session tools (065) sit after the agent tools, for every
         // agent.
@@ -389,21 +388,6 @@ struct AppServiceTests {
         await service.close()
     }
 
-    /// An older conversation may still send archive. The call reaches the sink; the
-    /// daemon keeps the outcome and declines the ask.
-    @Test func anArchiveAskStillReachesTheSink() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Merged and cleaned up.",
-                          "afterwards": "archive"],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.words.afterwards == .archive)
-        await service.close()
-    }
-
     /// A word that is neither, and each park pairing that would bury something,
     /// refused before the daemon is asked.
     @Test func anAskThatDoesNotFitIsRefusedWhole() async throws {
@@ -434,10 +418,7 @@ struct AppServiceTests {
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "  Renamed 14 call sites.  ",
                           "title": "Call sites renamed",
-                          "next_prompts": .array([
-                              ["label": "Run the tests", "prompt": "Run the tests and fix what fails"],
-                              ["label": "Push", "prompt": "Push the branch"],
-                          ])],
+                          "next_prompt": ["label": "Run the tests", "prompt": "Run the tests and fix what fails"]],
         ])
         #expect(result["isError"]?.boolValue == false)
         #expect(await box.outcome == "done")
@@ -456,7 +437,7 @@ struct AppServiceTests {
         for arguments in [
             JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied"]),
             JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied",
-                              "next_prompts": .array([])]),
+                              "next_prompt": .null]),
         ] {
             let result = try await client.call("tools/call", [
                 "name": .string(AppService.finishTurnToolName), "arguments": arguments,
@@ -476,7 +457,7 @@ struct AppServiceTests {
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "succeeded", "message": "all good", "title": "Tidied",
-                          "next_prompts": .array([["label": "A", "prompt": "Do A"]])],
+                          "next_prompt": ["label": "A", "prompt": "Do A"]],
         ])
         #expect(result["isError"]?.boolValue == true)
         let text = result["content"]?.arrayValue?.first?["text"]?.stringValue ?? ""
@@ -544,16 +525,18 @@ struct AppServiceTests {
         await service.close()
     }
 
-    @Test func fiveNextPromptsBecomeTheFirst() async throws {
+    /// The list conversations were briefed with before 031 is past the cut-off (#58):
+    /// the call lands, and the list is not read.
+    @Test func aListOfNextPromptsIsNotRead() async throws {
         let box = FinishBox()
         let (client, service) = await pair(finishTurn: finishing(box))
-        let many = (1...5).map { JSONValue.object(["label": .string("\($0)"), "prompt": .string("Do \($0)")]) }
-        _ = try await client.call("tools/call", [
+        let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
-                          "next_prompts": .array(many)],
+                          "next_prompts": .array([["label": "Listed", "prompt": "Do listed"]])],
         ])
-        #expect(await box.prompts.map(\.label) == ["1"])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.prompts.isEmpty)
         await service.close()
     }
 
@@ -568,34 +551,6 @@ struct AppServiceTests {
         ])
         #expect(result["isError"]?.boolValue == false)
         #expect(await box.prompts.map(\.prompt) == ["Push the branch"])
-        await service.close()
-    }
-
-    /// Both forms in one call: the one is what the agent meant, and wins.
-    @Test func theOneWinsOverTheList() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
-                          "next_prompt": ["label": "One", "prompt": "Do one"],
-                          "next_prompts": .array([["label": "Listed", "prompt": "Do listed"]])],
-        ])
-        #expect(await box.prompts.map(\.label) == ["One"])
-        await service.close()
-    }
-
-    /// A list whose first entry is blank keeps the first that is not.
-    @Test func aBlankFirstEntryGivesWayToTheNext() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
-                          "next_prompts": .array([["label": "Blank", "prompt": "  "],
-                                                  ["label": "Real", "prompt": "Do it"]])],
-        ])
-        #expect(await box.prompts.map(\.label) == ["Real"])
         await service.close()
     }
 
@@ -676,7 +631,7 @@ struct AppServiceTests {
     /// once ended with lease_resource, and every release became an extension.
     @Test func noToolNameEndsWithAnother() {
         let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
-                     AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent,
+                     AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent,
                      AppTool.listMyAgents,
                      AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
                      AppTool.listResources]

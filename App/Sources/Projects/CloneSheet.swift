@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AppKit
 import SwiftUI
 
@@ -66,13 +63,8 @@ struct CloneSheet: View {
     }
 
     private func destination(for remote: GitRemote) -> String {
-        #if AGENTS_STORE
         // The host clones into its own home folder; the window cannot see where that is.
         return "~/" + remote.folderName
-        #else
-        let folder = DaemonCore.defaultCloneParent().appending(path: remote.folderName)
-        return (folder.path as NSString).abbreviatingWithTildeInPath
-        #endif
     }
 
     private func clone() {

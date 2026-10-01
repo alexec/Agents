@@ -2,14 +2,13 @@
 // Fill a scratch store with agents for 051's walks and measures.
 //
 //   scripts/seed-archived.swift --root /tmp/run-051 --count 3 --archived-days-ago 31 \
-//       --transcript-bytes 2000000 [--legacy] [--live] [--project /tmp/run-051/project]
+//       --transcript-bytes 2000000 [--live] [--project /tmp/run-051/project]
 //
 // Each agent is the real-sized fixture record (`archived-agent.json`, whose option and
 // command lists are what make an archived record 24 KB) with a fresh id and dates, and a
 // transcript of about the size asked for, made of valid entries. It prints the ids.
 //
-// Archived by default, `--archived-days-ago` back. `--legacy` leaves `archivedAt` off, as
-// a record from before 051 has it. `--live` writes a finished agent instead.
+// Archived by default, `--archived-days-ago` back. `--live` writes a finished agent instead.
 //
 // It refuses any root under ~/Library: the real store is never a place to seed.
 
@@ -29,7 +28,6 @@ var root: String?
 var count = 1
 var daysAgo = 31.0
 var transcriptBytes = 20_000
-var legacy = false
 var live = false
 var project: String?
 
@@ -41,7 +39,6 @@ while let argument = arguments.next() {
     case "--count": count = need(Int(value()), "--count wants a number")
     case "--archived-days-ago": daysAgo = need(Double(value()), "--archived-days-ago wants a number")
     case "--transcript-bytes": transcriptBytes = need(Int(value()), "--transcript-bytes wants a number")
-    case "--legacy": legacy = true
     case "--live": live = true
     case "--project": project = value()
     default: fail("unknown argument \(argument)")
@@ -86,7 +83,7 @@ for index in 0 ..< count {
     } else {
         record["state"] = "archived"
         record["archivedReason"] = "byUser"
-        record["archivedAt"] = legacy ? nil : stamp.string(from: archivedAt)
+        record["archivedAt"] = stamp.string(from: archivedAt)
     }
 
     let folder = rootURL.appending(path: "agents/\(id.uuidString)")

@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import AppKit
 import SwiftUI
 
@@ -54,23 +51,6 @@ struct AgentsSetupPage<Content: View>: View {
             content
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
-/// The four things both Settings ▸ Shared and a project's configuration page set up.
-struct AgentsSetupView: View {
-    var place: AgentsPlace
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text(place.explainer)
-                .appText(.fine).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            AgentsInstructionsSection(place: place)
-            AgentsSkillsSection(place: place)
-            ProjectMCPSection(place: place)
-            AgentsPluginsSection(place: place)
         }
     }
 }

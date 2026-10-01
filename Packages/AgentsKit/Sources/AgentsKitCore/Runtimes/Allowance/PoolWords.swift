@@ -135,28 +135,6 @@ public enum PoolWords {
         "\(runtimeName(runtimeID)) is rate limited. Trying again at \(time(retryAt, now: now))."
     }
 
-    /// Why a chat moved, and where its model came from: a switch row's last column.
-    public static func why(_ record: SwitchRecord) -> String {
-        let from = runtimeName(record.from.runtimeID)
-        let reason = switch record.reason {
-        case .allowanceSpent: "\(from)’s allowance ran out"
-        case .overage: "\(from) began paid extra usage"
-        case .creditUsedUp: "\(from)’s credit was used up"
-        case .rateLimitPersisted: "\(from) stayed rate limited"
-        case .runtimeFailed: "\(from) failed"
-        case .everyoneOutResumed: "an allowance came back"
-        case .byHand: "By you"
-        }
-        guard let model = record.carried.first(where: { $0.optionID == "model" }) else { return reason }
-        let named = model.to?.stringValue ?? "its default"
-        let source = switch model.source {
-        case .level(let name): ", from \(name)"
-        case .person: ", chosen on the sheet"
-        default: ""
-        }
-        return "\(reason) · \(named)\(source)"
-    }
-
     /// The switch note in the chat (FR-013, FR-015a; wireframes §2): a headline and the
     /// lines under it, in order.
     public static func switchNote(_ record: SwitchRecord, now: Date) -> (headline: String, lines: [String]) {
@@ -227,34 +205,6 @@ public enum PoolWords {
         default:
             return "\(name) is out."
         }
-    }
-
-    /// The agent row's line under a chat that moved (wireframes §2).
-    public static func carriedOnFrom(_ record: SwitchRecord, now: Date) -> String {
-        "⇄ Carried on from \(runtimeName(record.from.runtimeID)) at \(time(record.at, now: now))"
-    }
-
-    /// Every runtime is out; the first due a check is checked then (US4).
-    public static func waiting(_ runtimeID: String, until: Date, now: Date) -> String {
-        "Every runtime in the pool is out. This chat waits, and \(runtimeName(runtimeID)) is checked at \(time(until, now: now)); it carries on once one is back."
-    }
-
-    /// Every runtime is out and none is due a check: credit, which only the person brings back.
-    public static let everyoneOutNoTime =
-        "Every other runtime in the pool is out too, and none is due a check, so this chat stopped here."
-
-    public static func cameBack(_ runtimeID: String) -> String {
-        "\(runtimeName(runtimeID))’s allowance is back, so this chat carries on."
-    }
-
-    public static let stoppedWaiting = "Stopped waiting for an allowance. It carries on when you next prompt it."
-
-    /// Mark on a session waiting for an allowance — not the Waiting group's hourglass.
-    public static let waitingSymbol = "banknote"
-
-    /// The agent row's line while it waits (US4).
-    public static func waitingLine(_ wait: AllowanceWait, now: Date) -> String {
-        "Waiting for an allowance · checking \(runtimeName(wait.runtimeID)) at \(time(wait.resumeAt, now: now))"
     }
 
     public static func stillRateLimited(_ runtimeID: String) -> String {

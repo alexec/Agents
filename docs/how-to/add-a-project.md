@@ -42,9 +42,9 @@ Mac; your iPhone and iPad show the same list.
    The sheet closes at once. The project appears in the list with **Cloning…** under its
    name while it downloads, then becomes an ordinary project.
 
-   If you have added a Linux server, the **+** menu has **This Mac** and one entry per
+   If you have added a server, the **+** menu has **This Mac** and one entry per
    server; pick where the project should live first. See
-   [Add a Linux server](add-a-linux-server.md).
+   [Add a server](add-a-server.md).
 
 **Archive a project you are done with**
 
@@ -71,7 +71,7 @@ if you no longer want it. **Show in Finder** on the same menu takes you there.
 
 ## See also
 
-- [Add a Linux server](add-a-linux-server.md)
+- [Add a server](add-a-server.md)
 - [Start an agent in its own worktree](start-in-a-worktree.md)
 - [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md)
 - [Runtimes](../reference/runtimes.md)

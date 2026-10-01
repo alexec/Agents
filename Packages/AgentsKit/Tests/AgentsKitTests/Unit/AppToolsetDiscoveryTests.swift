@@ -93,9 +93,4 @@ struct AppToolsetDiscoveryTests {
         #expect(!d.locate(appCopyOnly).isAvailable)
     }
 
-    @Test func aRuntimeFromAnOlderDaemonIsNotAppCopyOnly() throws {
-        let json = #"{"id":"claude","name":"Claude","executable":"npx","arguments":[]}"#
-        let runtime = try JSONDecoder().decode(Runtime.self, from: Data(json.utf8))
-        #expect(runtime.usesAppCopyOnly == false)
-    }
 }

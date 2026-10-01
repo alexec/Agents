@@ -42,22 +42,6 @@ public struct ModeStore: Sendable {
         return true
     }
 
-    /// Fill the gaps from a window's older memory. A runtime already remembered here
-    /// keeps what it has, so a window that has been away cannot undo a choice made
-    /// since on another device. Answers whether anything was filled.
-    @discardableResult
-    public func importing(_ modes: DaemonAPI.RememberedModes) throws -> Bool {
-        var file = raw()
-        let known = remembered()
-        var filled = false
-        for (runtimeID, mode) in modes where known[runtimeID] == nil {
-            file[runtimeID] = try JSONValue.encoding(Entry(mode: mode, chosenAt: now().formatted(.iso8601)))
-            filled = true
-        }
-        if filled { try write(file) }
-        return filled
-    }
-
     private func raw() -> [String: JSONValue] {
         guard let data = try? Data(contentsOf: locations.modes),
               let file = try? StoreCoding.decoder.decode([String: JSONValue].self, from: data) else { return [:] }

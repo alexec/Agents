@@ -36,8 +36,6 @@ extension TranscriptEntry.Kind {
         case "toolCall", "toolCallUpdate":
             guard let call = try? payload["_0"]?.decode(ToolCall.self) else { return nil }
             return name == "toolCall" ? .toolCall(call) : .toolCallUpdate(call)
-        case "plan":
-            return .plan(payload["_0"] ?? .null)
         case "planUpdated":
             guard let plan = try? payload["_0"]?.decode(Plan.self) else { return nil }
             return .planUpdated(plan)
@@ -122,8 +120,6 @@ extension TranscriptEntry.Kind {
             return ["toolCall": ["_0": (try? JSONValue.encoding(call)) ?? .null]]
         case .toolCallUpdate(let call):
             return ["toolCallUpdate": ["_0": (try? JSONValue.encoding(call)) ?? .null]]
-        case .plan(let value):
-            return ["plan": ["_0": value]]
         case .planUpdated(let plan):
             return ["planUpdated": ["_0": (try? JSONValue.encoding(plan)) ?? .null]]
         case .usageRecorded(let usage):

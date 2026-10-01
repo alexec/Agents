@@ -1,7 +1,4 @@
 import AgentsKitCore
-#if !AGENTS_STORE
-import AgentsKit
-#endif
 import SwiftUI
 
 /// What an agent has had in the background, and a subagent's own steps (057, frame C).
@@ -62,26 +59,18 @@ struct BackgroundPane: View {
 /// A task's output file, opened in TextEdit: it has no extension anything else claims,
 /// and it is the runtime's file, not inside the agent's folders.
 enum BackgroundOutput {
-    /// This Mac's file opens where it is. Another host's is read through `files/read`
-    /// and opened from what came back (058, R11). A path the host will not give is
-    /// left unopened: it is not on this disk.
+    /// Read through `files/read` on the agent's host and opened from what came back
+    /// (058, R11), this Mac's included. A path the host will not give is left unopened.
     @MainActor
     static func open(_ item: BackgroundItem, of agent: Agent, model: AppModel) async {
         guard let path = item.outputFilePath else { return }
         let url = URL(fileURLWithPath: path)
-        let local: URL
-        if model.readsDisk(of: agent.host) {
-            local = url
-        } else if let text = await model.textFile(at: url, on: agent.host, agentID: agent.id) {
-            let ext = url.pathExtension.isEmpty ? "txt" : url.pathExtension
-            let temp = FileManager.default.temporaryDirectory
-                .appendingPathComponent("agents-output-\(item.id)")
-                .appendingPathExtension(ext)
-            guard (try? text.write(to: temp, atomically: true, encoding: .utf8)) != nil else { return }  // store-ok: the app's own temporary folder
-            local = temp
-        } else {
-            return
-        }
+        guard let text = await model.textFile(at: url, on: agent.host, agentID: agent.id) else { return }
+        let ext = url.pathExtension.isEmpty ? "txt" : url.pathExtension
+        let local = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agents-output-\(item.id)")
+            .appendingPathExtension(ext)
+        guard (try? text.write(to: local, atomically: true, encoding: .utf8)) != nil else { return }  // store-ok: the app's own temporary folder
         // Async because this function already is: the synchronous open is not the one
         // a concurrent context is offered.
         _ = try? await NSWorkspace.shared.open([local],  // store-ok: a copy in the app's own temporary folder
