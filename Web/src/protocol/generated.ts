@@ -276,7 +276,7 @@ export type CarriedSettingSource =
 
 export type ChangeSource = "reported" | "reportedAndSeen" | "seen";
 
-export type ChangeState = "modified" | "added" | "deleted" | "binary";
+export type ChangeState = "modified" | "added" | "deleted" | "binary" | "renamed" | "untracked";
 
 export interface ChangedFile {
   path: string;
@@ -290,6 +290,7 @@ export interface ChangedFile {
   inProgress: boolean;
   outsideFolder: boolean;
   firstLine?: number;
+  oldPath?: string;
 }
 
 export interface ChangedFileDetail {
@@ -651,6 +652,11 @@ export interface Headline {
   h3: string;
 }
 
+export interface HelperLimits {
+  running?: number;
+  notArchived?: number;
+}
+
 export type Hold = "firstDay" | "worktreeHasWork" | "workflowRunning" | "openInWindow";
 
 export type HostID = string & { readonly __brand: "HostID" };
@@ -806,6 +812,7 @@ export interface Project {
   addedAt: WireDate;
   laidOutAt?: WireDate;
   layoutVersion?: number;
+  helperLimits?: HelperLimits;
 }
 
 export interface ProjectSummary {
@@ -1494,7 +1501,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Block: { required: ["waits"], optional: ["checkAgainAt", "clearedAt", "clearedBy"] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
-  ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine"] },
+  ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
   ChangesList: { required: ["files", "git", "reportsEdits"], optional: [] },
@@ -1534,6 +1541,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
+  HelperLimits: { required: [], optional: ["running", "notArchived"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
@@ -1550,7 +1558,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify"] },
-  Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion"] },
+  Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits"] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: [] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
