@@ -11,6 +11,30 @@ import Foundation
 /// anyone, and a helper continuing a teammate's work is the same act. Nobody is asked
 /// first, because the sessions are the person's own and nothing leaves the project.
 extension DaemonCore {
+    public func labelVocabulary(_ request: DaemonAPI.LabelVocabularyRequest) -> [String] {
+        SessionLabelPolicy.vocabulary(in: request.folder, agents: agents.values).map(\.value)
+    }
+
+    /// A window or paired device changes labels as the person. The daemon assigns
+    /// ownership and saves the complete result in a single broadcast.
+    public func setSessionLabels(_ request: DaemonAPI.SetLabelsRequest) throws -> Agent {
+        guard var agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
+                               message: "That session no longer exists.")
+        }
+        do {
+            agent.labels = try SessionLabelPolicy.change(
+                current: agent.labels, add: request.add, remove: request.remove,
+                actor: .person,
+                projectLabels: SessionLabelPolicy.vocabulary(in: agent.projectFolder, agents: agents.values))
+        } catch {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: error.localizedDescription)
+        }
+        changed(agent)
+        return agent
+    }
+
     public func listSessions(_ request: DaemonAPI.ListSessionsRequest) throws -> String {
         let caller = try sessionCaller(token: request.token)
         return SessionLookup.list(in: caller.projectFolder, agents: agents.values, caller: caller.id)

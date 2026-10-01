@@ -580,9 +580,10 @@ extension DaemonCore {
     /// Start a new agent for a workflow, as its file says, and mark it as the
     /// workflow's.
     private func startAgent(for workflow: Workflow, run: WorkflowRun, prompt: String) async throws -> UUID {
-        let request = try await startRequest(settings: workflow.settings, folder: workflow.folder,
+        var request = try await startRequest(settings: workflow.settings, folder: workflow.folder,
                                              prompt: prompt, managesAgents: true)
-        let agentID = try await start(request)
+        request.labels = workflow.settings.labels
+        let agentID = try await start(request, startedBy: nil, labelOwner: .agent)
         if var agent = agents[agentID] {
             agent.startedByWorkflow = workflow.workflowID
             agent.startedByRun = run.id

@@ -13,7 +13,7 @@ shown. Archived chats stay under **Archived**, folded away until you open it.
 
 The status is what the agent's icon says when you hover over it, and what a screen reader
 reads. The Mac, iPhone and iPad use the same words. Only **Needs you** is drawn in
-colour.
+colour. Session labels appear beneath the title on Mac rows and phone cards; agent-owned labels use an outline, while person-owned labels have a filled background. The phone shows two labels on a card and a **+N** count for the rest. Labels remain on archived sessions.
 
 | Status | Group | What it means | What you can do |
 | --- | --- | --- | --- |

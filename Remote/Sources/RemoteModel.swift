@@ -19,6 +19,7 @@ import Observation
 @Observable
 final class RemoteModel {
     let work = AgentsModel()
+    private var labelVocabularies: [URL: [String]] = [:]
 
     /// Whether the Mac is answering, and when it last did.
     private(set) var isConnected = false
@@ -512,7 +513,7 @@ final class RemoteModel {
     /// project cannot take a new agent. Refused by the Mac, its sentence is shown as it
     /// is. Lost on the way back, nothing is assumed: the start is kept, and settled by
     /// its request id once the Mac is heard from again.
-    func startAgent(prompt: String, attachments: [Attachment] = []) async -> Bool {
+    func startAgent(prompt: String, attachments: [Attachment] = [], labels: [String] = []) async -> Bool {
         let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !words.isEmpty, !isStarting, let folder = startingIn else { return false }
         if let refusal = startRefusalBeforeSending(in: folder) {
@@ -542,8 +543,37 @@ final class RemoteModel {
         let request = DaemonAPI.StartRequest(
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
-            worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox)
+            worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
+            labels: labels)
         return await send(start: request)
+    }
+
+    func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async -> Bool {
+        do {
+            let agent: Agent = try await client.call(
+                DaemonAPI.Method.agentsSetLabels,
+                DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove),
+                returning: Agent.self)
+            work.upsert(agent)
+            await loadLabelVocabulary(in: agent.projectFolder)
+            return true
+        } catch {
+            problem = (error as? JSONRPCError)?.message ?? "That label change did not reach your Mac."
+            return false
+        }
+    }
+
+    func labelSuggestions(in folder: URL) -> [String] {
+        labelVocabularies[Project.standardize(folder)]
+            ?? SessionLabelPolicy.vocabulary(in: folder, agents: work.agents).map(\.value)
+    }
+
+    func loadLabelVocabulary(in folder: URL) async {
+        let folder = Project.standardize(folder)
+        guard let values = try? await client.call(
+            DaemonAPI.Method.agentsLabelVocabulary,
+            DaemonAPI.LabelVocabularyRequest(folder: folder), returning: [String].self) else { return }
+        labelVocabularies[folder] = values
     }
 
     private func send(start request: DaemonAPI.StartRequest) async -> Bool {
@@ -894,9 +924,22 @@ final class RemoteModel {
             for await notification in notifications {
                 guard let self else { return }
                 self.lastHeardFrom = Date()
+                let updated = notification.method == DaemonAPI.Notification.agentChanged
+                    ? (try? notification.params?.decode(Agent.self)) : nil
+                let previousLabels = updated.flatMap { self.work.agent($0.id)?.labels }
+                let removed = notification.method == DaemonAPI.Notification.agentRemoved
+                    ? (try? notification.params?.decode(DaemonAPI.AgentRemovedNotification.self)) : nil
+                let removedProject = removed.flatMap { self.work.agent($0.agentID)?.projectFolder }
                 // Anything the shared model does not claim is the Mac's own — shells,
                 // terminals — and a remote has no business with it.
                 _ = self.work.apply(notification.method, notification.params)
+                if let updated, previousLabels != updated.labels,
+                   self.labelVocabularies[updated.projectFolder] != nil {
+                    await self.loadLabelVocabulary(in: updated.projectFolder)
+                }
+                if let removedProject, self.labelVocabularies[removedProject] != nil {
+                    await self.loadLabelVocabulary(in: removedProject)
+                }
                 if Self.attentionNotifications.contains(notification.method) {
                     self.publishAttention()
                 }
@@ -1287,6 +1330,14 @@ final class RemoteModel {
     func loadArchivedAgents(in folder: URL, limit: Int) async {
         let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
                                             folder: folder, limit: limit)
+        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
+                                                  returning: [Agent].self) else { return }
+        for agent in listed { work.upsert(agent) }
+    }
+
+    func loadAllArchivedAgents(in folder: URL) async {
+        let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
+                                            folder: folder)
         guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
                                                   returning: [Agent].self) else { return }
         for agent in listed { work.upsert(agent) }

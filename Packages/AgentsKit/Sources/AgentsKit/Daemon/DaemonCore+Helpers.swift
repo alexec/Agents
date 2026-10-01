@@ -65,6 +65,7 @@ extension DaemonCore {
             var start = try await startRequest(settings: settings, folder: folder,
                                                prompt: prompt, managesAgents: false)
             start.worktree = worktree
+            start.labels = request.labels
             agentID = try await self.start(start, startedBy: caller.id, chainDepth: depth)
         } catch let refused as SettingRefused {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
@@ -191,7 +192,7 @@ extension DaemonCore {
             return "You have not started any agents that are still here. \(places)"
         }
         let lines = mine.map { agent in
-            "- \(agent.id.uuidString): \u{201C}\(agent.title ?? "Untitled")\u{201D} — \(helperStatus(agent))"
+            "- \(agent.id.uuidString): \u{201C}\(agent.title ?? "Untitled")\u{201D} — \(helperStatus(agent))\(SessionLookup.labels(of: agent))"
         }
         return ([places] + lines).joined(separator: "\n")
     }

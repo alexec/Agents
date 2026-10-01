@@ -53,7 +53,9 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                                 message: message, prompts: prompts,
                                                 title: title, waitingOn: words.waitingOn,
                                                 checkAgainInMinutes: words.checkAgainInMinutes,
-                                                afterwards: words.afterwards?.rawValue),
+                                                afterwards: words.afterwards?.rawValue,
+                                                addLabels: words.addLabels,
+                                                removeLabels: words.removeLabels),
                     fallback: "Noted.")
     }) { prompts in
         await relay(DaemonAPI.Method.agentsSuggestPrompts,
@@ -80,12 +82,12 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                     fallback: "Noted.")
     } agents: { call in
         switch call {
-        case .start(let prompt, let runtime, let model, let permissionMode, let worktree):
+        case .start(let prompt, let runtime, let model, let permissionMode, let worktree, let labels):
             return await relay(DaemonAPI.Method.agentsStartHelper,
                                DaemonAPI.StartHelperRequest(token: token, prompt: prompt,
                                                             runtime: runtime, model: model,
                                                             permissionMode: permissionMode,
-                                                            worktree: worktree),
+                                                            worktree: worktree, labels: labels),
                                fallback: "Started.")
         case .stop(let agentID):
             return await relay(DaemonAPI.Method.agentsStopHelper,

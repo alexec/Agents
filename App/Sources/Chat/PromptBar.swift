@@ -20,6 +20,8 @@ struct PromptBar: View {
     @State private var dictation = Dictation()
     @State private var selectedCommand = 0
     @State private var attachments: [Attachment] = []
+    @State private var draftLabels: [String] = []
+    @State private var labelInput = ""
     @State private var mentions: [FileMention] = []
     /// The walk for the term typed so far. Each keystroke cancels the last.
     @State private var mentionSearch: Task<Void, Never>?
@@ -86,6 +88,7 @@ struct PromptBar: View {
         GlassEffectContainer(spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
                 whereAndWhat
+                if agent == nil { labelDraft }
                 atItsLimit
                 startingOnOut
                 if !attachments.isEmpty {
@@ -888,6 +891,48 @@ struct PromptBar: View {
         .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
     }
 
+    private var labelDraft: some View {
+        HStack(spacing: 6) {
+            ForEach(draftLabels, id: \.self) { value in
+                Button {
+                    draftLabels.removeAll { $0 == value }
+                } label: {
+                    Label(value, systemImage: "xmark.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Remove \(value) label")
+            }
+            if draftLabels.count < SessionLabelPolicy.maximumCount {
+                TextField("Add label", text: $labelInput)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 140)
+                    .onSubmit(addDraftLabel)
+                Button("Add") { addDraftLabel() }
+                    .disabled(labelInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if let folder = model.draftCwd {
+                    Menu("Suggestions") {
+                        ForEach(model.labelSuggestions(in: folder, on: model.selectedProjectHost), id: \.self) { value in
+                            Button(value) {
+                                labelInput = value
+                                addDraftLabel()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .appText(.fine)
+    }
+
+    private func addDraftLabel() {
+        guard let value = try? SessionLabelPolicy.cleaned(labelInput),
+              draftLabels.count < SessionLabelPolicy.maximumCount,
+              !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) })
+        else { return }
+        draftLabels.append(value)
+        labelInput = ""
+    }
+
     private func send() {
         guard canSend else { return }
         // Nothing the runtime cannot take is sent, and the prompt is not lost.
@@ -898,6 +943,7 @@ struct PromptBar: View {
         dictation.stop()
         let outgoing = text
         let going = attachments
+        let labels = draftLabels
         text = ""
         attachments = []
         // A draft exists only until it becomes a prompt. Given back below if it did not go.
@@ -913,7 +959,7 @@ struct PromptBar: View {
         Task {
             let went: Bool
             if agent == nil {
-                went = await model.startDraft(prompt: outgoing, attachments: going)
+                went = await model.startDraft(prompt: outgoing, attachments: going, labels: labels)
             } else {
                 went = await model.send(outgoing, attachments: going)
             }
@@ -923,6 +969,8 @@ struct PromptBar: View {
             if !went, text.isEmpty, attachments.isEmpty {
                 text = outgoing
                 attachments = going
+            } else if went, agent == nil {
+                draftLabels = []
             }
         }
     }

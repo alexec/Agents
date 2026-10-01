@@ -35,6 +35,9 @@ struct ChatView: View {
                         .safeAreaInset(edge: .top, spacing: 0) {
                             VStack(spacing: 0) {
                                 OfflineStrip(host: agent.host)
+                                SessionLabelEditor(agent: agent)
+                                    .chatColumn()
+                                    .padding(.vertical, 6)
                                 actions(for: agent)
                             }
                             // On the page's own paper, across the whole pane: the

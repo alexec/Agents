@@ -566,7 +566,7 @@ struct WorktreeStartTests {
     @Test func theToolTakesAWorktree() throws {
         let call = AppService.agentCall(named: "mcp__agents__start_agent",
                                         ["prompt": "go", "worktree": "new"])
-        guard case .success(.start(_, _, _, _, let worktree))? = call else {
+        guard case .success(.start(_, _, _, _, let worktree, _))? = call else {
             Issue.record("not a start: \(String(describing: call))")
             return
         }

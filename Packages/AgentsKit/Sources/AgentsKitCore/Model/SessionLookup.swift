@@ -63,10 +63,17 @@ public enum SessionLookup {
             var line = "- \(agent.id.uuidString): \(name) — \(PoolWords.runtimeName(agent.runtimeID)), "
                 + "\(status(of: agent)), last active \(when(agent.lastActivityAt))."
             if let said = agent.report?.message { line += " Last said: \(said)" }
+            line += labels(of: agent)
             return line
         }
         return (["Sessions in this project, most recent first. Read one with read_session, by id or exact title."]
                 + lines).joined(separator: "\n")
+    }
+
+    public static func labels(of agent: Agent) -> String {
+        guard !agent.labels.isEmpty else { return "" }
+        return " Labels: " + agent.labels.map { "\($0.value) (\($0.owner.rawValue))" }
+            .joined(separator: ", ") + "."
     }
 
     /// The status in the agent list's words: the group, and why it stopped when it did.
