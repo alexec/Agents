@@ -337,16 +337,16 @@ This comes before US4 and US5, because Agents Host restarts on every ship (plan.
 
 **Independent Test**: quickstart.md §7, first half.
 
-- [ ] T063 [US4] Build the files pane, `Web/src/views/FilesPane.tsx`:
+- [x] T063 (paths are absolute, as the host requires; folders watched and re-listed) [US4] Build the files pane, `Web/src/views/FilesPane.tsx`:
   - `files/list` and `files/read`;
   - text in monospace and Markdown through `render/markdown.ts`;
   - pictures, and SVG only as `<img src=blob:>`;
   - HTML as source.
 
   It sits in the fourth column or over the chat, as T037 laid out (FR-029, FR-031).
-- [ ] T064 [P] [US4] Build the changes view, `Web/src/views/Changes.tsx`, from `changes/list` and `changes/file`: per file, the diff as tinted lines.
-- [ ] T065 [US4] Add live documents: on `agent/showFile` for the open session, open the page beside the chat, `files/watch` it, and follow `files/changed`. Typing on it reaches the file through `artifact/write`, with the Mac window's merge rules (`Web/src/views/LiveDocument.tsx`).
-- [ ] T066 [US4] Walk US4 (quickstart §7): two files edited, a live page followed and typed on, and an `.html` and an `.svg` with a script that run nothing (CDP console and network). Record it in `walks/us4.md`.
+- [x] T064 (edits without git hunks are line-diffed by `model/diff.ts`; neutral marks, as the window) [P] [US4] Build the changes view, `Web/src/views/Changes.tsx`, from `changes/list` and `changes/file`: per file, the diff as tinted lines.
+- [x] T065 (`Passage` and `PassageMerge` ported and held to `page/` fixtures; the window's typing caret and line marks not yet) [US4] Add live documents: on `agent/showFile` for the open session, open the page beside the chat, `files/watch` it, and follow `files/changed`. Typing on it reaches the file through `artifact/write`, with the Mac window's merge rules (`Web/src/views/LiveDocument.tsx`).
+- [x] T066 (`walks/us4.md`: all five scenarios; no console call or off-origin request from the hostile files) [US4] Walk US4 (quickstart §7): two files edited, a live page followed and typed on, and an `.html` and an `.svg` with a script that run nothing (CDP console and network). Record it in `walks/us4.md`.
 
 ---
 

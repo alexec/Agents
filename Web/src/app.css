@@ -654,14 +654,13 @@ button.remove:hover { opacity: 1; }
 .file-page { line-height: 1.55; }
 .picture { max-width: 100%; height: auto; border-radius: var(--radius-control); background: var(--paper-well); }
 .changed-files > li { margin-bottom: 4px; }
-.row.changed .added { color: var(--tint-vouched); }
-.row.changed .removed { color: var(--tint-failure); }
+.row.changed .added, .row.changed .removed { font-variant-numeric: tabular-nums; }
 .hunk { margin: 4px 0 10px; }
 .diff-lines { margin: 0; font: 12px/1.5 var(--font-mono); white-space: pre; overflow-x: auto; border-radius: var(--radius-control); background: var(--paper-well); padding: 6px 0; }
 .diff-line { display: block; padding: 0 10px; }
 .diff-line .sign { display: inline-block; width: 1.2em; opacity: 0.6; }
-.diff-line.added { background: color-mix(in srgb, var(--tint-vouched) 14%, transparent); }
-.diff-line.removed { background: color-mix(in srgb, var(--tint-failure) 12%, transparent); }
+.diff-line.added { background: var(--paper-wash); font-weight: 500; }
+.diff-line.removed { opacity: 0.55; text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
 .live-page .page { line-height: 1.6; max-width: 70ch; margin: 0 auto; }
 .live-page .page.gone { opacity: 0.6; }
 .passage { padding: 2px 8px; margin: 0 -8px 10px; border-radius: var(--radius-control); transition: background 0.6s; }

@@ -1,11 +1,13 @@
 // What the agent changed, file by file (071 US4 scenario 2; the window's Changes pane): each file
-// with its state and line counts, and opened, its diff as tinted lines. The diff is the host's
-// (`changes/file`): git's hunks where the folder is a repository, else the agent's own edits.
+// with its state and line counts, and opened, its diff: git's hunks where the folder is a
+// repository, else the agent's own edits as line diffs (`changes/file`). Marked by sign, weight
+// and a faint neutral wash, never red and green: the app's one colour means something went wrong.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { ChangedFile, ChangedFileDetail, ChangesList, DiffLine } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
+import { lineDiff } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
 
 const stateWords: Record<ChangedFile["state"], string> = {
@@ -39,10 +41,8 @@ function Detail({ detail }: { detail: ChangedFileDetail }) {
     // No repository: the agent's own edits, each as the text it replaced and the text it wrote.
     return <>{detail.edits.map((edit, i) => (
       <div key={i} class="hunk">
-        <Lines lines={[
-          ...(edit.oldText ?? "").split("\n").filter((t, j, a) => j < a.length - 1 || t).map((text) => ({ kind: "removed" as const, text })),
-          ...edit.newText.split("\n").filter((t, j, a) => j < a.length - 1 || t).map((text) => ({ kind: "added" as const, text })),
-        ]} />
+        <p class="faint small">{detail.edits.length > 1 ? `Edit ${i + 1}` : "Edit"}{edit.oldText === undefined ? " · made the file" : ""}</p>
+        <Lines lines={lineDiff(edit.oldText, edit.newText)} />
       </div>
     ))}</>;
   }
