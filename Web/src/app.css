@@ -94,32 +94,254 @@ button.prominent {
   font-size: 12px;
 }
 
-/* Until the three columns: who this browser is, and what the hosts hold. */
-.paired {
-  padding: 24px;
-  max-width: 640px;
+/* The three columns (071 US2, US6; frames A–D). Widths from look/README.md: three columns
+   from 1200, the files pane as a fourth from 1440 (over the chat below that), the projects
+   folded into a menu from 760, and one column at a time below 760. */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-.paired h2 {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.6;
-  margin: 18px 0 6px;
+.columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 236px 320px minmax(0, 1fr);
 }
 
-.paired ul {
+.files-open .columns {
+  grid-template-columns: 236px 300px minmax(0, 1fr) 420px;
+}
+
+.projects, .sessions, .chat, .files {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--paper-rule);
+}
+
+.projects { background: var(--paper-sidebar); }
+.chat, .files { border-right: none; }
+.files { border-left: 1px solid var(--paper-rule); background: var(--paper-ground); }
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
   margin: 0;
-  padding-left: 18px;
+}
+
+.column-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--paper-rule);
+  box-sizing: border-box;
+}
+
+.column-head h1 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.column-head .actions { display: flex; gap: 6px; }
+
+.host h2 {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  margin: 12px 8px 4px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  border-radius: var(--radius-card);
+  padding: 6px 8px;
+}
+
+.row:hover { background: var(--paper-wash); }
+.row.chosen { background: var(--paper-selection); }
+.row .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .subtitle { grid-column: 1; font-size: 12px; opacity: 0.65; }
+.row .dot {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tint-attention);
+}
+.row.offline { opacity: 0.5; padding-top: 0; }
+.session { padding: 8px 10px; }
+
+.hint { opacity: 0.55; padding: 8px; margin: 0; }
+
+.search {
+  flex: 1;
+  font: inherit;
+  color: inherit;
+  background: var(--paper-wash);
+  border: none;
+  border-radius: var(--radius-control);
+  padding: 5px 8px;
+}
+
+button.icon { padding: 3px 9px; }
+
+button.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--tint-link, #2f6fd1);
 }
 
 .identity {
-  margin-top: 24px;
-  padding-top: 12px;
   border-top: 1px solid var(--paper-rule);
+  padding: 10px 12px;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.identity .confirm { display: flex; gap: 6px; }
+
+/* The chat: entries above, then the cards and the prompt, pinned to the foot. */
+/* Centred without its own display, so the narrow layout can still hide it. */
+.chat.empty { justify-content: center; align-items: center; opacity: 0.5; }
+
+.transcript { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+
+.bubble {
+  align-self: flex-end;
+  max-width: 70%;
+  background: var(--paper-well);
+  border-radius: var(--radius-card);
+  padding: 7px 12px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.reply { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+
+.foot { padding: 0 12px 12px; }
+
+.prompt {
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-floating);
+  padding: 10px 12px;
+}
+
+.prompt textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  resize: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  outline: none;
+}
+
+.prompt-row { display: flex; justify-content: flex-end; }
+
+.send {
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--paper-ink);
+  color: var(--paper-ground);
+}
+
+.files .tabs { flex: 1; display: flex; gap: 4px; }
+.files .tab { padding: 3px 10px; border-radius: var(--radius-control); }
+.files .tab.chosen { background: var(--paper-raised); }
+.files ul { list-style: none; }
+.files li { padding: 3px 8px; }
+
+/* Frame F: the connection lost. What was shown stays, greyed out, and nothing can be sent. */
+.banner {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  opacity: 0.85;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--paper-well);
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+.down .columns { opacity: 0.55; pointer-events: none; }
+
+/* Shown only at some widths. */
+.narrow-only, .medium-only { display: none; }
+
+.menu-anchor { position: relative; }
+
+.project-menu { font-weight: 600; white-space: nowrap; }
+.menu-anchor { margin-right: auto; }
+
+.popover {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 10;
+  width: 220px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card);
+  box-shadow: 0 6px 20px var(--paper-shadow);
+  padding: 4px;
+}
+
+/* Below 1440 the files pane opens over the chat, with its close button. */
+@media (max-width: 1439px) {
+  .files-open .columns { grid-template-columns: 236px 320px minmax(0, 1fr); }
+  /* The chat and the pane share one cell; the pane lies over the chat. */
+  .chat, .files { grid-column: 3; grid-row: 1; }
+  .files { z-index: 5; }
+}
+
+/* 760–1200: the projects fold into a menu atop the sessions column. */
+@media (max-width: 1199px) {
+  .columns, .files-open .columns { grid-template-columns: 300px minmax(0, 1fr); }
+  .projects { display: none; }
+  .chat, .files { grid-column: 2; grid-row: 1; }
+  .medium-only { display: inline-block; }
+  /* Frame C: the menu, then the icons; the search field waits for the wide layout. */
+  .search.wide-only { display: none; }
+}
+
+/* Below 760: one column at a time, in the iPhone Remote's order, with a back control. */
+@media (max-width: 759px) {
+  .columns, .files-open .columns { grid-template-columns: minmax(0, 1fr); }
+  .projects, .sessions, .chat { display: none; border-right: none; }
+  .depth-projects .projects, .depth-sessions .sessions, .depth-chat .chat { display: flex; }
+  .chat, .files, .sessions, .projects { grid-column: 1; grid-row: 1; }
+  .medium-only, .wide-only { display: none; }
+  .narrow-only { display: block; }
+  button.back.narrow-only { display: inline-block; border: none; background: none; color: #2f6fd1; padding: 0; }
+  .column-head h1.narrow-only { display: block; text-align: center; }
+  .projects .column-head h1 { text-align: left; font-size: 17px; }
 }

@@ -1,0 +1,14 @@
+opened: 6 sessions in web-remote, 32 lines in the chat
+1440 (1440×900, against frame A): columns ["projects","sessions","chat"]; problems []
+1600-files (1600×900, against frame B): columns ["projects","sessions","chat","files"]; problems []
+1300-files-over-chat (1300×900, against frame B, below 1440): columns ["projects","sessions","chat","files"]; problems []
+1000 (1000×800, against frame C): columns ["sessions","chat"]; problems []
+1000-menu (1000×800, against frame C, menu open): columns ["sessions","chat"]; problems []
+390-chat (390×844, against frame D3): columns ["chat"]; problems []
+390-sessions (390×844, against frame D2 (after the browser's Back)): columns ["sessions"]; problems []
+390-projects (390×844, against frame D1 (after Back again)): columns ["projects"]; problems []
+390 back control from sessions: columns ["projects"]
+F, down: banner "⚠︎ Can't reach the control plane at localhost:50746. Trying again.\nTry Now"; chat lines still shown 32
+F, back: reconnected by itself and caught up, with no reload
+F, forgotten: the pairing screen with the line saying why
+checks: errors []; requests off the page's origin []

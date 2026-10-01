@@ -284,7 +284,15 @@ export class Link {
     this.beat = setInterval(() => {
       const socket = this.socket;
       if (!socket) return;
-      const timer = setTimeout(() => socket.close(4000, "no answer"), within);
+      // A hung control plane never answers the close handshake either, so the page counts
+      // the link down at once rather than waiting for the browser's own timeout.
+      const timer = setTimeout(() => {
+        if (this.socket !== socket) return;
+        this.socket = null;
+        socket.close(4000, "no answer");
+        this.failPending();
+        this.down();
+      }, within);
       this.call("control/status", {} as Params<"control/status">).then(() => clearTimeout(timer), () => {});
     }, every);
   }
