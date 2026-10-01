@@ -672,18 +672,23 @@ final class AppModel {
     /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
     /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
-        _ = try? await client.call(DaemonAPI.Method.workflowsRun,
-                               DaemonAPI.WorkflowRequest(folder: summary.folder,
-                                                         workflowID: summary.workflowID))
+        // Its refusal is said, not swallowed: a Run now that does nothing looked broken (073).
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.workflowsRun,
+                                       DaemonAPI.WorkflowRequest(folder: summary.folder,
+                                                                 workflowID: summary.workflowID))
+        }
     }
 
     /// Put one away, or bring it back. The person's answer to a workflow an agent
     /// wrote, which is what makes writing one not need asking first.
     func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async {
-        _ = try? await client.call(DaemonAPI.Method.workflowsArchive,
-                               DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
-                                                                workflowID: summary.workflowID,
-                                                                archived: archived))
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.workflowsArchive,
+                                       DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
+                                                                        workflowID: summary.workflowID,
+                                                                        archived: archived))
+        }
     }
 
     /// A project's plugins, asked for when its page opens; kept current after that by
@@ -793,9 +798,10 @@ final class AppModel {
 
     /// The person changed Sleep. The daemon clamps the hours and answers with what it kept.
     func setWakeSettings(_ settings: WakeSettings) async {
-        guard let saved = try? await client.call(DaemonAPI.Method.wakeSet, settings,
-                                                 returning: WakeSettings.self) else { return }
-        wakeSettings = saved
+        await attempt {
+            self.wakeSettings = try await self.client.call(DaemonAPI.Method.wakeSet, settings,
+                                                           returning: WakeSettings.self)
+        }
     }
 
     /// Every resource and who holds it (036). A daemon too old to know the method
@@ -930,8 +936,12 @@ final class AppModel {
 
     /// Save Cursor/Grok permission mode and copy it to every connected server (061).
     func setClientPermissions(_ settings: ClientPermissionSettings) async {
-        guard let saved = try? await client.call(DaemonAPI.Method.clientPermissionsSet, settings,
-                                                 returning: ClientPermissionSettings.self) else { return }
+        var saved: ClientPermissionSettings?
+        await attempt {
+            saved = try await self.client.call(DaemonAPI.Method.clientPermissionsSet, settings,
+                                               returning: ClientPermissionSettings.self)
+        }
+        guard let saved else { return }
         clientPermissions = saved
         await pushClientPermissionsToServers(saved)
     }
@@ -969,10 +979,16 @@ final class AppModel {
     /// Save a runtime's sandbox default and copy it to every connected server (064): each
     /// server applies it to the runtimes installed there, as the Mac does.
     func setSandboxDefault(_ choice: SandboxChoice, for runtimeID: String) async {
+        let before = sandboxSettings
         let wanted = sandboxSettings.setting(choice, for: runtimeID)
         sandboxSettings = wanted
-        guard let saved = try? await client.call(DaemonAPI.Method.sandboxSet, wanted,
-                                                 returning: SandboxSettings.self) else { return }
+        var saved: SandboxSettings?
+        await attempt {
+            saved = try await self.client.call(DaemonAPI.Method.sandboxSet, wanted,
+                                               returning: SandboxSettings.self)
+        }
+        // Not kept, so not shown: the picker goes back to what the host still has (073).
+        guard let saved else { sandboxSettings = before; return }
         sandboxSettings = saved
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
             _ = try? await client(for: host.id).call(DaemonAPI.Method.sandboxSet, saved,
@@ -1009,10 +1025,14 @@ final class AppModel {
     }
 
     func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil) async {
-        guard let state = try? await client.call(
-            DaemonAPI.Method.costSetLimits,
-            DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily),
-            returning: DaemonAPI.CostState.self) else { return }
+        var set: DaemonAPI.CostState?
+        // A limit that did not take is said, not left looking set (073).
+        await attempt {
+            set = try await self.client.call(DaemonAPI.Method.costSetLimits,
+                                             DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily),
+                                             returning: DaemonAPI.CostState.self)
+        }
+        guard let state = set else { return }
         work.replaceCostState(state)
         // Every connected server keeps to the same limits, each on its own (037, R7).
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
@@ -1036,10 +1056,14 @@ final class AppModel {
     /// Letting one agent carry on past the per-agent limit, or giving it one of its
     /// own. Does not resume it — continuing is the reader's second, deliberate act.
     func setCostCeiling(_ agentID: UUID, to ceiling: Cost?) async {
-        guard let agent = try? await client(forAgent: agentID).call(
-            DaemonAPI.Method.agentsSetCeiling,
-            DaemonAPI.SetCeilingRequest(agentID: agentID, ceiling: ceiling),
-            returning: Agent.self) else { return }
+        var changed: Agent?
+        await attempt {
+            changed = try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.agentsSetCeiling,
+                DaemonAPI.SetCeilingRequest(agentID: agentID, ceiling: ceiling),
+                returning: Agent.self)
+        }
+        guard let agent = changed else { return }
         work.upsert(agent)
     }
 
@@ -2444,10 +2468,13 @@ final class AppModel {
     }
 
     func archive(_ id: UUID, andLeave: Bool = false) async {
-        await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id)) }
+        let archived = await attempt {
+            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id))
+        }
         // One path for menu, strip, swipe, ⌫ and the row: leave the chat when asked,
-        // so Archive always means the same thing wherever it is pressed.
-        if andLeave, selection == id { selection = nil }
+        // so Archive always means the same thing wherever it is pressed. Not when it
+        // failed: the chat stays in front, under the reason why (073).
+        if archived, andLeave, selection == id { selection = nil }
     }
 
     func unarchive(_ id: UUID) async {
@@ -2735,7 +2762,15 @@ final class AppModel {
                 carried.append(attachment)
                 continue
             }
-            guard let data = try? Data(contentsOf: url), data.count <= DaemonAPI.attachmentLimit else {  // store-ok: a file the person attached: picked or dropped
+            let data: Data
+            do {
+                data = try Data(contentsOf: url)  // store-ok: a file the person attached: picked or dropped
+            } catch {
+                // Not "too big": a file this window may not read, or one gone, says so (073).
+                problem = "\(name) could not be read to send to \(hosts.label(host)): \(error.localizedDescription)"
+                return nil
+            }
+            guard data.count <= DaemonAPI.attachmentLimit else {
                 problem = "\(name) is too big to send to \(hosts.label(host))."
                 return nil
             }
@@ -2782,7 +2817,7 @@ final class AppModel {
     }
 
     @discardableResult
-    private func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
+    func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
         do {
             try await work()
             return true
