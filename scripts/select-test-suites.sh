@@ -8,8 +8,9 @@
 # The web remote (071): WebTypes runs on any change to AgentsKitCore's source, to the
 # generator or to Web/, so a protocol type changed in Swift without regenerating fails.
 # ControlPlane runs on any change to it or to AgentsKit, which it links. A change under
-# Web/ alone runs AgentsKit's two suites that hold Web/ to Swift: the dist manifest and
-# the key vectors. CI's web job checks the rest of Web/ with Node, on every run.
+# Web/ alone runs AgentsKit's three suites that hold Web/ to Swift: the dist manifest, the
+# ported rules' fixtures and the key vectors. CI's web job checks the rest of Web/ with Node,
+# on every run.
 #
 # Usage: scripts/select-test-suites.sh <base-commit> >> "$GITHUB_OUTPUT"
 set -euo pipefail
@@ -97,7 +98,7 @@ else
 					webtypes=run
 					agentskit_touched=true
 					if ! $web_touched; then
-						agentskit_suites+=(WebDistManifestTests ControlAgreementVectorTests)
+						agentskit_suites+=(WebDistManifestTests ControlAgreementVectorTests WebFixturesTests)
 						web_touched=true
 					fi
 					;;
