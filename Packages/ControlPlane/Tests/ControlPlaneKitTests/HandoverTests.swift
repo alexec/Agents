@@ -144,6 +144,34 @@ extension ControlServiceTests {
         #expect(again.phase.now == .serving)
     }
 
+    @Test func forwardingEndsOnItsDateAndNeverRunsPastThirtyDays() async throws {
+        let old = try await start()
+        defer { Task { await old.service.stop() } }
+        let (client, _, credentials) = try await pairedClient(at: old.url,
+                                                              code: try await old.service.codes.issue(.client(.device)).text)
+        let book = EndpointBook(ControlMembership(client: client, controlKey: control.publicKey, addresses: [],
+                                                  name: "test", url: old.url.absoluteString))
+        let handover = try await Handover.Link(old.url, pin: nil, privateKey: control.privateKey)
+        _ = try await handover.call(Handover.Method.freeze)
+        let elsewhere = try JSONValue.encoding([ControlEndpoint(url: "https://agents.example.com")])
+
+        // Asked for longer than 30 days: 30 days.
+        let long = try await handover.call(Handover.Method.forward, [
+            "endpoints": elsewhere, "until": try JSONValue.encoding(Date().addingTimeInterval(90 * 24 * 3600))])
+            .decode(Handover.Status.self)
+        let until = try #require(long.forwardingUntil)
+        #expect(until.timeIntervalSinceNow <= Handover.longestForwarding + 5)
+        #expect(until.timeIntervalSinceNow > Handover.longestForwarding - 60)
+
+        // Past its date, a member is turned away rather than told.
+        old.service.forwardingUntil.set(Date().addingTimeInterval(-1))
+        await #expect(throws: ControlAuth.Refusal.self) {
+            _ = try await ControlCodeUse.dialEach(book, as: credentials, dial: ControlJoin.nio)
+        }
+        #expect(book.current.endpoints == nil)
+        await handover.close()
+    }
+
     @Test func onlyTheControlPlanesKeyDrivesAHandover() async throws {
         let old = try await start()
         defer { Task { await old.service.stop() } }

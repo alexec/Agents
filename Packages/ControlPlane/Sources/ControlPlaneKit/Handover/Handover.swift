@@ -48,6 +48,8 @@ public enum Handover {
         /// Members and the epoch each has said it holds, so the driver can say who has
         /// heard of the new place (nil: a build that keeps no list).
         public var members: [Member]
+        /// While forwarding: when it stops (Alex: 30 days at most, T126).
+        public var forwardingUntil: Date?
 
         public struct Member: Codable, Sendable, Equatable {
             public var id: String
@@ -55,6 +57,16 @@ public enum Handover {
             public var kind: String
             public var knownEpoch: Int?
             public var version: String?
+            /// Connected to this copy now. One that is, and still holds an older list, is a
+            /// build that can't follow.
+            public var online: Bool?
+            public var lastSeen: Date?
+
+            /// Whether it holds the list of `epoch` or a newer one.
+            public func knows(_ epoch: Int?) -> Bool {
+                guard let epoch else { return true }
+                return (knownEpoch ?? 0) >= epoch
+            }
         }
     }
 
@@ -150,9 +162,13 @@ public enum Handover {
             guard phase == .frozen else { throw refuse("Freeze and copy before forwarding.") }
             guard let list = try params?["endpoints"]?.decode([ControlEndpoint].self), !list.isEmpty,
                   list.allSatisfy(\.isAcceptable) else { throw refuse("Say where members go now.") }
+            // Never for ever: at most 30 days (Alex, T126), or sooner if asked.
+            let longest = Date().addingTimeInterval(Handover.longestForwarding)
+            let until = min((try? params?["until"]?.decode(Date.self)) ?? longest, longest)
             try await changeEndpoints(list, service: service)
+            service.forwardingUntil.set(until)
             service.phase.set(.forwarding)
-            service.log("forwarding: members are told \(list.map(\.url).joined(separator: ", "))")
+            service.log("forwarding until \(until.formatted(.iso8601)): members are told \(list.map(\.url).joined(separator: ", "))")
             return try JSONValue.encoding(await status(service))
 
         case Method.take:
@@ -191,19 +207,23 @@ public enum Handover {
         let hasRecords = (try? await service.configuration.store.get(ControlRecords.settingsKey)) != nil
         var members: [Status.Member] = []
         if phase != .receiving {
+            let connected = await service.router.connectedClients()
             for client in await service.methods.allClients {
                 members.append(.init(id: client.id.uuidString, name: client.name, kind: client.kind.rawValue,
-                                     knownEpoch: client.knownEpoch))
+                                     knownEpoch: client.knownEpoch, online: connected[client.id] != nil,
+                                     lastSeen: client.lastSeen))
             }
             for host in await service.methods.allHosts {
                 members.append(.init(id: host.id.rawValue, name: host.name, kind: host.relay == nil ? "host" : "relay",
-                                     knownEpoch: host.knownEpoch, version: host.version))
+                                     knownEpoch: host.knownEpoch, version: host.version,
+                                     online: await service.router.state(of: host.id)?.isOnline == true))
             }
         }
         let settings = await service.methods.controlSettings
         return Status(phase: phase, controlKey: service.publicKey, hasRecords: hasRecords,
                       endpoints: phase == .receiving ? [] : settings.currentEndpoints,
-                      epoch: phase == .receiving ? nil : settings.epoch, members: members)
+                      epoch: phase == .receiving ? nil : settings.epoch, members: members,
+                      forwardingUntil: phase == .forwarding ? service.forwardingUntil.now : nil)
     }
 
     // MARK: The driver's side
@@ -279,6 +299,20 @@ public struct PeerStore: ControlStore {
             return StoredKey(key: key, etag: etag)
         }
     }
+}
+
+extension Handover {
+    /// The longest a copy forwards (Alex, 2026-10-01): anyone still to hear after that
+    /// pairs again.
+    public static let longestForwarding: TimeInterval = 30 * 24 * 3600
+}
+
+/// When a forwarding copy stops; read on any thread.
+final class DateBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Date?
+    var now: Date? { lock.withLock { value } }
+    func set(_ new: Date?) { lock.withLock { value = new } }
 }
 
 /// Where a copy is in a handover; read on any thread.

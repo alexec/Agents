@@ -77,6 +77,8 @@ public final class ControlService: @unchecked Sendable {
     let desk = NoticeDesk()
     /// Where this copy is in a handover (R16): serving, receiving, frozen or forwarding.
     let phase: PhaseBox
+    /// When a forwarding copy stops telling members where to go.
+    let forwardingUntil = DateBox()
 
     public init(_ configuration: Configuration) throws {
         self.configuration = configuration
@@ -370,6 +372,9 @@ public final class ControlService: @unchecked Sendable {
             case (.receiving, _): throw ControlAuth.Refusal(.unknown)
             case (.frozen, .pairing), (.frozen, .enrolling), (.forwarding, .pairing), (.forwarding, .enrolling):
                 throw ControlAuth.Refusal(.unknown)
+            case (.forwarding, .client), (.forwarding, .host):
+                // Forwarding ended (30 days at most): anyone still to hear pairs again.
+                if let until = forwardingUntil.now, until < Date() { throw ControlAuth.Refusal(.unknown) }
             default: break
             }
             // A device through `agents-relay` (T096): the exchange is its own, end to end,

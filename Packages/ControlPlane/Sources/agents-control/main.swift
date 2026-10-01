@@ -259,9 +259,21 @@ func list(hosts: Bool) async {
 func handover() async {
     let step = arguments.dropFirst().first ?? ""
     let key = privateKey()
+    // `self` is the copy serving this store, at the address and pin its settings say:
+    // Agents Host's own, whose pin it never has to work out.
+    func own() async -> (String, String?) {
+        let records = ControlRecords(store: store())
+        guard (try? await records.load()) != nil, let settings = await records.settings, let url = settings.url else {
+            fail("this store has no control plane yet")
+        }
+        return (url, settings.pin)
+    }
     func link(_ flag: String, pin pinFlag: String) async -> Handover.Link {
-        guard let text = value(flag), let url = URL(string: text) else { fail("say \(flag) https://… for the copy") }
-        do { return try await Handover.Link(url, pin: value(pinFlag), privateKey: key) } catch {
+        guard var text = value(flag) else { fail("say \(flag) https://… (or self) for the copy") }
+        var pin = value(pinFlag)
+        if text == "self" { (text, pin) = await own() }
+        guard let url = URL(string: text) else { fail("\(text) is not an address") }
+        do { return try await Handover.Link(url, pin: pin, privateKey: key) } catch {
             fail("couldn't reach \(text) as this control plane: \(error)")
         }
     }
@@ -277,11 +289,12 @@ func handover() async {
             return print(String(decoding: (try? encoder.encode(status)) ?? Data(), as: UTF8.self))
         }
         print("phase\t\(status.phase.rawValue)")
+        if let until = status.forwardingUntil { print("until\t\(until.formatted(.iso8601))") }
         print("records\t\(status.hasRecords ? "yes" : "none")")
         print("epoch\t\(status.epoch.map(String.init) ?? "-")")
         for endpoint in status.endpoints { print("endpoint\t\(endpoint.url)\t\(endpoint.pin ?? "-")") }
         for member in status.members {
-            print("member\t\(member.id)\t\(member.name)\t\(member.kind)\t\(member.knownEpoch.map(String.init) ?? "-")")
+            print("member\t\(member.id)\t\(member.name)\t\(member.kind)\t\(member.knownEpoch.map(String.init) ?? "-")\t\(member.online == true ? "online" : "-")")
         }
     }
     do {
@@ -292,8 +305,12 @@ func handover() async {
             show(try await link("--at", pin: "--pin").call(Handover.Method.announce,
                                                           ["endpoint": try JSONValue.encoding(endpoints()[0])]))
         case "forward":
-            show(try await link("--at", pin: "--pin").call(Handover.Method.forward,
-                                                          ["endpoints": try JSONValue.encoding(endpoints())]))
+            // 30 days at most, the copy's own rule; --days for fewer.
+            var params: [String: JSONValue] = ["endpoints": try JSONValue.encoding(endpoints())]
+            if let days = value("--days").flatMap(Double.init) {
+                params["until"] = try JSONValue.encoding(Date().addingTimeInterval(days * 24 * 3600))
+            }
+            show(try await link("--at", pin: "--pin").call(Handover.Method.forward, .object(params)))
         case "freeze": show(try await link("--at", pin: "--pin").call(Handover.Method.freeze))
         case "unfreeze": show(try await link("--at", pin: "--pin").call(Handover.Method.unfreeze))
         case "withdraw": show(try await link("--at", pin: "--pin").call(Handover.Method.withdraw))
@@ -303,7 +320,7 @@ func handover() async {
             // machine opens (file://…, s3://…).
             func end(_ flag: String, pin: String) async -> any ControlStore {
                 guard let text = value(flag) else { fail("say \(flag)") }
-                if text.hasPrefix("https://") || text.hasPrefix("http://") { return PeerStore(await link(flag, pin: pin)) }
+                if text == "self" || text.hasPrefix("https://") || text.hasPrefix("http://") { return PeerStore(await link(flag, pin: pin)) }
                 return store(text)
             }
             let report = try await StoreCopy.copy(from: await end("--from", pin: "--from-pin"), to: await end("--to", pin: "--to-pin"))
@@ -311,7 +328,8 @@ func handover() async {
         default:
             fail("""
             usage: agents-control handover status|freeze|unfreeze|withdraw|take --at URL [--pin PIN] [--json]
-                   agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN]
+                   agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN] [--days N]
+            (URL may be `self`: the copy serving this store, at the address and pin its settings say)
                    agents-control handover copy --from URL|STORE [--from-pin PIN] --to URL|STORE [--to-pin PIN]
             """)
         }
