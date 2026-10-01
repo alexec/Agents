@@ -10,20 +10,17 @@ import SwiftUI
 /// phone draws too (033). What is left here is where each input comes from on a Mac.
 struct Transcript: View {
     @Environment(AppModel.self) private var model
-    /// Off unless View ▸ Show Thinking is on. The record still has the thinking.
-    @AppStorage(ThinkingDisplay.defaultsKey) private var showsThinking = false
+    /// The level every turn starts at: View ▸ Turns (069).
+    @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
     let agent: Agent
     /// How much of the foot of the pane the floating prompt covers.
     var bottomInset: CGFloat = 0
 
-    private var items: [TranscriptItem] {
-        showsThinking ? model.transcriptItems : model.transcriptItems.omittingThoughts()
-    }
-
     var body: some View {
         ChatTranscript(agent: agent,
-                       items: items,
+                       items: model.transcriptItems,
                        stored: model.work.turns,
+                       defaultDetail: turnDetail,
                        hasMore: model.transcriptHasMore,
                        // Turns count as growth at the front too, so an earlier page of
                        // them holds the reader's place as entries do.

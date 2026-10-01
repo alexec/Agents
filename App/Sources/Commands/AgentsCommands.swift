@@ -50,7 +50,7 @@ struct AgentsCommands: Commands {
     let frame: SidebarFrame
 
     /// Off unless asked for. The session draws thinking only while this is on.
-    @AppStorage(ThinkingDisplay.defaultsKey) private var showsThinking = false
+    @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
 
     static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
 
@@ -108,8 +108,13 @@ struct AgentsCommands: Commands {
             Button("Jump to Latest") { model.scrollToEnd() }
                 .keyboardShortcut(.downArrow, modifiers: .command)
                 .disabled(model.selectedAgent == nil)
-            Toggle("Show Thinking", isOn: $showsThinking)
-                .disabled(model.selectedAgent == nil)
+            // What every turn starts at (069). Thinking is part of Details now, so
+            // Show Thinking went with it.
+            Picker("Turns", selection: $turnDetail) {
+                ForEach(TurnDetail.allCases, id: \.self) { detail in
+                    Text(detail.title).help(detail.summary).tag(detail)
+                }
+            }
             Divider()
             Button("Find Session") { requests.focusSessionSearch() }
                 .keyboardShortcut("f")
