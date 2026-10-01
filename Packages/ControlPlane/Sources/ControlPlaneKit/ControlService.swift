@@ -119,11 +119,16 @@ public final class ControlService: @unchecked Sendable {
         } catch let error as StoreError {
             throw Failure("the store can't be used: \(error)")
         }
-        if phase.now == .receiving {
-            // A copy a move will fill (R16): an empty store, nothing made in it yet.
-            if try await store.get(ControlRecords.settingsKey) != nil {
-                throw Failure("this store already holds a control plane's records; a copy that receives starts on an empty one")
+        if phase.now == .receiving, let object = try await store.get(ControlRecords.settingsKey) {
+            // Started again after it took over (R16): it serves, as any copy would. A store
+            // with records that it never took is a handover that didn't finish.
+            let settings = try? ControlRecords.decoder.decode(ControlSettings.self, from: object.data)
+            guard settings?.currentEndpoints.first?.url == configuration.url.absoluteString else {
+                throw Failure("this store holds records from a handover that didn't finish; empty it and receive again")
             }
+            phase.set(.serving)
+        }
+        if phase.now == .receiving {
             // Ready for the copy handing over, which may come through a load balancer.
             await readiness.set(true)
         } else {
@@ -168,7 +173,7 @@ public final class ControlService: @unchecked Sendable {
             }
         }
         let port = channel.localAddress?.port ?? configuration.port
-        log("listening on \(configuration.bind):\(port) for \(configuration.url.absoluteString)\(phase.now == .receiving ? ", receiving a move" : "")")
+        log("listening on \(configuration.bind):\(port) for \(configuration.url.absoluteString)\(phase.now == .receiving ? ", receiving a handover" : "")")
         if phase.now != .receiving { await mesh?.start() }
         return port
     }

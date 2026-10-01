@@ -25,6 +25,8 @@ services:
       AGENTS_CONTROL_URL: https://${AGENTS_DOMAIN:?set AGENTS_DOMAIN to the name that points at this machine}
       AGENTS_CONTROL_KEY_FILE: /run/secrets/control-key
       AGENTS_CONTROL_NAME: ${AGENTS_CONTROL_NAME:-${AGENTS_DOMAIN}}
+      # 1 to start empty, for a handover from Agents Host to fill (058 research R16).
+      AGENTS_CONTROL_RECEIVE: ${AGENTS_CONTROL_RECEIVE:-}
     secrets: [control-key]
     volumes:
       - data:/data

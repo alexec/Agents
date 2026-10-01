@@ -484,24 +484,24 @@ with its record id and grant unchanged, and a turn runs on each host afterwards.
 `RemoteControl`). T120–T123 can start before it, in `AgentsKitCore` and `ControlPlaneKit`
 only.
 
-- [ ] T120 [P] `ControlAddress` (`url`, `pin`) in `AgentsKitCore/Control`. `ControlMembership`
+- [x] T120 (`ControlEndpoint`; `endpoints` + `epoch`, since `addresses` was already the version 1 list; ControlEndpointTests) [P] `ControlAddress` (`url`, `pin`) in `AgentsKitCore/Control`. `ControlMembership`
   and `ControlSettings` gain `addresses` and `epoch`, with `url` and `pin` kept as the first
   entry. Old files decode, and a membership with no list reads as `[url + pin]`. Unit tests
   for both directions.
-- [ ] T121 R6's `ok` gains optional `addresses` and `epoch`, and `auth` an optional `epoch`,
+- [x] T121 (ok/auth fields; `verify(origins:)`; `knownEpoch` on both records via `noteEpoch`; `ControlMethods.setEndpoints`) R6's `ok` gains optional `addresses` and `epoch`, and `auth` an optional `epoch`,
   in `ControlAuth`. The service fills `ok` from settings and writes `knownEpoch` on the
   record from `auth`. Tests: an older peer (no fields) still completes the exchange, and a
   peer with a stale epoch gets the list.
-- [ ] T122 Members save a newer list. `ControlCodeUse`/`ControlJoin` take the list from
+- [x] T122 (`EndpointBook` + `ControlCodeUse.dialEach`; `ControlJoin.hostDial(keep:)`, agentsd and `agents-relay` save it; EndpointsTests) Members save a newer list. `ControlCodeUse`/`ControlJoin` take the list from
   `ok`, save it over the membership file, and dial the list in order with each entry's own
   pin. Hosts (`ControlUplink` via `ControlJoin.hostDial`) and `agents-relay` first. Tests: a
   host dialled at `[a]` that is told `[a, b]` dials `b` when `a` is gone.
-- [ ] T123 [P] `PeerStore: ControlStore` over a copy-to-copy link (`x:`), with `store/list`,
+- [x] T123 (`Handover/Handover.swift`: `Handover.Link`, `PeerStore`; identity `x:handover-…`; HandoverTests) [P] `PeerStore: ControlStore` over a copy-to-copy link (`x:`), with `store/list`,
   `store/get` and `store/put` (create only), answered only by a copy that is in `--receive`
   or frozen. `StoreCopy` runs unchanged with a `PeerStore` at either end. Tests against two
   `ControlService`s on loopback with `FolderStore`s, including a refused peer with another
   key.
-- [ ] T124 `agents-control` modes: `serve --receive` (no settings created, members refused,
+- [x] T124 (phases on `ControlService`; `handover/*` methods; `serve --receive` or `AGENTS_CONTROL_RECEIVE=1`, which on a store it already took simply serves; `agents-control handover status|announce|freeze|unfreeze|withdraw|copy|take|forward`, run end to end on loopback) `agents-control` modes: `serve --receive` (no settings created, members refused,
   copies only); `control/announce` (append an address, bump the epoch, close live
   connections); `control/freeze` and `control/unfreeze` (writes refused with "The control
   plane is moving"); `control/forward` (frozen, and `ok` answers only the new list, then

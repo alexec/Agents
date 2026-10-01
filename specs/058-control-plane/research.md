@@ -778,6 +778,20 @@ the Mac. Without a Mac host a set-up has no notifications, which is #61's separa
 - **Sending the private key with the store.** The key is never in the store (R4), and that
   stays true. The person moves it once, by hand, to the new machine's secrets.
 
+### As built (T120–T124, 2026-10-01)
+
+- The list is `endpoints` of `ControlEndpoint`, since `addresses` already named version 1's
+  `host:port` list; the epoch a member holds is `knownEpoch` on its record.
+- The steps are `handover/status`, `announce`, `withdraw`, `freeze`, `unfreeze`, `take`
+  and `forward`, with `store/list`, `store/get` and `store/put` for `PeerStore`, over a
+  session proved as `x:handover-<id>`. `agents-control handover <step>` runs each one.
+- `serve --receive` (`AGENTS_CONTROL_RECEIVE=1`) on a store the copy already took serves it,
+  so the container can restart; on records it never took it refuses to start.
+- An `endpointsChanged` event closes members at every copy, so a bucket set-up with several
+  copies announces everywhere at once.
+- Not covered by freezing: `agents-control code` run on the machine itself writes a code
+  straight into the store. Don't make codes during a handover.
+
 ### Decided (Alex, 2026-10-01: the first two; the last two are defaults still open)
 
 - **The key goes to the cloud by hand,** as one file, from "Export the control plane's

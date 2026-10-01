@@ -119,6 +119,31 @@ extension ControlServiceTests {
         await handover.close()
     }
 
+    @Test func aReceivingCopyStartedAgainServesWhatItTookAndRefusesHalfAHandover() async throws {
+        let store = MemoryStore()
+        let port = try await freePort()
+        let url = URL(string: "http://localhost:\(port)")!
+        func copy() throws -> ControlService {
+            try ControlService(.init(store: store, privateKey: control.privateKey, url: url, bind: "127.0.0.1", port: port,
+                                     name: "test", receive: true))
+        }
+        // Records from elsewhere that were never taken: half a handover.
+        let elsewhere = ControlSettings(name: "test", machineID: "m", url: "http://127.0.0.1:1", controlKey: control.publicKey)
+        _ = try await store.put(ControlRecords.settingsKey, try ControlRecords.encoder.encode(elsewhere), when: .absent)
+        await #expect(throws: ControlService.Failure.self) { try await copy().start() }
+
+        // Taken: its own place first. Started again with --receive, it simply serves.
+        var taken = elsewhere
+        taken.endpoints = [ControlEndpoint(url: url.absoluteString)]
+        taken.epoch = 2
+        let held = try #require(try await store.get(ControlRecords.settingsKey))
+        _ = try await store.put(ControlRecords.settingsKey, try ControlRecords.encoder.encode(taken), when: .matching(held.etag))
+        let again = try copy()
+        try await again.start()
+        defer { Task { await again.stop() } }
+        #expect(again.phase.now == .serving)
+    }
+
     @Test func onlyTheControlPlanesKeyDrivesAHandover() async throws {
         let old = try await start()
         defer { Task { await old.service.stop() } }

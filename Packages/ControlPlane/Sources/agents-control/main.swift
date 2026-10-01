@@ -128,7 +128,8 @@ func serve() async {
                                                tls: tls?.context, bind: value("--bind") ?? "0.0.0.0",
                                                port: port, name: name,
                                                machineID: environment["AGENTS_CONTROL_MACHINE_ID"] ?? MachineID.current,
-                                               peerURL: environment["AGENTS_CONTROL_PEER_URL"].flatMap(URL.init(string:))))
+                                               peerURL: environment["AGENTS_CONTROL_PEER_URL"].flatMap(URL.init(string:)),
+                                               receive: arguments.contains("--receive") || environment["AGENTS_CONTROL_RECEIVE"] == "1"))
         let listening = try await service.start()
         if let pin { print("pin \(pin)") }
         #if canImport(dnssd)
@@ -252,12 +253,80 @@ func list(hosts: Bool) async {
     }
 }
 
+/// A handover of the running control plane to a copy elsewhere (058, research R16), one
+/// step at a time, with the control plane's key: Agents Host's *Move to another machine…*,
+/// or by hand. `--at` is the copy the step is for.
+func handover() async {
+    let step = arguments.dropFirst().first ?? ""
+    let key = privateKey()
+    func link(_ flag: String, pin pinFlag: String) async -> Handover.Link {
+        guard let text = value(flag), let url = URL(string: text) else { fail("say \(flag) https://… for the copy") }
+        do { return try await Handover.Link(url, pin: value(pinFlag), privateKey: key) } catch {
+            fail("couldn't reach \(text) as this control plane: \(error)")
+        }
+    }
+    func endpoints() -> [ControlEndpoint] {
+        guard let url = value("--endpoint") else { fail("say --endpoint https://… [--endpoint-pin PIN]") }
+        return [ControlEndpoint(url: url, pin: value("--endpoint-pin"))]
+    }
+    func show(_ result: JSONValue) {
+        guard let status = try? result.decode(Handover.Status.self) else { return print(result) }
+        if arguments.contains("--json") {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            return print(String(decoding: (try? encoder.encode(status)) ?? Data(), as: UTF8.self))
+        }
+        print("phase\t\(status.phase.rawValue)")
+        print("records\t\(status.hasRecords ? "yes" : "none")")
+        print("epoch\t\(status.epoch.map(String.init) ?? "-")")
+        for endpoint in status.endpoints { print("endpoint\t\(endpoint.url)\t\(endpoint.pin ?? "-")") }
+        for member in status.members {
+            print("member\t\(member.id)\t\(member.name)\t\(member.kind)\t\(member.knownEpoch.map(String.init) ?? "-")")
+        }
+    }
+    do {
+        switch step {
+        case "status":
+            show(try await link("--at", pin: "--pin").call(Handover.Method.status))
+        case "announce":
+            show(try await link("--at", pin: "--pin").call(Handover.Method.announce,
+                                                          ["endpoint": try JSONValue.encoding(endpoints()[0])]))
+        case "forward":
+            show(try await link("--at", pin: "--pin").call(Handover.Method.forward,
+                                                          ["endpoints": try JSONValue.encoding(endpoints())]))
+        case "freeze": show(try await link("--at", pin: "--pin").call(Handover.Method.freeze))
+        case "unfreeze": show(try await link("--at", pin: "--pin").call(Handover.Method.unfreeze))
+        case "withdraw": show(try await link("--at", pin: "--pin").call(Handover.Method.withdraw))
+        case "take": show(try await link("--at", pin: "--pin").call(Handover.Method.take))
+        case "copy":
+            // Either end a copy (https://…, over its handover session) or a store this
+            // machine opens (file://…, s3://…).
+            func end(_ flag: String, pin: String) async -> any ControlStore {
+                guard let text = value(flag) else { fail("say \(flag)") }
+                if text.hasPrefix("https://") || text.hasPrefix("http://") { return PeerStore(await link(flag, pin: pin)) }
+                return store(text)
+            }
+            let report = try await StoreCopy.copy(from: await end("--from", pin: "--from-pin"), to: await end("--to", pin: "--to-pin"))
+            print("copied \(report.copied) records (left out \(report.skipped) leases and copies, which are rebuilt)")
+        default:
+            fail("""
+            usage: agents-control handover status|freeze|unfreeze|withdraw|take --at URL [--pin PIN] [--json]
+                   agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN]
+                   agents-control handover copy --from URL|STORE [--from-pin PIN] --to URL|STORE [--to-pin PIN]
+            """)
+        }
+    } catch {
+        fail("\(error)")
+    }
+}
+
 switch arguments.first {
 case "serve": await serve()
 case "code": await code()
 case "hosts": await list(hosts: true)
 case "clients": await list(hosts: false)
 case "move": await move()
+case "handover": await handover()
 case "store" where arguments.dropFirst().first == "check": await checkStore()
 case "store" where arguments.dropFirst().first == "copy": await copyStore()
 case "install-script": print(HostInstallScript.text, terminator: "")
@@ -270,5 +339,7 @@ default:
            agents-control hosts | clients
            agents-control store check [--store URL]
            agents-control store copy --from URL --to URL
+           agents-control serve --receive            (empty, for a handover to fill; or AGENTS_CONTROL_RECEIVE=1)
+           agents-control handover status|announce|freeze|unfreeze|withdraw|copy|take|forward …
     """)
 }
