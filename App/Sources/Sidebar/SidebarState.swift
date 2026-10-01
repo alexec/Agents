@@ -173,6 +173,9 @@ final class AgentPaneState {
     /// Nil means the agent's own folder. The pane resolves it, so an agent whose folder
     /// moved does not carry a stale path around.
     var folder: URL?
+    /// The folders open in the Files tree, by path, so closing the pane and opening it
+    /// again finds the tree as it was left.
+    var expanded: Set<String> = []
     var openFile: URL?
     /// Where in the open file to put the reader, counted from one. Set when the agent
     /// asked for this file by line; nil whenever the user opened it themselves, which

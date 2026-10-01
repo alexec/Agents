@@ -222,7 +222,9 @@ struct PromptBar: View {
     }
 
     private var whereAndWhat: some View {
-        HStack(spacing: 12) {
+        // Top for a chat, so its runtime sits level with the first line however tall the
+        // header grows; the new chat's row of controls stays centred.
+        HStack(alignment: agent == nil ? .center : .top, spacing: 12) {
             if let agent {
                 VStack(alignment: .leading, spacing: 8) {
                     // Where it works, and the way to move it (053).
@@ -241,6 +243,7 @@ struct PromptBar: View {
                 }
                 .task(id: "\(agent.id)-\(agent.cwd.path)") { await model.loadAgentWorktrees(of: agent) }
                 Spacer(minLength: 0)
+                runtimeLabel(agent)
             } else {
                 // On a project page the folder is the project, named in the middle of
                 // the page; only a session with no project yet chooses one.
@@ -318,6 +321,20 @@ struct PromptBar: View {
                 .help(noServerRuntime ?? "")
             }
         }
+    }
+
+    /// The runtime the conversation is on, where a new chat chooses one. Said, not
+    /// offered: a conversation stays on the runtime it started on.
+    private func runtimeLabel(_ agent: Agent) -> some View {
+        Text(runtimeName(agent.runtimeID))
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .appText(.fine)
+            .fixedSize()
+            .paperRaised(in: .capsule)
+            .help("Runtime")
+            .accessibilityLabel("Runtime: \(runtimeName(agent.runtimeID))")
     }
 
     /// A server with nothing to start agents with says so where the runtime is chosen
