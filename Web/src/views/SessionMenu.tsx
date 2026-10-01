@@ -6,7 +6,8 @@ import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { isOpenBlock } from "../model/groups";
 
-type Action = "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive";
+type Action = "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
+  | "markRead" | "markUnread";
 
 /** What the menu offers, in order, with the window's words (ParkWords, AgentRow's menu). */
 export function sessionActions(agent: Agent): { action: Action; label: string; help: string }[] {
@@ -20,6 +21,12 @@ export function sessionActions(agent: Agent): { action: Action; label: string; h
       help: "whenTurnEnds" in agent.parking ? "Don't park this chat when its turn ends" : "Put this chat back where it was" });
   } else if (agent.state !== "archived") {
     found.push({ action: "agents/park", label: "Park", help: "Put this chat down to come back to later" });
+  }
+  // The person's own mark (#70): leave something to come back to, or clear it without opening it.
+  if (agent.state === "finished") {
+    found.push(agent.isUnread === true
+      ? { action: "markRead", label: "Mark as Read", help: "Clear the unread mark" }
+      : { action: "markUnread", label: "Mark as Unread", help: "Leave this to come back to" });
   }
   found.push(agent.state === "archived"
     ? { action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" }
@@ -46,7 +53,11 @@ export function SessionMenu({ store, host, agent, disabled }: { store: Store; ho
         <div class="popover right" role="menu">
           {sessionActions(agent).map(({ action, label, help }) => (
             <button key={action} role="menuitem" title={help}
-              onClick={() => { open.value = false; void store.perform(host, agent.id, action); }}>{label}</button>
+              onClick={() => {
+                open.value = false;
+                if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
+                else void store.perform(host, agent.id, action);
+              }}>{label}</button>
           ))}
         </div>
       )}

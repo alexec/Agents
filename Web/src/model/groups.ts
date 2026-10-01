@@ -47,6 +47,11 @@ export function isWaiting(agent: Agent): boolean {
   return (agent.eventWait !== undefined && agent.eventWait.ending === undefined) || resumesByItself(agent.report);
 }
 
+/** Agent.showsUnread: a finished turn nobody has opened since. A mark on the row, never a group (#70). */
+export function showsUnread(agent: Agent): boolean {
+  return agent.state === "finished" && agent.isUnread === true;
+}
+
 /** Agent.needsAPerson: it asked for an answer. */
 export function needsAPerson(agent: Agent): boolean {
   return agent.state === "waitingOnUser"
@@ -75,16 +80,15 @@ export function groupOf(agent: Agent, wantsEyes = false): AgentGroup {
   const wantsAnswer = report !== undefined && outcomeNeedsAPerson(report.outcome);
   const outcomeAsked = agent.outcomeAsked === true;
   const waitingOnEvents = agent.eventWait !== undefined && agent.eventWait.ending === undefined;
-  const isUnread = agent.isUnread === true;
   if (isParked(agent) && agent.state !== "archived" && agent.state !== "waitingOnUser") return "parked";
   switch (agent.state) {
     case "starting": return "running";
     case "waitingOnUser": return "needsAttention";
     case "running":
-      if (outcomeAsked) return settled(wantsEyes || wantsAnswer || isUnread || report === undefined, report, waitingOnEvents);
+      if (outcomeAsked) return settled(wantsEyes || wantsAnswer || report === undefined, report, waitingOnEvents);
       return wantsEyes ? "needsAttention" : "running";
     case "finished":
-      return settled(wantsEyes || wantsAnswer || isUnread || (outcomeAsked && report === undefined), report, waitingOnEvents);
+      return settled(wantsEyes || wantsAnswer || (outcomeAsked && report === undefined), report, waitingOnEvents);
     case "stopped":
       // The daemon never sends allowanceWait, so the Mac's "waiting for an allowance" arm is absent.
       return pausedEndings.includes(agent.endedReason) ? "stopped" : "needsAttention";
@@ -135,6 +139,35 @@ export function counts(agents: readonly Agent[], folder: string): Partial<Record
     result[group] = (result[group] ?? 0) + 1;
   }
   return result;
+}
+
+/** AgentsModel.attentionCount(in:): Needs you, Blocked, or unread: what the badge and the title count. */
+export function attentionCount(agents: readonly Agent[], folder: string): number {
+  const wanted = folderKey(folder);
+  return agents.filter((a) => {
+    if (projectFolder(a) !== wanted) return false;
+    if (showsUnread(a)) return true;
+    const group = groupOf(a);
+    return group === "needsAttention" || group === "blocked";
+  }).length;
+}
+
+/**
+ * What a project row says under its name (ProjectRow.subtitle): Needs you first, with unread
+ * beside it; else working and unread; else complete and stopped; else nothing.
+ */
+export function projectSubtitle(agents: readonly Agent[], folder: string): string | null {
+  const c = counts(agents, folder);
+  const unread = unreadCount(agents, folder);
+  if ((c.needsAttention ?? 0) > 0) return unread > 0 ? `Needs you · ${unread} unread` : "Needs you";
+  const parts: string[] = [];
+  if ((c.running ?? 0) > 0) parts.push(`${c.running} working`);
+  if (unread > 0) parts.push(`${unread} unread`);
+  if (!parts.length) {
+    if ((c.finished ?? 0) > 0) parts.push(`${c.finished} complete`);
+    if ((c.stopped ?? 0) > 0) parts.push(`${c.stopped} stopped`);
+  }
+  return parts.length ? parts.join(" · ") : null;
 }
 
 /** AgentsModel.unreadCount(in:): finished chats nobody has looked at since. */

@@ -49,7 +49,8 @@ export function shapeOf(agent: Agent, isComingBack = false): StatusShape {
     case "running": return "working";
     case "waitingOnUser": return "needsYou";
     case "finished":
-      if (agent.isUnread === true || endingIsUnaccountedFor(agent)) return "needsYou";
+      // Unread is the row's mark, not a need (#70).
+      if (endingIsUnaccountedFor(agent)) return "needsYou";
       if (outcome !== undefined && outcomeNeedsAPerson(outcome)) return "needsYou";
       if (isWaiting(agent)) return "waiting";
       if (outcome === "blocked") return "needsYou";

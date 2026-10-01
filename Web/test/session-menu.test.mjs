@@ -14,12 +14,17 @@ test("a running session can be stopped, parked and archived", () => {
 });
 
 test("a finished one can't be stopped, unless it sits in an open block", () => {
-  assert.deepEqual(labels("done"), ["Park", "Archive"]);
-  assert.deepEqual(labels("blocked on agents"), ["Stop", "Park", "Archive"]);
+  assert.deepEqual(labels("done"), ["Park", "Mark as Unread", "Archive"]);
+  assert.deepEqual(labels("blocked on agents"), ["Stop", "Park", "Mark as Unread", "Archive"]);
+});
+
+test("an unread finish offers Mark as Read; nothing else offers either (#70)", () => {
+  assert.deepEqual(labels("done, unread"), ["Park", "Mark as Read", "Archive"]);
+  assert.deepEqual(labels("stopped by the person"), ["Park", "Archive"]);
 });
 
 test("parked, or parking when the turn ends, offers Unpark", () => {
-  assert.deepEqual(labels("parked, done"), ["Unpark", "Archive"]);
+  assert.deepEqual(labels("parked, done"), ["Unpark", "Mark as Unread", "Archive"]);
   assert.deepEqual(labels("parked when the turn ends, running"), ["Stop", "Unpark", "Archive"]);
 });
 

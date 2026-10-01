@@ -81,7 +81,7 @@ public extension StatusShape {
     /// asks it. The web remote draws the same (071, research R7).
     init(row agent: Agent, isComingBack: Bool) {
         self.init(state: agent.state, outcome: agent.report?.outcome, isWaiting: agent.isWaiting,
-                  isComingBack: isComingBack, isUnread: agent.isUnread, endedReason: agent.endedReason,
+                  isComingBack: isComingBack, endedReason: agent.endedReason,
                   outcomeUnknown: agent.endingIsUnaccountedFor)
     }
 

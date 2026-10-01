@@ -627,3 +627,8 @@ button.remove:hover { opacity: 1; }
   color: inherit;
 }
 .menu-anchor.session-menu { margin-right: 0; }
+
+/* Unread (#70): a grey dot and a heavier title; never the attention colour. */
+.session .title { font-weight: 400; }
+.session .title.unread { font-weight: 600; }
+.unread-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.5; margin-right: 6px; vertical-align: middle; }

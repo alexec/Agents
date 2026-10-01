@@ -254,9 +254,9 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
+      "shape" : "done",
+      "symbol" : "checkmark.circle",
+      "tinted" : false,
       "words" : "Unread · Finished"
     },
     "input" : {
@@ -816,9 +816,9 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
+      "shape" : "done",
+      "symbol" : "checkmark.circle",
+      "tinted" : false,
       "words" : "Unread · Complete"
     },
     "input" : {

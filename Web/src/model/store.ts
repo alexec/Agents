@@ -443,6 +443,11 @@ export class Store extends Work {
     await this.act(action, { agentID: agentID as UUID }, host);
   }
 
+  /** Mark as Unread / Mark as Read (#70). */
+  async setUnread(host: string, agentID: string, unread: boolean): Promise<void> {
+    await this.act("agents/setUnread", { agentID: agentID as UUID, unread }, host);
+  }
+
   /** A menu's choice, shown at once and sent; the host's answer settles it either way. */
   async setOption(host: string, agentID: string, optionID: string, value: JSONValue): Promise<void> {
     this.pendingOptions.value = { ...this.pendingOptions.value,

@@ -5,7 +5,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { hostStateWords, type Store } from "../model/store";
-import { agentsIn, counts, folderKey, headings } from "../model/groups";
+import { agentsIn, counts, folderKey, headings, projectSubtitle, showsUnread } from "../model/groups";
 import { parseQuery, queryMatches } from "../model/labels";
 import type { Agent, ControlHost, ProjectSummary } from "../protocol/generated";
 import { go, route } from "../route";
@@ -74,11 +74,12 @@ function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
               const folder = project.project.folder;
               const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);
               const needs = needsYou(store, host.id, folder);
+              const subtitle = projectSubtitle(store.agents.value[host.id] ?? [], folder);
               return (
                 <button key={folder} class={`row project${chosen ? " chosen" : ""}`} aria-current={chosen}
                   onClick={() => { go({ host: host.id, project: folder }); onPick?.(); }}>
                   <span class="title">{project.name}</span>
-                  {needs > 0 && <span class="subtitle">{needs === 1 ? "Needs you" : `${needs} need you`}</span>}
+                  {subtitle && <span class="subtitle">{subtitle}</span>}
                   {needs > 0 && <span class="dot" aria-label="Needs you" />}
                 </button>
               );
@@ -179,6 +180,7 @@ function SessionsColumn({ store }: { store: Store }) {
               <div class="group" key={group.group} role="group" aria-label={group.title}>
                 <h3 class={`subhead${group.group === "needsAttention" ? " needs" : ""}`}>
                   {group.title} <span class="count">{group.agents.length}</span>
+                  {group.agents.some(showsUnread) && <span> · {group.agents.filter(showsUnread).length} unread</span>}
                 </h3>
                 {group.agents.map((agent) => (
                   <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} />

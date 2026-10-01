@@ -137,7 +137,8 @@ struct WebFixturesTests {
             let agent = try input["agent"]!.decode(Agent.self)
             let group = agent.group(wantsEyes: input["wantsEyes"]?.boolValue ?? false)
             return .object(["group": .string(group.rawValue), "title": .string(group.title),
-                            "needsAPerson": .bool(agent.needsAPerson), "isWaiting": .bool(agent.isWaiting)])
+                            "needsAPerson": .bool(agent.needsAPerson), "isWaiting": .bool(agent.isWaiting),
+                            "showsUnread": .bool(agent.showsUnread)])
         }
     }
 
@@ -175,7 +176,8 @@ struct WebFixturesTests {
             for group in AgentGroup.live {
                 for heading in group.headings(model.agents(in: folder, group: group)) {
                     headings.append(.object(["group": .string(group.rawValue), "title": .string(heading.title),
-                                             "ids": .array(heading.agents.map { .string($0.id.uuidString) })]))
+                                             "ids": .array(heading.agents.map { .string($0.id.uuidString) }),
+                                             "unread": .int(heading.agents.filter(\.showsUnread).count)]))
                 }
             }
             let counts = model.counts(in: folder)
@@ -185,6 +187,7 @@ struct WebFixturesTests {
                 "counts": .object(Dictionary(uniqueKeysWithValues: counts.map { ($0.key.rawValue, .int($0.value)) })),
                 "needsYou": .int(counts[.needsAttention] ?? 0),
                 "unread": .int(model.unreadCount(in: folder)),
+                "attention": .int(model.attentionCount(in: folder)),
             ])
         }
     }

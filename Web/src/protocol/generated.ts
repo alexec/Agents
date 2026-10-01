@@ -1001,6 +1001,11 @@ export interface SetOptionRequest {
   value: JSONValue;
 }
 
+export interface SetUnreadRequest {
+  agentID: UUID;
+  unread: boolean;
+}
+
 export interface ShowFileNotification {
   agentID: UUID;
   file: ShownFile;
@@ -1387,6 +1392,7 @@ export interface Methods {
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
   "agents/setLabels": { params: SetLabelsRequest; result: Agent };
   "agents/setOption": { params: SetOptionRequest; result: ConfigOption[] };
+  "agents/setUnread": { params: SetUnreadRequest; result: Empty };
   "agents/start": { params: StartRequest; result: UUID };
   "agents/stop": { params: AgentRequest; result: Empty };
   "agents/stopBackground": { params: StopBackgroundRequest; result: JSONValue };
@@ -1439,6 +1445,7 @@ export const MethodTarget = {
   "agents/sendNow": "host",
   "agents/setLabels": "host",
   "agents/setOption": "host",
+  "agents/setUnread": "host",
   "agents/start": "host",
   "agents/stop": "host",
   "agents/stopBackground": "host",
@@ -1592,6 +1599,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
+  SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line"] },
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },

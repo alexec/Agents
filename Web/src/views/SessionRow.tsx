@@ -3,7 +3,7 @@
 // background, and parking. Only Needs you is ever in colour.
 import type { Agent } from "../protocol/generated";
 import { backgroundMark } from "../model/background";
-import { parkedAt } from "../model/groups";
+import { parkedAt, showsUnread } from "../model/groups";
 import { rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 
@@ -62,7 +62,10 @@ export function SessionRow({ agent, chosen, onPick }: { agent: Agent; chosen: bo
     <button class={`row session${chosen ? " chosen" : ""}`} aria-current={chosen} onClick={onPick}>
       <StatusMark agent={agent} />
       <span class="body">
-        <span class="title">{agent.title ?? "Untitled"}</span>
+        {/* Unread is a mark, as in Mail (#70): a dot and a heavier title, gone once opened. */}
+        <span class={`title${showsUnread(agent) ? " unread" : ""}`} aria-description={showsUnread(agent) ? "unread" : undefined}>
+          {showsUnread(agent) && <span class="unread-dot" aria-hidden="true" />}{agent.title ?? "Untitled"}
+        </span>
         {agent.report && <span class="subtitle report">{agent.report.message}</span>}
         {(agent.worktree || labels.length > 0) && (
           <span class="chips">

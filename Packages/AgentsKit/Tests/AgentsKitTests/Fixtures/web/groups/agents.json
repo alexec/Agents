@@ -4,6 +4,7 @@
       "group" : "running",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Working"
     },
     "input" : {
@@ -39,6 +40,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -74,6 +76,7 @@
       "group" : "running",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Working"
     },
     "input" : {
@@ -109,6 +112,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -144,6 +148,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -180,6 +185,7 @@
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Done"
     },
     "input" : {
@@ -221,6 +227,7 @@
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Done"
     },
     "input" : {
@@ -254,10 +261,11 @@
   },
   {
     "expected" : {
-      "group" : "needsAttention",
+      "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
-      "title" : "Needs you"
+      "showsUnread" : true,
+      "title" : "Done"
     },
     "input" : {
       "agent" : {
@@ -294,6 +302,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -334,6 +343,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -374,6 +384,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -414,6 +425,7 @@
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Waiting"
     },
     "input" : {
@@ -462,6 +474,7 @@
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Waiting"
     },
     "input" : {
@@ -508,6 +521,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -548,6 +562,7 @@
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Done"
     },
     "input" : {
@@ -598,6 +613,7 @@
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Waiting"
     },
     "input" : {
@@ -647,6 +663,7 @@
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Done"
     },
     "input" : {
@@ -701,6 +718,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -738,6 +756,7 @@
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Done"
     },
     "input" : {
@@ -779,6 +798,7 @@
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Done"
     },
     "input" : {
@@ -816,10 +836,11 @@
   },
   {
     "expected" : {
-      "group" : "needsAttention",
+      "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
-      "title" : "Needs you"
+      "showsUnread" : true,
+      "title" : "Done"
     },
     "input" : {
       "agent" : {
@@ -860,6 +881,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -900,6 +922,7 @@
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Waiting"
     },
     "input" : {
@@ -953,6 +976,7 @@
       "group" : "stopped",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Paused"
     },
     "input" : {
@@ -989,6 +1013,7 @@
       "group" : "stopped",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Paused"
     },
     "input" : {
@@ -1025,6 +1050,7 @@
       "group" : "stopped",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Paused"
     },
     "input" : {
@@ -1061,6 +1087,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -1097,6 +1124,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -1133,6 +1161,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -1168,6 +1197,7 @@
       "group" : "stopped",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Paused"
     },
     "input" : {
@@ -1209,6 +1239,7 @@
       "group" : "parked",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Parked"
     },
     "input" : {
@@ -1254,6 +1285,7 @@
       "group" : "parked",
       "isWaiting" : false,
       "needsAPerson" : true,
+      "showsUnread" : false,
       "title" : "Parked"
     },
     "input" : {
@@ -1299,6 +1331,7 @@
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
+      "showsUnread" : false,
       "title" : "Needs you"
     },
     "input" : {
@@ -1339,6 +1372,7 @@
       "group" : "running",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Working"
     },
     "input" : {
@@ -1379,6 +1413,7 @@
       "group" : "archived",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Archived"
     },
     "input" : {
@@ -1414,6 +1449,7 @@
       "group" : "archived",
       "isWaiting" : false,
       "needsAPerson" : false,
+      "showsUnread" : false,
       "title" : "Archived"
     },
     "input" : {
