@@ -165,8 +165,8 @@ them into a way to find work.
   sessions do.
 - A project is deleted: its labels go with it. The same label in another project is that
   project's own label, with its own owner.
-- A server project: labels are set and read on the server the same as on the Mac, and
-  arrive on the phone.
+- A server project: labels are set and read on the server from the Mac. In this version,
+  iPhone and iPad show Mac projects only, as specified by feature 037.
 - A label that looks like a number, such as `#42`, is a label like any other and is not read
   as an issue reference.
 
@@ -247,8 +247,8 @@ them into a way to find work.
 
 **Keeping labels**
 
-- **FR-027**: Labels are kept with the session, and MUST reach the phone and a server
-  project the same as the Mac.
+- **FR-027**: Labels are kept with the session. They MUST reach the phone for Mac projects
+  and the Mac for server projects. Phone access to server projects is outside this feature.
 - **FR-028**: Labels MUST survive archiving. A session brought back has the labels it had.
 - **FR-029**: A label on no session in the project is no longer suggested, and MAY be typed
   again to start a new one.
@@ -268,10 +268,11 @@ them into a way to find work.
 ### Measurable Outcomes
 
 - **SC-001**: Alex can add a label to any session in under 10 seconds from the sessions
-  list, without opening the session, on the Mac and on the phone.
+  list, without opening the session, on the Mac; Mac-project sessions can also be labelled
+  on the phone.
 - **SC-002**: Every label an agent adds, through `start_agent`, `finish_turn` or a workflow,
-  is on the card and in the session list within 5 seconds of the call, on the Mac, on the
-  phone and in a server project.
+  is on the card and in the session list within 5 seconds of the call, on the Mac for
+  local and server projects and on the phone for Mac projects.
 - **SC-003**: Across 20 attempts by an agent to remove or rename a person's label, 0
   labels change, and all 20 calls return a reason.
 - **SC-004**: A label both the person and an agent have added to one session is shown once,
@@ -312,6 +313,8 @@ header and menu, are in [wireframe.md](wireframe.md).
 - Colour is per owner, not per label: the person's chip is filled, the agent's outlined, and
   both use the same two colours so a card does not become a colour chart.
 - Labels are per project, not per person or per Mac. Two projects may each have a `perf`.
+- The phone retains feature 037's Mac-project scope; server projects are managed from
+  the Mac in this version.
 - A label is free text and is not linked to anything, so `#42` does not turn into a link to
   issue 42.
 - Reading another session's history (065) does not create a successor link. The new chat

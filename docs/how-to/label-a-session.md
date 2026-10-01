@@ -1,6 +1,6 @@
 ---
 diataxis: how-to
-devices: [mac, iphone, ipad]
+devices: [mac, iphone, ipad, server]
 description: Add session labels, find labeled work, and see who owns each label.
 ---
 
@@ -9,6 +9,7 @@ description: Add session labels, find labeled work, and see who owns each label.
 Use labels to tell similar sessions apart and find them later in the same project.
 Each session can have up to five labels. A label has 1–24 characters; surrounding
 spaces are removed, and capitalization does not make a second label.
+Server projects can be labeled from the Mac. iPhone and iPad show Mac projects only.
 
 ## Add labels
 

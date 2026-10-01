@@ -42,8 +42,8 @@ The added tests should cover the cases below at their model/tool/daemon boundari
 8. Archive and restore a labeled session; verify its labels and owner classes survive.
    Start a separate chat and have it read that session's history; verify the new chat
    begins without those labels.
-9. Repeat on an isolated server project; verify its labels do not appear in a Mac project's
-   suggestions and the Remote view receives server updates.
+9. Repeat on an isolated server project from the Mac; verify its labels do not appear in
+   a Mac project's suggestions and that server label changes appear in the Mac app.
 
 ## Acceptance evidence
 
