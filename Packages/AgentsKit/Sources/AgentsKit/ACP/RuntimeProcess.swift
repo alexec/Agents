@@ -19,7 +19,10 @@ public final class RuntimeProcess: @unchecked Sendable {
                 onExit: @escaping @Sendable (Int32) -> Void) throws {
         process.executableURL = executable
         process.arguments = arguments
-        process.currentDirectoryURL = cwd
+        // Always a file URL: a folder sent as a bare path decodes to a URL with no scheme,
+        // and `Process` raises an Objective-C exception for that, which takes the whole
+        // daemon down with every agent in it.
+        process.currentDirectoryURL = RuntimeProcess.folderURL(cwd)
         process.environment = environment
         process.standardInput = inPipe
         process.standardOutput = outPipe
@@ -42,6 +45,11 @@ public final class RuntimeProcess: @unchecked Sendable {
         }
 
         try process.run()
+    }
+
+    /// `url` as a file URL to a folder, whatever scheme it came with.
+    static func folderURL(_ url: URL) -> URL {
+        url.isFileURL ? url : URL(filePath: url.path(percentEncoded: false), directoryHint: .isDirectory)
     }
 
     public var isRunning: Bool { process.isRunning }

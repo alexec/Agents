@@ -301,7 +301,7 @@ final class RouteProcess: @unchecked Sendable {
         // Same scrubbing a runtime launch gets: never the daemon's full environment
         // (security review S5).
         process.environment = RuntimeEnvironment.forRuntimes().merging(route.env) { $1 }
-        process.currentDirectoryURL = route.cwd
+        process.currentDirectoryURL = RuntimeProcess.folderURL(route.cwd)
         process.standardInput = input
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
