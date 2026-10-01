@@ -20,13 +20,10 @@ export type URLString = string & { readonly __brand: "URLString" };
 export const Failure = {
   agentLimitReached: -32023,
   agentRetired: -32050,
-  alreadyAnswered: -32019,
-  alreadyRunning: -32006,
   busy: -32040,
   catalogRefused: -32080,
   changedElsewhere: -32093,
   cloneFailed: -32026,
-  credentialRefused: -32037,
   credentialWanted: -32036,
   dayLimitReached: -32018,
   eventRefused: -32050,
@@ -39,9 +36,7 @@ export const Failure = {
   leaseRefused: -32035,
   needsSignIn: -32007,
   noSuchAgent: -32005,
-  noSuchDevice: -32020,
   noSuchHost: -32091,
-  noSuchNeed: -32021,
   noSuchProject: -32012,
   noSuchWorkflow: -32014,
   noWait: -32051,
@@ -66,7 +61,6 @@ export const Failure = {
   shellNotLive: -32011,
   shellWillNotStart: -32010,
   signInWanted: -32070,
-  stopTheTurnFirst: -32046,
   storeUnavailable: -32094,
   workflowLimitReached: -32017,
   workflowUnreadable: -32015,
@@ -96,7 +90,7 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
-export type AfterTurn = "park" | "archive";
+export type AfterTurn = "park";
 
 export interface Agent {
   id: UUID;
@@ -1114,7 +1108,6 @@ export type TranscriptEntryKind =
   | { agentThought: { messageID?: string; text: string } }
   | { toolCall: { _0: ToolCall } }
   | { toolCallUpdate: { _0: ToolCall } }
-  | { plan: { _0: JSONValue } }
   | { planUpdated: { _0: Plan } }
   | { usageRecorded: { _0: TurnUsage } }
   | { servedRequest: { _0: ServedRequest } }
