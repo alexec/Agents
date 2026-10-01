@@ -92,5 +92,9 @@ kill <server pid> <dns-sd pid>; rm -rf ~/Library/Containers/com.alexecollins.age
 - R6 should pin the key type to P-256, or the app needs a DER parser.
 - R8 should note that the pin makes the certificate's names irrelevant. Adding a Tailscale name
   needs no new certificate.
+  - *Corrected 2026-09-30:* true for our pin check, not for App Transport Security. ATS
+    refuses a self-signed certificate at a fully qualified name such as `*.ts.net`, even with
+    the pin accepted. IP addresses and `.local` names, which this spike dialled, are exempt.
+    See research R8 ("Extra addresses for Agents Host") and R15.
 - The walk still missing is a Finder-launched build dialling another machine, to see the Local
   Network prompt and what a denial does.

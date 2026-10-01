@@ -296,9 +296,8 @@ proxy understands (FR-011). Keeping the lines inside means the router, the host 
 - **A control plane has one address,** a URL. In rented hosting it is the load balancer's DNS
   name.
 - **The host app's single copy** listens on port 8791. Its address is
-  `https://<this Mac's .local name>:8791`, plus whatever name the person adds (for example
-  their Tailscale name). A fully qualified name under a pin fails App Transport Security
-  in the apps; see R15.
+  `https://<this Mac's .local name>:8791`. Extra addresses, such as a Tailscale one, are
+  below: as built, there are none.
 - **Codes and records** carry the URL and the pin.
 - **Bonjour** (`_agents-control._tcp`) stays only so a window on the same network finds the
   host app's control plane without typing (US2-2). The app declares it in
@@ -306,6 +305,73 @@ proxy understands (FR-011). Keeping the lines inside means the router, the host 
 
 **Rationale**: a stable name is what a load balancer gives, and what a phone away from home
 needs. A list of IP addresses (today's code format) goes stale.
+
+### Extra addresses for Agents Host (proposed 2026-09-30, for #61's "away from home")
+
+The first R8 said the host app's address could be "plus whatever name the person adds (for
+example their Tailscale name)", because a pin makes the certificate's names irrelevant (S2).
+That holds for our check but not for App Transport Security. ATS checks a fully qualified
+name's chain against the *system's* roots after the delegate has accepted it, so a pinned,
+self-signed certificate at `mac.tailnet.ts.net` is refused by the window and the Remote
+(R15, walks/public-cert.md). Nothing for extra names was ever built, so nothing breaks
+today. The rule going forward:
+
+**Every address is one of two kinds, and Agents Host offers no other:**
+- **Pinned**, at a name ATS leaves alone: a `.local` name or an IP address. The certificate
+  is Agents Host's own self-signed one, and the code carries its pin.
+- **Publicly trusted**, at any other name, with no pin (R15). The certificate is someone
+  else's to get and renew: Let's Encrypt behind Caddy, or Tailscale's.
+
+A fully qualified name with a self-signed certificate is never offered, and never put in a
+code.
+
+**For Tailscale, two ways, in this order:**
+1. **The Mac's Tailscale IP address, pinned.** Agents Host notices an address in
+   100.64.0.0/10 on one of the Mac's interfaces and offers it: "Also reachable over
+   Tailscale at 100.101.102.103". It is the same certificate and pin, with nothing more to
+   set up. Tailscale keeps a machine's address stable. An IP address is not a name, but a
+   device on the tailnet reaches it from anywhere, and it is ATS-exempt, as S2's LAN
+   address was.
+2. **The Mac's Tailscale name, publicly trusted, behind `tailscale serve`.** The person runs
+   `tailscale serve --bg https+insecure://localhost:8791`. Tailscale then gets a Let's
+   Encrypt certificate for `mac.tailnet.ts.net` and renews it, and passes connections to
+   the copy. (`https+insecure` only means Tailscale doesn't check the copy's own
+   certificate, on this Mac.)
+   - Agents Host doesn't run Tailscale's commands. It takes the name the person types and
+     dials it with no pin before adding it.
+   - If the certificate isn't publicly trusted, Agents Host refuses the name: "Windows and
+     phones can't use this name: its certificate isn't publicly trusted. Use the Tailscale
+     address instead, or put the name behind `tailscale serve`."
+   - Worth saying beside the field: Tailscale's certificates are published in Certificate
+     Transparency logs, so the tailnet's name becomes public.
+
+**What it needs from the code and the records:**
+- *Several addresses, each with its own pin or none.* A version 2 code has one URL and one
+  pin. A version 3 code would carry a list of `url|pin` pairs (`-` for none), in the order
+  to try: the `.local` name, then the Tailscale address or name.
+- *The membership keeps that list,* and a client tries the addresses in order, as version 1
+  tried its `host:port` list. When none answers, a device falls back to the relay (R10).
+- *Members learn new addresses without pairing again.* The control plane already keeps
+  `url` and `pin` in `ControlSettings`. A list there, sent with `hello`, lets a member
+  refresh its own list. Adding Tailscale later must not mean pairing every phone again.
+  This is the same mechanism #61's move needs to drop a pin (R15, Open).
+
+**Alternatives considered:**
+- *An ATS exception for `ts.net`* (`NSExceptionDomains` with
+  `NSExceptionAllowsInsecureHTTPLoads`). Our delegate's pin would still decide, so it is
+  safe for us. But it covers Tailscale's domain and no one else's (Headscale, a person's own
+  domain), and App Review asks for a reason. Kept only as a fallback if the two ways above
+  fall short in practice.
+- *Agents Host getting the certificate itself* (`tailscale cert`, or ACME). This means
+  running Tailscale's CLI or an ACME client from the host app, renewing every 90 days, and
+  reloading the copy's TLS. `tailscale serve` does all of that already.
+- *Only the relay away from home* (R10). It works without Tailscale, but it is slower, and
+  it needs iCloud and a Mac host. Tailscale is a direct route for people who already use
+  it.
+
+**Not yet walked:** a pinned dial to a Tailscale address from the sandboxed window and the
+Remote (S2 covered a LAN address, which ATS treats the same), and `tailscale serve` in
+front of the copy. This Mac has no Tailscale.
 
 ## R9 — The host download: an app outside the Store
 
@@ -534,7 +600,8 @@ fails with -1200.
   hold in the apps.** A self-signed, pinned certificate at a `*.ts.net` name would be
   refused by the Mac window and the Remote. Such a name needs a publicly trusted
   certificate (Tailscale's own HTTPS certificates are Let's Encrypt's), or an ATS
-  exception, which App Review asks to be justified. This is open for #61's "away from home".
+  exception, which App Review asks to be justified. What Agents Host offers instead is in
+  R8, "Extra addresses for Agents Host".
 
 **Open**:
 - *A membership made with a pin keeps it.* A control plane that moves from a self-signed
