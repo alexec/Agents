@@ -191,13 +191,9 @@ public struct StoreLocations: Sendable {
     public var wakeSettings: URL { root.appendingPathComponent("wake.json") }
     /// What is left of retired agents, one per line, never rewritten (051).
     public var retired: URL { root.appendingPathComponent("retired.jsonl") }
-    /// The person's pool of runtimes to carry a chat on with (052).
-    public var pool: URL { root.appendingPathComponent("pool.json") }
     /// Which credentials are out, until when, and what credit has been spent (052).
     /// The Mac's is the one that counts: a relayed plan is one allowance (R6).
     public var allowances: URL { root.appendingPathComponent("allowances.json") }
-    /// One line per chat that moved to another runtime, kept 30 days (052, FR-025).
-    public var switches: URL { root.appendingPathComponent("switches.jsonl") }
     /// Every archived agent, slim, with its size: what start reads instead of each
     /// record (051). A cache, rebuilt when it is missing or unreadable.
     public var archiveIndex: URL { root.appendingPathComponent("archive.json") }

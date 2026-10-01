@@ -35,28 +35,6 @@ public enum Payment: Codable, Hashable, Sendable {
     case freeCredit(amount: Cost?, expires: Date?)
     /// A balance topped up once, with auto-recharge off, as the person says.
     case prepaid(amount: Cost?, expires: Date?)
-
-    /// Credit that, once used, does not come back by itself (FR-001c).
-    public var isCredit: Bool {
-        switch self {
-        case .freeCredit, .prepaid: true
-        case .allowance, .freeTier: false
-        }
-    }
-
-    public var amount: Cost? {
-        switch self {
-        case .freeCredit(let amount, _), .prepaid(let amount, _): amount
-        case .allowance, .freeTier: nil
-        }
-    }
-
-    public var expires: Date? {
-        switch self {
-        case .freeCredit(_, let expires), .prepaid(_, let expires): expires
-        case .allowance, .freeTier: nil
-        }
-    }
 }
 
 /// One runtime with one way of paying for it (052, FR-001).
@@ -77,13 +55,6 @@ public struct PoolEntry: Codable, Hashable, Sendable, Identifiable {
     }
 
     public var credentialKind: CredentialKind? { credentialRef.flatMap(CredentialKind.init(rawValue:)) }
-
-    /// Its key is one this Mac lends to its runtime (046). None else can run a pool entry:
-    /// Codex's OpenAI key is gone (047), and so are Claude's tokens (056).
-    public var hasAKeyToLend: Bool {
-        guard let kind = credentialKind else { return false }
-        return kind.isLentOnTheMac && kind.runtimeID == runtimeID
-    }
 
     /// Runs on a key rather than a sign-in. Every kind Settings still takes is a key (056).
     public var isKeyed: Bool { credentialKind != nil }
