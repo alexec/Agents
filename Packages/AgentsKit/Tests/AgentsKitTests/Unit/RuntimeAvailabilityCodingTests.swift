@@ -40,13 +40,19 @@ struct RuntimeAvailabilityCodingTests {
         #expect(reason.contains("beingRepaired"))
     }
 
-    @Test func aRuntimeFromBeforeRecipesStillDecodes() throws {
+    /// A daemon from before 047/048 is past the cut-off (#58): its runtimes do not read.
+    @Test func aRuntimeFromBeforeRecipesDoesNotRead() {
         let old = Data(#"{"id":"grok","name":"Grok","executable":"grok","arguments":["agent","stdio"]}"#.utf8)
-        let runtime = try JSONDecoder().decode(Runtime.self, from: old)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(Runtime.self, from: old) }
+    }
+
+    /// A way of installing a newer daemon invented costs the install, not the runtime.
+    @Test func anInstallThisBuildDoesNotKnowIsNoInstall() throws {
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(RuntimeCatalog.grok)) as! [String: Any]
+        object["install"] = ["teleport": ["where": "space"]]
+        let runtime = try JSONDecoder().decode(Runtime.self, from: JSONSerialization.data(withJSONObject: object))
         #expect(runtime.install == nil)
         #expect(runtime.installPage == RuntimeCatalog.grok.installPage)
-        let unknown = Data(#"{"id":"zed","name":"Zed","executable":"zed","arguments":[]}"#.utf8)
-        #expect(try JSONDecoder().decode(Runtime.self, from: unknown).installPage == Runtime.genericInstallPage)
     }
 
     @Test func aRecipeRoundTrips() throws {

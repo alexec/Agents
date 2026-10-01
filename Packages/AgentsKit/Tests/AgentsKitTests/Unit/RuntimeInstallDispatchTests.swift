@@ -150,13 +150,14 @@ struct RuntimeInstallDispatchTests {
                 == "Grok isn’t installed: Couldn’t reach the internet to download Grok.")
     }
 
-    @Test func aStatusFromAnOlderDaemonIsNotOutdated() throws {
+    /// A status from a daemon before 047 is past the cut-off (#58).
+    @Test func aStatusFromBefore047DoesNotRead() throws {
         let status = RuntimeStatus(runtime: RuntimeCatalog.claude, availability: .missing(lookedIn: []))
         var json = try JSONEncoder().encode(status)
         var object = try JSONSerialization.jsonObject(with: json) as! [String: Any]
         object["outdated"] = nil
         json = try JSONSerialization.data(withJSONObject: object)
-        #expect(try JSONDecoder().decode(RuntimeStatus.self, from: json).outdated == false)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(RuntimeStatus.self, from: json) }
     }
 
     @Test func twoCallsAtOnceAreOneInstall() async throws {

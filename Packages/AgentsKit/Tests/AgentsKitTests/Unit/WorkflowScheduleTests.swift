@@ -159,12 +159,9 @@ struct WorkflowScheduleTests {
         }
     }
 
-    /// A schedule from an older daemon has neither minute, and means the whole of both
-    /// hours by it.
-    @Test func aScheduleWithoutRangeMinutesStillReads() throws {
+    /// A schedule from before the range minutes (09-24) is past the cut-off (#58).
+    @Test func aScheduleWithoutRangeMinutesDoesNotRead() {
         let old = #"{"minutes":[0,30],"hours":[9,18],"days":["mon"]}"#
-        let schedule = try JSONDecoder().decode(WorkflowSchedule.self, from: Data(old.utf8))
-        #expect(schedule.startMinute == 0)
-        #expect(schedule.endMinute == 30)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(WorkflowSchedule.self, from: Data(old.utf8)) }
     }
 }

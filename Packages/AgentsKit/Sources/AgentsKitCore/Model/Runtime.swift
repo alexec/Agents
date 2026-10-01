@@ -41,18 +41,17 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
         case id, name, executable, arguments, install, installPage, usesAppCopyOnly
     }
 
-    /// Lenient about the recipe fields, which a daemon from before 048 (or 047, for
-    /// `usesAppCopyOnly`) never sends.
+    /// Written by hand for `install` alone: a way of installing that a newer daemon
+    /// invented is no way this build knows, and must not cost the phone the runtime list.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
         executable = try c.decode(String.self, forKey: .executable)
         arguments = try c.decode([String].self, forKey: .arguments)
-        install = try? c.decodeIfPresent(RuntimeInstall.self, forKey: .install)
-        installPage = (try? c.decodeIfPresent(URL.self, forKey: .installPage))
-            ?? RuntimeCatalog.runtime(id: id)?.installPage ?? Self.genericInstallPage
-        usesAppCopyOnly = (try? c.decodeIfPresent(Bool.self, forKey: .usesAppCopyOnly)) ?? false
+        install = (try? c.decodeIfPresent(RuntimeInstall.self, forKey: .install)) ?? nil
+        installPage = try c.decode(URL.self, forKey: .installPage)
+        usesAppCopyOnly = try c.decode(Bool.self, forKey: .usesAppCopyOnly)
     }
 }
 
@@ -196,18 +195,5 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
         self.availability = availability
         self.checkedAt = checkedAt
         self.outdated = outdated
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case runtime, availability, checkedAt, outdated
-    }
-
-    /// Lenient about `outdated`, which a daemon from before 047 never sends.
-    public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        runtime = try c.decode(Runtime.self, forKey: .runtime)
-        availability = try c.decode(RuntimeAvailability.self, forKey: .availability)
-        checkedAt = try c.decode(Date.self, forKey: .checkedAt)
-        outdated = (try? c.decodeIfPresent(Bool.self, forKey: .outdated)) ?? false
     }
 }

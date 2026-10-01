@@ -543,9 +543,8 @@ public enum DaemonAPI {
             self.unmeasuredAgents = unmeasuredAgents
         }
 
-        /// An older daemon sends neither new field. Both default rather than fail, so
-        /// the response degrades to silence — no figure at all — never to a wrong
-        /// number.
+        /// Written by hand for `counts` alone, which a newer daemon may key by a group
+        /// this build has not heard of.
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             project = try c.decode(Project.self, forKey: .project)
@@ -559,9 +558,9 @@ public enum DaemonAPI {
             for (name, count) in try c.decode([String: Int].self, forKey: .counts) {
                 if let group = AgentGroup(rawValue: name) { counts[group] = count }
             }
-            costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
-            unmeasuredAgents = try c.decodeIfPresent(Int.self, forKey: .unmeasuredAgents) ?? 0
-            retiredCount = try c.decodeIfPresent(Int.self, forKey: .retiredCount) ?? 0
+            costToDate = try c.decode([String: Decimal].self, forKey: .costToDate)
+            unmeasuredAgents = try c.decode(Int.self, forKey: .unmeasuredAgents)
+            retiredCount = try c.decode(Int.self, forKey: .retiredCount)
         }
     }
 

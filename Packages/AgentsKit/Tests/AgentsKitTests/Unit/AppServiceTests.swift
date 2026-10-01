@@ -418,10 +418,7 @@ struct AppServiceTests {
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "  Renamed 14 call sites.  ",
                           "title": "Call sites renamed",
-                          "next_prompts": .array([
-                              ["label": "Run the tests", "prompt": "Run the tests and fix what fails"],
-                              ["label": "Push", "prompt": "Push the branch"],
-                          ])],
+                          "next_prompt": ["label": "Run the tests", "prompt": "Run the tests and fix what fails"]],
         ])
         #expect(result["isError"]?.boolValue == false)
         #expect(await box.outcome == "done")
@@ -440,7 +437,7 @@ struct AppServiceTests {
         for arguments in [
             JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied"]),
             JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied",
-                              "next_prompts": .array([])]),
+                              "next_prompt": .null]),
         ] {
             let result = try await client.call("tools/call", [
                 "name": .string(AppService.finishTurnToolName), "arguments": arguments,
@@ -460,7 +457,7 @@ struct AppServiceTests {
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "succeeded", "message": "all good", "title": "Tidied",
-                          "next_prompts": .array([["label": "A", "prompt": "Do A"]])],
+                          "next_prompt": ["label": "A", "prompt": "Do A"]],
         ])
         #expect(result["isError"]?.boolValue == true)
         let text = result["content"]?.arrayValue?.first?["text"]?.stringValue ?? ""
@@ -528,16 +525,18 @@ struct AppServiceTests {
         await service.close()
     }
 
-    @Test func fiveNextPromptsBecomeTheFirst() async throws {
+    /// The list conversations were briefed with before 031 is past the cut-off (#58):
+    /// the call lands, and the list is not read.
+    @Test func aListOfNextPromptsIsNotRead() async throws {
         let box = FinishBox()
         let (client, service) = await pair(finishTurn: finishing(box))
-        let many = (1...5).map { JSONValue.object(["label": .string("\($0)"), "prompt": .string("Do \($0)")]) }
-        _ = try await client.call("tools/call", [
+        let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
-                          "next_prompts": .array(many)],
+                          "next_prompts": .array([["label": "Listed", "prompt": "Do listed"]])],
         ])
-        #expect(await box.prompts.map(\.label) == ["1"])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.prompts.isEmpty)
         await service.close()
     }
 
@@ -552,34 +551,6 @@ struct AppServiceTests {
         ])
         #expect(result["isError"]?.boolValue == false)
         #expect(await box.prompts.map(\.prompt) == ["Push the branch"])
-        await service.close()
-    }
-
-    /// Both forms in one call: the one is what the agent meant, and wins.
-    @Test func theOneWinsOverTheList() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
-                          "next_prompt": ["label": "One", "prompt": "Do one"],
-                          "next_prompts": .array([["label": "Listed", "prompt": "Do listed"]])],
-        ])
-        #expect(await box.prompts.map(\.label) == ["One"])
-        await service.close()
-    }
-
-    /// A list whose first entry is blank keeps the first that is not.
-    @Test func aBlankFirstEntryGivesWayToTheNext() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
-                          "next_prompts": .array([["label": "Blank", "prompt": "  "],
-                                                  ["label": "Real", "prompt": "Do it"]])],
-        ])
-        #expect(await box.prompts.map(\.label) == ["Real"])
         await service.close()
     }
 

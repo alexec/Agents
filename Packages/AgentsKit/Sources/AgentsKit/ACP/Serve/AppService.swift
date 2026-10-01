@@ -278,8 +278,7 @@ public actor AppService {
                 // it is sent only when the goal changes: one left out, or that cleans
                 // to nothing, keeps the name the row already has.
                 let title = arguments?["title"]?.stringValue.flatMap(Agent.cleanedTitle)
-                let prompts = SuggestedPrompt.next(one: arguments?["next_prompt"],
-                                                   orFirstOf: arguments?["next_prompts"])
+                let prompts = SuggestedPrompt.next(arguments?["next_prompt"])
                 var words: BlockWords
                 switch Self.blockWords(raw, arguments) {
                 case .success(let read): words = read
