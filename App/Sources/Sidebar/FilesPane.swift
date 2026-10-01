@@ -40,6 +40,8 @@ struct FilesPane: View {
     /// Counted up on every folder event and handed to the page, which re-reads its
     /// pictures' stamps on each: a redrawn image changes no text (022 FR-020).
     @State private var folderEvents = 0
+    /// The file the person just chose from a row of the tree, which is in view already.
+    @State private var chosenFromRow: URL?
 
     private var folder: URL { state.folder ?? agent.cwd }
 
@@ -59,10 +61,16 @@ struct FilesPane: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if let openFile = state.openFile {
-                fileView(openFile)
-            } else {
+            // The tree stays under an open file rather than going, so Back finds it as
+            // it was left: scrolled where it was, the file's row marked (#66).
+            ZStack {
                 listingView
+                    .opacity(state.openFile == nil ? 1 : 0)
+                    .allowsHitTesting(state.openFile == nil)
+                    .accessibilityHidden(state.openFile != nil)
+                if let openFile = state.openFile {
+                    fileView(openFile)
+                }
             }
         }
         .task(id: agent.id) { await start() }
@@ -93,6 +101,7 @@ struct FilesPane: View {
             state.expanded = []
             state.openFile = nil
             state.openLine = nil
+            state.place.forget()
             loaded = nil
             probe = nil
             listings = [:]
@@ -104,13 +113,20 @@ struct FilesPane: View {
         // A file opened from elsewhere — the chat, a permission card — names its folder,
         // and the tree opens down to it so Back finds it in place.
         .onChange(of: state.folder) {
-            reveal()
+            reveal(folder)
             reloadListings()
         }
         // The agent can open a file here as well as the user (`show_file`), and when
         // it does, this pane is already on screen and has already run its task.
         .onChange(of: state.openFile) { _, url in
-            guard let url, url != loaded else { return }
+            guard let url else { return }
+            // Marked in the tree, and opened down to, so Back has it in view: from the
+            // Changes pane it comes with no folder of its own.
+            state.place.opened(url, fromRow: url == chosenFromRow)
+            chosenFromRow = nil
+            reveal(url.deletingLastPathComponent())
+            readUnread()
+            guard url != loaded else { return }
             reloadFile(url)
         }
     }
@@ -160,31 +176,37 @@ struct FilesPane: View {
         if let problem = problems[Self.key(root)] {
             Gone(message: problem) { reloadListing(of: root) }
         } else if listings[Self.key(root)] != nil {
-            List {
-                ForEach(treeLines) { line in
-                    switch line {
-                    case .entry(let entry, let depth):
-                        row(entry, depth: depth)
-                    case .note(_, let words, let depth):
-                        Text(words)
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, indent(depth))
-                    case .problem(let folder, let words, let depth):
-                        HStack(spacing: 8) {
+            let lines = treeLines
+            ScrollViewReader { reader in
+                List {
+                    ForEach(lines) { line in
+                        switch line {
+                        case .entry(let entry, let depth):
+                            row(entry, depth: depth)
+                        case .note(_, let words, let depth):
                             Text(words)
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
-                            Button("Try Again") { reloadListing(of: folder) }
-                                .appText(.fine)
-                                .buttonStyle(.link)
+                                .padding(.leading, indent(depth))
+                        case .problem(let folder, let words, let depth):
+                            HStack(spacing: 8) {
+                                Text(words)
+                                    .appText(.fine)
+                                    .foregroundStyle(.secondary)
+                                Button("Try Again") { reloadListing(of: folder) }
+                                    .appText(.fine)
+                                    .buttonStyle(.link)
+                            }
+                            .padding(.leading, indent(depth))
                         }
-                        .padding(.leading, indent(depth))
                     }
                 }
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
+                .onAppear { bringMarkedIntoView(lines, reader) }
+                .onChange(of: lines.map(\.id)) { bringMarkedIntoView(lines, reader) }
+                .onChange(of: state.place.toScroll) { bringMarkedIntoView(lines, reader) }
             }
-            .listStyle(.inset)
-            .scrollContentBackground(.hidden)
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -252,8 +274,22 @@ struct FilesPane: View {
 
     private func indent(_ depth: Int) -> CGFloat { CGFloat(depth) * 14 }
 
+    /// Scroll the marked file's row into view, once its folder has been read. Whether
+    /// the tree is on screen or under the file, so Back finds it there either way.
+    private func bringMarkedIntoView(_ lines: [TreeLine], _ reader: ScrollViewProxy) {
+        guard state.place.toScroll != nil else { return }
+        var rows: [String: String] = [:]
+        for line in lines {
+            if case .entry(let entry, _) = line, !entry.isDirectory { rows[Self.key(entry.url)] = line.id }
+        }
+        guard let key = state.place.scroll(among: rows.keys), let id = rows[key] else { return }
+        // After this pass: a list that has only just appeared has not been laid out.
+        Task { reader.scrollTo(id, anchor: .center) }
+    }
+
     private func row(_ entry: DirectoryEntry, depth: Int) -> some View {
         let isOpen = entry.isDirectory && state.expanded.contains(Self.key(entry.url))
+        let isMarked = !entry.isDirectory && state.place.marked == Self.key(entry.url)
         return Button {
             if entry.isDirectory {
                 toggle(folder: entry.url)
@@ -290,6 +326,15 @@ struct FilesPane: View {
         }
         .buttonStyle(.plain)
         .accessibilityValue(entry.isDirectory ? (isOpen ? "Expanded" : "Collapsed") : "")
+        // The file last open, so Back shows where it is (#66).
+        .accessibilityAddTraits(isMarked ? .isSelected : [])
+        .listRowBackground(Group {
+            if isMarked {
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color.accentColor.opacity(0.18))
+                    .padding(.horizontal, 10)
+            }
+        })
     }
 
     // MARK: One file
@@ -368,7 +413,14 @@ struct FilesPane: View {
         // in `state` waiting to be read. Clearing it here showed the folder instead,
         // which looked like `show_file` having done nothing at all.
         state.folder = folder
-        reveal()
+        reveal(folder)
+        // A tree drawn new starts at the top: the file open, or last open, is found again.
+        if let openFile = state.openFile {
+            state.place.opened(openFile, fromRow: false)
+            reveal(openFile.deletingLastPathComponent())
+        } else {
+            state.place.drawnAfresh()
+        }
         reloadListings()
         // Not `open(file:)` either, for the same reason at one remove: that treats the
         // file as the user's own choice and throws away the line the agent named.
@@ -394,7 +446,7 @@ struct FilesPane: View {
     }
 
     /// Open every folder between the agent's and the one asked for.
-    private func reveal() {
+    private func reveal(_ folder: URL) {
         let top = Self.key(agent.cwd), target = Self.key(folder)
         guard target != top, target.hasPrefix(top + "/") else { return }
         var url = agent.cwd
@@ -420,6 +472,7 @@ struct FilesPane: View {
     }
 
     private func open(file url: URL) {
+        chosenFromRow = url
         state.openFile = url
         // The user's own choice of file starts at the top. A line is where an agent
         // asked them to look, and that is only true of the file the agent named.

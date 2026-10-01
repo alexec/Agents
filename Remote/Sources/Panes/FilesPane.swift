@@ -31,6 +31,8 @@ struct FilesPane: View {
     @State private var listed = Listed.reading
     @State private var opened = Opened.reading
     @State private var generation = 0
+    /// The file the person just chose from a row, which is in view already.
+    @State private var chosenFromRow: URL?
 
     private var state: PaneState { model.panes.state(for: agent.id) }
     private var folder: URL { state.folder ?? agent.cwd }
@@ -41,13 +43,24 @@ struct FilesPane: View {
         VStack(spacing: 0) {
             bar
             Divider()
-            if let file = state.openFile {
-                fileView(file)
-            } else {
+            // The folder stays under an open file rather than going, so Back finds it
+            // as it was left: scrolled where it was, the file's row marked (#66).
+            ZStack {
                 listingView
+                    .opacity(state.openFile == nil ? 1 : 0)
+                    .allowsHitTesting(state.openFile == nil)
+                    .accessibilityHidden(state.openFile != nil)
+                if let file = state.openFile {
+                    fileView(file)
+                }
             }
         }
         .task { await start() }
+        .onChange(of: state.openFile) { _, url in
+            guard let url else { return }
+            state.place.opened(url, fromRow: url == chosenFromRow)
+            chosenFromRow = nil
+        }
         .task(id: folder) { await relist() }
         .task(id: state.openFile) { await reopen() }
         .onChange(of: model.files.changeCount(agentID: agent.id, folder: folder)) {
@@ -126,21 +139,39 @@ struct FilesPane: View {
             Said(message: message, symbol: "questionmark.folder") { Task { await relist() } }
         case .listing(let listing):
             let touched = model.touchedPaths(for: agent.id)
-            List {
-                ForEach(listing.entries) { entry in
-                    row(entry, touched: touched.contains(entry.url))
-                        .paperListRow()
+            ScrollViewReader { reader in
+                List {
+                    ForEach(listing.entries) { entry in
+                        let isMarked = !entry.isDirectory && state.place.marked == FileTree.key(entry.url)
+                        row(entry, touched: touched.contains(entry.url))
+                            // The file last open, so Back shows where it is (#66).
+                            .listRowBackground(Paper.raised.overlay(isMarked ? Color.accentColor.opacity(0.15) : .clear))
+                            .accessibilityAddTraits(isMarked ? .isSelected : [])
+                    }
+                    if listing.isTruncated {
+                        Text("\(listing.omitted) more, not shown")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .paperListRow()
+                    }
                 }
-                if listing.isTruncated {
-                    Text("\(listing.omitted) more, not shown")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .paperListRow()
-                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .onAppear { bringMarkedIntoView(listing, reader) }
+                .onChange(of: listing) { bringMarkedIntoView(listing, reader) }
+                .onChange(of: state.place.toScroll) { bringMarkedIntoView(listing, reader) }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
         }
+    }
+
+    /// Scroll the marked file's row into view, once it is in the folder on screen.
+    private func bringMarkedIntoView(_ listing: DirectoryListing, _ reader: ScrollViewProxy) {
+        guard state.place.toScroll != nil else { return }
+        var rows: [String: URL] = [:]
+        for entry in listing.entries where !entry.isDirectory { rows[FileTree.key(entry.url)] = entry.id }
+        guard let key = state.place.scroll(among: rows.keys), let id = rows[key] else { return }
+        // After this pass: a list that has only just appeared has not been laid out.
+        Task { reader.scrollTo(id, anchor: .center) }
     }
 
     private func row(_ entry: DirectoryEntry, touched: Bool) -> some View {
@@ -148,6 +179,9 @@ struct FilesPane: View {
             if entry.isDirectory {
                 state.folder = entry.url
             } else {
+                chosenFromRow = entry.url
+                // A Markdown file goes to the Page, and Files is drawn again on return.
+                state.place.opened(entry.url, fromRow: true)
                 state.open(file: entry.url, line: nil)
             }
         } label: {
@@ -210,6 +244,8 @@ struct FilesPane: View {
     // MARK: Reading
 
     private func start() async {
+        // A list drawn new starts at the top: the file open, or last open, is found again.
+        if let file = state.openFile { state.place.opened(file, fromRow: false) } else { state.place.drawnAfresh() }
         await model.files.watch(agentID: agent.id, folder: agent.cwd)
         await model.loadTouchedHistory(for: agent.id)
     }

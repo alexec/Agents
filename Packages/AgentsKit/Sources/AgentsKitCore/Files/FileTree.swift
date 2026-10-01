@@ -40,3 +40,45 @@ public enum FileTree {
         }
     }
 }
+
+/// Where a files pane is to be when it shows its folder again (#66): the file last
+/// open is marked, and brought into view unless it is where the person left it.
+///
+/// A file opened from a row of the tree on screen is in view already: the tree is kept
+/// as it was under the file, scroll and all, and Back finds it there. One opened from
+/// anywhere else — the chat, a card, an agent's `show_file` — or a tree drawn afresh
+/// is scrolled to it, once its row has been read.
+public struct FileTreePlace: Equatable, Sendable {
+    /// The file last open, by `FileTree.key`. Kept after Back, so its row stays marked.
+    public private(set) var marked: String?
+    /// The row still to be brought into view, once it is among the rows.
+    public private(set) var toScroll: String?
+
+    public init() {}
+
+    /// A file is open. `fromRow` is true when the person chose it from the tree on screen.
+    public mutating func opened(_ url: URL, fromRow: Bool) {
+        let key = FileTree.key(url)
+        marked = key
+        toScroll = fromRow ? nil : key
+    }
+
+    /// The tree is drawn new, at the top: whatever is marked has to be found again.
+    public mutating func drawnAfresh() {
+        toScroll = marked
+    }
+
+    /// The row to scroll to now, given the rows the tree has, by key. Nil while it is
+    /// not among them (its folder not read yet); once it is, it is scrolled to once.
+    public mutating func scroll(among rows: some Sequence<String>) -> String? {
+        guard let toScroll, rows.contains(toScroll) else { return nil }
+        self.toScroll = nil
+        return toScroll
+    }
+
+    /// The pane is somewhere else now (the agent moved): nothing to mark or find.
+    public mutating func forget() {
+        marked = nil
+        toScroll = nil
+    }
+}

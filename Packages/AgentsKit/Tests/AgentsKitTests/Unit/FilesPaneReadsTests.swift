@@ -124,3 +124,57 @@ private final class FarEndBox<T>: @unchecked Sendable {
         set { lock.withLock { held = newValue } }
     }
 }
+
+/// Back from a file finds the tree where it was, with the file marked (#66).
+@Suite("Files pane place")
+struct FilesPanePlaceTests {
+    private let file = URL(filePath: "/work/a/b/notes.txt")
+    private let rows = ["/work/a", "/work/a/b", "/work/a/b/notes.txt", "/work/z.txt"]
+
+    /// Chosen from a row: it is in view already, and the kept tree is not moved.
+    @Test func aFileChosenFromTheTreeIsMarkedAndLeftWhereItIs() {
+        var place = FileTreePlace()
+        place.opened(file, fromRow: true)
+        #expect(place.marked == "/work/a/b/notes.txt")
+        #expect(place.scroll(among: rows) == nil)
+    }
+
+    /// Opened from the chat, a card or `show_file`: scrolled to once its folder has
+    /// been read, and once only, so the person's own scrolling after is theirs.
+    @Test func aFileOpenedFromElsewhereIsScrolledToOnceItsRowIsRead() {
+        var place = FileTreePlace()
+        place.opened(file, fromRow: false)
+        #expect(place.scroll(among: ["/work/a"]) == nil)
+        #expect(place.scroll(among: rows) == "/work/a/b/notes.txt")
+        #expect(place.scroll(among: rows) == nil)
+        #expect(place.marked == "/work/a/b/notes.txt")
+    }
+
+    /// A tree drawn new (the pane closed and opened, the window opened) finds the
+    /// file last open again; a reload of the same tree does not.
+    @Test func aTreeDrawnAfreshFindsTheMarkedFileAgain() {
+        var place = FileTreePlace()
+        place.drawnAfresh()
+        #expect(place.scroll(among: rows) == nil)
+        place.opened(file, fromRow: true)
+        place.drawnAfresh()
+        #expect(place.scroll(among: rows) == "/work/a/b/notes.txt")
+    }
+
+    /// The same file opened again from elsewhere, after the person scrolled away from
+    /// it, is brought back into view.
+    @Test func theSameFileFromElsewhereIsScrolledToAgain() {
+        var place = FileTreePlace()
+        place.opened(file, fromRow: true)
+        place.opened(URL(filePath: "/work/a/b/notes.txt/"), fromRow: false)
+        #expect(place.scroll(among: rows) == "/work/a/b/notes.txt")
+    }
+
+    @Test func movingFolderForgetsTheMark() {
+        var place = FileTreePlace()
+        place.opened(file, fromRow: false)
+        place.forget()
+        #expect(place.marked == nil)
+        #expect(place.scroll(among: rows) == nil)
+    }
+}
