@@ -57,10 +57,4 @@ public enum AttentionSnapshotStore {
         guard let url = url(in: container), let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(AttentionSnapshot.self, from: data)
     }
-
-    /// Take it away, which nothing needs today and exists for the tests to be sure of.
-    static func remove(from container: URL? = nil) {
-        guard let url = url(in: container) else { return }
-        try? FileManager.default.removeItem(at: url)
-    }
 }

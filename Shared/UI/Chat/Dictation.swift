@@ -310,8 +310,4 @@ final class Dictation {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         #endif
     }
-
-    func toggle(appendingTo base: String, onText: @escaping (String) -> Void) {
-        if isListening { stop() } else { start(appendingTo: base, onText: onText) }
-    }
 }

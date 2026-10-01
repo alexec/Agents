@@ -9,19 +9,10 @@ import SwiftUI
 /// the edges cannot be changed independently and drift apart (FR-021). The arithmetic
 /// is `ChatMetrics`, in the kit where a test holds it; this only applies it.
 extension View {
-    /// Fits the view to the chat column for a pane of the given width: padded by the
-    /// measure's margin, capped at the measure, and centred so the surplus splits
-    /// either side (FR-020). The ceiling is on the column, not on the content, so
-    /// larger accessibility text reflows within it rather than being clipped (FR-022).
-    func chatColumn(paneWidth: Double) -> some View {
-        let metrics = ChatMetrics.forPane(width: paneWidth)
-        return self
-            .padding(.horizontal, metrics.padding)
-            .frame(maxWidth: metrics.measure + metrics.padding * 2)
-            .frame(maxWidth: .infinity, alignment: .center)
-    }
-
-    /// The same, measuring the pane itself.
+    /// Fits the view to the chat column of the pane it is in: padded by the measure's
+    /// margin, capped at the measure, and centred so the surplus splits either side
+    /// (FR-020). The ceiling is on the column, not on the content, so larger
+    /// accessibility text reflows within it rather than being clipped (FR-022).
     ///
     /// The modifier's outer frame takes whatever width it is offered, which in a
     /// vertical scroll view, a `ZStack` filling the pane, or the detail column is the
