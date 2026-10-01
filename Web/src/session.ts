@@ -8,6 +8,15 @@ import { parseCode } from "./wire/code";
 import { IndexedKeyStore, type KeyStore, makeKeyPair, newClientID, UnsupportedBrowser } from "./wire/keys";
 import { Link, type LinkState, Lines, type SocketLike } from "./wire/link";
 
+
+/**
+ * The page and its control plane are on one machine, so the link can afford to be quick: a beat
+ * every 2 s answered within 2 s notices a hung control plane in 4 s, and retries never more than
+ * 4 s apart catch its return within 5 (US7, SC-009). A control plane that stops outright closes
+ * the socket, which is noticed at once.
+ */
+export const loopbackTiming = { heartbeat: { every: 2_000, within: 2_000 }, backoff: [0.5, 1, 2, 4] };
+
 export type PageState =
   | LinkState
   | { kind: "pairing" }
@@ -54,7 +63,7 @@ export class Session {
     private readonly open: (url: string) => SocketLike = (url) => new WebSocket(url) as unknown as SocketLike,
   ) {
     const url = origin.replace(/^http/, "ws") + "/v1/connect";
-    this.link = new Link({ url, origin, keys, open });
+    this.link = new Link({ url, origin, keys, open, ...loopbackTiming });
     this.link.onState((state) => {
       if (state.kind === "forgotten") {
         this.wasForgotten.value = !this.forgettingMyself;

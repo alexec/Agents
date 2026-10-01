@@ -150,3 +150,10 @@ test("retryNow dials at once when down", async () => {
   assert.equal(l.state.kind, "open");
   l.stop();
 });
+
+test("the page's own link notices a hang within 4 s and retries at most 4 s apart (US7)", async () => {
+  const { loopbackTiming } = await load("src/session.ts");
+  assert.ok(loopbackTiming.heartbeat.every + loopbackTiming.heartbeat.within <= 4_000);
+  // The retry delay is the step times up to 1.2.
+  assert.ok(Math.max(...loopbackTiming.backoff) * 1.2 <= 5);
+});

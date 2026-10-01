@@ -4,7 +4,7 @@
 // a fourth from 1440; from 760 the projects fold into a menu; below 760 one column at a time.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import type { Store } from "../model/store";
+import { hostStateWords, type Store } from "../model/store";
 import { agentsIn, counts, folderKey, headings } from "../model/groups";
 import { parseQuery, queryMatches } from "../model/labels";
 import type { Agent, ControlHost, ProjectSummary } from "../protocol/generated";
@@ -67,9 +67,9 @@ function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
       {store.hosts.value.map((host) => {
         const offline = host.state !== "online";
         return (
-          <div class="host" key={host.id}>
+          <div class={`host${offline ? " host-offline" : ""}`} key={host.id}>
             <h2>{hostHeading(host)}</h2>
-            {offline && <p class="row offline">{host.state === "offline" ? "Offline" : host.state}</p>}
+            {offline && <p class="row offline">{hostStateWords(host.state)}: what's shown is from when it was last heard.</p>}
             {projectsOf(store, host).map((project) => {
               const folder = project.project.folder;
               const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);

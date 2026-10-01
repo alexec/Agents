@@ -130,6 +130,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
         <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>
         <h1>New session in {projectName}</h1>
       </header>
+      {!down && !store.hostIsOnline(host) && <p class="offline-strip" role="status">This host is offline. A session can start here once it's back.</p>}
       <div class="scroll new-form">
         <label class="field">
           <span class="quiet small">Works in</span>
@@ -160,7 +161,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       </div>
       <footer class="foot">
         <Prompt store={store} draftKey={`new|${host}|${folderKey(folder)}`} placeholder="What should it do?"
-          capabilities={capabilities} disabled={down || !chosenRuntime} send={start}>
+          capabilities={capabilities} disabled={down || !chosenRuntime || !store.hostIsOnline(host)} send={start}>
           <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]}
             onChange={(o, v) => (form.value = { ...form.value, chosen: { ...form.value.chosen, [o.id]: v } })} disabled={down} />
         </Prompt>

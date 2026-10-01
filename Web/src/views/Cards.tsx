@@ -9,6 +9,8 @@ import type {
 } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { CallFailed } from "../wire/link";
+import { describe } from "../model/errors";
+import { Failure } from "../protocol/generated";
 import { isSafeLink } from "../render/markdown";
 import { elicitationTitle } from "./chat/Rows";
 
@@ -77,8 +79,11 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
       mark(id, "here");
       held.value = held.value.filter((c) => c.request.id !== id);
     } catch (error) {
-      // The host refusing means it was no longer waiting; the link dropping means try again.
-      mark(id, error instanceof CallFailed ? "elsewhere" : null);
+      // The host refusing means it was no longer waiting; the link dropping, or the host
+      // being away, means try again.
+      const away = !(error instanceof CallFailed) || error.code === Failure.hostOffline;
+      if (away) store.problem.value = describe(error);
+      mark(id, away ? null : "elsewhere");
     }
   };
 

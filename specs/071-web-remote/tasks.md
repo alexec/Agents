@@ -325,9 +325,9 @@ This comes before US4 and US5, because Agents Host restarts on every ship (plan.
 
 **Independent Test**: quickstart.md §6.
 
-- [ ] T060 [US7] Wire `link.ts`'s states to the views: when the link is down, show **Can't reach the control plane** within 5 s, grey out the columns, disable sending and keep the drafts. On open, refresh everything, re-read the open transcript and pending cards, and enable sending again (FR-008, US7 scenarios 1–2).
-- [ ] T061 [P] [US7] When a host is offline (`control/hostChanged`, or a `hostOffline` failure), grey out that host's projects and say so, and leave the rest working (scenario 3).
-- [ ] T062 [US7] Walk US7 (quickstart §6): stop the scratch control plane mid-turn for 60 s, then start it again. Measure detection and catch-up (SC-009). Record it in `walks/us7.md`.
+- [x] T060 (the page's link beats every 2 s and retries at most 4 s apart; the prompt stays typable while down) [US7] Wire `link.ts`'s states to the views: when the link is down, show **Can't reach the control plane** within 5 s, grey out the columns, disable sending and keep the drafts. On open, refresh everything, re-read the open transcript and pending cards, and enable sending again (FR-008, US7 scenarios 1–2).
+- [x] T061 [P] [US7] When a host is offline (`control/hostChanged`, or a `hostOffline` failure), grey out that host's projects and say so, and leave the rest working (scenario 3).
+- [x] T062 (`walks/us7.md`: banner 0.2 s, caught up 2.8 s after a minute away, no reload) [US7] Walk US7 (quickstart §6): stop the scratch control plane mid-turn for 60 s, then start it again. Measure detection and catch-up (SC-009). Record it in `walks/us7.md`.
 
 ---
 

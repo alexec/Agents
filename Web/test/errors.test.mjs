@@ -15,3 +15,7 @@ test("anything else the host says is shown as it said it", () => {
   assert.equal(e.describe(new w.CallFailed(-32005, "No such agent.")), "No such agent.");
   assert.match(e.describe(new w.LinkDown()), /isn't answering/);
 });
+
+test("an offline host says so", () => {
+  assert.match(e.describe(new w.CallFailed(-32090, "host offline")), /^That host is offline/);
+});

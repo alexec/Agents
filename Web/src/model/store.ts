@@ -29,6 +29,17 @@ function newestFirst(agents: Agent[]): Agent[] {
  * The reducer: what each notification does to what is held. Kept apart from the link so the
  * fixtures can drive it, as `AgentsModel` is driven in Swift.
  */
+/** What a host's state says to the person (the window's HostHeading). */
+export function hostStateWords(state: string): string {
+  switch (state) {
+    case "online": return "Online";
+    case "connecting": return "Connecting…";
+    case "needsUpdate": return "Needs an update";
+    case "failed": return "Can't connect";
+    default: return "Offline";
+  }
+}
+
 export class Work {
   readonly hosts = signal<ControlHost[]>([]);
   readonly projects = signal<ByHost<ProjectSummary>>({});
@@ -225,6 +236,11 @@ export class Work {
   /** Whether anything at all of the conversation comes before what is in hand. */
   get hasMoreOfTheConversation(): boolean {
     return this.hasMoreBefore.value || this.firstTurn.value > 0;
+  }
+
+  /** Whether a host answers: online, or held back for a reason the page says. */
+  hostIsOnline(host: string): boolean {
+    return this.hosts.value.find((h) => h.id === host)?.state === "online";
   }
 
   agent(host: string, session: string): Agent | undefined {

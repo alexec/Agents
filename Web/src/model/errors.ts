@@ -11,6 +11,7 @@ export const notAllowedByGrant = "This browser's grant doesn't allow that.";
 export function describe(error: unknown): string {
   if (error instanceof CallFailed) {
     if (error.code === Failure.notPermitted || error.code === methodNotFound) return notAllowedByGrant;
+    if (error.code === Failure.hostOffline) return "That host is offline. What's shown is from when it was last heard.";
     return error.message || "The host refused that.";
   }
   if (error instanceof LinkDown) return "The control plane isn't answering. Try again when it's back.";

@@ -33,7 +33,10 @@ const defaultDetail = { value: savedDetail() };
 const leftTheEnd = 160;
 const atTheEnd = 40;
 
-export function Chat({ store, host, session, down }: { store: Store; host: string; session: string; down: boolean }) {
+export function Chat({ store, host, session, down: linkDown }: { store: Store; host: string; session: string; down: boolean }) {
+  // An offline host is the link down for this chat alone: read what was last heard, send nothing.
+  const hostDown = !linkDown && !store.hostIsOnline(host);
+  const down = linkDown || hostDown;
   const r = route.value;
   const agent = store.agent(host, session);
   const project = r.project ? (store.projects.value[host] ?? []).find((p) => p.project.folder === r.project) : undefined;
@@ -151,6 +154,7 @@ export function Chat({ store, host, session, down }: { store: Store; host: strin
           <SessionMenu store={store} host={host} agent={agent} disabled={down} />
         </span>
       </header>
+      {hostDown && <p class="offline-strip" role="status">This host is offline. What's shown is from when it was last heard; nothing can be sent until it's back.</p>}
       {agent && r.project && <Labels store={store} host={host} agent={agent} folder={r.project} disabled={down} />}
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}

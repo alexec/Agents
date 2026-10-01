@@ -15,6 +15,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   placeholder: string;
   capabilities: ACPPromptCapabilities | undefined;
   disabled: boolean;
+  /** Sending and attaching are off; typing never is. */
   /** Answers whether it went, so a refused prompt keeps what was typed. */
   send: (text: string, attachments: Attachment[]) => Promise<boolean>;
   /** The menus, under the text. */
@@ -87,7 +88,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
           })}
         </ul>
       )}
-      <textarea aria-label="Prompt" placeholder={placeholder} disabled={disabled} rows={2} value={text.value}
+      {/* Never disabled: what is typed while the link is down is kept and sent once it's back (US7). */}
+      <textarea aria-label="Prompt" placeholder={placeholder} rows={2} value={text.value}
         onInput={(e) => { text.value = (e.currentTarget as HTMLTextAreaElement).value; keep(); }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
