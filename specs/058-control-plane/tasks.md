@@ -516,7 +516,7 @@ only.
   old to follow); then Move (freeze, copy, switch); then its own Mac host and
   `agents-relay` rewritten to the new list, keeping host id `mac`, and the role "joined
   elsewhere, forwarding". **Stop forwarding** lists who would have to pair again.
-- [ ] T127 (frames U–Y approved by Alex 2026-10-01, `look/move/`) Agents Host, **Run it here again…**: an empty folder store with the earlier one
+- [ ] T127 (frames U–Y approved by Alex 2026-10-01, `look/move/`; built: `Host/Sources/MachineReturn.swift`, frame Y's row; the sequence walked with Pebble and a Linux host, `walks/t127-return.md`; the sheet on screen still to walk) Agents Host, **Run it here again…**: an empty folder store with the earlier one
   kept aside, its copy in `--receive`, then the same steps the other way, with the cloud
   copy forwarding afterwards.
 - [ ] T128 [P] Agents Host with a bucket store moves with no copy (R16 3): announce, stop
