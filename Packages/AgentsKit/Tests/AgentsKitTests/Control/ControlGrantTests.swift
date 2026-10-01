@@ -166,6 +166,31 @@ struct ControlRecordsTests {
         #expect(await elsewhere.clients.map(\.id) == [window.id])
     }
 
+    /// A Remote keeps its id: a device forgotten and paired again is admitted over its
+    /// tombstone, whether this copy forgot it or another did.
+    @Test func aForgottenDevicePairsAgainUnderItsOwnID() async throws {
+        let store = MemoryStore()
+        let records = ControlRecords(store: store)
+        let window = client(.operator)
+        let phone = client(.device)
+        try await records.save(window)
+        try await records.save(phone)
+        try await records.forget(phone.id)
+
+        let methods = ControlMethods(records: records, settings: ControlSettings(name: "test", machineID: "m"), version: "1")
+        try await methods.admit(phone)
+        #expect(await records.client(phone.id)?.forgotten != true)
+        #expect(Set(await records.clients.map(\.id)) == [window.id, phone.id])
+
+        // Another copy read the phone before it was forgotten here, so its write conflicts first.
+        let elsewhere = ControlRecords(store: store)
+        try await elsewhere.load()
+        try await records.forget(phone.id)
+        let there = ControlMethods(records: elsewhere, settings: ControlSettings(name: "test", machineID: "m"), version: "1")
+        try await there.admit(phone)
+        #expect(await elsewhere.client(phone.id) != nil)
+    }
+
     /// Two copies read the same client; the second to write loses and changes nothing
     /// (FR-008), even when the first wrote the record back to how it was (rule 10).
     @Test func aChangeMadeAgainstAStaleReadIsRefused() async throws {
