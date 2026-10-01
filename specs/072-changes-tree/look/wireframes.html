@@ -1,0 +1,240 @@
+<!doctype html><html><head><meta charset="utf-8"><title>072 wireframes</title><style>
+/* Wireframes for #63: Changes as a tree that shares its rows with Files. Lo-fi, in 066's and
+   071's paper style; the pane is drawn alone, as it sits beside the chat. Open with #a … #d to
+   see one frame alone. Status colours are the system's (macOS systemGreen, systemOrange,
+   systemRed, systemBlue, systemGray), light and dark values. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:44px;align-items:flex-start}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:1180px;line-height:1.45}
+.pair{display:flex;gap:28px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:6px}
+.lbl{font:600 12px -apple-system;color:#555}
+.note{font:italic 12px -apple-system;color:#c2185b;border:1px dashed #c2185b;border-radius:4px;padding:4px 8px;background:rgba(255,255,255,.7);max-width:340px;line-height:1.35;overflow-wrap:anywhere}
+.notes{display:flex;flex-direction:column;gap:8px;width:340px}
+
+/* the pane */
+.pane{--bg:#f7f5f0;--fg:#1d1d1d;--sec:#6f6c66;--ter:#a5a29a;--line:rgba(0,0,0,.08);--seg:#e3dfd6;--segon:#fdfcf9;--sel:rgba(0,0,0,.07);--tint:#007aff;
+  --add:#28cd41;--mod:#ff9500;--del:#ff3b30;--ren:#007aff;--unt:#8e8e93;--tip:#fffffe;
+  width:380px;height:560px;background:var(--bg);color:var(--fg);border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.16),0 8px 24px rgba(0,0,0,.16);display:flex;flex-direction:column;overflow:hidden;position:relative}
+.pane.dark{--bg:#1f1f1e;--fg:#e9e8e5;--sec:#9d9b96;--ter:#66645f;--line:rgba(255,255,255,.08);--seg:#2f2e2c;--segon:#55534f;--sel:rgba(255,255,255,.08);--tint:#0a84ff;
+  --add:#32d74b;--mod:#ff9f0a;--del:#ff453a;--ren:#0a84ff;--unt:#98989d;--tip:#3a3937;box-shadow:0 0 0 1px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.3)}
+.pane.short{height:auto}
+.picker{margin:8px 8px 4px;display:flex;background:var(--seg);border-radius:7px;padding:2px;font-size:10.5px;flex:none}
+.picker span{flex:1;text-align:center;padding:3px 0;border-radius:5px;color:var(--fg)}
+.picker span.on{background:var(--segon);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.list{padding:6px 10px 10px;display:flex;flex-direction:column;overflow:hidden;flex:1}
+.sum{font-size:11px;color:var(--sec);padding:4px 6px 8px}
+.sum small{display:block;color:var(--ter);font-size:11px;margin-top:3px;line-height:1.35}
+.hdr{display:flex;align-items:center;gap:6px;padding:4px 6px 6px;font-weight:500;font-size:13.5px}
+.hdr .g{color:var(--ter);font-size:12px}
+
+/* today's sectioned list */
+.sec{font-size:11px;color:var(--ter);padding:10px 6px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:left}
+.old{display:flex;gap:8px;padding:4px 6px;align-items:baseline}
+.old .nm{font-size:12.5px;white-space:nowrap}
+.old .w{font-size:11px;color:var(--sec)}
+.old .r{margin-left:auto;text-align:right;font-size:11px}
+.old .r small{display:block;color:var(--ter);font-size:11px}
+
+/* the shared tree row */
+.row{height:22px;display:flex;align-items:center;gap:6px;padding:0 6px;border-radius:5px;position:relative;font-size:13px;white-space:nowrap}
+.row.sel{background:var(--sel)}
+.chev{width:10px;height:10px;flex:none;color:var(--ter);display:inline-flex;align-items:center;justify-content:center}
+.chev.open{transform:rotate(90deg)}
+.chev.none{visibility:hidden}
+.ico{width:16px;height:16px;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.ico svg{width:15px;height:15px}
+.nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nm.path{direction:rtl;text-align:left}
+.nm.gone{text-decoration:line-through;color:var(--sec)}
+.cnt{margin-left:auto;padding-left:8px;font:11px -apple-system;font-variant-numeric:tabular-nums;display:flex;gap:4px;flex:none}
+.cnt .p{color:var(--fg)}.cnt .m{color:var(--ter)}
+.cnt.dir .p,.cnt.dir .m{color:var(--ter)}
+.spin{width:9px;height:9px;border:1.5px solid var(--ter);border-top-color:transparent;border-radius:50%;flex:none}
+.tip{position:absolute;z-index:4;background:var(--tip);color:var(--fg);border:1px solid var(--line);box-shadow:0 3px 10px rgba(0,0,0,.18);border-radius:5px;padding:3px 7px;font-size:11.5px;white-space:nowrap}
+.cursor{position:absolute;z-index:5;font-size:15px}
+.vo{position:absolute;z-index:4;border:2px solid #222;border-radius:6px;pointer-events:none}
+.pane.dark .vo{border-color:#ddd}
+.voc{font:12px -apple-system;background:#1d1d1d;color:#fff;border-radius:6px;padding:6px 9px;max-width:360px;line-height:1.4}
+
+/* key */
+.key{display:grid;grid-template-columns:22px 92px 1fr;gap:6px 8px;align-items:center;font-size:12px;color:#333;background:#f7f5f0;border-radius:8px;padding:10px 12px;box-shadow:0 0 0 1px rgba(0,0,0,.1)}
+.key code{font:11px "SF Mono",Menlo,monospace;color:#555}
+</style></head><body>
+<script>
+if (location.hash) document.body.classList.add('one');
+
+// ── the icons: a square with a glyph, after SF Symbols' plus.square, dot.square, minus.square,
+// arrow.right.square and questionmark.square.dashed. Shape carries the status as much as colour.
+const ICON = {
+  A:{c:'--add', g:'<path d="M8 4.8v6.4M4.8 8h6.4" stroke-width="1.6"/>', word:'added'},
+  M:{c:'--mod', g:'<circle cx="8" cy="8" r="2.3" fill="currentColor" stroke="none"/>', word:'changed'},
+  D:{c:'--del', g:'<path d="M4.8 8h6.4" stroke-width="1.6"/>', word:'deleted'},
+  R:{c:'--ren', g:'<path d="M4.6 8h6M8.4 5.6 10.8 8l-2.4 2.4" stroke-width="1.5" fill="none"/>', word:'renamed'},
+  U:{c:'--unt', g:'<text x="8" y="11.2" text-anchor="middle" font-size="9" font-weight="700" fill="currentColor" stroke="none" font-family="-apple-system">?</text>', word:'untracked', dashed:true},
+};
+function icon(s){
+  if (s==='doc') return `<span class="ico" style="color:var(--sec)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M4 1.8h5.2L12.4 5v9.2H4z"/><path d="M9.2 1.8V5h3.2"/></svg></span>`;
+  if (s==='dir'||s==='diropen') return `<span class="ico" style="color:var(--tint)"><svg viewBox="0 0 16 16" fill="${s==='diropen'?'currentColor':'none'}" fill-opacity="${s==='diropen'?.85:0}" stroke="currentColor" stroke-width="1.1"><path d="M1.6 4.2h4.6l1.4 1.4h6.8v7.6H1.6z"/></svg></span>`;
+  const i = ICON[s];
+  return `<span class="ico" style="color:var(${i.c})"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="1.8" y="1.8" width="12.4" height="12.4" rx="3"${i.dashed?' stroke-dasharray="2.2 1.6"':''}/>${i.g}</svg></span>`;
+}
+const cnt = (a,r,dir) => (a==null?'':`<span class="cnt${dir?' dir':''}"><span class="p">+${a}</span><span class="m">−${r}</span></span>`);
+
+// ── one sample: an agent's edits across a repository. Folders first, then files, by name,
+// as the Files pane sorts. A folder holding only one folder folds into one line.
+const TREE = [
+  {f:'App/Sources', kids:[
+    {f:'Chat', kids:[{n:'TurnView.swift',s:'M',a:12,r:4}]},
+    {f:'Sidebar', kids:[
+      {n:'ChangeRow.swift',s:'D',a:0,r:21},
+      {n:'ChangesPane.swift',s:'M',a:90,r:43,busy:true},
+      {n:'FileTreeRow.swift',s:'A',a:84,r:0},
+    ]},
+  ]},
+  {f:'docs/explanation', kids:[{n:'changes-pane.md',s:'R',from:'docs/explanation/changes.md',a:9,r:3}]},
+  {f:'Packages/AgentsKit/Sources/AgentsKitCore/Model/Changes', kids:[{n:'AgentChanges.swift',s:'M',a:12,r:2}]},
+  {n:'notes.txt',s:'U',a:6,r:0},
+];
+function totals(node){ if(!node.kids) return node.s?[node.a,node.r,1]:[0,0,0]; return node.kids.map(totals).reduce((t,x)=>[t[0]+x[0],t[1]+x[1],t[2]+x[2]],[0,0,0]); }
+function rows(nodes, depth, opts={}){
+  let h='';
+  for (const n of nodes){
+    const pad = `style="padding-left:${6+depth*14}px"`;
+    if (n.kids){
+      const open = !(opts.closed||[]).includes(n.f);
+      const [a,r] = totals(n);
+      h += `<div class="row" ${pad} data-id="${n.f}"><span class="chev${open?' open':''}"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 1.2 5.6 4 2.6 6.8"/></svg></span>${icon(open?'diropen':'dir')}<span class="nm${n.f.includes('/')?' path':''}">${n.f.includes('/')?'&lrm;'+n.f+'&lrm;':n.f}</span>${cnt(a,r,true)}</div>`;
+      if (open) h += rows(n.kids, depth+1, opts);
+    } else {
+      h += `<div class="row${opts.sel===n.n?' sel':''}" ${pad} data-id="${n.n}"><span class="chev none"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 1.2 5.6 4 2.6 6.8"/></svg></span>${icon(n.s)}<span class="nm${n.s==='D'?' gone':''}">${n.n}</span>${n.busy&&opts.busy?'<span class="spin"></span>':''}${cnt(n.a,n.r)}</div>`;
+    }
+  }
+  return h;
+}
+const PICK = on => `<div class="picker">${['Files','Changes','Terminal','Browser','Exchanged','Background'].map(p=>`<span class="${p===on?'on':''}">${p}</span>`).join('')}</div>`;
+const SUM = `<div class="sum">7 files · +213 −77<small>Also shows what git sees changed in this folder since the agent started. That may include other agents' work, and yours.</small></div>`;
+
+function treePane(dark, opts={}){
+  return `<div class="pane${dark?' dark':''}${opts.short?' short':''}">${PICK('Changes')}<div class="list">${SUM}${rows(TREE,0,opts)}</div>${opts.extra||''}</div>`;
+}
+
+// today's list, as ChangesPane draws it on main: one section per folder in first-change
+// order, the word for the kind, counts with a note under them. A rename is git's
+// delete-and-add (--no-renames) and an untracked file is "new".
+function todayPane(dark){
+  const sec = s => `<div class="sec">&lrm;${s}&lrm;</div>`;
+  const row = (n,w,a,r,note) => `<div class="old"><span class="nm">${n}</span>${w?`<span class="w">${w}</span>`:''}<span class="r">${a==null?'':`<span class="cnt" style="justify-content:flex-end"><span class="p">+${a}</span><span class="m">−${r}</span></span>`}${note?`<small>${note}</small>`:''}</span></div>`;
+  return `<div class="pane${dark?' dark':''}">${PICK('Changes')}<div class="list" style="padding-top:2px">
+  <div class="sum" style="padding-bottom:0">8 files · +250 −110<small>Also shows what git sees changed in this folder since the agent started. That may include other agents' work, and yours.</small></div>
+  ${sec('App/Sources/Sidebar')}${row('ChangesPane.swift','',90,43,'4 edits')}${row('FileTreeRow.swift','new',84,0,'1 edit')}${row('ChangeRow.swift','deleted',0,21,'in the folder')}
+  ${sec('Packages/AgentsKit/Sources/AgentsKitCore/Model/Changes')}${row('AgentChanges.swift','',12,2,'2 edits')}
+  ${sec('docs/explanation')}${row('changes.md','deleted',0,40,'in the folder')}${row('changes-pane.md','new',46,0,'1 edit')}
+  ${sec('App/Sources/Chat')}${row('TurnView.swift','',12,4,'1 edit')}
+  ${sec('Top folder')}${row('notes.txt','new',6,0,'in the folder')}
+  </div></div>`;
+}
+
+// the Files pane: the same row, a changed file's icon in its status colour where today has a dot.
+const FILES = [
+  {f:'.agents', kids:[]},
+  {f:'App', kids:[{f:'Sources', kids:[
+    {f:'Chat', kids:[{n:'TurnView.swift',s:'M',a:12,r:4}]},
+    {f:'Sidebar', kids:[
+      {n:'ArtifactsPane.swift'},{n:'ChangeFileView.swift'},{n:'ChangeRow.swift',s:'D',a:0,r:21,gone:true},
+      {n:'ChangesPane.swift',s:'M',a:90,r:43},{n:'FilesPane.swift'},
+      {n:'FileTreeRow.swift',s:'A',a:84,r:0},{n:'SidebarView.swift'},
+    ]},
+  ]}]},
+  {f:'docs', kids:[{n:'x',s:'R',a:9,r:3}]},
+  {f:'Packages', kids:[{n:'x',s:'M',a:12,r:2}]},
+  {f:'specs', kids:[]},
+  {n:'AGENTS.md'},{n:'notes.txt',s:'U',a:6,r:0},{n:'README.md'},
+];
+function fileRows(nodes, depth, today, closed){
+  let h='';
+  for (const n of nodes){
+    const pad = `style="padding-left:${6+depth*14}px"`;
+    if (n.kids){
+      const open = !closed.includes(n.f);
+      const [a,r,c] = n.kids.length? totals(n):[null,0,0];
+      h += `<div class="row" ${pad}><span class="chev${open?' open':''}"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 1.2 5.6 4 2.6 6.8"/></svg></span>${icon(open?'diropen':'dir')}<span class="nm">${n.f}</span>${today||!c?'':cnt(a,r,true)}</div>`;
+      if (open) h += fileRows(n.kids, depth+1, today, closed);
+    } else if (!n.gone) {
+      const s = n.s;
+      h += `<div class="row" ${pad}><span class="chev none"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 1.2 5.6 4 2.6 6.8"/></svg></span>${icon(today||!s?'doc':s)}<span class="nm">${n.n}</span>${today&&s?'<span style="width:6px;height:6px;border-radius:3px;background:var(--tint);flex:none"></span>':''}${!today&&s?cnt(n.a,n.r):''}</div>`;
+    }
+  }
+  return h;
+}
+function filesPane(dark, today){
+  return `<div class="pane${dark?' dark':''}">${PICK('Files')}<div class="hdr">work-github-issue-63</div><div class="list" style="padding-top:0">${fileRows(FILES,0,today,['.agents','Chat','docs','Packages','specs'])}</div></div>`;
+}
+
+const keyRows = Object.entries(ICON).map(([s,i])=>`<span class="pane" style="all:unset;--add:#28cd41;--mod:#ff9500;--del:#ff3b30;--ren:#007aff;--unt:#8e8e93">${icon(s)}</span><b style="font-weight:600">${i.word}</b><span>${{
+  A:'<code>plus.square</code> · systemGreen · new to git since the agent started',
+  M:'<code>dot.square</code> · systemOrange · there before, changed',
+  D:'<code>minus.square</code> · systemRed · gone; name struck through',
+  R:'<code>arrow.right.square</code> · systemBlue · the old path on hover',
+  U:'<code>questionmark.square.dashed</code> · systemGray · on disk, not in git',
+}[s]}</span>`).join('');
+
+document.write(`
+<div class="frame" id="a">
+  <div class="cap">A · Light: today's Changes list beside the tree</div>
+  <div class="sub">The same changes both times. Today: one section per folder, in the order of the first change, and a word for the kind. A rename is a deletion and a new file (so today counts 8 files), and a file git doesn't track reads as "new". Proposed: the Files pane's tree, with chevrons, folder icons and 14 pt of indent per level. Folders start open, a folder holding only one folder folds into one line, and each folder has its total. Each file's icon is a square that says what happened to it, in that status's system colour. The +N −M stays at the end of the row. The edit count and "in the folder", which sat under the counts, move to the row's hover text and its VoiceOver label, so a row is one line, as in Files.</div>
+  <div class="pair">
+    <div class="col"><div class="lbl">Today (main 1acf7a2f)</div>${todayPane(false)}</div>
+    <div class="col"><div class="lbl">Proposed</div>${treePane(false,{busy:true})}</div>
+    <div class="notes">
+      <div class="note">Long path: Packages/AgentsKit/Sources/AgentsKitCore/Model/Changes folds into one line and is cut at the front, so the end, the part that tells it apart, stays. The whole path is on hover.</div>
+      <div class="note">The spinner beside ChangesPane.swift: a call touching it hasn't finished (as today).</div>
+      <div class="note">Click a file: ChangeFileView opens over the pane, as today, with Back to the tree. Click a folder: it opens or closes.</div>
+      <div class="key">${keyRows}</div>
+    </div>
+  </div>
+</div>
+
+<div class="frame" id="b">
+  <div class="cap">B · Dark: today's Changes list beside the tree</div>
+  <div class="sub">The same pane in dark mode. The status colours are the system's own, so dark mode, Increase Contrast and the paper theme each get their right value. Counts and folder totals stay grey, so the colour is left to the icons.</div>
+  <div class="pair">
+    <div class="col"><div class="lbl">Today</div>${todayPane(true)}</div>
+    <div class="col"><div class="lbl">Proposed</div>${treePane(true,{busy:true})}</div>
+  </div>
+</div>
+
+<div class="frame" id="c">
+  <div class="cap">C · Every status, a rename's old path on hover, and what VoiceOver reads</div>
+  <div class="sub">Left, light: the pointer over the rename shows where it came from, and Chat is closed to show the chevron. Right, dark: the VoiceOver cursor on a deleted file. Status is never carried by colour alone. Each status has its own shape, a deleted name is struck through, and every row's label says the status in words.</div>
+  <div class="pair">
+    <div class="col"><div class="lbl">Light · pointer on the rename</div>${treePane(false,{closed:['Chat'],extra:'<div class="tip" style="left:56px;top:282px">Renamed from docs/explanation/changes.md · 1 edit</div><div class="cursor" style="left:150px;top:258px">⬉</div>'})}</div>
+    <div class="col"><div class="lbl">Dark · VoiceOver on a deleted file</div>${treePane(true,{sel:'ChangeRow.swift',extra:'<div class="vo" style="left:8px;top:187px;width:362px;height:24px"></div>'})}
+      <div class="voc">"ChangeRow.swift, deleted, 21 lines removed, git saw it in the folder. Button."</div></div>
+    <div class="notes">
+      <div class="lbl">VoiceOver labels, one element per row</div>
+      <div class="voc">FileTreeRow.swift, added, 84 lines added, 1 edit</div>
+      <div class="voc">ChangesPane.swift, changed, 90 lines added, 43 removed, 4 edits, still being edited</div>
+      <div class="voc">ChangeRow.swift, deleted, 21 lines removed, git saw it in the folder</div>
+      <div class="voc">changes-pane.md, renamed from docs/explanation/changes.md, 9 lines added, 3 removed</div>
+      <div class="voc">notes.txt, untracked, not in git, 6 lines</div>
+      <div class="voc">App/Sources, folder, 4 changed files, 186 lines added, 68 removed. Expanded</div>
+      <div class="note">One accessibility element per row, label and value together. Stacked labels over child Texts crashed AppKit once.</div>
+    </div>
+  </div>
+</div>
+
+<div class="frame" id="d">
+  <div class="cap">D · The Files pane with the same rows</div>
+  <div class="sub">Files and Changes now draw the same row view: the same chevron, icon, indent and counts. In Files, a file the agent changed swaps its plain document icon for its status square, where today it has a dot after its name, and gets its +N −M. A folder holding changes shows its total even when closed, so changes deep in the tree can still be found. A deleted file isn't on disk, so it shows only in Changes. A rename shows under its new name. Back and the scroll position stay as #66 leaves them.</div>
+  <div class="pair">
+    <div class="col"><div class="lbl">Today · light</div>${filesPane(false,true)}</div>
+    <div class="col"><div class="lbl">Proposed · light</div>${filesPane(false,false)}</div>
+    <div class="col"><div class="lbl">Proposed · dark</div>${filesPane(true,false)}</div>
+  </div>
+</div>
+`);
+</script>
+</body></html>
