@@ -1,0 +1,19 @@
+works in: A new worktree
+runtime: Claude; menus: ["Mode","Model","Effort","Fast mode"]
+attached: "🖼 071-red-square.png\n×"
+started 53B58444-EDB7-4D8B-AB6B-928B7AE5DBA5 from the browser: worktree say-one-sentence-what-2 (agents/say-one-sentence-what-2), cwd file:///tmp/run-webus3/work/.agents/worktrees/say-one-sentence-what-2
+its first prompt's blocks: ["text","image"]
+queued: 1 on the record; Send now offered: true
+Send now: the queue emptied on the record
+model menu: ["Default (recommended)","Opus 5.5","Fable 5.1","Sonnet 5","Haiku 4.5"], on Default (recommended); choosing Opus 5.5
+model on the record: "default" → "opus[1m]"
+Park while it runs: {"whenTurnEnds":{"since":812586501.249422}}
+Unpark: no parking on the record
+Stop: stopped, cancelled
+the waiting card after Stop: ["echo one > one.txt / The session stopped before this was answered."]
+Archive: archived on the record
+Bring Back: stopped
+label added: [{"owner":"person","value":"walked","addedAt":812586506.683664}]
+label removed: none on the record
+problems shown: null
+page errors: []

@@ -53,6 +53,8 @@ export function Chat({ store, host, session, down }: { store: Store; host: strin
   const settled = useRef(false);
 
   useEffect(() => {
+    // Whether its runtime takes words mid-turn, or pictures, is known once it has run.
+    void store.loadRuntimes(host);
     chosen.value = {};
     fetched.value = {};
     following.current = true;

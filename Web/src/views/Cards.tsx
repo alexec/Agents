@@ -15,13 +15,23 @@ import { elicitationTitle } from "./chat/Rows";
 type Held =
   | { kind: "permission"; request: PermissionRequest; answered: Answered }
   | { kind: "elicitation"; request: ElicitationRequest; answered: Answered };
-/** null while it waits; "here" once this page answered; "elsewhere" when another client did. */
-type Answered = null | "sending" | "here" | "elsewhere";
+/**
+ * null while it waits; "here" once this page answered; "elsewhere" when another client did;
+ * "withdrawn" when the session stopped before anyone answered.
+ */
+type Answered = null | "sending" | "here" | "elsewhere" | "withdrawn";
+
+/** What the host writes when a question goes because its agent ended (RuntimeNote.swift). */
+const questionWentUnanswered = "Nobody answered this question before the agent ended.";
 
 /** How long a card answered elsewhere stays to say so. */
 const answeredElsewhereShownFor = 4_000;
 
 export function Cards({ store, host, session }: { store: Store; host: string; session: string }) {
+  // A question taken away because its runtime went is said in the conversation first, then
+  // withdrawn (RuntimeNote.questionWentUnanswered): that line, after it was asked, is the tell.
+  const unansweredSince = (askedAt: number) => store.entries.value.some((e) =>
+    e.at >= askedAt && (e.kind as { runtimeNote?: { _0: string } }).runtimeNote?._0 === questionWentUnanswered);
   const held = useSignal<Held[]>([]);
   const permissions = store.permissionsFor(host, session);
   const elicitations = store.elicitationsFor(host, session);
@@ -34,16 +44,20 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
     const next: Held[] = [];
     for (const card of before) {
       if (live.has(card.request.id)) next.push(card);
-      else if (card.answered === null || card.answered === "elsewhere") next.push({ ...card, answered: "elsewhere" });
+      else if (card.answered === "elsewhere" || card.answered === "withdrawn") next.push(card);
+      else if (card.answered === null) {
+        next.push({ ...card, answered: unansweredSince(card.request.askedAt) ? "withdrawn" : "elsewhere" });
+      }
     }
     const known = new Set(next.map((c) => c.request.id));
     for (const request of permissions) if (!known.has(request.id)) next.push({ kind: "permission", request, answered: null });
     for (const request of elicitations) if (!known.has(request.id)) next.push({ kind: "elicitation", request, answered: null });
     held.value = next;
-    const gone = next.filter((c) => c.answered === "elsewhere" && !before.some((b) => b.request.id === c.request.id && b.answered === "elsewhere"));
+    const settled = (c: Held) => c.answered === "elsewhere" || c.answered === "withdrawn";
+    const gone = next.filter((c) => settled(c) && !before.some((b) => b.request.id === c.request.id && settled(b)));
     if (gone.length) {
       const ids = new Set(gone.map((c) => c.request.id));
-      setTimeout(() => (held.value = held.value.filter((c) => !(ids.has(c.request.id) && c.answered === "elsewhere"))),
+      setTimeout(() => (held.value = held.value.filter((c) => !(ids.has(c.request.id) && settled(c)))),
         answeredElsewhereShownFor);
     }
   }, [[...live].join(","), session]);
@@ -85,6 +99,7 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
 
 function AnsweredNote({ answered }: { answered: Answered }) {
   if (answered === "elsewhere") return <p class="answered" role="status">Answered on another device.</p>;
+  if (answered === "withdrawn") return <p class="answered" role="status">The session stopped before this was answered.</p>;
   if (answered === "sending") return <p class="answered" role="status">Sending…</p>;
   return null;
 }

@@ -150,6 +150,14 @@ function makePage(send, sessionId, targetId, listen) {
       if (!found) throw new Error(`nothing matches ${selector}`);
     },
 
+    /** Sets the files of the file input `selector`, as picking them would. */
+    async setFiles(selector, files) {
+      const { root } = await call("DOM.getDocument", { depth: 1 });
+      const { nodeId } = await call("DOM.querySelector", { nodeId: root.nodeId, selector });
+      if (!nodeId) throw new Error(`nothing matches ${selector}`);
+      await call("DOM.setFileInputFiles", { nodeId, files });
+    },
+
     async text(selector = "body") {
       return page.eval(`document.querySelector(${JSON.stringify(selector)})?.innerText ?? ""`);
     },

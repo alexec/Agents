@@ -302,16 +302,16 @@ new agent, session actions and labels.
 
 **Independent Test**: quickstart.md §5.
 
-- [ ] T054 [US3] Build the prompt in `Web/src/views/Prompt.tsx`:
+- [x] T054 (files go as `browser:<name>`; a picture is shrunk with createImageBitmap and OffscreenCanvas) [US3] Build the prompt in `Web/src/views/Prompt.tsx`:
   - text, with attachments dropped, pasted or picked;
   - attachments encoded as the Remote sends them (`Remote/Sources/StartAgent/PhoneAttachments.swift`, `agents/prompt`), within the same size limits;
   - queued prompts shown, with **Send now** (`agents/sendNow`) and remove (`agents/unqueue`);
   - the draft kept per session in memory.
-- [ ] T055 [P] [US3] Add the mode, model and runtime menus, from `agents/options`, `runtimes/list`, `options/remembered` and `modes/remembered`, set with `agents/setOption`, offering what the Mac window offers for that session (FR-025). Put them in `Web/src/views/PromptMenus.tsx`.
-- [ ] T056 [US3] Build the new-agent flow in `Web/src/views/NewAgent.tsx`: the project folder, or a new or existing worktree (`worktrees/list`), with runtime, model, mode and first prompt, through `agents/start`, running on the project's host (FR-026). It opens from the sessions column's compose control.
-- [ ] T057 [P] [US3] Add session actions and labels: stop, park, unpark, archive and bring back (`agents/*`), from the session's ··· menu and the chat header; and labels with the ported `SessionLabelPolicy` and `agents/labelVocabulary`, set with `agents/setLabels` (FR-027). Put them in `Web/src/views/SessionMenu.tsx` and `Labels.tsx`.
-- [ ] T058 [US3] Handle a refusal by grant anywhere: `methodNotAllowed`, or the grant failure, shows "This browser's grant doesn't allow that", never a silent failure (spec edge case). Put it in `Web/src/views/Errors.tsx`.
-- [ ] T059 [US3] Rebuild `dist`, then walk US3 (quickstart §5) on scratch, with the scratch window showing each step. Record it in `walks/us3.md`.
+- [x] T055 (the runtime is chosen in the new-session form; `model/options.ts` is held to `options/drawable.json`) [P] [US3] Add the mode, model and runtime menus, from `agents/options`, `runtimes/list`, `options/remembered` and `modes/remembered`, set with `agents/setOption`, offering what the Mac window offers for that session (FR-025). Put them in `Web/src/views/PromptMenus.tsx`.
+- [x] T056 (`WebSignatures` gains `agents/discardDraft`, `agents/draftOptions` and `modes/changed`) [US3] Build the new-agent flow in `Web/src/views/NewAgent.tsx`: the project folder, or a new or existing worktree (`worktrees/list`), with runtime, model, mode and first prompt, through `agents/start`, running on the project's host (FR-026). It opens from the sessions column's compose control.
+- [x] T057 [P] [US3] Add session actions and labels: stop, park, unpark, archive and bring back (`agents/*`), from the session's ··· menu and the chat header; and labels with the ported `SessionLabelPolicy` and `agents/labelVocabulary`, set with `agents/setLabels` (FR-027). Put them in `Web/src/views/SessionMenu.tsx` and `Labels.tsx`.
+- [x] T058 (`model/errors.ts` and the `Problem` strip in `Errors.tsx`) [US3] Handle a refusal by grant anywhere: `methodNotAllowed`, or the grant failure, shows "This browser's grant doesn't allow that", never a silent failure (spec edge case). Put it in `Web/src/views/Errors.tsx`.
+- [x] T059 (`walks/us3.md`: all five steps, the window captured at each; found a host-side permission race after Stop) [US3] Rebuild `dist`, then walk US3 (quickstart §5) on scratch, with the scratch window showing each step. Record it in `walks/us3.md`.
 
 **Checkpoint**: every P1 story passes. This is the first version worth having.
 

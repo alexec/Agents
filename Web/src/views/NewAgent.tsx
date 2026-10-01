@@ -48,6 +48,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const form = useSignal<Form>({ options: [], chosen: {}, state: "loading" });
 
   useEffect(() => {
+    // What each runtime takes changes once it has run: asked again as the form opens.
+    void store.loadRuntimes(host);
     where.value = { kind: "project" };
     void store.worktrees(host, folder).then((list) => {
       worktrees.value = (list?.worktrees ?? []).filter((w) => !w.isProjectFolder && w.exists);
