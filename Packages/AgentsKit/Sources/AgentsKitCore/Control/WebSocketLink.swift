@@ -23,6 +23,8 @@ public final class WebSocketLink: NSObject, LineTransport, URLSessionWebSocketDe
     private var task: URLSessionWebSocketTask?
     private var opening: CheckedContinuation<Void, any Error>?
     private var pinger: Task<Void, Never>?
+    /// A ping is out and its pong has not come back.
+    private var awaitingPong = false
     private let stream: AsyncThrowingStream<String, any Error>
     private let continuation: AsyncThrowingStream<String, any Error>.Continuation
 
@@ -97,8 +99,20 @@ public final class WebSocketLink: NSObject, LineTransport, URLSessionWebSocketDe
 
     private func ping() {
         guard let task = lock.withLock({ self.task }) else { return }
+        // The last ping still has no pong a whole interval later: the far end is gone
+        // without closing (a Mac asleep or switched off, a network that changed), and the
+        // socket would look open until TCP gave up minutes from now. Let it go, so the
+        // app reconnects and says it is reconnecting (073).
+        let unanswered = lock.withLock { () -> Bool in
+            defer { awaitingPong = true }
+            return awaitingPong
+        }
+        if unanswered {
+            finish(Failure("no answer to a ping in \(Self.pingEvery)"))
+            return
+        }
         task.sendPing { [weak self] error in
-            if let error { self?.finish(error) }
+            if let error { self?.finish(error) } else { self?.lock.withLock { self?.awaitingPong = false } }
         }
     }
 
