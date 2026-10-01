@@ -551,3 +551,75 @@ button.call-line:hover { opacity: 1; }
   .column-head h1.narrow-only { display: block; text-align: center; }
   .projects .column-head h1 { text-align: left; font-size: 17px; }
 }
+
+/* US3: the prompt's menus, attachments, labels, the session menu, the new-session form. */
+.prompt-row { align-items: center; gap: 6px; }
+.prompt .attach { background: none; border: none; font-size: 15px; opacity: 0.7; }
+.prompt.off { opacity: 0.6; }
+.menus { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.menus .spacer { flex: 1; }
+.pill {
+  position: relative;
+  flex: none;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  box-shadow: 0 1px 2px var(--paper-shadow);
+  white-space: nowrap;
+  color: inherit;
+}
+.pill.on { background: var(--paper-selection); }
+.pill.select select {
+  /* The browser's own menu, over the pill: every choice is reachable by keyboard and screen reader. */
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+}
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.attachments { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.attachments li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 240px;
+  padding: 3px 8px;
+  border-radius: var(--radius-card);
+  background: var(--paper-well);
+  font-size: 12px;
+}
+button.remove { background: none; border: none; padding: 0 2px; opacity: 0.55; font-size: 13px; line-height: 1; }
+button.remove:hover { opacity: 1; }
+.labels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 16px; border-bottom: 1px solid var(--paper-rule); }
+.labels .chip { display: inline-flex; align-items: center; gap: 2px; }
+.label-field { flex: 1; min-width: 80px; border: none; background: none; font: inherit; font-size: 12px; color: inherit; outline: none; }
+.popover.right { right: 0; left: auto; min-width: 160px; display: flex; flex-direction: column; }
+.popover [role=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
+.popover [role=menuitem]:hover { background: var(--paper-wash); }
+.queued-head { display: flex; align-items: center; gap: 8px; }
+.queued-head .faint { flex: 1; }
+.problem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--tint-failure) 10%, var(--paper-ground));
+  border-bottom: 1px solid var(--paper-rule);
+}
+.new-form { display: flex; flex-direction: column; gap: 12px; padding: 20px; max-width: 560px; }
+.new-form .field { display: flex; flex-direction: column; gap: 4px; }
+.new-form select {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-raised);
+  color: inherit;
+}
+.menu-anchor.session-menu { margin-right: 0; }

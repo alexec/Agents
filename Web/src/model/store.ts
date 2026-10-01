@@ -5,9 +5,11 @@ import { batch, signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
-  WorkflowSummary,
+  WorkflowSummary, Attachment, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
+  StartRequest, UUID, WorktreesListResponse,
 } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
+import { describe } from "./errors";
 import { log } from "../log";
 import { folderKey } from "./groups";
 import { DisplayBuilder, type Item } from "./turns";
@@ -45,6 +47,11 @@ export class Work {
   readonly openTurnStart = signal(0);
   readonly firstEntryIndex = signal(0);
   readonly hasMoreBefore = signal(false);
+
+  /** The latest correction to a new agent's form, for the form holding that draft. */
+  readonly draftOptions = signal<DraftOptionsNotification | null>(null);
+  /** The mode last chosen for each runtime, by host (029). */
+  readonly rememberedModes = signal<Record<string, Record<string, JSONValue>>>({});
 
   private display = new DisplayBuilder();
   private entryIDs = new Set<string>();
@@ -84,6 +91,12 @@ export class Work {
         this.elicitations.value = { ...this.elicitations.value, [host]: list };
         return true;
       }
+      case "agents/draftOptions":
+        this.draftOptions.value = params as DraftOptionsNotification;
+        return true;
+      case "modes/changed":
+        this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
+        return true;
       case "agent/removed": {
         const { agentID } = params as AgentRemovedNotification;
         batch(() => {
@@ -272,6 +285,7 @@ export class Store extends Work {
     if (agents) this.replaceAgents(agents, host);
     const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
+    void this.loadRuntimes(host);
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
       this.link.call("elicitations/pending", {}, host).catch(failed("elicitations/pending")),
@@ -354,4 +368,105 @@ export class Store extends Work {
     }, host).catch(() => null);
     return page?.entries ?? [];
   }
+
+  // MARK: What the browser sends (071 US3)
+
+  /** The last thing that didn't work, in one sentence; the page shows it until dismissed. */
+  readonly problem = signal<string | null>(null);
+  /** Each runtime and what each says it can take, by host. */
+  readonly runtimes = signal<Record<string, RuntimeStatus[]>>({});
+  readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
+  /** A choice made on a menu that the host hasn't confirmed, by agent then option. */
+  readonly pendingOptions = signal<Record<string, Record<string, JSONValue>>>({});
+  /** What is typed and attached, per session or per new-agent form, kept in memory only. */
+  readonly drafts = new Map<string, { text: string; attachments: Attachment[] }>();
+
+  /** Calls `method`, and on failure says why in `problem` and answers null. */
+  async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string): Promise<Methods[M]["result"] | null> {
+    try {
+      return await this.link.call(method, params, host);
+    } catch (error) {
+      log("call.failed", error instanceof CallFailed ? error.code : undefined);
+      this.problem.value = describe(error);
+      return null;
+    }
+  }
+
+  /** What runs on a host, and what each runtime takes; asked once a connection. */
+  async loadRuntimes(host: string): Promise<void> {
+    const [runtimes, accounts, modes] = await Promise.all([
+      this.link.call("runtimes/list", {}, host).catch(() => null),
+      this.link.call("runtimes/accounts", {}, host).catch(() => null),
+      this.link.call("modes/remembered", {}, host).catch(() => null),
+    ]);
+    batch(() => {
+      if (runtimes) this.runtimes.value = { ...this.runtimes.value, [host]: runtimes };
+      if (accounts) this.accounts.value = { ...this.accounts.value, [host]: accounts };
+      if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
+    });
+  }
+
+  account(host: string, runtimeID: string): RuntimeAccount | undefined {
+    return (this.accounts.value[host] ?? []).find((a) => a.runtimeID === runtimeID);
+  }
+
+  async prompt(host: string, agentID: string, text: string, attachments: Attachment[]): Promise<boolean> {
+    return (await this.act("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host)) !== null;
+  }
+
+  async sendNow(host: string, agentID: string, promptID: string): Promise<void> {
+    await this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host);
+  }
+
+  async unqueue(host: string, agentID: string, promptID: string): Promise<void> {
+    await this.act("agents/unqueue", { agentID: agentID as UUID, promptID: promptID as UUID }, host);
+  }
+
+  async perform(host: string, agentID: string,
+                action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<void> {
+    await this.act(action, { agentID: agentID as UUID }, host);
+  }
+
+  /** A menu's choice, shown at once and sent; the host's answer settles it either way. */
+  async setOption(host: string, agentID: string, optionID: string, value: JSONValue): Promise<void> {
+    this.pendingOptions.value = { ...this.pendingOptions.value,
+      [agentID]: { ...this.pendingOptions.value[agentID], [optionID]: value } };
+    await this.act("agents/setOption", { agentID: agentID as UUID, optionID, value }, host);
+    const mine = { ...this.pendingOptions.value[agentID] };
+    if (JSON.stringify(mine[optionID]) === JSON.stringify(value)) delete mine[optionID];
+    this.pendingOptions.value = { ...this.pendingOptions.value, [agentID]: mine };
+  }
+
+  async setLabels(host: string, agentID: string, add: string[], remove: string[]): Promise<boolean> {
+    const agent = await this.act("agents/setLabels", { agentID: agentID as UUID, add, remove }, host);
+    if (agent) this.upsertAgent(agent, host);
+    return agent !== null;
+  }
+
+  async labelVocabulary(host: string, folder: string): Promise<string[]> {
+    return (await this.link.call("agents/labelVocabulary", { folder: folder as never }, host).catch(() => null)) ?? [];
+  }
+
+  async worktrees(host: string, folder: string): Promise<WorktreesListResponse | null> {
+    return this.link.call("worktrees/list", { folder: folder as never }, host).catch(() => null);
+  }
+
+  /** A runtime started behind the new-agent form, so its choices are real ones. */
+  async draft(host: string, runtimeID: string, cwd: string) {
+    try {
+      return await this.link.call("agents/options", { runtimeID, cwd: cwd as never, mcpServers: [] }, host);
+    } catch (error) {
+      return { failure: describe(error) };
+    }
+  }
+
+  discardDraft(host: string, draftID: string): void {
+    void this.link.call("agents/discardDraft", { draftID: draftID as UUID }, host).catch(() => {});
+  }
+
+  /** Starts an agent; answers its id, or null with `problem` saying why. */
+  async start(host: string, request: StartRequest): Promise<string | null> {
+    return this.act("agents/start", request, host);
+  }
+
 }

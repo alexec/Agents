@@ -9,6 +9,8 @@ export interface Route {
   session?: string | undefined;
   /** The files pane, open beside or over the chat. */
   files?: boolean | undefined;
+  /** A new session's form, which is the project's empty pane: shown on a narrow window too. */
+  compose?: boolean | undefined;
 }
 
 export function parseRoute(hash: string): Route {
@@ -21,6 +23,7 @@ export function parseRoute(hash: string): Route {
       case "p": route.project = value; break;
       case "s": route.session = value; break;
       case "f": route.files = value === "1"; break;
+      case "n": route.compose = value === "1"; break;
     }
   }
   return route;
@@ -32,6 +35,7 @@ export function routeHash(route: Route): string {
   if (route.host && route.project) parts.push("p", route.project);
   if (route.host && route.project && route.session) parts.push("s", route.session);
   if (route.session && route.files) parts.push("f", "1");
+  if (route.host && route.project && !route.session && route.compose) parts.push("n", "1");
   return "#/" + parts.map(encodeURIComponent).join("/");
 }
 

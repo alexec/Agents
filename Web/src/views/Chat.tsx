@@ -12,6 +12,11 @@ import { toWireDate } from "../protocol/dates";
 import type { Agent } from "../protocol/generated";
 import { go, replace, route } from "../route";
 import { Cards } from "./Cards";
+import { Labels } from "./Labels";
+import { Prompt } from "./Prompt";
+import { PromptMenus } from "./PromptMenus";
+import { SessionMenu } from "./SessionMenu";
+import { drawable } from "../model/options";
 import { detailSummaries, detailTitles, TurnView, type TurnDetail } from "./chat/Rows";
 
 const detailKey = "agents.turnDetail";
@@ -141,9 +146,10 @@ export function Chat({ store, host, session, down }: { store: Store; host: strin
             ))}
           </select>
           <button onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
-          <button class="icon" aria-label="More" title="More" disabled>···</button>
+          <SessionMenu store={store} host={host} agent={agent} disabled={down} />
         </span>
       </header>
+      {agent && r.project && <Labels store={store} host={host} agent={agent} folder={r.project} disabled={down} />}
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, index) => (
@@ -151,7 +157,7 @@ export function Chat({ store, host, session, down }: { store: Store; host: strin
             isLive={index === rows.length - 1 && live} background={background}
             toggle={() => toggle(turn)} fetch={() => void fetch(turn)} />
         ))}
-        {agent && <Queued agent={agent} />}
+        {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
         {agent && (agent.state === "running" || agent.state === "starting") && (
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
@@ -160,26 +166,42 @@ export function Chat({ store, host, session, down }: { store: Store; host: strin
       <footer class="foot">
         <BackgroundRows agent={agent} />
         <Cards store={store} host={host} session={session} />
-        <div class="prompt">
-          {/* Sending is US3 (T054); until then the prompt is drawn, and off. */}
-          <textarea aria-label="Reply" placeholder="Reply…" disabled rows={2} data-down={down} />
-          <div class="prompt-row">
-            <button class="send" aria-label="Send" disabled>↑</button>
-          </div>
-        </div>
+        <Prompt store={store} draftKey={`${host}|${session}`} placeholder="Reply…" disabled={down || !agent}
+          capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
+          send={(text, attachments) => store.prompt(host, session, text, attachments)}>
+          {agent && (
+            <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down}
+              value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
+              onChange={(o, v) => void store.setOption(host, agent.id, o.id, v)} />
+          )}
+        </Prompt>
       </footer>
     </section>
   );
 }
 
-/** Something typed while the agent worked, where it will appear (QueuedPromptRow). */
-function Queued({ agent }: { agent: Agent }) {
+/**
+ * Something typed while the agent worked, where it will appear (QueuedPromptRow), removable, and
+ * with Send now while a turn runs on a runtime that takes words mid-turn.
+ */
+function Queued({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent; disabled: boolean }) {
+  const canSendNow = (agent.state === "running" || agent.state === "waitingOnUser")
+    && store.account(host, agent.runtimeID)?.canSteer === true;
   return (
     <>
       {(agent.queuedPrompts ?? []).map((queued) => (
         <div key={queued.id} class="queued">
-          <p class="faint">Waiting its turn</p>
+          <div class="queued-head">
+            <p class="faint">Waiting its turn</p>
+            {canSendNow && (
+              <button class="link" disabled={disabled} title="Send this into the turn that is running, without waiting for it to end"
+                onClick={() => void store.sendNow(host, agent.id, queued.id)}>↑ Send now</button>
+            )}
+            <button class="remove" aria-label="Remove queued prompt" title="Do not send this" disabled={disabled}
+              onClick={() => void store.unqueue(host, agent.id, queued.id)}>×</button>
+          </div>
           <p class="quiet">{queued.text}</p>
+          {queued.attachments.length > 0 && <p class="faint small">📎 {queued.attachments.map((a) => a.displayName).join(", ")}</p>}
         </div>
       ))}
     </>

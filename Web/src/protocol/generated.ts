@@ -448,6 +448,17 @@ export interface DirectoryListing {
   omitted: number;
 }
 
+export interface DiscardDraftRequest {
+  draftID: UUID;
+}
+
+export interface DraftOptionsNotification {
+  draftID: UUID;
+  options: ConfigOption[];
+  commands: SlashCommand[];
+  failure?: string;
+}
+
 export type Dropped =
   | { extraArguments: { _0: string[] } }
   | { alwaysAllow: { count: number } }
@@ -1367,6 +1378,7 @@ export interface WorktreesListResponse {
 export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
+  "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
@@ -1418,6 +1430,7 @@ export interface Methods {
 export const MethodTarget = {
   "agents/answerSandbox": "host",
   "agents/archive": "host",
+  "agents/discardDraft": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
   "agents/options": "host",
@@ -1473,9 +1486,11 @@ export interface Notifications {
   "agent/permission": PermissionNotification;
   "agent/removed": AgentRemovedNotification;
   "agent/showFile": ShowFileNotification;
+  "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
   "control/hostChanged": JSONValue;
   "files/changed": FilesChangedNotification;
+  "modes/changed": Record<string, JSONValue>;
   "project/changed": ProjectSummary;
 }
 
@@ -1517,6 +1532,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
   DirectoryListing: { required: ["url", "entries", "omitted"], optional: [] },
+  DiscardDraftRequest: { required: ["draftID"], optional: [] },
+  DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },

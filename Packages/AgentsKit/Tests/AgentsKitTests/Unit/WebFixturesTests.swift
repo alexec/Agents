@@ -579,6 +579,58 @@ struct WebFixturesTests {
             ])
         }
     }
+    // MARK: options/
+
+    /// The prompt's menus: which options are drawn and in what order, which sit apart as
+    /// permission, what a closed menu says, and what a new agent's mode opens on.
+    @Test func options() throws {
+        func choices(_ values: String...) -> [ConfigChoice] {
+            values.map { ConfigChoice(value: .string($0), name: $0.capitalized) }
+        }
+        let mode = ConfigOption(id: "mode", name: "Mode", category: "mode", type: "select",
+                                currentValue: .string("default"), options: choices("default", "acceptEdits", "plan"))
+        let model = ConfigOption(id: "model", name: "Model", category: "model", type: "select",
+                                 currentValue: .string("opus"), options: choices("opus", "sonnet"))
+        let effort = ConfigOption(id: "effort", name: "Effort", category: "thought_level", type: "select",
+                                  currentValue: .string("high"), options: choices("low", "high"))
+        let fast = ConfigOption(id: "fast", name: "Fast", type: "boolean", currentValue: .bool(false))
+        let odd = ConfigOption(id: "slider", name: "Slider", type: "slider")
+        let empty = ConfigOption(id: "empty", name: "Empty", category: "model", type: "select", options: [])
+        let allow = ConfigOption(id: "allow", name: "Allow all", category: "permissions", type: "boolean")
+        let newCategory = ConfigOption(id: "voice", name: "Voice", category: "voice", type: "select",
+                                       options: choices("calm"))
+        let grouped = ConfigOption(id: "mode", name: "Mode", kind: .select([
+            ConfigChoiceGroup(name: "Safe", choices: choices("ask")),
+            ConfigChoiceGroup(name: "Fast", choices: choices("auto"))]))
+        let sets: [(String, [ConfigOption], [ConfigOption], JSONValue?)] = [
+            ("agent's own, in category order", [fast, newCategory, model, effort, odd, empty, mode, allow], [], .string("plan")),
+            ("an agent's empty list falls to the draft", [], [effort, model], nil),
+            ("nothing drawable", [odd, empty], [], nil),
+            ("a remembered mode no longer offered", [mode], [], .string("bypassPermissions")),
+            ("grouped choices; mode found by id", [grouped], [], .string("auto")),
+        ]
+        let cases = try sets.map { name, agent, draft, remembered in
+            Case(name: name, input: .object([
+                "agentOptions": .array(try agent.map(Self.encode)), "draftOptions": .array(try draft.map(Self.encode)),
+                "remembered": remembered ?? .null,
+            ]))
+        }
+        try pin("options/drawable.json", cases) { input in
+            let agent = try input["agentOptions"]!.decode([ConfigOption].self)
+            let draft = try input["draftOptions"]!.decode([ConfigOption].self)
+            let drawn = PromptControlsState.drawable(agentOptions: agent, draftOptions: draft)
+            let remembered = input["remembered"].flatMap { $0.isNull ? nil : $0 }
+            let modeOption = ModeMemory.modeOption(in: drawn)
+            return .object([
+                "drawn": .array(drawn.map { .string($0.id) }),
+                "permission": .array(drawn.filter(\.isAboutPermission).map { .string($0.id) }),
+                "titles": .array(drawn.map { .string($0.closedTitle(for: nil)) }),
+                "mode": modeOption.map { .string($0.id) } ?? .null,
+                "modeStartsOn": modeOption.flatMap { ModeMemory.startingValue(remembered: remembered, for: $0) } ?? .null,
+            ])
+        }
+    }
+
     // MARK: overrides/
 
     /// A Swift-encoded sample of every case of each type whose TypeScript is hand-written

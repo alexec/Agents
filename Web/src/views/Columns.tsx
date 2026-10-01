@@ -12,6 +12,8 @@ import { go, route } from "../route";
 import { browserName, type Session } from "../session";
 import { Banner } from "./Banner";
 import { Chat } from "./Chat";
+import { NewAgent } from "./NewAgent";
+import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { SessionRow } from "./SessionRow";
 
@@ -19,7 +21,10 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   const r = route.value;
   const down = session.state.value.kind === "down";
   // Which single column a narrow window shows: the deepest one the route names.
-  const depth = r.session ? "chat" : r.project ? "sessions" : "projects";
+  const depth = r.session || r.compose ? "chat" : r.project ? "sessions" : "projects";
+  const project = r.host && r.project
+    ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
+    : undefined;
   useEffect(() => {
     if (r.host && r.session) void store.openSession(r.host, r.session);
     else store.closeSession();
@@ -27,11 +32,14 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   return (
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}
+      <Problem store={store} />
       <div class="columns" aria-busy={down}>
         <ProjectsColumn session={session} store={store} />
         <SessionsColumn store={store} />
         {r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
-          : <section class="chat empty" aria-label="Chat"><p>Choose a session.</p></section>}
+          : r.host && r.project && project ? (
+            <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
+          ) : <section class="chat empty" aria-label="Chat"><p>Choose a project.</p></section>}
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
       </div>
     </div>
@@ -159,7 +167,8 @@ function SessionsColumn({ store }: { store: Store }) {
             search.value = (e.currentTarget as HTMLInputElement).value;
             if (search.value) openArchived(true);
           }} />
-        <button class="icon" aria-label="New session" title="New session" disabled>✎</button>
+        <button class="icon" aria-label="New session" title="Start a new session in this project" disabled={!project}
+          onClick={() => go({ host, project: folder, compose: true })}>✎</button>
       </header>
       <div class="scroll">
         {!project && <p class="hint">Choose a project.</p>}

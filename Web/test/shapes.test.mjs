@@ -44,6 +44,9 @@ function typed() {
       if (step.page) add("TranscriptPage", step.page, `reducer ${c.name} #${i}`);
     });
   }
+  for (const c of cases("options/drawable.json")) {
+    [...c.input.agentOptions, ...c.input.draftOptions].forEach((x, i) => add("ConfigOption", x, `options ${c.name} #${i}`));
+  }
   for (const file of readdirSync(fixtures + "overrides").filter((f) => f.endsWith(".json"))) {
     const type = file.replace(/\.json$/, "");
     for (const c of cases(`overrides/${file}`)) add(type, c.input, `overrides/${type} ${c.name}`);

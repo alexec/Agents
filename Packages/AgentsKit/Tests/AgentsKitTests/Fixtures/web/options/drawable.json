@@ -1,0 +1,324 @@
+[
+  {
+    "expected" : {
+      "drawn" : [
+        "mode",
+        "model",
+        "effort",
+        "allow",
+        "fast",
+        "voice"
+      ],
+      "mode" : "mode",
+      "modeStartsOn" : "plan",
+      "permission" : [
+        "mode",
+        "allow"
+      ],
+      "titles" : [
+        "Default",
+        "Opus",
+        "High",
+        "Allow all",
+        "Fast",
+        "Voice"
+      ]
+    },
+    "input" : {
+      "agentOptions" : [
+        {
+          "currentValue" : false,
+          "id" : "fast",
+          "name" : "Fast",
+          "type" : "boolean"
+        },
+        {
+          "category" : "voice",
+          "id" : "voice",
+          "name" : "Voice",
+          "options" : [
+            {
+              "name" : "Calm",
+              "value" : "calm"
+            }
+          ],
+          "type" : "select"
+        },
+        {
+          "category" : "model",
+          "currentValue" : "opus",
+          "id" : "model",
+          "name" : "Model",
+          "options" : [
+            {
+              "name" : "Opus",
+              "value" : "opus"
+            },
+            {
+              "name" : "Sonnet",
+              "value" : "sonnet"
+            }
+          ],
+          "type" : "select"
+        },
+        {
+          "category" : "thought_level",
+          "currentValue" : "high",
+          "id" : "effort",
+          "name" : "Effort",
+          "options" : [
+            {
+              "name" : "Low",
+              "value" : "low"
+            },
+            {
+              "name" : "High",
+              "value" : "high"
+            }
+          ],
+          "type" : "select"
+        },
+        {
+          "id" : "slider",
+          "name" : "Slider",
+          "type" : "slider"
+        },
+        {
+          "category" : "model",
+          "id" : "empty",
+          "name" : "Empty",
+          "options" : [
+
+          ],
+          "type" : "select"
+        },
+        {
+          "category" : "mode",
+          "currentValue" : "default",
+          "id" : "mode",
+          "name" : "Mode",
+          "options" : [
+            {
+              "name" : "Default",
+              "value" : "default"
+            },
+            {
+              "name" : "Acceptedits",
+              "value" : "acceptEdits"
+            },
+            {
+              "name" : "Plan",
+              "value" : "plan"
+            }
+          ],
+          "type" : "select"
+        },
+        {
+          "category" : "permissions",
+          "id" : "allow",
+          "name" : "Allow all",
+          "type" : "boolean"
+        }
+      ],
+      "draftOptions" : [
+
+      ],
+      "remembered" : "plan"
+    },
+    "name" : "agent's own, in category order"
+  },
+  {
+    "expected" : {
+      "drawn" : [
+        "model",
+        "effort"
+      ],
+      "mode" : null,
+      "modeStartsOn" : null,
+      "permission" : [
+
+      ],
+      "titles" : [
+        "Opus",
+        "High"
+      ]
+    },
+    "input" : {
+      "agentOptions" : [
+
+      ],
+      "draftOptions" : [
+        {
+          "category" : "thought_level",
+          "currentValue" : "high",
+          "id" : "effort",
+          "name" : "Effort",
+          "options" : [
+            {
+              "name" : "Low",
+              "value" : "low"
+            },
+            {
+              "name" : "High",
+              "value" : "high"
+            }
+          ],
+          "type" : "select"
+        },
+        {
+          "category" : "model",
+          "currentValue" : "opus",
+          "id" : "model",
+          "name" : "Model",
+          "options" : [
+            {
+              "name" : "Opus",
+              "value" : "opus"
+            },
+            {
+              "name" : "Sonnet",
+              "value" : "sonnet"
+            }
+          ],
+          "type" : "select"
+        }
+      ],
+      "remembered" : null
+    },
+    "name" : "an agent's empty list falls to the draft"
+  },
+  {
+    "expected" : {
+      "drawn" : [
+
+      ],
+      "mode" : null,
+      "modeStartsOn" : null,
+      "permission" : [
+
+      ],
+      "titles" : [
+
+      ]
+    },
+    "input" : {
+      "agentOptions" : [
+        {
+          "id" : "slider",
+          "name" : "Slider",
+          "type" : "slider"
+        },
+        {
+          "category" : "model",
+          "id" : "empty",
+          "name" : "Empty",
+          "options" : [
+
+          ],
+          "type" : "select"
+        }
+      ],
+      "draftOptions" : [
+
+      ],
+      "remembered" : null
+    },
+    "name" : "nothing drawable"
+  },
+  {
+    "expected" : {
+      "drawn" : [
+        "mode"
+      ],
+      "mode" : "mode",
+      "modeStartsOn" : "default",
+      "permission" : [
+        "mode"
+      ],
+      "titles" : [
+        "Default"
+      ]
+    },
+    "input" : {
+      "agentOptions" : [
+        {
+          "category" : "mode",
+          "currentValue" : "default",
+          "id" : "mode",
+          "name" : "Mode",
+          "options" : [
+            {
+              "name" : "Default",
+              "value" : "default"
+            },
+            {
+              "name" : "Acceptedits",
+              "value" : "acceptEdits"
+            },
+            {
+              "name" : "Plan",
+              "value" : "plan"
+            }
+          ],
+          "type" : "select"
+        }
+      ],
+      "draftOptions" : [
+
+      ],
+      "remembered" : "bypassPermissions"
+    },
+    "name" : "a remembered mode no longer offered"
+  },
+  {
+    "expected" : {
+      "drawn" : [
+        "mode"
+      ],
+      "mode" : "mode",
+      "modeStartsOn" : "auto",
+      "permission" : [
+
+      ],
+      "titles" : [
+        "Mode"
+      ]
+    },
+    "input" : {
+      "agentOptions" : [
+        {
+          "id" : "mode",
+          "name" : "Mode",
+          "options" : [
+            {
+              "group" : "Safe",
+              "name" : "Safe",
+              "options" : [
+                {
+                  "name" : "Ask",
+                  "value" : "ask"
+                }
+              ]
+            },
+            {
+              "group" : "Fast",
+              "name" : "Fast",
+              "options" : [
+                {
+                  "name" : "Auto",
+                  "value" : "auto"
+                }
+              ]
+            }
+          ],
+          "type" : "select"
+        }
+      ],
+      "draftOptions" : [
+
+      ],
+      "remembered" : "auto"
+    },
+    "name" : "grouped choices; mode found by id"
+  }
+]
