@@ -38,7 +38,7 @@ struct ControlAgreementVectorTests {
 
         let shared = try ControlAgreement.sharedSecret(privateKey: clientPrivate, peerPublic: controlPublic)
         let clientKey = try ControlAuth.clientKey(privateKey: clientPrivate, peer: controlPublic, client: client)
-        let clientIdentity = ControlAgreement.clientIdentity(client)
+        let clientIdentity = ControlAuth.Identity.client(client).text
 
         let codeID = Data((0..<16).map { UInt8($0) })
         let codeSecret = try #require(ControlAuth.codeSecret(controlPrivateKey: controlPrivate, id: hex(codeID)))
