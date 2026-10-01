@@ -152,9 +152,10 @@ public enum DaemonAPI {
         /// Letting one agent carry on past the per-agent limit, or giving it a
         /// tighter ceiling of its own. The reader's call, never an agent's.
         public static let agentsSetCeiling = "agents/setCeiling"
-        /// Not the app's to call. This is how the MCP server we hand to every agent
-        /// gets what the agent passed it back to the agent's own record. Since 023
-        /// the older door for the chips half of `agentsFinishTurn`.
+        /// Not the app's to call. Since 023 the older door for the chips half of
+        /// `agentsFinishTurn`; the helper stopped relaying it when the tool names were
+        /// retired (09-29). Kept for a helper binary from before then, which is after the
+        /// #58 cut-off (051).
         public static let agentsSuggestPrompts = "agents/suggestPrompts"
         /// Nor this one. Another of that MCP server's tools: the agent asking that a
         /// file be put in front of the user.
@@ -238,7 +239,8 @@ public enum DaemonAPI {
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
         /// about whether the work is finished. Since 023 the older door for the
-        /// outcome half of `agentsFinishTurn`.
+        /// outcome half of `agentsFinishTurn`, kept like `agentsSuggestPrompts` above
+        /// for a helper from before 09-29 (#58).
         public static let agentsReportOutcome = "agents/reportOutcome"
         /// Both of those at once (023): the one call that ends a turn, relayed by the
         /// helper when an agent calls `finish_turn`. The two above stay for the older
@@ -311,7 +313,7 @@ public enum DaemonAPI {
         public static let runtimesMarkAvailable = "runtimes/markAvailable"
         /// What another daemon learned about a shared allowance (052, R6): the Mac's
         /// window carries it between the Mac and each server. The name is 052's, kept so
-        /// an older server still hears it.
+        /// an older server still hears it: renaming it buys nothing (#58).
         public static let poolApplyAllowances = "pool/applyAllowances"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
@@ -771,9 +773,8 @@ public enum DaemonAPI {
             self.sendID = sendID
         }
 
-        /// An older app sends only the text, so attachments are optional on the way in.
-        /// A remote built before 014 sends no origin, and its prompts are the person's,
-        /// which is correct.
+        /// Attachments and origin are optional on the way in: a caller that sends only the
+        /// text means a prompt of the person's with nothing attached.
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             agentID = try c.decode(UUID.self, forKey: .agentID)
@@ -1338,8 +1339,9 @@ public enum DaemonAPI {
         public var agentID: UUID
         /// Nil when the question has been answered and is no longer waiting.
         public var request: PermissionRequest?
-        /// Identifies a single withdrawn question. Nil supports older daemons
-        /// and an explicit withdrawal of all questions for an agent.
+        /// Identifies a single withdrawn question. Every withdrawal this daemon sends
+        /// carries one; nil is a daemon from before 09-27 withdrawing them all, kept
+        /// because that is after the #58 cut-off (051).
         public var requestID: UUID?
         public init(agentID: UUID, request: PermissionRequest?, requestID: UUID? = nil) {
             self.agentID = agentID
@@ -1541,7 +1543,8 @@ public enum DaemonAPI {
         public var scrollback: Data
         public var dropped: Int
         public var startedAt: Date
-        /// Where the shell was started. Nil from an older daemon (053).
+        /// Where the shell was started. Nil from a daemon before 053, which is after the
+        /// #58 cut-off (051), so it stays optional.
         public var folder: URL?
 
         public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
@@ -2511,8 +2514,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// `device/changed`: the whole record, or that it was forgotten (046). A build from
-    /// before 046 finds no `device` in a removal and decodes nothing, which is ignoring it.
+    /// `device/changed`: the whole record, or that it was forgotten (046).
     public struct DeviceNotification: Codable, Sendable, Hashable {
         public var id: UUID
         public var device: Device?
@@ -2544,7 +2546,8 @@ public enum DaemonAPI {
     /// What `devices/announce` answers: the device's record, as it always was, with the
     /// Mac's relay key beside its fields when a bridge has registered one (046). The one
     /// object is both, so a phone from before 046 decodes the record and keeps `macKey`
-    /// among the fields it does not know.
+    /// among the fields it does not know. Kept past the #58 cut-off: the flat shape is
+    /// the protocol now, and the bridge path it travels is 058 T106/T042's to replace.
     public struct AnnounceReply: Codable, Sendable, Hashable {
         public var device: Device
         public var macKey: Data?

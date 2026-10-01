@@ -117,9 +117,9 @@ extension DaemonCore {
     /// sentence rather than a code, because the agent is what reads it.
     ///
     /// Since 023 this is the older of two doors to the same record. `finishTurn` is
-    /// the one a fresh conversation is told about; this stays because the helper
-    /// relays the older name to it, and a conversation briefed with that name is still
-    /// calling it. Both go through `checkedReport` and `land`, so the refusals and the
+    /// the one a fresh conversation is told about. The helper stopped relaying the
+    /// older name on 09-29; this stays for a helper from before then, which is after
+    /// the #58 cut-off (051). Both go through `checkedReport` and `land`, so the refusals and the
     /// order of the writes cannot drift between them.
     public func reportOutcome(_ request: DaemonAPI.ReportOutcomeRequest) async throws -> String {
         let checked = try checkedReport(token: request.token, outcome: request.outcome,

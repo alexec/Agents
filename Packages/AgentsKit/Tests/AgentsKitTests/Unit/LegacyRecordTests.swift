@@ -76,8 +76,8 @@ struct LegacyRecordTests {
         #expect(value["workReported"]?["_0"]?["message"]?.stringValue == "all good")
     }
 
-    /// The prompt origin, the same way: absent means the person's, which is what every
-    /// entry written before 014 is.
+    /// The prompt origin: absent means the person's, which is how every prompt of the
+    /// person's is written.
     @Test func aPromptWithNoOriginIsThePersons() throws {
         let line = #"{"at":"2026-09-19T03:44:09.040Z","id":"11D9094D-5C1E-44BD-BC70-6FF7EA04375A","kind":{"userMessage":{"_0":"hello"}}}"#
         let entry = try decoder().decode(TranscriptEntry.self, from: Data(line.utf8))

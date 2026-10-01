@@ -77,6 +77,7 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
 
         /// A chat carried on with another runtime (052): drawn as the tinted note, with
         /// what it carried and what it did not. An older build reads it as unrecognised.
+        /// Nothing writes it since 065; read because 052 is after the #58 cut-off (051).
         case poolSwitch(SwitchRecord)
         /// A runtime's sandbox could not be set up (064). The card, until answered.
         case sandboxFailure(SandboxFailureRecord)
@@ -115,8 +116,8 @@ extension TranscriptEntry.Kind {
 }
 
 extension TranscriptEntry {
-    /// The blocks of a message, for the places that draw rather than read. A record
-    /// written before 003 has only text, so it becomes one text block.
+    /// The blocks of a message, for the places that draw rather than read. A message of
+    /// plain text is kept as text alone, with no blocks, so it becomes one text block.
     public var blocks: [ContentBlock]? {
         switch kind {
         case .userMessage(let text, let blocks, _), .agentMessage(_, let text, let blocks):

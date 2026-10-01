@@ -304,7 +304,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         background = try c.decodeIfPresent([BackgroundItem].self, forKey: .background) ?? []
         additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
         mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
-        // New in 004. A record written before it has nothing waiting.
+        // Written only when something is waiting.
         queuedPrompts = try c.decodeIfPresent([QueuedPrompt].self, forKey: .queuedPrompts) ?? []
         // On the record rather than held in memory so the chip is still there when the
         // app is opened again on a turn that ended last night.
@@ -316,7 +316,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         startedByAgent = try c.decodeIfPresent(UUID.self, forKey: .startedByAgent)
         chainDepth = try c.decodeIfPresent(Int.self, forKey: .chainDepth)
         eventWait = try c.decodeIfPresent(EventWait.self, forKey: .eventWait)
-        // New in 030, and optional: every agent before it works in its project folder.
+        // Optional: an agent outside a worktree works in its project folder.
         worktree = try c.decodeIfPresent(AgentWorktree.self, forKey: .worktree)
         pendingMove = (try? c.decodeIfPresent(PendingMove.self, forKey: .pendingMove)) ?? nil
         startingPoint = try c.decodeIfPresent(StartingPoint.self, forKey: .startingPoint)
@@ -340,11 +340,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New with the title on `finish_turn`. An older record's title came from the
         // runtime or the prompt, so a runtime title may still replace it.
         titledByAgent = try c.decodeIfPresent(Bool.self, forKey: .titledByAgent) ?? false
-        // New in 052. An older record is on no pool entry and carries on by default.
+        // 052's, read and never written since 065. Kept: 052 is after the cut-off
+        // (#58: 051), so a record a 052 build wrote must still open.
         poolEntryID = try c.decodeIfPresent(UUID.self, forKey: .poolEntryID)
         switchingOff = try c.decodeIfPresent(Bool.self, forKey: .switchingOff) ?? false
         allowanceWait = try c.decodeIfPresent(AllowanceWait.self, forKey: .allowanceWait)
-        // New in 040. A record written before it was never parked.
+        // Written only when parked.
         parking = try c.decodeIfPresent(Parking.self, forKey: .parking)
         // Absent when nothing was asked. A word this build does not know — a newer
         // build's, or the `archive` agents could once ask for — asked for nothing.
@@ -417,7 +418,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
         // 052's poolEntryID, switchingOff and allowanceWait are read from an older record
         // and never written again (065): nothing sets them, and a wait found at launch is
-        // cleared.
+        // cleared. They go once the #58 cut-off moves past 052.
         try c.encodeIfPresent(parking, forKey: .parking)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)

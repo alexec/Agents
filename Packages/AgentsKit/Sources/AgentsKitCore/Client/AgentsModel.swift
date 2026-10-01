@@ -135,8 +135,8 @@ public final class AgentsModel {
     /// consult its own clock: it may be in a different time zone from the daemon's,
     /// and the daemon's is the one the limit uses.
     public private(set) var costState: DaemonAPI.CostState?
-    /// How long archived agents are kept and what the archive holds (051). Nil against a
-    /// daemon from before 051, which leaves the settings section out.
+    /// How long archived agents are kept and what the archive holds (051). Nil until the
+    /// daemon has said, which leaves the settings section out.
     /// Every runtime's state on the Mac (065, US4): Agent Runtimes, the prompt bar's
     /// warning, and the phone's Runtimes list.
     public private(set) var runtimeAllowances: RuntimeAllowances?
@@ -345,7 +345,8 @@ public final class AgentsModel {
             if let id = notification.requestID ?? notification.request?.id {
                 permissions.removeAll { $0.agentID == notification.agentID && $0.id == id }
             } else {
-                // Legacy withdrawal, without a request identity.
+                // Every question at once: a daemon from before 09-27 withdraws this way
+                // (kept, #58; see `PermissionNotification.requestID`).
                 permissions.removeAll { $0.agentID == notification.agentID }
             }
             if let request = notification.request { permissions.append(request) }

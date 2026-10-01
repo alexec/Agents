@@ -65,7 +65,7 @@ public struct CredentialStore: Sendable {
     /// A record of a kind this version no longer takes (056: Claude's token; 047: Codex's
     /// OpenAI key) is forgotten, and its secret deleted from the Keychain: nothing will lend
     /// it again, so nothing should keep it. Every other runtime's is left as it is. Returns
-    /// the runtimes forgotten.
+    /// the runtimes forgotten. Kept past the #58 cut-off (051) for 056's Claude token.
     @discardableResult
     public func forgetKindsNoLongerTaken() -> [String] {
         guard let data = try? Data(contentsOf: file),

@@ -38,14 +38,4 @@ public struct QueuedPrompt: Codable, Hashable, Sendable, Identifiable {
         [.text(text)] + attachments.map(\.block)
     }
 
-    public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(UUID.self, forKey: .id)
-        text = try c.decode(String.self, forKey: .text)
-        attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
-        queuedAt = try c.decodeIfPresent(Date.self, forKey: .queuedAt) ?? Date()
-        // New in 014. Absent is the person's, which every prompt queued before it was.
-        from = try c.decodeIfPresent(PromptOrigin.self, forKey: .from) ?? .person
-        preface = try c.decodeIfPresent(String.self, forKey: .preface)
-    }
 }

@@ -2,8 +2,8 @@ import Foundation
 
 /// Which machine something lives on (037).
 ///
-/// `mac` is this Mac and is never written down: every record from before servers existed
-/// is this Mac's, and so is every record decoded without a host. A server's id is eight
+/// `mac` is this Mac and is never written down: every record decoded without a host is
+/// this Mac's. A server's id is eight
 /// lowercase letters and digits, short on purpose because it names the socket files the
 /// window keeps for it, and those have a 104-byte ceiling.
 public struct HostID: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {

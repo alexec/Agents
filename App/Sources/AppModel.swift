@@ -72,7 +72,7 @@ final class AppModel {
     /// Every resource an agent can lease and who holds it (036).
     var leases: DaemonAPI.LeaseSnapshot? { work.leases }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
-    /// How long archived agents are kept (051). Nil from a daemon before 051.
+    /// How long archived agents are kept (051). Nil until the daemon has said.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
     var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
     /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
