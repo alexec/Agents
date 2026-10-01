@@ -13,6 +13,7 @@ import Musl
 //
 //   agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
 //   agents-control serve --home DIR [--no-bonjour] [--key-fd N] [--store-credentials-fd N]
+//   agents-control serve … [--web DIR] [--web-port N] [--no-web]
 //   agents-control code (--client operator|device | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
 //   agents-control move --from ROOT     an old set-up's devices into this store, once (T084)
@@ -22,6 +23,11 @@ import Musl
 //
 // `--home` is Agents Host's single copy (T057): its certificate and store in DIR, port
 // 8791, this Mac's .local name, and Bonjour. Anything below still overrides it.
+//
+// The web remote (071): with `--web DIR` (the built Web/dist) and a port, a second
+// listener on 127.0.0.1 and ::1 only serves it at http://localhost:<port>. `--home`
+// defaults the port to 8792; without `--home` there is none unless given, so a container
+// serves no web remote unless asked. `--no-web` turns it off whatever else is given.
 //
 // Where things are comes from the environment:
 //   AGENTS_STORE                file:///path or s3://bucket/prefix
@@ -33,6 +39,7 @@ import Musl
 //   AGENTS_CONTROL_KEY          or the key itself, base64url
 //   AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
 //   AGENTS_CONTROL_PIN          the load balancer's certificate pin, for codes, when it terminates TLS
+//   AGENTS_CONTROL_WEB_PORT     the web remote's loopback port, when --web-port is not given
 
 setvbuf(stdout, nil, _IOLBF, 0)
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -100,6 +107,15 @@ func localHost() -> String {
     return name.hasSuffix(".local") ? name : name.split(separator: ".").first.map { "\($0).local" } ?? name
 }
 
+/// The web remote's listener, or nil: a folder and a port both, and no `--no-web` (071).
+func web() -> ControlService.Configuration.Web? {
+    guard !arguments.contains("--no-web"), let folder = value("--web") else { return nil }
+    let port = value("--web-port").flatMap(Int.init) ?? environment["AGENTS_CONTROL_WEB_PORT"].flatMap(Int.init)
+        ?? (home != nil ? Loopback.defaultPort : nil)
+    guard let port else { return nil }
+    return .init(folder: URL(fileURLWithPath: (folder as NSString).expandingTildeInPath, isDirectory: true), port: port)
+}
+
 func serve() async {
     // Beside the rest of what it says, in control.log, rather than in the system log (#93).
     WireLog.sink = { FileHandle.standardError.write(Data("agents-control: \($0)\n".utf8)) }
@@ -126,12 +142,14 @@ func serve() async {
     let pin = tls.flatMap { $0.pin.isEmpty ? nil : $0.pin } ?? environment["AGENTS_CONTROL_PIN"].flatMap { $0.isEmpty ? nil : $0 }
     let name = value("--name") ?? environment["AGENTS_CONTROL_NAME"] ?? (home != nil ? localName() : url.host ?? "control plane")
     do {
-        let service = try ControlService(.init(store: store(), privateKey: privateKey(), url: url, pin: pin,
-                                               tls: tls?.context, bind: value("--bind") ?? "0.0.0.0",
-                                               port: port, name: name,
-                                               machineID: environment["AGENTS_CONTROL_MACHINE_ID"] ?? MachineID.current,
-                                               peerURL: environment["AGENTS_CONTROL_PEER_URL"].flatMap(URL.init(string:)),
-                                               receive: arguments.contains("--receive") || environment["AGENTS_CONTROL_RECEIVE"] == "1"))
+        var configuration = ControlService.Configuration(
+            store: store(), privateKey: privateKey(), url: url, pin: pin,
+            tls: tls?.context, bind: value("--bind") ?? "0.0.0.0", port: port, name: name,
+            machineID: environment["AGENTS_CONTROL_MACHINE_ID"] ?? MachineID.current,
+            peerURL: environment["AGENTS_CONTROL_PEER_URL"].flatMap(URL.init(string:)),
+            receive: arguments.contains("--receive") || environment["AGENTS_CONTROL_RECEIVE"] == "1")
+        configuration.web = web()
+        let service = try ControlService(configuration)
         let listening = try await service.start()
         if let pin { print("pin \(pin)") }
         #if canImport(dnssd)
@@ -374,6 +392,7 @@ default:
     usage: agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
            agents-control code (--client operator|device | --host) [--minutes N]
            agents-control serve --home DIR [--no-bonjour]
+           agents-control serve … [--web DIR] [--web-port N] [--no-web]
            agents-control hosts | clients
            agents-control store check [--store URL]
            agents-control store copy --from URL --to URL

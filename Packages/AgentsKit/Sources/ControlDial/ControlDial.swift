@@ -23,8 +23,10 @@ public enum ControlDial {
     public static let group: MultiThreadedEventLoopGroup = .singleton
 
     /// A WebSocket to `url`, open and upgraded, as lines. The key exchange is the caller's
-    /// (`ControlAuth.join`).
+    /// (`ControlAuth.join`). `origin` is sent as a browser sends it: the web remote's
+    /// listener refuses an upgrade without its own (071); tests dial it as a page would.
     public static func connect(_ url: URL, pin: String? = nil, roots: [NIOSSLCertificate]? = nil,
+                               origin: String? = nil,
                                timeout: TimeAmount = .seconds(10)) async throws -> WebSocketLineTransport {
         guard let scheme = url.scheme?.lowercased(), let host = url.host else {
             throw Failure("\(url) is not an address to dial")
@@ -57,7 +59,8 @@ public enum ControlDial {
                         }
                         try channel.pipeline.syncOperations.addHandler(tls)
                     }
-                    let requester = UpgradeRequester(host: host, port: port, secure: secure, path: path, failed: opened)
+                    let requester = UpgradeRequester(host: host, port: port, secure: secure, path: path, origin: origin,
+                                                     failed: opened)
                     let upgrader = NIOWebSocketClientUpgrader(
                         requestKey: NIOWebSocketClientUpgrader.randomRequestKey(),
                         maxFrameSize: maxMessage,
@@ -131,13 +134,16 @@ private final class UpgradeRequester: ChannelInboundHandler, RemovableChannelHan
     let port: Int
     let secure: Bool
     let path: String
+    let origin: String?
     let failed: EventLoopPromise<WebSocketLineTransport>
 
-    init(host: String, port: Int, secure: Bool, path: String, failed: EventLoopPromise<WebSocketLineTransport>) {
+    init(host: String, port: Int, secure: Bool, path: String, origin: String?,
+         failed: EventLoopPromise<WebSocketLineTransport>) {
         self.host = host
         self.port = port
         self.secure = secure
         self.path = path
+        self.origin = origin
         self.failed = failed
     }
 
@@ -146,6 +152,7 @@ private final class UpgradeRequester: ChannelInboundHandler, RemovableChannelHan
         let standard = secure ? 443 : 80
         headers.add(name: "Host", value: port == standard ? host : "\(host):\(port)")
         headers.add(name: "Content-Length", value: "0")
+        if let origin { headers.add(name: "Origin", value: origin) }
         let head = HTTPRequestHead(version: .http1_1, method: .GET, uri: path, headers: headers)
         context.write(wrapOutboundOut(.head(head)), promise: nil)
         context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
@@ -173,10 +180,14 @@ public struct PlainReply: Sendable {
     public var status: HTTPResponseStatus
     public var body: Data
     public var contentType: String
-    public init(_ status: HTTPResponseStatus, _ body: Data, contentType: String = "application/octet-stream") {
+    /// Sent as well as the type, length and `Connection: close` (the web remote's CSP, 071).
+    public var headers: [(String, String)] = []
+    public init(_ status: HTTPResponseStatus, _ body: Data, contentType: String = "application/octet-stream",
+                headers: [(String, String)] = []) {
         self.status = status
         self.body = body
         self.contentType = contentType
+        self.headers = headers
     }
     public init(_ status: HTTPResponseStatus, text: String) {
         self.init(status, Data(text.utf8), contentType: "text/plain; charset=utf-8")
@@ -194,8 +205,11 @@ public enum ControlWebSocketServer {
                   opened: opened)
     }
 
+    /// `upgrade` may refuse an upgrade at `/v1/connect` after reading its head (the web
+    /// remote's `Host` and `Origin`, 071); a refused one is answered by `plain` instead.
     public static func configure(_ channel: any Channel, tls: NIOSSLContext?,
                                  reply plain: @escaping @Sendable (HTTPRequestHead) -> PlainReply,
+                                 upgrade: (@Sendable (HTTPRequestHead) -> Bool)? = nil,
                                  opened: @escaping @Sendable (WebSocketLineTransport) -> Void) -> EventLoopFuture<Void> {
         do {
             if let tls { try channel.pipeline.syncOperations.addHandler(NIOSSLServerHandler(context: tls)) }
@@ -206,7 +220,8 @@ public enum ControlWebSocketServer {
         let upgrader = NIOWebSocketServerUpgrader(
             maxFrameSize: maxMessage,
             shouldUpgrade: { channel, head in
-                channel.eventLoop.makeSucceededFuture(head.uri.split(separator: "?").first == "/v1/connect" ? HTTPHeaders() : nil)
+                let wanted = head.uri.split(separator: "?").first == "/v1/connect" && (upgrade?(head) ?? true)
+                return channel.eventLoop.makeSucceededFuture(wanted ? HTTPHeaders() : nil)
             },
             upgradePipelineHandler: { channel, _ in
                 channel.pipeline.addHandlers([
@@ -243,6 +258,7 @@ private final class PlainHTTP: ChannelInboundHandler, RemovableChannelHandler, @
             headers.add(name: "Content-Type", value: reply.contentType)
             headers.add(name: "Content-Length", value: "\(reply.body.count)")
             headers.add(name: "Connection", value: "close")
+            for (name, value) in reply.headers { headers.add(name: name, value: value) }
             context.write(wrapOutboundOut(.head(HTTPResponseHead(version: head.version, status: reply.status, headers: headers))),
                           promise: nil)
             var body = context.channel.allocator.buffer(capacity: reply.body.count)

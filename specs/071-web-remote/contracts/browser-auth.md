@@ -60,6 +60,18 @@ The code text is unchanged:
 - `ok.grant` is stored and shown. A grant change (FR-013, scenario 7) shows on the next
   connection, and every call is judged by the current grant whatever the page shows.
 
+## Which listener takes what
+
+As built in T012:
+- **The loopback listener** takes only `c:` and `p:` identities. A host, a host code or a copy
+  is refused `unknown` there.
+- **A paired client's kind must match the listener it connects through:** a `browser` only
+  through the loopback listener, and any other kind only through TLS. Otherwise it is refused
+  `unknown`. This goes beyond the origin binding: a key from one listener is refused on the
+  other even if the proof were made for the right origin.
+- **`clients/announce`** refuses with `invalidParams` a `browser` through TLS, or any other kind
+  through the loopback listener.
+
 ## Closing
 
 | Close | Meaning to the page |

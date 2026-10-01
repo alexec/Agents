@@ -55,7 +55,7 @@ starts until T002 is written up.
   - **`localhost` is not a secure context in a browser:** flip the canonical origin to `http://127.0.0.1:<port>` in research R2/R3/R5, contracts/loopback-listener.md, contracts/browser-auth.md and the spec's FR-004/FR-005/edge case. Tell Alex in the turn's ending.
   - **Vectors differ:** fix the byte handling in the spike until they match. Nothing goes on until they do.
   - **Persistence fails in Safari or Chrome, or neither can keep a non-extractable key:** stop, and ask Alex with the question tool. Pairing again after each restart breaks US1 scenario 4.
-- [ ] T003 (2026-10-01: T106 not merged, `Bridge/` still on main; Phase 2 went ahead on main as allowed below; ControlPlane's 52 tests pass) Rebase onto main once 058 T106 and T042 have merged (they are on `agents/do-058-s-t106`), and check with `git merge-base` that the rebase landed on this branch.
+- [x] T003 (2026-10-01: T106 and T042 merged; rebased onto 0d2adaf0; Bridge/, LinkTLS, AwayLink and AGENTS_STORE gone; ControlPlane's 52 tests pass) Rebase onto main once 058 T106 and T042 have merged (they are on `agents/do-058-s-t106`), and check with `git merge-base` that the rebase landed on this branch.
   - Confirm that `Bridge/`, `DirectLink`, `SocketLink` spawning, `LinkTLS`, `AwayLink` and the `AGENTS_STORE` compile condition are gone.
   - Run `swift test --package-path Packages/ControlPlane`. It must pass before Phase 3.
   - If T106 has not merged by then, start Phase 2 on main as it is. Phase 2's files (`Packages/ControlPlane`, `ControlDial.swift`, `ControlAuth.swift`, `Grant.swift`) are not ones T106 removes.
@@ -102,27 +102,27 @@ wire client. Every story needs them.
 
 ### The loopback listener
 
-- [ ] T011 Add `browser` to `ClientRecord.Kind` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift`. Test in `ControlGrantTests` that an older record still decodes, and that `browser` round-trips.
-- [ ] T012 Pass the exchange's origin per listener in `Packages/ControlPlane/Sources/ControlPlaneKit/ControlService.swift`, as research R5:
+- [x] T011 (unknown kinds read as `unknown`, so an older window still lists every client; browsers are left out of the relay's devices and notices) Add `browser` to `ClientRecord.Kind` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift`. Test in `ControlGrantTests` that an older record still decodes, and that `browser` round-trips.
+- [x] T012 (`Arrival` .tls / .loopback(origin); the kind rule also applies when a paired client connects, recorded in contracts/browser-auth.md) Pass the exchange's origin per listener in `Packages/ControlPlane/Sources/ControlPlaneKit/ControlService.swift`, as research R5:
   - `accept(…, origin:)` takes it from the listener, never from the request: `origin`, `peerOrigin` or `webOrigin`;
   - `ClientSession` gains `via: .tls | .loopback`;
   - `clients/announce` accepts `kind: browser` only via loopback, and only `browser` there;
   - a browser record is named `"<name> on <Host.current().localizedName>"`.
-- [ ] T013 Build `LoopbackListener` and `StaticFiles` in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/`, as contracts/loopback-listener.md:
+- [x] T013 (`Server/LoopbackListener.swift`: `WebFiles`, a pure `LoopbackGate`, two binds; `ControlDial.connect` can send an `Origin`, for tests) Build `LoopbackListener` and `StaticFiles` in `Packages/ControlPlane/Sources/ControlPlaneKit/Server/`, as contracts/loopback-listener.md:
   - bind `127.0.0.1` and `::1`;
   - judge each request in the contract's order: Host, method, redirect, upgrade, files;
   - check `Origin` in the upgrader's `shouldUpgrade`, added as a hook to `ControlWebSocketServer.configure` in `Packages/AgentsKit/Sources/ControlDial/ControlDial.swift`;
   - load the files from `MANIFEST` with their hashes checked, send the fixed headers, and keep the access log to method, path and status.
 
   Start it from `ControlService` when configured.
-- [ ] T014 Add `--web DIR`, `--web-port N` (and `AGENTS_CONTROL_WEB_PORT`) and `--no-web` to `Packages/ControlPlane/Sources/agents-control/main.swift`, with `--home` defaulting the port to 8792, as data-model.md. Update the header comment that lists the flags.
-- [ ] T015 [P] Add `LoopbackListenerTests` in `Packages/ControlPlane/Tests/ControlPlaneKitTests/LoopbackListenerTests.swift`. There is one case per row of contracts/loopback-listener.md's tables, plus:
+- [x] T014 Add `--web DIR`, `--web-port N` (and `AGENTS_CONTROL_WEB_PORT`) and `--no-web` to `Packages/ControlPlane/Sources/agents-control/main.swift`, with `--home` defaulting the port to 8792, as data-model.md. Update the header comment that lists the flags.
+- [x] T015 (12 tests) [P] Add `LoopbackListenerTests` in `Packages/ControlPlane/Tests/ControlPlaneKitTests/LoopbackListenerTests.swift`. There is one case per row of contracts/loopback-listener.md's tables, plus:
   - traversal attempts;
   - every header on every status;
   - not reachable on a non-loopback address;
   - a manifest mismatch leaves the listener off;
   - a taken port leaves TLS up.
-- [ ] T016 [P] Extend `ControlServiceTests` in `Packages/ControlPlane/Tests/ControlPlaneKitTests/ControlServiceTests.swift` for the origin binding:
+- [x] T016 (as `BrowserClientTests`, 9 tests, using ControlServiceTests' helpers) [P] Extend `ControlServiceTests` in `Packages/ControlPlane/Tests/ControlPlaneKitTests/ControlServiceTests.swift` for the origin binding:
   - a loopback proof fails on TLS, and a TLS proof fails on loopback;
   - `kind` is refused on the wrong listener;
   - two sockets of one browser client work at once;

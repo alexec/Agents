@@ -21,11 +21,21 @@ public enum Grant: String, Codable, Hashable, Sendable, CaseIterable {
     public func allows(_ method: String) -> Bool { role.allows(method) }
 }
 
-/// A paired screen: the Mac window, an iPhone, an iPad. `clients.json` under the control
-/// root, which is today's `devices.json` with a grant added and a Mac allowed.
+/// A paired screen: the Mac window, an iPhone, an iPad, a browser on the control plane's
+/// own Mac (071). `clients.json` under the control root, which is today's `devices.json`
+/// with a grant added and a Mac allowed.
 public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     public enum Kind: String, Codable, Hashable, Sendable {
         case mac, iPhone, iPad, unknown
+        /// The web remote (071): pairs and connects only through the loopback listener,
+        /// and has no relay mailbox, so it is never a notice's device.
+        case browser
+
+        /// A kind a later build added reads as `unknown`, so an older window can still list
+        /// every client.
+        public init(from decoder: any Decoder) throws {
+            self = Kind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .unknown
+        }
     }
 
     /// The pre-shared key's identity is `d:<id>`, as it is for a device today.

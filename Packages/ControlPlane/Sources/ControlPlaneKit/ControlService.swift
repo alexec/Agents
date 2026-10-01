@@ -34,6 +34,21 @@ public final class ControlService: @unchecked Sendable {
         /// refused, only the copy handing over answered, until it says take over.
         public var receive = false
 
+        /// The web remote's loopback listener (071): the built app and the port, or nil
+        /// for none, which is the container's default.
+        public var web: Web?
+
+        public struct Web: Sendable {
+            /// `Web/dist`, with its MANIFEST.
+            public var folder: URL
+            /// 0 lets the system choose (tests); Agents Host's copy uses `Loopback.defaultPort`.
+            public var port: Int
+            public init(folder: URL, port: Int) {
+                self.folder = folder
+                self.port = port
+            }
+        }
+
         public init(store: any ControlStore, privateKey: Data, url: URL, pin: String? = nil, tls: NIOSSLContext? = nil,
                     bind: String = "0.0.0.0", port: Int, name: String, machineID: String = "", version: String = ControlPlaneKit.version,
                     peerURL: URL? = nil, receive: Bool = false) {
@@ -70,6 +85,9 @@ public final class ControlService: @unchecked Sendable {
     public let leases: Leases
     public let mesh: CopyMesh?
     private var server: (any Channel)?
+    private let loopback = LoopbackListener()
+    /// The loopback listener's port once it is up, or nil (071).
+    public var webPort: Int? { loopback.port == 0 ? nil : loopback.port }
     private var refresher: Task<Void, Never>?
     private let readiness = Readiness()
     let sockets = Sockets()
@@ -163,11 +181,12 @@ public final class ControlService: @unchecked Sendable {
                 }, opened: { socket in
                     guard let service else { return socket.close() }
                     service.sockets.add(socket)
-                    Task { await service.accept(socket) }
+                    Task { await service.accept(socket, arrival: .tls) }
                 })
             }
         let channel = try await bootstrap.bind(host: configuration.bind, port: configuration.port).get()
         server = channel
+        if let web = configuration.web { await startWeb(web) }
         refresher = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
@@ -259,6 +278,7 @@ public final class ControlService: @unchecked Sendable {
         await mesh?.stop()
         try? await server?.close()
         server = nil
+        await loopback.stop()
         sockets.closeAll()
     }
 
@@ -326,6 +346,31 @@ public final class ControlService: @unchecked Sendable {
         for host in await router.hostStates.keys where !known.contains(host) { await router.forgetHost(host) }
     }
 
+    // MARK: The web remote's listener (071)
+
+    /// Starts the loopback listener. A build that doesn't match its manifest, or a port
+    /// that's taken, leaves it off and says so; the TLS listener and hosts carry on.
+    func startWeb(_ web: Configuration.Web) async {
+        let files: WebFiles
+        do {
+            files = try WebFiles.load(from: web.folder)
+        } catch {
+            log("web: not serving, \(error)")
+            return
+        }
+        do {
+            let port = try await loopback.start(port: web.port, files: files, log: { [weak self] in self?.log($0) }) {
+                [weak self] socket, origin in
+                guard let self else { return socket.close() }
+                self.sockets.add(socket)
+                Task { await self.accept(socket, arrival: .loopback(origin: origin)) }
+            }
+            log("web: serving the web remote at \(Loopback.origin(port: port))")
+        } catch {
+            log("web: port \(web.port) not bound (\(error)); not serving the web remote")
+        }
+    }
+
     // MARK: A socket
 
     /// Every origin a member may have dialled: this copy's own, and each endpoint
@@ -340,10 +385,18 @@ public final class ControlService: @unchecked Sendable {
         return seen
     }
 
+    /// Which listener a socket came in on. The exchange is bound to that listener's own
+    /// origin, never to anything the peer says (071, FR-006).
+    enum Arrival: Equatable {
+        case tls
+        /// The web remote's loopback listener: browsers only.
+        case loopback(origin: String)
+    }
+
     /// The server's side of the key exchange, then the socket goes where its identity
     /// says: a client to the router, a host's uplink to the router, a code holder to a
     /// one-time announce.
-    func accept(_ socket: WebSocketLineTransport) async {
+    func accept(_ socket: WebSocketLineTransport, arrival: Arrival) async {
         let reader = PrefixReader(socket)
         let serverNonce = ControlAuth.nonce()
         let hello = ControlAuth.Hello(name: configuration.name, control: ControlCode.base64url(publicKey),
@@ -355,10 +408,19 @@ public final class ControlService: @unchecked Sendable {
             }
             var admitted: Admitted?
             // A peer copy dials the address copies reach each other at, and proves that.
-            // Anyone else may have dialled any place the control plane answers (R16).
+            // Anyone else may have dialled any place the control plane answers (R16). On the
+            // loopback listener only a browser or its code may prove anything, and only to
+            // that listener's own origin (071).
             let settings = await methods.controlSettings
-            let peerCopy = auth.id.hasPrefix("x:") && !auth.id.hasPrefix("x:" + Handover.prefix)
-            let bound = peerCopy ? [peerOrigin ?? origin] : Self.origins(origin, settings)
+            let bound: [String]
+            switch arrival {
+            case .tls:
+                let peerCopy = auth.id.hasPrefix("x:") && !auth.id.hasPrefix("x:" + Handover.prefix)
+                bound = peerCopy ? [peerOrigin ?? origin] : Self.origins(origin, settings)
+            case .loopback(let web):
+                guard auth.id.hasPrefix("c:") || auth.id.hasPrefix("p:") else { throw ControlAuth.Refusal(.unknown) }
+                bound = [web]
+            }
             let (identity, mac) = try await ControlAuth.verify(auth, serverNonce: serverNonce, origins: bound) { identity in
                 let (key, who) = try await self.key(for: identity)
                 admitted = who
@@ -377,6 +439,11 @@ public final class ControlService: @unchecked Sendable {
                 // Forwarding ended (30 days at most): anyone still to hear pairs again.
                 if let until = forwardingUntil.now, until < Date() { throw ControlAuth.Refusal(.unknown) }
             default: break
+            }
+            // A browser's key works only through the loopback listener, and nothing else's
+            // does there (071).
+            if let client = admitted.client, (client.kind == .browser) != (arrival != .tls) {
+                throw ControlAuth.Refusal(.unknown)
             }
             // A device through `agents-relay` (T096): the exchange is its own, end to end,
             // and it says it came that way, for itself only.
@@ -415,7 +482,7 @@ public final class ControlService: @unchecked Sendable {
             case .host(let host):
                 await hostArrived(host, reader)
             case .pairing(let id), .enrolling(let id):
-                await announce(reader, code: id)
+                await announce(reader, code: id, arrival: arrival)
             case .copy(let id) where id.hasPrefix(Handover.prefix):
                 // Not a member: announcing or forwarding leaves it open.
                 sockets.keepOpen(socket)
@@ -511,7 +578,7 @@ public final class ControlService: @unchecked Sendable {
     }
 
     /// Someone holding a code says who they are, once, and hangs up (wire.md).
-    func announce(_ reader: PrefixReader, code id: String) async {
+    func announce(_ reader: PrefixReader, code id: String, arrival: Arrival) async {
         defer { reader.close() }
         guard let line = try? await reader.next(within: 15),
               case .request(let request, let method, let params)? = try? JSONRPCCodec.decode(line: line) else { return }
@@ -524,12 +591,17 @@ public final class ControlService: @unchecked Sendable {
                 guard let announce = try? params?.decode(DaemonAPI.ClientAnnounce.self), !announce.publicKey.isEmpty else {
                     throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Say who you are.")
                 }
+                // A browser pairs through the loopback listener, and only a browser does (071).
+                guard (announce.kind == .browser) == (arrival != .tls) else {
+                    throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Pair that kind of client elsewhere.")
+                }
                 let grant = stored.grant ?? .device
+                let name = announce.kind == .browser ? Self.browserName(announce.name) : announce.name
                 try await codes.spend(id)
-                try await methods.admit(ClientRecord(id: announce.id, name: announce.name, kind: announce.kind,
+                try await methods.admit(ClientRecord(id: announce.id, name: name, kind: announce.kind,
                                                      publicKey: announce.publicKey, grant: grant, paired: Date()))
                 admitted = DaemonAPI.Admitted(client: announce.id, grant: grant)
-                log("\(announce.name) paired as \(grant.rawValue)")
+                log("\(name) paired as \(grant.rawValue)")
                 // Known at every copy at once: the relay host may be held at another.
                 await self.announce(ControlEvent(kind: .clientPaired, subject: announce.id.uuidString, at: Date(), by: "code"))
                 Task { await self.tellRelayDevices() }
@@ -574,6 +646,18 @@ public final class ControlService: @unchecked Sendable {
         try? await Task.sleep(for: .milliseconds(200))
     }
 
+    /// "Safari on Alex's MacBook": the page can't learn the Mac's name, and the loopback
+    /// listener only ever runs on the Mac it names (071, FR-010).
+    static func browserName(_ said: String) -> String {
+        let product = String(said.prefix(40)).trimmingCharacters(in: .whitespacesAndNewlines)
+        #if os(macOS)
+        let mac = Host.current().localizedName ?? ProcessInfo.processInfo.hostName
+        #else
+        let mac = ProcessInfo.processInfo.hostName
+        #endif
+        return "\(product.isEmpty ? "A browser" : product) on \(mac)"
+    }
+
     // MARK: Relay hosts and notices (T096–T097)
 
     /// The router is held to the records: which hosts only relay. Then every relay host
@@ -589,7 +673,8 @@ public final class ControlService: @unchecked Sendable {
         let relays = await router.relaysHeldHere()
         guard !relays.isEmpty else { return }
         let devices = await methods.allClients.compactMap { record -> DaemonAPI.RelayDevices.Device? in
-            guard record.grant == .device, !record.publicKey.isEmpty else { return nil }
+            // A browser has no mailbox to carry for (071).
+            guard record.grant == .device, record.kind != .browser, !record.publicKey.isEmpty else { return nil }
             return .init(id: record.id, publicKey: record.publicKey)
         }
         guard let params = try? JSONValue.encoding(DaemonAPI.RelayDevices(devices: devices)) else { return }
@@ -611,11 +696,11 @@ public final class ControlService: @unchecked Sendable {
         }
         let flags = await router.notifyFlags()
         let devices = await methods.allClients.compactMap { record -> Device? in
-            guard record.grant == .device, !record.publicKey.isEmpty else { return nil }
+            guard record.grant == .device, record.kind != .browser, !record.publicKey.isEmpty else { return nil }
             let kind: Device.Kind = switch record.kind {
             case .iPhone: .iPhone
             case .iPad: .iPad
-            case .mac, .unknown: .unknown
+            case .mac, .browser, .unknown: .unknown
             }
             return Device(id: record.id, publicKey: record.publicKey, name: record.name, kind: kind,
                           announcedAt: record.paired, lastSeenAt: record.lastSeen,

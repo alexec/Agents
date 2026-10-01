@@ -228,4 +228,20 @@ struct ControlRecordsTests {
         try await records.load()
         #expect(await records.clients.isEmpty)
     }
+
+    // MARK: A browser (071)
+
+    @Test func aBrowserRecordRoundTripsAndAnOlderRecordStillReads() throws {
+        let record = ClientRecord(id: UUID(), name: "Safari on Alex's MacBook", kind: .browser,
+                                  publicKey: Data([4]), grant: .device, paired: Date(timeIntervalSince1970: 0))
+        let decoded = try JSONDecoder().decode(ClientRecord.self, from: try JSONEncoder().encode(record))
+        #expect(decoded.kind == .browser)
+        let older = #"{"id":"6F1C2A3B-4D5E-4F60-8172-93A4B5C6D7E8","name":"iPhone","kind":"iPhone","publicKey":"BA==","grant":"device","paired":0,"rev":0}"#
+        #expect(try JSONDecoder().decode(ClientRecord.self, from: Data(older.utf8)).kind == .iPhone)
+    }
+
+    @Test func aKindFromALaterBuildReadsAsUnknown() throws {
+        let later = #"{"id":"6F1C2A3B-4D5E-4F60-8172-93A4B5C6D7E8","name":"x","kind":"watch","publicKey":"BA==","grant":"device","paired":0,"rev":0}"#
+        #expect(try JSONDecoder().decode(ClientRecord.self, from: Data(later.utf8)).kind == .unknown)
+    }
 }

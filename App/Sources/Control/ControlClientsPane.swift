@@ -75,6 +75,7 @@ struct ControlClientsPage: View {
         case .mac: "Mac"
         case .iPhone: "iPhone"
         case .iPad: "iPad"
+        case .browser: "Browser"
         case .unknown: "Device"
         }
         let link = control.connections[client.id]
