@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Session labels as one tag input over the chat: type and a comma adds one, Delete
+/// Session labels as one tag input beside the worktree, above the prompt: a comma adds one, Delete
 /// takes away the one at the cursor (`LabelTagField`).
 struct SessionLabelEditor: View {
     @Environment(AppModel.self) private var model
