@@ -778,7 +778,7 @@ the Mac. Without a Mac host a set-up has no notifications, which is #61's separa
 - **Sending the private key with the store.** The key is never in the store (R4), and that
   stays true. The person moves it once, by hand, to the new machine's secrets.
 
-### Defaults taken (Alex to confirm or overturn)
+### Decided (Alex, 2026-10-01: the first two; the last two are defaults still open)
 
 - **The key goes to the cloud by hand,** as one file, from "Export the control plane's
   key…". Never in a code, a store or a URL.
