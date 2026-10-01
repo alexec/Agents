@@ -73,5 +73,10 @@ same sequence ran against the real thing:
   entry Accessibility needs; Screen Recording works again. The window's walk copy also opened no window, so it
   couldn't pair. The sheet is built and compiles; its commands are the ones above. A
   look needs those permissions back for whatever runs this session.
+  - *Afterwards (12:50 local):* even with an entry added, `tccd` answered `auth_value=0` for
+    `responsible_path=…/Agents Host.app/Contents/Helpers/agentsd`, a file a new build had
+    replaced at 12:47. Alex chose to leave the screen walk for now. To pick it up: check
+    the agentsd entry is on for the current file (remove and add it again after a ship),
+    then walk O–T against `look/move/`.
 - **The window and the Remote following** (T125), for the same reasons.
 - **Save Key…'s panel**, which needs a click.
