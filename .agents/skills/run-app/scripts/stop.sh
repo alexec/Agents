@@ -18,7 +18,20 @@ case "$ROOT" in
   *) echo "refusing: $ROOT is not a root launch.sh made" >&2; exit 2 ;;
 esac
 
-DAEMON_PID="$(tr -d '[:space:]' < "$ROOT/daemon.lock" 2>/dev/null || true)"
+DAEMON_PID="$( [ -f "$ROOT/daemon.lock" ] && tr -d '[:space:]' < "$ROOT/daemon.lock" || true)"
+
+# Run One Here on a scratch root (058) leaves launchd jobs of its own — control plane,
+# host, host-only — labelled by the root's hash, their plists in $ROOT/control. They
+# are KeepAlive, so they go first: a daemon killed before its job is booted out is
+# started again at once. Only labels whose plist is in this root are touched.
+for plist in "$ROOT"/control/com.alexecollins.agents.*.scratch-*.plist; do
+  [ -e "$plist" ] || continue
+  label="$(basename "$plist" .plist)"
+  if launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1; then
+    echo "booting out $label"
+    launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+  fi
+done
 
 for pid in $(pgrep -f "Agents.app/Contents/MacOS/Agents .*--root $ROOT" || true); do
   echo "quitting window $pid"

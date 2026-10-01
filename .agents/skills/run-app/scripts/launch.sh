@@ -10,15 +10,17 @@ APP="$REPO/build/DD/Build/Products/Debug/Agents.app"
 SLUG=""
 BUILD=1
 FRONT=0
+FIRST_RUN=0
 EXTRA_ENV=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-build) BUILD=0 ;;
     --front)    FRONT=1 ;;          # bring the window to the front; steals focus
+    --first-run) FIRST_RUN=1 ;;     # leave the root bare: the window opens on "Where should your agents run?"
     --slug)     SLUG="$2"; shift ;;
     --env)      EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the app, e.g. AGENTS_SSH=…
-    *) echo "usage: launch.sh [--slug NAME] [--no-build] [--front] [--env KEY=VALUE]…" >&2; exit 2 ;;
+    *) echo "usage: launch.sh [--slug NAME] [--no-build] [--front] [--first-run] [--env KEY=VALUE]…" >&2; exit 2 ;;
   esac
   shift
 done
@@ -47,6 +49,12 @@ fi
 
 mkdir -p "$ROOT"
 
+# A bare root asks where agents should run (058) and starts no daemon until somebody
+# answers, which a walk cannot do without Accessibility. A root that already lists
+# projects goes on the old way: the window starts agentsd on it. So seed an empty
+# list, unless the first-run screen is what is being walked (--first-run).
+[ "$FIRST_RUN" = 1 ] || echo '[]' > "$ROOT/projects.json"
+
 # env -i, because `open` hands this session's environment to the app, and the
 # CLAUDE_* variables in it reach every runtime the daemon starts. An agent
 # started that way stops authenticating the moment this session ends.
@@ -55,6 +63,18 @@ OPEN_FLAGS=(-n)
 env -i HOME="$HOME" USER="$USER" PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin" \
   ${SSH_AUTH_SOCK:+SSH_AUTH_SOCK="$SSH_AUTH_SOCK"} ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"} \
   open "${OPEN_FLAGS[@]}" "$APP" --args --root "$ROOT"
+
+if [ "$FIRST_RUN" = 1 ]; then
+  # No daemon yet: Run One Here starts the control plane and host under launchd,
+  # in $ROOT/control. stop.sh boots those jobs out again.
+  for _ in $(seq 1 100); do
+    APP_PID="$(pgrep -f "Agents.app/Contents/MacOS/Agents .*--root $ROOT" | head -1 || true)"
+    [ -n "$APP_PID" ] && break
+    sleep 0.1
+  done
+  printf 'ROOT=%s\nAPP_PID=%s\nDAEMON_PID=none\n' "$ROOT" "${APP_PID:-unknown}"
+  exit 0
+fi
 
 # The window starts the daemon; the daemon writes the lock and then listens.
 for _ in $(seq 1 200); do

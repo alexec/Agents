@@ -46,6 +46,14 @@ $S/stop.sh $ROOT
 `--no-build` when nothing has changed since the last one. The build log is at
 `/tmp/run-<slug>-build.log`.
 
+A bare root opens on "Where should your agents run?" (058) and starts no daemon
+until somebody answers. `launch.sh` seeds the root with an empty `projects.json`,
+which keeps it on the old way: the window starts `agentsd` on the root itself.
+To walk the first-run screen or Run One Here, pass `--first-run`. It leaves the
+root bare, prints `DAEMON_PID=none`, and doesn't wait for a socket. Run One Here
+then starts the control plane and host as launchd jobs, with their plists in
+`$ROOT/control`.
+
 ## Rules that are not optional
 
 1. **Never `pkill -f agentsd`, never `killall Agents`.** This session is hosted
@@ -54,7 +62,9 @@ $S/stop.sh $ROOT
 2. **Always stop what you started**, including when the test failed or you are
    about to hand back. A left-behind window and daemon are the user's problem to
    find. `stop.sh $ROOT` removes the root too; `stop.sh $ROOT --keep` leaves it
-   for reading and still stops the processes.
+   for reading and still stops the processes. It also boots out the launchd
+   jobs Run One Here made for this root, before it kills anything. They are
+   KeepAlive, so a daemon killed first is started again at once.
 3. **Launch with `env -i`** — `launch.sh` does. `open` hands this session's
    environment to the app, and the `CLAUDE_*` variables in it reach every
    runtime the daemon starts; an agent started that way stops authenticating
