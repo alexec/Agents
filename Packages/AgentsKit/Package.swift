@@ -25,9 +25,8 @@ let package = Package(
     ],
     dependencies: [
         // The control plane's WebSocket (058): `ControlDial`, linked by `agentsd` on the Mac
-        // and on Linux, and `LinuxControlDial`, the first build's TLS-PSK dialler, kept for
-        // one test until the first build's listener goes (T042). `swift-crypto` is not a
-        // dependency: its BoringSSL would be a second copy.
+        // and on Linux. `swift-crypto` is not a dependency: its BoringSSL would be a second
+        // copy.
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.80.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.29.0"),
         // Tests only. See the target below.
@@ -44,14 +43,6 @@ let package = Package(
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOWebSocket", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
-            ]),
-        .target(
-            name: "LinuxControlDial",
-            dependencies: [
-                "AgentsKitCore",
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-                .product(name: "NIOTLS", package: "swift-nio"),
             ]),
         // Nothing here, deliberately. `agentsd` links this library, and the daemon
         // moves terminal bytes without parsing them. SwiftTerm belongs to the app,
@@ -72,12 +63,10 @@ let package = Package(
         // The test target may have it, because a test target is not linked into any
         // product: the daemon is still free of it. The replay test needs a real
         // emulator to prove the property `shell.attach` rests on, which is that the
-        // same bytes in any chunking give the same screen. `LinuxControlDial` comes
-        // first: listed after `AgentsKit`, swiftbuild takes that Linux-only edge for it
-        // and leaves it out of the Mac link.
+        // same bytes in any chunking give the same screen.
         .testTarget(
             name: "AgentsKitTests",
-            dependencies: ["LinuxControlDial", "ControlDial", "AgentsKit", "AgentsKitCore",
+            dependencies: ["ControlDial", "AgentsKit", "AgentsKitCore",
                            .product(name: "SwiftTerm", package: "SwiftTerm")],
             swiftSettings: [.treatAllWarnings(as: .error)]),
     ]

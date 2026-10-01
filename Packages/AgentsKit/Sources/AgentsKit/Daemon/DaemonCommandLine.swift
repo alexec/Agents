@@ -16,16 +16,10 @@ public struct DaemonCommandLine: Sendable {
 
     public static let serveFlag = "--serve"
     public static let detachFlag = "--detach"
-    /// `--control <socket>`: a host of the control plane listening there (058). It
-    /// dials out to it and stays up with nobody connected, as `--serve` does, but is
-    /// otherwise the Mac's daemon it always was.
+    /// `--control <code>`: a host of the control plane the code is for (058). It enrols
+    /// with the code once, dials out over a WebSocket and stays up with nobody connected,
+    /// as `--serve` does, but is otherwise the Mac's daemon it always was.
     public static let controlFlag = "--control"
-    /// `--host-id <id>`: which host this is, said on the control plane's local socket.
-    /// `mac` unless told otherwise, so a set-up moved across keeps its host id (R7).
-    public static let hostIDFlag = "--host-id"
-    /// `--control-home`: a host of the control plane at its ordinary root on this Mac,
-    /// which is what the launch agent says (R5).
-    public static let controlHomeFlag = "--control-home"
 
     public let arguments: [String]
     public let mode: Mode
@@ -45,25 +39,15 @@ public struct DaemonCommandLine: Sendable {
         }
     }
 
-    /// The control plane's host socket, when this daemon is one of its hosts.
-    public var controlSocket: String? {
-        if let socket = value(after: Self.controlFlag) { return socket }
-        return arguments.contains(Self.controlHomeFlag) ? ControlPlane.hostSocket(root: ControlPlane.defaultRoot).path : nil
-    }
-
-    /// `--control-code <code>`: enrol this host with a control plane over the network,
-    /// once; after that the membership kept in the root is used, and so is it when
+    /// `--control <code>` or `--control-code <code>`: enrol this host with a control
+    /// plane, once; after that the membership kept in the root is used, and so is it when
     /// `--control-network` is given alone.
-    public var controlCode: String? { value(after: "--control-code") }
+    public var controlCode: String? { value(after: Self.controlFlag) ?? value(after: "--control-code") }
     public var controlNetwork: Bool { controlCode != nil || arguments.contains("--control-network") }
 
     /// `--host-name <name>`: what the control plane lists this host as, when not this
     /// machine's own name.
     public var hostName: String? { value(after: "--host-name") }
-
-    public var hostID: HostID {
-        value(after: Self.hostIDFlag).map(HostID.init(rawValue:)) ?? .mac
-    }
 
     private func value(after flag: String) -> String? {
         guard let at = arguments.firstIndex(of: flag), arguments.indices.contains(at + 1) else { return nil }

@@ -37,25 +37,17 @@ public enum ControlMove {
                        servers: HostStore(locations: locations).load().all.map(\.label))
     }
 
-    /// Step one: the control plane's store, with the host's devices as device clients and
-    /// this Mac's host named as the home host. The old root is only read. Run again after
-    /// a move that got this far and stopped, it finds its own work and changes nothing.
-    public static func prepare(control: URL, from locations: StoreLocations) async throws {
-        let records = ControlRecords(store: ControlPlane.store(root: control))
-        try await records.load()
-        try await prepare(records, from: locations, makeSettings: true)
-    }
-
-    /// The same into any store: the one a running copy of `agents-control` serves, on this
-    /// Mac or in a bucket (058, T084). Its settings are the copy's, so none are made here.
-    public static func prepare(_ records: ControlRecords, from locations: StoreLocations,
-                               makeSettings: Bool = false) async throws {
+    /// The control plane's store, with the host's devices as device clients and this
+    /// Mac's host named as the home host: the one a running copy of `agents-control`
+    /// serves, on this Mac or in a bucket (058, T084). Its settings are the copy's, so
+    /// none are made here. The old root is only read. Run again after a move that got
+    /// this far and stopped, it finds its own work and changes nothing.
+    public static func prepare(_ records: ControlRecords, from locations: StoreLocations) async throws {
         let devices = ControlRecords.legacyDevices(at: locations.devices)
         let ours = Set(devices.map(\.id))
         let foreign = await records.clients.filter { !ours.contains($0.id) && !($0.kind == .mac && $0.publicKey.isEmpty) }
         guard foreign.isEmpty, await records.hosts.allSatisfy({ $0.id == .mac }) else { throw Refusal.alreadyUsed }
         for device in devices where await records.client(device.id) == nil { try await records.save(device) }
-        if makeSettings { _ = try await records.settings(orMake: ControlPlane.freshSettings) }
         _ = try await records.changeSettings { $0.homeHost = .mac }
     }
 

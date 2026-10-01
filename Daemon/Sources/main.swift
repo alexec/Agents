@@ -207,10 +207,8 @@ let toolsetsFolder: URL? = {
 
 let daemon: Daemon
 do {
-    let control: Daemon.Control? = if let socket = commandLine.controlSocket {
-        Daemon.Control(socket: URL(fileURLWithPath: socket), host: commandLine.hostID, name: commandLine.hostName)
-    } else if commandLine.controlNetwork {
-        Daemon.Control(socket: nil, host: commandLine.hostID, name: commandLine.hostName, code: commandLine.controlCode)
+    let control: Daemon.Control? = if commandLine.controlNetwork {
+        Daemon.Control(name: commandLine.hostName, code: commandLine.controlCode)
     } else {
         nil
     }

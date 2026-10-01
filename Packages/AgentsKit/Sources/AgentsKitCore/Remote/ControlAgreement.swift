@@ -125,17 +125,9 @@ public enum ControlAgreement {
         return Data(okm.prefix(length))
     }
 
-    public static func codeIdentity(secret: Data, host: Bool) -> String {
-        let prefix = host ? "e:" : "p:"
-        return prefix + sha256(secret).prefix(8).map { String(format: "%02x", $0) }.joined()
-    }
-
     public static func codeKey(_ secret: Data) -> Data {
         hkdfSHA256(ikm: secret, salt: Data("agents-control-code-v1".utf8), info: Data(), length: 32)
     }
-
-    public static func hostIdentity(_ id: HostID) -> String { "h:" + id.rawValue }
-    public static func clientIdentity(_ id: UUID) -> String { "c:" + id.uuidString }
 
     public static func hostKey(privateKey: Data, peer: Data, host: HostID) throws -> Data {
         let shared = try sharedSecret(privateKey: privateKey, peerPublic: peer)
