@@ -63,3 +63,51 @@ stays while anyone is still to hear, and goes by itself once everyone has.
   the person stops it. T's row says when: "Forwarding until 31 October · 1 still to hear".
   Anyone still to hear after that pairs again.
 - **Old builds can't follow** (R16 default): they are listed, and pair again afterwards.
+
+# The way back: Run It Here Again… (T127)
+
+**For Alex's approval.** Frames U–Y, the same sheet the other way: the control plane comes
+back from the cloud machine to this Mac, and every window, phone and server follows without
+pairing again.
+
+## U · The way back in
+
+![The way back in](u.png)
+
+T, once forwarding has ended; *Run It Here Again…* is enabled. While this Mac is still
+forwarding, the button is there too, and the sheet stops the forwarding first.
+
+## V · 1. Check both ends
+
+![Check both ends](v.png)
+
+No key step: this Mac has had the key all along. This Mac's copy starts empty again, and the
+store from before the move is kept aside. The last line says what changes for phones away
+from home, because this Mac has no public address.
+
+## V2 · A check that fails
+
+![Check fails](v2.png)
+
+## W · 2. Tell everyone, and who knows
+
+![Who knows](w.png)
+
+As R, read from agents.example.com, where members report now.
+
+## X · 3. Moving back
+
+![Moving back](x.png)
+
+## Y · Afterwards
+
+![Afterwards](y.png)
+
+L as it was before the move, plus one row while agents.example.com forwards (30 days at
+most). When nobody is left to hear, the row says the machine can be taken down.
+
+## Open for Alex
+
+- **Phones away from home** after moving back: this Mac has no public address, and the relay
+  isn't in this build yet, so until it is they reach this Mac only on your network. V says so
+  before anything happens.
