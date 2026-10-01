@@ -1,0 +1,346 @@
+<!doctype html><html><head><meta charset="utf-8"><title>058 · move to another machine</title><style>
+/* Wireframes for 058, the control plane: first run, Settings ▸ Control plane, the window when it is away, the move. 055's hand and rail.
+   One window size for every pane, 1000 × 640. Open with #a … #h to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:960px;line-height:1.4}
+.win{width:1000px;height:640px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex}
+/* The rail runs the full height, under the traffic lights, as System Settings has it. */
+.rail{width:200px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px 10px}
+.lights{height:38px;display:flex;align-items:center;gap:8px;padding:0 6px}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc}
+.ri{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;color:#1d1d1d}
+.ri i{font-style:normal;width:22px;height:22px;border-radius:6px;background:#dcd8cf;color:#555;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.ri.on{background:#3d5a80;color:#fff}.ri.on i{background:rgba(255,255,255,.2);color:#fff}
+.ri.open{font-weight:600}
+.ri .d{margin-left:auto;color:#8a877f;font-size:10px}
+.sub-i{display:flex;align-items:center;padding:4px 8px 4px 38px;border-radius:6px;color:#333}
+.sub-i .n{margin-left:auto;color:#8a877f;font-size:12px}
+.sub-i .warn{margin-left:auto;color:#b5651d}
+.sub-i.on{background:#3d5a80;color:#fff}.sub-i.on .n{color:#dfe6ef}.sub-i.on .warn{color:#ffd9b0}
+.gap{height:10px}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.bar{height:38px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.06)}
+.bar .t{font:600 14px -apple-system}.bar .p{color:#8a877f;font:12px "SF Mono",Menlo,monospace}
+.bar .sp{flex:1}.bar .crumb{color:#8a877f;font-weight:400}
+.body{flex:1;display:flex;min-height:0}
+/* A form pane: one reading column, left-aligned, never stretched past 560. */
+.col{width:560px;padding:18px 28px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.sh{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:10px 4px 2px}
+.card{background:#fff;border:1px solid #e3dfd6;border-radius:9px}
+.line{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f2f0eb}
+.line:last-child{border-bottom:none}
+.line .l{flex:1;min-width:0}.line .s{color:#8a877f;font-size:11.5px;margin-top:2px}
+.line.indent{padding-left:34px}
+.foot{color:#8a877f;font-size:11.5px;line-height:1.4;padding:4px 4px 2px}
+.btn{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:3px 10px;font-size:12px;white-space:nowrap}
+.btn.p{background:#3d5a80;border-color:#3d5a80;color:#fff}.link{color:#3d5a80;font-size:12px}
+.seg{display:inline-flex;border:1px solid #cfcac0;border-radius:6px;overflow:hidden;font-size:12px}
+.seg span{padding:3px 14px;border-right:1px solid #cfcac0}.seg span:last-child{border-right:none}.seg .on{background:#3d5a80;color:#fff}
+.pop{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:2px 8px;font-size:12px}
+.pop:after{content:" ⌄";color:#8a877f}
+.field{border:1px solid #cfcac0;background:#fff;border-radius:5px;padding:2px 8px;width:80px;text-align:right;font-size:12px}
+.cdot{width:8px;height:8px;border-radius:4px;flex:none}
+.g{background:#5b8a5b}.o{background:#b5651d}.x{background:#c2beb6}
+.ic{width:22px;text-align:center;color:#8a877f}
+/* Shared's own pieces, as 054 drew them. */
+.lst{flex:1;overflow:hidden;padding:14px 18px 0;min-width:0}
+.lst.fixed{flex:none;width:400px;box-sizing:border-box}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#fff;border:1px solid #e3dfd6;margin-bottom:6px}
+.row.sel{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.row .nm{font-weight:600;white-space:nowrap}
+.row .ds{color:#6d6a64;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0}
+.mono{font:12px "SF Mono",Menlo,monospace}
+.chip{display:inline-block;border-radius:9px;padding:1px 7px;font-size:11px;background:#efece6;color:#555;white-space:nowrap}
+.chip.a{background:#e3eaf3;color:#3d5a80}.chip.w{background:#f7e7d6;color:#9a4f10}
+.reach{display:flex;gap:3px}
+.r{width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font:600 10px -apple-system;background:#e3eaf3;color:#3d5a80}
+.r.no{background:#f0eeea;color:#b9b5ad;text-decoration:line-through}
+.r.q{background:#f0eeea;color:#999;border:1px dashed #bbb;width:16px;height:16px}
+.detail{flex:1;min-width:0;border-left:1px solid rgba(0,0,0,.08);padding:14px;display:flex;flex-direction:column;gap:10px;background:#fbfaf7;overflow:hidden}
+.detail .t{font:600 15px -apple-system}
+.kv{display:grid;grid-template-columns:70px 1fr;gap:4px 8px;font-size:12px}.kv b{font-weight:400;color:#8a877f}
+.doc{background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:10px 12px;font:14px "Iowan Old Style",Georgia,serif;line-height:1.4;color:#333;flex:1;overflow:hidden}
+.doc .m{font:11px "SF Mono",Menlo,monospace;color:#999}
+.search{margin-bottom:10px;background:#fff;border:1px solid #dcd8cf;border-radius:7px;padding:4px 8px;color:#aaa}
+table.m{border-collapse:separate;border-spacing:0;width:100%;background:#fff;border:1px solid #e3dfd6;border-radius:8px;overflow:hidden}
+table.m th{font:600 11px -apple-system;color:#8a877f;text-align:center;padding:7px 4px;border-bottom:1px solid #eee}
+table.m th:first-child,table.m td:first-child{text-align:left;padding-left:12px}
+table.m td{text-align:center;padding:8px 4px;border-bottom:1px solid #f2f0eb}table.m tr:last-child td{border-bottom:none}
+.ok{color:#3d5a80;font-weight:600}.part{color:#9a4f10}.none{color:#c2beb6}.qq{color:#999}
+.sec{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px}
+/* H only: Shared keeping a column of its own beside the rail. */
+.inner{width:170px;flex:none;border-right:1px solid rgba(0,0,0,.08);padding:12px 8px;background:#f4f1eb;display:flex;flex-direction:column;gap:1px}
+.inner .si{padding:5px 8px;border-radius:6px;display:flex}.inner .si .n{margin-left:auto;color:#8a877f;font-size:12px}
+.inner .si.on{background:#3d5a80;color:#fff}.inner .si .warn{margin-left:auto;color:#b5651d}.inner .si.on .warn{color:#ffd9b0}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+</style><style>
+/* 058's own pieces: the main window, first run, sheets. */
+*{font-family:-apple-system,system-ui,"Helvetica Neue",sans-serif !important}
+.mono,.codebox,.bar .p{font-family:"SF Mono",Menlo,monospace !important}
+.mw{width:1000px;height:640px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.tb{height:38px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+.tb .tt{font:600 13px -apple-system;margin-left:10px}.tb .sp{flex:1}
+.mwb{flex:1;display:flex;min-height:0}
+.side{width:250px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+.hh{display:flex;align-items:center;gap:6px;font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;padding:10px 8px 4px}
+.hh .n{margin-left:auto;text-transform:none;font-weight:400}
+.pj{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px}
+.pj.on{background:#3d5a80;color:#fff}.pj .n{margin-left:auto;color:#8a877f;font-size:12px}.pj.on .n{color:#dfe6ef}
+.pj.dim{color:#a9a59d}
+.content{flex:1;display:flex;flex-direction:column;min-width:0}
+.strip{background:#f7e7d6;color:#7a4410;padding:7px 14px;font-size:12.5px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #ecd3b8}
+.strip.info{background:#e3eaf3;color:#2c4566;border-color:#cbd8e8}
+.center{flex:1;display:flex;align-items:center;justify-content:center}
+.choose{width:640px;display:flex;flex-direction:column;gap:14px}
+.choose h1{font:600 22px -apple-system;margin:0}
+.choose p{margin:0;color:#6d6a64;line-height:1.45}
+.opts{display:flex;gap:14px}
+.opt{flex:1;background:#fff;border:1px solid #e3dfd6;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.opt.rec{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.opt .t{font:600 15px -apple-system}.opt .d{color:#6d6a64;line-height:1.4;font-size:12.5px}
+.opt .btn{align-self:flex-start;margin-top:4px}
+.sheet-bg{flex:1;display:flex;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.08);padding-top:40px}
+.sheet{width:520px;background:#fbfaf7;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:20px;display:flex;flex-direction:column;gap:10px}
+.sheet .t{font:600 16px -apple-system}
+.sheet .d{color:#6d6a64;line-height:1.4}
+.acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.qr{width:150px;height:150px;background:repeating-linear-gradient(45deg,#333 0 4px,#fff 4px 8px);border-radius:6px;flex:none}
+.codebox{font:15px "SF Mono",Menlo,monospace;background:#fff;border:1px solid #cfcac0;border-radius:6px;padding:8px 10px;letter-spacing:.06em}
+.steps{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.steps .ok{color:#5b8a5b}.steps .wip{color:#3d5a80}.steps .todo{color:#b9b5ad}
+.grant{display:inline-flex;border:1px solid #cfcac0;border-radius:6px;overflow:hidden;font-size:11.5px}
+.grant span{padding:2px 9px;border-right:1px solid #cfcac0}.grant span:last-child{border-right:none}.grant .on{background:#3d5a80;color:#fff}
+.me{font-size:11px;color:#3d5a80;background:#e3eaf3;border-radius:8px;padding:1px 6px}
+.chat{flex:1;padding:18px 24px;display:flex;flex-direction:column;gap:10px;color:#555}
+.bub{background:#fff;border:1px solid #e3dfd6;border-radius:10px;padding:10px 12px;max-width:560px;line-height:1.4}
+</style><style>
+/* K–N: the App Store window, the host app, servers by command, relayed clients. */
+.hw{width:720px;height:600px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.hb{flex:1;padding:14px 22px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.fld{border:1px solid #cfcac0;background:#fff;border-radius:5px;padding:3px 8px;font-size:12px;flex:1;min-width:0;color:#333}
+.fld.dim{color:#aaa}
+.kvf{display:grid;grid-template-columns:90px 1fr;gap:6px 10px;align-items:center;font-size:12px;padding:8px 12px}
+.kvf b{font-weight:400;color:#8a877f;text-align:right}
+.tog{width:30px;height:18px;border-radius:9px;background:#5b8a5b;position:relative;flex:none}
+.tog:after{content:"";position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:7px;background:#fff}
+.cmd{font:12px "SF Mono",Menlo,monospace;background:#fff;border:1px solid #cfcac0;border-radius:6px;padding:8px 10px;line-height:1.5;word-break:break-all}
+.away{font-size:10.5px;color:#9a4f10;background:#f7e7d6;border-radius:8px;padding:1px 6px}
+.via{font-size:10.5px;color:#3d5a80;background:#e3eaf3;border-radius:8px;padding:1px 6px}
+</style><style>
+/* 058's own pieces: the main window, first run, sheets. */
+*{font-family:-apple-system,system-ui,"Helvetica Neue",sans-serif !important}
+.mono,.codebox,.bar .p{font-family:"SF Mono",Menlo,monospace !important}
+.mw{width:1000px;height:640px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.tb{height:38px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+.tb .tt{font:600 13px -apple-system;margin-left:10px}.tb .sp{flex:1}
+.mwb{flex:1;display:flex;min-height:0}
+.side{width:250px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+.hh{display:flex;align-items:center;gap:6px;font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;padding:10px 8px 4px}
+.hh .n{margin-left:auto;text-transform:none;font-weight:400}
+.pj{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px}
+.pj.on{background:#3d5a80;color:#fff}.pj .n{margin-left:auto;color:#8a877f;font-size:12px}.pj.on .n{color:#dfe6ef}
+.pj.dim{color:#a9a59d}
+.content{flex:1;display:flex;flex-direction:column;min-width:0}
+.strip{background:#f7e7d6;color:#7a4410;padding:7px 14px;font-size:12.5px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #ecd3b8}
+.strip.info{background:#e3eaf3;color:#2c4566;border-color:#cbd8e8}
+.center{flex:1;display:flex;align-items:center;justify-content:center}
+.choose{width:640px;display:flex;flex-direction:column;gap:14px}
+.choose h1{font:600 22px -apple-system;margin:0}
+.choose p{margin:0;color:#6d6a64;line-height:1.45}
+.opts{display:flex;gap:14px}
+.opt{flex:1;background:#fff;border:1px solid #e3dfd6;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.opt.rec{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.opt .t{font:600 15px -apple-system}.opt .d{color:#6d6a64;line-height:1.4;font-size:12.5px}
+.opt .btn{align-self:flex-start;margin-top:4px}
+.sheet-bg{flex:1;display:flex;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.08);padding-top:40px}
+.sheet{width:520px;background:#fbfaf7;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:20px;display:flex;flex-direction:column;gap:10px}
+.sheet .t{font:600 16px -apple-system}
+.sheet .d{color:#6d6a64;line-height:1.4}
+.acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.qr{width:150px;height:150px;background:repeating-linear-gradient(45deg,#333 0 4px,#fff 4px 8px);border-radius:6px;flex:none}
+.codebox{font:15px "SF Mono",Menlo,monospace;background:#fff;border:1px solid #cfcac0;border-radius:6px;padding:8px 10px;letter-spacing:.06em}
+.steps{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.steps .ok{color:#5b8a5b}.steps .wip{color:#3d5a80}.steps .todo{color:#b9b5ad}
+.grant{display:inline-flex;border:1px solid #cfcac0;border-radius:6px;overflow:hidden;font-size:11.5px}
+.grant span{padding:2px 9px;border-right:1px solid #cfcac0}.grant span:last-child{border-right:none}.grant .on{background:#3d5a80;color:#fff}
+.me{font-size:11px;color:#3d5a80;background:#e3eaf3;border-radius:8px;padding:1px 6px}
+.chat{flex:1;padding:18px 24px;display:flex;flex-direction:column;gap:10px;color:#555}
+.bub{background:#fff;border:1px solid #e3dfd6;border-radius:10px;padding:10px 12px;max-width:560px;line-height:1.4}
+</style><style>
+/* #61 · the move (T126). Agents Host's window, as L, with its sheet. */
+.hw{position:relative}
+.hw .sheet-bg{position:absolute;inset:38px 0 0 0;background:rgba(0,0,0,.16);display:flex;justify-content:center;align-items:flex-start;padding-top:26px}
+.hw .sheet{width:560px;gap:9px}
+.ck{display:flex;gap:9px;align-items:flex-start;line-height:1.35}
+.ck .m{width:16px;flex:none;text-align:center;font-weight:600}
+.ck .m.y{color:#5b8a5b}.ck .m.n{color:#b5651d}.ck .m.w{color:#8a877f}.ck .m.r{color:#3d5a80}
+.ck .s{color:#8a877f;font-size:11.5px}
+.btns{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:6px}
+.btns .sp{flex:1}
+.step{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em}
+.who{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #e3dfd6;border-radius:8px;overflow:hidden;font-size:12px}
+.who td{padding:6px 10px;border-bottom:1px solid #f2f0eb;vertical-align:top}.who tr:last-child td{border-bottom:none}
+.who .k{color:#8a877f;font-size:11px}
+.who .st{white-space:nowrap;width:46%}
+.who .y{color:#5b8a5b}.who .n{color:#b5651d}.who .w{color:#8a877f}
+.codebox{font:11.5px "SF Mono",Menlo,monospace;background:#fff;border:1px solid #e3dfd6;border-radius:6px;padding:7px 9px;color:#333;line-height:1.45}
+.bar2{height:6px;border-radius:3px;background:#e3dfd6;overflow:hidden}.bar2 i{display:block;height:6px;width:62%;background:#3d5a80}
+</style>
+</head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+<div class="frame" id="o"><div class="cap">O · Agents Host: the way in</div>
+<div class="sub">L as it is, with one new button beside the address the control plane runs at. It shows only while the control plane runs here. The way back (T127) is the same button on a Mac that has joined one elsewhere, as <i>Run It Here Again…</i>.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span class="on">Run it here</span><span>Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Running at <span class="mono">https://mini.local:8791</span><div class="s">since 09:12 · 3 clients · 4 hosts</div></div><span class="btn">Move to Another Machine…</span><span class="btn">Restart</span></div>
+   <div class="line"><div class="l">Keeps its store</div><span class="seg"><span class="on">On this Mac</span><span>In a bucket</span></span></div>
+  </div>
+  <div class="foot">Moving keeps every window, phone and server paired. This Mac stays a host.</div>
+  <div class="card"><div class="line"><div class="l">Relay for my devices<div class="s">Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you</div></div><span class="tog"></span></div></div>
+ </div></div></div>
+
+<div class="frame" id="p"><div class="cap">P · Move to another machine: 1. the key</div>
+<div class="sub">The other machine needs this control plane's key, once, before anything else. Agents Host never sends it anywhere: it saves one file and the person copies it across. The commands are the how-to's, with the receive switch on.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span class="on">Run it here</span><span>Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Running at <span class="mono">https://mini.local:8791</span><div class="s">since 09:12 · 3 clients · 4 hosts</div></div><span class="btn">Restart</span></div>
+   <div class="line"><div class="l">Keeps its store</div><span class="seg"><span class="on">On this Mac</span><span>In a bucket</span></span></div>
+  </div>
+ </div>
+ <div class="sheet-bg"><div class="sheet">
+  <div class="t">Move the control plane to another machine</div>
+  <div class="d">Your windows, phones and servers stay paired, and this Mac stays a host. Agents keep working while it moves.</div>
+  <div class="step">1 · Give the other machine this control plane's key</div>
+  <div class="ck"><span class="m r">1</span><div>Save the key, and copy it to the other machine as <span class="mono">deploy/secrets/control-key</span>.<div class="s">Anyone who has it can pose as your control plane. Delete your copy once it's there.</div></div></div>
+  <div style="padding-left:25px"><span class="btn">Save Key…</span></div>
+  <div class="ck"><span class="m r">2</span><div>Start the control plane there, empty, waiting for this one:</div></div>
+  <div class="codebox" style="margin-left:25px">AGENTS_CONTROL_RECEIVE=1 docker compose \<br>&nbsp;&nbsp;-f deploy/compose.public.yaml up -d</div>
+  <div class="s" style="padding-left:25px;color:#8a877f;font-size:11.5px">See <span class="link">Run the control plane in the cloud</span>.</div>
+  <div class="btns"><span class="btn">Cancel</span><span class="btn p">Continue</span></div>
+ </div></div>
+</div></div>
+
+<div class="frame" id="q"><div class="cap">Q · 2. Check the other machine</div>
+<div class="sub">The address the person gives is checked before anything is told to anyone: it answers, its certificate is trusted by every window and phone (not only by a pin), it holds this key, and its store is empty and waiting. <i>Tell Everyone</i> is offered only when all four are ticked, and is the first step anyone else sees.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span class="on">Run it here</span><span>Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Running at <span class="mono">https://mini.local:8791</span><div class="s">since 09:12 · 3 clients · 4 hosts</div></div><span class="btn">Restart</span></div>
+   <div class="line"><div class="l">Keeps its store</div><span class="seg"><span class="on">On this Mac</span><span>In a bucket</span></span></div>
+  </div>
+ </div>
+ <div class="sheet-bg"><div class="sheet">
+  <div class="t">Move the control plane to another machine</div>
+  <div class="step">2 · Where is it?</div>
+  <div style="display:flex;gap:8px;align-items:center"><span class="fld mono">https://agents.example.com</span><span class="btn">Check</span></div>
+  <div class="ck"><span class="m y">✓</span><div>It answers</div></div>
+  <div class="ck"><span class="m y">✓</span><div>Its certificate is publicly trusted<div class="s">So no pin is needed, and it renews itself.</div></div></div>
+  <div class="ck"><span class="m y">✓</span><div>It holds this control plane's key</div></div>
+  <div class="ck"><span class="m y">✓</span><div>It's empty, and waiting for this one</div></div>
+  <div class="btns"><span class="btn">Back</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Tell Everyone</span></div>
+ </div></div>
+</div></div>
+
+<div class="frame" id="q2"><div class="cap">Q2 · 2. A check that fails</div>
+<div class="sub">Each line that fails says what to do, in the person's words. Nothing has been told to anyone yet, so Cancel leaves everything as it was.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span class="on">Run it here</span><span>Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Running at <span class="mono">https://mini.local:8791</span><div class="s">since 09:12 · 3 clients · 4 hosts</div></div><span class="btn">Restart</span></div>
+   <div class="line"><div class="l">Keeps its store</div><span class="seg"><span class="on">On this Mac</span><span>In a bucket</span></span></div>
+  </div>
+ </div>
+ <div class="sheet-bg"><div class="sheet">
+  <div class="t">Move the control plane to another machine</div>
+  <div class="step">2 · Where is it?</div>
+  <div style="display:flex;gap:8px;align-items:center"><span class="fld mono">https://agents.example.com</span><span class="btn">Check</span></div>
+  <div class="ck"><span class="m y">✓</span><div>It answers</div></div>
+  <div class="ck"><span class="m y">✓</span><div>Its certificate is publicly trusted</div></div>
+  <div class="ck"><span class="m n">✕</span><div>It holds a different key<div class="s">Copy the key you saved to <span class="mono">deploy/secrets/control-key</span> there, empty its store, and start it again.</div></div></div>
+  <div class="ck"><span class="m w">–</span><div>It's empty, and waiting for this one</div></div>
+  <div class="btns"><span class="btn">Back</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p" style="opacity:.4">Tell Everyone</span></div>
+ </div></div>
+</div></div>
+
+<div class="frame" id="r"><div class="cap">R · 3. Tell everyone, and who knows</div>
+<div class="sub">Announce gives every window, phone and server the new address, beside this one. Those online learn it within seconds; the list fills as they do. The person moves when they like: anyone still to hear learns it later from this Mac, which keeps forwarding. A build too old to follow is named, with what to do. Withdraw takes the new address back.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span class="on">Run it here</span><span>Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Running at <span class="mono">https://mini.local:8791</span><div class="s">since 09:12 · 3 clients · 4 hosts</div></div><span class="btn">Restart</span></div>
+   <div class="line"><div class="l">Keeps its store</div><span class="seg"><span class="on">On this Mac</span><span>In a bucket</span></span></div>
+  </div>
+ </div>
+ <div class="sheet-bg"><div class="sheet">
+  <div class="t">Move the control plane to another machine</div>
+  <div class="step">3 · Tell everyone where it's going</div>
+  <div class="d">Everything that's paired now knows <span class="mono">agents.example.com</span> as well as this Mac.</div>
+  <table class="who">
+   <tr><td>This Mac<div class="k">host</div></td><td class="st y">✓ Knows</td></tr>
+   <tr><td>devbox<div class="k">server</div></td><td class="st y">✓ Knows</td></tr>
+   <tr><td>Alex's MacBook Air<div class="k">window</div></td><td class="st y">✓ Knows</td></tr>
+   <tr><td>Alex's iPhone<div class="k">phone</div></td><td class="st y">✓ Knows</td></tr>
+   <tr><td>Alex's iPad<div class="k">iPad · last connected 3 days ago</div></td><td class="st w">Not yet<div class="k">Learns it from this Mac when it next connects</div></td></tr>
+   <tr><td>old-mini<div class="k">server · Agents 0.1.0</div></td><td class="st n">Can't follow<div class="k">Update it first, or add it again afterwards</div></td></tr>
+  </table>
+  <div class="foot">4 of 6 know. You can move now, or wait for the rest.</div>
+  <div class="btns"><span class="btn">Withdraw</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Move Now</span></div>
+ </div></div>
+</div></div>
+
+<div class="frame" id="s"><div class="cap">S · 4. Moving</div>
+<div class="sub">One minute or so. Pairing and changes to grants and hosts wait while the records are copied; agents and conversations carry on. Until the other machine takes over, Cancel puts everything back as it was.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span class="on">Run it here</span><span>Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Running at <span class="mono">https://mini.local:8791</span><div class="s">since 09:12 · 3 clients · 4 hosts</div></div><span class="btn">Restart</span></div>
+   <div class="line"><div class="l">Keeps its store</div><span class="seg"><span class="on">On this Mac</span><span>In a bucket</span></span></div>
+  </div>
+ </div>
+ <div class="sheet-bg"><div class="sheet">
+  <div class="t">Moving to agents.example.com…</div>
+  <div class="ck"><span class="m y">✓</span><div>Holding records still<div class="s">Pairing and changes wait. Agents keep working.</div></div></div>
+  <div class="ck"><span class="m r">◐</span><div style="flex:1">Copying 128 records<div class="bar2" style="margin-top:5px"><i></i></div></div></div>
+  <div class="ck"><span class="m w">○</span><div>agents.example.com takes over</div></div>
+  <div class="ck"><span class="m w">○</span><div>This Mac's host and relay go there</div></div>
+  <div class="ck"><span class="m w">○</span><div>This Mac sends anyone still coming here on to it</div></div>
+  <div class="btns"><span class="btn">Cancel</span></div>
+ </div></div>
+</div></div>
+
+<div class="frame" id="t"><div class="cap">T · Afterwards: joined elsewhere, forwarding</div>
+<div class="sub">The sheet closes on its own. Where is now <i>Join one elsewhere</i>, at the new address, and This Mac is still a host there. A forwarding row stays while anyone is still to hear, naming who. Stop Forwarding asks first if that leaves someone behind ("Alex's iPad will need pairing again"), and the row goes away by itself once everyone has heard.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span>Run it here</span><span class="on">Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Joined <span class="mono">https://agents.example.com</span><div class="s">moved 10:42 · this Mac is a host there</div></div><span class="btn">Run It Here Again…</span></div>
+   <div class="line"><span class="cdot o"></span><div class="l">Forwarding from <span class="mono">https://mini.local:8791</span><div class="s">1 still to hear: Alex's iPad, last connected 3 days ago</div></div><span class="btn">Stop Forwarding…</span></div>
+  </div>
+  <div class="card"><div class="line"><div class="l">Relay for my devices<div class="s">Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you</div></div><span class="tog"></span></div></div>
+ </div></div></div>
+</body></html>
