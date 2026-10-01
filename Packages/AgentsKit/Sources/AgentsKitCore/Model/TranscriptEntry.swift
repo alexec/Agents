@@ -46,7 +46,6 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         case agentThought(messageID: String?, text: String)
         case toolCall(ToolCall)
         case toolCallUpdate(ToolCall)
-        case plan(JSONValue)
         case planUpdated(Plan)
         case usageRecorded(TurnUsage)
         case servedRequest(ServedRequest)

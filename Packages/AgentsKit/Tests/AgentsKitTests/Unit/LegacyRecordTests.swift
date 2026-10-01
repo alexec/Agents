@@ -125,6 +125,19 @@ struct LegacyRecordTests {
         #expect(value["somethingFromTheFuture"]?["_0"]?.intValue == 42)
     }
 
+    /// The `plan` kind 001 wrote is past the cut-off (#58): it is no longer drawn, and
+    /// is kept whole like any kind this build does not know, never thrown away.
+    @Test func a001PlanEntryIsKeptButNotRead() throws {
+        let line = #"{"at":"2026-09-19T03:44:09.040Z","id":"11D9094D-5C1E-44BD-BC70-6FF7EA04375A","kind":{"plan":{"_0":{"entries":[{"content":"Read it","status":"pending"}]}}}}"#
+        let entry = try decoder().decode(TranscriptEntry.self, from: Data(line.utf8))
+        guard case .unrecognised = entry.kind else {
+            Issue.record("a 001 plan must not read as one of today's kinds")
+            return
+        }
+        let again = try JSONDecoder().decode(JSONValue.self, from: try JSONEncoder().encode(entry.kind))
+        #expect(again["plan"]?["_0"]?["entries"]?.arrayValue?.count == 1)
+    }
+
     @Test func aFieldFromALaterVersionSurvivesBeingSaved() throws {
         let json = #"""
         {"id":"11D9094D-5C1E-44BD-BC70-6FF7EA04375A","runtimeID":"claude",

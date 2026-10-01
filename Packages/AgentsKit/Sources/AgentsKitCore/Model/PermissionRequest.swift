@@ -104,11 +104,9 @@ public struct ToolCall: Codable, Hashable, Sendable {
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        // Every field past `status` is new in 003. A record written before it has none.
-        // Through the same initialiser as everything else, so a record from before
-        // the fields existed is split the same way, and a record written with the
-        // copies still in `raw` is trimmed as it is read: an old chat costs no more
-        // to open than a new one.
+        // Every field a runtime may leave out is optional here as it is on the wire,
+        // and the record goes through the same initialiser as an update off the wire,
+        // so whatever is only inside `raw` is split out and `raw` trimmed the same way.
         self.init(toolCallID: try c.decodeIfPresent(String.self, forKey: .toolCallID),
                   title: try c.decodeIfPresent(String.self, forKey: .title) ?? "Tool call",
                   name: try c.decodeIfPresent(String.self, forKey: .name),

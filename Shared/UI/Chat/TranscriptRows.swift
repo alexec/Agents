@@ -223,11 +223,6 @@ private struct EntryRow: View {
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
             Text(call.line).appText(.reading).foregroundStyle(.secondary)
 
-        case .plan(let raw):
-            // The shape 001 stored. Read into entries where it can be.
-            PlanView(plan: Plan(planID: nil,
-                                entries: (raw["entries"]?.arrayValue ?? []).compactMap(PlanEntry.init(wire:))))
-
         case .planUpdated(let plan):
             PlanView(plan: plan)
 
