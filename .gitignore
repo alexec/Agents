@@ -20,3 +20,6 @@ App/Resources/servers/*
 # Built by scripts/docs.sh (044). The docs site; published from CI, never committed.
 site/
 .cache/
+
+# The web remote's packages (071). Web/dist is built from them and IS committed.
+Web/node_modules/
