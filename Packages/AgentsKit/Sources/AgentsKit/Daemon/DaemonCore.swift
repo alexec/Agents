@@ -974,7 +974,7 @@ public actor DaemonCore {
             if let entry = index[id], entry.agent.state == .archived,
                let modified = ArchiveIndex.modifiedAt(locations.record(id)),
                modified <= entry.fileModifiedAt.addingTimeInterval(Self.indexTolerance) {
-                agents[id] = seedingCost(entry.agent)
+                agents[id] = entry.agent
                 archiveIndex[id] = entry
             } else {
                 toRead.append(id)
@@ -983,19 +983,13 @@ public actor DaemonCore {
         let loaded = await store.load(toRead)
         for agent in loaded.agents {
             if agent.state == .archived {
-                agents[agent.id] = seedingCost(agent).slimmed()
+                agents[agent.id] = agent.slimmed()
                 indexEntry(for: agent.id)
             } else {
-                agents[agent.id] = seedingCost(agent)
+                agents[agent.id] = agent
             }
         }
         if archiveIndex != index { saveArchiveIndex() }
-        // An agent archived before 051 has no time it was archived. It is given this
-        // start, so nothing goes by age on the day 051 arrives (FR-008).
-        for (id, agent) in agents where agent.state == .archived && agent.archivedAt == nil {
-            agents[id]?.archivedAt = now()
-            if let dated = agents[id] { try? await store.save(dated) }
-        }
         // A record the rules forbid was brought to one they allow on the way in, and
         // the person is told so here, in the transcript, which is where this app
         // already explains itself.
@@ -1018,29 +1012,6 @@ public actor DaemonCore {
         }
         clearAllowanceWaitsLeftFromBefore()
         startRetentionChecks()
-    }
-
-    /// Give a record written before the cost was banked its total back.
-    ///
-    /// Every chat run before this was fixed holds its price in `usage.cost` — the last
-    /// figure its runtime quoted, which is that session's running total — and an empty
-    /// `costToDate`, because the banking watched the turn's reply, where no price ever
-    /// arrived. The figure is right there and is the right figure, so it is seeded
-    /// rather than left as a hole in every project total.
-    ///
-    /// Only into an empty total, so this can never touch a record that has been banked
-    /// properly and can never run twice on the same one. Nothing is written here: the
-    /// record is rewritten the next time the agent changes for a reason of its own,
-    /// and until then the seeded value is simply what the daemon serves.
-    ///
-    /// Not added to `spendLedger`: the ledger is what *today* cost, and none of this
-    /// was spent today. The day would be wrong for a week and then right again, which
-    /// is worse than a day that only counts from here.
-    private func seedingCost(_ agent: Agent) -> Agent {
-        guard agent.costToDate.isEmpty, let cost = agent.usage?.cost else { return agent }
-        var seeded = agent
-        seeded.costToDate[cost.currency] = cost.amount
-        return seeded
     }
 
     public func allAgents(includeArchived: Bool = true) -> [Agent] {

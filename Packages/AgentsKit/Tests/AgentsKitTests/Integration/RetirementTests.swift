@@ -114,19 +114,6 @@ struct RetirementTests {
         #expect(await core.agent(agent.id) != nil)
     }
 
-    @Test func aRecordFromBefore051IsTimedFromItsFirstStart() async throws {
-        let (locations, work) = try temporary()
-        var legacy = archived(work, daysAgo: 400)
-        legacy.archivedAt = nil
-        let core = try await core(locations, seeded: [legacy])
-        #expect(await core.agent(legacy.id)?.archivedAt == now)
-        await core.checkRetention()
-        #expect(await core.agent(legacy.id) != nil)
-        // And it was written down, so the next start does not move it again.
-        let disk = try StoreCoding.decoder.decode(Agent.self, from: Data(contentsOf: locations.record(legacy.id)))
-        #expect(disk.archivedAt == now)
-    }
-
     @Test func aStartSoonAfterTheTimeRanOutRetiresItWithoutHoldingStartUp() async throws {
         let (locations, work) = try temporary()
         let agent = archived(work, daysAgo: 29.9)

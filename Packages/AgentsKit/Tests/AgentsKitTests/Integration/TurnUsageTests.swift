@@ -129,48 +129,6 @@ struct TurnUsageTests {
         #expect(today["USD"] == 0.25, "and the day is counted the same way, once")
     }
 
-    /// Every chat run before the banking was fixed holds its price in `usage.cost`
-    /// and nothing in `costToDate`, so without this the project totals and the
-    /// Spending page read as nothing while each chat shows its own figure.
-    @Test func aRecordWrittenBeforeTheCostWasBankedGetsItsTotalBack() async throws {
-        let (locations, work) = try temporary()
-        let store = try AgentStore(locations: locations)
-        var old = Agent(runtimeID: "claude", cwd: work)
-        old.usage = Usage(used: 29325, size: 1_000_000,
-                          cost: Cost(amount: 0.22, currency: "USD"))
-        old.lastTurnUsage = TurnUsage(totalTokens: 110023)
-        #expect(old.costToDate.isEmpty, "the shape on disk: a price, and no total")
-        try await store.save(old)
-
-        let core = try core(FakeLauncher(), locations: locations)
-        await core.loadFromDisk()
-
-        let agent = try #require(await core.agent(old.id))
-        #expect(agent.costToDate["USD"] == 0.22, "the figure it already held, where the totals look")
-        #expect(agent.costIsUnmeasured == false)
-        // Not in the day: none of it was spent today, and a ledger that back-counted
-        // a week of work into this morning would be wrong in a way nobody could see.
-        let today = await core.costState().today
-        #expect(today["USD"] == nil)
-    }
-
-    /// Seeding must never touch a record that was banked properly, or a resumed agent
-    /// would have its history counted twice.
-    @Test func aRecordThatAlreadyHasATotalIsLeftAlone() async throws {
-        let (locations, work) = try temporary()
-        let store = try AgentStore(locations: locations)
-        var banked = Agent(runtimeID: "claude", cwd: work)
-        banked.usage = Usage(used: 10, size: 100, cost: Cost(amount: 0.30, currency: "USD"))
-        banked.costToDate["USD"] = 1.20
-        try await store.save(banked)
-
-        let core = try core(FakeLauncher(), locations: locations)
-        await core.loadFromDisk()
-
-        #expect(await core.agent(banked.id)?.costToDate["USD"] == 1.20,
-                "the banked total stands; the last reading is not added to it")
-    }
-
     @Test func aRuntimeThatReportsNothingShowsNothing() async throws {
         let (locations, work) = try temporary()
         // Grok sends neither usage updates nor a usage block.

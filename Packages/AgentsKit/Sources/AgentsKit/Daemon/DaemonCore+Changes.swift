@@ -119,8 +119,8 @@ extension DaemonCore {
             since = point.commit
             view = ownsItsFolder(agent) ? .owned(since: since) : .shared(since: since)
         } else if let found = try? await GitChanges.repositoryRoot(of: agent.cwd) {
-            // Started before 035, or somewhere git could not answer then: what is
-            // uncommitted is the most that can be said.
+            // Somewhere git could not answer when it started: what is uncommitted is
+            // the most that can be said.
             root = found
             since = "HEAD"
             view = .sharedFromHead

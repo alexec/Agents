@@ -178,8 +178,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// when none is running. Cleared when applied, cancelled, archived or deleted.
     public var pendingMove: PendingMove?
     /// Where git's view of this agent's changes is measured from: the commit its folder
-    /// was on when it started (035). Nil outside a repository, and for agents started
-    /// before 035.
+    /// was on when it started (035). Nil outside a repository, or where git could not
+    /// answer at the start.
     public var startingPoint: StartingPoint?
     /// The `requestID` of the start that made this agent, when the caller sent one
     /// (029). Written on the first save, never changed. It is how a start retried after
@@ -193,8 +193,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var restartPickUps: Int
 
     /// When it was last archived (051): the start of the time it is kept before it is
-    /// retired. Cleared on unarchiving. A record archived before 051 has none, and the
-    /// daemon gives it the time it first reads it, so nothing goes on the day 051 ships.
+    /// retired. Cleared on unarchiving.
     public var archivedAt: Date?
     /// What its row says about being retired, set by the daemon's check (051). Only
     /// ever on an archived agent.
@@ -276,7 +275,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         }
         runtimeSessionID = try c.decodeIfPresent(String.self, forKey: .runtimeSessionID)
         startOptions = try c.decodeIfPresent(StartOptions.self, forKey: .startOptions) ?? .none
-        // Records written before the controls moved onto the prompt bar have none.
+        // Always written, and still read as empty when absent: a build that stops
+        // writing either must not cost an older reader the whole agent.
         advertisedOptions = try c.decodeIfPresent([ConfigOption].self, forKey: .advertisedOptions) ?? []
         availableCommands = try c.decodeIfPresent([SlashCommand].self, forKey: .availableCommands) ?? []
         createdAt = try c.decode(Date.self, forKey: .createdAt)
@@ -293,8 +293,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // completion.
         if rawState != nil && endedReason == nil { endedReason = .unrecognised }
         archivedReason = try c.decodeIfPresent(ArchivedReason.self, forKey: .archivedReason)
-        // Every field below arrived with 003. A record written before it has none of
-        // them, and must still open.
+        // Written only when there is one, or when it is not empty.
         usage = try c.decodeIfPresent(Usage.self, forKey: .usage)
         lastTurnUsage = try c.decodeIfPresent(TurnUsage.self, forKey: .lastTurnUsage)
         costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
@@ -307,13 +306,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
         // New in 004. A record written before it has nothing waiting.
         queuedPrompts = try c.decodeIfPresent([QueuedPrompt].self, forKey: .queuedPrompts) ?? []
-        // Newer than the field above, and on the record rather than held in memory so
-        // the chips are still there when the app is opened again on a turn that ended
-        // last night.
-        // Cut to one since 031: a record written when a turn could offer four opens
-        // offering its first.
-        suggestedPrompts = Array((try c.decodeIfPresent([SuggestedPrompt].self, forKey: .suggestedPrompts) ?? [])
-            .prefix(SuggestedPrompt.limit))
+        // On the record rather than held in memory so the chip is still there when the
+        // app is opened again on a turn that ended last night.
+        suggestedPrompts = try c.decodeIfPresent([SuggestedPrompt].self, forKey: .suggestedPrompts) ?? []
         // New in 008, and optional, so every record written before workflows existed
         // opens unchanged and needs nothing migrating.
         startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)
@@ -354,7 +349,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // Absent when nothing was asked. A word this build does not know — a newer
         // build's, or the `archive` agents could once ask for — asked for nothing.
         afterTurn = (try? c.decodeIfPresent(AfterTurn.self, forKey: .afterTurn)) ?? nil
-        // New in 051. Absent on everything written before it.
+        // Stamped whenever an agent is archived (051), and absent on one that is not.
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
         retirement = (try? c.decodeIfPresent(Retirement.self, forKey: .retirement)) ?? nil
         // New in 064. Absent on everything written before it: the runtime's default.

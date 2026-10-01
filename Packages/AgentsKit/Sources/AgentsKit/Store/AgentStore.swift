@@ -215,6 +215,9 @@ public actor AgentStore {
                 agents.append(agent)
                 if let mend { mends[id] = mend }
             } catch {
+                // Left where it is, for a build that can read it, and said: an agent
+                // that does not appear needs a reason somebody can find.
+                DaemonLog.shared.write("could not read agent \(id), left on disk: \(error)")
                 unreadable.append(locations.record(id))
             }
         }
