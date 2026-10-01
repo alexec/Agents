@@ -231,6 +231,7 @@ struct ChangeFileView: View {
                         Text(mark)
                             .appText(.fine)
                             .foregroundStyle(.secondary)
+                            .help(ChangeWords.oldPath(of: file).map { "Renamed from \($0)" } ?? "")
                     }
                 }
                 if let file {
