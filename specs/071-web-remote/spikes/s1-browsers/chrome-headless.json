@@ -1,0 +1,226 @@
+{
+  "headed": false,
+  "chrome": "Chrome/154.0.8037.59",
+  "runs": {
+    "localhost": {
+      "first": {
+        "origin": "http://localhost:8893",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+        "at": "2026-10-01T05:06:34.007Z",
+        "secureContext": true,
+        "subtle": true,
+        "storage": {
+          "present": true,
+          "persistedBefore": false,
+          "persistGranted": false,
+          "persistedAfter": false,
+          "quota": 10737418240
+        },
+        "key": {
+          "existedBefore": false,
+          "made": "2026-10-01T05:06:34.061Z",
+          "ageHours": 0,
+          "privateIsCryptoKey": true,
+          "extractable": false,
+          "privateExportRefused": true,
+          "jwkExportRefused": true,
+          "publicRawLength": 65,
+          "publicRawFirstByte": 4,
+          "publicUnchanged": true,
+          "deriveUnchanged": true
+        },
+        "vectors": {
+          "sharedX": true,
+          "clientPeerMAC": true,
+          "clientServerMACVerifies": true,
+          "lowerCaseUUIDWouldMatch": false,
+          "codePeerMAC": true,
+          "codeServerMACVerifies": true
+        },
+        "pass": true
+      },
+      "afterRestart": {
+        "origin": "http://localhost:8893",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+        "at": "2026-10-01T05:06:42.406Z",
+        "secureContext": true,
+        "subtle": true,
+        "storage": {
+          "present": true,
+          "persistedBefore": false,
+          "persistGranted": false,
+          "persistedAfter": false,
+          "quota": 10737418240
+        },
+        "key": {
+          "existedBefore": true,
+          "made": "2026-10-01T05:06:34.061Z",
+          "ageHours": 0,
+          "privateIsCryptoKey": true,
+          "extractable": false,
+          "privateExportRefused": true,
+          "jwkExportRefused": true,
+          "publicRawLength": 65,
+          "publicRawFirstByte": 4,
+          "publicUnchanged": true,
+          "deriveUnchanged": true
+        },
+        "vectors": {
+          "sharedX": true,
+          "clientPeerMAC": true,
+          "clientServerMACVerifies": true,
+          "lowerCaseUUIDWouldMatch": false,
+          "codePeerMAC": true,
+          "codeServerMACVerifies": true
+        },
+        "pass": true
+      },
+      "incognito": {
+        "origin": "http://localhost:8893",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+        "at": "2026-10-01T05:06:42.761Z",
+        "secureContext": true,
+        "subtle": true,
+        "storage": {
+          "present": true,
+          "persistedBefore": false,
+          "persistGranted": false,
+          "persistedAfter": false,
+          "quota": 10737418240
+        },
+        "key": {
+          "existedBefore": false,
+          "made": "2026-10-01T05:06:42.769Z",
+          "ageHours": 0,
+          "privateIsCryptoKey": true,
+          "extractable": false,
+          "privateExportRefused": true,
+          "jwkExportRefused": true,
+          "publicRawLength": 65,
+          "publicRawFirstByte": 4,
+          "publicUnchanged": true,
+          "deriveUnchanged": true
+        },
+        "vectors": {
+          "sharedX": true,
+          "clientPeerMAC": true,
+          "clientServerMACVerifies": true,
+          "lowerCaseUUIDWouldMatch": false,
+          "codePeerMAC": true,
+          "codeServerMACVerifies": true
+        },
+        "pass": true
+      }
+    },
+    "127.0.0.1": {
+      "first": {
+        "origin": "http://127.0.0.1:8893",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+        "at": "2026-10-01T05:06:50.585Z",
+        "secureContext": true,
+        "subtle": true,
+        "storage": {
+          "present": true,
+          "persistedBefore": false,
+          "persistGranted": false,
+          "persistedAfter": false,
+          "quota": 10737418240
+        },
+        "key": {
+          "existedBefore": false,
+          "made": "2026-10-01T05:06:50.616Z",
+          "ageHours": 0,
+          "privateIsCryptoKey": true,
+          "extractable": false,
+          "privateExportRefused": true,
+          "jwkExportRefused": true,
+          "publicRawLength": 65,
+          "publicRawFirstByte": 4,
+          "publicUnchanged": true,
+          "deriveUnchanged": true
+        },
+        "vectors": {
+          "sharedX": true,
+          "clientPeerMAC": true,
+          "clientServerMACVerifies": true,
+          "lowerCaseUUIDWouldMatch": false,
+          "codePeerMAC": true,
+          "codeServerMACVerifies": true
+        },
+        "pass": true
+      },
+      "afterRestart": {
+        "origin": "http://127.0.0.1:8893",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+        "at": "2026-10-01T05:06:58.675Z",
+        "secureContext": true,
+        "subtle": true,
+        "storage": {
+          "present": true,
+          "persistedBefore": false,
+          "persistGranted": false,
+          "persistedAfter": false,
+          "quota": 10737418240
+        },
+        "key": {
+          "existedBefore": true,
+          "made": "2026-10-01T05:06:50.616Z",
+          "ageHours": 0,
+          "privateIsCryptoKey": true,
+          "extractable": false,
+          "privateExportRefused": true,
+          "jwkExportRefused": true,
+          "publicRawLength": 65,
+          "publicRawFirstByte": 4,
+          "publicUnchanged": true,
+          "deriveUnchanged": true
+        },
+        "vectors": {
+          "sharedX": true,
+          "clientPeerMAC": true,
+          "clientServerMACVerifies": true,
+          "lowerCaseUUIDWouldMatch": false,
+          "codePeerMAC": true,
+          "codeServerMACVerifies": true
+        },
+        "pass": true
+      },
+      "incognito": {
+        "origin": "http://127.0.0.1:8893",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+        "at": "2026-10-01T05:06:59.011Z",
+        "secureContext": true,
+        "subtle": true,
+        "storage": {
+          "present": true,
+          "persistedBefore": false,
+          "persistGranted": false,
+          "persistedAfter": false,
+          "quota": 10737418240
+        },
+        "key": {
+          "existedBefore": false,
+          "made": "2026-10-01T05:06:59.021Z",
+          "ageHours": 0,
+          "privateIsCryptoKey": true,
+          "extractable": false,
+          "privateExportRefused": true,
+          "jwkExportRefused": true,
+          "publicRawLength": 65,
+          "publicRawFirstByte": 4,
+          "publicUnchanged": true,
+          "deriveUnchanged": true
+        },
+        "vectors": {
+          "sharedX": true,
+          "clientPeerMAC": true,
+          "clientServerMACVerifies": true,
+          "lowerCaseUUIDWouldMatch": false,
+          "codePeerMAC": true,
+          "codeServerMACVerifies": true
+        },
+        "pass": true
+      }
+    }
+  }
+}

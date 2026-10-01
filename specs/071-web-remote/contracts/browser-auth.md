@@ -53,6 +53,7 @@ The code text is unchanged:
 ```
 
 - `K = HKDF-SHA256(ikm: ECDH_x(browserPrivate, control), salt: "agents-control-client-v1", info: uuid, 32)`.
+- **The UUID is upper case** everywhere: in `clients/announce`'s `id`, in `c:<uuid>` and in HKDF's info, as Swift's `uuidString` writes it. The browser upper-cases `crypto.randomUUID()` once, at pairing, and stores it that way (spike S1: a lower-case UUID gives a different MAC).
 - In WebCrypto: `deriveBits({name:"ECDH", public: control}, privateKey, 256)`, then
   `importKey("raw", bits, "HKDF", false, ["deriveKey"])`, then
   `deriveKey({name:"HKDF", hash:"SHA-256", salt, info}, …, {name:"HMAC", hash:"SHA-256", length:256}, false, ["sign","verify"])`.

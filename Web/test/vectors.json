@@ -1,0 +1,41 @@
+{
+  "about" : "071 T001: written by ControlAgreementVectorTests. Bytes are hex; jwk is base64url.",
+  "client" : {
+    "id" : "6F1C2A3B-4D5E-4F60-8172-93A4B5C6D7E8",
+    "identity" : "c:6F1C2A3B-4D5E-4F60-8172-93A4B5C6D7E8",
+    "jwk" : {
+      "crv" : "P-256",
+      "d" : "vLFtdiBPC2GNKIrEg2PrBVNM4INNIcz-TUc-TsbehBI",
+      "kty" : "EC",
+      "x" : "yO4oWj3GjW0pdLpnqcifi1pZqCDhAYFPD2hMqngnhwQ",
+      "y" : "BKlAaISptlCqESseAdoWLZU_vbeG8BaVb13JTvO48Pk"
+    },
+    "key" : "8575292c2effd9d7bdc1834b565d8f811c7d2d81bcd363215360c91b369bc490",
+    "mac" : {
+      "peer" : "53db2066ece12713876cfda087b5c3788cfb3802c8cda49f3699aca2c2b56d03",
+      "server" : "1d661df0e8afe692199d613e8fb0fffa6a3ef51daa660bfd02f4fad6f9d01f08"
+    },
+    "private" : "bcb16d76204f0b618d288ac48363eb05534ce0834d21ccfe4d473e4ec6de8412",
+    "public" : "04c8ee285a3dc68d6d2974ba67a9c89f8b5a59a820e101814f0f684caa7827870404a9406884a9b650aa112b1e01da162d953fbdb786f016956f5dc94ef3b8f0f9",
+    "salt" : "agents-control-client-v1",
+    "sharedX" : "18e8dc591fcae8e07b8212c55861dd930c6e18da14234ec11d5910c5b7124b4a"
+  },
+  "code" : {
+    "identity" : "p:000102030405060708090a0b0c0d0e0f",
+    "key" : "dc6033a43c7bb613973f88f96992e1d7d4f04ab1409468bfca277acbebf24f33",
+    "mac" : {
+      "peer" : "acb2f1589e81694d0aafae3f86bd00f34423db71f0ed14b7b96f0a14bd7610ad",
+      "server" : "b189e31c4f55d4a45e92b63b1cec632ed402ee9cea105e8cf0fb34be660d2246"
+    },
+    "salt" : "agents-control-code-v1",
+    "secret" : "000102030405060708090a0b0c0d0e0f58c864f5ec42dd0e00b873c7432475b0",
+    "secretBase64url" : "AAECAwQFBgcICQoLDA0OD1jIZPXsQt0OALhzx0MkdbA"
+  },
+  "control" : {
+    "private" : "53be762234edab94f0ec0dd593e436520697b642585c82b28a130e649bd4d9fd",
+    "public" : "0406bc684b2e222e7aa3458e6be5ccf2d006a6002a2244b255663eaf96c0a19fe4f67d99a9dd3adcfd6a253009f602eca12b517f7a427debcc006e5f119f583173"
+  },
+  "origin" : "http://localhost:8893",
+  "peerNonce" : "c835d923d7988f6cc9a4d900d47a200df9596a4f5487e557175d4fda9704fe15",
+  "serverNonce" : "dfa7fdfe1b83b5fff16594d2cfb95c96e988e32bde7804c6132cc0cea8a4d8f0"
+}

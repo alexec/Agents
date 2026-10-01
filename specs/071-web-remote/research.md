@@ -58,6 +58,22 @@ and a small script. The page is served from a scratch port by `python3 -m http.s
 | A non-extractable key cannot be stored at all in a browser | That browser is unsupported. The page detects it at runtime (try to store, read back, check `extractable === false`) and names the supported browsers (spec edge case). It never falls back to an exportable key. If both Safari and Chrome fail, stop and ask Alex. |
 | `persist()` cannot tell a private window apart | Drop the private-window warning, and say in the how-to that a private window forgets its key when it closes. |
 
+**Result (T001–T002, 2026-10-01)**: **pass** in Chrome 154 (headless and headed) and Safari
+27.0. Details are in [spikes/s1-browsers/results.md](spikes/s1-browsers/results.md).
+- **`http://localhost` is a secure context in both**, so the canonical origin stays
+  `http://localhost:8792`. `127.0.0.1` was also a secure context in Chrome.
+- **A non-extractable P-256 key survives a full quit and relaunch in both.**
+- **Chrome's ECDH → HKDF → HMAC matches `ControlAgreement` byte for byte**, for client and code
+  keys alike. In Safari the vectors check passed as part of `pass: true`.
+- **One byte rule is added: the UUID is upper case** in both the `c:` identity and HKDF's
+  info, as Swift's `uuidString` writes it. A lower-case UUID gives a different MAC, and
+  `crypto.randomUUID()` is lower case.
+- **`persist()` is refused in Chrome**, both normal and incognito. Storage is best-effort, and
+  Chrome cannot tell a private window apart. Per the table above, the private-window warning
+  is dropped, and the how-to says a private window forgets its key when it closes. Safari's
+  `persist()` answer and ITP's 7-day cap are left to the closing walk (T071).
+- **Firefox:** not installed, not spiked.
+
 **Rationale**: Every later phase rests on these five facts. The spike costs an hour, and a
 wrong guess would cost the pairing design.
 

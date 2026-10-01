@@ -38,7 +38,7 @@ WebSocket protocol.
 **Purpose**: prove what the browsers must do before anything rests on it. Nothing in Phase 2
 starts until T002 is written up.
 
-- [ ] T001 Spike S1, the browsers, in `specs/071-web-remote/spikes/s1-browsers/`, as research R1. It has four parts:
+- [x] T001 (Chrome 154 headless + headed, Safari 27.0 by Alex: pass; spikes/s1-browsers/results.md) Spike S1, the browsers, in `specs/071-web-remote/spikes/s1-browsers/`, as research R1. It has four parts:
   1. **Vectors.** Add `ControlAgreementVectorTests` to `Packages/AgentsKit/Tests/AgentsKitTests/Unit/`. It fixes a control key, a client key, a UUID, a code secret, both nonces and the origin `http://localhost:8893`. It writes the expected ECDH x, `clientKey`, `codeKey`, peer MAC and server MAC to `Web/test/vectors.json`, and fails when the checked-in file differs.
   2. **The page.** Write `index.html` and `spike.js`. The script has no dependencies; the page has no inline script, and is served with the CSP from contracts/loopback-listener.md by a 20-line `serve.py`, so the check runs under the real policy. It runs research R1's five checks and prints the results as text:
      - secure context;
@@ -50,7 +50,7 @@ starts until T002 is written up.
   4. **Safari.** Ask Alex with the question tool whether he runs the Safari half himself (open the page, **Run**, quit Safari, reopen, **Run**), or lets the agent do it under the screen lease while he is away. Either way, copy Safari's printed results.
 
   Write everything to `spikes/s1-browsers/results.md`. Firefox is not installed and is not spiked ("Safari only for now", 2026-09-30).
-- [ ] T002 Act on the spike, with research R1's outcome table. Record the outcome in research.md R1 under **Result**.
+- [x] T002 (all pass; the origin stays localhost; added: the UUID is upper case, and the private-window warning is dropped; research R1 Result) Act on the spike, with research R1's outcome table. Record the outcome in research.md R1 under **Result**.
   - **All pass:** carry on.
   - **`localhost` is not a secure context in a browser:** flip the canonical origin to `http://127.0.0.1:<port>` in research R2/R3/R5, contracts/loopback-listener.md, contracts/browser-auth.md and the spec's FR-004/FR-005/edge case. Tell Alex in the turn's ending.
   - **Vectors differ:** fix the byte handling in the spike until they match. Nothing goes on until they do.
@@ -148,6 +148,7 @@ wire client. Every story needs them.
 
 - [ ] T022 [P] Write `Web/src/wire/keys.ts`, as research R4 and data-model.md:
   - `storage.persist()`, then `generateKey` (non-extractable);
+  - the client id made with `crypto.randomUUID().toUpperCase()` (spike S1);
   - IndexedDB `agents`/`key`/`self`;
   - read back and check `extractable === false`;
   - export the public key as raw;
@@ -201,7 +202,7 @@ either side.
   - a paste field and nothing else;
   - the refusal words from contracts/browser-auth.md;
   - "This browser isn't supported", naming Safari and Chrome;
-  - the private-window note, if T002 found `persist()` can tell;
+  - no private-window note: T002 found Chrome cannot tell one apart, so the how-to carries it;
   - no code in any URL;
   - focus on the field.
 - [ ] T031 [US1] Build `Web/src/App.tsx`'s start-up:
