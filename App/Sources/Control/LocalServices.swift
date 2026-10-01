@@ -48,7 +48,23 @@ struct LocalServices {
         scratch ? await bootstrapScratch() : registerWithSystem()
     }
 
-    /// Takes both away again. Only walks and tests call this for now.
+    /// `Agents --remove-services`: unregister the jobs and quit, opening no window. Only
+    /// the bundle that registered a job may unregister it, so ship.sh's `--switch` asks the
+    /// window to before Agents Host runs the same two (058, T105a).
+    static let removeFlag = "--remove-services"
+
+    /// Blocks the launch until both are gone, then exits.
+    static func removeAndExit() -> Never {
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            await forThisWindow.remove()
+            done.signal()
+        }
+        done.wait()
+        exit(0)
+    }
+
+    /// Takes both away again: walks, tests and `--remove-services`.
     func remove() async {
         if scratch {
             for label in [controlLabel, hostLabel, hostOnlyLabel] { _ = await Self.launchctl(["bootout", "gui/\(getuid())/\(label)"]) }

@@ -459,8 +459,9 @@ again.
   - the relay passing the exchange through.
 - [x] T103 (walks/suite-compare.md: alternating six runs, the branch below main; main's RawHTTP taken off the pool, ControlAgreement on CryptoKit where present) Compare six full runs of `swift test` in `Packages/AgentsKit` and `Packages/ControlPlane` on this branch and on main. Build both schemes and the store configuration, and pass the Linux gate.
 - [x] T104 (main merged e682db9a and 14884087, main at 84519ec8; every scheme, both packages and the Linux gate built again) Merge `main` again before closing, and re-run T103's builds.
-- [ ] T105 Alex's own move: only with his go-ahead (AskUserQuestion), and with the hand-started bridge on 8790 stopped first.
-- [ ] T106 In a **separate** change, after T105 is walked, remove:
+- [x] T105 (moved 2026-09-30 19:32 through the developer window's own jobs: `agents-bridge --control-plane` on 8790/8791 and `agentsd --control-home`, with the window paired as an operator; the iPhone re-paired, by Alex's word) Alex's own move: only with his go-ahead (AskUserQuestion), and with the hand-started bridge on 8790 stopped first.
+- [ ] T105a Switch the live set-up from the developer window's jobs to Agents Host and the store window, since T106 removes the path T105 used. `ship.sh --switch` (once): the window unregisters its jobs (`Agents --remove-services`), the old bridges stop, `Agents Control` is moved aside, and Agents Host and the store window are installed and opened. Alex then presses Run it here, Move Across… and pairs the window, iPhone and iPad. From then on, `ship.sh` builds and ships `AgentsHost`, `AgentsStore` and the Remote.
+- [ ] T106 In a **separate** change, after T105a, remove:
   - the developer window path (`SocketLink` spawning, `HostSet`, `LocalServices` in the window);
   - the bridge's `DirectLink` and `Bridge/`;
   - the `AGENTS_STORE` switch, so the store configuration is the only one;
@@ -485,7 +486,7 @@ again.
 - **US7** needs US2 and T072.
 - **US8** needs US1 and T091.
 - **US9** needs US2.
-- **Polish** comes last, and T106 only after T105.
+- **Polish** comes last, and T106 only after T105 and T105a.
 
 ## Parallel opportunities
 

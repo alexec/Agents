@@ -13,6 +13,12 @@ struct AgentsApp: App {
     @State private var requests = WindowRequests()
     @State private var frame = SidebarFrame()
 
+    init() {
+        #if !AGENTS_STORE
+        if CommandLine.arguments.contains(LocalServices.removeFlag) { LocalServices.removeAndExit() }
+        #endif
+    }
+
     var body: some Scene {
         // Still a `WindowGroup`, but one window in practice: File ▸ New Window is
         // replaced by New Session (see `AgentsCommands`), and tabbing is off. Not a

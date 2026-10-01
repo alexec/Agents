@@ -1,4 +1,4 @@
-import AgentsKit
+import AgentsKitCore
 import SwiftUI
 
 /// Session labels as small chips, with the person's add and remove actions.
