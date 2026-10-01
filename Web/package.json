@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "tsc --noEmit -p . && node test/lint.mjs && node test/licences.mjs",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@preact/signals": "2.11.3",

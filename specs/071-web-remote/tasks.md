@@ -170,7 +170,7 @@ wire client. Every story needs them.
   Test in `Web/test/link.test.mjs` with a fake server.
 - [x] T025 [P] Write `Web/src/log.ts`, the only console writer: a fixed event name and an error code. Add `Web/test/secrets.test.mjs`, which runs pairing and a prompt through `link.ts` against the fake server with `console` spied, and fails if any argument holds the code, key bytes or message text (SC-008, FR-033).
 - [x] T026 [P] Write `Web/src/theme/paper.css`: the Paper palette and corner radii from `Shared/UI/Paper.swift`, and the state tints from `Shared/UI/StateTint.swift`, as CSS variables under `prefers-color-scheme` light and dark (FR-020). No web fonts: the system font stack.
-- [ ] T027 Walk tooling. Write `Web/test/walk/cdp.mjs`, a dependency-free CDP client on Node's built-in `WebSocket`, to:
+- [x] T027 (`Web/test/walk/cdp.mjs`; launch.sh serves the checkout's Web/dist on a free port and prints `WEB_URL`; smoke-tested with the real agents-control in headless Chrome 154: secure context, Paper ground, the 308, the page's own socket hears `hello`, no CSP violations) Walk tooling. Write `Web/test/walk/cdp.mjs`, a dependency-free CDP client on Node's built-in `WebSocket`, to:
   - launch and quit headless Chrome on a profile;
   - open a URL and set the viewport;
   - press by accessible name, type and paste;

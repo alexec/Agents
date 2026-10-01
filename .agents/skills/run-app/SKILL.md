@@ -52,7 +52,9 @@ and `-scheme AgentsStore`, one after the other, into the one `build/DD`, with `-
 nothing has changed since the last one. The build log is at
 `/tmp/run-<slug>-build.log`. Then it:
 1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
-   no Bonjour (its log is `$ROOT/control/control.log`);
+   no Bonjour (its log is `$ROOT/control/control.log`), serving the web remote (071) from
+   this checkout's `Web/dist` on another free loopback port, printed as `WEB_URL` (never
+   the live 8792);
 2. starts `agentsd --control-code <host code>` on `$ROOT`, as Agents Host's launch agent
    would, with this session's `CLAUDE_*` and `AGENTS_*` taken out of its environment;
 3. opens the window with `AGENTS_CONTROL=<operator code>` and `--walk run-<slug>`: it
@@ -212,3 +214,12 @@ xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' \
 
 A fake device (`FakeDeviceLiveTests`) stands in for a phone against a scratch
 control plane; the phone's look is the user's.
+
+## The web remote in a browser (071)
+
+`WEB_URL` is the scratch control plane's web remote. Walk it in headless Chrome with a
+throwaway profile, never Alex's own browser: `node Web/test/walk/cdp.mjs` is a dependency-free
+DevTools client (launch, open, set the viewport, press by accessible name, type, screenshot,
+read the console and network). Pair it with a code made as above (`code --client device`).
+Safari is walked only with Alex's go-ahead, asked with the question tool.
+

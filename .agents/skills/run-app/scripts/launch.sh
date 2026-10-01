@@ -68,6 +68,9 @@ CLEAN=(env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" TMPDIR="${TMPDIR:-/tmp}"
 # The control plane: a single copy on a free loopback port, its store, key and certificate
 # in <root>/control, and no Bonjour, so no window on the network finds it.
 PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+# The web remote (071): the checked-in Web/dist on a free loopback port of the root's own,
+# never the live 8792, so a scratch browser's key is bound to a scratch origin.
+WEB_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
 URL="https://127.0.0.1:$PORT"
 if [ "$LAN" = 1 ]; then
   # A container cannot reach this Mac's loopback (test-servers).
@@ -81,6 +84,7 @@ SERVERS=()
 "${CLEAN[@]}" ${SSH_AUTH_SOCK:+SSH_AUTH_SOCK="$SSH_AUTH_SOCK"} AGENTS_CONTROL_URL="$URL" AGENTS_CONTROL_NAME="run-$SLUG" \
   ${SERVERS[@]+"${SERVERS[@]}"} ${CONTROL_ENV[@]+"${CONTROL_ENV[@]}"} \
   nohup "$CONTROL" serve --home "$ROOT/control" --port "$PORT" --no-bonjour \
+    --web "$REPO/Web/dist" --web-port "$WEB_PORT" \
   >"$ROOT/control/control.log" 2>&1 &
 echo $! >"$ROOT/control/control.pid"
 for _ in $(seq 1 100); do
@@ -134,6 +138,7 @@ APP_PID=${APP_PID:-none}
 DAEMON_PID=${DAEMON_PID:-unknown}
 CONTROL_PID=$(cat "$ROOT/control/control.pid")
 CONTROL_URL=$URL
+WEB_URL=http://localhost:$WEB_PORT/
 PAIR_CODE=${PAIR_CODE:-}
 SOCK=$ROOT/daemon.sock
 LOG=$ROOT/daemon.log
