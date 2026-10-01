@@ -49,6 +49,25 @@ extension ControlServiceTests {
         await eventually { await running.service.methods.host(host)?.knownEpoch == 1 }
     }
 
+    @Test func aMemberIsCountedAsToldOnTheConnectionThatTellsIt() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        try await running.service.methods.setEndpoints([ControlEndpoint(url: running.url.absoluteString)])
+        // A build that keeps a list: told, and counted at once.
+        let (keeping, _, credentials) = try await pairedClient(at: running.url,
+                                                               code: try await running.service.codes.issue(.client(.device)).text)
+        let book = EndpointBook(ControlMembership(client: keeping, controlKey: control.publicKey, addresses: [],
+                                                  name: "test", url: running.url.absoluteString))
+        try await ControlCodeUse.dialEach(book, as: credentials, dial: ControlJoin.nio).close()
+        await eventually { await running.service.methods.client(keeping)?.knownEpoch == 1 }
+        // A build from before (no epoch in its auth): never counted, so listed as can't follow.
+        let (older, _, oldCredentials) = try await pairedClient(at: running.url,
+                                                                code: try await running.service.codes.issue(.client(.device)).text)
+        try await join(running.url, oldCredentials).close()
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(await running.service.methods.client(older)?.knownEpoch == nil)
+    }
+
     @Test func anOldPlaceThatNoLongerAnswersIsPassedOver() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }

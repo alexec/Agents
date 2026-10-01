@@ -87,7 +87,9 @@ public enum ControlCodeUse {
         for endpoint in book.order {
             guard let url = URL(string: endpoint.url), let origin = ControlAuth.origin(url) else { continue }
             var proving = credentials
-            proving.epoch = book.epoch
+            // Always said, 0 for none: a build that keeps a list says so, and takes the
+            // list it is given (R16), so the control plane may count it as told.
+            proving.epoch = book.epoch ?? 0
             do {
                 let (reader, _, ok) = try await ControlAuth.join(try await dial(url, endpoint.pin), origin: origin, as: proving)
                 book.answered(at: endpoint, ok: ok)

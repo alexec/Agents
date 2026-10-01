@@ -392,7 +392,10 @@ public final class ControlService: @unchecked Sendable {
                 mac: ControlCode.base64url(mac), grant: admitted.client?.grant, host: admitted.host,
                 relayed: relayed ? true : nil, endpoints: announced ? settings.currentEndpoints : nil,
                 epoch: settings.epoch)).line)
-            if let epoch = auth.epoch {
+            // A member that says an epoch keeps a list, and takes the one just given: it
+            // now holds the newer of the two. One that says none can't follow a move.
+            if let held = auth.epoch {
+                let epoch = max(held, announced ? settings.epoch ?? 0 : 0)
                 switch identity {
                 case .client(let id): Task { await self.methods.noteEpoch(client: id, epoch) }
                 case .host(let id): Task { await self.methods.noteEpoch(host: id, epoch) }
