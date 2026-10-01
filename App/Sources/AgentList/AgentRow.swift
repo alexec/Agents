@@ -319,7 +319,8 @@ struct StatusIcon: View {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .font(.system(size: 15))
-                    .foregroundStyle((shape.wantsAPerson && !isParked && !isWaitingForAllowance ? StateTint.attention : .none)
+                    .foregroundStyle((StatusShape.isTinted(shape, isParked: isParked, isWaitingForAllowance: isWaitingForAllowance)
+                                      ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
                 SyncedSpinner(diameter: 12)
@@ -330,29 +331,12 @@ struct StatusIcon: View {
         .accessibilityLabel(description)
     }
 
-    /// The outcome, where the turn it describes is the one the agent is settled on.
-    private var settledOutcome: WorkOutcome? {
-        state == .finished && !isComingBack ? outcome : nil
-    }
-
-    /// What a screen reader hears, and what the tooltip says. Precise where the shape
-    /// is not: the outcome's words come from `WorkOutcome.heading`, which the phone
-    /// reads too, and a stopped agent says why.
+    /// What a screen reader hears, and what the tooltip says: `StatusShape.words`, which
+    /// the web remote says too.
     private var description: String {
-        if isComingBack { return AgentsModel.comingBackDescription }
-        if isUnread && state == .finished { return "Unread · \(outcome?.heading ?? "Finished")" }
-        if isWaitingForAllowance { return "Waiting for an allowance" }
-        if shape == .waiting { return StatusShape.waitingLabel }
-        if let settledOutcome { return settledOutcome.heading }
-        if isUnaccountedFor && state == .finished { return "Finished without saying how it went" }
-        switch state {
-        case .running: return "Working"
-        case .starting: return AgentState.startingLabel
-        case .waitingOnUser: return "Waiting on you"
-        case .finished: return "Finished"
-        case .stopped: return ending ?? "Stopped"
-        case .archived: return "Archived"
-        }
+        StatusShape.words(shape, state: state, isComingBack: isComingBack, outcome: outcome,
+                          isUnaccountedFor: isUnaccountedFor, ending: ending, isUnread: isUnread,
+                          isWaitingForAllowance: isWaitingForAllowance)
     }
 }
 

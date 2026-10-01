@@ -1,0 +1,230 @@
+[
+  {
+    "expected" : {
+      "line" : "  List the files  ",
+      "turnLine" : "List the files"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "execute",
+        "locations" : [
+
+        ],
+        "rawInput" : {
+          "description" : "  List the files  "
+        },
+        "title" : "ls -la",
+        "toolCallID" : "1"
+      }
+    },
+    "name" : "described"
+  },
+  {
+    "expected" : {
+      "line" : "Read a.swift",
+      "turnLine" : "Read file"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "read",
+        "locations" : [
+
+        ],
+        "name" : "Read",
+        "title" : "Read a.swift",
+        "toolCallID" : "2"
+      }
+    },
+    "name" : "read"
+  },
+  {
+    "expected" : {
+      "line" : "Edit",
+      "turnLine" : "Edit file (Multi Edit)"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "edit",
+        "locations" : [
+
+        ],
+        "name" : "MultiEdit",
+        "title" : "Edit",
+        "toolCallID" : "3"
+      }
+    },
+    "name" : "edit, named"
+  },
+  {
+    "expected" : {
+      "line" : "make",
+      "turnLine" : "Run command (Bash)"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "execute",
+        "locations" : [
+
+        ],
+        "name" : "Bash",
+        "title" : "make",
+        "toolCallID" : "4"
+      }
+    },
+    "name" : "execute named Bash"
+  },
+  {
+    "expected" : {
+      "line" : "x",
+      "turnLine" : "Mcp Agents Show File"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "other",
+        "locations" : [
+
+        ],
+        "name" : "mcp__agents__show_file",
+        "title" : "x",
+        "toolCallID" : "5"
+      }
+    },
+    "name" : "other, an MCP tool"
+  },
+  {
+    "expected" : {
+      "line" : "x",
+      "turnLine" : "Used a tool"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "other",
+        "locations" : [
+
+        ],
+        "title" : "x",
+        "toolCallID" : "6"
+      }
+    },
+    "name" : "other, unnamed"
+  },
+  {
+    "expected" : {
+      "line" : "x",
+      "turnLine" : "Think"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "think",
+        "locations" : [
+
+        ],
+        "title" : "x",
+        "toolCallID" : "7"
+      }
+    },
+    "name" : "think, a kind of its own"
+  },
+  {
+    "expected" : {
+      "line" : "x",
+      "turnLine" : "Search files"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "search",
+        "locations" : [
+
+        ],
+        "name" : "search",
+        "title" : "x",
+        "toolCallID" : "8"
+      }
+    },
+    "name" : "search named search"
+  },
+  {
+    "expected" : {
+      "line" : "x",
+      "turnLine" : "Web Fetch"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "locations" : [
+
+        ],
+        "name" : "WebFetch",
+        "title" : "x",
+        "toolCallID" : "9"
+      }
+    },
+    "name" : "no kind, camel name"
+  },
+  {
+    "expected" : {
+      "line" : "Tool call",
+      "turnLine" : "Used a tool"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "locations" : [
+
+        ],
+        "title" : "Tool call",
+        "toolCallID" : "10"
+      }
+    },
+    "name" : "nothing at all"
+  },
+  {
+    "expected" : {
+      "line" : "GET",
+      "turnLine" : "Fetch data (Fetch Url)"
+    },
+    "input" : {
+      "call" : {
+        "content" : [
+
+        ],
+        "kind" : "Fetch",
+        "locations" : [
+
+        ],
+        "name" : "fetch_url",
+        "title" : "GET",
+        "toolCallID" : "11"
+      }
+    },
+    "name" : "fetch"
+  }
+]

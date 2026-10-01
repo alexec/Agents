@@ -1,0 +1,740 @@
+[
+  {
+    "expected" : {
+      "agents" : [
+        "00000000-0000-0000-0000-000000000060",
+        "00000000-0000-0000-0000-000000000061"
+      ],
+      "elicitations" : [
+
+      ],
+      "entries" : [
+
+      ],
+      "firstEntryIndex" : 0,
+      "items" : [
+
+      ],
+      "permissions" : [
+
+      ]
+    },
+    "input" : {
+      "steps" : [
+        {
+          "notify" : {
+            "method" : "agent/changed",
+            "params" : {
+              "advertisedOptions" : [
+
+              ],
+              "availableCommands" : [
+
+              ],
+              "createdAt" : 812500000,
+              "cwd" : "file:///fixture/project/",
+              "id" : "00000000-0000-0000-0000-000000000060",
+              "lastActivityAt" : 812500060,
+              "runtimeID" : "claude",
+              "startOptions" : {
+                "extraArguments" : [
+
+                ],
+                "values" : {
+
+                }
+              },
+              "state" : "running",
+              "title" : "Session 60"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/changed",
+            "params" : {
+              "advertisedOptions" : [
+
+              ],
+              "availableCommands" : [
+
+              ],
+              "createdAt" : 812500000,
+              "cwd" : "file:///fixture/project/",
+              "id" : "00000000-0000-0000-0000-000000000061",
+              "lastActivityAt" : 812500120,
+              "report" : {
+                "at" : 812500060,
+                "message" : "It went.",
+                "outcome" : "done"
+              },
+              "runtimeID" : "claude",
+              "startOptions" : {
+                "extraArguments" : [
+
+                ],
+                "values" : {
+
+                }
+              },
+              "state" : "finished",
+              "title" : "Session 61"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/changed",
+            "params" : {
+              "advertisedOptions" : [
+
+              ],
+              "availableCommands" : [
+
+              ],
+              "createdAt" : 812500000,
+              "cwd" : "file:///fixture/project/",
+              "id" : "00000000-0000-0000-0000-000000000060",
+              "lastActivityAt" : 812500540,
+              "runtimeID" : "claude",
+              "startOptions" : {
+                "extraArguments" : [
+
+                ],
+                "values" : {
+
+                }
+              },
+              "state" : "running",
+              "title" : "Session 60"
+            }
+          }
+        }
+      ]
+    },
+    "name" : "agents arrive and change, newest first"
+  },
+  {
+    "expected" : {
+      "agents" : [
+        "00000000-0000-0000-0000-000000000061"
+      ],
+      "elicitations" : [
+
+      ],
+      "entries" : [
+
+      ],
+      "firstEntryIndex" : 0,
+      "items" : [
+
+      ],
+      "permissions" : [
+
+      ]
+    },
+    "input" : {
+      "steps" : [
+        {
+          "notify" : {
+            "method" : "agent/changed",
+            "params" : {
+              "advertisedOptions" : [
+
+              ],
+              "availableCommands" : [
+
+              ],
+              "createdAt" : 812500000,
+              "cwd" : "file:///fixture/project/",
+              "id" : "00000000-0000-0000-0000-000000000060",
+              "lastActivityAt" : 812500060,
+              "runtimeID" : "claude",
+              "startOptions" : {
+                "extraArguments" : [
+
+                ],
+                "values" : {
+
+                }
+              },
+              "state" : "running",
+              "title" : "Session 60"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/changed",
+            "params" : {
+              "advertisedOptions" : [
+
+              ],
+              "availableCommands" : [
+
+              ],
+              "createdAt" : 812500000,
+              "cwd" : "file:///fixture/project/",
+              "id" : "00000000-0000-0000-0000-000000000061",
+              "lastActivityAt" : 812500120,
+              "report" : {
+                "at" : 812500060,
+                "message" : "It went.",
+                "outcome" : "done"
+              },
+              "runtimeID" : "claude",
+              "startOptions" : {
+                "extraArguments" : [
+
+                ],
+                "values" : {
+
+                }
+              },
+              "state" : "finished",
+              "title" : "Session 61"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/permission",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "request" : {
+                "agentID" : "00000000-0000-0000-0000-000000000060",
+                "askedAt" : 812500180,
+                "id" : "00000000-0000-0000-0000-000000000070",
+                "options" : [
+                  {
+                    "kind" : "allow_once",
+                    "name" : "Allow",
+                    "optionID" : "allow"
+                  },
+                  {
+                    "kind" : "reject_once",
+                    "name" : "Deny",
+                    "optionID" : "deny"
+                  }
+                ],
+                "toolCall" : {
+                  "content" : [
+
+                  ],
+                  "kind" : "execute",
+                  "locations" : [
+
+                  ],
+                  "title" : "rm -rf build",
+                  "toolCallID" : "p1"
+                }
+              },
+              "requestID" : "00000000-0000-0000-0000-000000000070"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/elicitation",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "request" : {
+                "agentID" : "00000000-0000-0000-0000-000000000060",
+                "askedAt" : 812500180,
+                "id" : "00000000-0000-0000-0000-000000000072",
+                "message" : "Which?",
+                "mode" : {
+                  "form" : {
+                    "_0" : {
+                      "properties" : [
+                        {
+                          "isRequired" : true,
+                          "kind" : {
+                            "string" : {
+                              "choices" : [
+                                {
+                                  "title" : "a",
+                                  "value" : "a"
+                                },
+                                {
+                                  "title" : "b",
+                                  "value" : "b"
+                                }
+                              ]
+                            }
+                          },
+                          "name" : "pick"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "scope" : "request"
+              },
+              "requestID" : "00000000-0000-0000-0000-000000000072"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/removed",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060"
+            }
+          }
+        }
+      ]
+    },
+    "name" : "an agent removed takes its cards with it"
+  },
+  {
+    "expected" : {
+      "agents" : [
+
+      ],
+      "elicitations" : [
+
+      ],
+      "entries" : [
+
+      ],
+      "firstEntryIndex" : 0,
+      "items" : [
+
+      ],
+      "permissions" : [
+        "00000000-0000-0000-0000-000000000070"
+      ]
+    },
+    "input" : {
+      "steps" : [
+        {
+          "notify" : {
+            "method" : "agent/permission",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "request" : {
+                "agentID" : "00000000-0000-0000-0000-000000000060",
+                "askedAt" : 812500180,
+                "id" : "00000000-0000-0000-0000-000000000070",
+                "options" : [
+                  {
+                    "kind" : "allow_once",
+                    "name" : "Allow",
+                    "optionID" : "allow"
+                  },
+                  {
+                    "kind" : "reject_once",
+                    "name" : "Deny",
+                    "optionID" : "deny"
+                  }
+                ],
+                "toolCall" : {
+                  "content" : [
+
+                  ],
+                  "kind" : "execute",
+                  "locations" : [
+
+                  ],
+                  "title" : "rm -rf build",
+                  "toolCallID" : "p1"
+                }
+              },
+              "requestID" : "00000000-0000-0000-0000-000000000070"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/permission",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000061",
+              "request" : {
+                "agentID" : "00000000-0000-0000-0000-000000000061",
+                "askedAt" : 812500060,
+                "id" : "00000000-0000-0000-0000-000000000071",
+                "options" : [
+
+                ],
+                "toolCall" : {
+                  "content" : [
+
+                  ],
+                  "locations" : [
+
+                  ],
+                  "title" : "Write a",
+                  "toolCallID" : "p2"
+                }
+              },
+              "requestID" : "00000000-0000-0000-0000-000000000071"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/permission",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "requestID" : "00000000-0000-0000-0000-000000000070"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/permission",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "request" : {
+                "agentID" : "00000000-0000-0000-0000-000000000060",
+                "askedAt" : 812500180,
+                "id" : "00000000-0000-0000-0000-000000000070",
+                "options" : [
+                  {
+                    "kind" : "allow_once",
+                    "name" : "Allow",
+                    "optionID" : "allow"
+                  },
+                  {
+                    "kind" : "reject_once",
+                    "name" : "Deny",
+                    "optionID" : "deny"
+                  }
+                ],
+                "toolCall" : {
+                  "content" : [
+
+                  ],
+                  "kind" : "execute",
+                  "locations" : [
+
+                  ],
+                  "title" : "rm -rf build",
+                  "toolCallID" : "p1"
+                }
+              },
+              "requestID" : "00000000-0000-0000-0000-000000000070"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/permission",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000061"
+            }
+          }
+        }
+      ]
+    },
+    "name" : "permissions in order asked, withdrawn by id or all at once"
+  },
+  {
+    "expected" : {
+      "agents" : [
+
+      ],
+      "elicitations" : [
+
+      ],
+      "entries" : [
+
+      ],
+      "firstEntryIndex" : 0,
+      "items" : [
+
+      ],
+      "permissions" : [
+
+      ]
+    },
+    "input" : {
+      "steps" : [
+        {
+          "notify" : {
+            "method" : "agent/elicitation",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "request" : {
+                "agentID" : "00000000-0000-0000-0000-000000000060",
+                "askedAt" : 812500180,
+                "id" : "00000000-0000-0000-0000-000000000072",
+                "message" : "Which?",
+                "mode" : {
+                  "form" : {
+                    "_0" : {
+                      "properties" : [
+                        {
+                          "isRequired" : true,
+                          "kind" : {
+                            "string" : {
+                              "choices" : [
+                                {
+                                  "title" : "a",
+                                  "value" : "a"
+                                },
+                                {
+                                  "title" : "b",
+                                  "value" : "b"
+                                }
+                              ]
+                            }
+                          },
+                          "name" : "pick"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "scope" : "request"
+              },
+              "requestID" : "00000000-0000-0000-0000-000000000072"
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/elicitation",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "requestID" : "00000000-0000-0000-0000-000000000072"
+            }
+          }
+        }
+      ]
+    },
+    "name" : "a question asked and answered"
+  },
+  {
+    "expected" : {
+      "agents" : [
+
+      ],
+      "elicitations" : [
+
+      ],
+      "entries" : [
+        "00000000-0000-0000-0000-000000001001",
+        "00000000-0000-0000-0000-000000001002"
+      ],
+      "firstEntryIndex" : 0,
+      "items" : [
+        {
+          "entry" : "00000000-0000-0000-0000-000000001001",
+          "kind" : "agentMessage",
+          "text" : "Hello"
+        }
+      ],
+      "permissions" : [
+
+      ]
+    },
+    "input" : {
+      "steps" : [
+        {
+          "watch" : "00000000-0000-0000-0000-000000000060"
+        },
+        {
+          "notify" : {
+            "method" : "agent/entry",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "entry" : {
+                "at" : 812500006,
+                "id" : "00000000-0000-0000-0000-000000001001",
+                "kind" : {
+                  "agentMessage" : {
+                    "messageID" : "r",
+                    "text" : "Hel"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/entry",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "entry" : {
+                "at" : 812500012,
+                "id" : "00000000-0000-0000-0000-000000001002",
+                "kind" : {
+                  "agentMessage" : {
+                    "messageID" : "r",
+                    "text" : "lo"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/entry",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000061",
+              "entry" : {
+                "at" : 812500018,
+                "id" : "00000000-0000-0000-0000-000000001003",
+                "kind" : {
+                  "agentMessage" : {
+                    "messageID" : "r",
+                    "text" : "Not mine"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "name" : "entries for the agent watched, and no other"
+  },
+  {
+    "expected" : {
+      "agents" : [
+
+      ],
+      "elicitations" : [
+
+      ],
+      "entries" : [
+        "00000000-0000-0000-0000-000000001001",
+        "00000000-0000-0000-0000-000000001004",
+        "00000000-0000-0000-0000-000000001005",
+        "00000000-0000-0000-0000-000000001006"
+      ],
+      "firstEntryIndex" : 3,
+      "items" : [
+        {
+          "entry" : "00000000-0000-0000-0000-000000001001",
+          "kind" : "userMessage",
+          "text" : "Hi"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001004",
+          "kind" : "agentMessage",
+          "text" : "on the page"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001005",
+          "kind" : "agentMessage",
+          "text" : "late and more"
+        }
+      ],
+      "permissions" : [
+
+      ]
+    },
+    "input" : {
+      "steps" : [
+        {
+          "watch" : "00000000-0000-0000-0000-000000000060"
+        },
+        {
+          "notify" : {
+            "method" : "agent/entry",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "entry" : {
+                "at" : 812500030,
+                "id" : "00000000-0000-0000-0000-000000001005",
+                "kind" : {
+                  "agentMessage" : {
+                    "messageID" : "r",
+                    "text" : "late"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/entry",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "entry" : {
+                "at" : 812500024,
+                "id" : "00000000-0000-0000-0000-000000001004",
+                "kind" : {
+                  "agentMessage" : {
+                    "messageID" : "r",
+                    "text" : "on the page"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "page" : {
+            "entries" : [
+              {
+                "at" : 812500006,
+                "id" : "00000000-0000-0000-0000-000000001001",
+                "kind" : {
+                  "userMessage" : {
+                    "_0" : "Hi"
+                  }
+                }
+              },
+              {
+                "at" : 812500024,
+                "id" : "00000000-0000-0000-0000-000000001004",
+                "kind" : {
+                  "agentMessage" : {
+                    "messageID" : "q",
+                    "text" : "on the page"
+                  }
+                }
+              }
+            ],
+            "firstIndex" : 3,
+            "total" : 5
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/entry",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "entry" : {
+                "at" : 812500024,
+                "id" : "00000000-0000-0000-0000-000000001004",
+                "kind" : {
+                  "agentMessage" : {
+                    "messageID" : "r",
+                    "text" : "on the page"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "notify" : {
+            "method" : "agent/entry",
+            "params" : {
+              "agentID" : "00000000-0000-0000-0000-000000000060",
+              "entry" : {
+                "at" : 812500036,
+                "id" : "00000000-0000-0000-0000-000000001006",
+                "kind" : {
+                  "agentMessage" : {
+                    "messageID" : "r",
+                    "text" : " and more"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "name" : "entries heard before the page land after it, once"
+  }
+]

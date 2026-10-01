@@ -1,0 +1,40 @@
+[
+  {
+    "expected" : "ToolCallContent",
+    "input" : {
+      "content" : {
+        "text" : "out",
+        "type" : "text"
+      },
+      "type" : "content"
+    },
+    "name" : "content"
+  },
+  {
+    "expected" : "ToolCallContent",
+    "input" : {
+      "newText" : "b",
+      "oldText" : "a",
+      "path" : "/a.swift",
+      "type" : "diff"
+    },
+    "name" : "diff"
+  },
+  {
+    "expected" : "ToolCallContent",
+    "input" : {
+      "newText" : "b",
+      "path" : "/b.swift",
+      "type" : "diff"
+    },
+    "name" : "new file"
+  },
+  {
+    "expected" : "ToolCallContent",
+    "input" : {
+      "terminalId" : "term-1",
+      "type" : "terminal"
+    },
+    "name" : "terminal"
+  }
+]

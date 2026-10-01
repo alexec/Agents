@@ -1,0 +1,26 @@
+[
+  {
+    "expected" : "NeedID",
+    "input" : {
+      "permission" : "00000000-0000-0000-0000-000000000001"
+    },
+    "name" : "permission"
+  },
+  {
+    "expected" : "NeedID",
+    "input" : {
+      "elicitation" : "00000000-0000-0000-0000-000000000002"
+    },
+    "name" : "elicitation"
+  },
+  {
+    "expected" : "NeedID",
+    "input" : {
+      "report" : {
+        "agentID" : "00000000-0000-0000-0000-000000000003",
+        "at" : 812500000
+      }
+    },
+    "name" : "report"
+  }
+]

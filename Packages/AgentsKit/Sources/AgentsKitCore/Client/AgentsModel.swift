@@ -833,7 +833,7 @@ public final class AgentsModel {
 
     /// The one thing every client says about a chat on its way back, so the window
     /// and the phone cannot drift apart saying it.
-    public static let comingBackDescription = "Coming back after a restart"
+    public nonisolated static let comingBackDescription = "Coming back after a restart"
     public static let comingBackSymbol = "arrow.clockwise.circle"
 
     // MARK: Reading it back

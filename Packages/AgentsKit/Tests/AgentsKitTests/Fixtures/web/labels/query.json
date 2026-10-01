@@ -1,0 +1,512 @@
+[
+  {
+    "expected" : {
+      "label" : null,
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : ""
+    },
+    "name" : "empty"
+  },
+  {
+    "expected" : {
+      "label" : null,
+      "matches" : true,
+      "text" : "login"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "login"
+    },
+    "name" : "login"
+  },
+  {
+    "expected" : {
+      "label" : null,
+      "matches" : true,
+      "text" : "LOGINS"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "LOGINS"
+    },
+    "name" : "LOGINS"
+  },
+  {
+    "expected" : {
+      "label" : "bug",
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "label:bug"
+    },
+    "name" : "label:bug"
+  },
+  {
+    "expected" : {
+      "label" : "BUG",
+      "matches" : true,
+      "text" : "login"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "label:BUG login"
+    },
+    "name" : "label:BUG login"
+  },
+  {
+    "expected" : {
+      "label" : "web ui",
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "label:\"web ui\""
+    },
+    "name" : "label:\"web ui\""
+  },
+  {
+    "expected" : {
+      "label" : "web",
+      "matches" : false,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "label:web"
+    },
+    "name" : "label:web"
+  },
+  {
+    "expected" : {
+      "label" : "",
+      "matches" : false,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "label:"
+    },
+    "name" : "label:"
+  },
+  {
+    "expected" : {
+      "label" : null,
+      "matches" : false,
+      "text" : "nothing here"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "nothing here"
+    },
+    "name" : "nothing here"
+  },
+  {
+    "expected" : {
+      "label" : "bug",
+      "matches" : false,
+      "text" : "nothing"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "label:bug nothing"
+    },
+    "name" : "label:bug nothing"
+  }
+]

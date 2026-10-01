@@ -1,0 +1,81 @@
+[
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "schedule" : {
+        "_0" : {
+          "days" : [
+            "mon"
+          ],
+          "endMinute" : 30,
+          "hours" : [
+            9,
+            17
+          ],
+          "minutes" : [
+            30
+          ],
+          "startMinute" : 0
+        }
+      }
+    },
+    "name" : "schedule"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "agentFinished" : {
+
+      }
+    },
+    "name" : "agent finished"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "agentAskedPermission" : {
+
+      }
+    },
+    "name" : "asked permission"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "agentAskedForm" : {
+
+      }
+    },
+    "name" : "asked a form"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "agentStopped" : {
+
+      }
+    },
+    "name" : "stopped"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "workflowCompleted" : {
+        "id" : "nightly"
+      }
+    },
+    "name" : "workflow completed"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "unrecognised" : {
+        "keys" : {
+          "branch" : "main"
+        },
+        "name" : "ci.finished"
+      }
+    },
+    "name" : "event"
+  }
+]

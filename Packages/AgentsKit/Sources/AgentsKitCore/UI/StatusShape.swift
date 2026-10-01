@@ -75,3 +75,48 @@ public enum StatusShape: Hashable, Sendable {
     /// Whether this shape gets the app's one colour.
     public var wantsAPerson: Bool { self == .needsYou }
 }
+
+public extension StatusShape {
+    /// The shape an agent's row in the Mac's sessions list draws, asked the way the row
+    /// asks it. The web remote draws the same (071, research R7).
+    init(row agent: Agent, isComingBack: Bool) {
+        self.init(state: agent.state, outcome: agent.report?.outcome, isWaiting: agent.isWaiting,
+                  isComingBack: isComingBack, isUnread: agent.isUnread, endedReason: agent.endedReason,
+                  outcomeUnknown: agent.endingIsUnaccountedFor)
+    }
+
+    /// Whether the row draws the shape in the app's one colour: it wants a person, and the
+    /// person has not parked it or been told it waits for an allowance.
+    static func isTinted(_ shape: StatusShape, isParked: Bool, isWaitingForAllowance: Bool = false) -> Bool {
+        shape.wantsAPerson && !isParked && !isWaitingForAllowance
+    }
+
+    /// What a screen reader hears for the shape, and what the tooltip says. Precise where
+    /// the shape is not: the outcome's words come from `WorkOutcome.heading`, and a
+    /// stopped agent says why.
+    static func words(_ shape: StatusShape, state: AgentState, isComingBack: Bool, outcome: WorkOutcome?,
+                      isUnaccountedFor: Bool, ending: String?, isUnread: Bool,
+                      isWaitingForAllowance: Bool = false) -> String {
+        if isComingBack { return AgentsModel.comingBackDescription }
+        if isUnread && state == .finished { return "Unread · \(outcome?.heading ?? "Finished")" }
+        if isWaitingForAllowance { return "Waiting for an allowance" }
+        if shape == .waiting { return waitingLabel }
+        if state == .finished, let outcome { return outcome.heading }
+        if isUnaccountedFor && state == .finished { return "Finished without saying how it went" }
+        switch state {
+        case .running: return "Working"
+        case .starting: return AgentState.startingLabel
+        case .waitingOnUser: return "Waiting on you"
+        case .finished: return "Finished"
+        case .stopped: return ending ?? "Stopped"
+        case .archived: return "Archived"
+        }
+    }
+
+    /// The words for an agent's row, as `init(row:isComingBack:)` draws its shape.
+    static func words(row agent: Agent, isComingBack: Bool) -> String {
+        words(StatusShape(row: agent, isComingBack: isComingBack), state: agent.state, isComingBack: isComingBack,
+              outcome: agent.report?.outcome, isUnaccountedFor: agent.endingIsUnaccountedFor,
+              ending: agent.endedReason?.summary, isUnread: agent.isUnread)
+    }
+}

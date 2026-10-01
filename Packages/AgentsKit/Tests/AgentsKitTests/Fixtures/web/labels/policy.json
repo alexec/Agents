@@ -1,0 +1,136 @@
+[
+  {
+    "expected" : {
+      "accepted" : [
+        "bug"
+      ],
+      "finished" : [
+        "bug"
+      ],
+      "remainder" : " ui"
+    },
+    "input" : {
+      "existing" : [
+
+      ],
+      "typed" : "bug, ui"
+    },
+    "name" : "one finished, one typing"
+  },
+  {
+    "expected" : {
+      "accepted" : [
+        "bug"
+      ],
+      "finished" : [
+        "bug"
+      ],
+      "remainder" : ""
+    },
+    "input" : {
+      "existing" : [
+
+      ],
+      "typed" : "bug,"
+    },
+    "name" : "trailing comma"
+  },
+  {
+    "expected" : {
+      "accepted" : [
+        "Bug"
+      ],
+      "finished" : [
+        " Bug ",
+        " bug",
+        "  "
+      ],
+      "remainder" : "ui"
+    },
+    "input" : {
+      "existing" : [
+        "UI"
+      ],
+      "typed" : " Bug , bug,  ,ui"
+    },
+    "name" : "spaces and repeats"
+  },
+  {
+    "expected" : {
+      "accepted" : [
+        "ok"
+      ],
+      "finished" : [
+        "xxxxxxxxxxxxxxxxxxxxxxxxx",
+        "ok"
+      ],
+      "remainder" : ""
+    },
+    "input" : {
+      "existing" : [
+
+      ],
+      "typed" : "xxxxxxxxxxxxxxxxxxxxxxxxx,ok,"
+    },
+    "name" : "too long"
+  },
+  {
+    "expected" : {
+      "accepted" : [
+        "yyyyyyyyyyyyyyyyyyyyyyyy"
+      ],
+      "finished" : [
+        "yyyyyyyyyyyyyyyyyyyyyyyy"
+      ],
+      "remainder" : ""
+    },
+    "input" : {
+      "existing" : [
+
+      ],
+      "typed" : "yyyyyyyyyyyyyyyyyyyyyyyy,"
+    },
+    "name" : "exactly 24"
+  },
+  {
+    "expected" : {
+      "accepted" : [
+        "a"
+      ],
+      "finished" : [
+        "a",
+        "b",
+        "c"
+      ],
+      "remainder" : ""
+    },
+    "input" : {
+      "existing" : [
+        "one",
+        "two",
+        "three",
+        "four"
+      ],
+      "typed" : "a,b,c,"
+    },
+    "name" : "no room"
+  },
+  {
+    "expected" : {
+      "accepted" : [
+
+      ],
+      "finished" : [
+
+      ],
+      "remainder" : ""
+    },
+    "input" : {
+      "existing" : [
+
+      ],
+      "typed" : ""
+    },
+    "name" : "nothing"
+  }
+]

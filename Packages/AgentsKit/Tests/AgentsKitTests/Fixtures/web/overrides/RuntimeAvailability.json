@@ -1,0 +1,62 @@
+[
+  {
+    "expected" : "RuntimeAvailability",
+    "input" : {
+      "available" : {
+        "path" : "/bin/claude",
+        "supportsResume" : true
+      }
+    },
+    "name" : "available"
+  },
+  {
+    "expected" : "RuntimeAvailability",
+    "input" : {
+      "missing" : {
+        "lookedIn" : [
+          "/bin"
+        ]
+      }
+    },
+    "name" : "missing"
+  },
+  {
+    "expected" : "RuntimeAvailability",
+    "input" : {
+      "needsSignIn" : {
+        "authMethods" : [
+          "oauth"
+        ],
+        "fixCommand" : "claude login"
+      }
+    },
+    "name" : "needs sign-in"
+  },
+  {
+    "expected" : "RuntimeAvailability",
+    "input" : {
+      "failed" : {
+        "reason" : "no"
+      }
+    },
+    "name" : "failed"
+  },
+  {
+    "expected" : "RuntimeAvailability",
+    "input" : {
+      "installing" : {
+        "progress" : "50%"
+      }
+    },
+    "name" : "installing"
+  },
+  {
+    "expected" : "RuntimeAvailability",
+    "input" : {
+      "installFailed" : {
+        "reason" : "no"
+      }
+    },
+    "name" : "install failed"
+  }
+]

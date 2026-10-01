@@ -1,0 +1,18 @@
+[
+  {
+    "expected" : "Surface",
+    "input" : {
+      "mac" : {
+
+      }
+    },
+    "name" : "mac"
+  },
+  {
+    "expected" : "Surface",
+    "input" : {
+      "device" : "00000000-0000-0000-0000-000000000004"
+    },
+    "name" : "device"
+  }
+]
