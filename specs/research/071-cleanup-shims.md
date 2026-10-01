@@ -94,6 +94,7 @@ record is set aside (or the field is lost) instead of read.
 | D24 | `Credentials/CredentialStore.swift:52,65`, `App/Sources/Settings/ServerCredentials.swift:43` | 047 / 056 | `credentials.json` entries for Codex's OpenAI key and Claude's token | Forgets them and deletes their Keychain items, on every Settings open. The per-entry decode at `:52` is also forward-compatible (an unknown kind costs only itself) — **keep that half**. |
 | D25 | `App/Sources/Sidebar/SidebarState.swift:96–122` | 022 width change (09-24) | A stored sidebar width near the old 380 default | Widens once and sets `sidebar.widenedForReadingStep`. |
 | D26 | `Store/AllowanceStore.swift:6` | 065 | `pool.json`, `switches.jsonl` | Not read. The two URLs were dead and went in step 1 (8b779d4e); only the comment saying the files are left on disk remains. |
+| D27 | `Model/QueuedPrompt.swift:41` | 014 | A queued prompt with no `from`, `queuedAt` or `attachments` | Hand-written decoder only for those defaults. |
 
 ## Wire and peers
 
@@ -124,6 +125,7 @@ sends for one. Removing one means that peer gets an error or less than it had.
 | W20 | `Daemon/DaemonAPI.swift:422` | 051 | daemon → older window | `agent/removed` is ignored by an older window, which drops the agent at its next list. Nothing to remove here. |
 | W21 | `Client/AgentsModel.swift:139`, `App/Sources/AppModel.swift:78` | 051 | daemon → window | `retentionState` nil "from a daemon before 051". It is also nil until the first answer, so the optional stays; only the comment is a shim. |
 | W22 | `Daemon/DaemonAPI.swift:162,246`, `DaemonCore+Dispatch.swift:579,697`, `ConnectionRole.swift:31`, `DaemonCore+AppTools.swift:124` | 023 R5 (09-29) | older helper → daemon | `agents/suggestPrompts` and `agents/reportOutcome`: the helper stopped relaying them when the tool names were retired, so only a helper binary from before then calls them. Thirteen calls in seven test files use `reportOutcome` directly as a shortcut; they would move to `finishTurn`. |
+| W23 | `Daemon/DaemonAPI.swift` `agentsMoveSelf` | 053 aliases retired 09-29 | older helper → daemon | `enter_worktree` / `exit_worktree` relayed by a helper from before `finish_turn` carried the move. |
 
 ## Left to 058 (T106 / T042)
 
@@ -173,3 +175,48 @@ Kept on purpose:
 - **The Blocked group** (W6): not dead code in the sense of step 1, since an older
   daemon can still send it. It goes or stays with the cut-off.
 - **The 058-owned hits** listed above.
+
+## Step 4: the cut-off, and what it did
+
+Alex chose on 2026-09-30: **drop every shim for something older than 051; keep the
+newer ones, each with a comment saying why.** A record that no longer reads is left on
+disk and logged (agents), set aside beside itself (`hosts.json`), or kept whole as
+unrecognised (transcript entries); none is decoded into something it was not.
+
+Removed:
+
+- **D3, D1, D2 (in part), D4**: `hosts.json` from before 043 does not read, and is set
+  aside rather than read as no servers and written over. Facts are re-probed on every
+  connect, so facts that do not read cost the facts, not the server. A bare-path
+  selected project is no project.
+- **D7, D12, D13**: the cut of four suggested prompts to one, the `archivedAt` stamp
+  for agents archived before 051, the cost seeded for chats run before banking.
+  A pre-051 archived agent with no `archivedAt` is now simply kept (retention counts
+  from now), and a pre-09-19 chat's cost no longer reaches the project totals.
+- **D15**: the `plan` kind 001 wrote reads as unrecognised.
+- **D21**: `modes/import` and the window's read of its old mode defaults.
+- **D25**: the one-off sidebar widening.
+- **D27**: `QueuedPrompt`'s decoder.
+- **W5**: parked chats are counted in project summaries again.
+- **W7, W8**: `Runtime`'s recipe fields and `RuntimeStatus.outdated` are required.
+- **W9**: `next_prompts` is not read.
+- **W12**: `Workflow`, `WorkflowSummary` and `WorkflowSchedule` lose their lenient
+  decoders.
+- **W19**: `ProjectSummary`'s cost and retired counts are required.
+- Comments only dating a field (D6, D8, D18, D23, W21, parts of D20) now say why the
+  field is optional.
+
+Kept past the cut-off, with the reason beside the code:
+
+- **Forward compatibility.** `advertisedOptions` / `availableCommands` stay lenient
+  (a build that stops writing one must not cost an older reader the agent), as do
+  `Runtime.install` (an unknown way of installing), `ProjectSummary.counts` (an unknown
+  group) and `ServerHost.facts` (a cache).
+- **D20** `layoutVersion ?? 1`: anything else lays step 1 out again or fails
+  `projects.json`.
+- **After 051**: D9, D10, D16 (052); W16 (053); D24 (056); W6 (09-26); W2 (09-27);
+  D22 (09-28); D17, W15 (069); D19, W22, W23 (09-29); ServerFacts `avx2` (049).
+- **W4** (046): before the cut-off, but the flat announce reply is the protocol, and the
+  bridge path it travels is 058 T106/T042's to replace.
+- **W13**: the method name `pool/applyAllowances`; renaming buys nothing.
+
