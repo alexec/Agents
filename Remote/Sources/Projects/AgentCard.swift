@@ -5,69 +5,17 @@ struct RemoteSessionLabels: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
     let compact: Bool
-    @State private var adding = false
-    @State private var draft = ""
 
     var body: some View {
-        Group {
-            if compact {
-                RemoteCompactLabelRow(labels: agent.labels)
-            } else {
-                VStack(alignment: .leading, spacing: 5) {
-                    ForEach(agent.labels, id: \.normalizedValue) { label in
-                        RemoteLabelChip(label: label)
-                    }
-                    Menu {
-                        ForEach(agent.labels, id: \.normalizedValue) { label in
-                            Button("Remove \(label.value)") {
-                                Task { _ = await model.setLabels(on: agent.id, remove: [label.value]) }
-                            }
-                        }
-                        if agent.labels.count < SessionLabelPolicy.maximumCount {
-                            ForEach(suggestions, id: \.self) { value in
-                                Button(value) { Task { _ = await model.setLabels(on: agent.id, add: [value]) } }
-                            }
-                            Button("New label…") { adding = true }
-                        }
-                    } label: {
-                        Label("Edit labels", systemImage: "tag")
-                    }
-                }
-            }
+        if compact {
+            RemoteCompactLabelRow(labels: agent.labels)
+        } else {
+            // As on the Mac: a comma adds one, Delete takes away the one at the cursor.
+            LabelTagField(labels: agent.labels,
+                          suggestions: model.labelSuggestions(in: agent.projectFolder),
+                          add: { values in Task { _ = await model.setLabels(on: agent.id, add: values) } },
+                          remove: { value in Task { _ = await model.setLabels(on: agent.id, remove: [value]) } })
         }
-        .alert("Add label", isPresented: $adding) {
-            TextField("Label", text: $draft)
-            Button("Add") {
-                let value = draft
-                draft = ""
-                Task { _ = await model.setLabels(on: agent.id, add: [value]) }
-            }
-            Button("Cancel", role: .cancel) { draft = "" }
-        } message: {
-            Text("Use 1–24 characters. A session can have up to five labels.")
-        }
-    }
-
-    private var suggestions: [String] {
-        let existing = Set(agent.labels.map(\.normalizedValue))
-        return model.labelSuggestions(in: agent.projectFolder)
-            .filter { !existing.contains(SessionLabelPolicy.key($0)) }
-    }
-}
-
-private struct RemoteLabelChip: View {
-    let label: SessionLabel
-
-    var body: some View {
-        Text(label.value)
-            .appText(.fine)
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(label.owner == .person ? Color.accentColor.opacity(0.15) : Color.clear)
-            .clipShape(Capsule())
-            .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.5)))
-            .accessibilityLabel("\(label.value), \(label.owner.rawValue) label")
     }
 }
 
@@ -78,12 +26,12 @@ private struct RemoteCompactLabelRow: View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 5) {
                 ForEach(labels.prefix(2), id: \.normalizedValue) { label in
-                    RemoteLabelChip(label: label)
+                    LabelChip(label: label)
                 }
                 if labels.count > 2 { count(labels.count - 2) }
             }
             HStack(spacing: 5) {
-                if let first = labels.first { RemoteLabelChip(label: first) }
+                if let first = labels.first { LabelChip(label: first) }
                 if labels.count > 1 { count(labels.count - 1) }
             }
         }
@@ -102,8 +50,6 @@ private struct RemoteCompactLabelRow: View {
 /// line of text — and what makes it a target a thumb can hit without aiming.
 struct AgentCard: View {
     @Environment(RemoteModel.self) private var model
-    @State private var addingLabel = false
-    @State private var labelDraft = ""
     /// The agent as the list had it when it drew this card. Only its id is trusted.
     private let given: Agent
 
@@ -215,23 +161,6 @@ struct AgentCard: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Menu("Labels") {
-                ForEach(agent.labels, id: \.normalizedValue) { label in
-                    Button("Remove \(label.value)") {
-                        Task { _ = await model.setLabels(on: agent.id, remove: [label.value]) }
-                    }
-                }
-                if agent.labels.count < SessionLabelPolicy.maximumCount {
-                    let used = Set(agent.labels.map(\.normalizedValue))
-                    ForEach(model.labelSuggestions(in: agent.projectFolder)
-                        .filter { !used.contains(SessionLabelPolicy.key($0)) }, id: \.self) { value in
-                        Button("Add \(value)") {
-                            Task { _ = await model.setLabels(on: agent.id, add: [value]) }
-                        }
-                    }
-                    Button("New label…") { addingLabel = true }
-                }
-            }
             if model.isBlocked(agent) {
                 Button {
                     Task { await model.carryOn(agent.id) }
@@ -253,15 +182,6 @@ struct AgentCard: View {
             if agent.state != .archived {
                 archiveButton
             }
-        }
-        .alert("Add label", isPresented: $addingLabel) {
-            TextField("Label", text: $labelDraft)
-            Button("Add") {
-                let value = labelDraft
-                labelDraft = ""
-                Task { _ = await model.setLabels(on: agent.id, add: [value]) }
-            }
-            Button("Cancel", role: .cancel) { labelDraft = "" }
         }
         // As a row in Mail: a swipe uncovers Archive, and a long one archives. The page
         // is a `swipeActionsContainer`.

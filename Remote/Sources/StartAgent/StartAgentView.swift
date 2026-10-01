@@ -16,7 +16,6 @@ struct StartAgentView: View {
     @State private var text = ""
     @State private var attachments: [Attachment] = []
     @State private var draftLabels: [String] = []
-    @State private var labelInput = ""
     /// Why something picked could not be attached, or that a kept picture was too big
     /// to keep and needs picking again.
     @State private var attachNote: String?
@@ -27,28 +26,12 @@ struct StartAgentView: View {
             Form {
                 ChoiceRows()
                 Section("Labels") {
-                    ForEach(draftLabels, id: \.self) { value in
-                        HStack {
-                            Text(value)
-                            Spacer()
-                            Button("Remove", systemImage: "xmark.circle") {
-                                draftLabels.removeAll { $0 == value }
-                            }
-                        }
-                    }
-                    if draftLabels.count < SessionLabelPolicy.maximumCount {
-                        HStack {
-                            TextField("Add label", text: $labelInput)
-                                .onSubmit(addDraftLabel)
-                            Button("Add") { addDraftLabel() }
-                        }
-                        ForEach(model.labelSuggestions(in: project), id: \.self) { value in
-                            Button(value) {
-                                labelInput = value
-                                addDraftLabel()
-                            }
-                        }
-                    }
+                    LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
+                                  suggestions: model.labelSuggestions(in: project),
+                                  add: { draftLabels += $0 },
+                                  remove: { value in
+                                      draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) }
+                                  })
                 }
             }
             .paperForm()
@@ -151,14 +134,5 @@ struct StartAgentView: View {
         let words = text
         let attached = attachments
         Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels) }
-    }
-
-    private func addDraftLabel() {
-        guard let value = try? SessionLabelPolicy.cleaned(labelInput),
-              draftLabels.count < SessionLabelPolicy.maximumCount,
-              !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) })
-        else { return }
-        draftLabels.append(value)
-        labelInput = ""
     }
 }

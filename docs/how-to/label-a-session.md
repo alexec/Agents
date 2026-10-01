@@ -13,14 +13,21 @@ Server projects can be labeled from the Mac. iPhone and iPad show Mac projects o
 
 ## Add labels
 
-On the Mac, use **Add label** beneath a session's title or in its chat. On iPhone
-and iPad, open the chat and choose **Edit labels**. Choose a label already used in
-the project, or enter a new one. You can also add labels before starting a new
-session on either device. Suggestions come from sessions still in the project,
-including archived ones, and disappear after the last use is removed.
+Labels are edited in one field at the top of a session's chat, on the Mac, iPhone
+and iPad, and in the same kind of field before you start a new session. Type a
+label and press comma, or Return, to add it; a pasted `perf, ui` adds both. As
+you type, labels already used in the project are offered: on the Mac in a list
+under the field, on iPhone and iPad as chips after it. Suggestions come from
+sessions still in the project, including archived ones, and disappear after the
+last use is removed. The session list shows a session's labels but does not
+change them.
 
-To remove a label, choose it on the Mac, or choose **Edit labels** in the phone
-chat. Removing it from one session leaves the other sessions' labels alone.
+## Remove a label
+
+Press Delete with the cursor at the start of the field to remove the label just
+before it. With a keyboard, the left arrow moves the cursor onto the labels and
+Delete removes the one it is on. Each label also has its own **×**. Removing it
+from one session leaves the other sessions' labels alone.
 
 Labels you add are yours. An agent may label its own work through `finish_turn`,
 and a helper or workflow can start with agent-owned labels. Agent-owned labels

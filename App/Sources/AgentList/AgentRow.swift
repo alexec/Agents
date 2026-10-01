@@ -34,15 +34,6 @@ struct AgentRow: View {
 
     var body: some View {
         rowContent
-            .alert("Add label", isPresented: $addingLabel) {
-                TextField("Label", text: $labelDraft)
-                Button("Add") {
-                    let value = labelDraft
-                    labelDraft = ""
-                    Task { await model.setLabels(on: agent.id, add: [value]) }
-                }
-                Button("Cancel", role: .cancel) { labelDraft = "" }
-            }
             // Last known, not current: its host is not answering (037), or the control
             // plane that would carry the answer is away (058, frame H).
             .opacity(model.hostUnreachable(agent.host) ? 0.55 : 1)
@@ -130,8 +121,11 @@ struct AgentRow: View {
                         .accessibilityHidden(true)
                 }
 
-                if !agent.labels.isEmpty || agent.labels.count < SessionLabelPolicy.maximumCount {
-                    SessionLabelEditor(agent: agent)
+                // Shown here, changed over the chat.
+                if !agent.labels.isEmpty {
+                    WrappingHStack(spacing: 5) {
+                        ForEach(agent.labels, id: \.normalizedValue) { LabelChip(label: $0) }
+                    }
                 }
 
                 // What it holds or waits for (036), so an idle agent still holding the
@@ -198,23 +192,6 @@ struct AgentRow: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .contextMenu {
-            Menu("Labels") {
-                ForEach(agent.labels, id: \.normalizedValue) { label in
-                    Button("Remove \(label.value)") {
-                        Task { await model.setLabels(on: agent.id, remove: [label.value]) }
-                    }
-                }
-                if agent.labels.count < SessionLabelPolicy.maximumCount {
-                    let used = Set(agent.labels.map(\.normalizedValue))
-                    ForEach(model.labelSuggestions(in: agent.projectFolder, on: agent.host)
-                        .filter { !used.contains(SessionLabelPolicy.key($0)) }, id: \.self) { value in
-                        Button("Add \(value)") {
-                            Task { await model.setLabels(on: agent.id, add: [value]) }
-                        }
-                    }
-                    Button("New label…") { addingLabel = true }
-                }
-            }
             if model.isBlocked(agent) {
                 Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
             }
@@ -256,8 +233,6 @@ struct AgentRow: View {
 
     @State private var retiring: DaemonAPI.RetirePreview?
     @State private var cannotRetire: String?
-    @State private var addingLabel = false
-    @State private var labelDraft = ""
     /// Whether the worktree's folder is gone. This Mac's is asked of the disk; another
     /// host's is `files/browse`, and stays "there" until that answer arrives (058, R11).
     @State private var worktreeGone = false

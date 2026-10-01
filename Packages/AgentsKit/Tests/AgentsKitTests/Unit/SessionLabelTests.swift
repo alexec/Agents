@@ -15,6 +15,19 @@ struct SessionLabelTests {
         #expect(second == first)
     }
 
+    @Test func commaFinishesWhatWasTyped() {
+        #expect(SessionLabelPolicy.split(typed: "perf") == (finished: [], remainder: "perf"))
+        #expect(SessionLabelPolicy.split(typed: "perf,") == (finished: ["perf"], remainder: ""))
+        #expect(SessionLabelPolicy.split(typed: "a, b,c") == (finished: ["a", " b"], remainder: "c"))
+        #expect(SessionLabelPolicy.split(typed: "") == (finished: [], remainder: ""))
+    }
+
+    @Test func acceptsOnlyWhatFits() {
+        #expect(SessionLabelPolicy.accepted([" ui ", "", "UI", "perf"], existing: ["Perf"]) == ["ui"])
+        #expect(SessionLabelPolicy.accepted([String(repeating: "x", count: 25), "ok"], existing: []) == ["ok"])
+        #expect(SessionLabelPolicy.accepted(["f", "g"], existing: ["a", "b", "c", "d"]) == ["f"])
+    }
+
     @Test func refusesEmptyAndOverlongValues() throws {
         #expect(throws: SessionLabelPolicy.Refusal.self) {
             try SessionLabelPolicy.change(current: [], add: ["   "],

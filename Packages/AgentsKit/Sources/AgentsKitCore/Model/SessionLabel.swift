@@ -58,6 +58,30 @@ public enum SessionLabelPolicy {
         return result
     }
 
+    /// What a tag field holds once typed: everything before the last comma is finished
+    /// labels, and what follows it is still being typed. A pasted "a, b, c" is two
+    /// labels and a third in progress; Return finishes that one.
+    public static func split(typed text: String) -> (finished: [String], remainder: String) {
+        var pieces = text.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        let remainder = pieces.removeLast()
+        return (pieces, remainder)
+    }
+
+    /// The typed values a session can take as they stand: cleaned, not already on it,
+    /// not repeated, and only as many as there is room for, so one stray value does not
+    /// have the whole change refused.
+    public static func accepted(_ typed: [String], existing: [String]) -> [String] {
+        var seen = Set(existing.map(key))
+        var result: [String] = []
+        for value in typed {
+            guard existing.count + result.count < maximumCount,
+                  let value = try? cleaned(value),
+                  seen.insert(key(value)).inserted else { continue }
+            result.append(value)
+        }
+        return result
+    }
+
     /// Existing labels elsewhere in the project carry its current canonical spelling.
     /// The caller supplies those from `vocabulary(in:agents:)`.
     public static func change(current: [SessionLabel], add: [String] = [], remove: [String] = [],

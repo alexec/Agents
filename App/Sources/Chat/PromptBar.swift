@@ -24,7 +24,6 @@ struct PromptBar: View {
     @State private var selectedCommand = 0
     @State private var attachments: [Attachment] = []
     @State private var draftLabels: [String] = []
-    @State private var labelInput = ""
     @State private var mentions: [FileMention] = []
     /// The walk for the term typed so far. Each keystroke cancels the last.
     @State private var mentionSearch: Task<Void, Never>?
@@ -912,45 +911,10 @@ struct PromptBar: View {
     }
 
     private var labelDraft: some View {
-        HStack(spacing: 6) {
-            ForEach(draftLabels, id: \.self) { value in
-                Button {
-                    draftLabels.removeAll { $0 == value }
-                } label: {
-                    Label(value, systemImage: "xmark.circle.fill")
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Remove \(value) label")
-            }
-            if draftLabels.count < SessionLabelPolicy.maximumCount {
-                TextField("Add label", text: $labelInput)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 140)
-                    .onSubmit(addDraftLabel)
-                Button("Add") { addDraftLabel() }
-                    .disabled(labelInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if let folder = model.draftCwd {
-                    Menu("Suggestions") {
-                        ForEach(model.labelSuggestions(in: folder, on: model.selectedProjectHost), id: \.self) { value in
-                            Button(value) {
-                                labelInput = value
-                                addDraftLabel()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .appText(.fine)
-    }
-
-    private func addDraftLabel() {
-        guard let value = try? SessionLabelPolicy.cleaned(labelInput),
-              draftLabels.count < SessionLabelPolicy.maximumCount,
-              !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) })
-        else { return }
-        draftLabels.append(value)
-        labelInput = ""
+        LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
+                      suggestions: model.draftCwd.map { model.labelSuggestions(in: $0, on: model.selectedProjectHost) } ?? [],
+                      add: { draftLabels += $0 },
+                      remove: { value in draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) } })
     }
 
     private func send() {
