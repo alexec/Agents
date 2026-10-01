@@ -1,6 +1,6 @@
 // Where a session sits in the sessions column: AgentGroup (Model/AgentGroup.swift), ported by
 // hand and held to Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/web/groups (research R7).
-import type { Agent, AgentGroup, EndedReason, WorkOutcome, WorkReport } from "../protocol/generated";
+import type { Agent, AgentGroup, EndedReason, WireDate, WorkOutcome, WorkReport } from "../protocol/generated";
 
 export const groupTitles: Record<AgentGroup, string> = {
   needsAttention: "Needs you",
@@ -38,7 +38,7 @@ export function isParked(agent: Agent): boolean {
   return agent.parking !== undefined && "parked" in agent.parking;
 }
 
-export function parkedAt(agent: Agent): number | undefined {
+export function parkedAt(agent: Agent): WireDate | undefined {
   return agent.parking && "parked" in agent.parking ? agent.parking.parked.at : undefined;
 }
 

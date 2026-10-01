@@ -6,6 +6,6 @@ const web = fileURLToPath(new URL("..", import.meta.url));
 
 export async function load(entry) {
   const { outputFiles } = await build({ entryPoints: [entry], bundle: true, format: "esm", write: false,
-    absWorkingDir: web, platform: "neutral", logLevel: "silent" });
+    absWorkingDir: web, platform: "neutral", mainFields: ["module", "main"], logLevel: "silent" });
   return import("data:text/javascript," + encodeURIComponent(outputFiles[0].text));
 }

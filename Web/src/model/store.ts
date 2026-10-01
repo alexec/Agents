@@ -5,6 +5,7 @@ import { batch, signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
+  WorkflowSummary,
 } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { log } from "../log";
@@ -252,6 +253,7 @@ export class Store extends Work {
    * then projects, then the cards and the open conversation at once. No cursors on the wire.
    */
   async load(): Promise<void> {
+    this.archivedLoaded.clear();
     const hosts = await this.link.call("hosts/list", {});
     this.hosts.value = hosts;
     await Promise.all(hosts.filter((host) => host.state === "online").map((host) => this.loadHost(host.id)));
@@ -281,8 +283,22 @@ export class Store extends Work {
     });
   }
 
+  /** The projects whose archived sessions have been listed since this connection opened. */
+  private archivedLoaded = new Set<string>();
+
+  /** Each project's workflows by `host|folder`, listed when the project is chosen (names only until US5). */
+  readonly workflows = signal<Record<string, WorkflowSummary[]>>({});
+
+  async loadWorkflows(host: string, folder: string): Promise<void> {
+    const listed = await this.link.call("workflows/list", { folder: folder as never }, host).catch(() => null);
+    if (listed) this.workflows.value = { ...this.workflows.value, [`${host}|${folderKey(folder)}`]: listed };
+  }
+
   /** One project's archived sessions, asked for when its fold opens. */
   async loadArchived(host: string, folder: string): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    if (this.archivedLoaded.has(key)) return;
+    this.archivedLoaded.add(key);
     const listed = await this.link.call("agents/list", {
       includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never,
     }, host).catch(() => null);

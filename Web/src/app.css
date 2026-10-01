@@ -188,7 +188,44 @@ button.prominent {
   background: var(--tint-attention);
 }
 .row.offline { opacity: 0.5; padding-top: 0; }
-.session { padding: 8px 10px; }
+.session { padding: 8px 10px; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 8px; align-items: start; }
+.session .body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.session .subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session .subtitle.quiet { opacity: 0.45; }
+.session .when { font-size: 11px; opacity: 0.45; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--paper-wash); opacity: 0.85; }
+.chip.worktree { background: none; opacity: 0.55; padding: 0; }
+
+/* The status mark: a spinner while working; the shape says who acts next. Only needs-you is in colour. */
+.status {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+.status.working { border-color: var(--paper-rule); border-top-color: var(--paper-ink); animation: spin 0.9s linear infinite; }
+.status.needsYou { background: currentColor; }
+.status.needsYou .glyph { color: var(--paper-ground); }
+.status.needsYou.tinted { color: var(--tint-attention); opacity: 1; }
+.status.waiting { border-style: dotted; }
+.status.stopped { font-size: 7px; }
+
+.section-head { font-size: 12px; font-weight: 600; margin: 8px 8px 2px; }
+.subhead { font-size: 11.5px; font-weight: 500; opacity: 0.6; margin: 10px 8px 2px; }
+.subhead.needs { opacity: 0.85; }
+.count { font-variant-numeric: tabular-nums; opacity: 0.55; font-weight: 400; }
+details.archived > summary { cursor: pointer; list-style-position: inside; }
+.workflows { margin-top: 8px; }
+.workflow { cursor: default; }
 
 .hint { opacity: 0.55; padding: 8px; margin: 0; }
 
@@ -237,10 +274,179 @@ button.link {
   border-radius: var(--radius-card);
   padding: 7px 12px;
   margin: 0;
-  white-space: pre-wrap;
 }
 
-.reply { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+.reply { margin: 0; line-height: 1.5; }
+
+/* Agent text, through the Markdown renderer. */
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p, .markdown ul, .markdown ol, .markdown pre, .markdown blockquote { margin: 0 0 8px; }
+.markdown ul, .markdown ol { padding-left: 22px; }
+.markdown pre, .call-detail pre, .note pre {
+  background: var(--paper-well);
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  overflow-x: auto;
+  font: 12px/1.45 var(--font-mono);
+  white-space: pre;
+}
+.markdown code { font: 0.92em var(--font-mono); }
+.markdown blockquote { border-left: 2px solid var(--paper-rule); padding-left: 10px; opacity: 0.8; }
+.markdown table { border-collapse: collapse; }
+.markdown th, .markdown td { border: 1px solid var(--paper-rule); padding: 3px 8px; }
+.image-placeholder { opacity: 0.6; font-style: italic; }
+
+.quiet { opacity: 0.65; margin: 0; }
+.faint { opacity: 0.45; margin: 0; }
+.strong { font-weight: 600; margin: 0; }
+.small { font-size: 12px; }
+.failure { color: var(--tint-failure); margin: 0; }
+.tinted { color: var(--tint-attention); }
+
+/* A turn (069): the ask, "N steps", the steps under a rule, and the outcome. */
+.turn { display: flex; flex-direction: column; gap: 10px; }
+.steps-control {
+  align-self: flex-start;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.steps-control:hover { border-color: var(--paper-rule); opacity: 1; }
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 14px;
+  border-left: 2px solid var(--paper-rule);
+  margin-left: 5px;
+}
+.run { display: flex; flex-direction: column; gap: 3px; }
+.call-line {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+button.call-line:hover { opacity: 1; }
+.chevron { display: inline-block; width: 12px; opacity: 0.6; }
+.call-detail { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px 12px; }
+.diff .removed { opacity: 0.6; text-decoration: line-through; }
+.locations { font: 12px var(--font-mono); opacity: 0.65; margin: 0; }
+.note { display: flex; flex-direction: column; gap: 3px; }
+.note.switch {
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--tint-attention) 25%, transparent);
+  background: color-mix(in srgb, var(--tint-attention) 7%, transparent);
+}
+.report .heading { font-weight: 500; margin: 0; opacity: 0.8; }
+.report .heading.tinted { opacity: 1; }
+.answers {
+  background: var(--paper-well);
+  border-radius: var(--radius-card);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.answers p { margin: 0; }
+.plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.plan .mark { opacity: 0.6; }
+.plan .completed { opacity: 0.6; }
+.thought { white-space: pre-wrap; }
+.queued {
+  border: 1px dashed var(--paper-rule);
+  border-radius: var(--radius-card);
+  padding: 8px 12px;
+}
+.queued p { margin: 0; }
+.working, .more { margin: 0; }
+.more { text-align: center; }
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--paper-rule);
+  border-top-color: var(--paper-ink);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+.jump {
+  position: relative;
+  align-self: center;
+  margin: -40px auto 8px;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  box-shadow: 0 2px 8px var(--paper-shadow);
+}
+.chat .detail { font: inherit; font-size: 12px; background: none; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
+
+/* What runs in the background, over the prompt (057). */
+.background { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.background li { display: flex; gap: 6px; opacity: 0.75; }
+.background .noun { font-weight: 500; }
+.background .age { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* Cards above the prompt: a question or a permission, answered here or elsewhere. */
+.cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-floating);
+  box-shadow: 0 4px 16px var(--paper-shadow);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card .question { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.card .options { display: flex; flex-direction: column; gap: 6px; }
+.card .row-options { flex-direction: row; flex-wrap: wrap; }
+.card .options button, .card .options .button {
+  text-align: left;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-ground);
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: inherit;
+  text-decoration: none;
+}
+.card button.prominent, .card .button.prominent { background: var(--paper-ink); color: var(--paper-ground); border-color: var(--paper-ink); }
+.card.inert button, .card.inert .button { opacity: 0.45; cursor: default; }
+.card .answered { margin: 0; font-weight: 500; }
+.card .form-row { display: flex; align-items: center; gap: 8px; }
+.card .form-row .spacer { flex: 1; }
+.card .form-row button { border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); padding: 4px 10px; }
+.card .form-row button.prominent { background: var(--paper-ink); color: var(--paper-ground); }
+.card .field { display: flex; flex-direction: column; gap: 4px; }
+.card .field input[type="text"], .card .field input[type="number"] {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-ground);
+  color: inherit;
+}
+.card .asked { margin: 0; }
 
 .foot { padding: 0 12px 12px; }
 

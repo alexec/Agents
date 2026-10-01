@@ -1,10 +1,10 @@
 // What the page shows for each state of its connection (071 US1).
-import type { Model } from "./model";
+import type { Store } from "./model/store";
 import type { Session } from "./session";
 import { Columns } from "./views/Columns";
 import { OtherControlPlane, Pairing, Unsupported } from "./views/Pairing";
 
-export function App({ session, model }: { session: Session; model: Model }) {
+export function App({ session, store }: { session: Session; store: Store }) {
   const state = session.state.value;
   switch (state.kind) {
     case "loading":
@@ -20,6 +20,6 @@ export function App({ session, model }: { session: Session; model: Model }) {
       return <OtherControlPlane session={session} />;
     case "open":
     case "down":
-      return <Columns session={session} model={model} />;
+      return <Columns session={session} store={store} />;
   }
 }

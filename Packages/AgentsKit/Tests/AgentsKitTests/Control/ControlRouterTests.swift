@@ -177,6 +177,40 @@ struct ControlRouterTests {
         host.stop()
     }
 
+    /// Two tabs of one browser are two sockets of one client. The client is active while either
+    /// is, whichever spoke last: a hidden tab must not mark the person away (071 R11, T052).
+    @Test func aClientIsActiveWhileAnyOfItsSocketsIs() async throws {
+        let router = ControlRouter(handler: StubControl(), homeHost: home)
+        let host = await connectHost(router, home)
+        let browser = client(.device)
+        var tabs: [(session: UUID, client: FakeControlClient)] = []
+        for _ in 0..<2 {
+            let (ours, theirs) = PairedTransport.pair()
+            tabs.append((await router.attachClient(browser, transport: ours), FakeControlClient(transport: theirs)))
+        }
+        await eventually { host.openChannels.count == 2 }
+        func report(_ tab: FakeControlClient, active: Bool, id: Int) throws {
+            let line = try JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.Method.presenceReport,
+                                                        params: try JSONValue.encoding(
+                                                            DaemonAPI.PresenceReport(watching: nil, active: active))))
+            try tab.send(ControlWire.wrap(host: home, message: line))
+        }
+        try report(tabs[0].client, active: true, id: 1)
+        await eventually { await router.foldedPresences()[.device(browser.id)]?.active == true }
+        // The other tab, hidden, speaks later.
+        try await Task.sleep(for: .milliseconds(20))
+        try report(tabs[1].client, active: false, id: 2)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await router.foldedPresences()[.device(browser.id)]?.active == true)
+
+        // The active tab closes: what is left is the hidden one.
+        await router.detachClient(tabs[0].session)
+        #expect(await router.foldedPresences()[.device(browser.id)]?.active == false)
+        await router.detachClient(tabs[1].session)
+        #expect(await router.foldedPresences()[.device(browser.id)] == nil)
+        host.stop()
+    }
+
     @Test func aDeviceChannelIsOpenedAsThatDeviceAndAnOperatorsAsNone() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)

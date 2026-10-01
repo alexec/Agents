@@ -85,8 +85,10 @@ public actor ControlRouter {
     /// devices through iCloud and are given no client channels, only channel 0.
     private var relays: [HostID: Bool] = [:]
     private var states: [HostID: HostState] = [:]
-    /// Where each client last said the person was. One record per client, across every
-    /// host that client has a channel to (058, R6).
+    /// Where each session last said the person was, keyed by the session, or by the client for
+    /// a report made at another copy. Folded per surface, so a client with two sockets (two tabs
+    /// of one browser, 071 R11) is active while either is: one record per client let the last
+    /// report win, and a hidden tab marked the person away from the one they were reading.
     private var notedPresence: [UUID: NotedPresence] = [:]
     /// How to reach each peer copy on its link, for streams carried for it (T064).
     private var peers: [String: @Sendable (String) -> Void] = [:]
@@ -98,6 +100,7 @@ public actor ControlRouter {
     private var presenceHeard: (@Sendable (UUID, Grant, DaemonAPI.PresenceReport) -> Void)?
 
     private struct NotedPresence {
+        var client: UUID
         var surface: Surface
         var watching: UUID?
         var active: Bool
@@ -147,11 +150,13 @@ public actor ControlRouter {
 
     /// What each device last said about showing a notification, where it has said.
     public func notifyFlags() -> [UUID: Bool] {
-        var flags: [UUID: Bool] = [:]
-        for (id, note) in notedPresence {
-            if let may = note.mayNotify { flags[id] = may }
+        var flags: [UUID: (Bool, Date)] = [:]
+        for note in notedPresence.values {
+            guard let may = note.mayNotify else { continue }
+            if let held = flags[note.client], held.1 > note.heardAt { continue }
+            flags[note.client] = (may, note.heardAt)
         }
-        return flags
+        return flags.mapValues(\.0)
     }
 
     /// A presence report made at another copy (US3): folded here as the client's own.
@@ -163,11 +168,15 @@ public actor ControlRouter {
         presenceHeard = heard
     }
 
-    private func notePresence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport, at: Date = Date()) {
+    /// `session` is the socket the report came on; nil for one made at another copy.
+    private func notePresence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport,
+                              session: UUID? = nil, at: Date = Date()) {
         let surface: Surface = grant == .device ? .device(client) : .mac
-        let previous = notedPresence[client]
-        notedPresence[client] = NotedPresence(surface: surface, watching: report.watching, active: report.active,
-                                              heardAt: at, mayNotify: report.mayNotify ?? previous?.mayNotify)
+        let key = session ?? client
+        let previous = notedPresence[key]
+        notedPresence[key] = NotedPresence(client: client, surface: surface, watching: report.watching,
+                                           active: report.active, heardAt: at,
+                                           mayNotify: report.mayNotify ?? previous?.mayNotify)
     }
 
     public func sessions(of client: UUID) -> [UUID] {
@@ -535,6 +544,7 @@ public actor ControlRouter {
     private func detachClient(_ id: UUID, closing code: UInt16?) {
         guard let session = clients.removeValue(forKey: id) else { return }
         let client = session.caller.client
+        notedPresence.removeValue(forKey: id)
         if !clients.values.contains(where: { $0.caller.client == client }) {
             notedPresence.removeValue(forKey: client)
         }
@@ -660,7 +670,8 @@ public actor ControlRouter {
         case .request(let id, let method, let params)?:
             if method == DaemonAPI.Method.presenceReport, let params,
                let report = try? params.decode(DaemonAPI.PresenceReport.self) {
-                notePresence(client: session.caller.client, grant: session.caller.grant, report: report)
+                notePresence(client: session.caller.client, grant: session.caller.grant, report: report,
+                             session: sessionID)
                 presenceHeard?(session.caller.client, session.caller.grant, report)
             }
             guard session.caller.grant.allows(method) else {

@@ -1,61 +1,165 @@
-// The chosen session's chat (071 US2): its entries, the cards above the prompt, and the prompt
-// pinned to the foot at every width (US6 scenario 4). Phase 5 draws text only; turns, tool
-// calls, cards and sending come in Phases 6 and 7.
-import { useLayoutEffect, useRef } from "preact/hooks";
-import type { Model } from "../model";
-import type { TranscriptEntry } from "../protocol/generated";
+// The chosen session's chat (071 US2, FR-023): concise turns at the chosen level (069), tool
+// calls, plans and background tasks (057), live from agent/entry and agent/changed; the cards
+// above the prompt; the prompt pinned to the foot at every width (US6 scenario 4). Long
+// conversations come a page at a time as the top is reached, and the pane follows the end
+// unless the person has scrolled up.
+import { useSignal } from "@preact/signals";
+import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import type { Store } from "../model/store";
+import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../model/background";
+import { display, isPersonsAsk, isWorking, storedTurn, turns, type ChatTurn, type Item } from "../model/turns";
+import { toWireDate } from "../protocol/dates";
+import type { Agent } from "../protocol/generated";
 import { go, replace, route } from "../route";
+import { Cards } from "./Cards";
+import { detailSummaries, detailTitles, TurnView, type TurnDetail } from "./chat/Rows";
 
-function text(entry: TranscriptEntry): { who: "person" | "agent"; text: string } | null {
-  const kind = entry.kind as Record<string, Record<string, unknown>>;
-  if (kind["userMessage"]) return { who: "person", text: String(kind["userMessage"]["_0"] ?? "") };
-  if (kind["agentMessage"]) return { who: "agent", text: String(kind["agentMessage"]["text"] ?? "") };
-  return null;
+const detailKey = "agents.turnDetail";
+
+function savedDetail(): TurnDetail {
+  const saved = localStorage.getItem(detailKey);
+  return saved === "steps" || saved === "details" ? saved : "outcome";
 }
 
-export function Chat({ model, host, session, down }: { model: Model; host: string; session: string; down: boolean }) {
+/** The level every turn starts at, the page's one setting (View ▸ Turns in the window). */
+const defaultDetail = { value: savedDetail() };
+
+/** How close to an edge counts as being at it. Two numbers, so following does not flicker. */
+const leftTheEnd = 160;
+const atTheEnd = 40;
+
+export function Chat({ store, host, session, down }: { store: Store; host: string; session: string; down: boolean }) {
   const r = route.value;
-  const agent = model.agent(host, session);
-  const project = r.project ? (model.projects.value[host] ?? []).find((p) => p.project.folder === r.project) : undefined;
-  const lines = model.entries.value.map(text).filter((line): line is NonNullable<typeof line> => line !== null && line.text !== "");
-  // Opens at the end and follows it, as the Mac window does, unless the person scrolled up.
+  const agent = store.agent(host, session);
+  const project = r.project ? (store.projects.value[host] ?? []).find((p) => p.project.folder === r.project) : undefined;
+  const level = useSignal<TurnDetail>(defaultDetail.value);
+  /** Turns opened or closed by hand, kept until the chat is left. */
+  const chosen = useSignal<Record<string, TurnDetail>>({});
+  const fetched = useSignal<Record<string, Item[]>>({});
+  const newBelow = useSignal(false);
+
+  const rows: ChatTurn[] = [...store.turns.value.map(storedTurn), ...turns(store.items.value)];
+  const background = agent?.background ?? [];
+  const live = agent ? isWorking(agent.state) : false;
+
   const scroller = useRef<HTMLDivElement>(null);
   const following = useRef(true);
-  useLayoutEffect(() => { following.current = true; }, [session]);
+  const loadingEarlier = useRef(false);
+  const settled = useRef(false);
+
+  useEffect(() => {
+    chosen.value = {};
+    fetched.value = {};
+    following.current = true;
+    newBelow.value = false;
+    settled.current = false;
+    const timer = setTimeout(() => (settled.current = true), 400);
+    return () => clearTimeout(timer);
+  }, [session]);
+
+  // Following the end: every kind of growth, a new line or a longer one, keeps the foot in view.
+  const entryCount = store.entries.value.length;
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (el && following.current) el.scrollTop = el.scrollHeight;
-  }, [lines.length, session]);
-  // A narrower or wider window reflows the text; following stays at the end.
+    if (!el || loadingEarlier.current) return;
+    if (following.current) el.scrollTop = el.scrollHeight;
+    else if (settled.current) newBelow.value = true;
+  }, [entryCount, store.turns.value.length, session]);
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const watcher = new ResizeObserver(() => {
-      if (following.current) el.scrollTop = el.scrollHeight;
+      if (following.current && !loadingEarlier.current) el.scrollTop = el.scrollHeight;
     });
     watcher.observe(el);
+    for (const child of Array.from(el.children)) watcher.observe(child);
     return () => watcher.disconnect();
-  }, []);
+  }, [rows.length]);
+
+  const earlier = async () => {
+    const el = scroller.current;
+    if (!el || loadingEarlier.current || !settled.current || !store.hasMoreOfTheConversation) return;
+    loadingEarlier.current = true;
+    // Hold the line being read: what arrives goes above it.
+    const fromBottom = el.scrollHeight - el.scrollTop;
+    await store.loadEarlier();
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight - fromBottom;
+      setTimeout(() => (loadingEarlier.current = false), 250);
+    });
+  };
+
+  const onScroll = (event: Event) => {
+    const el = event.currentTarget as HTMLDivElement;
+    const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (!loadingEarlier.current) {
+      if (fromBottom > leftTheEnd) following.current = false;
+      if (fromBottom < atTheEnd) {
+        following.current = true;
+        newBelow.value = false;
+      }
+    }
+    if (el.scrollTop < 400) void earlier();
+  };
+
+  const toEnd = () => {
+    const el = scroller.current;
+    following.current = true;
+    newBelow.value = false;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  };
+
+  const toggle = (turn: ChatTurn) => {
+    const now = chosen.value[turn.id] ?? level.value;
+    const open = level.value !== "outcome" ? level.value : "steps";
+    chosen.value = { ...chosen.value, [turn.id]: now !== "outcome" ? "outcome" : open };
+  };
+
+  const fetch = async (turn: ChatTurn) => {
+    if (!turn.range || fetched.value[turn.id]) return;
+    const items = display(await store.turnEntries(host, session, turn.range));
+    fetched.value = { ...fetched.value, [turn.id]: items[0] && isPersonsAsk(items[0]) ? items.slice(1) : items };
+  };
+
+  const choose = (detail: TurnDetail) => {
+    level.value = detail;
+    defaultDetail.value = detail;
+    localStorage.setItem(detailKey, detail);
+    chosen.value = {};
+  };
+
   return (
     <section class="chat" aria-label="Chat">
       <header class="column-head">
         <button class="back narrow-only" onClick={() => go({ host: r.host, project: r.project })}>‹ {project?.name ?? "Sessions"}</button>
         <h1>{agent?.title ?? "New session"}</h1>
         <span class="actions">
+          <select class="detail" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
+            onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value as TurnDetail)}>
+            {(["outcome", "steps", "details"] as const).map((d) => (
+              <option key={d} value={d} title={detailSummaries[d]}>{detailTitles[d]}</option>
+            ))}
+          </select>
           <button onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <button class="icon" aria-label="More" title="More" disabled>···</button>
         </span>
       </header>
-      <div class="scroll transcript" ref={scroller} onScroll={(event) => {
-        const el = event.currentTarget as HTMLDivElement;
-        following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-      }}>
-        {lines.map((line, index) => (
-          <p key={index} class={line.who === "person" ? "bubble" : "reply"}>{line.text}</p>
+      <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
+        {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
+        {rows.map((turn, index) => (
+          <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value} fetched={fetched.value[turn.id]}
+            isLive={index === rows.length - 1 && live} background={background}
+            toggle={() => toggle(turn)} fetch={() => void fetch(turn)} />
         ))}
+        {agent && <Queued agent={agent} />}
+        {agent && (agent.state === "running" || agent.state === "starting") && (
+          <p class="working" aria-label="Working"><span class="spinner" /></p>
+        )}
       </div>
+      {newBelow.value && <button class="jump" onClick={toEnd}>New messages ↓</button>}
       <footer class="foot">
-        <div class="cards" aria-label="Waiting for you" />
+        <BackgroundRows agent={agent} />
+        <Cards store={store} host={host} session={session} />
         <div class="prompt">
           {/* Sending is US3 (T054); until then the prompt is drawn, and off. */}
           <textarea aria-label="Reply" placeholder="Reply…" disabled rows={2} data-down={down} />
@@ -65,5 +169,41 @@ export function Chat({ model, host, session, down }: { model: Model; host: strin
         </div>
       </footer>
     </section>
+  );
+}
+
+/** Something typed while the agent worked, where it will appear (QueuedPromptRow). */
+function Queued({ agent }: { agent: Agent }) {
+  return (
+    <>
+      {(agent.queuedPrompts ?? []).map((queued) => (
+        <div key={queued.id} class="queued">
+          <p class="faint">Waiting its turn</p>
+          <p class="quiet">{queued.text}</p>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** What the agent left running, over the prompt (057). Stopping one is US3. */
+function BackgroundRows({ agent }: { agent: Agent | undefined }) {
+  const now = useSignal(toWireDate(new Date()));
+  const items = (agent?.background ?? []).filter(isRunning);
+  useEffect(() => {
+    if (!items.length) return;
+    const timer = setInterval(() => (now.value = toWireDate(new Date())), 1_000);
+    return () => clearInterval(timer);
+  }, [items.length]);
+  if (!items.length) return null;
+  return (
+    <ul class="background" aria-label="In the background">
+      {items.map((item) => (
+        <li key={item.id} title={item.command ?? item.detail ?? item.name}>
+          <span class="noun">{backgroundNoun(item)}</span> {item.name}
+          <span class="age">{backgroundEnded(item) ?? backgroundAge(item, now.value)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
