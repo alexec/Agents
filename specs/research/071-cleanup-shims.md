@@ -134,7 +134,10 @@ T042 delete outright: `Bridge/` (including `DirectLink.swift`), `SocketLink`, `H
 and `LocalServices` in the window, the `AGENTS_STORE` switch, the Remote's old TLS-PSK
 path, `ControlNet`, `ControlDialling`, `UnixSocketListener`'s control use and
 `ControlPlane.swift`'s bridge wiring. Any shim there is **removed by 058 T106/T042**,
-not here:
+not here. Both are on main as of 0d2adaf0: `DirectLink.swift`, `ControlNet`,
+`ControlDialling` and `LinuxControlDial` are gone; `SocketLink`, `HostSet`,
+`LocalServices`, `AGENTS_STORE` and the Periphery hits below are still there and still
+058's.
 
 - `Bridge/Sources/DirectLink.swift:96`: device records from before keys.
 - `LinuxControlDial` (`Package.swift`), "kept for one test until the first build's
