@@ -1,0 +1,12 @@
+browser: Chrome/154.0.8037.59
+1. no key: the page shows "Connect this browser to your agents" and only pairing
+3a. expired code: This code has expired. Ask for a new one.
+2. paired: "This browser · Device\nForget This Browser…"; Settings lists ["Chrome on Alex’s MacBook Air · browser · device"]
+3b. spent code: This code has been used. Ask for a new one.
+4. after a full restart: "This browser · Device\nForget This Browser…", with no code
+   a second tab connects too, on the same key
+7. promoted: after a reload the page says "This browser · Operator\nForget This Browser…"
+   demoted again: Device
+5. forgotten in Settings: the page said so after 60 ms; both tabs show pairing; IndexedDB holds []
+6. Forget This Browser…: the page shows pairing (without the forgotten line); Settings lists 0 browsers
+checks: errors []; requests off the page's origin []; console ["agents: link.connecting","agents: link.open","agents: link.forgotten","agents: pair.ok"]

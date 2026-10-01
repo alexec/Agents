@@ -66,12 +66,12 @@ function transcript(serverNonce: Uint8Array, peerNonce: Uint8Array, identity: st
 
 /** Proves `key` as `identity`, and checks the control plane proves it back. */
 async function prove(socket: LineSocket, hello: Hello, identity: string, key: CryptoKey, origin: string,
-                     peerNonce: Uint8Array): Promise<"operator" | "device"> {
+                     peerNonce: Uint8Array, kind: string): Promise<"operator" | "device"> {
   const serverNonce = fromBase64url(hello.nonce);
   if (!serverNonce) throw new Refused("bad-message");
   const said = transcript(serverNonce, peerNonce, identity, origin);
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, concat(utf8("c"), said) as BufferSource));
-  socket.send(JSON.stringify({ auth: { id: identity, nonce: base64url(peerNonce), mac: base64url(mac), kind: "browser" } }));
+  socket.send(JSON.stringify({ auth: { id: identity, nonce: base64url(peerNonce), mac: base64url(mac), kind } }));
   const answer = parse(await socket.next(15_000));
   const refused = answer["refused"] as { reason?: RefusalReason } | undefined;
   if (refused) throw new Refused(refused.reason ?? "unknown");
@@ -94,16 +94,17 @@ function nonce(): Uint8Array {
  */
 export async function pair(socket: LineSocket, code: ClientCode, origin: string, name: string,
                            makeKey: () => Promise<{ client: string; publicRaw: Uint8Array }>,
-                           peerNonce: Uint8Array = nonce()): Promise<Admitted & { client: string }> {
+                           peerNonce: Uint8Array = nonce(),
+                           kind = "browser"): Promise<Admitted & { client: string }> {
   const hello = await readHello(socket);
   const theirs = fromBase64url(hello.control);
   // Nothing is sent to a control plane that isn't the code's (spec edge case).
   if (!theirs || !same(theirs, code.controlKey)) throw new WrongControlPlane();
-  const grant = await prove(socket, hello, codeIdentity(code), await codeKey(code.secret), origin, peerNonce);
+  const grant = await prove(socket, hello, codeIdentity(code), await codeKey(code.secret), origin, peerNonce, kind);
   const made = await makeKey();
   socket.send(JSON.stringify({
     jsonrpc: "2.0", id: 1, method: "clients/announce",
-    params: { id: made.client, publicKey: base64(made.publicRaw), name, kind: "browser" },
+    params: { id: made.client, publicKey: base64(made.publicRaw), name, kind },
   }));
   const reply = parse(await socket.next(15_000));
   if (reply["error"]) {
@@ -114,14 +115,14 @@ export async function pair(socket: LineSocket, code: ClientCode, origin: string,
   return { grant: result?.grant === "operator" ? "operator" : grant, name: hello.name, client: made.client };
 }
 
-/** Connects as the browser `record` names. */
+/** Connects as the client `record` names: the page always as a browser; a walk tool may say otherwise. */
 export async function connect(socket: LineSocket, record: KeyRecord, origin: string,
-                              peerNonce: Uint8Array = nonce()): Promise<Admitted> {
+                              peerNonce: Uint8Array = nonce(), kind = "browser"): Promise<Admitted> {
   const hello = await readHello(socket);
   if (hello.control !== record.control) throw new WrongControlPlane();
   const control = fromBase64url(record.control);
   if (!control) throw new WrongControlPlane();
   const key = await clientKey(record.privateKey, control, record.client);
-  const grant = await prove(socket, hello, "c:" + record.client, key, origin, peerNonce);
+  const grant = await prove(socket, hello, "c:" + record.client, key, origin, peerNonce, kind);
   return { grant, name: hello.name };
 }

@@ -1,0 +1,18 @@
+## curl
+GET /: 200
+Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src ws://localhost:65187; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; manifest-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'
+X-Content-Type-Options: nosniff
+Referrer-Policy: no-referrer
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+X-Frame-Options: DENY
+Cache-Control: no-cache
+127.0.0.1/x → 308 http://localhost:65187/x
+Host evil.test → 421
+POST / → 405
+upgrade, Origin evil → 403
+upgrade, no Origin → 403
+/MANIFEST → 404
+listening:
+  127.0.0.1:65187
+  [::1]:65187

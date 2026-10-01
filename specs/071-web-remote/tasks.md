@@ -221,7 +221,7 @@ either side.
   - `deploy/Containerfile` copies it to `/usr/share/agents/web`, with no `--web-port`, so it is off.
 
   Run `xcodegen generate`, then build AgentsHost and AgentsStore one after the other (`-skipPackagePluginValidation`).
-- [ ] T035 [US1] Walk US1 (quickstart.md §1–§2) on a scratch root, in headless Chrome beside the scratch window. Cover:
+- [ ] T035 (walked in headless Chrome on /tmp/run-webus1, walks/us1.md: all seven scenarios pass, forgotten in 60 ms; Settings' calls made by walk/operator.mjs, since this session has no Accessibility permission; still to look at: the window's and Agents Host's sheets, waiting for the screen) [US1] Walk US1 (quickstart.md §1–§2) on a scratch root, in headless Chrome beside the scratch window. Cover:
   - the `curl` checks;
   - pairing as a device;
   - a restart on the same profile;
