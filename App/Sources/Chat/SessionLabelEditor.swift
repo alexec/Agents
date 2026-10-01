@@ -1,4 +1,4 @@
-import AgentsKit
+import AgentsKitCore
 import SwiftUI
 
 /// Session labels as one tag input over the chat: type and a comma adds one, Delete
