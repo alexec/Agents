@@ -302,6 +302,8 @@ final class AppModel {
     /// Pick a project on a host. The host goes first, so the folder's `didSet` stores
     /// and compares the pair rather than a folder paired with the last host (037).
     func select(_ key: ProjectKey?) {
+        let timing = Perf.begin("project-switch")
+        defer { Perf.endWhenDrawn(timing) }
         if let key, key.host != selectedProjectHost {
             selectedProjectHost = key.host
             // The same folder on another host is another project.
@@ -327,9 +329,13 @@ final class AppModel {
             presence?.watching(selection)
             // A session picked is the session shown, not a workflow left open over it.
             if selection != nil { openWorkflow = nil }
+            chatOpening = selection.map { (agent: $0, timing: Perf.begin("chat-open")) }
             Task { await loadTranscript() }
         }
     }
+
+    /// The chat being opened and since when, until its transcript is on screen (073).
+    @ObservationIgnored private var chatOpening: (agent: UUID, timing: Perf.Interval)?
 
     /// Which workflow is open, if one is instead of a conversation.
     ///
@@ -1738,6 +1744,7 @@ final class AppModel {
                                                     DaemonAPI.ListRequest(),
                                                     returning: [Agent].self)
             self.work.replaceAgents(listed, from: .mac)
+            Perf.sinceLaunch("first-list")
             // Whatever the list already shows was spent before this window opened, so
             // the session total starts from here rather than from the beginning of time.
         }
@@ -2071,6 +2078,10 @@ final class AppModel {
             guard self.selection == selection else { return }
             self.work.replaceTurns(with: turns)
             self.work.replaceTranscript(with: page)
+            if let opening = self.chatOpening, opening.agent == selection {
+                self.chatOpening = nil
+                Perf.endWhenDrawn(opening.timing, "\(turns.turns.count) turns, \(page.entries.count) entries")
+            }
         }
     }
 
