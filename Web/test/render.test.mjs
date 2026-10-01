@@ -58,6 +58,7 @@ test("the usual Markdown is drawn", () => {
     "<h1>Title</h1><ul><li><strong>one</strong></li><li><code>two</code></li></ul>"
     + '<pre data-language="swift"><code>let x = 1 &lt; 2\n</code></pre>');
   assert.equal(md("3. three\n4. four"), '<ol start="3"><li>three</li><li>four</li></ol>');
+  assert.equal(md("1. one\n2. two"), "<ol><li>one</li><li>two</li></ol>");
 });
 
 test("only http, https and mailto are safe", () => {

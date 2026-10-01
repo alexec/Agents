@@ -53,7 +53,9 @@ function build(tokens: readonly Token[]): ComponentChildren[] {
         }
       }
       if (name === "ordered_list") {
-        const start = Number(token.attrGet("start"));
+        // No attribute is a list from 1; Number(null) would make it 0.
+        const written = token.attrGet("start");
+        const start = written === null ? 1 : Number(written);
         if (Number.isInteger(start) && start !== 1) props["start"] = start;
       }
       // A list item's paragraphs are tight in a tight list: markdown-it marks them hidden.

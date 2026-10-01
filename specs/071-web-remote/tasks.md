@@ -268,28 +268,28 @@ permission and question cards answered from the browser.
 
 **Independent Test**: quickstart.md §4.
 
-- [ ] T041 [US2] Write a fixture writer and `WebFixturesTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WebFixturesTests.swift`, as research R7. With `AGENTS_WRITE_WEB_FIXTURES=1` it writes the cases; without it, it re-runs the Swift rules on each input and fails on a difference. Cover, under `Tests/AgentsKitTests/Fixtures/web/`, each folder with a `README.md` naming the Swift function it pins:
+- [x] T041 (ef117402; 9 files, run on every `swift test`; the row's words moved to `StatusShape.words` so the window and the fixtures share them) [US2] Write a fixture writer and `WebFixturesTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WebFixturesTests.swift`, as research R7. With `AGENTS_WRITE_WEB_FIXTURES=1` it writes the cases; without it, it re-runs the Swift rules on each input and fails on a difference. Cover, under `Tests/AgentsKitTests/Fixtures/web/`, each folder with a `README.md` naming the Swift function it pins:
   - `groups/`: every `AgentGroup` case and its order, parked order, needs-you count, and settled reports;
   - `status/`;
   - `turns/`: `TurnParts`, `TranscriptItem.display`, thoughts omitted, tool runs joined;
   - `background/`;
   - `labels/`;
   - `reducer/`: notification streams applied to an empty `AgentsModel`.
-- [ ] T042 [US2] Make the fixture writer also write the override samples T020 needs. Add `Web/test/shapes.test.mjs`: every Swift-encoded object in the fixtures has exactly the keys that the generated `Shapes` gives its type.
-- [ ] T043 [P] [US2] Port `AgentGroup`, its order and `StatusShape` to `Web/src/model/groups.ts` and `status.ts`. Test them against `groups/` and `status/` in `Web/test/groups.test.mjs` (SC-005).
-- [ ] T044 [P] [US2] Port `TurnParts`, `TurnDetail` words and `TranscriptDisplay` to `Web/src/model/turns.ts`. Test against `turns/`.
-- [ ] T045 [P] [US2] Port `BackgroundUpdate.applying`, `disconnecting` and `BackgroundWords` to `Web/src/model/background.ts`. Test against `background/`.
-- [ ] T046 [P] [US2] Port `SessionLabelPolicy` to `Web/src/model/labels.ts`. Test against `labels/`.
-- [ ] T047 [US2] Port `AgentsModel.apply`, `refreshEverything`'s order and `heardSincePage` to `Web/src/model/store.ts`, with signals. Test against `reducer/`.
-- [ ] T048 [P] [US2] Write `Web/src/render/markdown.ts`, as research R9: markdown-it with `html: false`, rendered from tokens to Preact nodes; remote images replaced with a placeholder; links with `target=_blank rel="noopener noreferrer"`. Test in `Web/test/render.test.mjs` that `<script>`, `<img src=https://…>`, `javascript:` links and raw HTML render as text or placeholders (FR-031).
-- [ ] T049 [US2] Fill the sessions column (`SessionsColumn.tsx`):
+- [x] T042 (12 override samples; `shapes.test.mjs` also type-checks every fixture as its generated type with `tsc`, nested keys too) [US2] Make the fixture writer also write the override samples T020 needs. Add `Web/test/shapes.test.mjs`: every Swift-encoded object in the fixtures has exactly the keys that the generated `Shapes` gives its type.
+- [x] T043 (75 cases) [P] [US2] Port `AgentGroup`, its order and `StatusShape` to `Web/src/model/groups.ts` and `status.ts`. Test them against `groups/` and `status/` in `Web/test/groups.test.mjs` (SC-005).
+- [x] T044 (20 cases) [P] [US2] Port `TurnParts`, `TurnDetail` words and `TranscriptDisplay` to `Web/src/model/turns.ts`. Test against `turns/`.
+- [x] T045 (`BackgroundWords` only: the daemon applies every update and sends `Agent.background` whole, so the web remote never applies one; `background/README.md` says so) [P] [US2] Port `BackgroundUpdate.applying`, `disconnecting` and `BackgroundWords` to `Web/src/model/background.ts`. Test against `background/`.
+- [x] T046 (and `SessionLabelQuery`, which the search field uses) [P] [US2] Port `SessionLabelPolicy` to `Web/src/model/labels.ts`. Test against `labels/`.
+- [x] T047 (`Work` is the reducer, `Store` adds the link; the front of a followed page is not trimmed yet) [US2] Port `AgentsModel.apply`, `refreshEverything`'s order and `heardSincePage` to `Web/src/model/store.ts`, with signals. Test against `reducer/`.
+- [x] T048 (8 cases) [P] [US2] Write `Web/src/render/markdown.ts`, as research R9: markdown-it with `html: false`, rendered from tokens to Preact nodes; remote images replaced with a placeholder; links with `target=_blank rel="noopener noreferrer"`. Test in `Web/test/render.test.mjs` that `<script>`, `<img src=https://…>`, `javascript:` links and raw HTML render as text or placeholders (FR-031).
+- [x] T049 (in `Columns.tsx` and `SessionRow.tsx`; archived listed when the fold opens, as the phone does) [US2] Fill the sessions column (`SessionsColumn.tsx`):
   - the groups in order, with their words, status shapes, labels and last activity, and only **Needs you** in colour (FR-018);
   - the workflows listed below them, as names only until US5;
   - archived sessions folded under **Archived sessions**.
-- [ ] T050 [US2] Fill the chat (`Chat.tsx` and `views/chat/`): concise turns, tool calls, plans, turn detail's Outcome, Steps and Details (069), and background-task rows (057), all live from `agent/entry` and `agent/changed`. Load long transcripts a page at a time, as the window does, and follow the end unless the person has scrolled up.
-- [ ] T051 [US2] Build the cards in `Web/src/views/Cards.tsx`: permission requests and question cards above the prompt, from `permissions/pending`, `elicitations/pending`, `agent/permission` and `agent/elicitation`. Answer with `permissions/answer` and `elicitations/answer`. When one is answered elsewhere, show it answered, and make its buttons do nothing (FR-024, scenario 5).
-- [ ] T052 [US2] Add presence and the title, as research R11: `presence/report` on visibility and focus, and `(N) Agents` from the needs-person count (FR-021, FR-022). Check that `ControlRouter`'s presence fold (lines 123–155) counts a client as active if any of its sessions is. If it does not, change it to fold per session, with a test in `ControlServiceTests` for two sockets of one client.
-- [ ] T053 [US2] Walk US2 (quickstart §4) with a real Claude turn on a scratch root: a question, then a permission, both answered in the browser. Measure the median update lag against the scratch window (SC-003). Record it in `walks/us2.md`.
+- [x] T050 (`Chat.tsx` and `views/chat/Rows.tsx`) [US2] Fill the chat (`Chat.tsx` and `views/chat/`): concise turns, tool calls, plans, turn detail's Outcome, Steps and Details (069), and background-task rows (057), all live from `agent/entry` and `agent/changed`. Load long transcripts a page at a time, as the window does, and follow the end unless the person has scrolled up.
+- [x] T051 [US2] Build the cards in `Web/src/views/Cards.tsx`: permission requests and question cards above the prompt, from `permissions/pending`, `elicitations/pending`, `agent/permission` and `agent/elicitation`. Answer with `permissions/answer` and `elicitations/answer`. When one is answered elsewhere, show it answered, and make its buttons do nothing (FR-024, scenario 5).
+- [x] T052 (the fold was per client: now per session, folded per surface; the test is `aClientIsActiveWhileAnyOfItsSocketsIs` in `ControlRouterTests`, where the fold lives) [US2] Add presence and the title, as research R11: `presence/report` on visibility and focus, and `(N) Agents` from the needs-person count (FR-021, FR-022). Check that `ControlRouter`'s presence fold (lines 123–155) counts a client as active if any of its sessions is. If it does not, change it to fold per session, with a test in `ControlServiceTests` for two sockets of one client.
+- [x] T053 (`walks/us2.md`: all six scenarios; median lag 1 ms against the window's wire; the scratch window itself not opened) [US2] Walk US2 (quickstart §4) with a real Claude turn on a scratch root: a question, then a permission, both answered in the browser. Measure the median update lag against the scratch window (SC-003). Record it in `walks/us2.md`.
 
 **Checkpoint**: US2's six scenarios pass. The browser and the window agree on every group.
 
