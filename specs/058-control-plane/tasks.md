@@ -470,6 +470,71 @@ again.
 - [ ] T107 Before the first App Store submission, and after T106 frees `com.alexecollins.agents`: decide whether the Mac window and the iPhone and iPad app become one app with Universal Purchase (one bundle ID, one listing and purchase). If so, move both to that ID, re-issue the app group, iCloud container, push and keychain entitlements and the App Store profiles, and remove the two unsubmitted records made for T093. Alex agreed the approach on 2026-09-29.
 ---
 
+## Phase 14: Moving the control plane between machines (#61, research R16)
+
+**Goal**: the live control plane moves from Agents Host to a cloud machine and back, and
+every host, client and grant survives with no pairing again.
+
+**Independent test**: a scratch Agents Host with a Mac host, a Linux host (devbox), the
+store window and the fake device. Move to `compose.public.yaml` with Pebble standing in
+(`deploy/pebble/up.sh`), then move back. Every member reconnects by itself both times,
+with its record id and grant unchanged, and a turn runs on each host afterwards.
+
+**Order:** after T106, which owns the files the dial loop touches (`ControlConfig`,
+`RemoteControl`). T120–T123 can start before it, in `AgentsKitCore` and `ControlPlaneKit`
+only.
+
+- [ ] T120 [P] `ControlAddress` (`url`, `pin`) in `AgentsKitCore/Control`. `ControlMembership`
+  and `ControlSettings` gain `addresses` and `epoch`, with `url` and `pin` kept as the first
+  entry. Old files decode, and a membership with no list reads as `[url + pin]`. Unit tests
+  for both directions.
+- [ ] T121 R6's `ok` gains optional `addresses` and `epoch`, and `auth` an optional `epoch`,
+  in `ControlAuth`. The service fills `ok` from settings and writes `knownEpoch` on the
+  record from `auth`. Tests: an older peer (no fields) still completes the exchange, and a
+  peer with a stale epoch gets the list.
+- [ ] T122 Members save a newer list. `ControlCodeUse`/`ControlJoin` take the list from
+  `ok`, save it over the membership file, and dial the list in order with each entry's own
+  pin. Hosts (`ControlUplink` via `ControlJoin.hostDial`) and `agents-relay` first. Tests: a
+  host dialled at `[a]` that is told `[a, b]` dials `b` when `a` is gone.
+- [ ] T123 [P] `PeerStore: ControlStore` over a copy-to-copy link (`x:`), with `store/list`,
+  `store/get` and `store/put` (create only), answered only by a copy that is in `--receive`
+  or frozen. `StoreCopy` runs unchanged with a `PeerStore` at either end. Tests against two
+  `ControlService`s on loopback with `FolderStore`s, including a refused peer with another
+  key.
+- [ ] T124 `agents-control` modes: `serve --receive` (no settings created, members refused,
+  copies only); `control/announce` (append an address, bump the epoch, close live
+  connections); `control/freeze` and `control/unfreeze` (writes refused with "The control
+  plane is moving"); `control/forward` (frozen, and `ok` answers only the new list, then
+  closes). Each over `x:` and from the command line (`agents-control move …`) for a copy
+  that Agents Host doesn't run.
+- [ ] T125 After T106: the store window (`ControlConfig.link`) and the Remote
+  (`RemoteControl`, the relay path included) save the list from `ok` and dial it in order.
+  The Remote still falls back to the relay when no address answers.
+- [ ] T126 Agents Host, **Move to another machine…** (frame to draw and approve first, as
+  for every new sheet): the new copy's address; a check that it holds this key and an empty
+  store; **Export the control plane's key…** for the person to copy to its secrets; then
+  Announce with the who-knows list (members not current, builds with no epoch, hosts too
+  old to follow); then Move (freeze, copy, switch); then its own Mac host and
+  `agents-relay` rewritten to the new list, keeping host id `mac`, and the role "joined
+  elsewhere, forwarding". **Stop forwarding** lists who would have to pair again.
+- [ ] T127 Agents Host, **Run it here again…**: an empty folder store with the earlier one
+  kept aside, its copy in `--receive`, then the same steps the other way, with the cloud
+  copy forwarding afterwards.
+- [ ] T128 [P] Agents Host with a bucket store moves with no copy (R16 3): announce, stop
+  the old copy, start the new ones on the same bucket, forward.
+- [ ] T129 Walk the independent test above, both directions, on scratch roots and with
+  Pebble. Include one member offline through the announce (it must come back through the
+  forwarder), one move refused by a host on an older build, and a copy failure part-way
+  (the old copy must unfreeze with nothing changed). Record it in
+  `walks/us7-cloud-move.md`.
+- [ ] T130 [P] `docs/how-to/run-the-control-plane-in-the-cloud.md`: replace the "Move the
+  control plane from your Mac" TODO with the steps, and the way back.
+- [ ] T131 Alex's own move, with his go-ahead (AskUserQuestion), once a cloud machine and
+  domain exist (#61's first box): the live set-up to the cloud, a turn on each host from the
+  phone over cellular, then back, with no pairing again.
+
+---
+
 ## Dependencies
 
 - **Setup and spikes** (T021–T026) come first. T025 (S5) sizes Phase 4. A failed S2 or S4 stops

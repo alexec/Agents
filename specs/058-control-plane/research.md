@@ -345,7 +345,8 @@ code.
    - Worth saying beside the field: Tailscale's certificates are published in Certificate
      Transparency logs, so the tailnet's name becomes public.
 
-**What it needs from the code and the records:**
+**What it needs from the code and the records** (superseded by R16, which keeps codes at
+version 2 and puts the list in memberships and settings, refreshed by every `ok`):
 - *Several addresses, each with its own pin or none.* A version 2 code has one URL and one
   pin. A version 3 code would carry a list of `url|pin` pairs (`-` for none), in the order
   to try: the `.local` name, then the Tailscale address or name.
@@ -632,10 +633,161 @@ fails with -1200.
 **Open**:
 - *A membership made with a pin keeps it.* A control plane that moves from a self-signed
   certificate to a public one must tell its members to drop the pin, or they stop
-  connecting. This is part of #61's move.
+  connecting. Planned in R16: the address list on every `ok`.
 - *The Remote on a phone* was not walked against a public certificate. Its dial is the
   same `WebSocketLink`, with the system's roots, so a real Let's Encrypt certificate is
   where it gets walked.
+
+## R16 — Moving a running control plane between machines, and members learning where it went (#61, 2026-10-01, planned)
+
+**The problem.** T105 moved the earlier app's set-up into a control plane. The live
+set-up's control plane now runs in Agents Host on the Mac. #61 moves it to a cloud machine
+and back, and every host, client and grant must survive without pairing again. Three
+things stand in the way today:
+- **A member knows one address.** `ControlMembership` holds one `url` and one `pin`, and
+  only a new code changes them. A phone told nothing keeps dialling `https://<mac>.local:8791`
+  with the Mac's pin for ever.
+- **The only "go here now" notice is the old one.** `control/moved` (T085) went over the
+  earlier bridge link, which T106 removes. Nothing on the WebSocket path tells a member
+  that the control plane has a new address or a new pin.
+- **A store copies only between stores one machine can open.** `StoreCopy` needs both ends
+  as `ControlStore`s. Agents Host's folder store is on the Mac, and the cloud copy's is
+  inside a container on another machine.
+
+What stays the same makes this tractable:
+- **The control plane's key is its identity** (R6). Every member checks the server's MAC
+  against the key it paired with, not the address. A copy anywhere with the same key, and
+  the same records, *is* the same control plane.
+- **Records don't say where they live** (`StoreCopy`'s comment), so a copied store needs no
+  rewriting. Leases and copies are skipped and rebuilt.
+- **Copies already prove themselves to each other** with the key alone (`x:<copy>`, R6).
+
+### Decision
+
+**1. Members keep a list of addresses, and every `ok` refreshes it.**
+- `ControlMembership` gains `addresses: [ControlAddress]`, each a `url` and a `pin` (or
+  none), in the order to try. `url` and `pin` stay for older code, and mirror the first
+  entry.
+- `ControlSettings` gains the same list, plus an `epoch` that goes up whenever the list
+  changes. `url` and `pin` stay as the first entry there too.
+- R6's `ok` gains `addresses` and `epoch`, both optional, so older members ignore them.
+  They arrive inside a connection whose certificate the member has checked, and only after
+  the server's MAC has proved the control plane's key. Nobody else can feed a member an
+  address.
+- A member that gets a newer `epoch` saves the list over its own, then carries on. Its next
+  dial follows the new list.
+- R6's `auth` gains the member's `epoch`, also optional. The control plane writes it on the
+  member's record (`knownEpoch`), so it can say who has heard and who hasn't. A member that
+  never reports one is running a build from before this change.
+- Every kind of member gets this: the store window, the Remote (directly or through the
+  relay, which passes R6 through end to end), Mac hosts, Linux hosts and `agents-relay`.
+  A dial loop over the list replaces the single dial in `ControlJoin.hostDial`,
+  `ControlConfig.link` and `RemoteControl`. It tries each address with its own pin, and
+  uses the first that answers. The Remote still falls back to the relay when none do.
+
+This is the "members learn new addresses without pairing again" piece R15 and R8 left
+open. It also covers the smaller cases with no move at all:
+- dropping a pin when a self-signed certificate is replaced by a public one;
+- a new pin when Agents Host's own certificate is renewed;
+- a second address added later.
+
+Each is the same announce-then-switch, below. Codes stay version 2, one URL and one pin: a
+code is made for the address the control plane has *now*.
+
+**2. A move is announce, freeze, copy, switch, forward.** One sequence for both directions.
+"Old" and "new" are the two copies, both holding the same key.
+
+1. **Ready the new copy.** It runs with the control plane's key and an empty store, and is
+   started with `--receive`: it creates no settings record of its own, refuses every
+   member, and answers only a copy (`x:`).
+   - *Mac → cloud:* the person brings up `compose.public.yaml` with the key that Agents
+     Host exports ("Export the control plane's key…", written once to a file the person
+     copies to the machine as `deploy/secrets/control-key`).
+   - *Cloud → Mac:* Agents Host starts its own copy with `--receive` on an empty folder
+     store, keeping the earlier one aside.
+   - Agents Host checks the new copy before going on: it dials it as a copy, and is told
+     the same control key and an empty store.
+2. **Announce.** The old copy adds the new address after its own (`[old, new]`), bumps
+   `epoch`, and closes every live connection. Members reconnect within seconds, as after a
+   restart, and their `ok` carries the list.
+   - Agents Host shows who knows: "5 of 6 know the new address. iPad: last connected 3 days
+     ago." It also flags members whose builds report no epoch.
+   - The person goes on when they like. Waiting for every member is the safe choice; going
+     on earlier leaves the rest to step 5.
+3. **Freeze.** The old copy refuses every write: pairing, codes, grants, enrolment and
+   forgetting. It says "The control plane is moving; try again in a minute." Live
+   connections and agents carry on, as when the store is unreachable (R4). From here no
+   record can change on the old side, so nothing is lost or split.
+4. **Copy.** `StoreCopy` runs from the old store to the new one, with a `PeerStore` at
+   whichever end is remote. `PeerStore` is a `ControlStore` over a copy-to-copy link:
+   `store/list`, `store/get` and `store/put` (create only), answered only for `x:` and only
+   to a copy in `--receive` or frozen. `StoreCopy`'s existing check, the count and every
+   object's SHA-256, decides success.
+   - On failure the new store is emptied, the old copy unfreezes and announces `[old]`
+     again, and nothing has changed for anyone.
+5. **Switch and forward.**
+   - The new copy leaves `--receive`. Its settings are set to `[new]` with the next
+     `epoch`, and it starts serving.
+   - The old copy becomes a **forwarder**. It keeps its frozen store and its key, runs R6
+     for any member that still dials it, and answers `ok` with `[new]`, then closes. A
+     member that missed step 2 learns the new address the first time it reaches the old
+     one: a phone at home on the Mac's network, say.
+   - The forwarder runs until every member's `knownEpoch` is current, or the person stops
+     it. Agents Host lists who would have to pair again before it lets the person stop.
+   - *Mac → cloud:* Agents Host rewrites its own Mac host's membership to `[new]` and
+     restarts it, keeping host id `mac` and its key: no new enrolment, so the projects
+     stay the Mac's. It does the same for `agents-relay`, and its role becomes "joined
+     elsewhere (forwarding)".
+   - *Cloud → Mac:* Agents Host's copy is the new one, its role is back to "run it here",
+     and the cloud copy forwards until the person takes the machine down.
+
+**3. A bucket store needs no copy.** If Agents Host already keeps its store in a bucket
+(T058a), the cloud copies are pointed at the same bucket, and steps 3–4 shrink to stopping
+the old copy. Announce, switch and forward are unchanged.
+
+**4. Notifications and the relay don't move.** They need a Mac host (R10), and the Mac is
+still one. `agents-relay` is a member like any other, and Agents Host rewrites its list on
+the Mac. Without a Mac host a set-up has no notifications, which is #61's separate question.
+
+### What else has to hold
+
+- **Hosts must understand the list before the announce.** A Linux host updates itself from
+  the control plane on connect. Agents Host refuses to announce while any host reports a
+  version from before this change, and names it.
+- **The pin is per address.** Mac → cloud goes from `[mac.local + pin]` to `[cloud, no pin]`.
+  Cloud → Mac goes back to Agents Host's own pin. Agents Host keeps its certificate across
+  the move, in `home/tls`, so its pin is the one members knew before.
+- **Home host.** The Mac's host stays `mac` in the store, so `homeHost` is unchanged. A copy
+  on the cloud machine shares no `machineID` with any host, and enrols none as `mac`.
+- **Codes in flight** are copied and stay good at the new address only if they carry it.
+  The announce step makes Agents Host's sheet stop offering codes until the switch.
+
+### Alternatives considered
+
+- **A move bundle the person carries** (store snapshot and key in a file, `scp` to the
+  machine, `store import`). It needs the same freeze and gives the person two secrets to
+  handle instead of one. Kept as the fallback for a machine Agents Host can't reach.
+- **Moving the store over ssh,** like Install over ssh (FR-018a). It assumes the compose
+  layout and the person's ssh key, and does nothing for the way back.
+- **A signed redirect** (an ECDSA signature by the control key over `[addresses, epoch]`,
+  checked offline). R6 deliberately avoids ECDSA on Linux. Delivering the list on an
+  authenticated `ok` gives the same assurance with the MAC we have.
+- **Pushing the list as a live notice** instead of closing connections. That means a new
+  notice in `ControlLink`, `HostLink`, `ControlUplink` and the Remote. A reconnect costs a
+  second, happens once per move, and uses only the `ok` path every member already has.
+- **Sending the private key with the store.** The key is never in the store (R4), and that
+  stays true. The person moves it once, by hand, to the new machine's secrets.
+
+### Defaults taken (Alex to confirm or overturn)
+
+- **The key goes to the cloud by hand,** as one file, from "Export the control plane's
+  key…". Never in a code, a store or a URL.
+- **The person decides when to go on** after the announce. Agents Host recommends waiting
+  until every member knows, but doesn't insist.
+- **The forwarder runs until every member is current or the person stops it,** with no
+  timer.
+- **App versions:** members on builds without this change are listed. They can't follow a
+  move, and pair again afterwards.
 
 ## Spikes
 
