@@ -147,22 +147,14 @@ extension DaemonCore {
         // wrong hears about that first; and before either write, so a refused ask
         // leaves nothing behind (the whole call is refused).
         var afterwards: AfterTurn?
-        // `archive` is a word an older conversation was told it could send. The
-        // outcome still lands — that is how the person knows whether the session was
-        // useful — and the session stays in the list.
-        var declinedArchive = false
         if let written = request.afterwards {
             guard let after = AfterTurn(wire: written) else {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: AfterTurn.unknown)
             }
-            if after == .archive {
-                declinedArchive = true
-            } else {
-                guard after.goes(with: checked.report.outcome) else {
-                    throw JSONRPCError(code: JSONRPCError.invalidParams, message: after.refusal)
-                }
-                afterwards = after
+            guard after.goes(with: checked.report.outcome) else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: after.refusal)
             }
+            afterwards = after
         }
         // A move is the agent carrying on somewhere else, so it does not go with an
         // ending that waits for someone, or with being put down (053).
@@ -208,9 +200,8 @@ extension DaemonCore {
                                labels: labels,
                                on: agents[checked.agentID] ?? checked.agent, id: checked.agentID)
         let asked = afterwards.map { " " + Self.afterTurnNote($0) } ?? ""
-        let kept = declinedArchive ? " " + AfterTurn.keptVisible : ""
         let moving = moved.map { " " + $0 } ?? ""
-        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked + kept + moving
+        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked + moving
     }
 
     static let moveRefusal = """
@@ -334,7 +325,6 @@ extension DaemonCore {
     static func afterTurnNote(_ after: AfterTurn) -> String {
         switch after {
         case .park: return "Once this turn ends, this conversation will be parked."
-        case .archive: return "Once this turn ends, this conversation will be archived."
         }
     }
 

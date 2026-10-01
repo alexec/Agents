@@ -170,14 +170,6 @@ extension DaemonCore {
         return "Parked \u{201C}\(title)\u{201D}. It keeps its place until it is archived."
     }
 
-    public func archiveHelper(_ request: DaemonAPI.HelperRequest) async throws -> String {
-        // An older conversation may still call archive_agent. The outcome of who may
-        // archive did not change with the tool still being known: only the person can.
-        _ = try helperCaller(token: request.token, refusing: "Nothing was archived")
-        throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                           message: AfterTurn.cannotArchiveAnother)
-    }
-
     // MARK: Listing
 
     public func listHelpers(_ request: DaemonAPI.ListHelpersRequest) throws -> String {

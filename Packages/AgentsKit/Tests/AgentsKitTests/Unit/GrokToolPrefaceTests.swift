@@ -29,7 +29,6 @@ struct GrokToolPrefaceTests {
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.startAgent)))
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.stopAgent)))
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.listMyAgents)))
-        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.archiveAgent)))
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.leaseResource)))
         // Grok's own question tool never reaches us, so this is its only way to ask.
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.askForm)))

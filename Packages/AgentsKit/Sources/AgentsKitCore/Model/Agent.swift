@@ -351,8 +351,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         allowanceWait = try c.decodeIfPresent(AllowanceWait.self, forKey: .allowanceWait)
         // New in 040. A record written before it was never parked.
         parking = try c.decodeIfPresent(Parking.self, forKey: .parking)
-        // New with self-archiving. A record from before never asked; one from a
-        // newer build asking for something this one does not know asked for nothing.
+        // Absent when nothing was asked. A word this build does not know — a newer
+        // build's, or the `archive` agents could once ask for — asked for nothing.
         afterTurn = (try? c.decodeIfPresent(AfterTurn.self, forKey: .afterTurn)) ?? nil
         // New in 051. Absent on everything written before it.
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)

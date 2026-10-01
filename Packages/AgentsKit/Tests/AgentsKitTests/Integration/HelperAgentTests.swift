@@ -557,22 +557,6 @@ struct HelperAgentTests {
         #expect(await core.agent(helper)?.parking?.isParked == true)
     }
 
-    @Test func archivingIsRefusedAndOnlyThePersonCan() async throws {
-        let (locations, root) = try temporary()
-        let work = try project(root)
-        let core = try await makeCore(locations, longTurns())
-        let (_, token) = try await caller(core, in: work)
-        let helper = try await start(core, token)
-        _ = await eventually("the helper is working") { await core.agent(helper)?.state == .running }
-
-        let error = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) } }
-
-        #expect(error?.message == AfterTurn.cannotArchiveAnother)
-        let still = try #require(await core.agent(helper))
-        #expect(still.state == .running, "nothing moved")
-        #expect(still.archivedReason == nil)
-    }
-
     @Test func anArchivedOneIsSaidToBeArchived() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
@@ -619,8 +603,6 @@ struct HelperAgentTests {
                 : expected
             let parked = await refusal { _ = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: target)) } }
             #expect(parked?.message == parkExpected, "park \(target)")
-            let archived = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: target)) } }
-            #expect(archived?.message == AfterTurn.cannotArchiveAnother, "archive \(target)")
         }
 
         let after = await core.allAgents().map { "\($0.id) \($0.state) \(String(describing: $0.endedReason))" }.sorted()

@@ -201,13 +201,12 @@ public enum DaemonAPI {
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
-        /// `stop_agent`, `park_agent`, `archive_agent` or `list_my_agents` (028). The
+        /// `stop_agent`, `park_agent` or `list_my_agents` (028). The
         /// caller is the token, and the token alone decides the project and what it
         /// may touch.
         public static let agentsStartHelper = "agents/startHelper"
         public static let agentsStopHelper = "agents/stopHelper"
         public static let agentsParkHelper = "agents/parkHelper"
-        public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
         /// `list_sessions` and `read_session` (065): the caller's project, read only.
         public static let agentsListSessions = "agents/listSessions"
@@ -2014,7 +2013,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// What an agent passes to `stop_agent`, `park_agent` or `archive_agent`. The id
+    /// What an agent passes to `stop_agent` or `park_agent`. The id
     /// is a string so one that is not a UUID is refused in words rather than failing
     /// to decode.
     public struct HelperRequest: Codable, Sendable {

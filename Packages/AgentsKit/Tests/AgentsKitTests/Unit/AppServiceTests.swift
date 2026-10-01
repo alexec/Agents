@@ -50,8 +50,7 @@ struct AppServiceTests {
         // The one call that ends a turn first, the ones that act mid-turn after it.
         // The two older names for its halves are gone (023 R5).
         // The four agent tools (028 + park) sit after the workflow tool, for an agent
-        // that may use them — which is the default.
-        // archive_agent is no longer offered. The three lease tools (036) follow
+        // that may use them — which is the default. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042). Moving (053) rides on
         // finish_turn. The two session tools (065) sit after the agent tools, for every
         // agent.
@@ -389,21 +388,6 @@ struct AppServiceTests {
         await service.close()
     }
 
-    /// An older conversation may still send archive. The call reaches the sink; the
-    /// daemon keeps the outcome and declines the ask.
-    @Test func anArchiveAskStillReachesTheSink() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Merged and cleaned up.",
-                          "afterwards": "archive"],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.words.afterwards == .archive)
-        await service.close()
-    }
-
     /// A word that is neither, and each park pairing that would bury something,
     /// refused before the daemon is asked.
     @Test func anAskThatDoesNotFitIsRefusedWhole() async throws {
@@ -676,7 +660,7 @@ struct AppServiceTests {
     /// once ended with lease_resource, and every release became an extension.
     @Test func noToolNameEndsWithAnother() {
         let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
-                     AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent,
+                     AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent,
                      AppTool.listMyAgents,
                      AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
                      AppTool.listResources]

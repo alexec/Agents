@@ -34,12 +34,10 @@ public actor AppService {
 
     /// And four that act on other agents (028), offered only to an agent the person or
     /// a workflow started: start one in this project, and stop, park or list the ones
-    /// this agent started. archive_agent is still recognised so an older conversation
-    /// is refused rather than told the word is unknown.
+    /// this agent started.
     public static let startAgentToolName = AppTool.startAgent
     public static let stopAgentToolName = AppTool.stopAgent
     public static let parkAgentToolName = AppTool.parkAgent
-    public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
     public static let listSessionsToolName = AppTool.listSessions
     public static let readSessionToolName = AppTool.readSession
@@ -117,7 +115,6 @@ public actor AppService {
                    worktree: String? = nil, labels: [String] = [])
         case stop(agentID: String)
         case park(agentID: String)
-        case archive(agentID: String)
         case list
     }
 
@@ -374,7 +371,7 @@ public actor AppService {
                 guard managesAgents else {
                     return .success(Self.reply("""
                         Nothing was done: an agent that another agent started cannot \
-                        start, stop, park, archive or list agents of its own.
+                        start, stop, park or list agents of its own.
                         """, isError: true))
                 }
                 switch call {
@@ -392,10 +389,8 @@ public actor AppService {
     }
 
     /// Which of the agent calls a tool name is, with its arguments read — or the
-    /// refusal for a call that is missing what it needs. `archive_agent` is still
-    /// recognised so an older conversation is refused at the daemon rather than
-    /// told the word is unknown.
-    /// sentence saying what was missing. `nil` when the name is none of them.
+    /// refusal for a call that is missing what it needs, as a sentence saying what was
+    /// missing. `nil` when the name is none of them.
     static func agentCall(named name: String,
                           _ arguments: JSONValue?) -> Result<AgentCall, AgentCallProblem>? {
         func text(_ key: String) -> String? {
@@ -415,15 +410,12 @@ public actor AppService {
                                    worktree: text("worktree"),
                                    labels: arguments?["labels"]?.arrayValue?.compactMap(\.stringValue) ?? []))
         }
-        if name.hasSuffix(stopAgentToolName)
-            || name.hasSuffix(parkAgentToolName)
-            || name.hasSuffix(archiveAgentToolName) {
+        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(parkAgentToolName) {
             guard let id = text("id") else {
                 return .failure("Nothing changed: `id` has to be the id start_agent or list_my_agents gave.")
             }
             if name.hasSuffix(stopAgentToolName) { return .success(.stop(agentID: id)) }
-            if name.hasSuffix(parkAgentToolName) { return .success(.park(agentID: id)) }
-            return .success(.archive(agentID: id))
+            return .success(.park(agentID: id))
         }
         if name.hasSuffix(listMyAgentsToolName) {
             return .success(.list)
@@ -520,8 +512,6 @@ public actor AppService {
         // older names for its halves were retired on 2026-09-29 (023 R5).
         // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
-        // archive_agent is no longer offered: only the person archives. An older
-        // conversation that still calls it is refused at the daemon.
         let agentTools = managesAgents
             ? [Self.startAgentTool, Self.stopAgentTool, Self.parkAgentTool, Self.listMyAgentsTool]
             : []
@@ -663,10 +653,6 @@ public actor AppService {
         guard let after = value.stringValue.flatMap(AfterTurn.init(wire:)) else {
             return .failure(AgentCallProblem(stringLiteral: AfterTurn.unknown))
         }
-        // `archive` is a word an older conversation was told it could send. Pass it
-        // through: the daemon keeps the outcome and declines the ask, so the person
-        // still sees whether the session was useful.
-        if after == .archive { return .success(after) }
         guard let ending = WorkOutcome(wire: outcome), after.goes(with: ending) else {
             return .failure(AgentCallProblem(stringLiteral: after.refusal))
         }
@@ -1181,7 +1167,7 @@ public actor AppService {
         ],
     ]
 
-    /// The id schema stop, park and archive share.
+    /// The id schema stop and park share.
     private static let agentIDSchema: JSONValue = [
         "type": "object",
         "properties": [
@@ -1219,17 +1205,6 @@ public actor AppService {
         "inputSchema": agentIDSchema,
     ]
 
-    static let archiveAgentTool: JSONValue = [
-        "name": .string(archiveAgentToolName),
-        "title": "Archive an agent you started",
-        "description": """
-            Archive an agent you started with start_agent, as the person's own Archive \
-            would, stopping it first if it is working. This gives its place in the \
-            project back. Only agents you started can be archived this way; not \
-            yourself, and not anyone else's.
-            """,
-        "inputSchema": agentIDSchema,
-    ]
 
     static let listMyAgentsTool: JSONValue = [
         "name": .string(listMyAgentsToolName),
