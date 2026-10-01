@@ -76,6 +76,17 @@ public enum ChangeSource: String, Codable, Hashable, Sendable {
 
 public enum ChangeState: String, Codable, Hashable, Sendable {
     case modified, added, deleted, binary
+    /// Moved or renamed since the agent started; `ChangedFile.oldPath` says from where (#63).
+    case renamed
+    /// On disk and new, but not given to git: git's `??` (#63).
+    case untracked
+
+    /// A state this build does not know, from a newer daemon or server, reads as a change
+    /// rather than losing the whole list.
+    public init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = ChangeState(rawValue: raw) ?? .modified
+    }
 }
 
 /// A file the Changes pane lists.
@@ -98,6 +109,8 @@ public struct ChangedFile: Codable, Hashable, Sendable, Identifiable {
     public var outsideFolder: Bool
     /// First changed line in the current file, for "Open in Files".
     public var firstLine: Int?
+    /// Where a renamed file was, shown as `relativePath` is.
+    public var oldPath: String?
 
     public var id: String { path }
     public var fileName: String { URL(filePath: path).lastPathComponent }
@@ -105,7 +118,7 @@ public struct ChangedFile: Codable, Hashable, Sendable, Identifiable {
     public init(path: String, relativePath: String? = nil, source: ChangeSource,
                 state: ChangeState, editCount: Int = 0, added: Int? = nil, removed: Int? = nil,
                 beyondReported: Bool = false, inProgress: Bool = false,
-                outsideFolder: Bool = false, firstLine: Int? = nil) {
+                outsideFolder: Bool = false, firstLine: Int? = nil, oldPath: String? = nil) {
         self.path = path
         self.relativePath = relativePath
         self.source = source
@@ -117,6 +130,7 @@ public struct ChangedFile: Codable, Hashable, Sendable, Identifiable {
         self.inProgress = inProgress
         self.outsideFolder = outsideFolder
         self.firstLine = firstLine
+        self.oldPath = oldPath
     }
 }
 

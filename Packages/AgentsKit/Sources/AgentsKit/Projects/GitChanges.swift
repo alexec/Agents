@@ -7,11 +7,12 @@ import Foundation
 /// `git status` is the command that quietly refreshes the index; `GIT_OPTIONAL_LOCKS=0`
 /// is git's own switch for a reader that must not, and every command here runs with it.
 /// The flags on every diff make the answer the same whatever the person's config says:
-/// no external diff tool, no text conversion, no colour, no rename guessing.
+/// no external diff tool, no text conversion, no colour, and renames found by git's own
+/// default rule rather than whatever `diff.renames` says (#63).
 public enum GitChanges {
     /// Laid over `GitProcess`'s environment for every command here.
     static let readOnly = ["GIT_OPTIONAL_LOCKS": "0"]
-    static let diffFlags = ["--no-ext-diff", "--no-textconv", "--no-color", "--no-renames"]
+    static let diffFlags = ["--no-ext-diff", "--no-textconv", "--no-color", "--find-renames"]
 
     public enum Failure: Error, Sendable, Equatable {
         case notInstalled
@@ -60,6 +61,8 @@ public enum GitChanges {
     struct Changed: Equatable, Sendable {
         var path: String
         var status: Character
+        /// Where a rename (`R`) came from, relative to the top.
+        var oldPath: String? = nil
         /// Nil for binary.
         var added: Int?
         var removed: Int?
@@ -80,8 +83,8 @@ public enum GitChanges {
         async let others = run(["ls-files", "--others", "--exclude-standard", "-z"] + pathspec, in: root)
         let counted = parseNumstat(try await numbers.data)
         let status = parseNameStatus(try await statuses.data)
-        var changed = status.map { path, code in
-            Changed(path: path, status: code,
+        var changed = status.map { path, code, oldPath in
+            Changed(path: path, status: code, oldPath: oldPath,
                     added: counted[path].flatMap { $0.added },
                     removed: counted[path].flatMap { $0.removed })
         }
@@ -91,32 +94,52 @@ public enum GitChanges {
         return changed
     }
 
-    /// `--numstat -z`: `added\tremoved\tpath\0`, with `-` for both on a binary file.
+    /// `--numstat -z`: `added\tremoved\tpath\0`, with `-` for both on a binary file. A
+    /// rename leaves the path empty and follows with `old\0new\0`; it counts under the new.
     static func parseNumstat(_ data: Data) -> [String: (added: Int?, removed: Int?)] {
         var counts: [String: (added: Int?, removed: Int?)] = [:]
-        for record in split(data) {
-            let fields = record.split(separator: "\t", maxSplits: 2, omittingEmptySubsequences: false)
+        let records = split(data, keepingEmpty: true)
+        var index = 0
+        while index < records.count {
+            let fields = records[index].split(separator: "\t", maxSplits: 2, omittingEmptySubsequences: false)
+            index += 1
             guard fields.count == 3 else { continue }
-            counts[String(fields[2])] = (Int(fields[0]), Int(fields[1]))
+            var path = String(fields[2])
+            if path.isEmpty, index + 1 < records.count {
+                path = records[index + 1]
+                index += 2
+            }
+            counts[path] = (Int(fields[0]), Int(fields[1]))
         }
         return counts
     }
 
-    /// `--name-status -z`: the status letter and the path, each ended by a NUL.
-    static func parseNameStatus(_ data: Data) -> [(path: String, status: Character)] {
+    /// `--name-status -z`: the status letter and the path, each ended by a NUL. A rename
+    /// (`R` and its score) is followed by both paths, old first.
+    static func parseNameStatus(_ data: Data) -> [(path: String, status: Character, oldPath: String?)] {
         let fields = split(data)
-        var result: [(String, Character)] = []
+        var result: [(String, Character, String?)] = []
         var index = 0
         while index + 1 < fields.count {
-            result.append((fields[index + 1], fields[index].first ?? "M"))
-            index += 2
+            let code = fields[index].first ?? "M"
+            if code == "R" || code == "C", index + 2 < fields.count {
+                // A copy leaves its source where it was, so it is a new file here.
+                result.append((fields[index + 2], code == "R" ? "R" : "A",
+                               code == "R" ? fields[index + 1] : nil))
+                index += 3
+            } else {
+                result.append((fields[index + 1], code, nil))
+                index += 2
+            }
         }
         return result
     }
 
-    static func split(_ data: Data) -> [String] {
-        data.split(separator: 0, omittingEmptySubsequences: true)
-            .map { String(decoding: $0, as: UTF8.self) }
+    static func split(_ data: Data, keepingEmpty: Bool = false) -> [String] {
+        var parts = data.split(separator: 0, omittingEmptySubsequences: !keepingEmpty)
+        // The NUL that ends the last record is not the start of another.
+        if keepingEmpty, data.last == 0, parts.last?.isEmpty == true { parts.removeLast() }
+        return parts.map { String(decoding: $0, as: UTF8.self) }
     }
 
     // MARK: Text at the starting point
@@ -151,9 +174,12 @@ public enum GitChanges {
     // MARK: One file
 
     /// The whole of a tracked file as it now stands against `since`, every line there
-    /// with removed lines in place. Nil for binary.
-    static func whole(of path: String, since: String, in root: URL) async throws -> [DiffLine]? {
-        let outcome = try await run(["diff", "-U999999"] + diffFlags + [since, "--", path], in: root)
+    /// with removed lines in place. Nil for binary. A renamed file is measured against
+    /// its old path, so only what changed in it is marked, not every line.
+    static func whole(of path: String, renamedFrom oldPath: String? = nil, since: String,
+                      in root: URL) async throws -> [DiffLine]? {
+        let paths = [oldPath, path].compactMap { $0 }
+        let outcome = try await run(["diff", "-U999999"] + diffFlags + [since, "--"] + paths, in: root)
         if outcome.output.contains("\nBinary files ") || outcome.output.hasPrefix("Binary files ") {
             return nil
         }
