@@ -7,8 +7,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
-HOSTAPP="$REPO/build/DD-host/Build/Products/Debug/Agents Host.app"
-APP="$REPO/build/DD-store/Build/Products/Debug/Agents.app"
+HOSTAPP="$REPO/build/DD/Build/Products/Debug/Agents Host.app"
+APP="$REPO/build/DD/Build/Products/Debug/Agents.app"
 SLUG=""
 BUILD=1
 FRONT=0
@@ -50,9 +50,9 @@ if [ "$BUILD" = 1 ]; then
   # One after the other: the schemes share SwiftPM state.
   ( cd "$REPO" && xcodegen generate >/dev/null \
     && xcodebuild -scheme AgentsHost -destination 'platform=macOS' -configuration Debug \
-         -derivedDataPath build/DD-host -skipPackagePluginValidation build \
+         -derivedDataPath build/DD -skipPackagePluginValidation build \
     && xcodebuild -scheme AgentsStore -destination 'platform=macOS' -configuration Debug \
-         -derivedDataPath build/DD-store -skipPackagePluginValidation build ) >/tmp/run-$SLUG-build.log 2>&1 \
+         -derivedDataPath build/DD -skipPackagePluginValidation build ) >/tmp/run-$SLUG-build.log 2>&1 \
     || { echo "build failed — tail /tmp/run-$SLUG-build.log" >&2; tail -30 /tmp/run-$SLUG-build.log >&2; exit 1; }
 fi
 

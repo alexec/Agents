@@ -48,8 +48,7 @@ $S/stop.sh $ROOT
 ```
 
 `launch.sh` builds with `xcodegen generate`, then `xcodebuild -scheme AgentsHost`
-into `build/DD-host` and `-scheme AgentsStore` into `build/DD-store`, one after the
-other, with `-skipPackagePluginValidation`. Skip the build with `--no-build` when
+and `-scheme AgentsStore`, one after the other, into the one `build/DD`, with `-skipPackagePluginValidation`. Skip the build with `--no-build` when
 nothing has changed since the last one. The build log is at
 `/tmp/run-<slug>-build.log`. Then it:
 1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
@@ -65,7 +64,7 @@ nothing has changed since the last one. The build log is at
 into **Connect…**. To walk Agents Host itself, open a scratch build of it with
 `AGENTS_ROOT=$ROOT` (its plists and jobs are the root's, and `stop.sh` boots them out). Make
 more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client device
---home $ROOT/control`, where `HOSTAPP` is `build/DD-host/Build/Products/Debug/Agents
+--home $ROOT/control`, where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents
 Host.app`.
 
 ## Rules that are not optional
@@ -208,7 +207,7 @@ The Remote is built for the generic simulator only, never booted here:
 
 ```sh
 xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath build/DD-sim -skipPackagePluginValidation build
+  -derivedDataPath build/DD -skipPackagePluginValidation build
 ```
 
 A fake device (`FakeDeviceLiveTests`) stands in for a phone against a scratch
