@@ -1,6 +1,6 @@
 # 058 · #61 · Move to another machine (T126)
 
-**Waiting for Alex's approval.** The look gate for Agents Host's *Move to another machine…*:
+**Approved by Alex 2026-10-01**, as drawn, with forwarding limited to 30 days. The look gate for Agents Host's *Move to another machine…*:
 moving the running control plane from this Mac to a machine elsewhere, with every window,
 phone and server staying paired (research R16). The way back, *Run It Here Again…* (T127),
 uses the same sheet in the other direction and is drawn once these are settled.
@@ -57,8 +57,9 @@ the other machine takes over.
 This Mac has joined the control plane elsewhere and is still a host there. A forwarding row
 stays while anyone is still to hear, and goes by itself once everyone has.
 
-## Open for Alex
+## Decided
 
-- **Forwarding has no timer** (R16 default): it runs until everyone has heard or the person
-  stops it. A limit (say 30 days) is easy to add.
+- **Forwarding stops after 30 days** (Alex, 2026-10-01), or sooner when everyone has heard or
+  the person stops it. T's row says when: "Forwarding until 31 October · 1 still to hear".
+  Anyone still to hear after that pairs again.
 - **Old builds can't follow** (R16 default): they are listed, and pair again afterwards.

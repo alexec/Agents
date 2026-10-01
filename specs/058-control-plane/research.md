@@ -798,8 +798,9 @@ the Mac. Without a Mac host a set-up has no notifications, which is #61's separa
   key…". Never in a code, a store or a URL.
 - **The person decides when to go on** after the announce. Agents Host recommends waiting
   until every member knows, but doesn't insist.
-- **The forwarder runs until every member is current or the person stops it,** with no
-  timer.
+- **The forwarder runs for 30 days at most** (Alex, 2026-10-01, at the T126 look gate), or
+  until every member is current or the person stops it. Anyone still to hear after that
+  pairs again.
 - **App versions:** members on builds without this change are listed. They can't follow a
   move, and pair again afterwards.
 

@@ -510,8 +510,7 @@ only.
 - [ ] T125 After T106: the store window (`ControlConfig.link`) and the Remote
   (`RemoteControl`, the relay path included) save the list from `ok` and dial it in order.
   The Remote still falls back to the relay when no address answers.
-- [ ] T126 Agents Host, **Move to another machine…** (frame to draw and approve first, as
-  for every new sheet): the new copy's address; a check that it holds this key and an empty
+- [ ] T126 Agents Host, **Move to another machine…** (frames O–T approved by Alex 2026-10-01, `look/move/`; forwarding stops after 30 days, so `handover/forward` takes an end date and the forwarding copy stops by itself): the new copy's address; a check that it holds this key and an empty
   store; **Export the control plane's key…** for the person to copy to its secrets; then
   Announce with the who-knows list (members not current, builds with no epoch, hosts too
   old to follow); then Move (freeze, copy, switch); then its own Mac host and
