@@ -30,12 +30,40 @@ struct ChangesPane: View {
     private var isShown: Bool { frame.pane == .changes }
 
     var body: some View {
-        Group {
+        // The tree stays under an open file rather than going, so Back finds it as it was
+        // left, scrolled where it was with the file marked, as Files does (#66).
+        ZStack {
+            listView
+                .opacity(state.changesSelection == nil ? 1 : 0)
+                .allowsHitTesting(state.changesSelection == nil)
+                .accessibilityHidden(state.changesSelection != nil)
             if let selection = state.changesSelection {
                 ChangeFileView(agent: agent, state: state, selection: selection,
                                listed: list?.files.first { $0.path == selection.path },
                                hasGit: list?.git.isAvailable ?? false)
-            } else if let list {
+            }
+        }
+        // Hidden panes are kept alive beside the shown one, so this one only asks
+        // while it is shown, and asks again as soon as it is.
+        .task(id: Ask(shown: isShown, revision: revision)) {
+            guard isShown else { return }
+            await fetch()
+        }
+        .onChange(of: model.entries.count) { _, _ in noticeFinishedEdits() }
+        .onChange(of: agent.state) { _, _ in revision += 1 }
+        // A move changes where git's view is taken, whether or not a turn went with it (053).
+        .onChange(of: agent.cwd) { _, _ in revision += 1 }
+        // However the file was opened, from a row or from an edit in the conversation.
+        .onChange(of: state.changesSelection?.path) { _, path in
+            if let path { state.changesMarked = path }
+        }
+        .onAppear { seenEntries = model.work.firstEntryIndex + model.entries.count }
+    }
+
+    @ViewBuilder
+    private var listView: some View {
+        Group {
+            if let list {
                 if list.files.isEmpty, !list.reportsEdits, case .unavailable(let why) = list.git {
                     NothingToShow(runtime: agent.runtimeID, why: why)
                 } else if list.files.isEmpty {
@@ -53,17 +81,6 @@ struct ChangesPane: View {
                 Color.clear
             }
         }
-        // Hidden panes are kept alive beside the shown one, so this one only asks
-        // while it is shown, and asks again as soon as it is.
-        .task(id: Ask(shown: isShown, revision: revision)) {
-            guard isShown else { return }
-            await fetch()
-        }
-        .onChange(of: model.entries.count) { _, _ in noticeFinishedEdits() }
-        .onChange(of: agent.state) { _, _ in revision += 1 }
-        // A move changes where git's view is taken, whether or not a turn went with it (053).
-        .onChange(of: agent.cwd) { _, _ in revision += 1 }
-        .onAppear { seenEntries = model.work.firstEntryIndex + model.entries.count }
     }
 
     private struct Ask: Equatable {
@@ -111,11 +128,13 @@ struct ChangesPane: View {
         if finished { revision += 1 }
     }
 
-    /// Grouped by folder, settled with Alex at 035's T021: a change is read as "what
-    /// happened in this part of the project", and the folder said once reads more
-    /// quietly than the same folder under every row.
+    /// A tree like the Files pane's, and like GitHub's "Files changed" (#63): folders
+    /// nest and fold, each with its total, and each file's icon says what happened to it.
+    /// It replaced 035's one section per folder, which never showed at a glance which
+    /// files were new, gone or moved, and looked nothing like Files beside it.
     private func files(_ list: ChangesList) -> some View {
-        List {
+        let lines = ChangeTree.lines(ChangeTree.build(list.files), collapsed: state.changesCollapsed)
+        return List {
             VStack(alignment: .leading, spacing: 4) {
                 Text(total(list.files))
                     .appText(.fine)
@@ -127,47 +146,38 @@ struct ChangesPane: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            ForEach(Self.folders(of: list.files), id: \.name) { folder in
-                Section {
-                    ForEach(folder.files) { file in
-                        Button {
-                            state.changesSelection = ChangesSelection(path: file.path)
-                        } label: {
-                            ChangeRow(file: file)
+            ForEach(lines) { line in
+                row(line)
+                    .listRowBackground(Group {
+                        if case .file(let file) = line.node, file.path == state.changesMarked {
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(Color.accentColor.opacity(0.18))
+                                .padding(.horizontal, 10)
                         }
-                        .buttonStyle(.plain)
-                    }
-                } header: {
-                    Text(folder.name)
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                }
+                    })
             }
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
     }
 
-    /// Folders in the order of the first file changed in each; files keep their own
-    /// order inside.
-    static func folders(of files: [ChangedFile]) -> [(name: String, files: [ChangedFile])] {
-        var order: [String] = []
-        var grouped: [String: [ChangedFile]] = [:]
-        for file in files {
-            let name = folderName(of: file)
-            if grouped[name] == nil { order.append(name) }
-            grouped[name, default: []].append(file)
+    @ViewBuilder
+    private func row(_ line: ChangeTree.Line) -> some View {
+        switch line.node {
+        case .folder(let name, let key, _, let totals):
+            let open = !state.changesCollapsed.contains(key)
+            FileTreeRow(name: name, kind: .folder(open: open), depth: line.depth,
+                        label: "\(name), folder, \(ChangeWords.label(totals))",
+                        added: totals.added, removed: totals.removed,
+                        isPath: name.contains("/"), help: name.contains("/") ? name : nil) {
+                if open { state.changesCollapsed.insert(key) } else { state.changesCollapsed.remove(key) }
+            }
+        case .file(let file):
+            FileTreeRow(changed: file, depth: line.depth) {
+                state.changesSelection = ChangesSelection(path: file.path)
+            }
+            .accessibilityAddTraits(file.path == state.changesMarked ? .isSelected : [])
         }
-        return order.map { ($0, grouped[$0] ?? []) }
-    }
-
-    /// The folder it is in, relative where there is something to be relative to.
-    static func folderName(of file: ChangedFile) -> String {
-        let shown = file.relativePath ?? file.path
-        let parent = (shown as NSString).deletingLastPathComponent
-        return parent.isEmpty ? "Top folder" : parent
     }
 
     /// Said once above the list, and only where git's half could be read as this
@@ -191,62 +201,17 @@ struct ChangesPane: View {
     }
 }
 
-/// One file in the list: its name and folder, what kind of change, and how much.
-struct ChangeRow: View {
-    let file: ChangedFile
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(file.fileName)
-                        .appText(.supporting)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    if let mark = ChangeMark.word(for: file) {
-                        Text(mark)
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                    }
-                    if file.inProgress {
-                        ProgressView().controlSize(.mini)
-                    }
-                }
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                ChangeCounts(added: file.added, removed: file.removed)
-                if let note {
-                    Text(note)
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-        }
-        .padding(.vertical, 3)
-        .contentShape(Rectangle())
-    }
-
-    /// Where the knowledge came from, when it is not simply the agent's edits.
-    private var note: String? {
-        let edits = file.editCount == 1 ? "1 edit" : "\(file.editCount) edits"
-        switch file.source {
-        case .seen: return "in the folder"
-        case .reportedAndSeen where file.beyondReported: return "\(edits) · changed since"
-        default: return file.editCount > 0 ? edits : nil
-        }
-    }
-}
-
 /// `+14 −3`, by weight rather than by colour: what came in primary, what went quieter.
+/// Quiet, both are: a folder's total, which should not outweigh its files.
 struct ChangeCounts: View {
     let added: Int?
     let removed: Int?
+    var quiet = false
 
     var body: some View {
         if let added, let removed {
             HStack(spacing: 4) {
-                Text("+\(added)").foregroundStyle(.primary)
+                Text("+\(added)").foregroundStyle(quiet ? .tertiary : .primary)
                 Text("−\(removed)").foregroundStyle(.tertiary)
             }
             .appText(.fine)
@@ -262,6 +227,8 @@ enum ChangeMark {
         case .added: return "new"
         case .deleted: return "deleted"
         case .binary: return "binary"
+        case .renamed: return "renamed"
+        case .untracked: return "untracked"
         case .modified: return nil
         }
     }

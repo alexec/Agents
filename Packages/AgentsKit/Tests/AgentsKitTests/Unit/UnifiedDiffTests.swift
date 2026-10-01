@@ -58,6 +58,27 @@ struct UnifiedDiffTests {
         #expect(status.map(\.status) == ["M", "A", "D"])
     }
 
+    @Test func numstatCountsARenameUnderItsNewPath() {
+        let data = Data(("1\t1\t\0old/a.swift\0new/a.swift\0" + "2\t0\tb.md\0").utf8)
+        let counts = GitChanges.parseNumstat(data)
+        #expect(counts["new/a.swift"]?.added == 1)
+        #expect(counts["old/a.swift"] == nil)
+        #expect(counts["b.md"]?.added == 2)
+    }
+
+    @Test func nameStatusReadsARenameWithBothPaths() {
+        let data = Data("R087\0old/a.swift\0new/a.swift\0M\0b.md\0C100\0c.txt\0d.txt\0".utf8)
+        let status = GitChanges.parseNameStatus(data)
+        #expect(status.map(\.path) == ["new/a.swift", "b.md", "d.txt"])
+        #expect(status.map(\.status) == ["R", "M", "A"])
+        #expect(status.map(\.oldPath) == ["old/a.swift", nil, nil])
+    }
+
+    @Test func anUnknownChangeStateReadsAsAChange() throws {
+        let decoded = try JSONDecoder().decode([ChangeState].self, from: Data(#"["renamed","copied"]"#.utf8))
+        #expect(decoded == [.renamed, .modified])
+    }
+
     @Test func aBatchAnswerIsReadByItsSizes() {
         let body = "one\ntwo\n"
         let data = Data("abc blob \(body.utf8.count)\n\(body)\nmissing.txt missing\n".utf8)

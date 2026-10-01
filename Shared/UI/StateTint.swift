@@ -86,3 +86,32 @@ extension View {
         }
     }
 }
+
+/// What happened to a file, as its icon in Files and Changes draws it (#63): a square
+/// whose glyph says the status, in the system colour GitHub's tree taught people to read.
+///
+/// Apart from `StateTint` on purpose. Those three say whether an agent needs a person;
+/// these five say what happened to a file, and Alex approved the system's own colours for
+/// them (specs/072-changes-tree/look), so dark mode and Increase Contrast each get theirs.
+/// The glyph and the words always go with the colour; it never carries the status alone.
+enum ChangeTint {
+    static func symbol(_ state: ChangeState) -> String {
+        switch state {
+        case .added: "plus.square"
+        case .modified, .binary: "dot.square"
+        case .deleted: "minus.square"
+        case .renamed: "arrow.right.square"
+        case .untracked: "questionmark.square.dashed"
+        }
+    }
+
+    static func color(_ state: ChangeState) -> Color {
+        switch state {
+        case .added: .green
+        case .modified, .binary: .orange
+        case .deleted: .red
+        case .renamed: .blue
+        case .untracked: .gray
+        }
+    }
+}

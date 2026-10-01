@@ -184,7 +184,7 @@ struct ChangesTests {
         #expect(listed.files.map(\.path) == [a, b])
         #expect(listed.files.map(\.source) == [.reportedAndSeen, .reportedAndSeen])
         #expect(listed.files[0].beyondReported == false, "the edit accounts for the file")
-        #expect(listed.files[1].state == .added)
+        #expect(listed.files[1].state == .untracked, "git's word, though the agent made it (#63)")
 
         // A formatter runs: it touches the reported file and one nobody reported.
         _ = try write("one\nTWO\nformatted\n", to: "a.swift", in: work)
@@ -194,6 +194,34 @@ struct ChangesTests {
         #expect(listed.files[0].beyondReported)
         #expect(listed.files[2].source == .seen)
         #expect(listed.files[2].added == 1)
+    }
+
+    @Test func aNewFileIsUntrackedUntilGitIsGivenIt() async throws {
+        let (core, id, work, _, _, b) = try await agentInRepository()
+        try git(["add", "b.md"], in: work)
+        let listed = try await core.changesList(.init(agentID: id))
+        #expect(listed.files.first { $0.path == b }?.state == .added)
+        let made = try #require(try await core.changesFile(.init(agentID: id, path: b, whole: true)).whole)
+        #expect(made.map(\.kind) == [.added])
+    }
+
+    /// A rename git can see is one row under its new name, with where it came from and the
+    /// edits made before it moved (#63).
+    @Test func aRenameIsOneRowWithItsOldPath() async throws {
+        let (core, id, work, _, a, _) = try await agentInRepository()
+        try FileManager.default.createDirectory(at: work.appending(path: "moved"), withIntermediateDirectories: true)
+        try git(["mv", "a.swift", "moved/a.swift"], in: work)
+        let listed = try await core.changesList(.init(agentID: id))
+        #expect(!listed.files.contains { $0.path == a }, "the old path is not a row of its own")
+        let moved = try #require(listed.files.first { $0.fileName == "a.swift" })
+        #expect(moved.state == .renamed)
+        #expect(moved.oldPath == a)
+        #expect(moved.relativePath == "moved/a.swift")
+        #expect(moved.added == 1)
+        #expect(moved.removed == 1)
+
+        let whole = try #require(try await core.changesFile(.init(agentID: id, path: moved.path, whole: true)).whole)
+        #expect(whole.map(\.kind) == [.context, .removed, .added], "measured against the old path")
     }
 
     @Test func whatTheAgentCommittedStaysListed() async throws {

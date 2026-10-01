@@ -4,8 +4,8 @@ import UIKit
 import VisionKit
 
 /// What a device with no way to its Mac shows: never paired, or forgotten (security
-/// review, Phase 3). The one thing to do is scan the code the Mac shows in Settings ▸
-/// Devices, on the same Wi-Fi, once; after that it reaches the Mac at home and away.
+/// review, Phase 3). The one thing to do is scan the code the control plane shows (Agents
+/// Host's Pair a Window or Phone…, or the window's Pair a Device), or paste it.
 struct PairingView: View {
     @Environment(RemoteModel.self) private var model
     @State private var scanning = false
@@ -137,8 +137,9 @@ private struct Scanner: UIViewControllerRepresentable {
         func dataScanner(_ scanner: DataScannerViewController, didAdd items: [RecognizedItem],
                          allItems: [RecognizedItem]) {
             for case .barcode(let code) in items {
-                // Only an Agents code: another QR code in view is passed over, not reported.
-                guard !done, let text = code.payloadStringValue, text.hasPrefix("agents-pair:") else { continue }
+                // Only a control plane's code: another QR code in view, or a first-build Mac's
+                // agents-pair code, is passed over, not reported.
+                guard !done, let text = code.payloadStringValue, text.hasPrefix("agents-control:") else { continue }
                 done = true
                 scanner.stopScanning()
                 found(text)

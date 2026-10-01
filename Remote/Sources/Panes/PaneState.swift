@@ -41,6 +41,9 @@ final class PaneState {
     var folder: URL?
     /// The file open in Files, if any.
     var openFile: URL?
+    /// The file last open, marked in the folder, and whether the list still has to be
+    /// scrolled to it (#66).
+    var place = FileTreePlace()
     /// The line an agent or a tool call named. Spent once it has been gone to.
     var openLine: Int?
     /// Where the reader was in each file: the passage or line index at the top.

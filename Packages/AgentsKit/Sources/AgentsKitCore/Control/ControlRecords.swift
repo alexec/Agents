@@ -135,11 +135,12 @@ public actor ControlRecords {
             condition = .matching(held.etag)
         } else {
             record.rev = 1
-            condition = .absent
+            condition = Self.overTombstone(tombstones[key])
         }
         let isNew = clientsHeld[record.id] == nil
         let (kept, etag) = try await write(record, to: key, when: condition)
         clientsHeld[record.id] = Held(record: kept, etag: etag)
+        tombstones[key] = nil
         // A new operator is one more that may be left; saying so can wait for a quiet
         // moment, since a list short of one only ever refuses more.
         if isNew, kept.grant == .operator {
@@ -224,10 +225,19 @@ public actor ControlRecords {
             condition = .matching(held.etag)
         } else {
             record.rev = 1
-            condition = .absent
+            condition = Self.overTombstone(tombstones[Self.hostKey(record.id)])
         }
         let (kept, etag) = try await write(record, to: Self.hostKey(record.id), when: condition)
         hostsHeld[record.id] = Held(record: kept, etag: etag)
+        tombstones[Self.hostKey(record.id)] = nil
+    }
+
+    /// Where a record is new: an empty key, or the tombstone left when the same id was
+    /// forgotten. A Remote keeps its id, so a device forgotten and paired again is written
+    /// over its tombstone (2026-10-01: an absent-only write conflicted for ever, after the
+    /// code was spent).
+    private static func overTombstone(_ etag: String?) -> StoreCondition {
+        etag.map { .matching($0) } ?? .absent
     }
 
     /// `hosts/remove`: a tombstone. Returns whether there was such a host.

@@ -1195,6 +1195,9 @@ final class AppModel {
         guard let link = ControlConfig.link(endpoint) else { return }
         controlLink = link
         client = DaemonClient(link: link.link(for: .mac))
+        // Made with the client just replaced, they would ask it for ever (#62).
+        serverFilesByHost[.mac] = nil
+        serverPicturesByHost[.mac] = nil
         needsFirstRun = false
         await stayConnected()
     }
@@ -1237,6 +1240,9 @@ final class AppModel {
             }
             await lendToThisMac()
             listen()
+            // A new connection watches nothing; what the files pane was watching is asked
+            // for again, and what it shows is read again (#62).
+            await serverFilesByHost[.mac]?.reconnected()
             startPresence()
             presence?.connected()
             await refreshEverything()
@@ -1299,6 +1305,12 @@ final class AppModel {
         case DaemonAPI.Notification.draftOptions:
             guard let notification = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
             settleDraft(notification)
+
+        case DaemonAPI.Notification.filesChanged:
+            // This Mac's host is read through `files/*` too (058, R11), and says so here
+            // when a watched folder changes. Dropped, its pane never followed the agent.
+            guard let change = try? params?.decode(DaemonAPI.FilesChangedNotification.self) else { return }
+            serverFiles(.mac).apply(change)
 
         case DaemonAPI.Notification.runtimeChanged:
             await refreshRuntimes()

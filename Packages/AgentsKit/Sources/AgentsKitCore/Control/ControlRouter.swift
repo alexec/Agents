@@ -564,7 +564,13 @@ public actor ControlRouter {
                 return reply(to: sessionID, host: host, id: id, wrapped: wrapped,
                              error: JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline."))
             }
-            try? uplink.transport.write(line: ControlWire.channel(channel, message: message))
+            // An uplink that has ended but is not yet dropped takes nothing: said, not lost (#62).
+            do {
+                try uplink.transport.write(line: ControlWire.channel(channel, message: message))
+            } catch {
+                reply(to: sessionID, host: host, id: id, wrapped: wrapped,
+                      error: JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline."))
+            }
         case .notification(let method, _)?:
             // A notification from a client is held to the same grant; there is nobody
             // to tell when it is refused.

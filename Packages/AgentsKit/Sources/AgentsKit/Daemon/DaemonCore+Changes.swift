@@ -64,12 +64,14 @@ extension DaemonCore {
         var detail = ChangedFileDetail(file: file, edits: edits)
         if request.whole, let git, !file.outsideFolder, file.state != .binary,
            let relative = Self.relative(path, to: git.rootPath) {
-            if file.state == .added, let text = Self.currentText(of: path) {
+            if file.state == .added || file.state == .untracked, let text = Self.currentText(of: path) {
                 // New since the agent started, whether git tracks it yet or not: all of
                 // it came in.
                 detail.whole = GitChanges.allLines(of: text, as: .added)
             } else {
-                detail.whole = try? await GitChanges.whole(of: relative, since: git.since, in: git.root)
+                let renamedFrom = file.oldPath.flatMap { Self.relative($0, to: git.rootPath) }
+                detail.whole = try? await GitChanges.whole(of: relative, renamedFrom: renamedFrom,
+                                                           since: git.since, in: git.root)
             }
         }
         return detail
@@ -154,6 +156,7 @@ extension DaemonCore {
         var index = Dictionary(uniqueKeysWithValues: files.enumerated().map { ($1.path, $0) })
         let base = (agent.startingPoint?.repository ?? agent.cwd).resolvingSymlinksInPath().path
         var seen: [ChangedFile] = []
+        var renamedAway: Set<String> = []
         for change in changed {
             let path = git.rootPath + "/" + change.path
             var added = change.added
@@ -163,22 +166,39 @@ extension DaemonCore {
                 // Untracked: git counts nothing, so the lines are read here.
                 if let counted = untrackedCount(path) { added = counted; removed = 0 } else { binary = true }
             }
+            // git's word, strictly (#63): new and not given to git is untracked, even when
+            // the agent wrote it; staged or committed, it is added.
             let state: ChangeState = binary ? .binary
                 : change.status == "D" ? .deleted
-                : (change.status == "A" || change.status == "?") ? .added : .modified
-            if let at = index[path] {
+                : change.status == "A" ? .added
+                : change.status == "?" ? .untracked
+                : change.status == "R" ? .renamed : .modified
+            let oldPath = change.oldPath.map { git.rootPath + "/" + $0 }
+            if let at = index[path], at >= 0 {
                 files[at].source = .reportedAndSeen
                 files[at].state = state
                 files[at].added = binary ? nil : added
                 files[at].removed = binary ? nil : removed
+                files[at].oldPath = oldPath
             } else {
                 seen.append(ChangedFile(path: path, relativePath: relative(path, to: base) ?? change.path,
                                         source: .seen, state: state,
-                                        added: binary ? nil : added, removed: binary ? nil : removed))
+                                        added: binary ? nil : added, removed: binary ? nil : removed,
+                                        oldPath: oldPath))
                 index[path] = -1
             }
+            // The row the agent's edits left at the old path is this file now.
+            if let oldPath, let at = index[oldPath], at >= 0 {
+                renamedAway.insert(oldPath)
+                if let into = files.firstIndex(where: { $0.path == path }) {
+                    files[into].editCount += files[at].editCount
+                } else if let into = seen.firstIndex(where: { $0.path == path }) {
+                    seen[into].editCount += files[at].editCount
+                    seen[into].source = .reportedAndSeen
+                }
+            }
         }
-        return files + seen.sorted { $0.path < $1.path }
+        return files.filter { !renamedAway.contains($0.path) } + seen.sorted { $0.path < $1.path }
     }
 
     /// Lines in an untracked file, or nil when it is binary or too big to read.
@@ -198,11 +218,13 @@ extension DaemonCore {
             files[$0].source == .reportedAndSeen && files[$0].state != .binary
                 && files[$0].state != .deleted
         }
-        let relatives = checked.compactMap { relative(files[$0].path, to: git.rootPath) }
+        // A renamed file started out under its old name.
+        let startPaths = files.map { $0.oldPath ?? $0.path }
+        let relatives = checked.compactMap { relative(startPaths[$0], to: git.rootPath) }
         let starts = try await GitChanges.texts(of: relatives, at: git.since, in: git.root)
         for at in checked {
             let path = files[at].path
-            guard let relative = relative(path, to: git.rootPath),
+            guard let relative = relative(startPaths[at], to: git.rootPath),
                   let now = currentText(of: path), let made = edits[path] else { continue }
             files[at].beyondReported = !EditReplay.accounts(for: made, start: starts[relative] ?? "",
                                                             now: now)

@@ -150,6 +150,9 @@ final class AgentPaneState {
     /// again finds the tree as it was left.
     var expanded: Set<String> = []
     var openFile: URL?
+    /// The file last open, marked in the tree, and whether the tree still has to be
+    /// scrolled to it (#66).
+    var place = FileTreePlace()
     /// Where in the open file to put the reader, counted from one. Set when the agent
     /// asked for this file by line; nil whenever the user opened it themselves, which
     /// is why it is cleared beside `openFile` rather than left to go stale.
@@ -158,6 +161,11 @@ final class AgentPaneState {
     /// The file open in the Changes pane, and which edit to bring into view. Nil is
     /// the list.
     var changesSelection: ChangesSelection?
+    /// Folders closed in the Changes tree, by their path from the top. Folders start
+    /// open, so it is the closed ones that are remembered (#63).
+    var changesCollapsed: Set<String> = []
+    /// The file last open from the Changes tree, marked there so Back shows where it was.
+    var changesMarked: String?
     /// The subagent whose steps the Background pane shows (057), by its id. Nil is the
     /// list of everything the agent has had in the background.
     var subagent: String?

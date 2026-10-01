@@ -554,6 +554,7 @@ public final class ControlService: @unchecked Sendable {
         } catch {
             reply = .failure(id: request, error: .internalError("\(error)"))
         }
+        if case .failure(_, let error) = reply { log("a \(method) with a code failed: \(error.message)") }
         if let line = try? JSONRPCCodec.encode(reply) { try? reader.write(line: line) }
         // Give the reply time to leave before the socket closes.
         try? await Task.sleep(for: .milliseconds(200))
