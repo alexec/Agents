@@ -76,30 +76,19 @@ struct ModeStoreTests {
         #expect(await core.rememberedModes() == ["claude": "plan"])
     }
 
-    @Test func importingFillsGapsAndNeverOverwrites() async throws {
-        let (locations, work) = try temporary()
-        let core = try core(locations)
-        _ = try await start(core, in: work, ["mode": "plan"])
-
-        let after = await core.importModes(.init(modes: ["claude": "default", "codex": "auto"]))
-
-        #expect(after == ["claude": "plan", "codex": "auto"],
-                "a window's old memory must not undo a choice made since on another device")
-    }
-
     @Test func anEntryThatNoLongerReadsIsAbsentAndLeftInTheFile() async throws {
-        let (locations, _) = try temporary()
+        let (locations, work) = try temporary()
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        let written = #"{"claude":"not an entry","codex":{"mode":"auto","chosenAt":"2026-09-24T10:00:00Z"}}"#
+        let written = #"{"grok":"not an entry","codex":{"mode":"auto","chosenAt":"2026-09-24T10:00:00Z"}}"#
         try Data(written.utf8).write(to: locations.modes)
         let core = try core(locations)
 
         #expect(await core.rememberedModes() == ["codex": "auto"])
 
-        _ = await core.importModes(.init(modes: ["grok": "fast"]))
+        _ = try await start(core, in: work, ["mode": "plan"])
         let file = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: locations.modes))
-        #expect(file["claude"] == "not an entry", "a later version may read it; it is not ours to throw away")
-        #expect(file["grok"] != nil)
+        #expect(file["grok"] == "not an entry", "a later version may read it; it is not ours to throw away")
+        #expect(file["claude"] != nil)
     }
 
     @Test func eachRootKeepsItsOwn() async throws {

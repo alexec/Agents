@@ -375,10 +375,6 @@ extension DaemonCore {
             case DaemonAPI.Method.modesRemembered:
                 return .success(try JSONValue.encoding(rememberedModes()))
 
-            case DaemonAPI.Method.modesImport:
-                let request = try require(params, as: DaemonAPI.ModesImportRequest.self)
-                return .success(try JSONValue.encoding(importModes(request)))
-
             case DaemonAPI.Method.agentsDiscardDraft:
                 let request = try require(params, as: DaemonAPI.DiscardDraftRequest.self)
                 await discardDraft(request)

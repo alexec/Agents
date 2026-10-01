@@ -61,9 +61,4 @@ struct ModeMemoryTests {
         #expect(ModeMemory.modeOption(in: [model]) == nil)
     }
 
-    @Test func eachRuntimeRemembersItsOwn() {
-        #expect(ModeMemory.defaultsKey(runtimeID: "claude") == "prompt.mode.claude")
-        #expect(ModeMemory.defaultsKey(runtimeID: "copilot") == "prompt.mode.copilot")
-        #expect(ModeMemory.defaultsKey(runtimeID: "claude") != ModeMemory.defaultsKey(runtimeID: "grok"))
-    }
 }

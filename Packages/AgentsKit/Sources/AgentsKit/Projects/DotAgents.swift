@@ -1,8 +1,9 @@
 import Foundation
 
-/// The layout a project is given, once — when it is added, or for a project from before
-/// this, when the first agent starts in it (`DaemonCore.layOutOnce`): the dotagents
-/// convention (github.com/bgreenwell/dotagents), with `.agents` as the one real copy.
+/// The layout a project is given, once — when it is added, or for a folder that became a
+/// project by an agent running in it, when that agent starts (`DaemonCore.layOutOnce`):
+/// the dotagents convention (github.com/bgreenwell/dotagents), with `.agents` as the one
+/// real copy.
 ///
 ///     AGENTS.md                the router every agent reads first
 ///     .agents/skills/          task-specific Agent Skills

@@ -45,10 +45,6 @@ public enum DaemonAPI {
         /// window and every phone offers the same one first (029). The whole map: it is
         /// a handful of entries, and a client holding a copy needs all of it.
         public static let modesRemembered = "modes/remembered"
-        /// Modes a window remembered before the daemon did. Fills gaps only: a runtime
-        /// the daemon already has a mode for keeps it, so an old window's memory can
-        /// never overwrite a choice made since on another device (029).
-        public static let modesImport = "modes/import"
         /// Where the person is, told by every surface when it comes to the front, goes
         /// behind, changes conversation, or sees input after a quiet spell (021 FR-011).
         /// No timestamp is accepted: the daemon stamps arrival with its own clock.
@@ -1923,11 +1919,6 @@ public enum DaemonAPI {
 
     /// Keyed by runtime id. What `modes/remembered` answers and `modes/changed` carries.
     public typealias RememberedModes = [String: JSONValue]
-
-    public struct ModesImportRequest: Codable, Sendable {
-        public var modes: RememberedModes
-        public init(modes: RememberedModes) { self.modes = modes }
-    }
 
     public struct RememberedOptionsRequest: Codable, Sendable {
         public var runtimeID: String

@@ -2477,28 +2477,12 @@ final class AppModel {
         work.rememberedMode(for: runtimeID)
     }
 
-    /// The daemon's memory, after giving it whatever this window remembered from
-    /// before the daemon kept one. The daemon only fills gaps, so this is safe on
-    /// every connection and from every copy of the app; the keys are left in place.
-    /// A daemon too old to know the methods leaves the form opening on the runtime's
-    /// own current mode, which is what it did before anything was remembered.
+    /// The daemon's memory. A daemon too old to know the method leaves the form opening
+    /// on the runtime's own current mode, which is what it did before anything was
+    /// remembered.
     func refreshModes() async {
-        let prefix = ModeMemory.defaultsKey(runtimeID: "")
-        var held: DaemonAPI.RememberedModes = [:]
-        for (key, stored) in UserDefaults.standard.dictionaryRepresentation() where key.hasPrefix(prefix) {
-            guard let data = stored as? Data,
-                  let mode = try? JSONDecoder().decode(JSONValue.self, from: data) else { continue }
-            held[String(key.dropFirst(prefix.count))] = mode
-        }
-        let modes: DaemonAPI.RememberedModes?
-        if held.isEmpty {
-            modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
+        let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
                                            returning: DaemonAPI.RememberedModes.self)
-        } else {
-            modes = try? await client.call(DaemonAPI.Method.modesImport,
-                                           DaemonAPI.ModesImportRequest(modes: held),
-                                           returning: DaemonAPI.RememberedModes.self)
-        }
         if let modes { work.replaceRememberedModes(modes) }
     }
 

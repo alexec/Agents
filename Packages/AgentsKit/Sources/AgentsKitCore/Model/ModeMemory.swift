@@ -32,11 +32,4 @@ public enum ModeMemory {
         }
         return remembered
     }
-
-    /// Where one runtime's remembered mode is kept.
-    ///
-    /// One key per runtime rather than one dictionary, matching `sidebar.isOpen` and
-    /// its neighbours: a runtime never used leaves no entry, and an entry we cannot
-    /// read costs that runtime rather than all of them.
-    public static func defaultsKey(runtimeID: String) -> String { "prompt.mode.\(runtimeID)" }
 }

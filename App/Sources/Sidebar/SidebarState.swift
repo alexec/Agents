@@ -58,9 +58,6 @@ final class SidebarFrame {
         static let isOpen = "sidebar.isOpen"
         static let width = "sidebar.width"
         static let pane = "sidebar.pane"
-        /// Set once, the first time a build carrying the reading-step document page
-        /// runs. Its only job is to make the widening below happen exactly once.
-        static let widenedForReadingStep = "sidebar.widenedForReadingStep"
     }
 
     private let defaults: UserDefaults
@@ -95,28 +92,7 @@ final class SidebarFrame {
         // the app's `reading` step now, and 60 characters of it needs 410 points of text
         // plus its padding. `PageMetrics.comfortablePane` is the same number for the
         // same reason.
-        //
-        // The stored width is widened to match, once. A width sitting near 380 was not a
-        // choice anybody made — it was the old default, or a drag that landed beside it —
-        // and leaving it alone means the page that was just moved to the reading step
-        // draws fifty characters, under the floor `PageMetricsTests` holds. So the first
-        // launch of a build with this in it raises a narrow column to the new default and
-        // writes a flag saying it did. Drag it back afterwards and it stays back, because
-        // the flag is already set; a column already wider than 460 is never narrowed.
-        //
-        // The widened width is written here rather than left to `width`'s observer: a
-        // property observer does not run during `init`, so assigning it would set the
-        // flag, open the column at 460 once, and persist nothing — quit without touching
-        // the divider and the old width comes back with the migration already spent.
-        let stored = defaults.object(forKey: Key.width) as? Double
-        if defaults.bool(forKey: Key.widenedForReadingStep) {
-            width = Self.clamp(stored ?? Self.readableWidth)
-        } else {
-            let widened = Self.clamp(max(stored ?? Self.readableWidth, Self.readableWidth))
-            width = widened
-            defaults.set(widened, forKey: Key.width)
-            defaults.set(true, forKey: Key.widenedForReadingStep)
-        }
+        width = Self.clamp((defaults.object(forKey: Key.width) as? Double) ?? Self.readableWidth)
         pane = (defaults.string(forKey: Key.pane).flatMap(SidebarPane.init(rawValue:))) ?? .files
     }
 

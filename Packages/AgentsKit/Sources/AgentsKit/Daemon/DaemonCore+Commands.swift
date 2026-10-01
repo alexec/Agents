@@ -155,12 +155,6 @@ extension DaemonCore {
         modeStore.remembered()
     }
 
-    /// A window's memory from before the daemon kept one. Fills gaps only.
-    public func importModes(_ request: DaemonAPI.ModesImportRequest) -> DaemonAPI.RememberedModes {
-        if (try? modeStore.importing(request.modes)) == true { tellModes() }
-        return modeStore.remembered()
-    }
-
     /// Remember the mode among these values, if one of them is this runtime's mode.
     func rememberMode(in values: [String: JSONValue], runtimeID: String, options: [ConfigOption]) {
         guard let mode = ModeMemory.modeOption(in: options), let value = values[mode.id] else { return }
@@ -411,8 +405,8 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.folderGone,
                                message: "\(cwd.path) is not there any more.")
         }
-        // Before the runtime reads the folder, so a project from before the layout
-        // existed has it by the first turn.
+        // Before the runtime reads the folder, so a folder that became a project by an
+        // agent running in it has the layout by the first turn.
         layOutOnce(cwd)
         // And the person's own `~/.agents`, so a skill added since the last start is here (054).
         reconcileHome()
