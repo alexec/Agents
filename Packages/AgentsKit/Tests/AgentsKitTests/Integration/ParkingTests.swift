@@ -233,7 +233,9 @@ struct ParkingTests {
         try await core.unarchive(seed.id)
         let back = try #require(await core.agent(seed.id))
         #expect(back.parking == nil)
-        #expect(back.group(wantsEyes: false) == .needsAttention)
+        // Back as unread news, in Done: unread is a mark, not Needs you (#70).
+        #expect(back.group(wantsEyes: false) == .finished)
+        #expect(back.showsUnread)
     }
 
     @Test func aParkedChatStillHoldsItsProjectsSpending() async throws {

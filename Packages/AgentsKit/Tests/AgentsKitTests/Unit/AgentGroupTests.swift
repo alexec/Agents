@@ -20,13 +20,41 @@ struct AgentGroupTests {
         #expect(!AgentGroup.live.contains(.blocked))
     }
 
-    @Test func unreadFinishedSessionsNeedYouUntilOpened() {
+    /// #70: unread is a mark on the row, not a reason for a group, so reading a chat
+    /// never moves it.
+    @Test func finishedAndUnreadIsDone() {
         var completed = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
-        #expect(completed.group(wantsEyes: false) == .needsAttention)
+        #expect(completed.group(wantsEyes: false) == .finished)
+        #expect(completed.showsUnread)
         completed.isUnread = false
         #expect(completed.group(wantsEyes: false) == .finished)
-        completed.report = WorkReport(outcome: .needsAnswer, message: "Choose", at: Date())
-        #expect(completed.group(wantsEyes: false) == .needsAttention)
+    }
+
+    @Test func parkedAndUnreadIsParked() {
+        var parked = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
+        parked.parking = .parked(at: Date())
+        #expect(parked.group(wantsEyes: false) == .parked)
+    }
+
+    /// What truly needs the person stays under Needs you, read or not.
+    @Test func whatNeedsYouStaysWhetherReadOrNot() {
+        for unread in [false, true] {
+            var asked = agent(.finished, report: .needsAnswer, endedReason: .endTurn, unread: unread)
+            #expect(asked.group(wantsEyes: false) == .needsAttention)
+            asked.report = nil
+            asked.outcomeAsked = true
+            #expect(asked.group(wantsEyes: false) == .needsAttention, "an unaccounted ending")
+            #expect(agent(.waitingOnUser, unread: unread).group(wantsEyes: false) == .needsAttention)
+            #expect(agent(.finished, report: .done, endedReason: .endTurn, unread: unread)
+                .group(wantsEyes: true) == .needsAttention, "a file it asked the person to look at")
+        }
+    }
+
+    /// The icon no longer turns orange for unread alone: the dot carries it.
+    @Test func unreadAloneIsNotTheAttentionShape() {
+        #expect(StatusShape(state: .finished, outcome: .done, isWaiting: false, isComingBack: false) == .done)
+        #expect(StatusShape(state: .finished, outcome: nil, isWaiting: false, isComingBack: false,
+                            outcomeUnknown: true) == .needsYou)
     }
 
     @Test func unaccountedOutcomesNeedReview() {
@@ -42,7 +70,7 @@ struct AgentGroupTests {
                                     block: Block(checkAgainAt: Date().addingTimeInterval(600)))
         #expect(blocked.group(wantsEyes: false) == .waiting)
         blocked.isUnread = true
-        #expect(blocked.group(wantsEyes: false) == .needsAttention)
+        #expect(blocked.group(wantsEyes: false) == .waiting, "an unread wait still carries on by itself")
     }
 
     @Test func stoppedSessionsFollowWhoActsNext() {

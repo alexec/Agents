@@ -165,7 +165,7 @@ struct UnreportedEndingTests {
         #expect(agent.report?.outcome == .done)
         // Nothing about it reads as an agent that had to be asked.
         #expect(agent.endingIsUnaccountedFor == false)
-        #expect(agent.group(wantsEyes: false) == .needsAttention)
+        #expect(agent.group(wantsEyes: false) == .finished)
     }
 
     // MARK: When nothing is asked at all

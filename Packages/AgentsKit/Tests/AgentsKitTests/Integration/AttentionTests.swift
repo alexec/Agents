@@ -572,6 +572,45 @@ struct ReadingTests {
         }
     }
 
+    /// #70: Mark as Unread on the chat that is open holds while the window keeps saying
+    /// it is still there, and opening it again reads it.
+    @Test func markedUnreadWhileOpenStaysUnreadUntilOpenedAgain() async throws {
+        let (locations, work) = try temporary()
+        let core = try makeCore(locations: locations)
+        let mac = FakeSurface(.mac)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "hello"))
+        await mac.report(core, watching: id, active: true)
+        await eventually("finished") { await core.agent(id)?.state == .finished }
+        #expect(await core.agent(id)?.isUnread == false)
+
+        let marked = await core.handle(method: DaemonAPI.Method.agentsSetUnread,
+                                       params: try JSONValue.encoding(DaemonAPI.SetUnreadRequest(agentID: id, unread: true)),
+                                       from: mac.surface, connection: mac.connection)
+        if case .failure(let error) = marked { Issue.record("refused: \(error.message)") }
+        #expect(await core.agent(id)?.isUnread == true)
+        #expect(await core.agent(id)?.group(wantsEyes: false) == .finished, "marking it moves nothing")
+        await mac.report(core, watching: id, active: true)
+        #expect(await core.agent(id)?.isUnread == true, "the same report again is not opening it")
+        await mac.report(core, watching: nil, active: true)
+        await mac.report(core, watching: id, active: true)
+        #expect(await core.agent(id)?.isUnread == false)
+
+        try await core.setUnread(id, unread: true)
+        try await core.setUnread(id, unread: false)
+        #expect(await core.agent(id)?.isUnread == false, "Mark as Read clears it unopened")
+    }
+
+    @Test func onlyAFinishedChatCanBeMarkedUnread() async throws {
+        let (locations, work) = try temporary()
+        let core = try makeCore(locations: locations)
+        await #expect(throws: JSONRPCError.self) { try await core.setUnread(UUID(), unread: true) }
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "hello"))
+        await eventually("finished") { await core.agent(id)?.state == .finished }
+        try await core.archive(id)
+        await #expect(throws: JSONRPCError.self) { try await core.setUnread(id, unread: true) }
+        #expect(await core.agent(id)?.isUnread == false)
+    }
+
     @Test func lookingWhileAwayFromTheMacDoesNotRead() async throws {
         let (locations, work) = try temporary()
         let core = try makeCore(locations: locations)

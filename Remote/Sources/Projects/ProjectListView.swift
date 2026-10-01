@@ -139,9 +139,12 @@ struct ProjectRow: View {
     /// Mac shows, in the same order.
     private var subtitle: String? {
         let working = counts[.running] ?? 0
-        if needsPerson { return "Needs you" }
-        if working > 0 { return working == 1 ? "1 working" : "\(working) working" }
-        return nil
+        let unread = model.work.unreadCount(in: summary.key)
+        var parts: [String] = []
+        if needsPerson { parts.append("Needs you") } else if working > 0 { parts.append("\(working) working") }
+        // Beside Needs you, not inside it (#70): news is not a need.
+        if unread > 0 { parts.append("\(unread) unread") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     /// Said in words, because a coloured dot is not something VoiceOver can read.
@@ -149,6 +152,8 @@ struct ProjectRow: View {
         var parts = [summary.name]
         if !summary.exists { parts.append("folder is missing") }
         if needsPerson { parts.append("needs attention") }
+        let unread = model.work.unreadCount(in: summary.key)
+        if unread > 0 { parts.append("\(unread) unread") }
         return parts.joined(separator: ", ")
     }
 }

@@ -142,6 +142,11 @@ private actor FakeState {
                 await change(request?.agentID) { $0.parking = nil }
                 return .success(.object([:]))
 
+            case DaemonAPI.Method.agentsSetUnread:
+                let request = try params?.decode(DaemonAPI.SetUnreadRequest.self)
+                await change(request?.agentID) { $0.isUnread = request?.unread == true }
+                return .success(.object([:]))
+
             default:
                 return .failure(JSONRPCError(code: -32601, message: "Not in the fake: \(method)"))
             }

@@ -635,13 +635,10 @@ final class AppModel {
     func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
     func unreadCount(in key: ProjectKey?) -> Int { work.unreadCount(in: key) }
 
-    /// How many sessions across every project need a person: Needs attention and Blocked.
-    /// Drives the Dock badge.
+    /// How many sessions across every project want a look: Needs you, Blocked, and
+    /// unread finishes (#70). Drives the Dock badge.
     var needsPersonCount: Int {
-        liveProjects.reduce(0) { total, summary in
-            let c = counts(in: summary.key)
-            return total + (c[.needsAttention] ?? 0) + (c[.blocked] ?? 0)
-        }
+        liveProjects.reduce(0) { $0 + work.attentionCount(in: $1.key) }
     }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.
@@ -2448,6 +2445,14 @@ final class AppModel {
 
     func unarchive(_ id: UUID) async {
         await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id)) }
+    }
+
+    /// Mark as Unread / Mark as Read, from the row's menu (#70).
+    func setUnread(_ id: UUID, _ unread: Bool) async {
+        await attempt {
+            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetUnread,
+                                                     DaemonAPI.SetUnreadRequest(agentID: id, unread: unread))
+        }
     }
 
     /// Park or unpark, whichever `Agent.parkAction` offers (040).

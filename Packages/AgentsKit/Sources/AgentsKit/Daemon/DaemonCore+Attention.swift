@@ -157,9 +157,13 @@ extension DaemonCore {
                                message: "This connection is not a window or a device, so it cannot say where anybody is.")
         }
         let now = now()
+        let before = presences[connection]
         presences[connection] = Presence(surface: surface, watching: report.watching,
                                          active: report.active, heardAt: now)
-        if report.active, let watching = report.watching { markRead(watching) }
+        // Read when it comes into view, not each time the surface says it is still there:
+        // a chat marked unread while it is open stays so until it is opened again (#70).
+        let wasWatching = before.map { $0.active ? $0.watching : nil } ?? nil
+        if report.active, let watching = report.watching, watching != wasWatching { markRead(watching) }
         // An archived chat on screen is read whole (051, FR-024).
         if let watching = report.watching, agents[watching]?.isSlim == true {
             Task { [weak self] in await self?.makeWhole(watching) }
@@ -183,6 +187,24 @@ extension DaemonCore {
         guard agent.isUnread || seesReport else { return }
         agent.isUnread = false
         if seesReport { agent.reportSeenAt = agent.report?.at }
+        changed(agent)
+    }
+
+    /// `agents/setUnread`: the person's own mark, from a row's menu (#70). Only a
+    /// finished chat can be unread, as only a finishing one is made so; anything else is
+    /// refused rather than given a mark nothing would draw. Reading it again is the
+    /// same as opening it, report and all.
+    public func setUnread(_ agentID: UUID, unread: Bool) throws {
+        guard var agent = agents[agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        guard unread else { return markRead(agentID) }
+        guard agent.state == .finished else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: "Only a finished conversation can be marked unread.")
+        }
+        guard !agent.isUnread else { return }
+        agent.isUnread = true
         changed(agent)
     }
 

@@ -40,12 +40,16 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// one: see the case.
     public static let live: [AgentGroup] = [.needsAttention, .waiting, .running, .finished, .stopped, .parked]
 
-    /// Place a session by what happens next. Questions, unread endings, unresolved
+    /// Place a session by what happens next. Questions, unaccounted endings, unresolved
     /// blocks, and unexpected stops need the person; watched waits resume on their
     /// own. A deliberate stop is Paused. Parked and Archived remain explicit choices.
     /// The runtime state stays intact while this presentation changes.
+    ///
+    /// Unread is not an argument (#70). It is a mark on the row, not a reason for a
+    /// group: a group that depended on it moved the row out from under the person the
+    /// moment they opened it.
     public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool,
-                parked: Bool, waitingOnEvents: Bool = false, isUnread: Bool = false,
+                parked: Bool, waitingOnEvents: Bool = false,
                 endedReason: EndedReason? = nil, waitingForAllowance: Bool = false) {
         let wantsAnswer = report?.outcome.needsAPerson == true
         if parked, state != .archived, state != .waitingOnUser {
@@ -60,10 +64,10 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .waitingOnUser: self = .needsAttention
         // Answering the app's question: where it was, not Working. See above.
         case .running where outcomeAsked:
-            self = Self.settled(wantsEyes || wantsAnswer || isUnread || report == nil, report,
+            self = Self.settled(wantsEyes || wantsAnswer || report == nil, report,
                                 waitingOnEvents: waitingOnEvents)
         case .running: self = wantsEyes ? .needsAttention : .running
-        case .finished: self = Self.settled(wantsEyes || wantsAnswer || isUnread || (outcomeAsked && report == nil), report,
+        case .finished: self = Self.settled(wantsEyes || wantsAnswer || (outcomeAsked && report == nil), report,
                                             waitingOnEvents: waitingOnEvents)
         case .stopped where waitingForAllowance: self = .waiting
         // A spent allowance is Paused, not Needs you (065, R7): the way on is a new chat,
@@ -73,8 +77,8 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         }
     }
 
-    /// A finished turn needs review before it can be Done. An automatic wait only
-    /// wins when nobody needs to read or answer it.
+    /// A finished turn that asks something, or says nothing when asked, is not Done.
+    /// An automatic wait only wins when nobody needs to answer it.
     private static func settled(_ wantsAPerson: Bool, _ report: WorkReport?,
                                 waitingOnEvents: Bool) -> AgentGroup {
         if wantsAPerson { return .needsAttention }
@@ -94,8 +98,8 @@ public struct AgentHeading: Identifiable, Sendable {
 public extension AgentGroup {
     /// The headings this group is drawn under, empty ones left out.
     ///
-    /// Every displayed group has one heading. Reading a finished chat can move it
-    /// from Needs you to Done without changing its stored state.
+    /// Every displayed group has one heading. Reading a chat never moves it: unread is
+    /// the row's mark, not the group's (#70).
     func headings(_ agents: [Agent]) -> [AgentHeading] {
         agents.isEmpty ? [] : [AgentHeading(title: title, agents: agents)]
     }
@@ -130,7 +134,7 @@ public extension Agent {
     func group(wantsEyes: Bool) -> AgentGroup {
         AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked,
                    parked: parking?.isParked == true, waitingOnEvents: eventWait?.isOpen == true,
-                   isUnread: isUnread, endedReason: endedReason, waitingForAllowance: allowanceWait != nil)
+                   endedReason: endedReason, waitingForAllowance: allowanceWait != nil)
     }
 
     /// Whether the agent explicitly asked for an answer.
@@ -143,9 +147,15 @@ public extension Agent {
     }
 
     /// Whether the app will carry this agent on by itself: an open wait on events, or a
-    /// block naming agents or a time. Unread endings can still place it under Needs you.
+    /// block naming agents or a time.
     var isWaiting: Bool {
         eventWait?.isOpen == true || report?.resumesByItself == true
+    }
+
+    /// A finished turn nobody has opened since: news, but not a need (#70). Drawn as a
+    /// mark on the row and counted beside the groups, never as a group of its own.
+    var showsUnread: Bool {
+        state == .finished && isUnread
     }
 
     /// Whether the person has looked at this conversation since its report landed.

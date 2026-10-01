@@ -123,7 +123,7 @@ struct BlockedTests {
         let note = try await finish(core, leadToken, "blocked", "Waiting on both helpers.",
                                     waitingOn: [first.uuidString, "update the tests"])
         #expect(note.contains("under \"Waiting\""))
-        #expect(await core.agent(lead)?.group(wantsEyes: false) == .needsAttention)
+        #expect(await core.agent(lead)?.group(wantsEyes: false) == .waiting)
         try await finish(core, firstToken, "done", "Ported.")
         firstGate.open()
 

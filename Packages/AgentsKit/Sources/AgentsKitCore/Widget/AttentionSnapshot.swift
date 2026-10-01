@@ -55,19 +55,19 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
 
     /// The snapshot of what the app can see, at `date`.
     ///
-    /// The count is the Dock badge's count and not a second rule: the same two groups over
-    /// the same live projects, so the widget cannot disagree with the badge or with a
-    /// project's row (FR-001, FR-019).
+    /// The count is the Dock badge's count and not a second rule: `AgentsModel.wantsALook`
+    /// over the same live projects, so the widget cannot disagree with the badge
+    /// (FR-001, FR-019). An unread finish is counted and drawn though it is no longer
+    /// under Needs you (#70): it is still news.
     @MainActor
     public static func make(model: AgentsModel, at date: Date = Date(),
                             limit: Int = AttentionSnapshot.rowLimit) -> AttentionSnapshot {
         var total = 0
         var waiting: [Agent] = []
         for summary in model.liveProjects {
-            let counts = model.counts(in: summary.folder)
-            total += (counts[.needsAttention] ?? 0) + (counts[.blocked] ?? 0)
-            waiting += model.agents(in: summary.folder, group: .needsAttention)
-            if (counts[.blocked] ?? 0) > 0 { waiting += model.agents(in: summary.folder, group: .blocked) }
+            total += model.attentionCount(in: summary.folder)
+            waiting += AgentGroup.allCases.flatMap { model.agents(in: summary.folder, group: $0) }
+                .filter(model.wantsALook)
         }
         // One row per session. An agent that asked twice is one session waiting on you and
         // must not take two rows (FR-005).

@@ -40,7 +40,8 @@ struct SessionsColumn: View {
                     // The same headings the project page draws, one step down.
                     ForEach(AgentGroup.live, id: \.self) { group in
                         ForEach(group.headings(matching(model.agents(in: model.selectedProjectKey, group: group)))) { part in
-                            subheading(part.title, count: part.agents.count)
+                            subheading(part.title, count: part.agents.count,
+                                       unread: part.agents.filter(\.showsUnread).count)
                             ForEach(part.agents) { agent in
                                 row(agent)
                             }
@@ -249,11 +250,15 @@ struct SessionsColumn: View {
         }
     }
 
-    /// A group within Sessions: Working, Needs you, Archived sessions.
-    private func subheading(_ title: String, count: Int) -> some View {
+    /// A group within Sessions: Working, Needs you, Archived sessions. With how many
+    /// under it are unread (#70), so finished work is not missed now it sits in Done.
+    private func subheading(_ title: String, count: Int, unread: Int = 0) -> some View {
         HStack(spacing: 6) {
             Text(title)
             Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+            if unread > 0 {
+                Text("· \(unread) unread").monospacedDigit()
+            }
         }
         .appText(.fine)
         .foregroundStyle(.secondary)

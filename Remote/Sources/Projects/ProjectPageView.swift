@@ -79,7 +79,8 @@ struct ProjectPageView: View {
 
                 ForEach(AgentGroup.live, id: \.self) { group in
                     ForEach(group.headings(matching(model.agents(group: group)))) { heading in
-                        GroupHeading(title: heading.title, count: heading.agents.count)
+                        GroupHeading(title: heading.title, count: heading.agents.count,
+                                     unread: heading.agents.filter(\.showsUnread).count)
                         ForEach(heading.agents) { agent in
                             AgentCard(agent: agent)
                         }
@@ -237,6 +238,8 @@ struct DisclosureHeading: View {
 struct GroupHeading: View {
     let title: String
     let count: Int
+    /// How many under it nobody has opened since they finished (#70), as the Mac says it.
+    var unread = 0
 
     var body: some View {
         HStack(spacing: 6) {
@@ -244,6 +247,10 @@ struct GroupHeading: View {
             Text("\(count)")
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
+            if unread > 0 {
+                Text("· \(unread) unread")
+                    .monospacedDigit()
+            }
         }
         .appText(.fine).fontWeight(.medium)
         .foregroundStyle(.secondary)

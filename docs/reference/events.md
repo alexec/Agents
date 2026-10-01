@@ -38,7 +38,7 @@ All are about agents in the same project. Each carries `agent`, the agent's id.
 | `agent.finished` | agent, outcome | An agent ended a turn having done its work. |
 | `agent.asked_permission` | agent | An agent is asking for permission. |
 | `agent.asked_form` | agent | An agent raised a form to fill in. |
-| `agent.blocked` | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. An unread ending appears under **Needs you** until opened, even if it will resume by itself. See [Statuses and groups](statuses.md). |
+| `agent.blocked` | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | agent, by | An agent was stopped before finishing. |
 | `agent.failed` | agent, reason | An agent ended in an error. |
 | `agent.retired` | agent, because | An archived agent was retired and its conversation deleted. `because` is `age`, `cap` or `person`. |

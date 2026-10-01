@@ -67,10 +67,12 @@ struct ProjectRow: View {
     ///
     /// Urgency first, and only ever two facts: this is a caption on one line in a
     /// column that can be 200pt wide, and a third would be the one that truncates.
-    /// Needs you includes unread endings as well as sessions asking for action.
+    /// Unread is counted beside Needs you, not inside it (#70), so a project with both
+    /// says both.
     private var subtitle: String? {
         if needsPerson {
-            return "Needs you"
+            let unread = model.unreadCount(in: summary.key)
+            return unread > 0 ? "Needs you · \(unread) unread" : "Needs you"
         }
         // Every chat that is not archived is something: the agent working, the agent
         // waiting, or the person meaning to do something with it. So the row always

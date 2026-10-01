@@ -68,9 +68,18 @@ struct AgentRow: View {
 
             VStack(alignment: .leading, spacing: isCompact ? 4 : 3) {
                 HStack(spacing: 5) {
+                    // Unread is a mark on the row, as in Mail, and never a group (#70): a
+                    // dot and a heavier title, both gone once it is opened, and the row
+                    // where it was. Said as the title's value, not as a label over the
+                    // row, which would stack on the Text's own (one element per row).
+                    if agent.showsUnread {
+                        UnreadDot()
+                    }
                     Text(agent.title ?? "Untitled")
-                        .appText(isCompact ? .supporting : .reading).fontWeight(.semibold)
+                        .appText(isCompact ? .supporting : .reading)
+                        .fontWeight(agent.showsUnread ? .semibold : .regular)
                         .lineLimit(1)
+                        .accessibilityValue(agent.showsUnread ? "unread" : "")
                     // Started by a workflow rather than a person: the one thing about
                     // an agent's origin worth a mark, because it is the difference
                     // between something you asked for and something that ran itself.
@@ -209,6 +218,19 @@ struct AgentRow: View {
                     }
                 }
             } else {
+                // The person's own mark (#70): leave something to come back to, or
+                // clear it without opening it.
+                if agent.state == .finished {
+                    if agent.isUnread {
+                        Button("Mark as Read", systemImage: "envelope.open") {
+                            Task { await model.setUnread(agent.id, false) }
+                        }
+                    } else {
+                        Button("Mark as Unread", systemImage: "envelope.badge") {
+                            Task { await model.setUnread(agent.id, true) }
+                        }
+                    }
+                }
                 // Branching leaves the original alone and carries the history so far.
                 Button("Branch") { Task { await model.fork(agent.id) } }
                 if let action = agent.parkAction {
@@ -275,6 +297,7 @@ struct StatusIcon: View {
     /// Why it stopped, where it did, in `EndedReason`'s words.
     var ending: String?
     var endedReason: EndedReason?
+    /// Said in the tooltip only; the row's dot is the mark, and the shape ignores it (#70).
     var isUnread = false
     /// Parked (040): the shape still says how it ended, but it is not orange, because
     /// the person has seen it and chosen later.
@@ -285,7 +308,7 @@ struct StatusIcon: View {
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
-                    isUnread: isUnread, endedReason: endedReason,
+                    endedReason: endedReason,
                     waitingForAllowance: isWaitingForAllowance,
                     outcomeUnknown: isUnaccountedFor)
     }
@@ -330,6 +353,17 @@ struct StatusIcon: View {
         case .stopped: return ending ?? "Stopped"
         case .archived: return "Archived"
         }
+    }
+}
+
+/// The unread mark before a row's title (#70). Grey, not the attention colour: unread
+/// is news, not a need. Silent to a screen reader, which hears the title's value instead.
+struct UnreadDot: View {
+    var body: some View {
+        Circle()
+            .fill(.secondary)
+            .frame(width: 7, height: 7)
+            .accessibilityHidden(true)
     }
 }
 

@@ -138,6 +138,9 @@ public enum DaemonAPI {
         /// word about their own attention: no agent tool reaches either.
         public static let agentsPark = "agents/park"
         public static let agentsUnpark = "agents/unpark"
+        /// Mark a finished chat unread, or read, from its row (#70). The person's word
+        /// about their own attention, as parking is: no agent tool reaches it.
+        public static let agentsSetUnread = "agents/setUnread"
         public static let agentsTranscript = "agents/transcript"
         /// The conversation's finished turns, each as its ask and its last block.
         public static let agentsTurns = "agents/turns"
@@ -732,6 +735,16 @@ public enum DaemonAPI {
     public struct AgentRequest: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    /// `agents/setUnread`: put the unread mark on a finished chat, or take it off.
+    public struct SetUnreadRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var unread: Bool
+        public init(agentID: UUID, unread: Bool) {
+            self.agentID = agentID
+            self.unread = unread
+        }
     }
 
     /// A person changes one session's labels. Ownership is assigned by the daemon.

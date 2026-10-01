@@ -25,13 +25,12 @@ colour. Session labels appear beneath the title on Mac rows and phone cards; age
 | **Partly done** | Needs you | The turn ended with some of the work done; the rest needs a decision from you. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
 | **Stuck** | Needs you | The turn ended without the work done, and the agent says why. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
 | **Blocked** | Needs you | The turn ended blocked on something the app cannot watch, such as a review. | **Carry on**, once the block has gone. **Stop**, **Park**, **Archive**, **Branch**. |
-| **Unread** | Needs you | A finished turn has not been opened since it ended. Reading it moves a completed turn to Done; a question or unresolved problem stays here. | Open the conversation. |
 | **Outcome unknown** | Needs you | The turn ended without a report saying how the work went. | Read the conversation and reply if needed. |
 | **Unexpected stop** | Needs you | The runtime crashed, failed, hit a limit or otherwise stopped short without you choosing to stop it. | Read the reason on the row and reply to resume. |
 | A session that asked you to look at a file | Needs you | The agent opened a file for you to look at, and you have not looked. | Open the conversation. |
 | **Waiting** | Waiting | The agent is waiting on something the app watches: agents it started, a time to check again, or an event such as checks passing. The card says what it is waiting for. It carries on by itself when that comes, so you need not do anything. Its icon is an hourglass. | **Carry on**, to tell it the wait is over early. **Stop**, so it does not carry on. **Park**, **Archive**, **Branch**. |
-| **Complete** | Done | The agent did what was asked, and you have read its last turn. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
-| **Nothing to do** | Done | The agent found nothing that needed doing, and you have read its last turn. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
+| **Complete** | Done | The agent did what was asked. | Reply in the prompt. **Mark as Unread**, **Park**, **Archive**, **Branch**. |
+| **Nothing to do** | Done | The agent found nothing that needed doing. | Reply in the prompt. **Mark as Unread**, **Park**, **Archive**, **Branch**. |
 | **Stopped by you** or **Stopped by the agent that started it** | Paused | The turn was deliberately cut short. | Reply in the prompt to start a new turn. **Park**, **Archive**, **Branch**. |
 | **Its allowance ran out** | Paused | The runtime refused the turn because its plan's allowance, or a key's credit, is spent. The chat stays on that runtime, and nothing carries it on. | Start a new chat on another runtime and ask it to continue this one; see [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). Or reply here once the runtime is back. **Park**, **Archive**, **Branch**. |
 | **Parked** | Parked | You put the conversation down to come back to later. The card says when, such as **Parked 3 days ago**. It stays parked even if its turn ends wanting you, unless it asks you something mid-turn. | **Unpark**, to put it back in its group. **Archive**, **Branch**. |
@@ -39,6 +38,22 @@ colour. Session labels appear beneath the title on Mac rows and phone cards; age
 | **Archived** | Archived | You, or the agent that started it, put it away. If the app made a worktree for it and everything in it is committed, the worktree is removed; its branch is deleted too if it was merged. | **Bring Back**. |
 
 **Show in Finder** is on every agent's menu on the Mac.
+
+## Unread
+
+Unread is a mark on a row, not a group. A turn that finishes while you aren't looking at
+it shows a dot before its title, and the title is bold, as in Mail. A screen reader reads
+it as "unread". The row stays in its group: a completed turn is under **Done** from the
+moment it ends, and opening it clears the mark without moving it. A question or an
+unresolved problem is under **Needs you** whether you have read it or not.
+
+Each group heading counts what is unread under it, such as **Done 5 · 2 unread**, and so
+does the project's row in the sidebar and on the phone. The Dock badge and the Home-screen
+widget count what needs you and what is unread, so a new finish still shows there.
+
+To leave a finished conversation to come back to, choose **Mark as Unread** from its
+menu. It stays unread until you open it again. **Mark as Read** clears the mark without
+opening it.
 
 ## The phone's connection
 

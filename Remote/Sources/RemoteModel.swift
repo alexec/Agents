@@ -1291,8 +1291,7 @@ final class RemoteModel {
     /// one that knows whether a person has looked at an agent, and not the counts the
     /// daemon sent.
     private func needsYou(_ summary: DaemonAPI.ProjectSummary) -> Bool {
-        let counts = work.counts(in: summary.project.folder)
-        return (counts[.needsAttention] ?? 0) + (counts[.blocked] ?? 0) > 0
+        work.attentionCount(in: summary.project.folder) > 0
     }
 
     private func identify() async {
@@ -1874,6 +1873,20 @@ final class RemoteModel {
     /// Park or unpark, whichever `Agent.parkAction` offers (040). From the card's menu.
     func perform(_ action: ParkAction, on agentID: UUID) async {
         await act(action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark, agentID)
+    }
+
+    /// Mark as Unread / Mark as Read, from the card's menu (#70).
+    func setUnread(_ agentID: UUID, _ unread: Bool) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsSetUnread,
+                                  DaemonAPI.SetUnreadRequest(agentID: agentID, unread: unread))
+        } catch {
+            problem = "That did not reach your Mac."
+        }
     }
 
     private func act(_ method: String, _ agentID: UUID) async {

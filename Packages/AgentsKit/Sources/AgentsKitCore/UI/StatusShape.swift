@@ -27,7 +27,7 @@ public enum StatusShape: Hashable, Sendable {
 
     /// `isWaiting` is `Agent.isWaiting`: the app will carry it on by itself.
     public init(state: AgentState, outcome: WorkOutcome?, isWaiting: Bool, isComingBack: Bool,
-                isUnread: Bool = false, endedReason: EndedReason? = nil,
+                endedReason: EndedReason? = nil,
                 waitingForAllowance: Bool = false, outcomeUnknown: Bool = false) {
         // Coming back is work being done on the chat's behalf, even though the record
         // still reads stopped until the pick-up lands. Showing the stop mark would say
@@ -37,8 +37,9 @@ public enum StatusShape: Hashable, Sendable {
         case .starting, .running: self = .working
         case .waitingOnUser: self = .needsYou
         // Only a finished agent's outcome counts. A stopped one keeps the stop mark
-        // whatever it last claimed, which is the rule `AgentGroup` follows too.
-        case .finished where isUnread || outcomeUnknown: self = .needsYou
+        // whatever it last claimed, which is the rule `AgentGroup` follows too. Unread
+        // is not here: it is the row's mark, not a need (#70).
+        case .finished where outcomeUnknown: self = .needsYou
         case .finished:
             switch outcome {
             case .some(let outcome) where outcome.needsAPerson: self = .needsYou

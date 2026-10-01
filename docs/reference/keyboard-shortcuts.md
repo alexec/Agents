@@ -35,7 +35,7 @@ ones every Mac app has.
 | Delete | Selected session(s) in the sessions list | Archives the highlighted session, or every highlighted one that is not already archived (⌘-click to pick several). |
 | Option-Command-B | **Session ▸ Branch** | Starts a new agent from this conversation so far. |
 | Option-Command-Down Arrow, Option-Command-Up Arrow | **Go ▸ Next Session**, **Previous Session** | Moves through the sessions in the list. |
-| Command-J | **Go ▸ Next Needing Attention** | Opens the next session under **Needs you**, including unread finished sessions. |
+| Command-J | **Go ▸ Next Needing Attention** | Opens the next session under **Needs you**, then the next unread finished session. |
 | Control-Command-1 to 9 | **Go ▸** a project | Opens that project. |
 | Option-Command-I | **View ▸ Show Inspector** or **Hide Inspector** | Opens or closes the sidebar beside the conversation. |
 | Command-1 to Command-6 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background** | Opens that pane of the sidebar. While a permission or question card is up, these yield to the card's answers. |

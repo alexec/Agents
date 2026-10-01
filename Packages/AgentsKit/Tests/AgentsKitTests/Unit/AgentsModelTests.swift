@@ -188,8 +188,9 @@ struct AgentsModelTests {
         #expect(!model.agents(in: folder, group: .running).contains { $0.id == shown.id })
     }
 
-    /// The unread count is the finished chats the daemon has flagged, and only those
-    /// under Complete: one flagged but wanting eyes is under Needs attention instead.
+    /// The unread count is the finished chats the daemon has flagged, whichever group
+    /// they are under (#70): one flagged and wanting eyes is under Needs you, and still
+    /// unread.
     @Test func unreadCountsFlaggedFinishedChatsUnderComplete() throws {
         let model = AgentsModel()
         var unread = agent(state: .finished); unread.isUnread = true

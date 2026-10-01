@@ -47,12 +47,20 @@ struct AttentionSnapshotTests {
     /// SC-001. The widget and the Dock badge read the same expression, so a change to one
     /// that did not change the other would be a change to this, once.
     @Test func theCountIsTheDockBadgesCount() {
-        let model = model([agent(), agent(), agent(state: .running)])
-        let badge = model.liveProjects.reduce(0) { total, project in
-            let counts = model.counts(in: project.folder)
-            return total + (counts[.needsAttention] ?? 0) + (counts[.blocked] ?? 0)
-        }
+        let model = model([agent(), agent(), agent(state: .running), agent(state: .finished)])
+        let badge = model.liveProjects.reduce(0) { $0 + model.attentionCount(in: $1.key) }
         #expect(AttentionSnapshot.make(model: model).total == badge)
+    }
+
+    /// #70: an unread finish left Needs you, and is still news: counted and drawn, once.
+    @Test func anUnreadFinishIsCountedThoughItIsDone() {
+        let unread = agent(state: .finished, report: WorkReport(outcome: .done, message: "Done", at: Date()))
+        let asked = agent(state: .finished, report: WorkReport(outcome: .needsAnswer, message: "Which?", at: Date()))
+        let model = model([unread, asked, agent(state: .finished, isUnread: false)])
+        #expect(model.agents(in: folder, group: .finished).contains { $0.id == unread.id })
+        let snapshot = AttentionSnapshot.make(model: model)
+        #expect(snapshot.total == 2, "the unread one and the question, each once")
+        #expect(Set(snapshot.sessions.map(\.id)) == [unread.id, asked.id])
     }
 
     @Test func anArchivedProjectIsNotCounted() {

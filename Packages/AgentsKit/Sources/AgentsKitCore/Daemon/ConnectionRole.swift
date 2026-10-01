@@ -76,6 +76,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsUnarchive,
         DaemonAPI.Method.agentsPark,
         DaemonAPI.Method.agentsUnpark,
+        DaemonAPI.Method.agentsSetUnread,
         DaemonAPI.Method.agentsResuming,
         DaemonAPI.Method.agentsOptions,
         DaemonAPI.Method.agentsSetOption,

@@ -263,10 +263,14 @@ struct AgentsCommands: Commands {
         model.openAgent(ids[next])
     }
 
-    /// Every session needing the person, project by project in the list's order.
+    /// Every session needing the person, project by project in the list's order, and
+    /// after each project's Needs you, its unread finishes (#70).
     private var needingAttention: [UUID] {
         projectsInListOrder.flatMap { summary in
             model.agents(in: summary.key, group: .needsAttention)
+                + AgentGroup.live.filter { $0 != .needsAttention }
+                    .flatMap { model.agents(in: summary.key, group: $0) }
+                    .filter(\.showsUnread)
         }.map(\.id)
     }
 

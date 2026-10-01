@@ -64,8 +64,8 @@ that agent, so it carries on. It can still ask you a question, and the question 
 the host for you. Any window or device connected to your control plane can answer it.
 
 When you open Agents again, it connects to the control plane and picks up where it was,
-without starting anything. An unread finished agent is under **Needs you** with its
-summary. Once you open it, completed work moves to **Done**.
+without starting anything. A finished agent you haven't read is in its group, such as
+**Done**, with its summary and an unread mark. Opening it clears the mark and nothing moves.
 
 While any agent has a turn in flight, the host keeps the Mac from going to sleep because
 it has been left alone. After the last turn stops, it stays awake for a while longer so

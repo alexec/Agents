@@ -478,6 +478,11 @@ extension DaemonCore {
                 try unpark(request.agentID)
                 return .success([:])
 
+            case DaemonAPI.Method.agentsSetUnread:
+                let request = try require(params, as: DaemonAPI.SetUnreadRequest.self)
+                try setUnread(request.agentID, unread: request.unread)
+                return .success([:])
+
             case DaemonAPI.Method.agentsTranscript:
                 let request = try require(params, as: DaemonAPI.TranscriptRequest.self)
                 return .success(try JSONValue.encoding(try await transcript(request)))

@@ -68,7 +68,6 @@ struct AgentCard: View {
                 StatusIcon(state: agent.state, isComingBack: isComingBack,
                            outcome: agent.report?.outcome,
                            isWaiting: agent.isWaiting,
-                           isUnread: agent.isUnread,
                            endedReason: agent.endedReason,
                            outcomeUnknown: agent.endingIsUnaccountedFor,
                            isParked: agent.parking?.isParked == true)
@@ -76,8 +75,17 @@ struct AgentCard: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        // Unread is a mark, as on the Mac's row (#70): a dot and a
+                        // heavier title, and the card stays where it is once read.
+                        if agent.showsUnread {
+                            Circle()
+                                .fill(.secondary)
+                                .frame(width: 8, height: 8)
+                                .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+                        }
                         Text(agent.title ?? "Untitled")
-                            .appText(.reading).fontWeight(.semibold)
+                            .appText(.reading)
+                            .fontWeight(agent.showsUnread ? .semibold : .regular)
                             .lineLimit(2)
                         // Started by another agent (028), marked as the Mac's row
                         // marks it.
@@ -179,6 +187,16 @@ struct AgentCard: View {
                 .disabled(model.isStale)
                 .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
             }
+            // Leave it to come back to, or clear it unopened (#70).
+            if agent.state == .finished {
+                Button {
+                    Task { await model.setUnread(agent.id, !agent.isUnread) }
+                } label: {
+                    Label(agent.isUnread ? "Mark as Read" : "Mark as Unread",
+                          systemImage: agent.isUnread ? "envelope.open" : "envelope.badge")
+                }
+                .disabled(model.isStale)
+            }
             if agent.state != .archived {
                 archiveButton
             }
@@ -192,6 +210,7 @@ struct AgentCard: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(agent.showsUnread ? "unread" : "")
     }
 
     private var archiveButton: some View {
@@ -213,7 +232,6 @@ struct AgentCard: View {
             ? AgentsModel.comingBackDescription
             : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
                                isWaiting: agent.isWaiting,
-                               isUnread: agent.isUnread,
                                isUnaccountedFor: agent.endingIsUnaccountedFor)
         if agent.state == .stopped, let why = agent.endedReason?.summary { words = why }
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
@@ -234,7 +252,6 @@ struct StatusIcon: View {
     var outcome: WorkOutcome?
     /// The app will carry it on by itself (`Agent.isWaiting`): Waiting, not Blocked.
     var isWaiting = false
-    var isUnread = false
     var endedReason: EndedReason?
     var outcomeUnknown = false
     var isWaitingForAllowance = false
@@ -243,7 +260,7 @@ struct StatusIcon: View {
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
-                    isUnread: isUnread, endedReason: endedReason,
+                    endedReason: endedReason,
                     waitingForAllowance: isWaitingForAllowance,
                     outcomeUnknown: outcomeUnknown)
     }
@@ -267,8 +284,7 @@ struct StatusIcon: View {
     /// The words a screen reader hears. An outcome's come from `WorkOutcome.heading`,
     /// which is the same place the Mac reads them, so the two cannot drift (FR-017).
     static func words(for state: AgentState, outcome: WorkOutcome? = nil, isWaiting: Bool = false,
-                      isUnread: Bool = false, isUnaccountedFor: Bool = false) -> String {
-        if state == .finished && isUnread { return "Unread · \(outcome?.heading ?? "Finished")" }
+                      isUnaccountedFor: Bool = false) -> String {
         if StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: false) == .waiting {
             return StatusShape.waitingLabel
         }

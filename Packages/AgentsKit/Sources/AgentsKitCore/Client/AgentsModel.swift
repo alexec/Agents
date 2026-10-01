@@ -891,9 +891,24 @@ public final class AgentsModel {
     public func unreadCount(in key: ProjectKey?) -> Int {
         guard let key else { return 0 }
         let wanted = Project.standardize(key.folder)
-        return agents.filter {
-            $0.host == key.host && projectFolder(of: $0) == wanted && $0.state == .finished && $0.isUnread
-        }.count
+        return agents.filter { $0.host == key.host && projectFolder(of: $0) == wanted && $0.showsUnread }.count
+    }
+
+    /// What the Dock badge counts for one project: every session under Needs you, and
+    /// every finished one nobody has opened, each once (#70). Unread left Needs you, so
+    /// it is added back here: a new finish still raises the badge.
+    public func attentionCount(in key: ProjectKey?) -> Int {
+        guard let key else { return 0 }
+        let wanted = Project.standardize(key.folder)
+        return agents.filter { $0.host == key.host && projectFolder(of: $0) == wanted && wantsALook($0) }.count
+    }
+
+    /// Needs you, Blocked from an older daemon, or unread: what the badge and the widget
+    /// count, and what Next Needing Attention visits.
+    public func wantsALook(_ agent: Agent) -> Bool {
+        if agent.showsUnread { return true }
+        let group = group(of: agent)
+        return group == .needsAttention || group == .blocked
     }
 
     /// By folder alone, whichever host it is on: what the phone asks, which only ever
@@ -961,13 +976,20 @@ public final class AgentsModel {
         return counts
     }
 
-    /// How many finished conversations in this project nobody has looked at since.
-    /// The number a project row shows in place of "complete": a complete chat that
-    /// has been read is not news.
+    /// How many finished conversations in this project nobody has looked at since,
+    /// whichever group they are under. The number a project row shows in place of
+    /// "complete": a complete chat that has been read is not news.
     public func unreadCount(in folder: URL?) -> Int {
         guard let folder else { return 0 }
         let wanted = Project.standardize(folder)
-        return agents.filter { projectFolder(of: $0) == wanted && $0.state == .finished && $0.isUnread }.count
+        return agents.filter { projectFolder(of: $0) == wanted && $0.showsUnread }.count
+    }
+
+    /// `attentionCount(in:)` by folder alone, as the phone and the widget ask.
+    public func attentionCount(in folder: URL?) -> Int {
+        guard let folder else { return 0 }
+        let wanted = Project.standardize(folder)
+        return agents.filter { projectFolder(of: $0) == wanted && wantsALook($0) }.count
     }
 
     /// The question this agent is blocked on, if it still is.
