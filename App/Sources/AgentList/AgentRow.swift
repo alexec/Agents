@@ -90,11 +90,6 @@ struct AgentRow: View {
                             .help(starter)
                             .accessibilityLabel(starter)
                     }
-                    // Working in a worktree (030): named, because with two agents in
-                    // one project the worktree is how you tell whose changes are whose.
-                    if let worktree = agent.worktree {
-                        WorktreeBadge(worktree: worktree, isGone: worktreeGone)
-                    }
                 }
 
                 // The agent's own account of its last turn, and nothing else. This line
@@ -118,9 +113,15 @@ struct AgentRow: View {
                         .accessibilityHidden(true)
                 }
 
-                // Shown here, changed over the chat.
-                if !agent.labels.isEmpty {
+                // Working in a worktree (030): named, because with two agents in one
+                // project the worktree is how you tell whose changes are whose. On this
+                // line, not the title's, so a long branch never cuts the title short (#68).
+                // Labels are shown here and changed over the chat.
+                if agent.worktree != nil || !agent.labels.isEmpty {
                     WrappingHStack(spacing: 5) {
+                        if let worktree = agent.worktree {
+                            WorktreeBadge(worktree: worktree, isGone: worktreeGone)
+                        }
                         ForEach(agent.labels, id: \.normalizedValue) { LabelChip(label: $0) }
                     }
                 }
