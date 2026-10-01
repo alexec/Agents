@@ -84,12 +84,25 @@ public final class ControlRelay: @unchecked Sendable {
     public var publicKey: Data { (try? ControlAgreement.publicKey(privateKey: privateKey)) ?? Data() }
 
     public func start() async {
-        guard let text = membership.url, let url = URL(string: text) else { return }
-        let pin = membership.pin, dial = self.dial
+        guard !membership.endpointsToDial.isEmpty else { return }
+        let dial = self.dial, file = files.membership, log = self.log
+        let book = EndpointBook(membership) { newer in
+            // The control plane moved or changed its certificate (R16).
+            try? newer.save(file)
+            log("relay: the control plane is now at \(newer.url ?? "?")")
+        }
         // A device's session: a socket of its own to the control plane, nothing proved
         // on it here. The device's first line is its answer to the control plane's hello.
-        await core.setOpenDevice { _ in try await dial(url, pin) }
-        let hostDial = try? ControlJoin.hostDial(membership, privateKey: privateKey)
+        // It goes where the relay's own uplink last got an answer.
+        await core.setOpenDevice { _ in
+            var last: any Error = Failure("the control plane has no address")
+            for endpoint in book.order {
+                guard let url = URL(string: endpoint.url) else { continue }
+                do { return try await dial(url, endpoint.pin) } catch { last = error }
+            }
+            throw last
+        }
+        let hostDial = try? ControlJoin.hostDial(book, privateKey: privateKey)
         let carrying = Task { [core] in await core.run() }
         let sweeping = Task { [core] in
             while !Task.isCancelled {

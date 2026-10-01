@@ -45,12 +45,16 @@ public enum ControlAuth {
         public var kind: String
         /// A relayed device's id: `agents-relay` opens the socket for it (R10).
         public var `for`: String?
-        public init(id: String, nonce: String, mac: String, kind: String, for device: String? = nil) {
+        /// The epoch of the endpoints this peer holds (R16), so the control plane knows
+        /// who has heard of a move. Nil from a build that keeps none.
+        public var epoch: Int?
+        public init(id: String, nonce: String, mac: String, kind: String, for device: String? = nil, epoch: Int? = nil) {
             self.id = id
             self.nonce = nonce
             self.mac = mac
             self.kind = kind
             self.for = device
+            self.epoch = epoch
         }
     }
 
@@ -59,11 +63,18 @@ public enum ControlAuth {
         public var grant: Grant?
         public var host: HostID?
         public var relayed: Bool?
-        public init(mac: String, grant: Grant? = nil, host: HostID? = nil, relayed: Bool? = nil) {
+        /// Where the control plane answers now, and from when (R16): a member with an older
+        /// epoch keeps this list in place of its own. Sent once one has been announced.
+        public var endpoints: [ControlEndpoint]?
+        public var epoch: Int?
+        public init(mac: String, grant: Grant? = nil, host: HostID? = nil, relayed: Bool? = nil,
+                    endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil) {
             self.mac = mac
             self.grant = grant
             self.host = host
             self.relayed = relayed
+            self.endpoints = endpoints
+            self.epoch = epoch
         }
     }
 
@@ -242,7 +253,7 @@ public enum ControlAuth {
     /// expects in `ok`. `controlKey` is the key it already trusts; a hello with any other
     /// is not its control plane.
     public static func answer(_ hello: Hello, identity: Identity, key: Data, origin: String, kind: String,
-                              expecting controlKey: Data?, for device: UUID? = nil)
+                              expecting controlKey: Data?, for device: UUID? = nil, epoch: Int? = nil)
         throws -> (auth: Auth, expect: Data) {
         guard hello.v == version, let serverNonce = ControlCode.data(base64url: hello.nonce), serverNonce.count == 32 else {
             throw Refusal(.badMessage)
@@ -255,7 +266,7 @@ public enum ControlAuth {
         let mac = peerMAC(key: key, serverNonce: serverNonce, peerNonce: peerNonce, identity: text, origin: origin)
         let expect = serverMAC(key: key, serverNonce: serverNonce, peerNonce: peerNonce, identity: text, origin: origin)
         return (Auth(id: text, nonce: ControlCode.base64url(peerNonce), mac: ControlCode.base64url(mac), kind: kind,
-                     for: device?.uuidString), expect)
+                     for: device?.uuidString, epoch: epoch), expect)
     }
 
     /// Checks the server's `ok` against what `answer` said to expect.
@@ -271,14 +282,25 @@ public enum ControlAuth {
     /// an identity, or says why there is none. Returns who it is and the server's MAC.
     public static func verify(_ auth: Auth, serverNonce: Data, origin: String,
                               key: (Identity) async throws -> Data) async throws -> (Identity, mac: Data) {
+        try await verify(auth, serverNonce: serverNonce, origins: [origin], key: key)
+    }
+
+    /// As above, for a control plane that answers at several places (R16): the peer's
+    /// MAC may bind any one of them, and the server's binds the same one.
+    public static func verify(_ auth: Auth, serverNonce: Data, origins: [String],
+                              key: (Identity) async throws -> Data) async throws -> (Identity, mac: Data) {
         guard let identity = Identity(text: auth.id),
               let peerNonce = ControlCode.data(base64url: auth.nonce), peerNonce.count == 32,
               let mac = ControlCode.data(base64url: auth.mac) else { throw Refusal(.badMessage) }
         let shared = try await key(identity)
-        let wanted = peerMAC(key: shared, serverNonce: serverNonce, peerNonce: peerNonce, identity: auth.id, origin: origin)
-        guard same(mac, wanted) else { throw Refusal(.badProof) }
-        return (identity, serverMAC(key: shared, serverNonce: serverNonce, peerNonce: peerNonce,
-                                    identity: auth.id, origin: origin))
+        for origin in origins {
+            let wanted = peerMAC(key: shared, serverNonce: serverNonce, peerNonce: peerNonce, identity: auth.id, origin: origin)
+            if same(mac, wanted) {
+                return (identity, serverMAC(key: shared, serverNonce: serverNonce, peerNonce: peerNonce,
+                                            identity: auth.id, origin: origin))
+            }
+        }
+        throw Refusal(.badProof)
     }
 
     public struct Refusal: Error, Sendable, Equatable {

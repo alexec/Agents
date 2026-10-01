@@ -46,6 +46,9 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     public var rev: Int
     /// Forgotten: kept as a tombstone, read as absent (rule 11).
     public var forgotten: Bool?
+    /// The newest list of endpoints it has said it holds (R16); nil from a build that
+    /// keeps none.
+    public var knownEpoch: Int?
 
     public init(id: UUID, name: String, kind: Kind, publicKey: Data, grant: Grant,
                 paired: Date, lastSeen: Date? = nil, mayNotify: Bool? = nil,
@@ -121,6 +124,8 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     public var rev: Int
     /// Removed: kept as a tombstone, read as absent.
     public var forgotten: Bool?
+    /// As `ClientRecord.knownEpoch`.
+    public var knownEpoch: Int?
 
     public init(id: HostID, name: String, publicKey: Data? = nil, reach: HostReach = .dialOut,
                 platform: String = "", version: String = "", installed: Bool = false,
@@ -191,6 +196,10 @@ public struct ControlSettings: Codable, Hashable, Sendable {
     /// when that is not publicly trusted (R6). Absent on the first build's control plane.
     public var url: String?
     public var pin: String?
+    /// Every place it answers, in the order members should try, once announced (R16), and
+    /// the `epoch` that goes up whenever the list changes. Members are given both in `ok`.
+    public var endpoints: [ControlEndpoint]?
+    public var epoch: Int?
     /// The control plane's public key, X9.63. The private half is never in the store.
     public var controlKey: Data?
     public var owner: PersonID?

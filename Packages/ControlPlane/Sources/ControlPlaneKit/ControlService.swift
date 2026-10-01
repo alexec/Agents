@@ -293,6 +293,18 @@ public final class ControlService: @unchecked Sendable {
 
     // MARK: A socket
 
+    /// Every origin a member may have dialled: this copy's own, and each endpoint
+    /// announced (R16), in that order and once each.
+    static func origins(_ own: String, _ settings: ControlSettings) -> [String] {
+        var seen: [String] = [own]
+        for endpoint in settings.currentEndpoints {
+            if let url = URL(string: endpoint.url), let origin = ControlAuth.origin(url), !seen.contains(origin) {
+                seen.append(origin)
+            }
+        }
+        return seen
+    }
+
     /// The server's side of the key exchange, then the socket goes where its identity
     /// says: a client to the router, a host's uplink to the router, a code holder to a
     /// one-time announce.
@@ -308,8 +320,10 @@ public final class ControlService: @unchecked Sendable {
             }
             var admitted: Admitted?
             // A peer copy dials the address copies reach each other at, and proves that.
-            let bound = auth.id.hasPrefix("x:") ? (peerOrigin ?? origin) : origin
-            let (identity, mac) = try await ControlAuth.verify(auth, serverNonce: serverNonce, origin: bound) { identity in
+            // Anyone else may have dialled any place the control plane answers (R16).
+            let settings = await methods.controlSettings
+            let bound = auth.id.hasPrefix("x:") ? [peerOrigin ?? origin] : Self.origins(origin, settings)
+            let (identity, mac) = try await ControlAuth.verify(auth, serverNonce: serverNonce, origins: bound) { identity in
                 let (key, who) = try await self.key(for: identity)
                 admitted = who
                 return key
@@ -323,9 +337,20 @@ public final class ControlService: @unchecked Sendable {
                     throw ControlAuth.Refusal(.badMessage)
                 }
             }
+            // Once a list has been announced, every member is given it, and says back
+            // which it holds (R16).
+            let announced = settings.epoch != nil
             try reader.write(line: ControlAuth.Message.ok(ControlAuth.OK(
                 mac: ControlCode.base64url(mac), grant: admitted.client?.grant, host: admitted.host,
-                relayed: relayed ? true : nil)).line)
+                relayed: relayed ? true : nil, endpoints: announced ? settings.currentEndpoints : nil,
+                epoch: settings.epoch)).line)
+            if let epoch = auth.epoch {
+                switch identity {
+                case .client(let id): Task { await self.methods.noteEpoch(client: id, epoch) }
+                case .host(let id): Task { await self.methods.noteEpoch(host: id, epoch) }
+                default: break
+                }
+            }
             switch identity {
             case .client:
                 guard let client = admitted.client else { throw ControlAuth.Refusal(.unknown) }

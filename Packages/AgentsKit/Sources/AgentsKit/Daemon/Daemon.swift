@@ -296,7 +296,11 @@ public final class Daemon: @unchecked Sendable {
                 return
             }
             let uplink = ControlUplink(server: server, hello: hello,
-                                       dial: try ControlJoin.hostDial(membership, privateKey: privateKey))
+                                       dial: try ControlJoin.hostDial(membership, privateKey: privateKey) { newer in
+                                           // The control plane moved or changed its certificate (R16).
+                                           try? newer.save(membershipFile)
+                                           DaemonLog.shared.write("uplink: the control plane is now at \(newer.url ?? "?")")
+                                       })
             self.uplink = uplink
             await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
             await lendAndBorrowSignIns(through: uplink)

@@ -35,14 +35,23 @@ public enum ControlJoin {
                                  url: code.url, pin: code.pin)
     }
 
-    /// How a host's uplink dials, every time: as itself, with its own key.
-    public static func hostDial(_ membership: ControlMembership, privateKey: Data) throws -> @Sendable () async throws -> any LineTransport {
-        guard let text = membership.url, let url = URL(string: text), let host = membership.host else {
+    /// How a host's uplink dials, every time: as itself, with its own key, at each of the
+    /// control plane's endpoints in turn. `keep` saves a newer list the control plane
+    /// gives (R16).
+    public static func hostDial(_ membership: ControlMembership, privateKey: Data,
+                                keep: EndpointBook.Keep? = nil) throws -> @Sendable () async throws -> any LineTransport {
+        try hostDial(EndpointBook(membership, keep: keep), privateKey: privateKey)
+    }
+
+    /// As above, over a book the caller also reads (the relay opens devices' sockets at
+    /// the same place).
+    public static func hostDial(_ book: EndpointBook, privateKey: Data) throws -> @Sendable () async throws -> any LineTransport {
+        let membership = book.current
+        guard !membership.endpointsToDial.isEmpty, let host = membership.host else {
             throw Failure("that membership has no address; it is from the first build")
         }
         let key = try ControlAuth.hostKey(privateKey: privateKey, peer: membership.controlKey, host: host)
         let credentials = ControlAuth.Credentials(identity: .host(host), key: key, kind: "host", controlKey: membership.controlKey)
-        let pin = membership.pin
-        return { try await dial(url, pin: pin, as: credentials) }
+        return { try await ControlCodeUse.dialEach(book, as: credentials, dial: nio) }
     }
 }

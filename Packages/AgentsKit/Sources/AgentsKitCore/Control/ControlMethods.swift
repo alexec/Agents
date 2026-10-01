@@ -126,9 +126,40 @@ public actor ControlMethods: ControlHandling {
         }
     }
 
+    /// What a member said it holds of the endpoints (R16), written only when it changes,
+    /// so Agents Host can say who has heard of a move. A conflict is let go: the next
+    /// connection says it again.
+    public func noteEpoch(client id: UUID, _ epoch: Int) async {
+        guard var known = await records.client(id), known.knownEpoch != epoch else { return }
+        known.knownEpoch = epoch
+        try? await records.save(known)
+    }
+
+    public func noteEpoch(host id: HostID, _ epoch: Int) async {
+        guard var known = await records.host(id), known.knownEpoch != epoch else { return }
+        known.knownEpoch = epoch
+        try? await records.save(known)
+    }
+
     /// A host that has enrolled, or this Mac's own host arriving on the local socket.
     public func enroll(_ host: HostRecord) async throws {
         try await records.save(host)
+    }
+
+    /// Where the control plane answers from now on, in order (R16): the list every member
+    /// is given in `ok`, under a new epoch so each one takes it.
+    @discardableResult
+    public func setEndpoints(_ endpoints: [ControlEndpoint]) async throws -> ControlSettings {
+        guard !endpoints.isEmpty, endpoints.allSatisfy(\.isAcceptable) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Each place must be https, with a pin or none.")
+        }
+        settings = try await records.changeSettings {
+            $0.endpoints = endpoints
+            $0.epoch = ($0.epoch ?? 0) + 1
+            $0.url = endpoints[0].url
+            $0.pin = endpoints[0].pin
+        }
+        return settings
     }
 
     public func setHomeHost(_ host: HostID) async throws {

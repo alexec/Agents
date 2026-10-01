@@ -51,26 +51,94 @@ public enum ControlCodeUse {
 
     /// How a moved device dials (T085): with the key it already shares with the control
     /// plane, derived where its private key lives (a Secure Enclave key cannot leave).
+    /// `keep` is handed the membership whenever the control plane gives a newer list of
+    /// endpoints (R16), to save it.
     public static func clientDial(_ membership: ControlMembership, sharedKey: Data, kind: String,
-                                  dial: @escaping Dial) throws -> @Sendable () async throws -> any LineTransport {
-        guard let text = membership.url, let url = URL(string: text), let client = membership.client else {
+                                  dial: @escaping Dial, keep: EndpointBook.Keep? = nil)
+        throws -> @Sendable () async throws -> any LineTransport {
+        guard !membership.endpointsToDial.isEmpty, let client = membership.client else {
             throw Failure("that membership has no address; it is from the first build")
         }
         let credentials = ControlAuth.Credentials(identity: .client(client), key: sharedKey, kind: kind,
                                                   controlKey: membership.controlKey)
-        let pin = membership.pin
-        return { try await join(url, pin: pin, as: credentials, dial: dial) }
+        let book = EndpointBook(membership, keep: keep)
+        return { try await dialEach(book, as: credentials, dial: dial) }
     }
 
     /// How a paired client dials, every time, as itself.
     public static func clientDial(_ membership: ControlMembership, privateKey: Data, kind: String,
-                                  dial: @escaping Dial) throws -> @Sendable () async throws -> any LineTransport {
-        guard let text = membership.url, let url = URL(string: text), let client = membership.client else {
+                                  dial: @escaping Dial, keep: EndpointBook.Keep? = nil)
+        throws -> @Sendable () async throws -> any LineTransport {
+        guard let client = membership.client else {
             throw Failure("that membership has no address; it is from the first build")
         }
         let key = try ControlAuth.clientKey(privateKey: privateKey, peer: membership.controlKey, client: client)
-        let credentials = ControlAuth.Credentials(identity: .client(client), key: key, kind: kind, controlKey: membership.controlKey)
-        let pin = membership.pin
-        return { try await join(url, pin: pin, as: credentials, dial: dial) }
+        return try clientDial(membership, sharedKey: key, kind: kind, dial: dial, keep: keep)
+    }
+
+    /// Dials the book's endpoints in turn, each with its own pin, and proves `credentials`
+    /// on the first that answers; a newer list in its `ok` goes into the book (R16).
+    ///
+    /// A refusal is the control plane's answer and ends it, except "not this control
+    /// plane", which only means something else now answers at that place.
+    public static func dialEach(_ book: EndpointBook, as credentials: ControlAuth.Credentials,
+                                dial: Dial) async throws -> PrefixReader {
+        var last: any Error = Failure("there is no address to dial")
+        for endpoint in book.order {
+            guard let url = URL(string: endpoint.url), let origin = ControlAuth.origin(url) else { continue }
+            var proving = credentials
+            proving.epoch = book.epoch
+            do {
+                let (reader, _, ok) = try await ControlAuth.join(try await dial(url, endpoint.pin), origin: origin, as: proving)
+                book.answered(at: endpoint, ok: ok)
+                return reader
+            } catch let refusal as ControlAuth.Refusal where refusal.reason != .wrongControlPlane {
+                throw refusal
+            } catch {
+                last = error
+            }
+        }
+        throw last
+    }
+}
+
+/// The endpoints a member dials, and the one that last answered, which it tries first
+/// (058, research R16). The control plane may give a newer list in any `ok`: the book
+/// takes it in place of its own, and hands the membership to `keep` to save.
+public final class EndpointBook: @unchecked Sendable {
+    public typealias Keep = @Sendable (ControlMembership) -> Void
+
+    private let lock = NSLock()
+    private var membership: ControlMembership
+    private var lastAnswered: ControlEndpoint?
+    private let keep: Keep?
+
+    public init(_ membership: ControlMembership, keep: Keep? = nil) {
+        self.membership = membership
+        self.keep = keep
+    }
+
+    public var current: ControlMembership { lock.withLock { membership } }
+    public var epoch: Int? { lock.withLock { membership.epoch } }
+
+    /// The endpoints in the order to try: the one that answered last, then the rest as
+    /// the control plane listed them.
+    public var order: [ControlEndpoint] {
+        lock.withLock {
+            let all = membership.endpointsToDial
+            guard let first = lastAnswered, all.contains(first) else { return all }
+            return [first] + all.filter { $0 != first }
+        }
+    }
+
+    /// An endpoint answered with `ok`: remember it, and take a newer list if it gave one.
+    public func answered(at endpoint: ControlEndpoint, ok: ControlAuth.OK) {
+        let changed = lock.withLock { () -> ControlMembership? in
+            lastAnswered = endpoint
+            guard let newer = membership.adopting(ok.endpoints, epoch: ok.epoch) else { return nil }
+            membership = newer
+            return newer
+        }
+        if let changed { keep?(changed) }
     }
 }

@@ -72,9 +72,14 @@ public struct ControlMembership: Codable, Sendable, Hashable {
     /// a version 2 code, which is dialled over a WebSocket (058 re-plan).
     public var url: String?
     public var pin: String?
+    /// Every place the control plane answers, in order, as it last said in `ok`, and the
+    /// `epoch` of that list (R16). Absent until a control plane announces one; `url` and
+    /// `pin` are then its first entry.
+    public var endpoints: [ControlEndpoint]?
+    public var epoch: Int?
 
     public init(client: UUID? = nil, host: HostID? = nil, controlKey: Data, addresses: [String], name: String,
-                url: String? = nil, pin: String? = nil) {
+                url: String? = nil, pin: String? = nil, endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil) {
         self.client = client
         self.host = host
         self.controlKey = controlKey
@@ -82,6 +87,8 @@ public struct ControlMembership: Codable, Sendable, Hashable {
         self.name = name
         self.url = url
         self.pin = pin
+        self.endpoints = endpoints
+        self.epoch = epoch
     }
 
     public static func load(_ file: URL) -> ControlMembership? {

@@ -65,12 +65,16 @@ public extension ControlAuth {
         /// The control plane's key this peer trusts, when it already knows it.
         public var controlKey: Data?
         public var relayingFor: UUID?
-        public init(identity: Identity, key: Data, kind: String, controlKey: Data?, relayingFor: UUID? = nil) {
+        /// The epoch of the endpoints this peer holds (R16), told to the control plane.
+        public var epoch: Int?
+        public init(identity: Identity, key: Data, kind: String, controlKey: Data?, relayingFor: UUID? = nil,
+                    epoch: Int? = nil) {
             self.identity = identity
             self.key = key
             self.kind = kind
             self.controlKey = controlKey
             self.relayingFor = relayingFor
+            self.epoch = epoch
         }
     }
 
@@ -86,7 +90,7 @@ public extension ControlAuth {
         }
         let (auth, expect) = try answer(hello, identity: credentials.identity, key: credentials.key, origin: origin,
                                         kind: credentials.kind, expecting: credentials.controlKey,
-                                        for: credentials.relayingFor)
+                                        for: credentials.relayingFor, epoch: credentials.epoch)
         try reader.write(line: Message.auth(auth).line)
         guard let reply = try await reader.next(within: seconds), let message = Message(line: reply) else {
             reader.close()
