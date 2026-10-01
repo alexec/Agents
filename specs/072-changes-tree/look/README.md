@@ -1,6 +1,6 @@
 # 072 · Wireframes: Changes as a tree (#63)
 
-**Waiting on Alex's approval.** This is the look gate for #63.
+**Approved by Alex, 2026-10-01: frames A–D.** This was the look gate for #63. He chose to follow git strictly for new files: a file git doesn't track is grey (untracked) even when the agent wrote it, and turns green (added) once it is staged or committed.
 
 The Changes pane becomes the Files pane's tree, in the style GitHub's "Files changed" made
 familiar. Files and Changes draw the same row view, so they read as one pane with two filters.
