@@ -109,6 +109,7 @@ final class HostModel {
             clients = nil
             hosts = nil
         }
+        await readForwarding()
         await countWork()
     }
 
@@ -210,6 +211,42 @@ final class HostModel {
         guard await start(.daemon) else { return }
         if wasRunning { _ = await services.restart(.daemon) }
         await refresh()
+    }
+
+    // MARK: Moved to another machine (T126, frame T)
+
+    /// This Mac's copy, while it forwards members that haven't heard where it went.
+    private(set) var forwarding: HandoverStatus?
+
+    /// The handover is done: this Mac is a host of the control plane at `place`, and its
+    /// own copy forwards until `until`, if it is forwarding at all.
+    func moved(to place: String, forwardingUntil until: Date?) {
+        settings.role = .joinElsewhere
+        settings.movedTo = place
+        settings.movedAt = Date()
+        settings.forwardingUntil = until
+        settings.save(paths)
+        Task { await refresh() }
+    }
+
+    /// Who this Mac's forwarding copy still has to tell. Asked of the control plane where
+    /// it is now: members say what they hold there, not to the frozen copy here.
+    /// Forwarding ends by itself once everyone has heard, or on its date (30 days at most).
+    private func readForwarding() async {
+        guard let until = settings.forwardingUntil, let place = settings.movedTo else { forwarding = nil; return }
+        if until < Date() { return await stopForwarding() }
+        let read = await ControlTool.run(["handover", "status", "--at", place, "--json"], paths: paths, settings: settings)
+        guard read.ok, let status = try? JSONDecoder().decode(HandoverStatus.self, from: Data(read.output.utf8)) else { return }
+        forwarding = status
+        if status.stillToHear.isEmpty { await stopForwarding() }
+    }
+
+    /// Stop Forwarding: this Mac's copy stops. Anyone still to hear pairs again.
+    func stopForwarding() async {
+        await services.unregister(.control)
+        settings.forwardingUntil = nil
+        settings.save(paths)
+        forwarding = nil
     }
 
     func restartControl() async {

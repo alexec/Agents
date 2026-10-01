@@ -507,7 +507,7 @@ only.
   plane is moving"); `control/forward` (frozen, and `ok` answers only the new list, then
   closes). Each over `x:` and from the command line (`agents-control move …`) for a copy
   that Agents Host doesn't run.
-- [ ] T125 After T106: the store window (`ControlConfig.link`) and the Remote
+- [x] T125 (`keep:` in `ControlConfig.link` and `RemoteControl`, both direct and moved links; the relayed dial still takes the list only once the device next dials directly) After T106: the store window (`ControlConfig.link`) and the Remote
   (`RemoteControl`, the relay path included) save the list from `ok` and dial it in order.
   The Remote still falls back to the relay when no address answers.
 - [ ] T126 Agents Host, **Move to another machine…** (frames O–T approved by Alex 2026-10-01, `look/move/`; forwarding stops after 30 days, so `handover/forward` takes an end date and the forwarding copy stops by itself): the new copy's address; a check that it holds this key and an empty

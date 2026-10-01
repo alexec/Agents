@@ -15,6 +15,11 @@ struct HostSettings: Codable, Sendable, Equatable {
     var role: Role = .none
     var store: StoreChoice = .thisMac
     var bucket = BucketPlace()
+    /// Where the control plane went when it was moved off this Mac (T126, frame T), and
+    /// when; and until when this Mac's copy forwards members that haven't heard.
+    var movedTo: String?
+    var movedAt: Date?
+    var forwardingUntil: Date?
 
     private static func key(_ paths: HostPaths) -> String { "hostSettings.\(paths.suffix)" }
 

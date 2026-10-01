@@ -11,6 +11,8 @@ struct HostWindow: View {
     @State private var joinCode = ""
     @State private var confirmingSwitch = false
     @State private var moving = false
+    @State private var movingMachine = false
+    @State private var confirmingStop = false
 
     var body: some View {
         @Bindable var model = model
@@ -43,6 +45,12 @@ struct HostWindow: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $model.showingPairing) { PairingSheet().environment(model) }
         .sheet(isPresented: $moving) { MoveSheet().environment(model) }
+        .sheet(isPresented: $movingMachine) { MachineMoveSheet().environment(model) }
+        .confirmationDialog("Stop forwarding?", isPresented: $confirmingStop) {
+            Button("Stop Forwarding", role: .destructive) { Task { await model.stopForwarding() } }
+        } message: {
+            Text(stopMessage)
+        }
         .task {
             while !Task.isCancelled {
                 await model.refresh()
@@ -147,9 +155,12 @@ struct HostWindow: View {
                         Text("Join one elsewhere").tag(1)
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .disabled(model.settings.movedTo != nil && model.settings.role == .joinElsewhere)
                 }
                 Divider()
-                if model.settings.role == .runHere && !pickingJoin {
+                if model.settings.role == .joinElsewhere, let place = model.settings.movedTo, !pickingJoin {
+                    movedRows(place)
+                } else if model.settings.role == .runHere && !pickingJoin {
                     running
                     Divider()
                     storeRows
@@ -182,8 +193,67 @@ struct HostWindow: View {
                 Text(runningLine).font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
+            // Frame O: the control plane moved off this Mac, everyone kept (T126).
+            Button("Move to Another Machine…") { movingMachine = true }
+                .disabled(!model.controlRunning || model.busy != nil)
             Button("Restart") { Task { await model.restartControl() } }.disabled(model.busy != nil)
         }
+    }
+
+    // MARK: Moved (frame T)
+
+    @ViewBuilder
+    private func movedRows(_ place: String) -> some View {
+        row {
+            Circle().fill(model.daemonRunning ? Color.green : Color.orange).frame(width: 9, height: 9)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Joined \(Text(place).font(.system(.body, design: .monospaced)))")
+                Text(movedLine).font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Run It Here Again…") {}.disabled(true).help("Not in this build yet")
+        }
+        if let until = model.settings.forwardingUntil {
+            Divider()
+            row {
+                Circle().fill(Color.orange).frame(width: 9, height: 9)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Forwarding from \(Text(model.controlURL).font(.system(.body, design: .monospaced)))")
+                    Text(forwardingLine(until)).font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Button("Stop Forwarding…") { confirmingStop = true }
+            }
+        }
+    }
+
+    private var movedLine: String {
+        var parts: [String] = []
+        if let at = model.settings.movedAt { parts.append("moved \(at.formatted(date: .omitted, time: .shortened))") }
+        parts.append("this Mac is a host there")
+        return parts.joined(separator: " · ")
+    }
+
+    private func forwardingLine(_ until: Date) -> String {
+        let date = "until \(until.formatted(date: .long, time: .omitted))"
+        guard let status = model.forwarding else { return date }
+        let left = status.stillToHear
+        guard !left.isEmpty else { return "\(date) · everyone has heard" }
+        let names = left.map { member in
+            var name = member.id == HostID.mac.rawValue ? "This Mac" : member.name
+            if member.online != true, let seen = member.lastSeen {
+                name += ", last connected \(seen.formatted(.relative(presentation: .named)))"
+            }
+            return name
+        }
+        return "\(date) · \(left.count) still to hear: \(names.joined(separator: "; "))"
+    }
+
+    private var stopMessage: String {
+        let left = model.forwarding?.stillToHear.map(\.name) ?? []
+        guard !left.isEmpty else { return "Everyone has heard where the control plane went." }
+        return "\(ListFormatter.localizedString(byJoining: left)) will need pairing again."
     }
 
     private var runningLine: String {

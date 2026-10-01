@@ -153,11 +153,11 @@ public actor ControlMethods: ControlHandling {
         guard !endpoints.isEmpty, endpoints.allSatisfy(\.isAcceptable) else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Each place must be https, with a pin or none.")
         }
+        // `url` and `pin` stay this copy's own, which codes carry and a handover reaches it
+        // at; the list is what members are told.
         settings = try await records.changeSettings {
             $0.endpoints = endpoints
             $0.epoch = ($0.epoch ?? 0) + 1
-            $0.url = endpoints[0].url
-            $0.pin = endpoints[0].pin
         }
         return settings
     }

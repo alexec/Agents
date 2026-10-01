@@ -72,12 +72,17 @@ enum RemoteControl {
         try? FileManager.default.removeItem(at: movedFile)
     }
 
+    /// A newer list of the control plane's endpoints, given when it moved or changed its
+    /// certificate (R16): kept, so the next launch dials there.
+    static let keepNewer: EndpointBook.Keep = { newer in try? newer.save(membershipFile) }
+
     /// The link the Remote's model is built on while paired with a control plane.
     static func link() -> (any DaemonLink)? {
         guard let membership else { return nil }
         if FileManager.default.fileExists(atPath: movedFile.path) { return movedLink(membership) }
         guard let key = try? ControlAgreement.loadOrMake(file: keyFile),
-              let dial = try? ControlCodeUse.clientDial(membership, privateKey: key, kind: kind.rawValue, dial: dial) else {
+              let dial = try? ControlCodeUse.clientDial(membership, privateKey: key, kind: kind.rawValue, dial: dial,
+                                                        keep: keepNewer) else {
             return nil
         }
         let relayed: @Sendable () async throws -> any LineTransport = {
@@ -95,7 +100,8 @@ extension RemoteControl {
         guard let client = membership.client,
               let key = try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup),
               let shared = try? key.controlClientKey(controlKey: membership.controlKey, client: client),
-              let dial = try? ControlCodeUse.clientDial(membership, sharedKey: shared, kind: kind.rawValue, dial: dial) else {
+              let dial = try? ControlCodeUse.clientDial(membership, sharedKey: shared, kind: kind.rawValue, dial: dial,
+                                                        keep: keepNewer) else {
             return nil
         }
         let relayed: @Sendable () async throws -> any LineTransport = {

@@ -40,6 +40,10 @@ enum ControlTool {
         environment["AGENTS_STORE"] = address.url
         environment["HOME"] = NSHomeDirectory()
         environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
+        #if DEBUG
+        // A walk's stand-in for a public root (#61, Pebble): Debug builds only.
+        if let root = ProcessInfo.processInfo.environment["AGENTS_TEST_TRUST_ROOT"] { environment["AGENTS_TEST_TRUST_ROOT"] = root }
+        #endif
         return (arguments, environment, secrets)
     }
 
