@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// What all of the work has cost, and where it went.

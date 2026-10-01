@@ -1,0 +1,24 @@
+# agents-control as a container (058, T068): one static binary, no shell, a user of its own.
+# The binary is cross-built on a Mac first: scripts/build-linux-control.sh.
+#
+#   docker build -f deploy/Containerfile -t agents-control deploy
+#
+# Configured by the environment (contracts/store.md "Configuration"): AGENTS_STORE,
+# AGENTS_CONTROL_URL, AGENTS_CONTROL_PEER_URL, AGENTS_CONTROL_KEY_FILE, and for a bucket
+# AGENTS_STORE_ENDPOINT, AGENTS_STORE_PATH_STYLE and the AWS keys.
+FROM alpine:3.20 AS base
+RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 control
+# The machine's own build, chosen here rather than by TARGETARCH, which the classic
+# builder does not set.
+COPY bin/ /bin-in/
+RUN case "$(uname -m)" in aarch64) a=arm64;; x86_64) a=amd64;; *) exit 1;; esac \
+ && cp /bin-in/agents-control-linux-$a /agents-control && chmod 755 /agents-control
+
+FROM scratch
+COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=base /etc/passwd /etc/passwd
+COPY --from=base /agents-control /agents-control
+USER control
+EXPOSE 8791
+ENTRYPOINT ["/agents-control"]
+CMD ["serve", "--bind", "0.0.0.0", "--port", "8791"]

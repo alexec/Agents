@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Add a server (037, wireframes/mac-add-server.svg): one field, then a checklist that

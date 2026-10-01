@@ -1,0 +1,271 @@
+App/Sources/AppModel.swift:1001:46: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1020:48: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1028:45: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1070:45: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1115:43: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1169:47: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1242:34: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1247:22: error: reference to member 'disconnect' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1248:20: error: cannot find 'StoreLocations' in scope
+App/Sources/AppModel.swift:1251:19: error: cannot find 'DaemonLock' in scope
+App/Sources/AppModel.swift:1280:18: error: no 'init' candidates produce the expected contextual result type '@MainActor @Sendable (HostID) -> DaemonClient'
+App/Sources/AppModel.swift:1280:9: error: cannot assign to value: 'client' is a method
+App/Sources/AppModel.swift:1315:30: error: reference to member 'connect' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1318:26: error: reference to member 'setCredentialLender' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1339:36: error: reference to member 'notifications' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1462:44: error: cannot infer type of closure parameter 'id' without a type annotation
+App/Sources/AppModel.swift:1467:45: error: cannot infer type of closure parameter 'id' without a type annotation
+App/Sources/AppModel.swift:1467:49: error: cannot infer type of closure parameter 'runtimeID' without a type annotation
+App/Sources/AppModel.swift:1476:46: error: cannot infer type of closure parameter 'server' without a type annotation
+App/Sources/AppModel.swift:1476:54: error: cannot infer type of closure parameter 'online' without a type annotation
+App/Sources/AppModel.swift:1478:40: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1582:43: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1732:44: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1753:48: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1767:46: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1779:37: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1789:37: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1799:27: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1807:43: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1825:27: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1833:27: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1840:46: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1851:34: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1873:37: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1885:37: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1896:27: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1902:27: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1910:34: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1922:34: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1935:34: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1949:43: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1970:51: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:1982:48: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2014:40: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2037:40: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2050:42: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2062:42: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2149:26: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2156:26: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2421:44: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2519:39: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2522:39: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2605:44: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2626:39: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2636:39: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:2646:39: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:400:25: error: missing argument for parameter 'link' in call
+App/Sources/AppModel.swift:436:34: error: no 'client' candidates produce the expected contextual result type 'DaemonClient'
+App/Sources/AppModel.swift:453:35: error: cannot convert value of type '_' to expected argument type 'Bool'
+App/Sources/AppModel.swift:520:38: error: cannot convert value of type '_' to expected argument type 'Bool'
+App/Sources/AppModel.swift:647:46: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:662:26: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:668:31: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:675:30: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:684:52: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:695:27: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:703:27: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:714:67: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:725:64: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:741:61: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:763:61: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:800:45: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:809:42: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:816:45: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:824:48: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:836:44: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:845:44: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:853:31: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:859:48: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:867:48: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:875:45: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:891:46: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:899:43: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:903:53: error: generic parameter 'some Encodable' could not be inferred
+App/Sources/AppModel.swift:940:43: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:952:28: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:958:31: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:975:46: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:983:46: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/AppModel.swift:990:45: error: reference to member 'call' cannot be resolved without a contextual type
+App/Sources/Catalog/AddMCPSheet.swift:197:24: error: cannot find 'MCPCatalogWords' in scope
+App/Sources/Catalog/AddMCPSheet.swift:54:30: error: cannot find 'MCPCatalogWords' in scope
+App/Sources/Catalog/RemoveMCPServerSheet.swift:75:23: error: cannot find 'MCPCatalogWords' in scope
+App/Sources/Catalog/SetSecretSheet.swift:60:27: error: cannot find 'MCPCatalogWords' in scope
+App/Sources/Chat/DraftKeeper.swift:37:20: error: cannot find 'StoreLocations' in scope
+App/Sources/Chat/ThinkingDisplay.swift:9:25: error: cannot find 'StoreLocations' in scope
+App/Sources/ContentView.swift:75:41: error: referencing subscript 'subscript(dynamicMember:)' requires wrapper 'Bindable<AppModel>'
+App/Sources/ContentView.swift:76:41: error: referencing subscript 'subscript(dynamicMember:)' requires wrapper 'Bindable<AppModel>'
+App/Sources/ContentView.swift:76:66: error: cannot assign value of type 'Binding<Subject>?' to type 'Binding<Subject>'
+App/Sources/Control/ConnectSheet.swift:142:53: error: cannot find 'ControlNet' in scope
+App/Sources/Control/ConnectSheet.swift:143:61: error: cannot infer type of closure parameter 'results' without a type annotation
+App/Sources/Control/ConnectSheet.swift:143:70: error: cannot infer type of closure parameter '_' without a type annotation
+App/Sources/Control/ControlConfig.swift:108:82: error: missing argument for parameter 'link' in call
+App/Sources/Control/ControlConfig.swift:24:60: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/ControlConfig.swift:25:46: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/ControlConfig.swift:26:39: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/ControlConfig.swift:36:9: error: cannot find 'ControlPlane' in scope
+App/Sources/Control/ControlConfig.swift:52:25: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/ControlConfig.swift:65:39: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/ControlConfig.swift:72:25: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/ControlConfig.swift:75:74: error: cannot find 'Daemon' in scope
+App/Sources/Control/ControlConfig.swift:76:22: error: cannot find 'Daemon' in scope
+App/Sources/Control/ControlConfig.swift:91:22: error: cannot find 'ControlPlane' in scope
+App/Sources/Control/ControlConfig.swift:92:54: error: cannot find 'connectUnixSocket' in scope
+App/Sources/Control/ControlSettingsModel.swift:38:50: error: cannot find 'MachineID' in scope
+App/Sources/Control/ControlSettingsModel.swift:41:77: error: cannot find 'MachineID' in scope
+App/Sources/Control/ControlSettingsModel.swift:42:78: error: cannot find 'MachineID' in scope
+App/Sources/Control/ControlSettingsView.swift:173:38: error: cannot find 'MachineID' in scope
+App/Sources/Control/FirstRunView.swift:180:23: error: cannot find 'MachineID' in scope
+App/Sources/Control/LocalServices.swift:123:45: error: cannot find 'ControlPlane' in scope
+App/Sources/Control/LocalServices.swift:128:15: error: cannot find 'ControlNet' in scope
+App/Sources/Control/LocalServices.swift:130:35: error: cannot find 'DaemonCommandLine' in scope
+App/Sources/Control/LocalServices.swift:130:66: error: cannot find 'ControlPlane' in scope
+App/Sources/Control/LocalServices.swift:22:25: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/LocalServices.swift:24:73: error: cannot find 'ControlPlane' in scope
+App/Sources/Control/LocalServices.swift:74:61: error: cannot find 'MachineID' in scope
+App/Sources/Control/MoveAcross.swift:21:18: error: cannot find type 'ControlMove' in scope
+App/Sources/Control/MoveAcross.swift:25:19: error: cannot find 'ControlMove' in scope
+App/Sources/Control/MoveAcross.swift:25:43: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/MoveAcross.swift:29:25: error: cannot find 'StoreLocations' in scope
+App/Sources/Control/MoveAcross.swift:32:17: error: cannot find 'ControlMove' in scope
+App/Sources/Control/MoveAcross.swift:64:27: error: cannot find 'ControlMove' in scope
+App/Sources/Control/MoveAcross.swift:69:18: error: cannot find 'ControlMove' in scope
+App/Sources/Control/ThisMacHost.swift:15:43: error: cannot find 'MachineID' in scope
+App/Sources/Hosts/AddServerFlow.swift:118:75: error: cannot infer key path type from context; consider explicitly specifying a root type
+App/Sources/Hosts/AddServerFlow.swift:119:18: error: reference to member 'connect' cannot be resolved without a contextual type
+App/Sources/Hosts/AddServerFlow.swift:119:28: error: reference to member 'checkSystem' cannot be resolved without a contextual type
+App/Sources/Hosts/AddServerFlow.swift:119:42: error: reference to member 'setUp' cannot be resolved without a contextual type
+App/Sources/Hosts/AddServerFlow.swift:119:50: error: reference to member 'installClaude' cannot be resolved without a contextual type
+App/Sources/Hosts/AddServerFlow.swift:119:66: error: reference to member 'findRuntimes' cannot be resolved without a contextual type
+App/Sources/Hosts/AddServerFlow.swift:124:38: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerFlow.swift:13:10: error: type 'AddServerFlow.Phase' does not conform to protocol 'Equatable'
+App/Sources/Hosts/AddServerFlow.swift:133:34: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerFlow.swift:139:21: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerFlow.swift:15:22: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerFlow.swift:167:26: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/AddServerFlow.swift:18:38: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerFlow.swift:25:29: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerFlow.swift:28:30: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerFlow.swift:38:48: error: cannot find type 'StoreLocations' in scope
+App/Sources/Hosts/AddServerFlow.swift:40:47: error: cannot find type 'HostKeyCheck' in scope
+App/Sources/Hosts/AddServerFlow.swift:41:46: error: cannot find type 'HostKeyCheck' in scope
+App/Sources/Hosts/AddServerFlow.swift:42:49: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerFlow.swift:45:21: error: cannot find type 'StoreLocations' in scope
+App/Sources/Hosts/AddServerFlow.swift:69:38: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/AddServerFlow.swift:71:26: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/AddServerFlow.swift:74:41: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/AddServerFlow.swift:88:23: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/AddServerSheet.swift:116:60: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerSheet.swift:117:21: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/AddServerSheet.swift:126:32: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:110:37: error: cannot find 'ServerReachability' in scope
+App/Sources/Hosts/HostSet.swift:116:33: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:167:46: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:20:39: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:250:54: error: cannot find type 'StoreLocations' in scope
+App/Sources/Hosts/HostSet.swift:250:73: error: cannot find type 'SSHCommand' in scope
+App/Sources/Hosts/HostSet.swift:251:9: error: cannot find 'SSHCommand' in scope
+App/Sources/Hosts/HostSet.swift:255:61: error: cannot find type 'StoreLocations' in scope
+App/Sources/Hosts/HostSet.swift:260:110: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:260:35: error: '@escaping' only applies to function types
+App/Sources/Hosts/HostSet.swift:260:68: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:261:9: error: cannot find 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:272:49: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:28:39: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:286:59: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:310:56: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:316:53: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:33:50: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:332:53: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:352:75: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:374:29: error: failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)
+App/Sources/Hosts/HostSet.swift:40:59: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:423:48: error: cannot find type 'HostKeyCheck' in scope
+App/Sources/Hosts/HostSet.swift:426:34: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/HostSet.swift:427:19: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/HostSet.swift:428:19: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/HostSet.swift:43:44: error: cannot find type 'HostStore' in scope
+App/Sources/Hosts/HostSet.swift:44:48: error: cannot find type 'StoreLocations' in scope
+App/Sources/Hosts/HostSet.swift:440:48: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/HostSet.swift:47:67: error: cannot find 'StoreLocations' in scope
+App/Sources/Hosts/HostSet.swift:528:88: error: cannot find 'SSHCommand' in scope
+App/Sources/Hosts/HostSet.swift:541:65: error: cannot find type 'ServerBinary' in scope
+App/Sources/Hosts/HostSet.swift:546:40: error: cannot find 'ServerInstaller' in scope
+App/Sources/Hosts/HostSet.swift:547:20: error: cannot find 'ServerBinary' in scope
+App/Sources/Hosts/HostSet.swift:554:16: error: cannot find 'ServerBinary' in scope
+App/Sources/Hosts/HostSet.swift:80:21: error: cannot find type 'StoreLocations' in scope
+App/Sources/Hosts/HostSet.swift:82:22: error: cannot find 'HostStore' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:11:33: error: cannot find type 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:61:38: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:62:28: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:63:33: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/RebuiltServerSheet.swift:87:26: error: cannot find 'HostKeyCheck' in scope
+App/Sources/Hosts/SignInRelays.swift:106:100: error: cannot find type 'MacSignInRelay' in scope
+App/Sources/Hosts/SignInRelays.swift:106:80: error: cannot find type 'MacSignInSource' in scope
+App/Sources/Hosts/SignInRelays.swift:11:28: error: cannot find type 'StoreLocations' in scope
+App/Sources/Hosts/SignInRelays.swift:111:20: error: cannot find 'MacSignInRelay' in scope
+App/Sources/Hosts/SignInRelays.swift:112:49: error: cannot find 'RelayCertificates' in scope
+App/Sources/Hosts/SignInRelays.swift:13:34: error: cannot find type 'MacSignInRelay' in scope
+App/Sources/Hosts/SignInRelays.swift:15:21: error: cannot find type 'StoreLocations' in scope
+App/Sources/Hosts/SignInRelays.swift:23:66: error: cannot find type 'MacSignInSource' in scope
+App/Sources/Hosts/SignInRelays.swift:28:55: error: cannot find type 'MacSignInSource' in scope
+App/Sources/Hosts/SignInRelays.swift:33:24: error: cannot find type 'MacSignInSource' in scope
+App/Sources/Hosts/SignInRelays.swift:36:20: error: cannot find 'CodexFileSignIn' in scope
+App/Sources/Hosts/SignInRelays.swift:38:20: error: cannot find 'ClaudeKeychainSignIn' in scope
+App/Sources/Hosts/SignInRelays.swift:62:9: error: failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)
+App/Sources/Hosts/SignInRelays.swift:70:29: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/SignInRelays.swift:71:22: error: cannot find type 'ServerConnection' in scope
+App/Sources/Hosts/SignInRelays.swift:83:31: error: cannot find 'MacSignInRelay' in scope
+App/Sources/Hosts/SignInRelays.swift:87:42: error: cannot find 'MacSignInRelay' in scope
+App/Sources/Hosts/SignInRelays.swift:88:31: error: cannot find 'ServerConnection' in scope
+App/Sources/Hosts/WindowFiles.swift:12:20: error: cannot find 'StoreLocations' in scope
+App/Sources/Hosts/WindowFiles.swift:26:20: error: cannot find 'StoreLocations' in scope
+App/Sources/Pool/AddCreditSheet.swift:33:24: error: cannot find type 'CredentialStore' in scope
+App/Sources/Projects/CloneSheet.swift:66:22: error: cannot find 'DaemonCore' in scope
+App/Sources/Projects/ProjectListView.swift:100:44: error: cannot find 'StoreLocations' in scope
+App/Sources/Projects/ProjectListView.swift:125:26: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+App/Sources/Projects/ProjectListView.swift:98:26: error: cannot find 'StoreLocations' in scope
+App/Sources/Projects/ProjectMCPSection.swift:164:40: error: cannot find 'MCPCatalogWords' in scope
+App/Sources/Projects/WorkflowPage.swift:542:9: error: cannot find 'WorkflowFile' in scope
+App/Sources/Projects/WorkflowRow.swift:78:25: error: cannot find 'WorkflowFile' in scope
+App/Sources/Runtimes/InstallAgentsSheet.swift:211:25: error: cannot find 'StoreLocations' in scope
+App/Sources/Settings/AgentRuntimesSettingsView.swift:48:25: error: cannot find 'StoreLocations' in scope
+App/Sources/Settings/AppearanceSettingsView.swift:41:25: error: cannot find 'StoreLocations' in scope
+App/Sources/Settings/ArchiveSettingsView.swift:46:17: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+App/Sources/Settings/CostSettingsView.swift:46:17: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+App/Sources/Settings/CredentialRow.swift:106:33: error: cannot find type 'CredentialStore' in scope
+App/Sources/Settings/CredentialRow.swift:117:35: error: cannot find type 'CredentialStore' in scope
+App/Sources/Settings/CredentialRow.swift:129:34: error: cannot find type 'CredentialStore' in scope
+App/Sources/Settings/CredentialRow.swift:31:34: error: cannot find type 'CredentialStore' in scope
+App/Sources/Settings/CredentialRow.swift:34:44: error: value of type 'some View' has no member 'style'
+App/Sources/Settings/ServerCredentials.swift:17:10: error: type 'ServerCredentials.Checking' does not conform to protocol 'Equatable'
+App/Sources/Settings/ServerCredentials.swift:20:23: error: cannot find type 'CredentialCheck' in scope
+App/Sources/Settings/ServerCredentials.swift:23:40: error: cannot find type 'CredentialStore' in scope
+App/Sources/Settings/ServerCredentials.swift:26:44: error: cannot find type 'CredentialStore' in scope
+App/Sources/Settings/ServerCredentials.swift:27:46: error: cannot find type 'CredentialCheck' in scope
+App/Sources/Settings/ServerCredentials.swift:29:21: error: cannot find type 'StoreLocations' in scope
+App/Sources/Settings/ServerCredentials.swift:29:46: error: cannot find type 'CredentialCheck' in scope
+App/Sources/Settings/ServerCredentials.swift:33:17: error: cannot find 'CredentialStore' in scope
+App/Sources/Settings/ServerCredentials.swift:40:41: error: cannot find type 'CredentialStore' in scope
+App/Sources/Sidebar/BrowserPane.swift:235:20: error: cannot find 'BrowserPolicy' in scope
+App/Sources/Sidebar/BrowserPane.swift:73:25: error: cannot find 'BrowserPolicy' in scope
+App/Sources/Sidebar/BrowserPane.swift:77:16: error: cannot find 'BrowserPolicy' in scope
+App/Sources/Sidebar/FilesPane.swift:20:31: error: cannot find type 'FileProbe' in scope
+App/Sources/Sidebar/FilesPane.swift:22:31: error: cannot find type 'FolderWatch' in scope
+App/Sources/Sidebar/FilesPane.swift:279:17: error: cannot find 'FolderWatch' in scope
+App/Sources/Sidebar/FilesPane.swift:331:31: error: cannot find 'DirectoryReader' in scope
+App/Sources/Sidebar/FilesPane.swift:338:30: error: cannot find 'DirectoryReader' in scope
+App/Sources/Sidebar/FilesPane.swift:352:23: error: cannot find 'DirectoryReader' in scope
+App/Sources/Sidebar/FilesPane.swift:356:23: error: cannot find 'DirectoryReader' in scope
+App/Sources/Sidebar/FilesPane.swift:384:29: error: cannot find 'FileProbe' in scope
+App/Sources/Sidebar/FilesPane.swift:394:17: error: cannot find 'FileProbe' in scope
+App/Sources/Sidebar/FilesPane.swift:399:17: error: cannot find 'FileProbe' in scope
+App/Sources/Sidebar/FilesPane.swift:409:58: error: cannot find type 'FileProbe' in scope
+App/Sources/Sidebar/FilesPane.swift:412:13: error: cannot find 'FileProbe' in scope
+App/Sources/Sidebar/FilesPane.swift:414:13: error: cannot find 'FileProbe' in scope
+App/Sources/Sidebar/FilesPane.swift:416:13: error: cannot find 'FileProbe' in scope
+App/Sources/Sidebar/FilesPane.swift:70:10: error: type '@Sendable ((TranscriptEntry) throws(E) -> Bool) throws(E) -> Int' cannot conform to 'Equatable' [#ProtocolTypeNonConformance]
+App/Sources/Sidebar/FilesPane.swift:70:44: error: contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored
+App/Sources/Sidebar/FilesPane.swift:73:29: error: cannot convert value of type 'URL' to expected argument type '(_, _)'
+App/Sources/Sidebar/ImageFile.swift:21:16: error: cannot find type 'FileProbe' in scope

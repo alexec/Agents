@@ -104,7 +104,22 @@ final class RemoteModel {
     @ObservationIgnored private var watchingLink: Task<Void, Never>?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
 
+    /// The link the Mac is reached by, kept so a second connection can be made over it
+    /// to a control plane's other hosts (058, US4).
+    @ObservationIgnored private let baseLink: any DaemonLink
+    /// Every host a control plane has besides the one this phone paired with, each with
+    /// a client of its own over one more connection (058, US4). Empty against a bridge
+    /// with no control plane.
+    @ObservationIgnored private var otherHosts: [HostID: DaemonClient] = [:]
+    @ObservationIgnored private var hostWatch: Task<Void, Never>?
+    /// What `hosts/list` last said, so the project list can name each host (058, frame H).
+    /// Empty when this phone is not a client of a control plane.
+    private(set) var controlHosts: [DaemonAPI.ControlHost] = []
+    /// The host this phone's own connection reaches. Its projects are stamped `.mac`.
+    private(set) var controlHome: HostID?
+
     init(link: any DaemonLink) {
+        baseLink = link
         client = DaemonClient(link: link)
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
@@ -133,7 +148,10 @@ final class RemoteModel {
     /// Nothing to reach the Mac with, near or far: never paired, or forgotten by the
     /// Mac (FR-009). Since the security review's Phase 3 the direct link is locked with
     /// the Mac's key too, so this is true at home as well as away.
-    var needsPairing: Bool { away != nil && !hasMacKey && !isConnected }
+    var needsPairing: Bool { (away != nil && !hasMacKey && !isConnected) || forgottenByControlPlane }
+
+    /// The control plane refused this device's key: forgotten, or never known (058, US5).
+    private(set) var forgottenByControlPlane = false
 
     /// Where a pairing started from the scanner has got to.
     enum Pairing: Equatable {
@@ -151,7 +169,31 @@ final class RemoteModel {
     /// connection that may do one thing, announce this device, and the Mac's key is kept
     /// from the code, never from the reply: a Mac that cannot finish the handshake was
     /// not the one on the screen.
+    /// Set once this phone has paired with a control plane: the app makes a new model on
+    /// that link (058, US5).
+    private(set) var pairedWithControlPlane = false
+
     func pair(scanned text: String) async {
+        // A control plane's device code (058, US5): announced over its WebSocket.
+        if let control = ControlCode(text: text) {
+            guard case .client = control.purpose else {
+                pairing = .failed("That code is for adding a host, not a phone.")
+                return
+            }
+            pairing = .pairing
+            do {
+                try await RemoteControl.pair(with: control, id: deviceID)
+                pairing = .paired
+                note("pairing: paired with the control plane \(control.name)")
+                pairedWithControlPlane = true
+            } catch let error as JSONRPCError {
+                pairing = .failed(error.message)
+            } catch {
+                note("pairing: failed: \(error)")
+                pairing = .failed("The control plane didn't take that code. It may have run out: show a new one and try again.")
+            }
+            return
+        }
         guard let code = DaemonAPI.PairingCode(text: text) else {
             pairing = .failed("That isn't a pairing code from Agents on your Mac.")
             return
@@ -251,6 +293,33 @@ final class RemoteModel {
     // MARK: What the screens read
 
     var projects: [DaemonAPI.ProjectSummary] { work.liveProjects }
+
+    /// One host's heading in the project list. Several hosts, and the list is grouped
+    /// under these; one host, and there is no heading, as on the Mac (058, frame H).
+    struct HostSection: Identifiable {
+        /// The id projects from this host are stamped with. The phone's own Mac is
+        /// `.mac`, whichever id the control plane gave that host.
+        var id: HostID
+        var title: String
+        var offline: Bool
+    }
+
+    var hostSections: [HostSection] {
+        guard controlHosts.count > 1, let home = controlHome else { return [] }
+        let homeRecord = controlHosts.first { $0.id == home }
+        var sections = [HostSection(id: .mac, title: "This Mac",
+                                    offline: homeRecord?.state == "offline")]
+        for host in controlHosts where host.id != home && host.id != .mac {
+            sections.append(HostSection(id: host.id, title: host.name.isEmpty ? host.id.rawValue : host.name,
+                                        offline: host.state == "offline"))
+        }
+        return sections
+    }
+
+    /// Whether `host`'s projects are last known rather than current (frame H greys them).
+    func hostIsOffline(_ host: HostID) -> Bool {
+        hostSections.first { $0.id == host }?.offline ?? false
+    }
     /// Archived ones too, for the spending page. A project put away still cost what it
     /// cost, and a grand total that quietly dropped it would be wrong rather than tidy.
     /// The archived ones are fetched when that page opens (`loadArchivedProjects`).
@@ -695,6 +764,7 @@ final class RemoteModel {
     /// A project's counts from the same grouping its page uses, so the list and the
     /// page cannot disagree about what needs attention.
     func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
+    func counts(in key: ProjectKey) -> [AgentGroup: Int] { work.counts(in: key) }
 
     /// Whether the Mac is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
@@ -906,10 +976,109 @@ final class RemoteModel {
             if link == .relayed || away?.chooser.link == .relayed { relayTrouble = nil }
             await files.reconnected()
             await refreshEverything()
+            watchOtherHosts()
             return true
         } catch {
+            if let reason = ControlPlaneLink.refused.take(), reason == .forgotten || reason == .unknown {
+                // Forgotten from a window: this device asks for a new code, and stops dialling.
+                RemoteControl.forget()
+                forgottenByControlPlane = true
+                isConnected = false
+                reconnecting?.cancel()
+                return false
+            }
             isConnected = false
             return false
+        }
+    }
+
+    // MARK: A control plane's other hosts (058, US4)
+
+    /// The client a call belongs to: another host's for an agent or a folder there,
+    /// this phone's own host's for everything else. Worked out from what the call names,
+    /// so no call site has to know there is more than one host.
+    private func client(for params: some Encodable) -> DaemonClient {
+        guard !otherHosts.isEmpty, let value = try? JSONValue.encoding(params) else { return client }
+        if let id = (value["agentID"] ?? value["id"])?.stringValue.flatMap(UUID.init(uuidString:)),
+           let host = work.agent(id)?.host, let other = otherHosts[host] {
+            return other
+        }
+        for key in ["folder", "cwd"] {
+            guard let folder = value[key]?.stringValue else { continue }
+            if let project = work.projects.first(where: { $0.folder.absoluteString == folder && $0.host != .mac }),
+               let other = otherHosts[project.host] {
+                return other
+            }
+        }
+        return client
+    }
+
+    /// Ask whether a control plane is on the other end, and follow its other hosts if so.
+    /// A bridge with no control plane answers `control/status` with methodNotFound, and
+    /// nothing more happens.
+    private func watchOtherHosts() {
+        guard hostWatch == nil else { return }
+        hostWatch = Task { [weak self] in
+            guard let self else { return }
+            guard (try? await self.client.call(DaemonAPI.Method.controlStatus)) != nil else {
+                self.hostWatch = nil
+                return
+            }
+            // Through the relay a device has one session at a time (046), and it is the
+            // home host's: the other hosts wait until the control plane's address answers.
+            let base: any DaemonLink = (self.baseLink as? ControlPlaneLink)?.addressOnly ?? self.baseLink
+            let link = ControlLink { try await base.transport() }
+            let control = DaemonClient(link: link.controlLink)
+            while !Task.isCancelled {
+                if (try? await control.connect(startIfNeeded: false, timeout: .seconds(5))) != nil {
+                    await self.syncOtherHosts(control, link: link)
+                    for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
+                        await self.syncOtherHosts(control, link: link)
+                    }
+                }
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
+    private func syncOtherHosts(_ control: DaemonClient, link: ControlLink) async {
+        guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self),
+              let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
+        else { return }
+        controlHosts = listed.filter { $0.relay != true }
+        controlHome = status.homeHost
+        // The relay's key, from the control plane itself (T077): kept for when its address
+        // cannot be reached.
+        RemoteControl.keepRelayKey(status.relayKey)
+        let others = listed.filter { $0.id != status.homeHost && $0.state == "online" && $0.relay != true }
+        for host in others {
+            let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
+            otherHosts[host.id] = other
+            guard await !other.isConnected,
+                  (try? await other.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
+            let id = host.id
+            if let projects = try? await other.call(DaemonAPI.Method.projectsList,
+                                                    DaemonAPI.ProjectsListRequest(includeArchived: false),
+                                                    returning: [DaemonAPI.ProjectSummary].self) {
+                work.replaceProjects(projects, from: id)
+            }
+            if let agents = try? await other.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(includeArchived: false),
+                                                  returning: [Agent].self) {
+                work.replaceAgents(agents, from: id)
+            }
+            let notes = other.notifications()
+            Task { [weak self] in
+                for await note in notes { _ = self?.work.apply(note.method, note.params, from: id) }
+            }
+        }
+        // A host that went offline keeps its projects, greyed under its heading (frame H).
+        // One the control plane no longer lists is gone, and so is what it showed.
+        for id in otherHosts.keys where !others.contains(where: { $0.id == id }) {
+            await otherHosts.removeValue(forKey: id)?.disconnect()
+            if !listed.contains(where: { $0.id == id }) {
+                work.replaceProjects([], from: id)
+                work.replaceAgents([], from: id)
+            }
         }
     }
 
@@ -978,6 +1147,18 @@ final class RemoteModel {
                    let account = try? notification.params?.decode(RuntimeAccount.self) {
                     self.accounts[account.runtimeID] = account
                 }
+                // The Mac's set-up moved to a control plane (058, T085): go there, as
+                // this device, without pairing again.
+                if notification.method == DaemonAPI.Notification.controlMoved, !self.pairedWithControlPlane,
+                   let moved = try? notification.params?.decode(DaemonAPI.ControlMoved.self) {
+                    do {
+                        try RemoteControl.adoptMove(moved, device: self.deviceID)
+                        note("moved: the control plane is now at \(moved.url)")
+                        self.pairedWithControlPlane = true
+                    } catch {
+                        note("moved: could not keep the new address: \(error)")
+                    }
+                }
                 if notification.method == DaemonAPI.Notification.deviceChanged,
                    let change = try? notification.params?.decode(DaemonAPI.DeviceNotification.self),
                    change.id == self.deviceID {
@@ -1028,6 +1209,7 @@ final class RemoteModel {
     /// as the Mac is back.
     @discardableResult
     private func sendOnce(_ method: String, _ params: some Encodable & Sendable) async throws -> JSONValue {
+        let client = client(for: params)
         do {
             return try await client.call(method, params)
         } catch is JSONRPCTransportError {
@@ -1128,7 +1310,7 @@ final class RemoteModel {
             }
             // The relay's wake-up (046): a push when the Mac writes to this device's
             // zone, so a relayed session looks at once. Polling still works without it.
-            if hasMacKey {
+            if hasMacKey || RemoteControl.relayKey != nil {
                 do {
                     try await CloudKitRelayChannel().subscribe(device: deviceID)
                     note("relay: subscribed")
@@ -1311,7 +1493,9 @@ final class RemoteModel {
                                                   DaemonAPI.ListRequest(includeArchived: false),
                                                   returning: [Agent].self) else { return }
         let live = Set(listed.map(\.id))
-        work.replaceAgents(listed + work.agents.filter { $0.state == .archived && !live.contains($0.id) })
+        // Only this host's: another host's agents come from that host (058, US4).
+        work.replaceAgents(listed + work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) },
+                           from: .mac)
     }
 
     /// The newest `limit` archived agents in a project, for its Archived section when
@@ -1432,7 +1616,7 @@ final class RemoteModel {
                                                   DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                   returning: [DaemonAPI.ProjectSummary].self)
         else { return }
-        work.replaceProjects(listed)
+        work.replaceProjects(listed, from: .mac)
     }
 
     private func refreshPermissions() async {
@@ -1593,15 +1777,14 @@ final class RemoteModel {
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
         // The finished turns as summaries, then the turn in progress. A Mac too old to
-        // keep turns gives the lot.
-        let turns = (try? await client.call(DaemonAPI.Method.agentsTurns,
-                                            DaemonAPI.TurnsRequest(agentID: selection),
-                                            returning: TurnsPage.self))
+        // keep turns gives the lot. Both from the chat's own host (058).
+        let turnsRequest = DaemonAPI.TurnsRequest(agentID: selection)
+        let turns = (try? await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
+                                                               returning: TurnsPage.self))
             ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
-        guard let page = try? await client.call(DaemonAPI.Method.agentsTranscript,
-                                                DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize,
-                                                                            from: turns.openStart),
-                                                returning: TranscriptPage.self) else { return }
+        let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize, from: turns.openStart)
+        guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                              returning: TranscriptPage.self) else { return }
         // A chat left before its page arrived does not get that page shown under the
         // next one's name.
         guard self.selection == selection else { return }
@@ -1611,11 +1794,10 @@ final class RemoteModel {
 
     /// Every entry of a finished turn, for the chat to open it.
     func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
-        let page = try? await client.call(
-            DaemonAPI.Method.agentsTranscript,
-            DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
-                                        limit: range.count, from: range.lowerBound),
-            returning: TranscriptPage.self)
+        let request = DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
+                                                  limit: range.count, from: range.lowerBound)
+        let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                        returning: TranscriptPage.self)
         return page?.entries ?? []
     }
 
@@ -1627,18 +1809,17 @@ final class RemoteModel {
         defer { isLoadingEarlier = false }
         // Past the start of the turn in progress, the turns before it.
         if !work.hasMoreBefore {
-            guard let turns = try? await client.call(
-                DaemonAPI.Method.agentsTurns,
-                DaemonAPI.TurnsRequest(agentID: selection, before: work.firstTurn),
-                returning: TurnsPage.self), self.selection == selection else { return }
+            let turnsRequest = DaemonAPI.TurnsRequest(agentID: selection, before: work.firstTurn)
+            guard let turns = try? await client(for: turnsRequest).call(
+                DaemonAPI.Method.agentsTurns, turnsRequest, returning: TurnsPage.self),
+                self.selection == selection else { return }
             work.prependTurns(turns)
             return
         }
-        guard let page = try? await client.call(
-            DaemonAPI.Method.agentsTranscript,
-            DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex,
-                                        limit: firstPageSize, from: work.openTurnStart),
-            returning: TranscriptPage.self) else { return }
+        let request = DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex,
+                                                  limit: firstPageSize, from: work.openTurnStart)
+        guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                              returning: TranscriptPage.self) else { return }
         guard self.selection == selection else { return }
         work.prepend(page)
     }

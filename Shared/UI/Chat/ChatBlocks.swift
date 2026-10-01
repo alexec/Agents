@@ -19,6 +19,8 @@ import UIKit
 struct BlocksView: View {
     @Environment(\.textFillsWidth) private var fillsWidth
     let blocks: [ContentBlock]
+    /// The window's: a sandboxed one sends a file on a host to that host (058, US1).
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -56,7 +58,7 @@ struct BlocksView: View {
         case .resourceLink(let uri, let name, _, _, _):
             #if os(macOS)
             Button {
-                if let url = URL(string: uri) { NSWorkspace.shared.open(url) }
+                if let url = URL(string: uri) { openURL(url) }
             } label: {
                 Label(name, systemImage: "doc")
                     .appText(.reading)

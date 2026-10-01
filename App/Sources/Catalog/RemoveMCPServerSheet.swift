@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Remove a server the app added. The secret stays unless nothing else names it and

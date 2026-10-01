@@ -134,8 +134,17 @@ final class Relay {
         do {
             // A device's connection, not a window's: the daemon hears nothing from the
             // device until it has agreed, and then only as that device.
-            let transport = try await DeviceBinder.bind(try await SocketLink().transport(), device: id,
+            // With a control plane, a paired device is one of its clients (058, US4): it
+            // sees every host, as its grant allows. Pairing is still this Mac's host's.
+            let transport: any LineTransport
+            if let controlPlane, !pairing, let id {
+                let known = KnownDevices.all[id]
+                transport = await controlPlane.attachDevice(id, name: known?.name ?? "A device",
+                                                            kind: known.map(KnownDevices.kind) ?? .unknown)
+            } else {
+                transport = try await DeviceBinder.bind(try await SocketLink().transport(), device: id,
                                                         pairing: pairing)
+            }
             // The device can go while the daemon is being reached.
             guard !stopped else { transport.close(); return }
             daemon = transport
@@ -206,6 +215,21 @@ final class Relay {
     }
 }
 
+/// The devices this Mac's host has paired, by id, as the direct link last heard: what a
+/// control plane calls a device when it first becomes its client.
+@MainActor
+enum KnownDevices {
+    static var all: [UUID: Device] = [:]
+
+    static func kind(_ device: Device) -> ClientRecord.Kind {
+        switch device.kind {
+        case .iPhone: .iPhone
+        case .iPad: .iPad
+        case .unknown: .unknown
+        }
+    }
+}
+
 /// Held so a relay is not collected the moment it is made. Each takes itself out when
 /// it stops; until 2026-09-25 none did, and every reconnect of a phone stayed here.
 @MainActor
@@ -213,17 +237,70 @@ enum Relays {
     static var open: [Relay] = []
 }
 
+// The control plane (058), when given a root: this Mac's window and this Mac's host
+// meet here, and the window reaches its host through it. Devices keep the way below,
+// straight to the host's socket, until they move onto the router (US4).
+let controlPlane: ControlPlane? = ControlPlane.chosenRoot().map { root in
+    try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    DaemonLog.shared.setDestination(root.appendingPathComponent("control.log"))
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+    // Its own port, beside the bridge's: phones paired the old way keep 8790.
+    let controlPort = ProcessInfo.processInfo.environment[ControlNet.portVariable].flatMap(Int.init)
+        ?? Int(ControlNet.defaultPort)
+    return ControlPlane(root: root, version: version, port: controlPort,
+                        awayFromHome: ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil)
+}
+let mailboxTransport = MailboxTransport()
+let carryMail = ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil
+if let controlPlane {
+    // Hosts send needs unsealed. This seals them, once, from every client's presence.
+    // A walk that wants the LAN alone never seals, and never talks to CloudKit.
+    if carryMail {
+        controlPlane.onNeed = { [mailboxTransport] _, params in await mailboxTransport.heard(params) }
+        mailboxTransport.follow(controlPlane)
+    }
+    Task {
+        do {
+            try await controlPlane.start()
+            log("control plane at \(controlPlane.root.path)")
+        } catch {
+            log("the control plane could not start: \(error)")
+            exit(1)
+        }
+    }
+}
+
+// A device forgotten in Settings ▸ Control plane is forgotten by this Mac's host as well,
+// which is what takes its key off the direct link and the relay.
+controlPlane?.onClientForgotten = { id in
+    let host = DaemonClient(link: SocketLink())
+    guard (try? await host.connect(startIfNeeded: false)) != nil else { return }
+    _ = try? await host.call(DaemonAPI.Method.devicesForget, DaemonAPI.DeviceForget(id: id))
+    await host.disconnect()
+}
+
 let directLink = DirectLink(port: port)
 directLink.start()
 
+// launchd ends the bridge with SIGTERM. With a control plane, its ssh masters go with it.
+signal(SIGTERM, SIG_IGN)
+let terminating = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+terminating.setEventHandler {
+    Task {
+        await controlPlane?.stop()
+        exit(0)
+    }
+}
+terminating.resume()
+
 // The mailbox, unless told not to: a Mac with no iCloud account, or a walk that wants
 // the LAN alone, sets AGENTS_BRIDGE_NO_MAILBOX and the bridge is what it was.
-let mailboxTransport = MailboxTransport()
 // And the relay (046), switched off by the same flag: both need iCloud.
 let relayHost = RelayHost()
-if ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil {
-    mailboxTransport.start()
-    relayHost.start()
+if carryMail {
+    // A control plane's mailbox hears hosts, not this Mac's daemon socket.
+    if controlPlane == nil { mailboxTransport.start() }
+    relayHost.start(controlPlane: controlPlane)
 }
 
 dispatchMain()

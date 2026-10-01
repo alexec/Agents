@@ -20,7 +20,6 @@ struct AgentToolsServiceTests {
         async -> (client: JSONRPCConnection, service: AppService) {
         let (mine, theirs) = PairedTransport.pair()
         let service = AppService(transport: theirs, managesAgents: managesAgents,
-                                 sink: { _ in .refused("not expected") },
                                  agents: { call in
                                      await calls.record(call)
                                      return .shown("done")

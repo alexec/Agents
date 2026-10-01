@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import Foundation
 
 /// A server asked for a credential this window has none of (043, FR-015): asked of the
@@ -11,13 +14,66 @@ struct TokenAsk: Identifiable {
     let answer: CheckedContinuation<Bool, Never>
 }
 
+/// A server asked for a sign-in this Mac relays (058, T091): asked of the person, once per
+/// server and runtime, before the control plane lets the server reach this Mac's relay.
+struct SignInLendAsk: Identifiable {
+    let id = UUID()
+    let runtimeName: String
+    let label: String
+    let answer: CheckedContinuation<Bool, Never>
+}
+
 extension AppModel {
+    /// A server of the control plane wants a sign-in this Mac relays (T091). Asks the
+    /// person the first time; then the control plane lets the server tunnel to this Mac's
+    /// host, which relays the sign-in, and the server is told where its gate goes. The
+    /// token never leaves this Mac. Nil when this is not such a case.
+    func relaySignInThroughControl(_ wanted: DaemonAPI.CredentialWanted, to id: HostID) async -> Bool? {
+        guard reachesThroughControl(id), ToolPolicyCatalog.policy(for: wanted.runtime).relay != nil,
+              let lender = thisMacHostID, lender != id, let control = controlPlaneClient() else { return nil }
+        defer { Task { await control.disconnect() } }
+        let allowed = controlPlaneHosts?.first { $0.id == id }?.signInFrom?[wanted.runtime] == lender
+        if !allowed {
+            let name = RuntimeCatalog.runtime(id: wanted.runtime)?.name ?? wanted.runtime
+            let yes = await withCheckedContinuation { answer in
+                signInLendAsk = SignInLendAsk(runtimeName: name, label: hosts.label(id), answer: answer)
+            }
+            guard yes else { return false }
+            do {
+                try await control.connect(startIfNeeded: false, timeout: .seconds(5))
+                _ = try await control.call(DaemonAPI.Method.hostsLendSignIn,
+                                           DaemonAPI.LendSignIn(host: id, from: lender, runtime: wanted.runtime, allowed: true))
+            } catch {
+                return false
+            }
+        }
+        do {
+            let grant = try await client(for: lender).call(DaemonAPI.Method.relayGrant,
+                                                          DaemonAPI.RelayGrantRequest(runtime: wanted.runtime),
+                                                          returning: DaemonAPI.RelayGrantReply.self)
+            _ = try await client(for: id).call(DaemonAPI.Method.relayOffer, DaemonAPI.RelayOffer(
+                runtime: wanted.runtime, socketPath: "tunnel", caCertificate: grant.caCertificate, standIn: grant.standIn))
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// The person answered the lend ask.
+    func finishSignInLendAsk(allowed: Bool) {
+        guard let ask = signInLendAsk else { return }
+        signInLendAsk = nil
+        ask.answer.resume(returning: allowed)
+    }
+
     /// What a server may be lent from here, sent on every connect (043). Names only.
     func credentialOffer(_ id: HostID) -> DaemonAPI.CredentialsOffer {
         let ownOnly = hosts.host(id)?.ownSignInOnly ?? false
         let runtimes = ownOnly ? [] : ServerCredentials.runtimes.filter { credentials.record($0) != nil }
         // What this Mac would relay and cannot now, so the server can say why (056).
         var notRelayed: [String: DaemonAPI.SignInWanted.Reason] = [:]
+        #if !AGENTS_STORE
+        // The store window relays no sign-in: Agents Host does, on its Mac (T091).
         if !ownOnly {
             for runtimeID in SignInRelays.relayed {
                 if let why = SignInRelays.whyNotRelayed(runtimeID) { notRelayed[runtimeID] = why }
@@ -28,6 +84,9 @@ extension AppModel {
         let signIns = ownOnly ? [] : ServerBinaries.serverRuntimes.filter {
             MacFileSignIn(runtimeID: $0)?.read().lendable != nil
         }
+        #else
+        let signIns: [String] = []
+        #endif
         return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly,
                                           notRelayed: notRelayed.isEmpty ? nil : notRelayed,
                                           signIns: signIns.isEmpty ? nil : signIns)
@@ -38,11 +97,15 @@ extension AppModel {
     /// that was refused is then sent again.
     func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: HostID) async -> Bool {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false) else { return false }
+        // A sign-in this Mac relays, to a server of the control plane (T091).
+        if let relayed = await relaySignInThroughControl(wanted, to: id) { return relayed }
+        #if !AGENTS_STORE
         // This Mac's sign-in file (049): read now, so a provider signed in to since the
         // server connected is lent too. With nothing in it the start goes on without.
         if let file = MacFileSignIn(runtimeID: wanted.runtime) {
             return await hosts.lendSignIn(id, runtime: wanted.runtime, file.read().lendable)
         }
+        #endif
         if credentials.secretToLend(wanted.runtime) == nil {
             let saved = await withCheckedContinuation { answer in
                 tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: hosts.label(id), answer: answer)
@@ -50,9 +113,18 @@ extension AppModel {
             guard saved else { return false }
         }
         guard let secret = credentials.secretToLend(wanted.runtime) else { return false }
+        // A host the control plane reaches is lent on its channel (058, FR-020). One
+        // this window still reaches over its own ssh is lent the way it always was.
+        if let lent = await lendThroughControl(id, runtime: wanted.runtime, secret: secret, offered: wanted.offered) {
+            return lent
+        }
+        #if AGENTS_STORE
+        return false
+        #else
         // The offer made on connect did not name a runtime there was no credential for.
         if !wanted.offered { await hosts.offerCredentials(id) }
         return await hosts.lend(id, runtime: wanted.runtime, secret)
+        #endif
     }
 
     /// What this Mac's own agents are lent (046, D3): Gemini's key, which is the only way

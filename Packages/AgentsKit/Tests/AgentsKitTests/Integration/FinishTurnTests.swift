@@ -6,9 +6,10 @@ import Testing
 /// One call that ends a turn: how it went, and what to ask next (023).
 ///
 /// The daemon's half. What these are for is the shape of the promise: a call lands
-/// both halves or neither, a later call is the whole account, and the two older
-/// names — still accepted, because a conversation briefed with them is still calling
-/// them — leave the agent exactly where the one call would.
+/// both halves or neither, a later call is the whole account, and the daemon methods
+/// behind the two older names — no longer offered to agents (023 R5), but still
+/// answered for a helper started from an older build — leave the agent exactly where the
+/// one call would.
 @Suite("Ending a turn in one call", .timeLimit(.minutes(1)))
 struct FinishTurnTests {
     private func temporary() throws -> (StoreLocations, URL) {

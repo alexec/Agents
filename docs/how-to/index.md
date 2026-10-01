@@ -8,6 +8,19 @@ description: Short guides for one task each, for when you know the basics.
 One task each, for when you already know your way around the app and want to get
 something particular done.
 
+### Setting up
+
+- [Set up Agents on this Mac](set-up-on-this-mac.md): install Agents Host, run your
+  agents and the control plane here, and pair the window.
+- [Connect a window or phone](connect-a-window-or-phone.md): pair another Mac, an iPhone
+  or an iPad, change what it may do, and forget it.
+- [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
+  control plane.
+- [Run the control plane as several copies](run-several-copies.md): over one bucket,
+  behind a load balancer, so it stays up when your Mac sleeps.
+- [Move an existing set-up across](move-an-existing-set-up.md): bring the earlier app's
+  agents, devices and servers to a control plane, once.
+
 ### Projects
 
 - [Add a project](add-a-project.md): add a folder or clone a Git URL, and archive a
@@ -57,7 +70,9 @@ something particular done.
 
 ### Servers
 
-- [Add a Linux server](add-a-linux-server.md): have agents work on a Linux box over ssh.
+- [Add a server](add-a-server.md): make a Linux server a host of your control plane.
+- [Add a Linux server](add-a-linux-server.md): the earlier app's way, over ssh from the
+  Mac.
 
 ### Automation
 

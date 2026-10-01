@@ -117,7 +117,11 @@ public enum RuntimeCatalog {
         usesAppCopyOnly: true)
 
     /// `builtIn[0]` is the default runtime, so a new one is appended.
-    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, codex, gemini, antigravity, opencode]
+    public static var builtIn: [Runtime] { [claude, grok, copilot, cursor, codex, gemini, antigravity, opencode] + extra }
+
+    /// Runtimes a host adds for itself at start-up, before anything reads the catalog: the
+    /// demo runtime of a review control plane (058, T092). Empty everywhere else.
+    nonisolated(unsafe) public static var extra: [Runtime] = []
 
     /// The runtimes that pick their own conversation back up when started again in a
     /// different folder, which is what moving an agent into a worktree mid-work asks of

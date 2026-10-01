@@ -1,0 +1,328 @@
+<!doctype html><html><head><meta charset="utf-8"><title>069 wireframes</title><style>
+/* Wireframes for Outcome / Steps / Details (069). Lo-fi, in 057's and 066's paper style.
+   Open with #a … #e to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:1100px;line-height:1.4}
+.note{font:italic 12px -apple-system;color:#c2185b}
+.win{width:1100px;height:720px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;position:relative}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc;display:inline-block}
+.side{width:190px;background:#ebe8e1;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px}
+.side .lights{height:44px;display:flex;align-items:center;gap:7px;padding-left:6px}
+.side .p{padding:6px 8px;border-radius:6px;color:#333}
+.side .p.on{background:rgba(0,0,0,.08)}
+.mid{width:260px;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;background:#f3f0ea}
+.tb{height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+.tb .title{font:600 13px -apple-system;color:#333}
+.row{margin:2px 6px;padding:7px 8px;border-radius:7px}
+.row.on{background:#d9d4c8}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .d{color:#8a877f;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.scroll{flex:1;overflow:hidden;padding:18px 0 0}
+.col{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding:0 24px}
+.turn{display:flex;flex-direction:column;gap:10px}
+.turn+.turn{border-top:1px solid rgba(0,0,0,.05);padding-top:14px}
+.ask{align-self:flex-end;max-width:78%;background:#ebe7de;border-radius:12px;padding:10px 12px;line-height:1.4}
+.say{line-height:1.45}
+.say p{margin:0 0 6px}
+.muted{color:#8a877f}
+.steps{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;color:#8a877f;font-size:12px;padding:2px 8px 2px 6px;border-radius:10px;border:1px solid transparent}
+.steps.hover{border-color:rgba(0,0,0,.12);background:#faf8f4;color:#555}
+.steps .chev{font-size:10px;width:10px;text-align:center}
+.stepbox{border-left:2px solid #e0dcd3;margin-left:6px;padding:2px 0 2px 14px;display:flex;flex-direction:column;gap:6px}
+.step{color:#8a877f;display:flex;gap:6px;align-items:baseline}
+.step .chev{font-size:10px;width:10px;color:transparent}
+.step.hover .chev,.step.open .chev{color:#8a877f}
+.step.hover{color:#444}
+.step.open{color:#333}
+.stepsay{color:#555;line-height:1.4}
+.io{margin:2px 0 4px 16px;border:1px solid #e3dfd6;border-radius:8px;background:#fff;font:11.5px ui-monospace,Menlo,monospace;color:#444;overflow:hidden}
+.io .k{font:600 10px -apple-system;color:#9a968d;letter-spacing:.04em;text-transform:uppercase;padding:6px 10px 2px}
+.io pre{margin:0;padding:0 10px 6px;white-space:pre-wrap}
+.io .more{font:12px -apple-system;color:#3b6fd8;padding:0 10px 7px}
+.io hr{border:0;border-top:1px solid #efece5;margin:0}
+.thought{color:#8a877f;font-style:italic}
+.plan{border:1px solid #e3dfd6;border-radius:8px;background:#fff;padding:6px 10px;font-size:12px;color:#555;display:flex;flex-direction:column;gap:2px}
+.report{display:flex;flex-direction:column;gap:2px}
+.report .h{font-weight:600;color:#6f6c65}
+.report .h.attn{color:#b26a00}
+.report .h.fail{color:#c0392b}
+.report .m{color:#8a877f}
+.live{color:#8a877f;display:flex;gap:6px;align-items:center}
+.spin{width:10px;height:10px;border-radius:5px;border:2px solid #cfcac0;border-top-color:#8a877f;display:inline-block}
+.promptbar{margin:10px 24px 16px;border:1px solid rgba(0,0,0,.14);border-radius:14px;background:#fff;padding:10px 12px;color:#a09d95;height:40px}
+.ip{display:inline-flex;background:#c2185b;color:#fff;font:600 10px -apple-system;width:15px;height:15px;border-radius:8px;align-items:center;justify-content:center;margin-right:6px;flex:none;vertical-align:1px}
+.pin{position:absolute;background:#c2185b;color:#fff;font:600 11px -apple-system;width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.menubar{height:24px;background:rgba(240,238,233,.96);border-bottom:1px solid rgba(0,0,0,.1);display:flex;gap:18px;align-items:center;padding:0 14px;font-size:13px}
+.menubar .on{background:#3b6fd8;color:#fff;border-radius:4px;padding:1px 7px;margin:0 -7px}
+.menu{position:absolute;background:rgba(246,244,240,.98);border:1px solid rgba(0,0,0,.14);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.2);padding:5px;min-width:220px;font-size:13px}
+.menu div{padding:3px 10px 3px 22px;border-radius:4px;display:flex;justify-content:space-between;gap:18px;position:relative}
+.menu div.sel{background:#3b6fd8;color:#fff}
+.menu div .kb{color:#9a968d}
+.menu div.sel .kb{color:#dfe7fb}
+.menu div .ck{position:absolute;left:7px}
+.menu hr{border:0;border-top:1px solid rgba(0,0,0,.1);margin:4px 6px}
+.menu .gone{color:#b3afa6;text-decoration:line-through}
+/* phone */
+.phones{display:flex;gap:40px;align-items:flex-start}
+.phone{width:390px;height:800px;background:#f7f5f0;border-radius:44px;box-shadow:0 0 0 10px #1d1d1d,0 14px 30px rgba(0,0,0,.25);overflow:hidden;display:flex;flex-direction:column;position:relative;margin:10px}
+.pstatus{height:48px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 30px 6px;font:600 14px -apple-system}
+.pnav{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:600 16px -apple-system}
+.pnav .b{color:#3b6fd8;font-weight:400}
+.pnav .dots{width:30px;height:30px;border-radius:15px;background:#e6e2da;display:flex;align-items:center;justify-content:center;color:#444}
+.phone .col{padding:0 16px;max-width:none;gap:12px}
+.phone .ask{max-width:85%}
+.phone .steps{min-height:32px;padding:0 12px 0 8px;border-color:rgba(0,0,0,.1);background:#faf8f4;font-size:13px;border-radius:16px}
+.phone .step{min-height:44px;align-items:center}
+.phone .step .chev{color:#b3afa6}
+.phone .step.open .chev{color:#8a877f}
+.phone .promptbar{margin:8px 12px 30px;border-radius:20px}
+.sheetmenu{position:absolute;right:14px;top:96px;background:rgba(246,244,240,.98);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);width:230px;font-size:15px;overflow:hidden}
+.sheetmenu div{padding:11px 16px;border-bottom:1px solid rgba(0,0,0,.07);display:flex;justify-content:space-between}
+.sheetmenu .hd{font-size:12px;color:#8a877f;padding:8px 16px 4px;border:0}
+.sheetmenu .ck{color:#3b6fd8}
+</style></head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+
+<!-- ============================ A ============================ -->
+<div class="frame" id="a">
+  <div class="cap">A · Mac, Outcome (the default)</div>
+  <div class="sub">Every turn is its ask, one quiet "N steps" line, what the agent said at the end, and how it went.
+  Three turns: one finished with a report, one that failed with no last message, one still running.
+  Nothing on this page responds to a click on text. The only control is the steps line.</div>
+  <div class="win">
+    <div class="side"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="p on">Agents</div><div class="p">site</div><div class="p">dotfiles</div></div>
+    <div class="mid"><div class="tb"><span class="title">Agents</span></div>
+      <div class="row on"><div class="t">Login redirect</div><div class="d">Running tests…</div></div>
+      <div class="row"><div class="t">Session display levels</div><div class="d">Complete</div></div>
+      <div class="row"><div class="t">Release notes</div><div class="d">Failed</div></div></div>
+    <div class="detail"><div class="tb"><span class="title">Login redirect</span></div>
+      <div class="scroll"><div class="col">
+
+        <div class="turn">
+          <div class="ask">Why does login send me to /home instead of where I was?</div>
+          <div class="steps"><span class="ip">1</span><span class="chev">›</span>9 steps</div>
+          <div class="say"><p>The redirect target is dropped in <code>AuthCallback.swift:42</code>: the <code>next</code> parameter is read before the session is restored, so it is always nil and the fallback wins.</p><p>I fixed it by reading it after restore, and added a test for the round trip.</p></div>
+          <div class="report"><span class="h"><span class="ip">2</span>Done</span><span class="m">Login returns you to the page you came from; one test added, suite green.</span></div>
+        </div>
+
+        <div class="turn">
+          <div class="ask">Push it and open a PR.</div>
+          <div class="steps hover"><span class="chev">›</span>3 steps</div>
+          <div class="report"><span class="h fail"><span class="ip">3</span>Failed</span><span class="m">Claude hit its usage limit (resets 14:00). Nothing was pushed.</span></div>
+        </div>
+
+        <div class="turn">
+          <div class="ask">Carry on with Codex.</div>
+          <div class="steps"><span class="chev">›</span>7 steps</div>
+          <div class="live"><span class="ip">4</span><span class="spin"></span>Running the test suite</div>
+        </div>
+
+      </div></div>
+      <div class="promptbar">Ask for a change…</div>
+    </div>
+  </div>
+  <div class="note">1 "9 steps": quiet, secondary colour, a chevron. Hover (turn 2) gives it a faint outline. It is not drawn when a turn has no steps.
+  · 2 The report is the last line of a finished turn, drawn as the app's note, in the same words as the row in the list.
+  · 3 A failure with no last message still ends on the failure, in the failure tint. Today this turn would end on its last tool line.
+  · 4 A running turn shows its latest step as one live line under the steps row.</div>
+</div>
+
+<!-- ============================ B ============================ -->
+<div class="frame" id="b">
+  <div class="cap">B · Mac, one turn's steps open</div>
+  <div class="sub">A click on "3 steps" opens that turn's steps in place, under a thin rule. Each step is one line: a tool call by its description,
+  what the agent said between calls, and the app's notes (a model switch, a plan, a warning). The outcome stays below the steps.
+  Hovering a step shows its own chevron: that opens its details (C).</div>
+  <div class="win">
+    <div class="side"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="p on">Agents</div><div class="p">site</div><div class="p">dotfiles</div></div>
+    <div class="mid"><div class="tb"><span class="title">Agents</span></div>
+      <div class="row on"><div class="t">Login redirect</div><div class="d">Running tests…</div></div>
+      <div class="row"><div class="t">Session display levels</div><div class="d">Complete</div></div></div>
+    <div class="detail"><div class="tb"><span class="title">Login redirect</span></div>
+      <div class="scroll"><div class="col">
+
+        <div class="turn">
+          <div class="ask">Why does login send me to /home instead of where I was?</div>
+          <div class="steps"><span class="chev">›</span>9 steps</div>
+          <div class="say"><p>…and added a test for the round trip.</p></div>
+          <div class="report"><span class="h">Done</span><span class="m">Login returns you to the page you came from; one test added, suite green.</span></div>
+        </div>
+
+        <div class="turn">
+          <div class="ask">Push it and open a PR.</div>
+          <div class="steps hover"><span class="ip">1</span><span class="chev">⌄</span>Hide steps</div>
+          <div class="stepbox">
+            <div class="stepsay">I'll commit on a branch first, then push.</div>
+            <div class="step"><span class="chev">›</span>Create branch fix/login-redirect</div>
+            <div class="step hover"><span class="chev">›</span><span class="ip">2</span>Commit the redirect fix and its test</div>
+            <div class="step"><span class="chev">›</span>Push to origin</div>
+            <div class="muted" style="font-size:12px"><span class="ip">3</span>Claude: usage limit reached, resets 14:00</div>
+          </div>
+          <div class="report"><span class="h fail">Failed</span><span class="m">Claude hit its usage limit (resets 14:00). Nothing was pushed.</span></div>
+        </div>
+
+        <div class="turn">
+          <div class="ask">Carry on with Codex.</div>
+          <div class="steps"><span class="chev">›</span>7 steps</div>
+          <div class="live"><span class="spin"></span>Running the test suite</div>
+        </div>
+
+      </div></div>
+      <div class="promptbar">Ask for a change…</div>
+    </div>
+  </div>
+  <div class="note">1 Open, the row reads "Hide steps" with a down chevron. It is the same control in the same place, so closing it is one click, never a trip through Details.
+  · 2 A step shows its chevron on hover only. Message text in a step is selectable and opens nothing.
+  · 3 The error notice that is invisible today is a step, and the failure it caused is the outcome below.</div>
+</div>
+
+<!-- ============================ C ============================ -->
+<div class="frame" id="c">
+  <div class="cap">C · Mac, one step open to its details</div>
+  <div class="sub">Clicking a step line opens that one call: what it was given, then what it gave back, clipped to 12 lines with "Show all".
+  The other steps stay as lines. With View ▸ Turns ▸ Details, thinking is drawn as a step too, in italics.</div>
+  <div class="win">
+    <div class="side"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="p on">Agents</div><div class="p">site</div><div class="p">dotfiles</div></div>
+    <div class="mid"><div class="tb"><span class="title">Agents</span></div>
+      <div class="row on"><div class="t">Login redirect</div><div class="d">Running tests…</div></div></div>
+    <div class="detail"><div class="tb"><span class="title">Login redirect</span></div>
+      <div class="scroll"><div class="col">
+        <div class="turn">
+          <div class="ask">Push it and open a PR.</div>
+          <div class="steps"><span class="chev">⌄</span>Hide steps</div>
+          <div class="stepbox">
+            <div class="thought"><span class="ip">1</span>The fix is already on main locally; a branch keeps the PR clean.</div>
+            <div class="stepsay">I'll commit on a branch first, then push.</div>
+            <div class="step"><span class="chev">›</span>Create branch fix/login-redirect</div>
+            <div class="step open"><span class="chev">⌄</span><span class="ip">2</span>Commit the redirect fix and its test</div>
+            <div class="io"><div class="k">Command</div><pre>git add App/Auth/AuthCallback.swift Tests/AuthCallbackTests.swift
+git commit -m "Restore the session before reading next"</pre><hr>
+              <div class="k">Output</div><pre>[fix/login-redirect 3e1a9c2] Restore the session before reading next
+ 2 files changed, 41 insertions(+), 3 deletions(-)</pre></div>
+            <div class="step"><span class="chev">›</span>Push to origin</div>
+            
+            <div class="muted" style="font-size:12px">Claude: usage limit reached, resets 14:00</div>
+          </div>
+          <div class="report"><span class="h fail">Failed</span><span class="m">Claude hit its usage limit (resets 14:00). Nothing was pushed.</span></div>
+        </div>
+      </div></div>
+      <div class="promptbar">Ask for a change…</div>
+    </div>
+  </div>
+  <div class="note">1 Thinking, only when Details is the default. With Outcome or Steps it is left out, as View ▸ Show Thinking once promised.
+  · 2 One call open. Its line keeps the down chevron; clicking it again closes it. Input and output are labelled by what they are for this kind of call (Command, File, Query…), not "raw input".</div>
+</div>
+
+<!-- ============================ D ============================ -->
+<div class="frame" id="d">
+  <div class="cap">D · Mac, View ▸ Turns</div>
+  <div class="sub">One choice for every chat: what an unopened turn starts at. Show Thinking goes, because thinking now belongs to Details.
+  A turn opened or closed by hand keeps its own state until you leave the chat.</div>
+  <div class="win" style="flex-direction:column">
+    <div class="menubar"><b></b><b>Agents</b><span>File</span><span>Edit</span><span class="on">View</span><span>Window</span><span>Help</span></div>
+    <div style="flex:1;display:flex;opacity:.55">
+      <div class="side"><div class="p on">Agents</div></div>
+      <div class="mid"></div>
+      <div class="detail"><div class="scroll"><div class="col">
+        <div class="turn"><div class="ask">Why does login send me to /home instead of where I was?</div>
+        <div class="steps"><span class="chev">›</span>9 steps</div>
+        <div class="say"><p>The redirect target is dropped in AuthCallback.swift:42…</p></div></div>
+      </div></div></div>
+    </div>
+    <div class="menu" style="left:132px;top:24px">
+      <div>Show Sidebar<span class="kb">⌃⌘S</span></div>
+      <div>Show Files<span class="kb">⌥⌘F</span></div>
+      <hr>
+      <div class="sel">Turns<span class="kb">▸</span></div>
+      <div class="gone">Show Thinking</div>
+      <hr>
+      <div>Enter Full Screen<span class="kb">⌃⌘F</span></div>
+    </div>
+    <div class="menu" style="left:358px;top:88px;min-width:250px">
+      <div><span class="ck">✓</span>Outcome<span class="kb">what was asked and how it went</span></div>
+      <div>Steps<span class="kb">every step, one line each</span></div>
+      <div>Details<span class="kb">every call opened, and thinking</span></div>
+      <hr>
+      <div>Show Steps of This Turn<span class="kb">⌘]</span></div>
+    </div>
+    <span class="pin" style="left:338px;top:92px">1</span>
+    <span class="pin" style="left:338px;top:176px">2</span>
+  </div>
+  <div class="note">1 The default, per app. The words beside each choice are there so nobody has to try all three to learn them.
+  · 2 A keyboard way to open the steps of the turn the pane is on, for someone who never reaches for the pointer. The shortcut is a placeholder: check it against the existing ones.
+  Show Thinking (struck through) is removed.</div>
+</div>
+
+<!-- ============================ E / F ============================ -->
+<div class="frame" id="e">
+  <div class="cap">E · Phone, Outcome · F · Phone, steps and one call open</div>
+  <div class="sub">The same three levels and the same one control. On the phone the steps row is a 32pt pill and each step is a 44pt row,
+  with its chevron always shown, because there is no hover. The default is chosen from the chat's ··· menu.</div>
+  <div class="phones">
+    <div class="phone">
+      <div class="pstatus"><span>09:41</span><span>●●● ▮</span></div>
+      <div class="pnav"><span class="b">‹ Agents</span><span>Login redirect</span><span class="dots">···</span></div>
+      <div class="scroll" style="padding-top:8px"><div class="col">
+        <div class="turn">
+          <div class="ask">Why does login send me to /home instead of where I was?</div>
+          <div class="steps"><span class="chev">›</span>9 steps</div>
+          <div class="say"><p>The redirect target is dropped in <code>AuthCallback.swift:42</code>: <code>next</code> is read before the session is restored.</p><p>Fixed, with a test.</p></div>
+          <div class="report"><span class="h">Done</span><span class="m">Login returns you to the page you came from.</span></div>
+        </div>
+        <div class="turn">
+          <div class="ask">Push it and open a PR.</div>
+          <div class="steps"><span class="chev">›</span>3 steps</div>
+          <div class="report"><span class="h fail">Failed</span><span class="m">Claude hit its usage limit (resets 14:00). Nothing was pushed.</span></div>
+        </div>
+        <div class="turn">
+          <div class="ask">Carry on with Codex.</div>
+          <div class="steps"><span class="chev">›</span>7 steps</div>
+          <div class="live"><span class="spin"></span>Running the test suite</div>
+        </div>
+      </div></div>
+      <div class="promptbar">Ask for a change…</div>
+    </div>
+
+    <div class="phone">
+      <div class="pstatus"><span>09:41</span><span>●●● ▮</span></div>
+      <div class="pnav"><span class="b">‹ Agents</span><span>Login redirect</span><span class="dots">···</span></div>
+      <div class="scroll" style="padding-top:8px"><div class="col">
+        <div class="turn">
+          <div class="ask">Push it and open a PR.</div>
+          <div class="steps"><span class="chev">⌄</span>Hide steps</div>
+          <div class="stepbox">
+            <div class="stepsay">I'll commit on a branch first, then push.</div>
+            <div class="step"><span class="chev">›</span>Create branch fix/login-redirect</div>
+            <div class="step open"><span class="chev">⌄</span>Commit the fix and its test</div>
+            <div class="io" style="margin-left:0"><div class="k">Command</div><pre>git add App/Auth/AuthCallback.swift …
+git commit -m "Restore the session…"</pre><hr>
+              <div class="k">Output</div><pre>[fix/login-redirect 3e1a9c2] …
+ 2 files changed, 41 insertions(+)</pre><div class="more">Show all</div></div>
+            <div class="step"><span class="chev">›</span>Push to origin</div>
+            <div class="muted" style="font-size:12px">Claude: usage limit reached</div>
+          </div>
+          <div class="report"><span class="h fail">Failed</span><span class="m">Claude hit its usage limit (resets 14:00).</span></div>
+        </div>
+      </div></div>
+      <div class="promptbar">Ask for a change…</div>
+      <div class="sheetmenu">
+        <div class="hd">Turns show</div>
+        <div>Outcome<span class="ck">✓</span></div>
+        <div>Steps<span></span></div>
+        <div>Details<span></span></div>
+        <div class="muted" style="border-top:6px solid rgba(0,0,0,.06);font-size:13px">the chat's own actions, as today</div>
+      </div>
+    </div>
+  </div>
+  <div class="note">E: the pill is the only tap target in a turn, so a tap to select a reply's text never changes anything.
+  · F: a call opens in place, the same as the Mac (open question in the README: a page of its own instead?). The ··· menu gets a "Turns show" section above the chat's own actions.</div>
+</div>
+
+</body></html>

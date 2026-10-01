@@ -62,7 +62,7 @@ public enum RemitCategory: String, Codable, Hashable, Sendable, CaseIterable {
         case .suggestions:
             "Use `\(AppTool.finishTurn)` at the end of the turn."
         case .workingFolder:
-            "Use `\(AppTool.enterWorktree)` or `\(AppTool.exitWorktree)` to change where you work."
+            "Give `worktree` or `leave_worktree` to `\(AppTool.finishTurn)` to change where you work."
         }
     }
 }
@@ -387,7 +387,7 @@ public struct ToolPolicy: Hashable, Sendable {
     ///
     /// Matched on the end of the name and never whole, for the reason `AppService`
     /// already gives about its own tools: a runtime is free to prefix a tool's name —
-    /// the Claude adapter shows ours as `mcp__agents__suggest_next_prompts` — and none
+    /// the Claude adapter shows ours as `mcp__agents__finish_turn` — and none
     /// of them changes what follows the prefix.
     public func residual(matching name: String) -> ResidualTool? {
         residue.first { name.hasSuffix($0.name) }

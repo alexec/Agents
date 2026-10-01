@@ -89,13 +89,13 @@ Claude and Cursor may ask your permission before an agent uses some of these too
 Your agents belong to a helper that runs in the background, not to the window. Close the
 window or quit the app, and they carry on. They can still ask you questions, and the
 questions wait. While a turn is in progress, the Mac does not go to sleep on its own. If
-the Mac restarts, the agents that were working pick up where they stopped the next time
-you open Agents. See [The window and the daemon](window-and-daemon.md).
+the Mac restarts, the agents that were working pick up where they stopped once you log in
+again. See [The window and the host](window-and-daemon.md).
 
 On your iPhone or iPad you see the same list. You can read a conversation as it happens,
 answer questions, send a prompt or a picture, start and stop agents, and open their files
 and a terminal. When an agent needs you and you are away from the Mac, the device you used
-last gets a notification. See [How the phone and iPad reach the Mac](phone-and-ipad.md).
+last gets a notification. See [How the phone and iPad reach your agents](phone-and-ipad.md).
 
 ## Your machines, one figure
 
@@ -133,10 +133,10 @@ Compare on the runtimes you already use, leases, events, workflows, the phone an
   closer to hand.
 - **You are not on a Mac.** Agents needs a Mac. Servers and phones hang off one.
 - **You want to download and go.** Today Agents is built from source in Xcode.
-- **You want to reach your agents with the Mac asleep.** Away from home the phone and iPad
-  reach the Mac through your iCloud, so you can read and answer from anywhere, but only
-  while the Mac is awake with the bridge running (see [How the phone and iPad reach the
-  Mac](phone-and-ipad.md)). The terminal, files and live pages need the Mac's own network.
+- **You want to reach your agents with the Mac asleep.** Agents on your Mac stop being
+  reachable while it sleeps, and so does everything else if the control plane runs on it.
+  To work with the Mac asleep, put the work on a server and run the control plane as
+  copies elsewhere (see [The control plane](control-plane.md)).
 - **Your machine should be off while the work happens.** A cloud agent does that; Agents
   does not.
 

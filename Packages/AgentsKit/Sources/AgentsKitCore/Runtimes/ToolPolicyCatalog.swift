@@ -243,8 +243,9 @@ public enum ToolPolicyCatalog {
     ///
     /// Measured on 0.156.1 with a real ChatGPT turn (research R5): the switches do take tools
     /// away (turning the shell features off empties the shell tools), so `sleep_tool` takes
-    /// `clock.sleep`, and `goals`, `memories`, `apps` and `in_app_local_automation` take
-    /// Codex's own long-running goals, memory store, ChatGPT connectors and automations.
+    /// `clock.sleep`, and `goals`, `apps` and `in_app_local_automation` take Codex's own
+    /// long-running goals, ChatGPT connectors and automations. Memories are left to
+    /// Codex's own configuration.
     /// `multi_agent` is left on (Alex, 2026-09-26, 057): Codex's sub-agents are its own,
     /// and the app shows them as a list rather than refusing them. Off, it never took the
     /// `collaboration.*` tools away anyway (the model's catalog names them), so they were
@@ -261,7 +262,6 @@ public enum ToolPolicyCatalog {
         removed: [
             RemovedTool(name: "sleep", category: .standingArrangements),
             RemovedTool(name: "automations", category: .standingArrangements),
-            RemovedTool(name: "memories", category: .artefacts),
             RemovedTool(name: "apps", category: .artefacts),
         ],
         kept: [
@@ -275,7 +275,6 @@ public enum ToolPolicyCatalog {
                 "sleep_tool": .bool(false),
                 "goals": .bool(true),
                 "in_app_local_automation": .bool(false),
-                "memories": .bool(false),
                 "apps": .bool(false),
                 "multi_agent": .bool(true),
                 "default_mode_request_user_input": .bool(true),

@@ -10,6 +10,11 @@ A server is a Linux machine you reach with `ssh`. Once it is added, a project ca
 it: its agents run there, on its files, and keep working when your Mac is asleep or
 closed. You follow them from the Mac as you would any other project.
 
+!!! note
+    This page is for the earlier Agents app, which reaches a server over ssh itself. With
+    a control plane, a server joins by connecting out, and every window and phone sees it:
+    see [Add a server](add-a-server.md).
+
 ## Before you start
 
 - A Linux machine on x86-64 or ARM64. This guide calls it `devbox.example.com`.

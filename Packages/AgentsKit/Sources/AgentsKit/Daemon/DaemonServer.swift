@@ -196,11 +196,29 @@ public final class DaemonServer: @unchecked Sendable {
         if role != .control {
             DaemonLog.shared.write("socket: pid \(peer.map(String.init) ?? "?") connected as \(role.rawValue)")
         }
-        let transport = FDTransport(socket: fd)
         // Everything that reaches this socket is a window on this Mac, until the bridge
         // exists to say otherwise: helpers and probes that connect here never report
         // presence, and a window that does is the Mac.
-        let identity = ConnectionIdentity(peer: peer, role: role)
+        serve(FDTransport(socket: fd), identity: ConnectionIdentity(peer: peer, role: role))
+    }
+
+    /// A channel the control plane opened on this host's uplink (058, R3): one virtual
+    /// connection, the same in every respect as one accepted on the socket. An
+    /// operator's is a window's; a device's is bound to that device before a line of it
+    /// is read, exactly as the bridge binds one today. Nothing else can make one, and
+    /// nothing on the channel can raise it.
+    ///
+    /// `ended` is called once the connection is gone, from either end.
+    public func acceptVirtual(_ transport: any LineTransport, grant: Grant, device: UUID?,
+                              ended: @escaping @Sendable () -> Void = {}) {
+        let identity = ConnectionIdentity(peer: nil, role: .control)
+        if grant == .device { _ = identity.bindDevice(device) }
+        DaemonLog.shared.write("uplink: a channel opened for \(grant == .device ? "device \(device?.uuidString ?? "?")" : "an operator")")
+        serve(transport, identity: identity, ended: ended)
+    }
+
+    private func serve(_ transport: any LineTransport, identity: ConnectionIdentity,
+                       ended: @escaping @Sendable () -> Void = {}) {
         let handler = self.handler
         let connection = JSONRPCConnection(transport: transport) { method, params in
             // Refused by the server, before the daemon hears of it: a helper asking for
@@ -226,6 +244,7 @@ public final class DaemonServer: @unchecked Sendable {
                 DaemonLog.shared.write(binding.pairing == true
                     ? "socket: a connection now carries a device that is pairing"
                     : "socket: a connection now carries device \(binding.id?.uuidString ?? "(not yet named)")")
+                if binding.pairing != true { self.tellMoved(identity.id) }
                 return .success([:])
             }
             // A device naming itself, by saying which it is or announcing its key. On a
@@ -243,6 +262,7 @@ public final class DaemonServer: @unchecked Sendable {
             if method == DaemonAPI.Method.surfaceIdentify,
                let who = try? params?.decode(DaemonAPI.SurfaceIdentification.self) {
                 identity.surface = .device(who.id)
+                if identity.role == .device { self.tellMoved(identity.id) }
             }
             return await handler(identity.context, method, params)
         }
@@ -263,6 +283,7 @@ public final class DaemonServer: @unchecked Sendable {
             self.connections.remove(connection)
             self.onConnectionCountChanged(self.connections.count)
             self.onDisconnected(identity.id)
+            ended()
         }
     }
 
@@ -293,6 +314,18 @@ public final class DaemonServer: @unchecked Sendable {
     /// queue still receives what the daemon said in the order it said it.
     public func broadcast(_ method: String, _ params: JSONValue?) {
         broadcast(method, params, to: { _ in true })
+    }
+
+    /// After a move (058, T085): a device that connects the old way, through the bridge or
+    /// the relay, is told where the control plane is now, once it has said which it is.
+    /// A moment later, so the answer to what it asked goes first.
+    private func tellMoved(_ connection: UUID) {
+        let file = url.deletingLastPathComponent().appendingPathComponent("control-moved.json")
+        guard let data = try? Data(contentsOf: file), let moved = try? JSONValue.parse(data) else { return }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.broadcast(DaemonAPI.Notification.controlMoved, moved, to: { $0.id == connection })
+            DaemonLog.shared.write("socket: told a device where the control plane is now")
+        }
     }
 
     /// Tell only the connections `wanted` picks, in the same order and on the same

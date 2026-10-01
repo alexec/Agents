@@ -41,14 +41,14 @@ struct BriefingTests {
         #expect(!text.contains("agents__\(AppTool.finishTurn)"))
     }
 
-    /// The older names are for conversations that were told them; a fresh one is told
-    /// the one tool and nothing older (023 FR-016).
+    /// The older names are retired; a fresh conversation is told the one tool and
+    /// nothing older (023 FR-016, R5).
     @Test func theFinishLineNamesNeitherOldName() {
-        #expect(!Briefing.finish.contains(AppTool.suggestPrompts))
-        #expect(!Briefing.finish.contains(AppTool.reportOutcome))
-        for policy in ToolPolicyCatalog.builtIn {
-            #expect(!Briefing.text(for: policy).contains(AppTool.suggestPrompts))
-            #expect(!Briefing.text(for: policy).contains(AppTool.reportOutcome))
+        for retired in AppTool.retiredEndOfTurn {
+            #expect(!Briefing.finish.contains(retired))
+            for policy in ToolPolicyCatalog.builtIn {
+                #expect(!Briefing.text(for: policy).contains(retired))
+            }
         }
     }
 

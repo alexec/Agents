@@ -173,13 +173,29 @@ public struct ServerInstaller: Sendable {
             """)
     }
 
+    /// Leave a one-time host code where the daemon reads it on its next start (058, T072):
+    /// not on its command line, where anyone on the server could see it in `ps`.
+    public func leaveJoinCode(_ code: String) async throws {
+        // A host already running here holds the root's lock: it stops, and the one started
+        // next takes the code.
+        try await check("""
+            umask 077; d="$HOME/.agents-server/root"; mkdir -p "$d"; \
+            if [ -f "$d/daemon.lock" ]; then p=$(cat "$d/daemon.lock" 2>/dev/null || true); \
+            [ -n "$p" ] && kill "$p" 2>/dev/null && sleep 1; fi; \
+            rm -f "$d/control-host.json"; printf %s \(Self.quote(code)) > "$d/control-join-code"
+            """)
+    }
+
     // MARK: § 7 Start
 
     /// Start the server's daemon in the background. Returns once it has detached;
     /// readiness is the forward answering, which is `DaemonClient.connect`'s to wait for.
-    public func startDaemon() async throws {
+    /// `extra` is appended after `--detach`: `--control-code` the first time a host
+    /// dials out, `--control-network` when it already has a membership (058, T044).
+    public func startDaemon(extra: [String] = []) async throws {
+        let tail = extra.map { " " + Self.quote($0) }.joined()
         try await check("""
-            "$HOME/.agents-server/bin/current" --root "$HOME/.agents-server/root" --serve --detach
+            "$HOME/.agents-server/bin/current" --root "$HOME/.agents-server/root" --serve --detach\(tail)
             """)
     }
 

@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// One agent on a project page: what it is, and what it is doing.
@@ -40,8 +43,10 @@ struct AgentRow: View {
                 }
                 Button("Cancel", role: .cancel) { labelDraft = "" }
             }
-            // Last known, not current: its server is not answering (037).
-            .opacity(model.hosts.isOffline(agent.host) ? 0.55 : 1)
+            // Last known, not current: its host is not answering (037), or the control
+            // plane that would carry the answer is away (058, frame H).
+            .opacity(model.hostUnreachable(agent.host) ? 0.55 : 1)
+            .task(id: worktreeWatch) { await refreshWorktree() }
             .confirmationDialog("Retire this agent?",
                                 isPresented: Binding(get: { retiring != nil }, set: { if !$0 { retiring = nil } }),
                                 presenting: retiring) { preview in
@@ -100,7 +105,7 @@ struct AgentRow: View {
                     // Working in a worktree (030): named, because with two agents in
                     // one project the worktree is how you tell whose changes are whose.
                     if let worktree = agent.worktree {
-                        WorktreeBadge(worktree: worktree, isGone: !worktreeIsThere(worktree))
+                        WorktreeBadge(worktree: worktree, isGone: worktreeGone)
                     }
                 }
 
@@ -239,11 +244,11 @@ struct AgentRow: View {
                 }
                 Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
             }
-            Divider()
-            // Only on this Mac: a server's folder is not somewhere Finder can go.
-            if agent.host == .mac {
+            // Finder only sees this Mac's disk (058, FR-019).
+            if model.isOnThisMac(agent.host) {
+                Divider()
                 Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([agent.cwd])
+                    model.reveal(agent.cwd, on: agent.host)
                 }
             }
         }
@@ -253,9 +258,21 @@ struct AgentRow: View {
     @State private var cannotRetire: String?
     @State private var addingLabel = false
     @State private var labelDraft = ""
+    /// Whether the worktree's folder is gone. This Mac's is asked of the disk; another
+    /// host's is `files/browse`, and stays "there" until that answer arrives (058, R11).
+    @State private var worktreeGone = false
 
-    private func worktreeIsThere(_ worktree: AgentWorktree) -> Bool {
-        FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))
+    private var worktreeWatch: String {
+        "\(agent.host.rawValue)|\(agent.worktree?.root.path ?? "")|\(model.controlPlaneAway)"
+    }
+
+    private func refreshWorktree() async {
+        guard let worktree = agent.worktree else { worktreeGone = false; return }
+        if model.readsDisk(of: agent.host) {
+            worktreeGone = !FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))  // store-ok: readsDisk(of:) is false in the store window
+        } else {
+            worktreeGone = await !model.pathIsThere(worktree.root, on: agent.host)
+        }
     }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.

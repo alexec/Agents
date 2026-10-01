@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Set or replace a secret. The value is written to `~/.agents/secrets.env` and never

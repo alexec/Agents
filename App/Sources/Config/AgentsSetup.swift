@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import AppKit
 import SwiftUI
 
@@ -79,6 +82,13 @@ struct AgentsInstructionsSection: View {
     var place: AgentsPlace
     @State private var path = ""
     @State private var text = ""
+    @State private var exists = false
+
+    /// Whose disk the file is on: this Mac's host for yours, the project's host for a project's.
+    private var host: HostID {
+        if case .project = place { return model.selectedProjectHost }
+        return .mac
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -86,9 +96,11 @@ struct AgentsInstructionsSection: View {
                 SectionHeading(title: "Instructions").fixedSize()
                 Spacer()
                 if !path.isEmpty {
-                    Button(FileManager.default.fileExists(atPath: path) ? "Edit AGENTS.md" : "Write AGENTS.md") {
-                        ensureFile()
-                        SharedFiles.open(path)
+                    Button(exists ? "Edit AGENTS.md" : "Write AGENTS.md") {
+                        Task {
+                            await ensureFile()
+                            model.open(URL(filePath: path), on: host)
+                        }
                     }
                     .buttonStyle(.paper)
                     .padding(.top, 20)
@@ -123,8 +135,10 @@ struct AgentsInstructionsSection: View {
 
     private func load() async {
         path = await resolvedPath()
-        guard !path.isEmpty else { text = ""; return }
-        text = (try? String(contentsOf: URL(filePath: path), encoding: .utf8)) ?? ""
+        guard !path.isEmpty else { text = ""; exists = false; return }
+        let read = await model.readText(URL(filePath: path), on: host)
+        exists = read != nil
+        text = read ?? ""
     }
 
     private func resolvedPath() async -> String {
@@ -137,16 +151,17 @@ struct AgentsInstructionsSection: View {
         }
     }
 
-    private func ensureFile() {
+    private func ensureFile() async {
+        guard !exists else { return }
         let url = URL(filePath: path)
-        guard !FileManager.default.fileExists(atPath: url.path) else { return }
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let starter = switch place {
         case .you: "# Personal instructions\n\nHow you like to work, for every agent the app starts.\n"
         case .project: "# Project instructions\n\nHow to work in this project.\n"
         }
-        try? Data(starter.utf8).write(to: url)
-        text = starter
+        if await model.saveText(starter, to: url, on: host, onlyIfAbsent: true) {
+            exists = true
+            text = starter
+        }
     }
 }
 
@@ -305,7 +320,7 @@ private struct YourPluginsSection: View {
                 SectionHeading(title: "Plugins").fixedSize()
                 Spacer()
                 if !folder.isEmpty {
-                    Button("Reveal in Finder") { SharedFiles.reveal(folder) }
+                    Button("Reveal in Finder") { model.reveal(URL(filePath: folder), on: .mac) }
                         .buttonStyle(.paper)
                         .padding(.top, 20)
                 }
@@ -324,8 +339,7 @@ private struct YourPluginsSection: View {
                         Text(name).appText(.reading).fontWeight(.semibold)
                         Spacer()
                         Button("Show in Finder") {
-                            let url = URL(filePath: folder).appending(path: name)
-                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                            model.reveal(URL(filePath: folder).appending(path: name), on: .mac)
                         }
                         .buttonStyle(.paper)
                         .appText(.fine)
@@ -344,10 +358,11 @@ private struct YourPluginsSection: View {
     private func load() async {
         guard let snapshot = await model.sharedSnapshot() else { return }
         folder = snapshot.home + "/plugins"
-        let url = URL(filePath: folder)
-        let items = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
-        names = items.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
-            .map(\.lastPathComponent)
+        // This Mac's host lists its own folder: the window reads no disk (058, R12).
+        let listing = try? await model.client(for: .mac).call(DaemonAPI.Method.filesBrowse,
+                                                              DaemonAPI.FilesBrowseRequest(path: folder),
+                                                              returning: DirectoryListing.self)
+        names = (listing?.entries ?? []).filter(\.isDirectory).map(\.name)
             .filter { !$0.hasPrefix(".") }
             .sorted()
     }

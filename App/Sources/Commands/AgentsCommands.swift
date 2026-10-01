@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import AppKit
 import SwiftUI
 
@@ -47,7 +50,7 @@ struct AgentsCommands: Commands {
     let frame: SidebarFrame
 
     /// Off unless asked for. The session draws thinking only while this is on.
-    @AppStorage(ThinkingDisplay.defaultsKey) private var showsThinking = false
+    @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
 
     static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
 
@@ -105,8 +108,13 @@ struct AgentsCommands: Commands {
             Button("Jump to Latest") { model.scrollToEnd() }
                 .keyboardShortcut(.downArrow, modifiers: .command)
                 .disabled(model.selectedAgent == nil)
-            Toggle("Show Thinking", isOn: $showsThinking)
-                .disabled(model.selectedAgent == nil)
+            // What every turn starts at (069). Thinking is part of Details now, so
+            // Show Thinking went with it.
+            Picker("Turns", selection: $turnDetail) {
+                ForEach(TurnDetail.allCases, id: \.self) { detail in
+                    Text(detail.title).help(detail.summary).tag(detail)
+                }
+            }
             Divider()
             Button("Find Session") { requests.focusSessionSearch() }
                 .keyboardShortcut("f")
@@ -159,7 +167,7 @@ struct AgentsCommands: Commands {
         }
 
         CommandGroup(replacing: .help) {
-            Button("Agents Help") { NSWorkspace.shared.open(Self.helpURL) }
+            Button("Agents Help") { NSWorkspace.shared.open(Self.helpURL) }  // store-ok: a web page
                 .keyboardShortcut("?")
         }
     }
@@ -177,17 +185,17 @@ struct AgentsCommands: Commands {
 
     /// The open chat's folder, or else the selected project's. Only on this Mac:
     /// a server's folder is not somewhere Finder can go.
-    private var folderForFinder: URL? {
+    private var folderForFinder: (URL, HostID)? {
         if let agent = model.selectedAgent {
-            return agent.host == .mac ? agent.cwd : nil
+            return model.isOnThisMac(agent.host) ? (agent.cwd, agent.host) : nil
         }
-        guard let summary = model.selectedProjectSummary, summary.host == .mac, summary.exists else { return nil }
-        return summary.folder
+        guard let summary = model.selectedProjectSummary, model.isOnThisMac(summary.host), summary.exists else { return nil }
+        return (summary.folder, summary.host)
     }
 
     private func showInFinder() {
-        guard let folder = folderForFinder else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([folder])
+        guard let (folder, host) = folderForFinder else { return }
+        model.reveal(folder, on: host)
     }
 
     // MARK: View
@@ -238,7 +246,7 @@ struct AgentsCommands: Commands {
         let live = model.liveProjects
         guard !model.hosts.isEmpty else { return live }
         return live.filter { $0.host == .mac }
-            + model.hosts.hosts.all.flatMap { host in live.filter { $0.host == host.id } }
+            + model.hosts.servers.flatMap { host in live.filter { $0.host == host } }
     }
 
     /// The selected project's live sessions, in the order its page draws them.

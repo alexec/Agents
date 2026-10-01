@@ -1,43 +1,136 @@
 import Foundation
 
+/// How much of a turn is drawn (069). The app keeps one of these as the level every turn
+/// starts at; a turn opened or closed by hand holds its own until the chat is left.
+public enum TurnDetail: String, CaseIterable, Codable, Hashable, Sendable {
+    /// The ask, the answers, the reply and how it went.
+    case outcome
+    /// And every step between them, one line each.
+    case steps
+    /// And every call opened, and the agent's thinking.
+    case details
+
+    public var title: String {
+        switch self {
+        case .outcome: return "Outcome"
+        case .steps: return "Steps"
+        case .details: return "Details"
+        }
+    }
+
+    /// What the level shows, said beside it in the menu so nobody has to try all three.
+    public var summary: String {
+        switch self {
+        case .outcome: return "What was asked and how it went"
+        case .steps: return "Every step, one line each"
+        case .details: return "Every call opened, and thinking"
+        }
+    }
+
+    public var showsSteps: Bool { self != .outcome }
+
+    /// Where the phone keeps its choice. The Mac scopes its own by root.
+    public static let phoneDefaultsKey = "turnDetail"
+}
+
 /// One turn of a conversation: what the person asked, and everything up to the next ask.
 ///
-/// Drawn concise by default: the ask, every answer, and the latest work. When that work
-/// is a tool call, the text immediately before it is shown too.
+/// Drawn at one of three levels (069). Its outcome — the answers, the reply and how it
+/// went — is drawn at every one; the steps between are a click away.
 public struct ChatTurn: Identifiable, Hashable, Sendable {
     /// The ask's id, or the first item's for what came before any ask.
     public var id: UUID
     public var ask: TranscriptItem?
-    /// Every tool call and text block, in order. Empty for a turn known only by its
+    /// Everything drawn after the ask, in order. Empty for a turn known only by its
     /// summary until its entries are fetched.
-    public var blocks: [TranscriptItem]
-    /// The latest work block, also kept for summaries written by older builds.
-    public var last: TranscriptItem?
-    /// The work and answers visible while this turn is concise, in transcript order.
-    public var concise: [TranscriptItem]
+    public var items: [TranscriptItem]
+    /// A stored turn's outcome and step count, drawn before its entries are in hand.
+    public var storedOutcome: [TranscriptItem]?
+    public var storedStepCount: Int?
     /// Where it sits in the transcript, for a turn known only by its summary.
     public var range: Range<Int>?
 
-    public init(id: UUID, ask: TranscriptItem?, blocks: [TranscriptItem], last: TranscriptItem?,
-                concise: [TranscriptItem]? = nil,
+    public init(id: UUID, ask: TranscriptItem?, items: [TranscriptItem],
+                storedOutcome: [TranscriptItem]? = nil, storedStepCount: Int? = nil,
                 range: Range<Int>? = nil) {
         self.id = id
         self.ask = ask
-        self.blocks = blocks
-        self.last = last
-        self.concise = concise ?? blocks.conciseTurnItems()
+        self.items = items
+        self.storedOutcome = storedOutcome
+        self.storedStepCount = storedStepCount
         self.range = range
     }
 
-    /// A stored summary, drawn before its entries are in hand.
+    /// A stored summary, drawn before its entries are in hand. One written before 069
+    /// has no outcome, and its concise blocks stand in.
     public init(_ summary: TurnSummary) {
+        let outcome = summary.outcome ?? summary.concise ?? summary.last.map { [$0] } ?? []
         self.init(id: summary.id,
                   ask: summary.ask.map(TranscriptItem.entry),
-                  blocks: [],
-                  last: summary.last.map(TranscriptItem.entry),
-                  concise: summary.concise?.map(TranscriptItem.entry)
-                    ?? summary.last.map { [.entry($0)] } ?? [],
+                  items: [],
+                  storedOutcome: outcome.map(TranscriptItem.entry),
+                  storedStepCount: summary.steps,
                   range: summary.start..<summary.end)
+    }
+
+    /// Whether this is a stored turn whose entries have not been fetched.
+    public var isSummaryOnly: Bool { items.isEmpty && range != nil }
+}
+
+/// A turn's items, read for drawing.
+public struct TurnParts: Hashable, Sendable {
+    /// The answers, the reply and how it went, in order.
+    public var outcome: [TranscriptItem]
+    /// How many step lines there are behind the control. Thinking is not counted.
+    public var stepCount: Int
+    /// The latest step, while the turn runs and has said nothing after it.
+    public var live: TranscriptItem?
+
+    /// `items` is everything drawn after the ask. `isLive` is whether the turn is still
+    /// going: its reply is only a reply once nothing follows it.
+    public init(_ items: [TranscriptItem], isLive: Bool) {
+        let shown = Self.drawn(items, isLive: isLive).filter { !$0.isThought }
+        let reply = Self.reply(in: shown, isLive: isLive)
+        var outcome: [TranscriptItem] = []
+        var reports: [TranscriptItem] = []
+        var steps = 0
+        for (index, item) in shown.enumerated() {
+            if item.isReport {
+                reports.append(item)
+            } else if reply.contains(index) || item.isOutcome {
+                outcome.append(item)
+            } else if case .toolRun(_, let calls) = item {
+                steps += calls.count
+            } else {
+                steps += 1
+            }
+        }
+        // The report is the turn's last line, whatever the agent said after it.
+        self.outcome = outcome + reports
+        self.stepCount = steps
+        self.live = isLive && reply.isEmpty ? shown.last(where: { !$0.isOutcome }) : nil
+    }
+
+    /// What a turn draws of its items, thinking aside. A passing line — "Picked the
+    /// conversation back up." — is only news while its turn is going; once the turn
+    /// is over it is neither a step nor something standing between the reply and the
+    /// end of the turn.
+    public static func drawn(_ items: [TranscriptItem], isLive: Bool) -> [TranscriptItem] {
+        items.filter { $0.isInTurn && (isLive || !$0.isPassing) }
+    }
+
+    /// The reply: what the agent said at the end, after its last step. Claude often
+    /// says a closing line after its report, and that belongs with the reply rather
+    /// than standing in for it. A finished turn that ended on a step still has its
+    /// last message as the reply; a running one is still on its way.
+    static func reply(in items: [TranscriptItem], isLive: Bool) -> [Int] {
+        var run: [Int] = []
+        for index in items.indices.reversed() {
+            if items[index].isAgentMessage { run.insert(index, at: 0) }
+            else if !items[index].isOutcome { break }
+        }
+        if !run.isEmpty || isLive { return run }
+        return items.lastIndex(where: \.isAgentMessage).map { [$0] } ?? []
     }
 }
 
@@ -49,19 +142,26 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     public var start: Int
     public var end: Int
     public var ask: TranscriptEntry?
-    /// The last work block, retained for summaries written by older builds.
+    /// The last work block, retained for clients built before 069.
     public var last: TranscriptEntry?
-    /// Optional so summaries written before concise turns kept context still decode.
+    /// The latest work and its context, retained for clients built before 069.
     public var concise: [TranscriptEntry]?
+    /// The answers, the reply and how it went (069). Nil in a summary written before.
+    public var outcome: [TranscriptEntry]?
+    /// How many step lines the turn has behind its control (069).
+    public var steps: Int?
 
     public init(id: UUID, start: Int, end: Int, ask: TranscriptEntry?, last: TranscriptEntry?,
-                concise: [TranscriptEntry]? = nil) {
+                concise: [TranscriptEntry]? = nil, outcome: [TranscriptEntry]? = nil,
+                steps: Int? = nil) {
         self.id = id
         self.start = start
         self.end = end
         self.ask = ask
         self.last = last
         self.concise = concise
+        self.outcome = outcome
+        self.steps = steps
     }
 
     /// The turn made of these entries, the first at `start` in the transcript.
@@ -70,8 +170,10 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
         let items = TranscriptEntry.display(entries)
         let last = items.last(where: \.isBlock).flatMap(\.concise)
         let concise = items.conciseTurnItems().compactMap(\.concise)
+        let parts = TurnParts(Array(items.dropFirst(ask == nil ? 0 : 1)), isLive: false)
         return TurnSummary(id: ask?.id ?? entries.first?.id ?? UUID(), start: start,
-                           end: start + entries.count, ask: ask, last: last, concise: concise)
+                           end: start + entries.count, ask: ask, last: last, concise: concise,
+                           outcome: parts.outcome.compactMap(\.concise), steps: parts.stepCount)
     }
 
     /// Cut a run of the transcript, the first entry at `start`, into turns. Each ask
@@ -96,9 +198,8 @@ extension Array where Element == TranscriptItem {
         func close() {
             guard let first = current.first else { return }
             let ask = first.isPersonsAsk ? first : nil
-            let blocks = current.filter { $0.isBlock || $0.isUserInput }
-            turns.append(ChatTurn(id: first.id, ask: ask, blocks: blocks,
-                                  last: blocks.last(where: \.isBlock)))
+            turns.append(ChatTurn(id: first.id, ask: ask,
+                                  items: Array(current.dropFirst(ask == nil ? 0 : 1))))
         }
         for item in self {
             if item.isPersonsAsk {
@@ -114,14 +215,52 @@ extension Array where Element == TranscriptItem {
 }
 
 extension TranscriptItem {
-    var isPersonsAsk: Bool {
+    public var isPersonsAsk: Bool {
         if case .entry(let entry) = self, case .userMessage(_, _, .person) = entry.kind { return true }
         return false
     }
 
-    /// A tool call or something the agent said: all a turn draws besides the ask. And a
-    /// sandbox that could not start (064), which ends its turn and must be seen to be
-    /// answered, so it is the block a concise turn shows.
+    var isAgentMessage: Bool {
+        if case .entry(let entry) = self, case .agentMessage = entry.kind { return true }
+        return false
+    }
+
+    /// Something that says how the turn went, or the person's own answer: drawn at every
+    /// level (069). A stop, a failure, an error, the agent's report.
+    public var isOutcome: Bool {
+        guard case .entry(let entry) = self else { return false }
+        switch entry.kind {
+        // An answer to a question is the person's say in how it went. A permission
+        // choice is a step: "You chose Yes" says nothing about the outcome.
+        case .elicitationAnswered, .workReported, .sandboxFailure:
+            return true
+        case .stateChanged(let state, _):
+            return state == .stopped
+        case .notice(let notice):
+            return notice.isError
+        default:
+            return false
+        }
+    }
+
+    /// Whether a turn draws it at all. A state the turn passed through — working,
+    /// waiting on you — is said by the row and the prompt while it is true, and is not
+    /// a step. A stop is kept: it is how the turn went.
+    public var isInTurn: Bool {
+        if case .entry(let entry) = self, case .stateChanged(let state, _) = entry.kind {
+            return state == .stopped
+        }
+        return true
+    }
+
+    var isReport: Bool {
+        if case .entry(let entry) = self, case .workReported = entry.kind { return true }
+        return false
+    }
+
+    /// A tool call or something the agent said. And a sandbox that could not start
+    /// (064), which ends its turn and must be seen to be answered. Kept for the
+    /// summaries older clients read.
     public var isBlock: Bool {
         switch self {
         case .toolRun: return true
@@ -161,8 +300,8 @@ extension TranscriptItem {
 }
 
 extension Array where Element == TranscriptItem {
-    /// Keep answers wherever they occurred, plus the latest work and its immediate
-    /// preceding text when the latest work is a tool call.
+    /// The pre-069 concise turn, still written for older clients: answers wherever they
+    /// occurred, plus the latest work and the text before it when that work is a call.
     func conciseTurnItems() -> [TranscriptItem] {
         guard let last = lastIndex(where: \.isBlock) else { return filter(\.isUserInput) }
         var selected = Set([last])
@@ -185,5 +324,36 @@ extension ToolCall {
     }
 
     /// The one line a tool call is drawn as in a turn.
-    public var turnLine: String { describedAs ?? "Used a tool" }
+    public var turnLine: String {
+        if let describedAs { return describedAs }
+        if let kind = kind?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !kind.isEmpty {
+            let label: String
+            switch kind {
+            case "read": label = "Read file"
+            case "edit": label = "Edit file"
+            case "delete": label = "Delete file"
+            case "move": label = "Move file"
+            case "search": label = "Search files"
+            case "execute": label = "Run command"
+            case "fetch": label = "Fetch data"
+            case "other": label = Self.readableToolName(name) ?? "Used a tool"
+            default: label = Self.readableToolName(name) ?? Self.readableToolName(kind) ?? "Used a tool"
+            }
+            if let name = Self.readableToolName(name), !label.localizedCaseInsensitiveContains(name) {
+                return "\(label) (\(name))"
+            }
+            return label
+        }
+        return Self.readableToolName(name) ?? "Used a tool"
+    }
+
+    private static func readableToolName(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let words = value
+            .replacingOccurrences(of: "([a-z0-9])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "[_./-]+", with: " ", options: .regularExpression)
+            .split(whereSeparator: \.isWhitespace)
+        guard !words.isEmpty else { return nil }
+        return words.map { $0.capitalized }.joined(separator: " ")
+    }
 }

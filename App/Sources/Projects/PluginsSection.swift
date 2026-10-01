@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// A project's plugins, under its workflows (security review, S2).
@@ -79,7 +82,7 @@ private struct PluginRow: View {
 
             HStack(spacing: 6) {
                 Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([plugin.folder])
+                    model.reveal(plugin.folder, on: model.selectedProjectHost)
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)

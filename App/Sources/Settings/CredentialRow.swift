@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// One runtime's credential, under that runtime in Settings ▸ Agent Runtimes (046).

@@ -12,31 +12,22 @@ import Testing
 struct AppServiceTests {
     /// A service on one end of a pipe and a plain JSON-RPC client on the other, which
     /// is what a runtime is here.
-    private func pair(sink: @escaping AppService.Sink,
-                      showFile: @escaping AppService.FileSink = { _ in .refused("not expected") },
+    private func pair(showFile: @escaping AppService.FileSink = { _ in .refused("not expected") },
                       askForm: @escaping AppService.AskFormSink = { _, _ in .refused("not expected") },
-                      reportOutcome: @escaping AppService.OutcomeSink = { _, _, _ in
-                          .refused("not expected")
-                      },
                       finishTurn: @escaping AppService.FinishSink = { _, _, _, _, _ in
                           .refused("not expected")
                       })
         async -> (client: JSONRPCConnection, service: AppService) {
         let (mine, theirs) = PairedTransport.pair()
-        let service = AppService(transport: theirs, finishTurn: finishTurn, sink: sink,
-                                 showFile: showFile, askForm: askForm,
-                                 reportOutcome: reportOutcome)
+        let service = AppService(transport: theirs, finishTurn: finishTurn,
+                                 showFile: showFile, askForm: askForm)
         let client = JSONRPCConnection(transport: mine)
         await client.start()
         return (client, service)
     }
 
-    private func neverCalled() -> AppService.Sink {
-        { _ in .refused("not expected") }
-    }
-
     @Test func itAnswersTheHandshakeWithTheVersionTheClientAsked() async throws {
-        let (client, service) = await pair(sink: neverCalled())
+        let (client, service) = await pair()
         let result = try await client.call("initialize", ["protocolVersion": "2025-03-26"])
         #expect(result["protocolVersion"]?.stringValue == "2025-03-26")
         #expect(result["serverInfo"]?["name"]?.stringValue == "agents")
@@ -46,25 +37,24 @@ struct AppServiceTests {
     }
 
     @Test func aClientThatNamesNoVersionGetsOurs() async throws {
-        let (client, service) = await pair(sink: neverCalled())
+        let (client, service) = await pair()
         let result = try await client.call("initialize", .object([:]))
         #expect(result["protocolVersion"]?.stringValue == AppService.protocolVersion)
         await service.close()
     }
 
     @Test func everyToolIsListedWithASchemaTheAgentCanFill() async throws {
-        let (client, service) = await pair(sink: neverCalled())
+        let (client, service) = await pair()
         let result = try await client.call("tools/list", .object([:]))
         let tools = result["tools"]?.arrayValue ?? []
-        // The one call that ends a turn first, the two that act mid-turn after it,
-        // and the two older names last: listed, so a runtime that checks a name
-        // against the list before calling it still finds what it was told (023).
-        // The four agent tools (028 + park) sit after the workflow tool, before the
-        // older names, for an agent that may use them — which is the default.
+        // The one call that ends a turn first, the ones that act mid-turn after it.
+        // The two older names for its halves are gone (023 R5).
+        // The four agent tools (028 + park) sit after the workflow tool, for an agent
+        // that may use them — which is the default.
         // archive_agent is no longer offered. The three lease tools (036) follow
-        // them, for every agent, then the three event tools (042), and the two move
-        // tools (053) after those. The two session tools (065) sit after the agent
-        // tools, for every agent.
+        // them, for every agent, then the three event tools (042). Moving (053) rides on
+        // finish_turn. The two session tools (065) sit after the agent tools, for every
+        // agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
@@ -74,9 +64,7 @@ struct AppServiceTests {
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
-                AppService.publishEventToolName,
-                AppService.enterWorktreeToolName, AppService.exitWorktreeToolName,
-                AppService.toolName, AppService.reportOutcomeToolName])
+                AppService.publishEventToolName])
 
         let finish = tools.first?["inputSchema"]
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
@@ -92,15 +80,6 @@ struct AppServiceTests {
         #expect(next?["required"]?.arrayValue?.compactMap { $0.stringValue }
             == ["label", "prompt"])
         #expect(finish?["properties"]?["next_prompts"] == nil)
-
-        let suggest = tools.first { $0["name"]?.stringValue == AppService.toolName }
-        let list = suggest?["inputSchema"]?["properties"]?["prompts"]
-        // No ceiling in the schema: a conversation told "up to four" must not be
-        // refused before the call for sending four.
-        #expect(list?["maxItems"] == nil)
-        let items = list?["items"]
-        #expect(items?["properties"]?["label"] != nil)
-        #expect(items?["properties"]?["prompt"] != nil)
 
         let showFile = tools[1]["inputSchema"]
         #expect(showFile?["properties"]?["path"] != nil)
@@ -123,20 +102,11 @@ struct AppServiceTests {
         // agent makes first.
         #expect(workflows?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["action"])
 
-        let outcome = tools.last?["inputSchema"]
-        // The six, and only the six, spelled the way the daemon reads them. A seventh
-        // word offered here would be a word the daemon has to refuse.
-        #expect(outcome?["properties"]?["outcome"]?["enum"]?.arrayValue?
-            .compactMap { $0.stringValue }
-            == WorkOutcome.allCases.map(\.rawValue))
-        // Both required. A status with no words is what the app already had.
-        #expect(outcome?["required"]?.arrayValue?.compactMap { $0.stringValue }
-            == ["outcome", "message"])
         await service.close()
     }
 
     @Test func aWorkflowCallWithNoUsableActionIsToldRatherThanGuessedAt() async throws {
-        let (client, service) = await pair(sink: neverCalled())
+        let (client, service) = await pair()
         let result = try await client.call("tools/call", [
             "name": .string(AppService.workflowToolName),
             "arguments": ["action": "schedule"],
@@ -147,115 +117,8 @@ struct AppServiceTests {
         await service.close()
     }
 
-    @Test func aCallReachesTheSinkAndTheAgentIsToldWhatHappened() async throws {
-        let box = Box()
-        let (client, service) = await pair(sink: { prompts in
-            await box.record(prompts)
-            return .shown("Shown above the prompt.")
-        })
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.toolName),
-            "arguments": ["prompts": .array([
-                ["label": "Run the tests", "prompt": "Run the tests and fix what fails"],
-            ])],
-        ])
-        #expect(await box.prompts.map(\.label) == ["Run the tests"])
-        #expect(await box.prompts.map(\.prompt) == ["Run the tests and fix what fails"])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == "Shown above the prompt.")
-        await service.close()
-    }
-
-    /// The Claude adapter prefixes the tools of an MCP server with the server's name,
-    /// so the name that comes back is not the name we gave it.
-    @Test func aPrefixedToolNameIsStillOurTool() async throws {
-        let box = Box()
-        let (client, service) = await pair(sink: { prompts in
-            await box.record(prompts)
-            return .shown("ok")
-        })
-        _ = try await client.call("tools/call", [
-            "name": "mcp__agents__suggest_next_prompts",
-            "arguments": ["prompts": .array([["label": "One", "prompt": "Do one"]])],
-        ])
-        #expect(await box.prompts.count == 1)
-        await service.close()
-    }
-
-    @Test func aRefusalIsAToolErrorRatherThanAProtocolError() async throws {
-        let (client, service) = await pair(sink: { _ in .refused("That conversation is closed.") })
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.toolName),
-            "arguments": ["prompts": .array([["label": "One", "prompt": "Do one"]])],
-        ])
-        // Not a JSON-RPC failure: the agent is meant to read this and carry on.
-        #expect(result["isError"]?.boolValue == true)
-        #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == "That conversation is closed.")
-        await service.close()
-    }
-
-    @Test func onlyTheFirstGetsThrough() async throws {
-        let box = Box()
-        let (client, service) = await pair(sink: { prompts in
-            await box.record(prompts)
-            return .shown("ok")
-        })
-        let many = (1...9).map { JSONValue.object(["label": .string("\($0)"), "prompt": .string("Do \($0)")]) }
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.toolName),
-            "arguments": ["prompts": .array(many)],
-        ])
-        #expect(await box.prompts.map(\.label) == ["1"])
-        await service.close()
-    }
-
-    /// One blank entry must not cost the other three.
-    @Test func anEmptyPromptIsDroppedAndTheRestAreKept() async throws {
-        let box = Box()
-        let (client, service) = await pair(sink: { prompts in
-            await box.record(prompts)
-            return .shown("ok")
-        })
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.toolName),
-            "arguments": ["prompts": .array([
-                ["label": "Blank", "prompt": "   "],
-                ["label": "Real", "prompt": "Do the real one"],
-            ])],
-        ])
-        #expect(await box.prompts.map(\.label) == ["Real"])
-        await service.close()
-    }
-
-    /// A label is what fits on the chip. A prompt with no label at all still gets one.
-    @Test func aMissingLabelBecomesTheStartOfThePrompt() async throws {
-        let box = Box()
-        let (client, service) = await pair(sink: { prompts in
-            await box.record(prompts)
-            return .shown("ok")
-        })
-        let long = String(repeating: "a", count: 200)
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.toolName),
-            "arguments": ["prompts": .array([["prompt": .string(long)]])],
-        ])
-        #expect(await box.prompts.first?.label.count == SuggestedPrompt.labelLimit)
-        #expect(await box.prompts.first?.prompt == long)
-        await service.close()
-    }
-
-    @Test func nothingSentIsAnErrorTheAgentCanRead() async throws {
-        let (client, service) = await pair(sink: neverCalled())
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.toolName),
-            "arguments": ["prompts": .array([])],
-        ])
-        #expect(result["isError"]?.boolValue == true)
-        await service.close()
-    }
-
     @Test func someOtherToolIsNotOurs() async throws {
-        let (client, service) = await pair(sink: neverCalled())
+        let (client, service) = await pair()
         await #expect(throws: JSONRPCError.self) {
             _ = try await client.call("tools/call", ["name": "rm_rf", "arguments": .object([:])])
         }
@@ -266,7 +129,7 @@ struct AppServiceTests {
 
     @Test func aFileAndALineReachTheSinkAndTheAgentIsToldWhatHappened() async throws {
         let box = FileBox()
-        let (client, service) = await pair(sink: neverCalled(), showFile: { file in
+        let (client, service) = await pair(showFile: { file in
             await box.record(file)
             return .shown("README.md is open at line 12.")
         })
@@ -285,7 +148,7 @@ struct AppServiceTests {
     /// agent reads when it reaches for the tool, and these are the words that make a
     /// Markdown file a page it shows once and then writes on.
     @Test func theShowFileDescriptionSaysAMarkdownFileIsALivePage() async throws {
-        let (client, service) = await pair(sink: neverCalled())
+        let (client, service) = await pair()
         let result = try await client.call("tools/list", .object([:]))
         let description = result["tools"]?.arrayValue?[1]["description"]?.stringValue ?? ""
         #expect(description.contains("opens as a page"))
@@ -297,7 +160,7 @@ struct AppServiceTests {
 
     @Test func aPrefixedShowFileIsStillOurTool() async throws {
         let box = FileBox()
-        let (client, service) = await pair(sink: neverCalled(), showFile: { file in
+        let (client, service) = await pair(showFile: { file in
             await box.record(file)
             return .shown("ok")
         })
@@ -315,7 +178,7 @@ struct AppServiceTests {
 
     @Test func anAskFormReachesTheSinkAndTheAgentIsToldWhatHappened() async throws {
         let box = AskFormBox()
-        let (client, service) = await pair(sink: neverCalled(), askForm: { title, questions in
+        let (client, service) = await pair(askForm: { title, questions in
             await box.record(title, questions)
             return .shown("They answered:\n- Drink?: tea")
         })
@@ -339,7 +202,7 @@ struct AppServiceTests {
     }
 
     @Test func anAskFormWithNoQuestionsIsToldRatherThanGuessedAt() async throws {
-        let (client, service) = await pair(sink: neverCalled(), askForm: { _, _ in
+        let (client, service) = await pair(askForm: { _, _ in
             .shown("should not happen")
         })
         let result = try await client.call("tools/call", [
@@ -354,7 +217,7 @@ struct AppServiceTests {
 
     @Test func aPrefixedAskFormIsStillOurTool() async throws {
         let box = AskFormBox()
-        let (client, service) = await pair(sink: neverCalled(), askForm: { title, questions in
+        let (client, service) = await pair(askForm: { title, questions in
             await box.record(title, questions)
             return .shown("ok")
         })
@@ -380,8 +243,7 @@ struct AppServiceTests {
     /// what it types in a terminal all day. It is refused here rather than resolved
     /// against a working directory this process does not have.
     @Test func aRelativePathIsRefusedBeforeItReachesTheSink() async throws {
-        let (client, service) = await pair(sink: neverCalled(),
-                                           showFile: { _ in .shown("should not happen") })
+        let (client, service) = await pair(showFile: { _ in .shown("should not happen") })
         let result = try await client.call("tools/call", [
             "name": .string(AppService.showFileToolName),
             "arguments": ["path": "src/main.swift"],
@@ -393,7 +255,7 @@ struct AppServiceTests {
 
     @Test func aLineThatIsNotAPlaceIsDroppedAndTheFileStillOpens() async throws {
         let box = FileBox()
-        let (client, service) = await pair(sink: neverCalled(), showFile: { file in
+        let (client, service) = await pair(showFile: { file in
             await box.record(file)
             return .shown("ok")
         })
@@ -411,97 +273,28 @@ struct AppServiceTests {
         func record(_ file: ShownFile) { self.file = file }
     }
 
-    private actor Box {
-        private(set) var prompts: [SuggestedPrompt] = []
-        func record(_ prompts: [SuggestedPrompt]) { self.prompts = prompts }
-    }
-
-    // MARK: Saying how the work went
-
-    /// The refusals are what an agent reads when it got the call wrong, so they have
-    /// to say which five words there are rather than that one was not among them.
-    @Test func anOutcomeWeDoNotKnowIsNamedRatherThanRounded() async throws {
-        let (client, service) = await pair(sink: neverCalled())
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.reportOutcomeToolName),
-            "arguments": ["outcome": "succeeded", "message": "all good"],
-        ])
-        #expect(result["isError"]?.boolValue == true)
-        let text = result["content"]?.arrayValue?.first?["text"]?.stringValue ?? ""
-        #expect(text.contains("nothing_to_do"))
-        #expect(text.contains("partly_done"))
-        await service.close()
-    }
-
-    @Test func anOutcomeWithNoWordsIsRefused() async throws {
-        let (client, service) = await pair(sink: neverCalled())
-        for message in ["", "   "] {
-            let result = try await client.call("tools/call", [
-                "name": .string(AppService.reportOutcomeToolName),
-                "arguments": ["outcome": "done", "message": .string(message)],
-            ])
-            #expect(result["isError"]?.boolValue == true)
-            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
-                .contains("how it went") == true)
-        }
-        await service.close()
-    }
-
-    /// A runtime is free to prefix the name — the Claude adapter shows the first of
-    /// these as `mcp__agents__suggest_next_prompts` — so the match is on the end.
-    @Test func aPrefixedNameStillReachesTheSameSink() async throws {
-        let seen = Recorder()
-        let (client, service) = await pair(sink: neverCalled(),
-                                           reportOutcome: { outcome, message, _ in
-            await seen.record(outcome, message)
-            return .shown("Noted.")
-        })
-        let result = try await client.call("tools/call", [
-            "name": "mcp__agents__report_outcome",
-            "arguments": ["outcome": "needs_answer", "message": "  Drop the index first?  "],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await seen.outcome == "needs_answer")
-        // Trimmed on the way through, so the daemon is never handed the agent's
-        // whitespace to decide about.
-        #expect(await seen.message == "Drop the index first?")
-        await service.close()
-    }
-
-    private actor Recorder {
-        var outcome = ""
-        var message = ""
-        func record(_ outcome: String, _ message: String) {
-            self.outcome = outcome
-            self.message = message
-        }
-    }
-
-    /// The two older names are listed — a runtime that checks a name against the
-    /// list before calling it still finds what it was told — and described as the
-    /// older names for the one tool, so a fresh agent reading the whole list is
-    /// pointed at the right one (FR-011, FR-013). Their schemas are what they were.
-    @Test func theOldNamesAreListedAsAliasesOfTheOneTool() async throws {
-        let (client, service) = await pair(sink: neverCalled())
-        let result = try await client.call("tools/list", .object([:]))
-        let tools = result["tools"]?.arrayValue ?? []
-        let older = Array(tools.suffix(2))
-        #expect(older.compactMap { $0["name"]?.stringValue }
-            == [AppService.toolName, AppService.reportOutcomeToolName])
-        for tool in older {
-            let description = tool["description"]?.stringValue ?? ""
-            #expect(description.contains(AppTool.finishTurn))
-            #expect(description.lowercased().contains("older"))
-            #expect(tool["title"]?.stringValue?.contains("older name") == true)
-        }
-        #expect(older[0]["inputSchema"]?["required"]?.arrayValue?.compactMap { $0.stringValue }
-            == ["prompts"])
-        #expect(older[1]["inputSchema"]?["required"]?.arrayValue?.compactMap { $0.stringValue }
-            == ["outcome", "message"])
-        await service.close()
-    }
-
     // MARK: Ending the turn in one call
+
+    /// The two older names for the halves of `finish_turn` were retired (023 R5): not
+    /// listed, and a call to either, prefixed or not, is no tool of ours.
+    @Test func theRetiredNamesAreNeitherListedNorAnswered() async throws {
+        let (client, service) = await pair()
+        let listed = try await client.call("tools/list", .object([:]))["tools"]?.arrayValue?
+            .compactMap { $0["name"]?.stringValue } ?? []
+        for name in AppTool.retiredEndOfTurn {
+            #expect(!listed.contains(name))
+            for called in [name, "mcp__agents__\(name)"] {
+                await #expect(throws: JSONRPCError.self) {
+                    _ = try await client.call("tools/call", [
+                        "name": .string(called),
+                        "arguments": ["outcome": "done", "message": "All done.",
+                                      "prompts": .array([["label": "One", "prompt": "Do one"]])],
+                    ])
+                }
+            }
+        }
+        await service.close()
+    }
 
     private actor FinishBox {
         var calls = 0
@@ -530,20 +323,18 @@ struct AppServiceTests {
 
     // MARK: Blocked (039)
 
-    /// The sixth outcome is offered, with what it carries, on both names.
+    /// The sixth outcome is offered, with what it carries.
     @Test func blockedIsOfferedWithWhatItCarries() async throws {
-        for tool in [AppService.finishTurnTool, AppService.reportOutcomeTool] {
-            let properties = tool["inputSchema"]?["properties"]
-            #expect(properties?["outcome"]?["enum"]?.arrayValue?.contains("blocked") == true)
-            #expect(properties?["waiting_on"]?["type"]?.stringValue == "array")
-            #expect(properties?["check_again_in_minutes"]?["maximum"]?.intValue == 1440)
-        }
+        let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
+        #expect(properties?["outcome"]?["enum"]?.arrayValue?.contains("blocked") == true)
+        #expect(properties?["waiting_on"]?["type"]?.stringValue == "array")
+        #expect(properties?["check_again_in_minutes"]?["maximum"]?.intValue == 1440)
         #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("blocked") == true)
     }
 
     @Test func aBlockedCallCarriesItsWaitsAndTimeToTheSink() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "blocked", "message": "Waiting on the helpers.",
@@ -559,7 +350,7 @@ struct AppServiceTests {
     /// whole and in range. Refused before the daemon is asked.
     @Test func blockArgumentsAreRefusedWhereTheyDoNotBelong() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let cases: [JSONValue] = [
             ["outcome": "done", "message": "m", "title": "t", "waiting_on": ["A"]],
             ["outcome": "done", "message": "m", "title": "t", "check_again_in_minutes": 5],
@@ -579,16 +370,15 @@ struct AppServiceTests {
 
     // MARK: Parked or archived once the turn ends
 
-    @Test func afterwardsIsOfferedOnTheOneCallAlone() async throws {
+    @Test func afterwardsIsOffered() async throws {
         let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
         #expect(properties?["afterwards"]?["enum"]?.arrayValue == ["park"])
-        #expect(AppService.reportOutcomeTool["inputSchema"]?["properties"]?["afterwards"] == nil)
         #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("afterwards") == true)
     }
 
     @Test func anAskThatFitsTheOutcomeReachesTheSink() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Merged and cleaned up.",
@@ -603,7 +393,7 @@ struct AppServiceTests {
     /// daemon keeps the outcome and declines the ask.
     @Test func anArchiveAskStillReachesTheSink() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Merged and cleaned up.",
@@ -618,7 +408,7 @@ struct AppServiceTests {
     /// refused before the daemon is asked.
     @Test func anAskThatDoesNotFitIsRefusedWhole() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let cases: [(JSONValue, String)] = [
             (["outcome": "done", "message": "m", "afterwards": "delete"], AfterTurn.unknown),
             (["outcome": "needs_answer", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
@@ -639,7 +429,7 @@ struct AppServiceTests {
 
     @Test func aFinishCallReachesTheSinkWithBothHalves() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "  Renamed 14 call sites.  ",
@@ -662,7 +452,7 @@ struct AppServiceTests {
     /// the outcome still lands (FR-003).
     @Test func aFinishCallWithNoPromptsStillReachesTheSink() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         for arguments in [
             JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied"]),
             JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied",
@@ -682,7 +472,7 @@ struct AppServiceTests {
     /// again with a word we know (Research R4).
     @Test func aFinishCallWithAnUnknownOutcomeIsRefusedWhole() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "succeeded", "message": "all good", "title": "Tidied",
@@ -698,7 +488,7 @@ struct AppServiceTests {
 
     @Test func aFinishCallWithNoWordsIsRefused() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         for message in ["", "   "] {
             let result = try await client.call("tools/call", [
                 "name": .string(AppService.finishTurnToolName),
@@ -714,7 +504,7 @@ struct AppServiceTests {
 
     @Test func aPrefixedFinishCallIsStillOurTool() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": "mcp__agents__finish_turn",
             "arguments": ["outcome": "stuck", "message": "No signing certificate.",
@@ -725,9 +515,38 @@ struct AppServiceTests {
         await service.close()
     }
 
+    @Test func aRefusalIsAToolErrorRatherThanAProtocolError() async throws {
+        let (client, service) = await pair(finishTurn: { _, _, _, _, _ in
+            .refused("That conversation is closed.")
+        })
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "All done."],
+        ])
+        // Not a JSON-RPC failure: the agent is meant to read this and carry on.
+        #expect(result["isError"]?.boolValue == true)
+        #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == "That conversation is closed.")
+        await service.close()
+    }
+
+    /// A label is what fits on the chip. A prompt with no label at all still gets one.
+    @Test func aMissingLabelBecomesTheStartOfThePrompt() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(finishTurn: finishing(box))
+        let long = String(repeating: "a", count: 200)
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "All done.",
+                          "next_prompt": ["prompt": .string(long)]],
+        ])
+        #expect(await box.prompts.first?.label.count == SuggestedPrompt.labelLimit)
+        #expect(await box.prompts.first?.prompt == long)
+        await service.close()
+    }
+
     @Test func fiveNextPromptsBecomeTheFirst() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let many = (1...5).map { JSONValue.object(["label": .string("\($0)"), "prompt": .string("Do \($0)")]) }
         _ = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
@@ -741,7 +560,7 @@ struct AppServiceTests {
     /// What a fresh agent is told to send (031).
     @Test func oneNextPromptReachesTheSink() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
@@ -755,7 +574,7 @@ struct AppServiceTests {
     /// Both forms in one call: the one is what the agent meant, and wins.
     @Test func theOneWinsOverTheList() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         _ = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
@@ -769,7 +588,7 @@ struct AppServiceTests {
     /// A list whose first entry is blank keeps the first that is not.
     @Test func aBlankFirstEntryGivesWayToTheNext() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         _ = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
@@ -787,7 +606,7 @@ struct AppServiceTests {
     /// the row keeps the name it has.
     @Test func aFinishCallWithNoTitleLandsWithoutOne() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         for arguments in [
             JSONValue.object(["outcome": "done", "message": "All done."]),
             JSONValue.object(["outcome": "done", "message": "All done.", "title": ""]),
@@ -824,7 +643,7 @@ struct AppServiceTests {
     /// prompt-made title may be.
     @Test func aTitleIsMadeFitForARow() async throws {
         let box = FinishBox()
-        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let (client, service) = await pair(finishTurn: finishing(box))
         _ = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Done.",
@@ -843,22 +662,9 @@ struct AppServiceTests {
         await service.close()
     }
 
-    /// The older name for the outcome is left as it was: a conversation begun before
-    /// the title existed was never told to send one, and still has to land.
-    @Test func theOlderOutcomeNameNeedsNoTitle() async throws {
-        let (client, service) = await pair(sink: neverCalled(),
-                                           reportOutcome: { _, _, _ in .shown("Noted.") })
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.reportOutcomeToolName),
-            "arguments": ["outcome": "done", "message": "All done."],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        await service.close()
-    }
-
     /// The tool says what the title is for, where an agent reads it.
     @Test func theToolSaysWhatTheTitleIsFor() async throws {
-        let (client, service) = await pair(sink: neverCalled())
+        let (client, service) = await pair()
         let result = try await client.call("tools/list", .object([:]))
         let description = result["tools"]?.arrayValue?.first?["description"]?.stringValue ?? ""
         #expect(description.contains("The title is the name on that row"))

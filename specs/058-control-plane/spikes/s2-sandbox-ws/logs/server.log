@@ -1,0 +1,16 @@
+server: spki-sha256 pin lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A
+server: listening on [IPv6]::/:::8797
+server: upgrade request /v1/connect
+server: got line from [IPv6]::ffff:127.0.0.1/::ffff:127.0.0.1:61189: {"client":"hello from sandbox via 127.0.0.1"}
+server: close from peer
+server: tls/channel error handshakeFailed(NIOSSL.BoringSSLError.sslError([Error:  EOF during handshake]))
+server: upgrade request /v1/connect
+server: got line from [IPv6]::1/::1:61191: {"client":"hello from sandbox via Alexs-MacBook-Air.local"}
+server: close from peer
+server: upgrade request /v1/connect
+server: got line from [IPv6]::ffff:127.0.0.1/::ffff:127.0.0.1:61198: {"client":"hello from sandbox via 127.0.0.1"}
+server: close from peer
+server: tls/channel error handshakeFailed(NIOSSL.BoringSSLError.sslError([Error:  EOF during handshake]))
+server: upgrade request /v1/connect
+server: got line from [IPv6]::ffff:192.168.0.238/::ffff:192.168.0.238:61200: {"client":"hello from sandbox via 192.168.0.238"}
+server: close from peer

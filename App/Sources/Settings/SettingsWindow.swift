@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import AppKit
 import SwiftUI
 
@@ -16,6 +19,10 @@ struct SettingsWindow: View {
     /// Asked for when the window appears, when Shared is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
+    @State private var controlPage: ControlPage = .overview
+    /// Settings ▸ Control plane's own view of the control plane, while the window has one
+    /// (058). Without one, Devices and Servers are listed as they always were.
+    @State private var control: ControlSettingsModel? = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
 
     /// The size it opens at, and the smallest it will go. A larger window gives the extra
     /// room to the detail on Shared, and to the empty space beside a form pane, which
@@ -47,7 +54,7 @@ struct SettingsWindow: View {
     var body: some View {
         HStack(spacing: 0) {
             SettingsRail(pane: pane, sharedPage: sharedPage, runtimeID: runtimeID,
-                         snapshot: sharedSnapshot)
+                         snapshot: sharedSnapshot, controlPage: $controlPage, control: control)
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -67,6 +74,8 @@ struct SettingsWindow: View {
             await model.refreshRuntimes()
             await refreshShared()
         }
+        .task { await control?.start() }
+        .onDisappear { control?.stop() }
         // Asked for from elsewhere in the app: a link that names a Settings pane.
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
@@ -99,7 +108,13 @@ struct SettingsWindow: View {
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
         case .devices: FormColumn { DevicesPane() }
+        #if AGENTS_STORE
+        case .servers: EmptyView()
+        #else
         case .servers: FormColumn { ServersSettingsView() }
+        #endif
+        case .controlPlane:
+            if let control { ControlSettingsView(control: control, page: $controlPage) }
         }
     }
 
@@ -109,7 +124,7 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: String, Hashable, CaseIterable {
-    case general, runtimes, shared, spending, devices, servers
+    case general, runtimes, shared, spending, devices, servers, controlPlane
 
     var title: String {
         switch self {
@@ -119,6 +134,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .spending: "Spending"
         case .devices: "Devices"
         case .servers: "Servers"
+        case .controlPlane: "Control plane"
         }
     }
 
@@ -130,12 +146,19 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .spending: "dollarsign.circle"
         case .devices: "iphone"
         case .servers: "server.rack"
+        case .controlPlane: "point.3.connected.trianglepath.dotted"
         }
     }
 
     /// General on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
-    static let groups: [[SettingsPane]] = [[.general], [.runtimes, .spending], [.shared], [.devices, .servers]]
+    ///
+    /// With a control plane, Devices and Servers fold into its one group (058, frame D):
+    /// its hosts are the servers and its clients the devices.
+    static var groups: [[SettingsPane]] {
+        let ways: [SettingsPane] = ControlConfig.endpoint == nil ? [.devices, .servers] : [.controlPlane]
+        return [[.general], [.runtimes, .spending], [.shared], ways]
+    }
 }
 
 /// The Settings scene's window has no grow box, and `windowResizability` on that
@@ -210,6 +233,8 @@ private struct SettingsRail: View {
     @Binding var sharedPage: SharedPage
     @Binding var runtimeID: String
     let snapshot: DaemonAPI.SharedSnapshot?
+    @Binding var controlPage: ControlPage
+    let control: ControlSettingsModel?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -219,6 +244,7 @@ private struct SettingsRail: View {
                     switch each {
                     case .shared: sharedGroup
                     case .runtimes: runtimesGroup
+                    case .controlPlane: controlGroup
                     default: paneItem(each)
                     }
                 }
@@ -266,6 +292,43 @@ private struct SettingsRail: View {
                 }
                 .padding(.leading, 28)
             }
+        }
+    }
+
+    /// The control plane, drawn as Shared is: a heading always open over its pages (058).
+    @ViewBuilder
+    private var controlGroup: some View {
+        heading(.controlPlane)
+        controlItem(.overview, count: nil)
+        controlItem(.hosts, count: control?.hosts.count)
+        controlItem(.clients, count: control.map { $0.clients.count })
+    }
+
+    private func heading(_ each: SettingsPane) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: each.symbol)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            Text(each.title)
+        }
+        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func controlItem(_ target: ControlPage, count: Int?) -> some View {
+        let chosen = pane == .controlPlane && controlPage == target
+        return RailButton(lit: chosen, label: target.title + (count.map { ", \($0)" } ?? ""),
+                          selected: chosen, action: { pane = .controlPlane; controlPage = target }) {
+            HStack(spacing: 6) {
+                Text(target.title)
+                Spacer()
+                if let count { Text("\(count)").monospacedDigit()
+                        .foregroundStyle(chosen ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary)) }
+            }
+            .padding(.leading, 28)
         }
     }
 

@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// "Gemini on devbox needs a key" (043, contracts/ui.md § 3; Gemini's alone since 056): asked

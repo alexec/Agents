@@ -12,8 +12,7 @@ import Foundation
 /// the line under the agent's name and the row of chips above the prompt — and two
 /// that act mid-turn, `show_file` and `manage_workflows`. Four more act on other
 /// agents — `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` (028) —
-/// and are offered only to an agent the person or a workflow started. Two older names
-/// for the halves of the first are still served, for conversations briefed with them.
+/// and are offered only to an agent the person or a workflow started.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
 /// JSON-RPC over a pipe, which is what `JSONRPCConnection` already does for ACP.
@@ -24,10 +23,6 @@ public actor AppService {
     /// than whole.
     public static let finishTurnToolName = AppTool.finishTurn
 
-    /// The older name for the chips half of `finishTurnToolName`, still served so a
-    /// conversation briefed with it finds what it was told.
-    public static let toolName = AppTool.suggestPrompts
-
     /// The other one: show the user a file.
     public static let showFileToolName = AppTool.showFile
 
@@ -36,9 +31,6 @@ public actor AppService {
 
     /// Ask the person and wait: the form card every runtime can reach.
     public static let askFormToolName = AppTool.askForm
-
-    /// And the older name for the outcome half: say how the work went, on its own.
-    public static let reportOutcomeToolName = AppTool.reportOutcome
 
     /// And four that act on other agents (028), offered only to an agent the person or
     /// a workflow started: start one in this project, and stop, park or list the ones
@@ -57,8 +49,6 @@ public actor AppService {
     public static let publishEventToolName = AppTool.publishEvent
     public static let releaseResourceToolName = AppTool.releaseResource
     public static let listResourcesToolName = AppTool.listResources
-    public static let enterWorktreeToolName = AppTool.enterWorktree
-    public static let exitWorktreeToolName = AppTool.exitWorktree
 
     /// The last version of MCP this was written against. A client that asks for one it
     /// knows is answered with its own, which is what the specification says to do and
@@ -72,9 +62,6 @@ public actor AppService {
         case refused(String)
     }
 
-    /// Where a suggestion goes.
-    public typealias Sink = @Sendable ([SuggestedPrompt]) async -> Outcome
-
     /// Where a file to show goes.
     public typealias FileSink = @Sendable (ShownFile) async -> Outcome
 
@@ -86,37 +73,37 @@ public actor AppService {
     public typealias WorkflowSink =
         @Sendable (DaemonAPI.ManageWorkflowsRequest.Action, String?, String?) async -> Outcome
 
-    /// Where an outcome goes: the wire spelling, and the agent's own sentence. Both
-    /// still strings here — the daemon owns which words it knows, because it is the
-    /// daemon that has to refuse one it does not.
-    public typealias OutcomeSink = @Sendable (String, String, BlockWords) async -> Outcome
-
     /// Where the one call goes: the outcome's wire spelling, the sentence, the chips,
-    /// which may be none, and the conversation's new title. One sink rather than the
-    /// two above in turn, because the daemon refuses the whole call or lands the whole
-    /// call, and two sinks could do half of each.
+    /// which may be none, and the conversation's new title. The outcome is still a
+    /// string here — the daemon owns which words it knows, because it is the daemon
+    /// that has to refuse one it does not. One sink for the lot, because the daemon
+    /// refuses the whole call or lands the whole call.
     public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String?, BlockWords) async -> Outcome
 
     /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
     /// on, as written, and when to check again. Empty for every other outcome — and
     /// refused here if it is not, so the agent hears it before the call goes further.
     /// And, on `finish_turn` alone, where the agent asked to be put once the turn is
-    /// over — carried here so the sink's shape stays as it was.
+    /// over, and where it asked to move to (053) — carried here so the sink's shape
+    /// stays as it was.
     public struct BlockWords: Sendable, Equatable {
         public var waitingOn: [String]?
         public var checkAgainInMinutes: Int?
         public var afterwards: AfterTurn?
         public var addLabels: [String]
         public var removeLabels: [String]
+        public var move: MoveCall?
 
         public init(waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
                     afterwards: AfterTurn? = nil,
-                    addLabels: [String] = [], removeLabels: [String] = []) {
+                    addLabels: [String] = [], removeLabels: [String] = [],
+                    move: MoveCall? = nil) {
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
             self.afterwards = afterwards
             self.addLabels = addLabels
             self.removeLabels = removeLabels
+            self.move = move
         }
 
         public static let none = BlockWords()
@@ -158,14 +145,11 @@ public actor AppService {
     /// Where those go. A wait may take up to the hold limit to come back.
     public typealias EventsSink = @Sendable (EventCall) async -> Outcome
 
-    /// `enter_worktree` or `exit_worktree` (053), as the agent made it: one move, which
+    /// A move asked for on `finish_turn` (053), as the agent made it: one move, which
     /// the daemon checks and keeps for when the turn ends.
     public enum MoveCall: Sendable, Equatable {
         case move(target: MoveTarget, removeLeft: Bool, discardChanges: Bool)
     }
-
-    /// Where those go.
-    public typealias MovesSink = @Sendable (MoveCall) async -> Outcome
 
     /// `list_sessions` or `read_session` (065), as the agent made it. Neither names a
     /// project: the daemon takes it from the caller.
@@ -179,21 +163,19 @@ public actor AppService {
 
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
-    private let sink: Sink
     private let fileSink: FileSink
     private let askFormSink: AskFormSink
     private let workflowSink: WorkflowSink
-    private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
     private let leasesSink: LeasesSink
     private let eventsSink: EventsSink
-    private let movesSink: MovesSink
     private let sessionsSink: SessionsSink
     /// Whether the agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
-    /// Whether the two move tools are offered. False for an agent on a runtime that cannot
-    /// carry its conversation into another folder (053), said with `--no-move-tools`.
+    /// Whether `finish_turn` offers the move arguments. False for an agent on a runtime
+    /// that cannot carry its conversation into another folder (053), said with
+    /// `--no-move-tools`.
     private let movesItself: Bool
     private let box = ServiceBox()
 
@@ -203,16 +185,12 @@ public actor AppService {
                 finishTurn: @escaping FinishSink = { _, _, _, _, _ in
                     .refused("This app cannot end a turn.")
                 },
-                sink: @escaping Sink,
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
                 askForm: @escaping AskFormSink = { _, _ in
                     .refused("This app cannot ask the person.")
                 },
                 workflows: @escaping WorkflowSink = { _, _, _ in
                     .refused("This app cannot manage workflows.")
-                },
-                reportOutcome: @escaping OutcomeSink = { _, _, _ in
-                    .refused("This app cannot record an outcome.")
                 },
                 agents: @escaping AgentsSink = { _ in
                     .refused("This app cannot start or stop agents.")
@@ -223,23 +201,17 @@ public actor AppService {
                 events: @escaping EventsSink = { _ in
                     .refused("This app cannot wait on or publish events.")
                 },
-                moves: @escaping MovesSink = { _ in
-                    .refused("This app cannot move agents.")
-                },
                 sessions: @escaping SessionsSink = { _ in
                     .refused("This app cannot read other sessions.")
                 }) {
         let box = self.box
         self.finishSink = finishTurn
-        self.sink = sink
         self.fileSink = showFile
         self.askFormSink = askForm
         self.workflowSink = workflows
-        self.outcomeSink = reportOutcome
         self.agentsSink = agents
         self.leasesSink = leases
         self.eventsSink = events
-        self.movesSink = moves
         self.sessionsSink = sessions
         self.managesAgents = managesAgents
         self.movesItself = movesItself
@@ -289,11 +261,12 @@ public actor AppService {
             // Longest suffix wins, though nothing here shares one: a runtime is free
             // to prefix a tool's name and none of them changes what follows it.
             if name.hasSuffix(Self.finishTurnToolName) {
-                // The outcome's checks are the report's, and they run here as well as
-                // at the daemon so an agent that got the word wrong is told which five
-                // there are before the call goes any further. The chips are cleaned
-                // the way the older tool cleans them, and may come to nothing: the
-                // call is the outcome; the chips ride along (FR-003).
+                // The outcome's checks run here as well as at the daemon so an agent
+                // that got the word wrong is told which five there are before the call
+                // goes any further. Never rounded to the nearest one: an unknown outcome
+                // read as `done` is exactly the unearned tick this exists to remove. The
+                // chips are cleaned, and may come to nothing: the call is the outcome;
+                // the chips ride along (FR-003).
                 let raw = (arguments?["outcome"]?.stringValue ?? "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard WorkOutcome(wire: raw) != nil else {
@@ -330,16 +303,18 @@ public actor AppService {
                     if assign { words.addLabels = values.compactMap(\.stringValue) }
                     else { words.removeLabels = values.compactMap(\.stringValue) }
                 }
-                return .success(Self.reply(await finishSink(raw, message, prompts, title, words)))
-            }
-
-            if name.hasSuffix(Self.toolName) {
-                let prompts = SuggestedPrompt.list(in: arguments?["prompts"])
-                guard !prompts.isEmpty else {
-                    return .success(Self.reply("No suggestions were sent, so none are shown.",
-                                               isError: true))
+                switch Self.moveCall(arguments) {
+                case .success(let read): words.move = read
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 }
-                return .success(Self.reply(await sink(prompts)))
+                if words.move != nil && !movesItself {
+                    return .success(Self.reply("""
+                        Nothing was recorded: this runtime cannot carry its conversation \
+                        into another folder, so you stay where you are. Call again without \
+                        worktree or leave_worktree.
+                        """, isError: true))
+                }
+                return .success(Self.reply(await finishSink(raw, message, prompts, title, words)))
             }
 
             if name.hasSuffix(Self.showFileToolName) {
@@ -395,19 +370,6 @@ public actor AppService {
                 }
             }
 
-            if let call = Self.moveCall(named: name, arguments) {
-                guard movesItself else {
-                    return .success(Self.reply("""
-                        Nothing was moved: this runtime cannot carry its conversation into \
-                        another folder, so you stay where you are.
-                        """, isError: true))
-                }
-                switch call {
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
-                case .success(let call): return .success(Self.reply(await movesSink(call)))
-                }
-            }
-
             if let call = Self.agentCall(named: name, arguments) {
                 guard managesAgents else {
                     return .success(Self.reply("""
@@ -418,27 +380,6 @@ public actor AppService {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await agentsSink(call)))
-                }
-            }
-
-            if name.hasSuffix(Self.reportOutcomeToolName) {
-                // Checked here as well as at the daemon, so an agent that sent a word
-                // we do not know is told which five we do before the call goes any
-                // further. Never rounded to the nearest one: an unknown outcome read
-                // as `done` is exactly the unearned tick this tool exists to remove.
-                let raw = (arguments?["outcome"]?.stringValue ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard WorkOutcome(wire: raw) != nil else {
-                    return .success(Self.reply(Self.unknownOutcome, isError: true))
-                }
-                let message = (arguments?["message"]?.stringValue ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !message.isEmpty else {
-                    return .success(Self.reply(Self.noWords, isError: true))
-                }
-                switch Self.blockWords(raw, arguments) {
-                case .success(let words): return .success(Self.reply(await outcomeSink(raw, message, words)))
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 }
             }
 
@@ -575,8 +516,8 @@ public actor AppService {
 
     /// Every tool this server offers, in the order they are listed.
     static func tools(managesAgents: Bool, movesItself: Bool = true) -> [JSONValue] {
-        // The one that ends a turn first, the two that act mid-turn, and the two
-        // older names last, described as such (023).
+        // The one that ends a turn first, then the ones that act mid-turn. The two
+        // older names for its halves were retired on 2026-09-29 (023 R5).
         // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
         // archive_agent is no longer offered: only the person archives. An older
@@ -589,14 +530,15 @@ public actor AppService {
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
         // The three event tools, for every agent (042).
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
-        // The two for moving itself, for every agent (053).
-        // Not for a runtime that would forget the conversation on the way.
-        let moveTools = movesItself ? [Self.enterWorktreeTool, Self.exitWorktreeTool] : []
         // The two for reading another session in this project, for every agent (065).
         let sessionTools = [Self.listSessionsTool, Self.readSessionTool]
-        return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool, Self.askFormTool]
+        // Moving itself rides on the call that ends the turn, since that is when a move
+        // happens (053); not offered on a runtime that would forget the conversation on
+        // the way.
+        return [Self.finishTurnTool(movesItself: movesItself), Self.showFileTool, Self.workflowTool,
+                Self.askFormTool]
             + agentTools + sessionTools + leaseTools
-            + eventTools + moveTools + [Self.tool, Self.reportOutcomeTool]
+            + eventTools
     }
 
     /// The questions an `ask_form` call carried, or why it cannot be asked.
@@ -627,43 +569,44 @@ public actor AppService {
         return .success((cleanedTitle, questions))
     }
 
-    /// Which of the two move calls a tool name is, with its arguments read (053). `nil`
-    /// when the name is neither.
-    static func moveCall(named name: String,
-                         _ arguments: JSONValue?) -> Result<MoveCall, AgentCallProblem>? {
+    /// The move a `finish_turn` call asks for (053), with its arguments read. `nil` when
+    /// it asks for none.
+    static func moveCall(_ arguments: JSONValue?) -> Result<MoveCall?, AgentCallProblem> {
         func text(_ key: String) -> String? {
             let value = arguments?[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
             return value?.isEmpty == false ? value : nil
         }
-        if name.hasSuffix(enterWorktreeToolName) {
-            let name = text("name"), path = text("path")
-            if name != nil, path != nil {
-                return .failure("Nothing was moved: give name for a new worktree or path for one already there, not both.")
+        let discard = arguments?["discard_changes"]?.boolValue ?? false
+        let worktree = text("worktree"), leaving = text("leave_worktree")
+        if worktree != nil, leaving != nil {
+            return .failure("Nothing was recorded: give worktree to move into one, or leave_worktree to go back to the project folder, not both.")
+        }
+        if let worktree {
+            guard !discard else {
+                return .failure("Nothing was recorded: discard_changes only goes with leave_worktree remove.")
             }
-            if let path {
-                guard path.hasPrefix("/") else {
-                    return .failure("Nothing was moved: path has to be an absolute path, starting at /.")
-                }
-                return .success(.move(target: .existing(URL(filePath: path, directoryHint: .isDirectory)),
+            if worktree.hasPrefix("/") {
+                return .success(.move(target: .existing(URL(filePath: worktree, directoryHint: .isDirectory)),
                                       removeLeft: false, discardChanges: false))
             }
-            return .success(.move(target: .newWorktree(name: name), removeLeft: false, discardChanges: false))
+            return .success(.move(target: .newWorktree(name: worktree), removeLeft: false, discardChanges: false))
         }
-        if name.hasSuffix(exitWorktreeToolName) {
-            let discard = arguments?["discard_changes"]?.boolValue ?? false
-            switch text("action") {
-            case "keep":
-                guard !discard else {
-                    return .failure("Nothing was moved: discard_changes only goes with action remove.")
-                }
-                return .success(.move(target: .projectFolder, removeLeft: false, discardChanges: false))
-            case "remove":
-                return .success(.move(target: .projectFolder, removeLeft: true, discardChanges: discard))
-            default:
-                return .failure("Nothing was moved: action has to be keep or remove.")
+        switch leaving {
+        case nil:
+            guard !discard else {
+                return .failure("Nothing was recorded: discard_changes only goes with leave_worktree remove.")
             }
+            return .success(nil)
+        case "keep":
+            guard !discard else {
+                return .failure("Nothing was recorded: discard_changes only goes with leave_worktree remove.")
+            }
+            return .success(.move(target: .projectFolder, removeLeft: false, discardChanges: false))
+        case "remove":
+            return .success(.move(target: .projectFolder, removeLeft: true, discardChanges: discard))
+        default:
+            return .failure("Nothing was recorded: leave_worktree has to be keep or remove.")
         }
-        return nil
     }
 
     /// What was wrong with an agent call's arguments, in the sentence the agent reads.
@@ -761,10 +704,45 @@ public actor AppService {
     /// suggestion tool called exactly never — so this is written for an agent already
     /// told, in the briefing, to call it. The description's job is to say which of
     /// the five is true and what the chips are for.
+    static func finishTurnTool(movesItself: Bool) -> JSONValue {
+        guard !movesItself else { return finishTurnTool }
+        guard case .object(var tool) = finishTurnTool,
+              case .object(var schema)? = tool["inputSchema"],
+              case .object(var properties)? = schema["properties"],
+              let description = tool["description"]?.stringValue else { return finishTurnTool }
+        for key in movingArguments { properties.removeValue(forKey: key) }
+        schema["properties"] = .object(properties)
+        tool["inputSchema"] = .object(schema)
+        tool["description"] = .string(description.replacingOccurrences(of: "\n\n" + movingParagraph, with: ""))
+        return .object(tool)
+    }
+
+    /// The arguments that move the agent (053), left out on a runtime that cannot move.
+    static let movingArguments = ["worktree", "leave_worktree", "discard_changes"]
+
+    /// What an agent is told about moving itself. The move happens when the turn ends,
+    /// so asking for it on the call that ends the turn leaves no stretch of the turn in
+    /// which edits land in the folder being left. Words from contracts/move.md.
+    static let movingParagraph = """
+        To move into a git worktree of this project, give worktree: a name for a new \
+        one, or the absolute path of one already there. Do it on your own judgement \
+        when the work turns into a change that should be on its own branch, or when \
+        asked. To go back to the project folder, give leave_worktree: keep leaves the \
+        worktree and its branch as they are; remove takes the worktree away, and its \
+        branch if the app made it and it is merged. Remove is refused for a worktree \
+        the app did not make or another agent works in, and, unless discard_changes \
+        is true, when anything in it is uncommitted or unmerged: ask the person before \
+        discarding. You move once this turn ends and are started again there to carry \
+        on, so the outcome is how the work stands now, and a move does not go with \
+        needs_answer, blocked or afterwards. Nothing uncommitted comes with you, and a \
+        new worktree starts from the commit you have checked out: commit first what \
+        you want to bring.
+        """
+
     static let finishTurnTool: JSONValue = [
         "name": .string(finishTurnToolName),
         "title": "Finish the turn",
-        "description": """
+        "description": .string("""
             Call this once, as the very last thing you do before you stop. It says how \
             the work actually went, and it is the only thing that does: without it the \
             app can only say your turn ended, which it will show as an ending nobody \
@@ -822,10 +800,32 @@ public actor AppService {
             If you can carry on once you have an answer, do not use this: ask with your \
             question or form tool, which stops and waits for them. This one does not \
             wait. It is how you end.
-            """,
+
+            \(movingParagraph)
+            """),
         "inputSchema": [
             "type": "object",
             "properties": [
+                "worktree": [
+                    "type": "string",
+                    "description": """
+                        Move into a git worktree of this project once this turn ends: a \
+                        name for a new one, or the absolute path of one already there. \
+                        Not with leave_worktree.
+                        """,
+                ],
+                "leave_worktree": [
+                    "type": "string",
+                    "enum": .array(["keep", "remove"]),
+                    "description": """
+                        Move back to the project folder once this turn ends. keep leaves \
+                        the worktree as it is; remove takes it away after you have left.
+                        """,
+                ],
+                "discard_changes": [
+                    "type": "boolean",
+                    "description": "Only with leave_worktree remove. Remove even though work would be lost.",
+                ],
                 "outcome": [
                     "type": "string",
                     "enum": .array(["done", "nothing_to_do", "needs_answer",
@@ -898,52 +898,6 @@ public actor AppService {
                 ],
             ],
             "required": .array(["outcome", "message"]),
-        ],
-    ]
-
-    // The two older names. Kept because the briefing that named them is sent once
-    // and lives in the runtime's history, so a conversation begun before 2026-09-23
-    // and resumed after it calls these and has to find them. Listed, because some
-    // runtimes check a name against the list before calling it; described as the
-    // older names, because a fresh agent reading the whole list should be pointed at
-    // the one tool rather than left to pick. Their schemas and rules are untouched,
-    // but for the ceiling on the list below: since 031 only the first is kept, and a
-    // conversation told "up to four" must not be refused by a runtime checking the
-    // count against the schema before it calls.
-    //
-    // Removing them is deleting these two entries, their two branches in `handle`,
-    // their two sinks in the helper, and their two predicates in `PermissionRequest`.
-    // Nothing else may come to depend on them (023 FR-014).
-
-    /// The older name for the chips half of `finishTurnTool`.
-    static let tool: JSONValue = [
-        "name": .string(toolName),
-        "title": "Suggest what to ask next (older name)",
-        "description": """
-            The older name for the suggestions half of finish_turn. Use finish_turn \
-            instead: it takes the same prompts and the outcome together. This still \
-            works, and shows the first prompt in the person's empty prompt.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "prompts": [
-                    "type": "array",
-                    "minItems": .int(1),
-                    "description": "The suggestions, best first. Only the first is shown.",
-                    "items": [
-                        "type": "object",
-                        "properties": [
-                            "label": ["type": "string",
-                                      "description": "Two to five words for the button, e.g. \"Run the tests\"."],
-                            "prompt": ["type": "string",
-                                       "description": "The prompt itself, addressed to you, which goes into their prompt box when they tap it."],
-                        ],
-                        "required": .array(["label", "prompt"]),
-                    ],
-                ],
-            ],
-            "required": .array(["prompts"]),
         ],
     ]
 
@@ -1414,59 +1368,6 @@ public actor AppService {
         ],
     ]
 
-    // MARK: Moving (053). Words from contracts/move.md.
-
-    static let enterWorktreeTool: JSONValue = [
-        "name": .string(enterWorktreeToolName),
-        "title": "Move into a worktree",
-        "description": """
-            Move yourself into a git worktree of this project: a new one, or one that is \
-            already there. Use it on your own judgement when the work turns into a change \
-            that should be on its own branch, or when asked. The move happens when your turn \
-            ends, so finish your turn soon after calling it; edits you make before then land \
-            where you are now. Nothing uncommitted comes with you. A new worktree starts from \
-            the commit your current folder has checked out, so commit first what you want to \
-            bring. After the move you are started again in the new folder to carry on.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "name": [
-                    "type": "string",
-                    "description": "A name for a new worktree. Leave out for one named from this conversation's title. Not with path.",
-                ],
-                "path": [
-                    "type": "string",
-                    "description": "The absolute path of an existing worktree of this repository to move into. Not with name.",
-                ],
-            ],
-        ],
-    ]
-
-    static let exitWorktreeTool: JSONValue = [
-        "name": .string(exitWorktreeToolName),
-        "title": "Move back to the project folder",
-        "description": """
-            Move yourself back to the project folder from the worktree you are in. keep \
-            leaves the worktree and its branch as they are; remove takes the worktree away \
-            after you have left, and its branch if the app made it and it is merged. Remove \
-            is refused for a worktree the app did not make or another agent works in, and, \
-            unless discard_changes is true, when anything in it is uncommitted or unmerged: \
-            ask the person before discarding. The move happens when your turn ends.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "action": ["type": "string", "enum": .array(["keep", "remove"])],
-                "discard_changes": [
-                    "type": "boolean",
-                    "description": "Only with remove. Remove even though work would be lost.",
-                ],
-            ],
-            "required": .array(["action"]),
-        ],
-    ]
-
     // MARK: Leases (036). Words from contracts/lease-tools.md.
 
     static let leaseResourceTool: JSONValue = [
@@ -1533,54 +1434,6 @@ public actor AppService {
             and waits first.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
-    ]
-
-    /// The older name for the outcome half of `finishTurnTool`. See `tool`.
-    static let reportOutcomeTool: JSONValue = [
-        "name": .string(reportOutcomeToolName),
-        "title": "Say how the work went (older name)",
-        "description": """
-            The older name for the outcome half of finish_turn. Use finish_turn \
-            instead: it takes the same outcome and message and your suggestions \
-            together. This still works, and records how the work went.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "outcome": [
-                    "type": "string",
-                    "enum": .array(["done", "nothing_to_do", "needs_answer",
-                                    "partly_done", "stuck", "blocked"]),
-                    "description": "The one that is true.",
-                ],
-                "message": [
-                    "type": "string",
-                    "description": """
-                        One or two sentences, for somebody who has not read the \
-                        conversation. For needs_answer, the question itself.
-                        """,
-                ],
-                "waiting_on": [
-                    "type": "array",
-                    "items": ["type": "string"],
-                    "description": """
-                        Only with blocked. The agents in this project you are waiting on, \
-                        by id (as start_agent or list_my_agents gave it) or by exact \
-                        title. You will be resumed once every one has finished.
-                        """,
-                ],
-                "check_again_in_minutes": [
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 1440,
-                    "description": """
-                        Only with blocked. When to be resumed anyway, to check on \
-                        something the app can't see, like a CI run or a review.
-                        """,
-                ],
-            ],
-            "required": .array(["outcome", "message"]),
-        ],
     ]
 }
 

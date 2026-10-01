@@ -1,0 +1,26 @@
+[122.80] sandbox: NSHomeDirectory = /Users/alexcollins/Library/Containers/com.alexecollins.agents.spike.s2/Data
+[122.80] sandbox: APP_SANDBOX_CONTAINER_ID = com.alexecollins.agents.spike.s2
+[122.80] sandbox: reading /Users/alexcollins/Desktop failed as expected: The file “Desktop” couldn’t be opened because you don’t have permission to view it.
+[122.80] loopback: dialing wss://127.0.0.1:8797/v1/connect expecting pin lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A
+[122.81]   delegate: server pin lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A matches -> useCredential
+[122.82]   delegate: websocket open
+[122.82] loopback: sent line {"client":"hello from sandbox via 127.0.0.1"}
+[122.82] loopback: OK received line {"server":"got {'client':'hello from sandbox via 127.0.0.1'}"} (server pin seen: lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A)
+[122.82] wrong-pin: dialing wss://127.0.0.1:8797/v1/connect expecting pin IqqPkAymSO7MUOc3ZSxZJF4_iheQyjXglyhADzQ0tZo
+[122.82]   delegate: server pin lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A != expected IqqPkAymSO7MUOc3ZSxZJF4_iheQyjXglyhADzQ0tZo -> cancel
+[122.83] wrong-pin: FAILED error NSURLErrorDomain -999: cancelled userInfo=["NSErrorFailingURLKey": https://127.0.0.1:8797/v1/connect, "NSLocalizedDescription": cancelled, "NSErrorFailingURLStringKey": https://127.0.0.1:8797/v1/connect] (server pin seen: lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A)
+[122.83] dotlocal: dialing wss://192.168.0.238:8797/v1/connect expecting pin lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A
+[122.83]   delegate: server pin lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A matches -> useCredential
+[122.83]   delegate: websocket open
+[122.83] dotlocal: sent line {"client":"hello from sandbox via 192.168.0.238"}
+[122.83] dotlocal: OK received line {"server":"got {'client':'hello from sandbox via 192.168.0.238'}"} (server pin seen: lklbR2Vetu2K7unZQaxWKvokpS5yRzKtUGxgu78bB2A)
+[122.83] bonjour: NWBrowser for _agents-control._tcp in local.
+[122.84] bonjour: state ready
+[125.15] bonjour: results ["S2\\032spike._agents-control._tcp.local."]
+[125.15] bonjour: state cancelled
+[125.15] ==== SUMMARY ====
+[125.15] RESULT sandbox: PASS (home=/Users/alexcollins/Library/Containers/com.alexecollins.agents.spike.s2/Data, Desktop read denied)
+[125.15] RESULT loopback pinned dial + line each way: PASS received line {"server":"got {'client':'hello from sandbox via 127.0.0.1'}"}
+[125.15] RESULT wrong pin rejected: PASS error NSURLErrorDomain -999: cancelled userInfo=["NSErrorFailingURLKey": https://127.0.0.1:8797/v1/connect, "NSLocalizedDescription": cancelled, "NSErrorFailingURLStringKey": https://127.0.0.1:8797/v1/connect]
+[125.15] RESULT .local pinned dial + line each way: PASS received line {"server":"got {'client':'hello from sandbox via 192.168.0.238'}"}
+[125.15] RESULT bonjour browse: PASS found S2\032spike._agents-control._tcp.local.

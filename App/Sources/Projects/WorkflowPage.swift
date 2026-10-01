@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// One workflow, opened up.
@@ -197,7 +200,7 @@ struct WorkflowPage: View {
                 block(rawText)
             }
         }
-        .task(id: workflow) { rawText = try? String(contentsOf: url(workflow), encoding: .utf8) }
+        .task(id: workflow) { rawText = await readRaw(workflow) }
     }
 
     // MARK: The form, shaped like the prompt bar
@@ -269,16 +272,26 @@ struct WorkflowPage: View {
     /// where the bar has its picker.
     private func fileAndRuntime(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
+        let file = url(workflow)
+        let here = model.isOnThisMac(model.selectedProjectHost)
         return HStack(spacing: 12) {
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([url(workflow)])
-            } label: {
-                Label(url(workflow).lastPathComponent, systemImage: "doc.text")
+            if here {
+                Button {
+                    model.reveal(file, on: model.selectedProjectHost)
+                } label: {
+                    Label(file.lastPathComponent, systemImage: "doc.text")
+                        .lineLimit(1)
+                }
+                .buttonStyle(.paper)
+                .appText(.fine)
+                .help("\(file.path) — click to show in Finder")
+            } else {
+                // The file is on the host. Finder here cannot show it (058, FR-019).
+                Label(file.lastPathComponent, systemImage: "doc.text")
+                    .appText(.fine)
                     .lineLimit(1)
+                    .help("On \(model.hosts.label(model.selectedProjectHost)). Open it there.")
             }
-            .buttonStyle(.paper)
-            .appText(.fine)
-            .help("\(url(workflow).path) — click to show in Finder")
             Spacer(minLength: 8)
             runtimeControl(summary)
                 .disabled(workflow.mode == .triggering)
@@ -544,7 +557,20 @@ struct WorkflowPage: View {
     }
 
     private func url(_ workflow: Workflow) -> URL {
-        WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
+        WorkflowPaths.url(for: workflow.workflowID, in: workflow.folder)
+    }
+
+    /// This Mac's file is read here. Another host's is `files/read`, scoped to an agent
+    /// in that project (058, R11). With no such agent there is nothing to scope it to.
+    private func readRaw(_ workflow: Workflow) async -> String? {
+        let file = url(workflow)
+        let host = model.selectedProjectHost
+        if model.readsDisk(of: host) { return try? String(contentsOf: file, encoding: .utf8) }  // store-ok: readsDisk(of:) is false in the store window
+        #if AGENTS_STORE
+        return await model.readText(file, on: host)
+        #else
+        return await model.textFile(at: file, on: host, agentID: model.anAgent(in: workflow.folder, on: host))
+        #endif
     }
 
     /// When it next runs and what happened last, as one sentence. The row's third line,

@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import AppKit
 import SwiftUI
 
@@ -14,6 +17,7 @@ struct ContentView: View {
     /// ordinary thing to do here, and a list that hides itself when used is a list you
     /// have to keep fetching back.
     @State private var columns = NavigationSplitViewVisibility.all
+    @State private var offeringMove = false
 
     /// Put the file the selected agent asked about in front of the user.
     ///
@@ -61,11 +65,22 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
             // A server asked for a credential there is none of (043).
             .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
+            .alert(model.signInLendAsk.map { "Let \($0.label) use this Mac’s \($0.runtimeName) sign-in?" } ?? "",
+                   isPresented: Binding(get: { model.signInLendAsk != nil },
+                                        set: { if !$0 { model.finishSignInLendAsk(allowed: false) } }),
+                   presenting: model.signInLendAsk) { _ in
+                Button("Allow") { model.finishSignInLendAsk(allowed: true) }
+                Button("Don’t Allow", role: .cancel) { model.finishSignInLendAsk(allowed: false) }
+            } message: { ask in
+                Text("Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Control plane ▸ Hosts.")
+            }
             // A known server with a new key: rebuilt, or not what it says (043).
+            #if !AGENTS_STORE
             .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
                                  set: { model.hosts.rebuiltAsk = $0 })) { host in
                 RebuiltServerSheet(host: host).paperSheet()
             }
+            #endif
             // Agents missing at start-up, offered once each (048). Closed any way at
             // all, what was missing counts as offered.
             .sheet(isPresented: $model.isOfferingInstall,
@@ -116,8 +131,20 @@ struct ContentView: View {
         // sessions in the one picked, and what is being read. Picking a session shows
         // its chat beside the list rather than pushing it over the project, so moving
         // between two chats is one click, and the list stays in sight.
+        // Today's set-up, offered the move to a control plane, never moved on its own
+        // (058, frame I). Above the columns, not an inset: a split view's columns run
+        // under an inset and hide their first rows behind it.
+        VStack(spacing: 0) {
+        #if !AGENTS_STORE
+        if model.offersMoveAcross { MoveAcrossStrip(offering: $offeringMove) }
+        #endif
+        if model.controlPlaneAway { ControlAwayStrip() }
         Group {
-            if isShowingActivity {
+            if model.needsFirstRun {
+                // No control plane and nothing of the old way: one question, and no
+                // sidebar or toolbar until it is answered (058, frame A).
+                FirstRunView()
+            } else if isShowingActivity {
                 // Events, Resources and Spending are about all of the work, so the
                 // sessions of one project have no place beside them: two columns.
                 NavigationSplitView(columnVisibility: $columns) {
@@ -141,10 +168,23 @@ struct ContentView: View {
                 }
             }
         }
+        }
+        #if !AGENTS_STORE
+        .sheet(isPresented: $offeringMove) { MoveAcrossSheet().paperSheet() }
+        #endif
         .environment(frame)
         .environment(requests)
         .environment(sidebarStates)
         .environment(webHolders)
+        #if AGENTS_STORE
+        // A file a chat links to is on its host: that host opens it (058, US1). Links to
+        // the web are the window's own.
+        .environment(\.openURL, OpenURLAction { url in
+            guard url.isFileURL else { return .systemAction }
+            model.open(url, on: model.selectedProjectHost)
+            return .handled
+        })
+        #endif
         .task { await model.stayConnected() }
         // No tabs: the only way left to a second window, and a second window would be a
         // mirror of the first, because what is selected lives on the one model.

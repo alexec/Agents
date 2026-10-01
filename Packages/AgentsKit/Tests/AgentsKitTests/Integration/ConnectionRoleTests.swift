@@ -175,6 +175,32 @@ struct ConnectionRoleTests {
         #expect(!heard.all.contains(DaemonAPI.Method.credentialsLend))
     }
 
+    /// After a move (058, T085): a device that connects the old way is told where the
+    /// control plane is now; a device still pairing is not.
+    @Test func aMovedDeviceIsToldWhereTheControlPlaneIs() async throws {
+        let folder = "/tmp/ag-mv-\(UUID().uuidString.prefix(6))"
+        try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: folder) }
+        let moved = DaemonAPI.ControlMoved(url: "https://mini.local:8791", pin: "pin", controlKey: Data([4, 1]), name: "mini")
+        try JSONEncoder().encode(moved).write(to: URL(fileURLWithPath: folder + "/control-moved.json"))
+        let path = folder + "/daemon.sock"
+        let server = try server(.control, at: path, heard: Heard())
+        defer { server.stop() }
+
+        let pairing = connect(path)
+        defer { close(pairing) }
+        #expect(errorCode(await ask(pairing, DaemonAPI.Method.connectionBindDevice, "{\"pairing\":true}")) == nil)
+        #expect(await readLine(pairing, deadline: Date().addingTimeInterval(1.5)) == nil)
+
+        let fd = connect(path)
+        defer { close(fd) }
+        #expect(errorCode(await ask(fd, DaemonAPI.Method.connectionBindDevice, "{\"id\":\"\(UUID().uuidString)\"}")) == nil)
+        let told = await readLine(fd, deadline: Date().addingTimeInterval(5))
+        #expect(told?["method"] as? String == DaemonAPI.Notification.controlMoved)
+        let params = try JSONSerialization.data(withJSONObject: told?["params"] ?? [:])
+        #expect(try JSONDecoder().decode(DaemonAPI.ControlMoved.self, from: params) == moved)
+    }
+
     @Test func aDeviceBoundByTheBridgeCannotSpeakAsAnother() async throws {
         let path = path()
         let server = try server(.control, at: path, heard: Heard())

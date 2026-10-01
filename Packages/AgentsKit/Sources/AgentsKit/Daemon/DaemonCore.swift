@@ -467,6 +467,21 @@ public actor DaemonCore {
     /// no Mac connected, so scheduled workflows keep firing (037). A server has no
     /// battery to spare and no window that could start it again on its own.
     var exitsWhenIdle = true
+    /// A Mac's daemon kept running for a control plane (058). It never leaves for being
+    /// idle, as a server's does not, but it is still the Mac's: keys are lent as on a
+    /// Mac and its own sign-ins are the person's.
+    var hostsForControlPlane = false
+    /// Where an unsealed need goes when this daemon is a host of a control plane (058,
+    /// R6). Nil otherwise, and the daemon seals to its own devices as it always has.
+    var tellControl: (@Sendable (JSONValue) -> Void)?
+
+    /// The uplink to hand `attention/need` to. Set once the control-plane connection exists.
+    public func deliverNeeds(by tell: @escaping @Sendable (JSONValue) -> Void) {
+        tellControl = tell
+    }
+    /// Whether this is a server's daemon (037, 043): one that stays up with nobody
+    /// connected, and was not asked to stay up by a control plane.
+    var onServer: Bool { !exitsWhenIdle && !hostsForControlPlane }
     /// What each connection said it could lend (043): names only.
     var credentialOffers: [UUID: DaemonAPI.CredentialsOffer] = [:]
     /// What each connection has lent, in memory only, dropped when it closes (043, R6).
@@ -478,6 +493,15 @@ public actor DaemonCore {
     var relayOffers: [UUID: [String: DaemonAPI.RelayOffer]] = [:]
     /// One gate per forwarded relay socket, started on the first offer of it.
     var relayGates: [String: RelayGate] = [:]
+    /// A borrowing host's own end of each tunnelled relay (058, T091), by runtime.
+    var tunnelSockets: [String: TunnelSocket] = [:]
+    /// How this host asks its control plane for a tunnel to the Mac that lends it a
+    /// sign-in: set when it has an uplink.
+    var tunnelOpener: (@Sendable (String) async throws -> any LineTransport)?
+    #if canImport(Network) && canImport(Security)
+    /// The sign-ins this Mac's host relays to servers through the control plane (T091).
+    lazy var signInRelays = HostSignInRelays(locations: locations)
+    #endif
     /// What a window lent this Mac's own agents (046, D3): Gemini's key, which has no other
     /// way in. Kept for the daemon's life, not the connection's, so an agent a workflow starts
     /// with no window open still has it; in memory only, and gone when the window stops

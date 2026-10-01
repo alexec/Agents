@@ -1,0 +1,433 @@
+<!doctype html><html><head><meta charset="utf-8"><title>058 wireframes</title><style>
+/* Wireframes for 058, the control plane: first run, Settings ▸ Control plane, the window when it is away, the move. 055's hand and rail.
+   One window size for every pane, 1000 × 640. Open with #a … #h to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:960px;line-height:1.4}
+.win{width:1000px;height:640px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex}
+/* The rail runs the full height, under the traffic lights, as System Settings has it. */
+.rail{width:200px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px 10px}
+.lights{height:38px;display:flex;align-items:center;gap:8px;padding:0 6px}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc}
+.ri{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;color:#1d1d1d}
+.ri i{font-style:normal;width:22px;height:22px;border-radius:6px;background:#dcd8cf;color:#555;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.ri.on{background:#3d5a80;color:#fff}.ri.on i{background:rgba(255,255,255,.2);color:#fff}
+.ri.open{font-weight:600}
+.ri .d{margin-left:auto;color:#8a877f;font-size:10px}
+.sub-i{display:flex;align-items:center;padding:4px 8px 4px 38px;border-radius:6px;color:#333}
+.sub-i .n{margin-left:auto;color:#8a877f;font-size:12px}
+.sub-i .warn{margin-left:auto;color:#b5651d}
+.sub-i.on{background:#3d5a80;color:#fff}.sub-i.on .n{color:#dfe6ef}.sub-i.on .warn{color:#ffd9b0}
+.gap{height:10px}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.bar{height:38px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.06)}
+.bar .t{font:600 14px -apple-system}.bar .p{color:#8a877f;font:12px "SF Mono",Menlo,monospace}
+.bar .sp{flex:1}.bar .crumb{color:#8a877f;font-weight:400}
+.body{flex:1;display:flex;min-height:0}
+/* A form pane: one reading column, left-aligned, never stretched past 560. */
+.col{width:560px;padding:18px 28px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.sh{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:10px 4px 2px}
+.card{background:#fff;border:1px solid #e3dfd6;border-radius:9px}
+.line{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f2f0eb}
+.line:last-child{border-bottom:none}
+.line .l{flex:1;min-width:0}.line .s{color:#8a877f;font-size:11.5px;margin-top:2px}
+.line.indent{padding-left:34px}
+.foot{color:#8a877f;font-size:11.5px;line-height:1.4;padding:4px 4px 2px}
+.btn{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:3px 10px;font-size:12px;white-space:nowrap}
+.btn.p{background:#3d5a80;border-color:#3d5a80;color:#fff}.link{color:#3d5a80;font-size:12px}
+.seg{display:inline-flex;border:1px solid #cfcac0;border-radius:6px;overflow:hidden;font-size:12px}
+.seg span{padding:3px 14px;border-right:1px solid #cfcac0}.seg span:last-child{border-right:none}.seg .on{background:#3d5a80;color:#fff}
+.pop{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:2px 8px;font-size:12px}
+.pop:after{content:" ⌄";color:#8a877f}
+.field{border:1px solid #cfcac0;background:#fff;border-radius:5px;padding:2px 8px;width:80px;text-align:right;font-size:12px}
+.cdot{width:8px;height:8px;border-radius:4px;flex:none}
+.g{background:#5b8a5b}.o{background:#b5651d}.x{background:#c2beb6}
+.ic{width:22px;text-align:center;color:#8a877f}
+/* Shared's own pieces, as 054 drew them. */
+.lst{flex:1;overflow:hidden;padding:14px 18px 0;min-width:0}
+.lst.fixed{flex:none;width:400px;box-sizing:border-box}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#fff;border:1px solid #e3dfd6;margin-bottom:6px}
+.row.sel{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.row .nm{font-weight:600;white-space:nowrap}
+.row .ds{color:#6d6a64;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0}
+.mono{font:12px "SF Mono",Menlo,monospace}
+.chip{display:inline-block;border-radius:9px;padding:1px 7px;font-size:11px;background:#efece6;color:#555;white-space:nowrap}
+.chip.a{background:#e3eaf3;color:#3d5a80}.chip.w{background:#f7e7d6;color:#9a4f10}
+.reach{display:flex;gap:3px}
+.r{width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font:600 10px -apple-system;background:#e3eaf3;color:#3d5a80}
+.r.no{background:#f0eeea;color:#b9b5ad;text-decoration:line-through}
+.r.q{background:#f0eeea;color:#999;border:1px dashed #bbb;width:16px;height:16px}
+.detail{flex:1;min-width:0;border-left:1px solid rgba(0,0,0,.08);padding:14px;display:flex;flex-direction:column;gap:10px;background:#fbfaf7;overflow:hidden}
+.detail .t{font:600 15px -apple-system}
+.kv{display:grid;grid-template-columns:70px 1fr;gap:4px 8px;font-size:12px}.kv b{font-weight:400;color:#8a877f}
+.doc{background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:10px 12px;font:14px "Iowan Old Style",Georgia,serif;line-height:1.4;color:#333;flex:1;overflow:hidden}
+.doc .m{font:11px "SF Mono",Menlo,monospace;color:#999}
+.search{margin-bottom:10px;background:#fff;border:1px solid #dcd8cf;border-radius:7px;padding:4px 8px;color:#aaa}
+table.m{border-collapse:separate;border-spacing:0;width:100%;background:#fff;border:1px solid #e3dfd6;border-radius:8px;overflow:hidden}
+table.m th{font:600 11px -apple-system;color:#8a877f;text-align:center;padding:7px 4px;border-bottom:1px solid #eee}
+table.m th:first-child,table.m td:first-child{text-align:left;padding-left:12px}
+table.m td{text-align:center;padding:8px 4px;border-bottom:1px solid #f2f0eb}table.m tr:last-child td{border-bottom:none}
+.ok{color:#3d5a80;font-weight:600}.part{color:#9a4f10}.none{color:#c2beb6}.qq{color:#999}
+.sec{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px}
+/* H only: Shared keeping a column of its own beside the rail. */
+.inner{width:170px;flex:none;border-right:1px solid rgba(0,0,0,.08);padding:12px 8px;background:#f4f1eb;display:flex;flex-direction:column;gap:1px}
+.inner .si{padding:5px 8px;border-radius:6px;display:flex}.inner .si .n{margin-left:auto;color:#8a877f;font-size:12px}
+.inner .si.on{background:#3d5a80;color:#fff}.inner .si .warn{margin-left:auto;color:#b5651d}.inner .si.on .warn{color:#ffd9b0}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+</style></head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+<style>
+/* 058's own pieces: the main window, first run, sheets. */
+*{font-family:-apple-system,system-ui,"Helvetica Neue",sans-serif !important}
+.mono,.codebox,.bar .p{font-family:"SF Mono",Menlo,monospace !important}
+.mw{width:1000px;height:640px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.tb{height:38px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+.tb .tt{font:600 13px -apple-system;margin-left:10px}.tb .sp{flex:1}
+.mwb{flex:1;display:flex;min-height:0}
+.side{width:250px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+.hh{display:flex;align-items:center;gap:6px;font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;padding:10px 8px 4px}
+.hh .n{margin-left:auto;text-transform:none;font-weight:400}
+.pj{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px}
+.pj.on{background:#3d5a80;color:#fff}.pj .n{margin-left:auto;color:#8a877f;font-size:12px}.pj.on .n{color:#dfe6ef}
+.pj.dim{color:#a9a59d}
+.content{flex:1;display:flex;flex-direction:column;min-width:0}
+.strip{background:#f7e7d6;color:#7a4410;padding:7px 14px;font-size:12.5px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #ecd3b8}
+.strip.info{background:#e3eaf3;color:#2c4566;border-color:#cbd8e8}
+.center{flex:1;display:flex;align-items:center;justify-content:center}
+.choose{width:640px;display:flex;flex-direction:column;gap:14px}
+.choose h1{font:600 22px -apple-system;margin:0}
+.choose p{margin:0;color:#6d6a64;line-height:1.45}
+.opts{display:flex;gap:14px}
+.opt{flex:1;background:#fff;border:1px solid #e3dfd6;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.opt.rec{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.opt .t{font:600 15px -apple-system}.opt .d{color:#6d6a64;line-height:1.4;font-size:12.5px}
+.opt .btn{align-self:flex-start;margin-top:4px}
+.sheet-bg{flex:1;display:flex;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.08);padding-top:40px}
+.sheet{width:520px;background:#fbfaf7;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:20px;display:flex;flex-direction:column;gap:10px}
+.sheet .t{font:600 16px -apple-system}
+.sheet .d{color:#6d6a64;line-height:1.4}
+.acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.qr{width:150px;height:150px;background:repeating-linear-gradient(45deg,#333 0 4px,#fff 4px 8px);border-radius:6px;flex:none}
+.codebox{font:15px "SF Mono",Menlo,monospace;background:#fff;border:1px solid #cfcac0;border-radius:6px;padding:8px 10px;letter-spacing:.06em}
+.steps{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.steps .ok{color:#5b8a5b}.steps .wip{color:#3d5a80}.steps .todo{color:#b9b5ad}
+.grant{display:inline-flex;border:1px solid #cfcac0;border-radius:6px;overflow:hidden;font-size:11.5px}
+.grant span{padding:2px 9px;border-right:1px solid #cfcac0}.grant span:last-child{border-right:none}.grant .on{background:#3d5a80;color:#fff}
+.me{font-size:11px;color:#3d5a80;background:#e3eaf3;border-radius:8px;padding:1px 6px}
+.chat{flex:1;padding:18px 24px;display:flex;flex-direction:column;gap:10px;color:#555}
+.bub{background:#fff;border:1px solid #e3dfd6;border-radius:10px;padding:10px 12px;max-width:560px;line-height:1.4}
+</style>
+
+<!-- A — First run -->
+<div class="frame" id="a"><div class="cap">A · First run: the window has no control plane yet</div>
+<div class="sub">The window no longer starts anything itself, so with nothing set up it asks one question. <b>Run one on this Mac</b> is the usual answer and is marked as such. Nothing else is in the window: no sidebar, no toolbar, until one is chosen.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents</span></div>
+ <div class="center"><div class="choose">
+  <h1>Where should your agents run?</h1>
+  <p>Agents runs your agents on a <b>control plane</b>: a small program on a machine you own. This window, your iPhone and your iPad all connect to it, and it reaches every Mac and server your agents work on.</p>
+  <div class="opts">
+   <div class="opt rec"><div class="t">Run one on this Mac</div>
+    <div class="d">Sets up the control plane and this Mac's agents here. macOS keeps them running, even with this window closed. Your agents stop while this Mac sleeps.</div>
+    <span class="btn p">Run One Here</span></div>
+   <div class="opt"><div class="t">Connect to a control plane</div>
+    <div class="d">You already run one, on another Mac or a server. You'll need a pairing code from it.</div>
+    <span class="btn">Connect…</span></div>
+  </div>
+  <p style="font-size:12px">Nothing passes through a service of ours. You can change this later in Settings ▸ Control plane.</p>
+ </div></div></div></div>
+
+<!-- B — Run one here, in progress -->
+<div class="frame" id="b"><div class="cap">B · Run one on this Mac: setting up</div>
+<div class="sub">Everything comes from inside the app; nothing is downloaded. macOS asks once to allow two background items; the step says so. When it finishes, the window opens on an empty project list with this Mac as the only host.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents</span></div>
+ <div class="center"><div class="choose" style="width:460px">
+  <h1>Setting up on this Mac</h1>
+  <div class="card" style="padding:14px 16px"><div class="steps">
+   <div><span class="ok">✓</span> Control plane started</div>
+   <div><span class="ok">✓</span> This Mac added as a host</div>
+   <div><span class="wip">◌</span> Allowing Agents in the background <span style="color:#8a877f">— macOS may ask you in System Settings ▸ Login Items</span></div>
+   <div><span class="todo">○</span> Pairing this window</div>
+  </div></div>
+  <p style="font-size:12px">Two background items appear under Login Items: <b>Agents</b> (your agents on this Mac) and <b>Agents Control</b>. Turning either off stops your agents being reachable.</p>
+ </div></div></div></div>
+
+<!-- C — Connect to one elsewhere -->
+<div class="frame" id="c"><div class="cap">C · Connect to a control plane</div>
+<div class="sub">Control planes on the same network are listed by name. Choosing one asks for the code it shows (in its own Settings ▸ Control plane ▸ Clients, or printed by <span class="mono">agents-control code</span> on a server). A code says what the window may do: pairing as an operator needs an operator code.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents</span></div>
+ <div class="sheet-bg"><div class="sheet">
+  <div class="t">Connect to a control plane</div>
+  <div class="sh" style="margin:4px 0 0">On this network</div>
+  <div class="card">
+   <div class="line"><span class="cdot g"></span><div class="l"><b>Studio</b><div class="s">Mac · 3 hosts</div></div><span class="link">Choose</span></div>
+   <div class="line"><span class="cdot g"></span><div class="l"><b>homelab</b><div class="s">Linux · 2 hosts</div></div><span class="link">Choose</span></div>
+  </div>
+  <div class="sh" style="margin:4px 0 0">Code</div>
+  <div class="codebox">AGT-7Q4F-M2KD-X9PA-…</div>
+  <div class="d" style="font-size:12px">Paste the code, or its link. It works once, for five minutes.</div>
+  <div class="acts"><span class="btn">Cancel</span><span class="btn p">Connect</span></div>
+ </div></div></div></div>
+
+<!-- D — Settings ▸ Control plane ▸ Overview -->
+<div class="frame" id="d"><div class="cap">D · Settings ▸ Control plane ▸ Overview</div>
+<div class="sub">Devices and Servers become one group, <b>Control plane</b>, which opens like Shared: Overview, Hosts, Clients. The overview says where the control plane runs and how to reach it, and sums up the other two pages.</div>
+<div class="win"><div class="rail" data-on="control" data-page="overview"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Overview</span></span></div>
+  <div class="body"><div class="col">
+   <div class="card">
+    <div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b> <span class="me">you are here</span><div class="s">agents-control 1.15 · running since 09:12 · port 8790</div></div><span class="btn">Restart</span></div>
+    <div class="line"><div class="l">Reachable away from home<div class="s">Through your iCloud account, sealed to each device</div></div><span style="color:#5b8a5b">On</span></div>
+   </div>
+   <div class="foot">While this Mac sleeps, no window or device can reach any of your agents. Agents on servers keep working.</div>
+   <div class="sh">Hosts</div>
+   <div class="card"><div class="line"><div class="l">4 hosts · 3 online<div class="s">This Mac, devbox, gpu-01 (offline since 14:02), staging</div></div><span class="link">Show</span></div></div>
+   <div class="sh">Clients</div>
+   <div class="card"><div class="line"><div class="l">3 clients · 1 operator<div class="s">This window, Alex's iPhone, Alex's iPad</div></div><span class="link">Show</span></div></div>
+  </div></div></div></div></div>
+
+<!-- E — Hosts -->
+<div class="frame" id="e"><div class="cap">E · Settings ▸ Control plane ▸ Hosts</div>
+<div class="sub">Every machine your agents run on. Servers are added as today (Add a server… installs over your ssh), but the control plane does it, so every window and device sees the result. A host that can connect out does; one that can't is reached over ssh and says so. <b>Add by code…</b> is for another Mac, or a server you set up yourself.</div>
+<div class="win"><div class="rail" data-on="control" data-page="hosts"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Hosts</span></span></div>
+  <div class="body"><div class="col">
+   <div class="card">
+    <div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">macOS · arm64 · Agents 1.15 · 5 projects · 3 agents working</div></div></div>
+    <div class="line"><span class="cdot g"></span><div class="l"><b>devbox</b><div class="s">Linux · arm64 · Agents 1.15 · connects out · 2 projects</div></div><span class="btn">Check again</span><span class="btn" style="color:#b0302a">Remove…</span></div>
+    <div class="line"><span class="cdot x"></span><div class="l"><b>gpu-01</b><div class="s">Offline since 14:02 · Linux · x86-64 · reached over ssh</div></div><span class="btn">Check again</span><span class="btn" style="color:#b0302a">Remove…</span></div>
+    <div class="line"><span class="cdot o"></span><div class="l"><b>staging</b><div class="s">Update waiting — an agent is mid-turn · 1.14 → 1.15</div></div><span class="btn">Update now</span></div>
+   </div>
+   <div style="display:flex;gap:8px;margin-top:4px"><span class="btn">Add a Server…</span><span class="btn">Add by Code…</span></div>
+   <div class="foot">Removing a host stops it connecting. Its agents are left running where they are.</div>
+  </div></div></div></div></div>
+
+<!-- F — Clients -->
+<div class="frame" id="f"><div class="cap">F · Settings ▸ Control plane ▸ Clients</div>
+<div class="sub">Every window and device that can reach your agents, and what each may do. <b>Operator</b> is everything this window does; <b>Device</b> is what a phone can do today (no signing in, lending, adding hosts or changing settings). The grant changes at once, without pairing again. The last operator can't be demoted or forgotten.</div>
+<div class="win"><div class="rail" data-on="control" data-page="clients"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Clients</span></span></div>
+  <div class="body"><div class="col">
+   <div class="card">
+    <div class="line"><span class="ic">▭</span><div class="l"><b>This window</b> <span class="me">you</span><div class="s">Mac · paired today · connected</div></div><span class="grant"><span class="on">Operator</span><span>Device</span></span></div>
+    <div class="line"><span class="ic">▯</span><div class="l"><b>Alex's iPhone</b><div class="s">iPhone · seen 2 min ago, away</div></div><span class="grant"><span>Operator</span><span class="on">Device</span></span><span class="btn">Forget…</span></div>
+    <div class="line"><span class="ic">▯</span><div class="l"><b>Alex's iPad</b><div class="s">iPad · seen yesterday</div></div><span class="grant"><span>Operator</span><span class="on">Device</span></span><span class="btn">Forget…</span></div>
+   </div>
+   <div style="display:flex;gap:8px;margin-top:4px"><span class="btn">Pair a Device…</span><span class="btn">Pair a Mac…</span></div>
+   <div class="foot">Forgetting cuts a client off at once, at home and away. To use it again, pair it again.</div>
+  </div></div></div></div></div>
+
+<!-- G — Pair a Mac sheet -->
+<div class="frame" id="g"><div class="cap">G · Pair a Mac… (and Pair a Device…)</div>
+<div class="sub">The same sheet as Pair a Device today, with the grant chosen first. A device defaults to Device, a Mac to Operator. The code is shown as a QR for a phone and as text for a Mac, which has no camera to scan with.</div>
+<div class="win"><div class="rail" data-on="control" data-page="clients"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Clients</span></span></div>
+  <div class="sheet-bg"><div class="sheet">
+   <div class="t">Pair a Mac</div>
+   <div class="line" style="padding:0"><div class="l">It may</div><span class="grant"><span class="on">do everything (Operator)</span><span>what a phone can (Device)</span></span></div>
+   <div style="display:flex;gap:16px;align-items:center"><div class="qr"></div>
+    <div style="display:flex;flex-direction:column;gap:8px;flex:1"><div class="codebox">AGT-7Q4F-M2KD-X9PA-3HCE</div>
+     <div class="d" style="font-size:12px">On the other Mac, open Agents and choose <b>Connect to a control plane</b>. The code works once, for 4:52.</div></div></div>
+   <div class="acts"><span class="btn">Done</span></div>
+  </div></div></div></div></div>
+
+<!-- H — the main window, several hosts, control plane unreachable -->
+<div class="frame" id="h"><div class="cap">H · The window when the control plane can't be reached</div>
+<div class="sub">The sidebar keeps every host's projects, greyed, as an offline server's are today. One strip says what's wrong and where it expected the control plane. Agents keep working on their hosts; the window catches up when it's back. An offline host (gpu-01) looks as today.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">api — Fix the flaky upload test</span><span class="sp"></span><span class="btn">New Agent</span></div>
+ <div class="strip" style="gap:4px">Can't reach the control plane on <b>Studio</b> (studio.local:8790). Your agents are still working there. <span class="sp" style="flex:1"></span><span class="btn">Try Again</span></div>
+ <div class="mwb"><div class="side">
+  <div class="hh">This Mac</div>
+  <div class="pj dim">Agents <span class="n">3</span></div><div class="pj dim">notes</div>
+  <div class="hh">devbox</div>
+  <div class="pj on">api <span class="n">2</span></div><div class="pj dim">infra</div>
+  <div class="hh">gpu-01 <span class="n">offline</span></div>
+  <div class="pj dim">train</div>
+ </div>
+ <div class="content"><div class="chat">
+  <div class="bub">Found it: the upload test races the temp-dir cleanup. I've moved the cleanup into tearDown and I'm running the suite three times to be sure.</div>
+  <div style="color:#8a877f;font-size:12px">Last update 14:31 — waiting for the control plane</div>
+ </div></div></div></div></div>
+
+<!-- I — Moving an existing set-up -->
+<div class="frame" id="i"><div class="cap">I · Moving today's set-up across (once, when chosen)</div>
+<div class="sub">A window updated from today's app keeps working the old way and offers the move in a strip, never on its own. The sheet says what will happen and what won't. If anything fails before the last step, nothing has changed and it can be tried again.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents</span></div>
+ <div class="strip info">Agents now runs on a control plane, so your iPhone and iPad see your servers too. <span class="sp" style="flex:1"></span><span class="btn">Move Across…</span></div>
+ <div class="sheet-bg"><div class="sheet">
+  <div class="t">Move to a control plane on this Mac</div>
+  <div class="d">This sets up a control plane on this Mac and keeps everything you have:</div>
+  <div class="steps" style="padding-left:6px">
+   <div><span class="ok">✓</span> All 41 agents and their conversations stay on this Mac, as this Mac's host</div>
+   <div><span class="ok">✓</span> Your iPhone and iPad keep working, without pairing again</div>
+   <div><span class="ok">✓</span> devbox, gpu-01 and staging are added as hosts, over your ssh as now</div>
+   <div><span class="ok">✓</span> Work on this Mac carries on after a restart, without opening Agents</div>
+  </div>
+  <div class="d" style="font-size:12px">Your iPhone and iPad will be able to do what they can today, and now on your servers too. You can let one do everything in Settings ▸ Control plane ▸ Clients.</div>
+  <div class="acts"><span class="btn">Not Now</span><span class="btn p">Move Across</span></div>
+ </div></div></div></div>
+
+<!-- J — the alternative: two flat panes -->
+<div class="frame" id="j"><div class="cap">J · The alternative: Hosts and Clients as two flat panes</div>
+<div class="sub">For comparison. Devices becomes Clients and Servers becomes Hosts, side by side in the rail as today, with no overview. Fewer clicks to a list, but nowhere to say where the control plane is, and "Hosts" sits beside "Clients" without saying what joins them.</div>
+<div class="win"><div class="rail" data-on="hosts2" data-flat="1"></div>
+ <div class="main"><div class="bar"><span class="t">Hosts</span><span class="sp"></span><span class="btn">Add a Server…</span></div>
+  <div class="body"><div class="col">
+   <div class="card">
+    <div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">macOS · arm64 · 5 projects</div></div></div>
+    <div class="line"><span class="cdot g"></span><div class="l"><b>devbox</b><div class="s">Linux · arm64 · connects out · 2 projects</div></div></div>
+   </div>
+  </div></div></div></div></div>
+
+
+<!-- ============ Re-plan 2026-09-28: frames K–N ============ -->
+<style>
+/* K–N: the App Store window, the host app, servers by command, relayed clients. */
+.hw{width:720px;height:600px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.hb{flex:1;padding:14px 22px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.fld{border:1px solid #cfcac0;background:#fff;border-radius:5px;padding:3px 8px;font-size:12px;flex:1;min-width:0;color:#333}
+.fld.dim{color:#aaa}
+.kvf{display:grid;grid-template-columns:90px 1fr;gap:6px 10px;align-items:center;font-size:12px;padding:8px 12px}
+.kvf b{font-weight:400;color:#8a877f;text-align:right}
+.tog{width:30px;height:18px;border-radius:9px;background:#5b8a5b;position:relative;flex:none}
+.tog:after{content:"";position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:7px;background:#fff}
+.cmd{font:12px "SF Mono",Menlo,monospace;background:#fff;border:1px solid #cfcac0;border-radius:6px;padding:8px 10px;line-height:1.5;word-break:break-all}
+.away{font-size:10.5px;color:#9a4f10;background:#f7e7d6;border-radius:8px;padding:1px 6px}
+.via{font-size:10.5px;color:#3d5a80;background:#e3eaf3;border-radius:8px;padding:1px 6px}
+</style>
+
+<!-- K — First run of the App Store window, no host app on this Mac -->
+<div class="frame" id="k"><div class="cap">K · First run (App Store window): nothing set up on this Mac</div>
+<div class="sub">The App Store window can't run anything itself, so <b>Set one up on this Mac</b> now sends the person to <b>Agents Host</b>, our small app from outside the App Store that runs their agents and the control plane. The window watches for it: once it's installed, this screen turns into K2 by itself.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents</span></div>
+ <div class="center"><div class="choose">
+  <h1>Where should your agents run?</h1>
+  <p>This window is where you work with your agents. They run on a <b>control plane</b> you own: on this Mac, on another Mac, or on a server. Your iPhone and iPad connect to it too.</p>
+  <div class="opts">
+   <div class="opt rec"><div class="t">Set one up on this Mac</div>
+    <div class="d">Install <b>Agents Host</b>, a free app from us. It runs your agents and the control plane on this Mac, and keeps them running with this window closed. It isn't in the App Store because it runs programs for your agents.</div>
+    <span class="btn p">Get Agents Host…</span></div>
+   <div class="opt"><div class="t">Connect to a control plane</div>
+    <div class="d">You already run one, on another Mac or a server. You'll need a pairing code from it.</div>
+    <span class="btn">Connect…</span></div>
+  </div>
+  <p style="font-size:12px">Waiting for Agents Host… It appears here as soon as it's running. Nothing passes through a service of ours.</p>
+ </div></div></div></div>
+
+<!-- K2 — the host app is running on this Mac -->
+<div class="frame" id="k2"><div class="cap">K2 · First run: Agents Host found on this Mac</div>
+<div class="sub">Found on this Mac (by Bonjour, with the pin from its record), so there is no code to type: <b>Pair</b> shows the same code in Agents Host's window to confirm, and the window pairs as an operator. A control plane elsewhere is still one click away.</div>
+<div class="mw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents</span></div>
+ <div class="center"><div class="choose" style="width:520px">
+  <h1>Agents Host is running on this Mac</h1>
+  <div class="card">
+   <div class="line"><span class="cdot g"></span><div class="l"><b>Alex's Mac mini</b><div class="s">Control plane · 1 host · keeps its store on this Mac</div></div><span class="btn p">Pair</span></div>
+  </div>
+  <p style="font-size:12.5px">Pairing lets this window do everything: start agents, sign runtimes in, add servers and pair your phone. Agents Host will show a code to confirm it's you.</p>
+  <p style="font-size:12px"><span class="link">Connect to a different control plane…</span></p>
+ </div></div></div></div>
+
+<!-- L — the host app's window -->
+<div class="frame" id="l"><div class="cap">L · Agents Host</div>
+<div class="sub">The host app's one window. It says what this Mac is doing and holds the choices only a machine can make: whether the control plane runs here and where it keeps its store (this Mac, or a bucket of the person's own), whether this Mac relays for their devices away from home, and the move from today's set-up. The code to pair a window or phone is here too.</div>
+<div class="hw"><div class="tb"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="tt">Agents Host</span></div>
+ <div class="strip info">You have agents from the earlier Agents app on this Mac. <span class="sp" style="flex:1"></span><span class="btn">Move Across…</span></div>
+ <div class="hb">
+  <div class="card"><div class="line"><span class="cdot g"></span><div class="l"><b>This Mac</b><div class="s">Running your agents · 3 working · 5 projects · Agents Host 2.0</div></div><span class="btn">Pair a Window or Phone…</span></div></div>
+  <div class="sh">Control plane</div>
+  <div class="card">
+   <div class="line"><div class="l">Where</div><span class="seg"><span class="on">Run it here</span><span>Join one elsewhere</span></span></div>
+   <div class="line"><span class="cdot g"></span><div class="l">Running at <span class="mono">https://mini.local:8791</span><div class="s">since 09:12 · 3 clients · 4 hosts</div></div><span class="btn">Restart</span></div>
+   <div class="line"><div class="l">Keeps its store</div><span class="seg"><span>On this Mac</span><span class="on">In a bucket</span></span></div>
+   <div class="kvf">
+    <b>Endpoint</b><span class="fld">https://s3.eu-west-2.amazonaws.com</span>
+    <b>Bucket</b><span class="fld">alex-agents</span>
+    <b>Prefix</b><span class="fld">control</span>
+    <b>Access key</b><span class="fld">AKIA••••••••W3QF</span>
+    <b>Secret</b><span class="fld">••••••••••••••••</span>
+    <b></b><span style="display:flex;gap:8px;align-items:center"><span class="btn">Check</span><span style="color:#5b8a5b;font-size:12px">✓ Works, with safe concurrent writes</span><span class="sp" style="flex:1"></span><span class="link">Switch Store…</span></span>
+   </div>
+  </div>
+  <div class="foot">The keys stay in this Mac's keychain. In a bucket, what the control plane remembers outlives this Mac, and a copy elsewhere can share it later.</div>
+  <div class="card"><div class="line"><div class="l">Relay for my devices<div class="s">Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you</div></div><span class="tog"></span></div></div>
+ </div></div></div>
+
+<!-- M — Add a Server: run a command -->
+<div class="frame" id="m"><div class="cap">M · Settings ▸ Control plane ▸ Hosts ▸ Add a Server: run a command</div>
+<div class="sub">The usual way now: the server installs itself and connects out, so nothing has to reach it. The command carries a one-time host code; the sheet closes by itself when the server joins. <b>Install over ssh</b> is the other tab (M2).</div>
+<div class="win"><div class="rail" data-on="control" data-page="hosts"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Hosts</span></span></div>
+  <div class="sheet-bg"><div class="sheet">
+   <div class="t">Add a Server</div>
+   <div><span class="seg"><span class="on">Run a command</span><span>Install over ssh</span></span></div>
+   <div class="d">On the server, as the user your agents should run as:</div>
+   <div class="cmd">curl -fsSL https://mini.local:8791/v1/install.sh | sh -s -- 'agents-control:2:h:-:https%3A%2F%2Fmini.local%3A8791:Qk3v…:Zp9d…:Alex'</div>
+   <div style="display:flex;gap:8px;align-items:center"><span class="btn">Copy</span><span class="d" style="font-size:12px">Works once, for 4:52 · Linux, arm64 or x86-64</span></div>
+   <div class="steps" style="font-size:12.5px"><div><span class="wip">◌</span> Waiting for the server to connect…</div></div>
+   <div class="acts"><span class="btn">Cancel</span></div>
+  </div></div></div></div></div>
+
+<!-- M2 — Add a Server: install over ssh -->
+<div class="frame" id="m2"><div class="cap">M2 · Add a Server: install over ssh</div>
+<div class="sub">For a server the person can already ssh to. The control plane installs the host once with the key given here, then lets go: it keeps neither the key nor the session, and the server connects out like any other.</div>
+<div class="win"><div class="rail" data-on="control" data-page="hosts"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Hosts</span></span></div>
+  <div class="sheet-bg"><div class="sheet">
+   <div class="t">Add a Server</div>
+   <div><span class="seg"><span>Run a command</span><span class="on">Install over ssh</span></span></div>
+   <div class="kvf" style="padding:4px 0">
+    <b>Server</b><span class="fld">agents@devbox.lan</span>
+    <b>Name</b><span class="fld">devbox</span>
+    <b>Key</b><span style="display:flex;gap:6px"><span class="fld">~/.ssh/id_ed25519</span><span class="btn">Choose…</span></span>
+   </div>
+   <div class="d" style="font-size:12px">The key is used for this install only. The control plane doesn't keep it, and afterwards the server connects to the control plane by itself.</div>
+   <div class="acts"><span class="btn">Cancel</span><span class="btn p">Install</span></div>
+  </div></div></div></div></div>
+
+<!-- N — Clients with a relayed device -->
+<div class="frame" id="n"><div class="cap">N · Settings ▸ Control plane ▸ Clients: a device away from home</div>
+<div class="sub">As F, plus how each client is reaching the control plane right now. The iPhone is away and has no route to the control plane's address, so it comes in through the iCloud relay on a Mac host, and says which. Away limits apply to it as today.</div>
+<div class="win"><div class="rail" data-on="control" data-page="clients"></div>
+ <div class="main"><div class="bar"><span class="t">Control plane <span class="crumb">› Clients</span></span></div>
+  <div class="body"><div class="col">
+   <div class="card">
+    <div class="line"><span class="ic">▭</span><div class="l"><b>This window</b> <span class="me">you</span><div class="s">Mac · connected directly</div></div><span class="grant"><span class="on">Operator</span><span>Device</span></span></div>
+    <div class="line"><span class="ic">▯</span><div class="l"><b>Alex's iPhone</b> <span class="away">away</span><div class="s">iPhone · connected through <b>Alex's Mac mini</b> (iCloud relay)</div></div><span class="grant"><span>Operator</span><span class="on">Device</span></span><span class="btn">Forget…</span></div>
+    <div class="line"><span class="ic">▯</span><div class="l"><b>Alex's iPad</b><div class="s">iPad · seen yesterday</div></div><span class="grant"><span>Operator</span><span class="on">Device</span></span><span class="btn">Forget…</span></div>
+   </div>
+   <div style="display:flex;gap:8px;margin-top:4px"><span class="btn">Pair a Device…</span><span class="btn">Pair a Mac…</span></div>
+   <div class="foot">Forgetting cuts a client off at once, directly and through the relay. To use it again, pair it again.</div>
+  </div></div></div></div></div>
+
+<script>
+// 055's rail, with Devices and Servers folded into one opening group, Control plane.
+const groups = [
+  [['appearance','◐','Appearance']],
+  [['agents','▣','Agents'],['shared','⧉','Shared'],['spending','$','Spending']],
+  [['control','⌬','Control plane']],
+];
+const flatGroups = [
+  [['appearance','◐','Appearance']],
+  [['agents','▣','Agents'],['shared','⧉','Shared'],['spending','$','Spending']],
+  [['clients2','▯','Clients'],['hosts2','≡','Hosts']],
+];
+const pages = [['overview','Overview',''],['hosts','Hosts','4'],['clients','Clients','3']];
+document.querySelectorAll('.rail').forEach(rail => {
+  const on = rail.dataset.on, page = rail.dataset.page, flat = rail.dataset.flat;
+  let h = '<div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  (flat ? flatGroups : groups).forEach((g, i) => {
+    if (i) h += '<div class="gap"></div>';
+    g.forEach(([id, icon, name]) => {
+      const open = id === 'control' && on === 'control';
+      const cls = open ? 'ri open' : (id === on ? 'ri on' : 'ri');
+      const disc = id === 'control' ? `<span class="d">${open ? '▾' : '›'}</span>` : (id === 'shared' ? '<span class="d">›</span>' : '');
+      h += `<div class="${cls}"><i>${icon}</i>${name}${disc}</div>`;
+      if (open) pages.forEach(([pid, pname, n]) => {
+        h += `<div class="sub-i${pid === page ? ' on' : ''}">${pname}${n ? `<span class="n">${n}</span>` : ''}</div>`;
+      });
+    });
+  });
+  rail.innerHTML = h;
+});
+</script>
+</body></html>

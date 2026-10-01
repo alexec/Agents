@@ -23,18 +23,27 @@ struct RemoteApp: App {
     ///
     /// The real one is two links (046): the Mac's own network when the phone is on it,
     /// and the relay through iCloud when it is not.
-    @State private var model = RemoteModel(
-        link: ProcessInfo.processInfo.arguments.contains("-fake")
-            ? FakeDaemon()
-            : AwayLink(device: RemoteModel.deviceID,
-                       key: try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)))
+    ///
+    /// Paired with a control plane (058, US5), it is the control plane's address instead.
+    @State private var model = RemoteModel(link: RemoteApp.link())
+
+    static func link() -> any DaemonLink {
+        if ProcessInfo.processInfo.arguments.contains("-fake") { return FakeDaemon() }
+        if let control = RemoteControl.link() { return control }
+        return AwayLink(device: RemoteModel.deviceID, key: try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup))
+    }
 
     var body: some Scene {
         WindowGroup {
             RemoteView()
                 .background(Paper.ground)
                 .environment(model)
+                // A new model on a new link once the phone pairs with a control plane.
+                .id(ObjectIdentifier(model))
                 .task { push.received = { [model] userInfo in await model.receivedPush(userInfo) } }
+                .onChange(of: model.pairedWithControlPlane) { _, paired in
+                    if paired { model = RemoteModel(link: RemoteApp.link()) }
+                }
         }
     }
 }

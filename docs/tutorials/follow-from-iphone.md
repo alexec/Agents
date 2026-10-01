@@ -126,4 +126,4 @@ needs to reach the Mac through iCloud. Your Mac needs to stay awake with the bri
   notification when your Mac is not in use.
 - [Start an agent in its own worktree](../how-to/start-in-a-worktree.md), so two agents in one project
   do not change the same files.
-- [How the phone and iPad reach the Mac](../explanation/phone-and-ipad.md).
+- [How the phone and iPad reach your agents](../explanation/phone-and-ipad.md).

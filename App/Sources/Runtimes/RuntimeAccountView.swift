@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Whether a runtime can be used, and what to do when it cannot.
@@ -34,6 +37,10 @@ struct RuntimeAccountView: View {
     /// What servers borrow of this Mac's sign-in, and what stays here and why (049 D7), for a
     /// runtime whose server runs borrow it. Nil with no servers.
     private var serversNote: String? {
+        #if AGENTS_STORE
+        // The store window reads no sign-in of this Mac's; Agents Host lends them (058).
+        return nil
+        #else
         guard !model.hosts.isEmpty, let reading = MacFileSignIn(runtimeID: runtimeID)?.read() else { return nil }
         if reading.unreadable { return "Servers can’t borrow this Mac’s \(name) sign-in: Agents couldn’t read it." }
         var said: [String] = []
@@ -46,6 +53,7 @@ struct RuntimeAccountView: View {
             said.append("\(Self.names(reading.kept)) \(reading.kept.count == 1 ? "stays" : "stay") on this Mac: a browser sign-in renews itself, and a server renewing it would leave this Mac’s copy stale.")
         }
         return said.joined(separator: " ")
+        #endif
     }
 
     private static func names(_ providers: [String]) -> String {
@@ -208,6 +216,6 @@ struct RuntimeAccountView: View {
         // the wrong folder is still one keystroke from working.
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(command, forType: .string)
-        NSWorkspace.shared.open(URL(filePath: "/System/Applications/Utilities/Terminal.app"))
+        model.openTerminal()
     }
 }

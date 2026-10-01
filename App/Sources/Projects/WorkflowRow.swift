@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// One workflow on a project page: what it is, and what is happening to it.
@@ -71,11 +74,12 @@ struct WorkflowRow: View {
                 }
                 Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
             }
-            Divider()
-            Button("Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([
-                    WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
-                ])
+            if model.isOnThisMac(model.selectedProjectHost) {
+                Divider()
+                Button("Show in Finder") {
+                    model.reveal(WorkflowPaths.url(for: workflow.workflowID, in: workflow.folder),
+                                 on: model.selectedProjectHost)
+                }
             }
         }
     }

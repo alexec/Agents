@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- This Mac's host (058, T055): the daemon that owns this Mac's agents at the ordinary
+     root, dialling out to its control plane with the membership kept there. The first
+     time, Agents Host leaves it a one-time host code in the root. It never leaves for
+     being idle, and launchd starts it at login. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.alexecollins.agentshost.daemon</string>
+    <key>BundleProgram</key>
+    <string>Contents/Helpers/agentsd</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>agentsd</string>
+        <string>--control-network</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

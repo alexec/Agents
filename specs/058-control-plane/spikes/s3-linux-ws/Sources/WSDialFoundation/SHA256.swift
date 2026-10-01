@@ -1,0 +1,1 @@
+../WSDial/SHA256.swift

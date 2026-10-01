@@ -68,6 +68,10 @@ struct ConsistencyTests {
          why: "the same flag on a phone, where the accent is the colour of the person's own insertion point (034)"),
         (file: "App/Sources/Settings/Shared/SharedSettingsView.swift", contains: "static let reach = Color.accentColor",
          why: "Settings ▸ Shared draws what a runtime gets, and the chosen row, in the accent, as its approved frames do (054)"),
+        (file: "App/Sources/Control/FirstRunView.swift", contains: "static let usual = Color.accentColor",
+         why: "first run outlines the usual choice, Run one on this Mac, in the accent, as approved frame A does (058)"),
+        (file: "App/Sources/Control/StoreFirstRunView.swift", contains: "usual ? Color.accentColor",
+         why: "the App Store window's first run outlines its usual choice, Set one up on this Mac, in the accent, as approved frame K does (058)"),
     ]
 
     @Test func noCallSiteNamesAStateColourItself() throws {

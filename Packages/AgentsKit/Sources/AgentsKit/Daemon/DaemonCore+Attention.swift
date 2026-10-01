@@ -247,6 +247,7 @@ extension DaemonCore {
         // Met: answered anywhere, or the agent stopped or archived. Every surface hears
         // it, so the losers withdraw too (FR-016); a withdrawal names only the id.
         for id in deliveries.keys where !live.contains(id) {
+            if hostsForControlPlane { tellControlPlane(.withdraw(id)) }
             if let device = deliveries[id]?.to?.deviceID { withdraw(id, from: device, at: now) }
             deliveries.removeValue(forKey: id)
             cancelSettling(id)
@@ -258,6 +259,7 @@ extension DaemonCore {
         for need in outstanding {
             let decision = Routing.decide(need: need, presences: presences, devices: pairedDevices,
                                           delivery: deliveries[need.id], thresholds: thresholds, now: now)
+            if hostsForControlPlane { forward(need, decision: decision, presences: presences) }
             if decision.wait {
                 // At the Mac, and given a moment to look before anything is shown. One
                 // timer per need, and rung 0 runs again when it fires (FR-014, FR-015).
@@ -316,7 +318,29 @@ extension DaemonCore {
     /// is reached by push, not by a socket nobody is holding (research §1). Sealing
     /// needs the device's key; a record without a usable one is sent nothing, which is
     /// the truth about it rather than a banner in the clear.
+    /// A host of a control plane does not seal. The need goes up channel 0, unsealed,
+    /// and the control plane chooses the device from every client's presence (058, R6).
+    /// The person at a screen this host can see, or watching the conversation, takes
+    /// the banner down instead.
+    private func forward(_ need: Need, decision: Decision, presences: [Surface: Presence]) {
+        let watched = presences.values.contains { $0.isWatching(need.agentID) }
+        if decision.wait || decision.to?.isMac == true || watched {
+            tellControlPlane(.withdraw(need.id))
+            return
+        }
+        // Nowhere this host can see is still somewhere another host's client might be.
+        tellControlPlane(.offer(need, buzz: decision.alert || decision.to == nil))
+    }
+
+    private func tellControlPlane(_ message: DaemonAPI.AttentionNeed) {
+        guard let tellControl, let params = try? JSONValue.encoding(message) else { return }
+        tellControl(params)
+    }
+
     private func post(_ need: Need, to id: UUID, alert: Bool, at now: Date) {
+        // Sealing is the control plane's once this daemon is its host. `forward` already
+        // said the need, unsealed.
+        if hostsForControlPlane { return }
         // A newer decision about this need on this device voids any withdrawal still
         // waiting for a carrier. Otherwise a banner taken off the phone and put back while
         // the bridge was away would be taken off again the moment the bridge arrived —
@@ -355,6 +379,8 @@ extension DaemonCore {
     /// no next decision. Broadcast into a room with no bridge in it, it is gone, and the
     /// phone keeps a question nobody can answer (025 US2).
     private func withdraw(_ id: NeedID, from device: UUID, at now: Date) {
+        // The control plane was told in the same pass that noticed the need was over.
+        if hostsForControlPlane { return }
         guard !pendingWithdrawals.contains(where: { $0.need == id && $0.device == device }) else { return }
         pendingWithdrawals.append(PendingWithdrawal(need: id, device: device, decidedAt: now))
     }

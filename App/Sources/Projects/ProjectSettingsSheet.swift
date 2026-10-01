@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import AppKit
 import SwiftUI
 
@@ -193,7 +196,7 @@ private struct ProjectGeneralPane: View {
                                     .tinted(.failure)
                             } else if summary.host == .mac {
                                 Button("Show in Finder") {
-                                    NSWorkspace.shared.activateFileViewerSelecting([summary.folder])
+                                    model.reveal(summary.folder, on: summary.host)
                                 }
                                 .buttonStyle(.paper)
                                 .appText(.fine)
@@ -253,7 +256,7 @@ enum ProjectPlace {
     static func path(_ folder: URL, on host: HostID) -> String {
         let path = folder.path
         guard host == .mac else { return path }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = RealHome.path
         if path == home { return "~" }
         if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
         return path

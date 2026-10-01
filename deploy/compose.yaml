@@ -1,0 +1,80 @@
+# Several copies of the control plane over one bucket, behind a load balancer (058, T068;
+# quickstart Walk 2). For walks and for trying it out:
+#
+#   scripts/build-linux-control.sh aarch64      # or x86_64, for the machine running Docker
+#   deploy/make-secrets.sh
+#   docker compose -f deploy/compose.yaml up -d --build
+#
+# Clients and hosts reach https://127.0.0.1:8443 (Caddy), with the pin in deploy/secrets/pin.
+# MinIO's console is not published; its API is on 127.0.0.1:19100 for looking at the bucket.
+
+x-copy: &copy
+  build:
+    context: .
+    dockerfile: Containerfile
+  image: agents-control:walk
+  restart: unless-stopped
+  depends_on:
+    bucket:
+      condition: service_completed_successfully
+  environment: &copy-environment
+    AGENTS_STORE: s3://agents-walk/w1
+    AGENTS_STORE_ENDPOINT: http://minio:9000
+    AGENTS_STORE_PATH_STYLE: "1"
+    AWS_ACCESS_KEY_ID: walkuser
+    AWS_SECRET_ACCESS_KEY: walkwalkwalk
+    AGENTS_CONTROL_URL: https://127.0.0.1:8443
+    AGENTS_CONTROL_PIN: ${AGENTS_CONTROL_PIN:?run deploy/make-secrets.sh first}
+    AGENTS_CONTROL_KEY_FILE: /secrets/control-key
+    AGENTS_CONTROL_NAME: Walk control plane
+  volumes:
+    - ./secrets/control-key:/secrets/control-key:ro
+
+services:
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: walkuser
+      MINIO_ROOT_PASSWORD: walkwalkwalk
+    ports: ["127.0.0.1:19100:9000"]
+
+  # Makes the bucket once, signed like any client.
+  bucket:
+    image: curlimages/curl:latest
+    depends_on: [minio]
+    command:
+      - sh
+      - -c
+      - |
+        for i in $$(seq 1 30); do
+          code=$$(curl -s -o /dev/null -w '%{http_code}' --aws-sigv4 aws:amz:us-east-1:s3 --user walkuser:walkwalkwalk -X PUT http://minio:9000/agents-walk)
+          [ "$$code" = 200 ] || [ "$$code" = 409 ] && exit 0
+          sleep 1
+        done
+        exit 1
+
+  cp1:
+    <<: *copy
+    environment:
+      <<: *copy-environment
+      AGENTS_CONTROL_PEER_URL: http://cp1:8791
+  cp2:
+    <<: *copy
+    environment:
+      <<: *copy-environment
+      AGENTS_CONTROL_PEER_URL: http://cp2:8791
+  cp3:
+    <<: *copy
+    environment:
+      <<: *copy-environment
+      AGENTS_CONTROL_PEER_URL: http://cp3:8791
+
+  caddy:
+    image: caddy:2
+    depends_on: [cp1, cp2, cp3]
+    ports: ["127.0.0.1:8443:8443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./secrets/cert.pem:/secrets/cert.pem:ro
+      - ./secrets/key.pem:/secrets/key.pem:ro

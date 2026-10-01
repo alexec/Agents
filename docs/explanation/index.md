@@ -10,13 +10,15 @@ Nothing here needs doing; it is for understanding.
 
 - [Why Agents](why-agents.md): why you would run your coding agents here, alongside the
   editor you already use, and when something else is better.
-- [The window and the daemon](window-and-daemon.md): why agents keep working when the
-  window is closed, and what happens to them when the Mac restarts.
+- [The control plane](control-plane.md): hosts, clients, copies and the store, where to
+  run it, and what happens when it is down.
+- [The window and the host](window-and-daemon.md): why agents keep working when the
+  window is closed, what Agents Host does, and what happens when the Mac restarts.
 - [Why agents' own tools are taken away](scoped-tools.md): what a runtime loses in the
   app's sessions, what it keeps, and why your own setup is untouched.
 - [Projects, hosts and worktrees](projects-hosts-worktrees.md): a project is a folder on
   one machine, and an agent can have a worktree of its own.
 - [Leases on shared resources](leases.md): how agents take turns with the screen, a
   browser or a simulator, and what you can end.
-- [How the phone and iPad reach the Mac](phone-and-ipad.md): the local connection,
-  notifications, and what each device can do.
+- [How the phone and iPad reach your agents](phone-and-ipad.md): every host, at home and
+  away, grants, and forgetting a device.

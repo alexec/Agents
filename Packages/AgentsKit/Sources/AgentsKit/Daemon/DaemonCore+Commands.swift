@@ -1317,6 +1317,15 @@ extension DaemonCore {
     /// this leaves `outcomeAsked` false on a record whose turn is long over, which is
     /// harmless: only a fresh `.endTurn` opens the gate.
     func askForOutcomeIfSilent(agentID: UUID, reason: EndedReason) async {
+        // The review demo's echo (T092) cannot report, and has always done what it was
+        // asked by the time its turn ends: said so for it, or every turn a reviewer sent
+        // would sit under Needs you.
+        if reason == .endTurn, var agent = agents[agentID], agent.runtimeID == "demo",
+           agent.state == .finished, agent.report == nil {
+            agent.report = WorkReport(outcome: .done, message: "Said back what you typed.", at: now())
+            changed(agent)
+            return
+        }
         guard willAskForOutcome(agentID: agentID, reason: reason),
               var agent = agents[agentID] else { return }
         agent.outcomeAsked = true
@@ -1341,6 +1350,8 @@ extension DaemonCore {
     /// an agent to account for a turn they have superseded is noise (FR-023).
     func willAskForOutcome(agentID: UUID, reason: EndedReason?) -> Bool {
         guard reason == .endTurn, let agent = agents[agentID] else { return false }
+        // The review demo's echo (T092) has no tools to report with.
+        if agent.runtimeID == "demo" { return false }
         return agent.state == .finished
             && agent.report == nil
             && !agent.outcomeAsked

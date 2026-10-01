@@ -1,3 +1,4 @@
+import ControlDial
 import Foundation
 #if canImport(Darwin)
 import Darwin
@@ -15,6 +16,26 @@ public final class Daemon: @unchecked Sendable {
     private let lock: DaemonLock
     private let core: DaemonCore
     private var server: DaemonServer?
+    /// The control plane this daemon is a host of, if any (058).
+    private let control: Control?
+    private var uplink: ControlUplink?
+
+    /// Where a host's control plane is, and which host it is there.
+    public struct Control: Sendable {
+        /// The control plane's local socket, for a host on the same Mac; nil for one
+        /// reached over the network.
+        public var socket: URL?
+        public var host: HostID
+        public var name: String?
+        /// A host code to enrol with, over the network, when this root has not yet.
+        public var code: String?
+        public init(socket: URL?, host: HostID, name: String? = nil, code: String? = nil) {
+            self.socket = socket
+            self.host = host
+            self.name = name
+            self.code = code
+        }
+    }
 
     public enum StartError: Error, Sendable {
         /// Another daemon holds the lock. Not a failure: the caller connects to that
@@ -32,9 +53,11 @@ public final class Daemon: @unchecked Sendable {
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
                 launcher: (any SessionLauncher)? = nil,
                 serve: Bool = false,
+                control: Control? = nil,
                 toolsetsFolder: URL? = nil) throws {
         Self.applyPrivateUmask()
         self.locations = locations
+        self.control = control
         try locations.createDirectories()
         guard let lock = DaemonLock(at: locations.lock) else { throw StartError.alreadyRunning }
         self.lock = lock
@@ -84,7 +107,10 @@ public final class Daemon: @unchecked Sendable {
         // Endings are about to be discovered, and no workflow has been read yet. Hold
         // what they raise rather than firing it into a layer that cannot act — see
         // `deferredLifecycleEvents`. `startWorkflows()` below drains it.
-        await core.setExitsWhenIdle(!serve)
+        // A host of a control plane is kept running by launchd, not by a window being
+        // there, so it never leaves for being idle (058, R5).
+        await core.setExitsWhenIdle(!serve && control == nil)
+        await core.setHostsForControlPlane(control != nil && !serve)
         await core.holdWorkflowEventsUntilStarted()
         // Whatever a previous daemon was cloning when it went is half a repository.
         // It was never in the home folder, so this is the whole of cleaning up (027).
@@ -152,6 +178,23 @@ public final class Daemon: @unchecked Sendable {
         await core.startWorkflows()
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
+        if let control {
+            let name = control.name ?? Host.current().localizedName ?? "A Mac"
+            let hello = DaemonAPI.HostHello(host: control.host, version: Self.version, platform: Self.platform,
+                                            machineID: MachineID.current, name: name)
+            if let socket = control.socket?.path {
+                let uplink = ControlUplink(server: server, hello: hello) {
+                    FDTransport(socket: try connectUnixSocket(path: socket))
+                }
+                self.uplink = uplink
+                await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+                await lendAndBorrowSignIns(through: uplink)
+                uplink.start()
+                DaemonLog.shared.write("uplink: a host of the control plane at \(socket), as \(control.host)")
+            } else {
+                await joinOverTheNetwork(control, server: server, hello: hello)
+            }
+        }
         // Last, and on purpose. Picking an agent back up starts a runtime and sends it
         // a prompt, and both of those belong in front of a window that can watch them
         // rather than behind a socket nobody can reach yet.
@@ -171,6 +214,99 @@ public final class Daemon: @unchecked Sendable {
         await core.reviseWakefulness()
     }
 
+    /// A sign-in relayed between hosts through the control plane (058, T091): this Mac's
+    /// relays are what a tunnel to it reaches, and a server's gate opens a tunnel from it.
+    private func lendAndBorrowSignIns(through uplink: ControlUplink) async {
+        let core = self.core
+        uplink.setLendingPort { runtime in await core.signInRelayPort(runtime) }
+        await core.setTunnelOpener { runtime in try await uplink.openTunnel(runtime: runtime) }
+    }
+
+    /// A host of a control plane elsewhere (058, T021): enrolled once with a host code,
+    /// then dialled with its own key, kept beside it in this root.
+    private func joinOverTheNetwork(_ control: Control, server: DaemonServer, hello: DaemonAPI.HostHello) async {
+        // A version 2 code, or a membership made from one, goes over the WebSocket, on a
+        // Mac and on Linux alike (058 re-plan). The first build's codes keep their path
+        // until it is removed.
+        let kept = ControlMembership.load(locations.controlHostMembership)
+        let code = (control.code ?? takeLeftCode()).flatMap(ControlCode.init(text:))
+        if kept?.url != nil || (kept == nil && code?.url != nil) {
+            await joinOverWebSocket(code: kept == nil ? code : nil, server: server, hello: hello)
+            return
+        }
+        #if canImport(Network) && canImport(CryptoKit)
+        let membershipFile = locations.controlHostMembership
+        do {
+            let key = try DeviceKey.load(file: locations.controlHostKey)
+            var membership = ControlMembership.load(membershipFile)
+            if membership == nil, let text = control.code {
+                guard let code = ControlCode(text: text) else {
+                    DaemonLog.shared.write("uplink: that is not a host code")
+                    return
+                }
+                let joined = try await ControlDialling.enroll(code, announce: DaemonAPI.HostAnnounce(
+                    publicKey: key.publicKey, name: hello.name ?? "A Mac", platform: hello.platform,
+                    version: hello.version, machineID: hello.machineID))
+                try joined.save(membershipFile)
+                membership = joined
+                DaemonLog.shared.write("uplink: enrolled with \(joined.name) as \(joined.host?.rawValue ?? "?")")
+            }
+            guard let membership else {
+                DaemonLog.shared.write("uplink: no control plane to join; start with --control-code")
+                return
+            }
+            let uplink = ControlUplink(server: server, hello: hello, dial: ControlDialling.hostDial(membership, key: key))
+            self.uplink = uplink
+            await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+            await lendAndBorrowSignIns(through: uplink)
+            uplink.start()
+            DaemonLog.shared.write("uplink: a host of \(membership.name) over the network, as \(membership.host?.rawValue ?? "?")")
+        } catch {
+            DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
+        }
+        #else
+        DaemonLog.shared.write("uplink: this build cannot reach a control plane over the network")
+        #endif
+    }
+
+    /// A code Agents Host left in the root, taken once: it is spent by the first join.
+    private func takeLeftCode() -> String? {
+        let file = locations.controlJoinCode
+        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
+        try? FileManager.default.removeItem(at: file)
+        let code = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return code.isEmpty ? nil : code
+    }
+
+    /// Enrols with a version 2 host code if there is no membership yet, then dials as this
+    /// host with its own key, kept beside the membership in this root.
+    private func joinOverWebSocket(code: ControlCode?, server: DaemonServer, hello: DaemonAPI.HostHello) async {
+        let membershipFile = locations.controlHostMembership
+        do {
+            let privateKey = try ControlAgreement.loadOrMake(file: locations.controlHostKey)
+            var membership = ControlMembership.load(membershipFile)
+            if membership == nil, let code {
+                let joined = try await ControlJoin.enrollHost(code, privateKey: privateKey, hello: hello)
+                try joined.save(membershipFile)
+                membership = joined
+                DaemonLog.shared.write("uplink: enrolled with \(joined.name) as \(joined.host?.rawValue ?? "?")")
+            }
+            guard let membership else {
+                DaemonLog.shared.write("uplink: no control plane to join; start with --control <code>")
+                return
+            }
+            let uplink = ControlUplink(server: server, hello: hello,
+                                       dial: try ControlJoin.hostDial(membership, privateKey: privateKey))
+            self.uplink = uplink
+            await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+            await lendAndBorrowSignIns(through: uplink)
+            uplink.start()
+            DaemonLog.shared.write("uplink: a host of \(membership.name) at \(membership.url ?? "?"), as \(membership.host?.rawValue ?? "?")")
+        } catch {
+            DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
+        }
+    }
+
     /// Serve until there is nothing in hand and nobody connected.
     public func run(grace: Duration = .seconds(10)) async {
         await core.runUntilIdle(grace: grace)
@@ -179,9 +315,27 @@ public final class Daemon: @unchecked Sendable {
 
     public func shutDown() async {
         DaemonLog.shared.write("shutting down")
+        uplink?.stop()
         server?.stop()
         await core.shutDown()
         lock.release()
+    }
+
+    public static var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+    }
+
+    public static var platform: String {
+        #if os(macOS)
+        let os = "macOS"
+        #else
+        let os = "Linux"
+        #endif
+        #if arch(arm64)
+        return os + " arm64"
+        #else
+        return os + " x86-64"
+        #endif
     }
 
     /// For tests, which drive the core directly rather than over a socket.

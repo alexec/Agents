@@ -13,16 +13,14 @@ struct GrokToolPrefaceTests {
         #expect(rules.contains("use_tool"))
         let offered = AppService.tools(managesAgents: true, movesItself: false)
             .compactMap { $0["name"]?.stringValue }
-            .filter { $0 != AppTool.suggestPrompts && $0 != AppTool.reportOutcome }
         for name in offered {
             #expect(rules.contains(GrokToolPreface.catalogName(name)), "\(name)")
         }
         #expect(rules.contains("one of done, nothing_to_do, needs_answer, partly_done, stuck, blocked"))
         #expect(rules.contains("permission-mode: plan"))
-        #expect(!rules.contains(AppTool.suggestPrompts))
-        #expect(!rules.contains(AppTool.reportOutcome))
-        #expect(!rules.contains(AppTool.enterWorktree))
-        #expect(!rules.contains(AppTool.exitWorktree))
+        for retired in AppTool.retiredEndOfTurn { #expect(!rules.contains(retired)) }
+        // Grok cannot carry its conversation into another folder (053).
+        #expect(!rules.contains("leave_worktree"))
     }
 
     @Test func aHelperIsNotToldHowToStartAnAgent() {

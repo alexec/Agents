@@ -199,6 +199,10 @@ private struct PaperRow: ViewModifier {
 /// A small control on paper: raised capsule, hairline edge, a wash while pressed.
 /// Replaces `.buttonStyle(.glass)`.
 struct PaperButtonStyle: ButtonStyle {
+    /// Dimmed when it can't be used, as the prominent style is: a style of our own does
+    /// not get the system's greying.
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .padding(.horizontal, 12)
@@ -206,6 +210,7 @@ struct PaperButtonStyle: ButtonStyle {
             .background(configuration.isPressed ? Paper.wash : Paper.raised, in: Capsule())
             .overlay(Capsule().strokeBorder(Paper.rule, lineWidth: 1))
             .contentShape(Capsule())
+            .opacity(isEnabled ? 1 : 0.4)
     }
 }
 

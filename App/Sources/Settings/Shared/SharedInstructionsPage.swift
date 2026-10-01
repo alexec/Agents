@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Frame G: everything else in `~/.agents`, with what (if anything) uses it. Nothing is

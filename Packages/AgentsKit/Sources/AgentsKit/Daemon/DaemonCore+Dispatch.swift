@@ -82,6 +82,10 @@ extension DaemonCore {
                 try offerRelay(request, connection: connection)
                 return .success([:])
 
+            case DaemonAPI.Method.relayGrant:
+                let request = try require(params, as: DaemonAPI.RelayGrantRequest.self)
+                return .success(try JSONValue.encoding(try await grantRelay(request.runtime)))
+
             case DaemonAPI.Method.credentialsLend:
                 let request = try require(params, as: DaemonAPI.CredentialsLend.self)
                 try lendCredential(request, connection: connection)
@@ -95,6 +99,25 @@ extension DaemonCore {
             case DaemonAPI.Method.filesWrite:
                 let request = try require(params, as: DaemonAPI.FilesWriteRequest.self)
                 return .success(try JSONValue.encoding(try writeAttachment(request)))
+
+            case DaemonAPI.Method.macReveal:
+                try macReveal(try require(params, as: DaemonAPI.MacPathRequest.self))
+                return .success([:])
+
+            case DaemonAPI.Method.macOpen:
+                try macOpenPath(try require(params, as: DaemonAPI.MacPathRequest.self))
+                return .success([:])
+
+            case DaemonAPI.Method.macTerminal:
+                try macTerminal(try decode(params, as: DaemonAPI.MacTerminalRequest.self) ?? .init())
+                return .success([:])
+
+            case DaemonAPI.Method.filesReadText:
+                return .success(try JSONValue.encoding(try readText(try require(params, as: DaemonAPI.FilesTextRequest.self))))
+
+            case DaemonAPI.Method.filesSaveText:
+                try saveText(try require(params, as: DaemonAPI.FilesSaveTextRequest.self))
+                return .success([:])
 
             case DaemonAPI.Method.filesBrowse:
                 let request = try decode(params, as: DaemonAPI.FilesBrowseRequest.self) ?? .init()

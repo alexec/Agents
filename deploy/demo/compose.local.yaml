@@ -1,0 +1,20 @@
+# The demo on one machine, for a walk (058, T093): no public name, so the copy terminates
+# TLS itself with a self-signed certificate, whose pin every code carries, at an address
+# both the machine and the demo host's container reach (a LAN address, say). Caddy is off.
+#
+#   deploy/demo/local-cert.sh 192.168.0.152
+#   docker compose -f deploy/demo/compose.yaml -f deploy/demo/compose.local.yaml up -d --build
+services:
+  control:
+    environment:
+      AGENTS_CONTROL_URL: https://${DEMO_ADDRESS:?run deploy/demo/local-cert.sh first}:18893
+      AGENTS_CONTROL_TLS_CERT: /secrets/cert.pem
+      AGENTS_CONTROL_TLS_KEY: /secrets/key.pem
+      AGENTS_CONTROL_PIN: ${DEMO_PIN}
+    volumes:
+      - ./secrets:/secrets:ro
+    ports: ["18893:8791"]
+  demo-host:
+    extra_hosts: !reset []
+  caddy:
+    profiles: ["public"]

@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// One folder in the sidebar.
@@ -92,7 +95,7 @@ struct ProjectRow: View {
     }
 
     private var abbreviatedPath: String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = RealHome.path
         let path = summary.folder.path
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }

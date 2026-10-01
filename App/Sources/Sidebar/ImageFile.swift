@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import AppKit
 import SwiftUI
 
@@ -23,6 +26,9 @@ struct ImageFile: View {
     /// The server the file is on, when it is not this Mac (037). Its picture is drawn
     /// from the bytes the server sent, and there is nowhere here to open it.
     var server: String? = nil
+    /// For the way out when it cannot be drawn: see `OpenElsewhere`.
+    var elsewhere: String? = nil
+    var host: HostID = .mac
 
     @State private var image: NSImage?
     @State private var failed = false
@@ -48,13 +54,13 @@ struct ImageFile: View {
                     .padding(.vertical, 6)
                 }
             } else if failed {
-                OpenElsewhere(url: url, description: description, server: server)
+                OpenElsewhere(url: url, description: description, server: elsewhere, host: host)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task(id: probe) {
-            let loaded = server == nil ? NSImage(contentsOf: url) : NSImage(data: probe.prefix)
+            let loaded = server == nil ? NSImage(contentsOf: url) : NSImage(data: probe.prefix)  // store-ok: server is never nil in the store window: the host read it
             image = loaded
             failed = loaded == nil
         }

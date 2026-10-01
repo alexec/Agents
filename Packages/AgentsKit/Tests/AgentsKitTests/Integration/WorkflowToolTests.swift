@@ -433,7 +433,7 @@ struct WorkflowToolTests {
                 options: [PermissionOption(optionID: "allow", name: "Allow", kind: .allowAlways)])
         }
 
-        #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.suggestPrompts)")) != nil)
+        #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.finishTurn)")) != nil)
         #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.showFile)")) != nil)
         #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.manageWorkflows)")) != nil)
         #expect(await core.autoAllowed(request(named: "Write")) == nil)

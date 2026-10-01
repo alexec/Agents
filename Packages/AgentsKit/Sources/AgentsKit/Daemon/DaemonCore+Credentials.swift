@@ -60,7 +60,7 @@ extension DaemonCore {
     func offerCredentials(_ offer: DaemonAPI.CredentialsOffer, connection: UUID?) {
         // On this Mac an offer is the window saying what it still holds: a key taken out
         // of Settings stops being lent to agents started from now on.
-        if exitsWhenIdle {
+        if !onServer {
             for runtime in macLent.keys where !offer.runtimes.contains(runtime) { macLent[runtime] = nil }
             return
         }
@@ -76,7 +76,7 @@ extension DaemonCore {
     /// for it. Only on a server, only what the connection offered, and never to one marked
     /// "own sign-in only".
     func lendSignIn(_ lend: DaemonAPI.SignInLend, connection: UUID?) throws {
-        guard !exitsWhenIdle else {
+        guard onServer else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
                                message: "This Mac's own agents use this Mac's sign-in; nothing is lent to them.")
         }
@@ -111,12 +111,12 @@ extension DaemonCore {
 
     func lendCredential(_ lend: DaemonAPI.CredentialsLend, connection: UUID?) throws {
         // This Mac's own agents are lent only what has no other way in (046, D3).
-        if exitsWhenIdle, let secret = Secret(lend.secret), secret.kind == lend.kind,
+        if !onServer, let secret = Secret(lend.secret), secret.kind == lend.kind,
            secret.kind.isLentOnTheMac, secret.kind.runtimeID == lend.runtime {
             macLent[lend.runtime] = secret
             return
         }
-        guard !exitsWhenIdle else {
+        guard onServer else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
                                message: "This Mac's own agents use this Mac's sign-in; nothing is lent to them.")
         }
@@ -154,7 +154,25 @@ extension DaemonCore {
     /// (once per forwarded socket) and keep the offer for as long as the connection lasts.
     /// Only on a server; the Mac's own agents use the Mac's sign-in directly.
     func offerRelay(_ offer: DaemonAPI.RelayOffer, connection: UUID?) throws {
-        guard !exitsWhenIdle else {
+        // Through the control plane (058, T091): a tunnel to the lending Mac, not a socket a
+        // window forwarded. Kept for the daemon's life, as the operator's yes is.
+        if offer.socketPath == Self.tunnelTarget {
+            guard let opener = tunnelOpener else {
+                throw JSONRPCError(code: DaemonAPI.Failure.notAServer, message: "This host has no control plane to tunnel through.")
+            }
+            let runtime = offer.runtime
+            let path = locations.root.appendingPathComponent("relay-\(runtime).sock").path
+            if tunnelSockets[runtime] == nil {
+                tunnelSockets[runtime] = try TunnelSocket(path: path) { try await opener(runtime) }
+            }
+            var kept = offer
+            kept.socketPath = path
+            if relayGates[path] == nil { relayGates[path] = try RelayGate(target: path) }
+            relayOffers[Self.tunnelOffers, default: [:]][runtime] = kept
+            DaemonLog.shared.write("relay offered for \(runtime) through the control plane, on port \(relayGates[path]?.port ?? 0)")
+            return
+        }
+        guard onServer else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
                                message: "This Mac's own agents use this Mac's sign-in; nothing is relayed to them.")
         }
@@ -164,6 +182,34 @@ extension DaemonCore {
         }
         relayOffers[connection, default: [:]][offer.runtime] = offer
         DaemonLog.shared.write("relay offered for \(offer.runtime) on port \(relayGates[offer.socketPath]?.port ?? 0)")
+    }
+
+    /// What a tunnelled offer names as its socket, and where such offers are kept.
+    static let tunnelTarget = "tunnel"
+    static let tunnelOffers = UUID(uuidString: "00000000-0000-0000-0000-000000000058")!
+
+    /// The borrowing host's tunnel opener, once it has an uplink (T091).
+    public func setTunnelOpener(_ opener: @escaping @Sendable (String) async throws -> any LineTransport) {
+        tunnelOpener = opener
+    }
+
+    /// `relay/grant`, on the Mac's host: relay a sign-in to a server through the control
+    /// plane. The token stays here; what goes back is the stand-in and the relay's CA.
+    func grantRelay(_ runtimeID: String) async throws -> DaemonAPI.RelayGrantReply {
+        #if canImport(Network) && canImport(Security)
+        return try await signInRelays.grant(runtimeID)
+        #else
+        throw JSONRPCError(code: DaemonAPI.Failure.notPermitted, message: "Only a Mac relays a sign-in.")
+        #endif
+    }
+
+    /// Where the relay for `runtimeID` listens here, for a tunnel to connect to.
+    public func signInRelayPort(_ runtimeID: String) -> UInt16? {
+        #if canImport(Network) && canImport(Security)
+        return signInRelays.port(for: runtimeID)
+        #else
+        return nil
+        #endif
     }
 
     /// The offer relaying `runtimeID`'s sign-in: the asking connection's, else any other's.
@@ -213,7 +259,21 @@ extension DaemonCore {
     /// credential it has not lent yet, or when nothing was lent and the server has no
     /// sign-in of its own. The window lends and asks again with the same `sendID`.
     func launchEnvironment(for runtimeID: String) throws -> [String: String] {
-        if exitsWhenIdle { return try macLaunchEnvironment(for: runtimeID) }
+        // A sign-in relayed through the control plane from the Mac that lends it (058, T091),
+        // on any host it was offered to.
+        if relayOffers[Self.tunnelOffers]?[runtimeID] != nil, let relayed = relayEnvironment(for: runtimeID) {
+            return relayed
+        }
+        #if os(Linux)
+        // A server of a control plane, for a runtime only a Mac relays, with no sign-in of its
+        // own: ask. An operator's window asks the person, then offers the tunnel, and the
+        // start is sent again (T091).
+        if hostsForControlPlane, ToolPolicyCatalog.policy(for: runtimeID).relay != nil,
+           !Self.lendableRuntimes.contains(runtimeID), !hasOwnSignIn(runtimeID) {
+            throw Self.wanted(runtimeID, offered: false)
+        }
+        #endif
+        if !onServer { return try macLaunchEnvironment(for: runtimeID) }
         if let signIn = RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn {
             return try lentSignInEnvironment(runtimeID, signIn)
         }
@@ -271,7 +331,7 @@ extension DaemonCore {
     /// `data.errorKind == "authentication_failed"`, for a subscription token and an API key
     /// alike. Only on a server; the Mac's own sign-in is 037's business.
     func credentialRefusal(agentID: UUID, error: any Error) -> DaemonAPI.CredentialRefused? {
-        guard !exitsWhenIdle, let agent = agents[agentID], let error = error as? JSONRPCError,
+        guard onServer, let agent = agents[agentID], let error = error as? JSONRPCError,
               Self.isAuthenticationFailure(error) else { return nil }
         // This Mac's own sign-in, relayed and refused even after the relay re-read it (056).
         if ToolPolicyCatalog.policy(for: agent.runtimeID).relay != nil, relayOffer(for: agent.runtimeID) != nil {

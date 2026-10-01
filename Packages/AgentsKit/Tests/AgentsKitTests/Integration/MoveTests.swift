@@ -394,6 +394,86 @@ struct MoveTests {
         #expect(worktreesMade(repo) == ["two"])
     }
 
+    // MARK: Asked on finish_turn
+
+    private func finish(_ core: DaemonCore, _ token: String, _ outcome: String = "partly_done",
+                        afterwards: String? = nil, move: DaemonAPI.MoveAsk?) async throws -> String {
+        try await core.finishTurn(.init(token: token, outcome: outcome, message: "Moving on to its own branch.",
+                                        prompts: [], afterwards: afterwards, move: move))
+    }
+
+    @Test func aMoveOnFinishTurnLandsTheReportAndMovesWhenTheTurnEnds() async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, token) = try await busyAgent(core, repo, gate, launcher)
+
+        let answer = try await finish(core, token, move: .init(target: .newWorktree(name: "from-finish")))
+
+        #expect(answer.contains("when this turn ends"))
+        #expect(await core.agent(id)?.report?.outcome == .partlyDone)
+        #expect(await core.agent(id)?.pendingMove?.askedBy == .agent)
+        #expect(await core.agent(id)?.cwd == repo.project, "nothing moves while the turn runs")
+
+        gate.open()
+        let moved = repo.top.appending(path: ".agents/worktrees/from-finish").path
+        await eventually("moved when the turn ended") { await core.agent(id)?.cwd.path == moved }
+        await eventually("started again to carry on") {
+            (try? await appPrompts(core, id).contains(DaemonCore.carryOn)) == true
+        }
+    }
+
+    /// A move carries the agent on, so it does not go with an ending that waits or puts it down.
+    @Test func aMoveWithAnEndingThatWaitsIsRefusedWhole() async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, token) = try await busyAgent(core, repo, gate, launcher)
+        let move = DaemonAPI.MoveAsk(target: .newWorktree(name: "nope"))
+
+        for (outcome, afterwards) in [("needs_answer", nil), ("done", "park")] as [(String, String?)] {
+            await #expect(throws: JSONRPCError.self) {
+                _ = try await finish(core, token, outcome, afterwards: afterwards, move: move)
+            }
+        }
+        #expect(await core.agent(id)?.report == nil)
+        #expect(await core.agent(id)?.pendingMove == nil)
+        gate.open()
+    }
+
+    /// A move the daemon cannot make refuses the call, so the agent hears why while it can still act.
+    @Test func aMoveThatIsRefusedRecordsNothing() async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, token) = try await busyAgent(core, repo, gate, launcher)
+
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await finish(core, token, move: .init(target: .existing(URL(filePath: "/tmp/not-a-worktree"))))
+        }
+        #expect(await core.agent(id)?.report == nil)
+        #expect(await core.agent(id)?.pendingMove == nil)
+        gate.open()
+    }
+
+    /// The last call is the whole account of the turn: one without a move takes back the agent's.
+    @Test func aLaterFinishTurnWithoutAMoveTakesItBack() async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, token) = try await busyAgent(core, repo, gate, launcher)
+
+        _ = try await finish(core, token, move: .init(target: .newWorktree(name: "second-thoughts")))
+        _ = try await finish(core, token, "done", move: nil)
+
+        #expect(await core.agent(id)?.pendingMove == nil)
+        #expect(await core.agent(id)?.report?.outcome == .done)
+        gate.open()
+        await eventually("the turn ended") { await core.agent(id)?.state.hasTurnInFlight == false }
+        #expect(worktreesMade(repo).isEmpty)
+        #expect(await core.agent(id)?.cwd == repo.project)
+    }
+
     @Test func aStoppedTurnStillMovesButDoesNotCarryOn() async throws {
         let repo = try await repository()
         let (launcher, gate) = gatedLauncher()

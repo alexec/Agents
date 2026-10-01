@@ -85,27 +85,10 @@ public enum AppTool {
     /// Say that something happened, as a `custom.` event.
     public static let publishEvent = "publish_event"
 
-    // Two for moving this agent itself (053), shaped like Claude Code's own worktree
-    // tools, which are taken away. Offered to every agent: moving yourself is not
-    // managing anyone. Neither name ends with another tool's name.
-
-    /// Move into a new worktree, or one already there, when the turn ends.
-    public static let enterWorktree = "enter_worktree"
-
-    /// Move back to the project folder, keeping or removing the worktree left.
-    public static let exitWorktree = "exit_worktree"
-
-    // The older names for the two halves of `finishTurn`, kept since 2026-09-23 (023).
-    // The briefing that named them is sent once and lives in the runtime's own
-    // history, so a conversation begun before that date and resumed after it calls
-    // these, and must find them. Remove the two together, once no such conversation
-    // could be resumed; nothing else depends on them.
-
-    /// The older name for the suggestions half: the row of chips, on its own.
-    public static let suggestPrompts = "suggest_next_prompts"
-
-    /// The older name for the outcome half: how the work went, on its own.
-    public static let reportOutcome = "report_outcome"
+    /// The older names for the two halves of `finishTurn`, served from 2026-09-23 (023)
+    /// until 2026-09-29. No longer offered or answered; kept only so a conversation that
+    /// called them still draws without them, the way it did.
+    public static let retiredEndOfTurn = ["suggest_next_prompts", "report_outcome"]
 
     /// The name the app's MCP server goes by in a runtime's session (`mcpServers`).
     public static let serverName = "agents"
@@ -114,8 +97,7 @@ public enum AppTool {
     public static let all: [String] = [
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
         archiveAgent, listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
-        cancelWait, publishEvent, suggestPrompts, reportOutcome,
-        listSessions, readSession,
+        cancelWait, publishEvent, listSessions, readSession,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

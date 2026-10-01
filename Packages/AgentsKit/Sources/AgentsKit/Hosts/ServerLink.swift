@@ -11,11 +11,14 @@ public struct ServerLink: DaemonLink {
     public let socket: URL
     public let installer: ServerInstaller
     private let masterIsUp: @Sendable () async -> Bool
+    private let launchArguments: @Sendable () -> [String]
 
-    public init(socket: URL, installer: ServerInstaller, masterIsUp: @escaping @Sendable () async -> Bool) {
+    public init(socket: URL, installer: ServerInstaller, masterIsUp: @escaping @Sendable () async -> Bool,
+                launchArguments: @escaping @Sendable () -> [String] = { [] }) {
         self.socket = socket
         self.installer = installer
         self.masterIsUp = masterIsUp
+        self.launchArguments = launchArguments
     }
 
     public func transport() async throws -> any LineTransport {
@@ -28,6 +31,6 @@ public struct ServerLink: DaemonLink {
     /// `DaemonClient.connect` waits for it to answer.
     public func start() async throws {
         guard await masterIsUp() else { throw HostProblem.offline }
-        try await installer.startDaemon()
+        try await installer.startDaemon(extra: launchArguments())
     }
 }

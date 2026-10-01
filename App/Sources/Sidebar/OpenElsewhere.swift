@@ -1,3 +1,4 @@
+import AgentsKitCore
 import AppKit
 import SwiftUI
 
@@ -13,12 +14,16 @@ struct OpenElsewhere: View {
     let url: URL
     let description: String
     /// The server the file is on (037). It is not on this Mac, so nothing here can open
-    /// or reveal it; the pane says where it is instead.
+    /// or reveal it; the pane says where it is instead. Without one, the file is this
+    /// Mac's host's, which opens and reveals it.
     var server: String? = nil
+    /// This Mac's host, whose files these buttons open and reveal.
+    var host: HostID = .mac
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))  // store-ok: an icon for the file's kind; nothing is read
                 .resizable()
                 .frame(width: 64, height: 64)
             Text(url.lastPathComponent)
@@ -36,10 +41,10 @@ struct OpenElsewhere: View {
             } else {
             HStack(spacing: 8) {
                 if let app = defaultApp {
-                    Button("Open in \(app)") { NSWorkspace.shared.open(url) }
+                    Button("Open in \(app)") { model.open(url, on: host) }
                         .buttonStyle(.paperProminent)
                 }
-                Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                Button("Reveal in Finder") { model.reveal(url, on: host) }
                     .buttonStyle(.paper)
             }
             .padding(.top, 10)

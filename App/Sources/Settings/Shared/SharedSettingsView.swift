@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import AppKit
 import SwiftUI
 
@@ -117,12 +120,24 @@ private struct SharedOffState: View {
 // MARK: - Pieces every page uses
 
 enum SharedFiles {
-    static func reveal(_ path: String) {
+    /// In the App Store window, what this Mac's host does for these (058, US1): set by the
+    /// model when it starts. Your ~/.agents and a project's files are on this Mac.
+    @MainActor static var onThisMacsHost: ((URL, _ reveal: Bool) -> Void)?
+
+    @MainActor static func reveal(_ path: String) {
+        #if AGENTS_STORE
+        onThisMacsHost?(URL(filePath: path), true)
+        #else
         NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: path)])
+        #endif
     }
 
-    static func open(_ path: String) {
+    @MainActor static func open(_ path: String) {
+        #if AGENTS_STORE
+        onThisMacsHost?(URL(filePath: path), false)
+        #else
         NSWorkspace.shared.open(URL(filePath: path))
+        #endif
     }
 
     static func tilde(_ path: String) -> String {

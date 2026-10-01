@@ -60,6 +60,13 @@ public actor RelayHostCore {
         }
     }
 
+    /// How a device's session is opened when a control plane carries it (058, US4): a
+    /// device client of the router, already that device, so no binding is sent.
+    public typealias OpenDevice = @Sendable (UUID) async throws -> any LineTransport
+    private var openDevice: OpenDevice?
+
+    public func setOpenDevice(_ open: OpenDevice?) { openDevice = open }
+
     public init(channel: any RelayChannel, key: any RelayKey, openDaemon: @escaping OpenDaemon,
                 window: TimeInterval = 0.4, silence: TimeInterval = 120, patience: TimeInterval = 10,
                 livePoll: TimeInterval = 0.5, idlePoll: TimeInterval = 5,
@@ -178,7 +185,11 @@ public actor RelayHostCore {
         do {
             // The device's connection, never the bridge's: bound before the session's
             // first line is carried, to the device whose key opened the frame.
-            let daemon = try await DeviceBinder.bind(try await openDaemon(), device: session.device)
+            let daemon: any LineTransport = if let openDevice {
+                try await openDevice(session.device)
+            } else {
+                try await DeviceBinder.bind(try await openDaemon(), device: session.device)
+            }
             session.daemon = daemon
             let id = session.id
             let device = session.device

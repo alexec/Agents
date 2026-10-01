@@ -1,4 +1,7 @@
+#if !AGENTS_STORE
 import AgentsKit
+#endif
+import AgentsKitCore
 import SwiftUI
 
 /// Every runtime on this Mac and where its allowance stands (065, US4).

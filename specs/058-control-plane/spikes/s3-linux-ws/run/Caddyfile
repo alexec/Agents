@@ -1,0 +1,8 @@
+{
+	skip_install_trust
+}
+
+s3-spike-caddy {
+	tls internal
+	reverse_proxy s3-spike-echo:8080
+}

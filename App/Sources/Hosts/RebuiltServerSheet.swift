@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// "devbox has a new identity" (043, contracts/ui.md § 5): a known server whose key has

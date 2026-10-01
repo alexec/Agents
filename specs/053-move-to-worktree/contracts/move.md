@@ -1,61 +1,51 @@
 # Contract: Moving an Agent
 
-## 1. App tools (served by `agentsd mcp`, every agent)
+## 1. Arguments of `finish_turn` (served by `agentsd mcp`, every agent)
 
-Offered to every agent, including one another agent started: moving yourself isn't managing
-anyone. They're listed after the event tools. Neither name ends with another tool's name
-(036's `release_resource` lesson).
+**Changed 2026-09-29.** Moving was two tools, `enter_worktree` and `exit_worktree`. It is now
+three optional arguments of `finish_turn`, because a move only ever happens when the turn
+ends: asking on the call that ends the turn leaves no stretch of the turn in which edits land
+in the folder being left, and an agent already calls `finish_turn` every turn, so the move
+needs no briefing line of its own. The daemon keeps `agents/moveSelf` for helpers begun
+before the change.
 
-### `enter_worktree`
-
-```json
-{
-  "name": "enter_worktree",
-  "description": "Move yourself into a git worktree of this project: a new one, or one that is already there. Use it on your own judgement when the work turns into a change that should be on its own branch, or when asked. The move happens when your turn ends, so finish your turn soon after calling it; edits you make before then land where you are now. Nothing uncommitted comes with you. A new worktree starts from the commit your current folder has checked out, so commit first what you want to bring. After the move you are started again in the new folder to carry on.",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "name": { "type": "string", "description": "A name for a new worktree. Leave out for one named from this conversation's title. Not with path." },
-      "path": { "type": "string", "description": "The absolute path of an existing worktree of this repository to move into. Not with name." }
-    }
-  }
-}
-```
-
-### `exit_worktree`
+Offered to every agent on a runtime that can move, including one another agent started:
+moving yourself isn't managing anyone. On a runtime that can't (`--no-move-tools`), the three
+properties and the paragraph about them are left out of `finish_turn`'s schema, and a call
+that sends them anyway is refused.
 
 ```json
-{
-  "name": "exit_worktree",
-  "description": "Move yourself back to the project folder from the worktree you are in. keep leaves the worktree and its branch as they are; remove takes the worktree away after you have left, and its branch if the app made it and it is merged. Remove is refused for a worktree the app did not make or another agent works in, and, unless discard_changes is true, when anything in it is uncommitted or unmerged: ask the person before discarding. The move happens when your turn ends.",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "action": { "type": "string", "enum": ["keep", "remove"] },
-      "discard_changes": { "type": "boolean", "description": "Only with remove. Remove even though work would be lost." }
-    },
-    "required": ["action"]
-  }
-}
+"worktree": { "type": "string", "description": "Move into a git worktree of this project once this turn ends: a name for a new one, or the absolute path of one already there. Not with leave_worktree." },
+"leave_worktree": { "type": "string", "enum": ["keep", "remove"], "description": "Move back to the project folder once this turn ends. keep leaves the worktree as it is; remove takes it away after you have left." },
+"discard_changes": { "type": "boolean", "description": "Only with leave_worktree remove. Remove even though work would be lost." }
 ```
 
-**Local refusals** (AppService, before the daemon):
-- `name` and `path` together.
-- A `path` that doesn't start with `/`.
-- `action` missing or unknown.
-- `discard_changes` without `remove`.
+`worktree` starting with `/` is an existing worktree; anything else names a new one. There's
+no longer a way to ask for a new worktree named from the title: the agent names it.
 
-**Answers** (text, from the daemon):
-- Accepted mid-turn: "Moving to a new worktree like `fix-login` when this turn ends. Nothing
-  uncommitted comes with you (3 files here are uncommitted). End your turn to move."
-- Accepted, and nothing will follow: "You are not in a worktree; nothing to do."
-- Refused, with the reason, and nothing stored: not a repository; not a worktree of this
-  repository; the worktree is missing; removal would lose `<what>` (with the list of files and
-  commits); removal refused for a worktree the app did not make or one another agent is in.
+**Local refusals** (AppService, before the daemon; nothing is recorded):
+- `worktree` and `leave_worktree` together.
+- `leave_worktree` other than `keep` or `remove`.
+- `discard_changes` without `leave_worktree` `remove`.
+- Any of them on a runtime that can't move.
+
+**Daemon refusals** (the whole call is refused: no report, no chips, no move):
+- A move with `needs_answer` or `blocked`, or with `afterwards`: a move carries the agent on
+  in the new folder, which none of those wants.
+- Everything `askMove` refuses: not a repository; not a worktree of this repository; the
+  worktree is missing; no commit to base one on; removal would lose `<what>`; removal refused
+  for a worktree the app did not make or one another agent is in.
+
+**Answers**: the report's own note, then the move's: "Moving to a new worktree like
+`fix-login` when this turn ends. Nothing uncommitted comes with you (3 files here are
+uncommitted). End your turn to move; you will be started again there to carry on."
+
+A later `finish_turn` in the same turn without a move takes back a move the agent asked for
+earlier (the last call is the whole account of the turn). A move the person asked for stays.
 
 ## 2. Daemon methods
 
-### `agents/moveSelf`: from the tool relay
+### `agents/moveSelf`: from a helper begun before 2026-09-29
 
 ```swift
 struct MoveSelfRequest: Codable { var token: String; var target: MoveTarget

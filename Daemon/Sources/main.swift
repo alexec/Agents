@@ -5,6 +5,18 @@
 import AgentsKit
 import Foundation
 
+// A review control plane's demo host offers the echo runtime beside the others (T092).
+if let demo = EchoAgent.runtime, CommandLine.arguments.count < 2 || CommandLine.arguments[1] != "acp-echo" {
+    RuntimeCatalog.extra = [demo]
+}
+
+// `agentsd acp-echo`: the demo runtime App Review is given (058, T092), offered only on a
+// host started with AGENTS_TEST_RUNTIME=echo. It answers every prompt by saying it back.
+if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "acp-echo" {
+    await EchoAgent.run()
+    exit(0)
+}
+
 // Run as `agentsd mcp` this is not the daemon at all: it is the MCP server the
 // daemon hands to every agent, started by the runtime the way it starts any stdio MCP
 // server. One binary rather than two, so there is one thing to build, sign and ship.
@@ -17,8 +29,8 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
     // or archiving agents (028). The daemon says so here, when it hands the runtime
     // this server; it refuses the calls as well, so this only keeps the menu honest.
     let managesAgents = !CommandLine.arguments.contains(DaemonCore.noAgentToolsFlag)
-    // Nor, on a runtime that forgets its conversation in another folder, the tools for
-    // moving itself (053).
+    // Nor, on a runtime that forgets its conversation in another folder, the arguments
+    // of `finish_turn` for moving itself (053).
     let movesItself = !CommandLine.arguments.contains(DaemonCore.noMoveToolsFlag)
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: .default)
@@ -46,8 +58,7 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
 
     let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1),
                              managesAgents: managesAgents,
-                             movesItself: movesItself,
-                             finishTurn: { outcome, message, prompts, title, words in
+                             movesItself: movesItself) { outcome, message, prompts, title, words in
         await relay(DaemonAPI.Method.agentsFinishTurn,
                     DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
                                                 message: message, prompts: prompts,
@@ -55,12 +66,15 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                                 checkAgainInMinutes: words.checkAgainInMinutes,
                                                 afterwards: words.afterwards?.rawValue,
                                                 addLabels: words.addLabels,
-                                                removeLabels: words.removeLabels),
+                                                removeLabels: words.removeLabels,
+                                                move: words.move.map {
+                                                    switch $0 {
+                                                    case .move(let target, let removeLeft, let discardChanges):
+                                                        DaemonAPI.MoveAsk(target: target, removeLeft: removeLeft,
+                                                                          discardChanges: discardChanges)
+                                                    }
+                                                }),
                     fallback: "Noted.")
-    }) { prompts in
-        await relay(DaemonAPI.Method.agentsSuggestPrompts,
-                    DaemonAPI.SuggestPromptsRequest(token: token, prompts: prompts),
-                    fallback: "Shown in the person's empty prompt.")
     } showFile: { file in
         await relay(DaemonAPI.Method.agentsShowFile,
                     DaemonAPI.ShowFileRequest(token: token, file: file),
@@ -74,12 +88,6 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                     DaemonAPI.ManageWorkflowsRequest(token: token, action: action,
                                                      workflowID: workflowID, content: content),
                     fallback: "Done.")
-    } reportOutcome: { outcome, message, words in
-        await relay(DaemonAPI.Method.agentsReportOutcome,
-                    DaemonAPI.ReportOutcomeRequest(token: token, outcome: outcome,
-                                                   message: message, waitingOn: words.waitingOn,
-                                                   checkAgainInMinutes: words.checkAgainInMinutes),
-                    fallback: "Noted.")
     } agents: { call in
         switch call {
         case .start(let prompt, let runtime, let model, let permissionMode, let worktree, let labels):
@@ -143,14 +151,6 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                                              details: details),
                                fallback: "Published.")
         }
-    } moves: { call in
-        switch call {
-        case .move(let target, let removeLeft, let discardChanges):
-            return await relay(DaemonAPI.Method.agentsMoveSelf,
-                               DaemonAPI.MoveSelfRequest(token: token, target: target, removeLeft: removeLeft,
-                                                         discardChanges: discardChanges),
-                               fallback: "The move is asked for.")
-        }
     } sessions: { call in
         // Only ever the caller's own project: the daemon takes it from the token (065).
         switch call {
@@ -207,7 +207,14 @@ let toolsetsFolder: URL? = {
 
 let daemon: Daemon
 do {
-    daemon = try Daemon(serve: serve, toolsetsFolder: toolsetsFolder)
+    let control: Daemon.Control? = if let socket = commandLine.controlSocket {
+        Daemon.Control(socket: URL(fileURLWithPath: socket), host: commandLine.hostID, name: commandLine.hostName)
+    } else if commandLine.controlNetwork {
+        Daemon.Control(socket: nil, host: commandLine.hostID, name: commandLine.hostName, code: commandLine.controlCode)
+    } else {
+        nil
+    }
+    daemon = try Daemon(serve: serve, control: control, toolsetsFolder: toolsetsFolder)
 } catch Daemon.StartError.alreadyRunning {
     // Another daemon holds the lock. That is the ordinary case when two windows open
     // at once, and there is nothing to say about it.

@@ -52,6 +52,53 @@ public struct DeviceKey: Sendable {
         return made
     }
 
+    /// A software key kept in a file of its own, `0600` in a folder only this account can
+    /// read: the control plane's key and the keys its clients and hosts hold (058). A
+    /// file rather than the keychain, so a control plane on a scratch root never touches
+    /// the person's keychain, and so the same code serves a Mac and, later, Linux.
+    public static func load(file: URL) throws -> DeviceKey {
+        if let stored = try? Data(contentsOf: file),
+           let key = try? P256.KeyAgreement.PrivateKey(rawRepresentation: stored) {
+            return DeviceKey(publicKey: key.publicKey.x963Representation, holder: .software(key))
+        }
+        let key = P256.KeyAgreement.PrivateKey()
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        FileManager.default.createFile(atPath: file.path, contents: key.rawRepresentation,
+                                       attributes: [.posixPermissions: 0o600])
+        guard (try? Data(contentsOf: file)) == key.rawRepresentation else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: file.path])
+        }
+        return DeviceKey(publicKey: key.publicKey.x963Representation, holder: .software(key))
+    }
+
+    /// What this key proves to a control plane as client `client` (058, T085): the same
+    /// bytes `ControlAuth.clientKey` derives from a raw key, so a device paired the old
+    /// way, its key perhaps in the Secure Enclave, dials the new way as itself.
+    public func controlClientKey(controlKey: Data, client: UUID) throws -> Data {
+        try sharedKey(with: controlKey, salt: ControlAuth.clientSalt, id: client.uuidString)
+            .withUnsafeBytes { Data($0) }
+    }
+
+    /// The secret this key and `peer` share, for `purpose` and `id`: what both ends of a
+    /// control plane's link derive their key from (058, ControlKeys).
+    public func sharedKey(with peer: Data, salt: String, id: String) throws -> SymmetricKey {
+        let other = try P256.KeyAgreement.PublicKey(x963Representation: peer)
+        let shared: SharedSecret
+        switch holder {
+        case .enclave(let key): shared = try key.sharedSecretFromKeyAgreement(with: other)
+        case .software(let key): shared = try key.sharedSecretFromKeyAgreement(with: other)
+        }
+        return shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: Data(salt.utf8),
+                                              sharedInfo: Data(id.utf8), outputByteCount: 32)
+    }
+
+    /// A key already in hand: 32 raw bytes, as `ControlAgreement` makes them (058, T096).
+    public static func software(privateKey: Data) throws -> DeviceKey {
+        let key = try P256.KeyAgreement.PrivateKey(rawRepresentation: privateKey)
+        return DeviceKey(publicKey: key.publicKey.x963Representation, holder: .software(key))
+    }
+
     /// A key that lives only for this process: for tests, and for a Mac that is only
     /// ever the sender.
     public static func ephemeral() -> DeviceKey {

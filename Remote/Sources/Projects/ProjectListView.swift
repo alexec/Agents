@@ -15,27 +15,16 @@ struct ProjectListView: View {
 
     var body: some View {
         List(selection: $selection) {
-            ForEach(model.projects, id: \.folder) { summary in
-                // A button rather than a link to the selection: tapping the project
-                // already chosen changed nothing, so on a phone nothing opened.
-                Button {
-                    selection = summary.folder
-                    compactColumn = .detail
-                } label: {
-                    HStack {
-                        ProjectRow(summary: summary)
-                        if sizeClass != .regular {
-                            Image(systemName: "chevron.right")
-                                .appText(.fine).fontWeight(.semibold)
-                                .foregroundStyle(.tertiary)
-                                .accessibilityHidden(true)
-                        }
+            if model.hostSections.isEmpty {
+                projectRows(model.projects)
+            } else {
+                ForEach(model.hostSections) { section in
+                    Section {
+                        projectRows(model.projects.filter { $0.host == section.id })
+                    } header: {
+                        HostListHeading(name: section.title, note: section.offline ? "offline" : nil)
                     }
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .tag(summary.folder)
-                .paperListRow()
             }
             // Pages about all the work rather than one project, as on the Mac (042,
             // 052): rows of the list under their own heading, with the Mac's icons,
@@ -64,6 +53,34 @@ struct ProjectListView: View {
         .refreshable { await model.refreshEverything() }
     }
 
+    /// One host's projects. An offline host's stay, greyed, as frame H's sidebar does.
+    @ViewBuilder
+    private func projectRows(_ summaries: [DaemonAPI.ProjectSummary]) -> some View {
+        ForEach(summaries, id: \.key) { summary in
+            // A button rather than a link to the selection: tapping the project
+            // already chosen changed nothing, so on a phone nothing opened.
+            Button {
+                selection = summary.folder
+                compactColumn = .detail
+            } label: {
+                HStack {
+                    ProjectRow(summary: summary)
+                    if sizeClass != .regular {
+                        Image(systemName: "chevron.right")
+                            .appText(.fine).fontWeight(.semibold)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .tag(summary.folder)
+            .paperListRow()
+            .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
+        }
+    }
+
     /// Said once on the screen. Beside the project on a wide iPad, the project page
     /// carries the line; and with no projects yet, the waiting view in the middle says
     /// the same thing in more words.
@@ -83,7 +100,7 @@ struct ProjectRow: View {
     /// The phone's own counts, not `summary.counts`: the daemon's are made without
     /// knowing which agents have asked to be looked at, and the page under this row
     /// uses the phone's. The Mac's row does the same, for the same reason.
-    private var counts: [AgentGroup: Int] { model.counts(in: summary.folder) }
+    private var counts: [AgentGroup: Int] { model.counts(in: summary.key) }
 
     /// Exactly when something in it is under Needs you on its page.
     private var needsPerson: Bool { (counts[.needsAttention] ?? 0) > 0 }

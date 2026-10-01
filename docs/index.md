@@ -45,4 +45,5 @@ them from your iPhone or iPad.
 
 - **Mac**: the app itself. Your agents run here.
 - **iPhone and iPad**: follow, answer and start agents on your Mac from anywhere.
-- **Linux servers**: run agents on a machine of your own over SSH, managed from the Mac.
+- **Linux servers**: run agents on a machine of your own, which joins your control plane
+  and is seen from every window and phone. See [The control plane](explanation/control-plane.md).

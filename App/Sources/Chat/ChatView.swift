@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// The right-hand side, whether or not there is an agent yet.
@@ -70,7 +73,7 @@ struct ChatView: View {
     private var chatActions: ChatActions {
         ChatActions(
             // The editor the Mac opens that file with, which is the one the user chose.
-            open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
+            open: { [model] location in model.open(URL(filePath: location.path), on: model.selectedAgent?.host ?? .mac) },
             terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
@@ -90,7 +93,10 @@ struct ChatView: View {
                 frame.pane = .background
                 if !frame.isOpen { frame.open() }
             },
-            backgroundOutput: { item in BackgroundOutput.open(item) },
+            backgroundOutput: { [model] item in
+                guard let agent = model.selectedAgent else { return }
+                Task { await BackgroundOutput.open(item, of: agent, model: model) }
+            },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
             keepStopped: sandboxAnswer(carryOn: false),

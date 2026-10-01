@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -215,7 +218,7 @@ struct PromptBar: View {
         BackgroundActions(
             stop: { [model] item in await model.stopBackground(item, of: agent.id) },
             steps: { [chatActions] item in chatActions.subagentSteps?(item.id) },
-            output: { item in BackgroundOutput.open(item) })
+            output: { [model] item in Task { await BackgroundOutput.open(item, of: agent, model: model) } })
     }
 
     private var whereAndWhat: some View {
@@ -468,7 +471,7 @@ struct PromptBar: View {
                                                  set: { if !$0 { dictation.dismissProblem() } })) {
             // Where a switch would fix it, offer to open the switch.
             if let permission = dictation.problem?.permission {
-                Button("Open System Settings") { NSWorkspace.shared.open(permission.settings) }
+                Button("Open System Settings") { NSWorkspace.shared.open(permission.settings) }  // store-ok: System Settings, not a path
             }
             Button("OK", role: .cancel) {}
         } message: {
@@ -537,7 +540,7 @@ struct PromptBar: View {
     /// as a reference, which every runtime takes.
     private func attach(_ url: URL) {
         let isImage = ["png", "jpg", "jpeg", "gif", "heic", "webp"].contains(url.pathExtension.lowercased())
-        if isImage, model.promptCapabilities.allows(.image), let data = try? Data(contentsOf: url) {
+        if isImage, model.promptCapabilities.allows(.image), let data = try? Data(contentsOf: url) {  // store-ok: a file the person picked or dropped
             attachments.append(.image(data, mimeType: mimeType(for: url), name: url.lastPathComponent))
         } else {
             attachments.append(.file(url))

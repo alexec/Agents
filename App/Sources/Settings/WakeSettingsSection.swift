@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// Settings ▸ General ▸ Sleep. The switch and the hours after the last agent stops.

@@ -1,0 +1,18 @@
+# The load balancer in front of the copies (058, T068): TLS with the certificate made by
+# make-secrets.sh, whose pin goes into every code, and WebSockets passed through to any copy
+# that says it can reach the store.
+{
+	auto_https off
+	admin off
+}
+
+:8443 {
+	tls /secrets/cert.pem /secrets/key.pem
+	reverse_proxy cp1:8791 cp2:8791 cp3:8791 {
+		lb_policy round_robin
+		lb_try_duration 5s
+		health_uri /readyz
+		health_interval 2s
+		fail_duration 5s
+	}
+}

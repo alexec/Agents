@@ -14,18 +14,10 @@ import Foundation
 /// reported as unreadable rather than guessed at, because a workflow that runs
 /// something other than what its author wrote is worse than one that does not run.
 public enum WorkflowFile {
-    public static let fileExtension = "md"
-    /// Where a project keeps them. One folder, so nothing else in a repository can
-    /// accidentally become a thing that starts agents.
-    public static let folderName = ".agents/workflows"
-
-    public static func folder(in project: URL) -> URL {
-        project.appending(path: folderName, directoryHint: .isDirectory)
-    }
-
-    public static func url(for workflowID: String, in project: URL) -> URL {
-        folder(in: project).appending(path: "\(workflowID).\(fileExtension)")
-    }
+    public static let fileExtension = WorkflowPaths.fileExtension
+    public static let folderName = WorkflowPaths.folderName
+    public static func folder(in project: URL) -> URL { WorkflowPaths.folder(in: project) }
+    public static func url(for workflowID: String, in project: URL) -> URL { WorkflowPaths.url(for: workflowID, in: project) }
 
     /// Read and parse one file. A file that cannot be read at all is still a workflow —
     /// one carrying its problem, so the project page can say what is wrong with it

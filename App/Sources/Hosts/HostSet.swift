@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import AppKit
 import Foundation
 import Network
@@ -44,8 +47,9 @@ final class HostSet {
     @ObservationIgnored private var retrying: [HostID: Task<Void, Never>] = [:]
     @ObservationIgnored private let store: HostStore
     @ObservationIgnored private let locations: StoreLocations
-    /// The sign-ins this Mac relays to servers (047).
-    @ObservationIgnored lazy var relays = SignInRelays(locations: locations)
+    /// The sign-ins this Mac relays to servers (047). Certificates live with the
+    /// window, not in a host's root (058, R11).
+    @ObservationIgnored lazy var relays = SignInRelays(locations: StoreLocations(root: WindowFiles.support))
     @ObservationIgnored private var pathMonitor: NWPathMonitor?
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var quitObserver: (any NSObjectProtocol)?
@@ -54,6 +58,23 @@ final class HostSet {
     /// agents on them, carry on.
     func stopForQuit() {
         for connection in connections.values { connection.stopForQuit() }
+    }
+
+    /// The move across (058, US6): the control plane reaches these servers now, so the
+    /// window lets go of its own ssh to each and forgets them. Their daemons, and the
+    /// agents on them, carry on, and their list is kept beside, renamed, by the move.
+    func handOver() -> [HostID] {
+        let ids = hosts.all.map(\.id)
+        for id in ids {
+            listening[id]?.cancel()
+            retrying[id]?.cancel()
+            connections[id]?.stopForQuit()
+            connections[id] = nil
+            states[id] = nil
+            reachability.forget(id)
+            hosts.remove(id)
+        }
+        return ids
     }
 
     /// What a server said, and which one said it.
@@ -65,15 +86,28 @@ final class HostSet {
         self.locations = locations
         self.store = HostStore(locations: locations)
         self.hosts = store.load()
+        // Before the first log line or relay, so both are written where the window keeps them.
+        WindowFiles.prepare()
     }
 
-    var isEmpty: Bool { hosts.all.isEmpty }
+    var isEmpty: Bool { hosts.all.isEmpty && controlled.isEmpty }
+
+    /// Every server the window lists, its own and the control plane's (058), in the
+    /// order they were added, then by name.
+    var servers: [HostID] {
+        hosts.all.map(\.id) + controlled.filter { $0.key != .mac && hosts[$0.key] == nil }
+            .sorted { $0.value.label.localizedStandardCompare($1.value.label) == .orderedAscending }.map(\.key)
+    }
 
     func host(_ id: HostID) -> ServerHost? { hosts[id] }
 
     func label(_ id: HostID) -> String {
-        id == .mac ? "This Mac" : hosts[id]?.label ?? "a server"
+        id == .mac ? "This Mac" : hosts[id]?.label ?? controlled[id]?.label ?? "a server"
     }
+
+    /// Hosts the control plane reaches for this window (058, US3): their names, and
+    /// whether each is online. They have no ssh connection here; the control plane has it.
+    var controlled: [HostID: (label: String, online: Bool)] = [:]
 
     /// Since when a server that was connected has been gone. Kept through the retries,
     /// so the heading says Offline and since when rather than flickering to a spinner
@@ -86,6 +120,7 @@ final class HostSet {
 
     func state(_ id: HostID) -> ServerConnection.State {
         guard id != .mac else { return .connected }
+        if let controlled = controlled[id] { return controlled.online ? .connected : .offline(since: Date()) }
         let state = states[id] ?? .idle
         if case .connecting = state, let since = offlineSince[id] { return .offline(since: since) }
         return state
@@ -202,11 +237,12 @@ final class HostSet {
 
     // MARK: -
 
-    /// `<root>/hosts/hosts.log`: every server's state as it changes, for finding out
-    /// afterwards why one would not come back.
+    /// The window's `hosts.log`: every server's state as it changes, for finding out
+    /// afterwards why one would not come back. Beside the host's root once a control
+    /// plane is set (058, R11).
     private func log(_ line: String) {
-        let file = locations.hostsFolder.appendingPathComponent("hosts.log")
-        try? FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
+        let file = WindowFiles.hostsLog
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         let stamped = "\(ISO8601DateFormatter().string(from: Date())) \(line)\n"
         if let handle = try? FileHandle(forWritingTo: file) {
             handle.seekToEndOfFile(); handle.write(Data(stamped.utf8)); try? handle.close()

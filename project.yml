@@ -51,6 +51,12 @@ packages:
   # the grammars are seventeen megabytes it has no use for.
   CodeText:
     path: Packages/CodeText
+  # The control plane as a service (058): Agents Host carries its agents-control.
+  ControlPlane:
+    path: Packages/ControlPlane
+  swift-nio-ssl:
+    url: https://github.com/apple/swift-nio-ssl.git
+    from: 2.29.0
 targets:
   Agents:
     type: application
@@ -85,6 +91,13 @@ targets:
       # `CODE_SIGN_ENTITLEMENTS` below is what actually signs it in.
       - path: App/Agents.entitlements
         buildPhase: none
+      # The two launch agents Run one on this Mac registers (058, R5). SMAppService
+      # reads them from here and nowhere else.
+      - path: App/LaunchAgents
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
     dependencies:
       - package: AgentsKit
       - package: SwiftTerm
@@ -92,6 +105,12 @@ targets:
       # The helper goes in the bundle, so there is one thing to build, one thing to
       # sign, and nothing for anyone to install.
       - target: agentsd
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      # The control plane (058), in the bundle for the same reason: Run one on this Mac
+      # has nothing to download.
+      - target: agents-bridge
         copy:
           destination: wrapper
           subpath: Contents/Helpers
@@ -126,6 +145,91 @@ targets:
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
+  # The App Store window (058, research R12): the same sources as Agents, built with
+  # AGENTS_STORE, sandboxed, and linking AgentsKitCore only, as the Remote does. It
+  # carries no helpers, no Linux programs and no install scripts: Agents Host runs the
+  # agents, and the window reaches them through the control plane. Its own bundle id
+  # while the developer window exists, so a walk never shares the real app's defaults.
+  AgentsStore:
+    type: application
+    supportedDestinations: [macOS]
+    # The sandbox gate (T044b): linking only Core stops a Process, not a read of the disk
+    # or Finder pointed at a path. This does, before anything compiles.
+    preBuildScripts:
+      - name: Check the sandbox gate
+        script: python3 "$SRCROOT/scripts/check-store-window.py"
+        basedOnDependencyAnalysis: false
+    sources:
+      - path: App/Sources
+        excludes:
+          # The window's own hosts, ssh and launch agents: the control plane's and
+          # Agents Host's now (T049b, T049c).
+          - Hosts/HostSet.swift
+          - Hosts/AddServerFlow.swift
+          - Hosts/AddServerSheet.swift
+          - Hosts/RebuiltServerSheet.swift
+          - Hosts/SignInRelays.swift
+          - Hosts/WindowFiles.swift
+          - Control/LocalServices.swift
+          - Control/MoveAcross.swift
+          - Settings/ServersSettingsView.swift
+      - path: App/Resources
+        excludes:
+          - servers
+          - toolsets
+      - path: Shared/UI
+      - path: App/Agents-Store.entitlements
+        buildPhase: none
+    dependencies:
+      - package: AgentsKit
+        product: AgentsKitCore
+      - package: SwiftTerm
+      - package: CodeText
+    info:
+      path: App/Info-Store.plist
+      properties:
+        CFBundleDisplayName: Agents
+        CFBundleName: Agents
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: © 2026 Alex Collins
+        NSMicrophoneUsageDescription: >-
+          So you can say what you want done instead of typing it.
+        NSSpeechRecognitionUsageDescription: >-
+          So what you say becomes the words in the prompt. It is recognised on this Mac
+          where this Mac can do it.
+        NSLocalNetworkUsageDescription: >-
+          To find and reach your agents' control plane on this network.
+        NSBonjourServices: [_agents-control._tcp]
+        # Where "Set one up on this Mac" sends the person (frame K).
+        AgentsHostDownloadURL: https://github.com/alexec/Agents/releases/latest
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.store
+        CODE_SIGN_ENTITLEMENTS: App/Agents-Store.entitlements
+        PRODUCT_NAME: Agents
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) AGENTS_STORE"
+        # The gate reads the sources, which a sandboxed script phase may not.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        # While US1 is under way: see every error, not the first file's (S5).
+        OTHER_SWIFT_FLAGS: "$(inherited) -Xfrontend -continue-building-after-errors"
+      # The App Store archive (058, T089, T093): Apple Distribution and the App Store profile
+      # made for it, so the archive carries the entitlements an upload is checked against.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Agents Store App Store
   # The remote: the same app, laid out for a phone and an iPad. It links
   # AgentsKitCore and nothing else, which is the rule that keeps a `Process` or a PTY
   # from ever reaching it — the compiler refuses before a reviewer has to.
@@ -219,6 +323,13 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
+      # The App Store archive (058, T089): production push and iCloud. Uploading is Alex's.
+      configs:
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Remote/Remote-AppStore.entitlements
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Agents Remote App Store
 
   # Opens the sealed headline in a loud push and puts the words in the banner, on
   # the device (021 T068). Links AgentsKitCore only, as the Remote does.
@@ -252,6 +363,11 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Agents Remote Notify App Store
 
   # The Home-screen widget (068). It shows the count of sessions that need a person, and
   # a tap on a row opens that conversation in the Remote. It links AgentsKitCore and
@@ -344,6 +460,133 @@ targets:
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
 
+  # agents-relay (058, T096): the bridge's relay and mailbox, cut down to a helper of
+  # Agents Host that carries devices to the control plane through iCloud. Signed as the
+  # bridge, with its iCloud container (Alex's choice: nothing new in the developer
+  # account), so it must not run beside the old bridge's mailbox on one Mac.
+  agents-relay:
+    type: application
+    supportedDestinations: [macOS]
+    sources:
+      - path: Host/Relay/Sources
+      - path: Bridge/agents-bridge.entitlements
+        buildPhase: none
+    dependencies:
+      - package: AgentsKit
+    info:
+      path: Host/Relay/Info.plist
+      properties:
+        CFBundleName: agents-relay
+        CFBundleDisplayName: Agents Relay
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: true
+        LSBackgroundOnly: true
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.bridge
+        PRODUCT_NAME: agents-relay
+        CODE_SIGN_ENTITLEMENTS: Bridge/agents-bridge.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+
+  # Agents Host (058, US2, T054): the download of its own that runs this Mac's host and,
+  # when chosen, the control plane's single copy, as launch agents. Not sandboxed and not
+  # in the App Store, because it runs programs for the person's agents; Developer ID for
+  # a release. Its window is frame L.
+  AgentsHost:
+    type: application
+    supportedDestinations: [macOS]
+    sources:
+      - path: Host/Sources
+      - path: Host/AgentsHost.entitlements
+        buildPhase: none
+      # The two launch agents Run it here registers (T055). SMAppService reads them from
+      # here and nowhere else.
+      - path: Host/LaunchAgents
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
+      # What this Mac's host gives a server and downloads for a runtime (037, 048), as
+      # the Agents target carries them until the developer window goes (T106).
+      - path: App/Resources/servers
+        type: folder
+        optional: true
+      - path: App/Resources/toolsets
+        type: folder
+    dependencies:
+      - package: AgentsKit
+        product: AgentsKit
+      - package: AgentsKit
+        product: AgentsKitCore
+      - target: agentsd
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      - target: agents-control
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      - target: agents-relay
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+    info:
+      path: Host/Info.plist
+      properties:
+        CFBundleDisplayName: Agents Host
+        CFBundleName: Agents Host
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: © 2026 Alex Collins
+        # A menu bar item and one window; no Dock tile.
+        LSUIElement: true
+        # agents-host://pair: the App Store window's K2 asks for a code to be shown.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.alexecollins.agents.host
+            CFBundleURLSchemes: [agents-host]
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.host
+        CODE_SIGN_ENTITLEMENTS: Host/AgentsHost.entitlements
+        PRODUCT_NAME: Agents Host
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
+
+  # The control plane's program (058), built here for Agents Host's bundle; Linux builds it
+  # with `swift build` in Packages/ControlPlane.
+  agents-control:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Packages/ControlPlane/Sources/agents-control
+    dependencies:
+      - package: ControlPlane
+        product: ControlPlaneKit
+      - package: AgentsKit
+        product: AgentsKitCore
+      - package: swift-nio-ssl
+        product: NIOSSL
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.control
+        PRODUCT_NAME: agents-control
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+
   agentsd:
     type: tool
     supportedDestinations: [macOS]
@@ -361,10 +604,31 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
 
 schemes:
+  AgentsHost:
+    build:
+      targets:
+        AgentsHost: all
+    run:
+      config: Debug
+  AgentsStore:
+    build:
+      targets:
+        AgentsStore: all
+    run:
+      config: Debug
+    # The Mac App Store archive (058, T089), checked by scripts/check-store-archive.sh.
+    archive:
+      config: Release
   agents-bridge:
     build:
       targets:
         agents-bridge: all
+    run:
+      config: Debug
+  agents-relay:
+    build:
+      targets:
+        agents-relay: all
     run:
       config: Debug
   Remote:
@@ -373,6 +637,8 @@ schemes:
         Remote: all
     run:
       config: Debug
+    archive:
+      config: Release
   # On its own, for a widget that will not install and no error worth reading in the
   # Remote's own build log (068).
   RemoteWidget:

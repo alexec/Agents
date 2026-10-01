@@ -73,8 +73,8 @@ struct UnreportedEndingTests {
         #expect(await core.agent(id)?.outcomeAsked == true)
     }
 
-    /// The ask names `finish_turn`; an agent answers it by that name or, if it was
-    /// briefed before 023, by `report_outcome`. The older name is
+    /// The ask names `finish_turn`; a helper started from an older build may still answer by
+    /// `report_outcome`, whose daemon method stays. The older name is
     /// `anAnsweredQuestionLeavesNothingMarkingItAsHavingBeenAsked` above; this is the
     /// new one, and the ending is accounted for either way (FR-018).
     @Test func anAnswerByEitherNameAccountsForTheEnding() async throws {
@@ -103,9 +103,7 @@ struct UnreportedEndingTests {
         #expect(try await asks(core, id) == 1)
     }
 
-    /// The ask names the one tool a fresh conversation was told about, and neither of
-    /// the older names — an agent briefed with those answers by them all the same,
-    /// because the aliases are accepted everywhere (023, FR-018).
+    /// The ask names the one tool, and neither of the retired older names (023 R5).
     @Test func theQuestionNamesTheOneTool() async throws {
         let (locations, work) = try temporary()
         let core = try core(FakeLauncher(), locations: locations)
@@ -115,8 +113,7 @@ struct UnreportedEndingTests {
         try await settle(core, id)
         let asked = try #require(try await prompts(core, id).first { $0.1 == .app }?.0)
         #expect(asked.contains(AppTool.finishTurn))
-        #expect(!asked.contains(AppTool.reportOutcome))
-        #expect(!asked.contains(AppTool.suggestPrompts))
+        for retired in AppTool.retiredEndOfTurn { #expect(!asked.contains(retired)) }
     }
 
     /// SC-009, counted. The turn the question causes comes back through the same

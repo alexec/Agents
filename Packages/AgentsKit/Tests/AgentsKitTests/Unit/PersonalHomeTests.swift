@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// Which home folder a daemon lays out (054, research R4): the real one only for the
 /// ordinary daemon, a named one for a scratch copy that asks, and none otherwise.

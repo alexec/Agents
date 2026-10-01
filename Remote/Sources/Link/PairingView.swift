@@ -19,11 +19,11 @@ struct PairingView: View {
                 .font(.system(size: 28, weight: .light))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text("Pair with your Mac")
+            Text("Connect to your agents")
                 .appText(.reading).fontWeight(.semibold)
                 .multilineTextAlignment(.center)
-            Text("On your Mac, open Agents ▸ Settings ▸ Devices and choose Pair a Device. "
-                 + "Then scan the code it shows, with this \(device) on the same Wi-Fi.")
+            Text("On your Mac, choose Pair a Window or Phone… in Agents Host, or Pair a Device in "
+                 + "Agents ▸ Settings. Then scan the code it shows, or copy it and paste it here.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -38,6 +38,13 @@ struct PairingView: View {
             .buttonStyle(.paperProminent)
             .disabled(model.pairing == .pairing)
             .padding(.top, 8)
+            // A code sent as text, as App Review is given one (058, T092).
+            PasteButton(payloadType: String.self) { strings in
+                guard let text = strings.first?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
+                model.forgetPairingOutcome()
+                Task { await model.pair(scanned: text) }
+            }
+            .disabled(model.pairing == .pairing)
         }
         .padding(32)
         .frame(maxWidth: 420)

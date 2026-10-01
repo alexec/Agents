@@ -77,7 +77,9 @@ struct ToolPolicyTests {
         }
         #expect(RemitCategory.standingArrangements.instead.contains(AppTool.manageWorkflows))
         #expect(RemitCategory.suggestions.instead.contains(AppTool.finishTurn))
-        #expect(!RemitCategory.suggestions.instead.contains(AppTool.suggestPrompts))
+        for retired in AppTool.retiredEndOfTurn {
+            #expect(!RemitCategory.suggestions.instead.contains(retired))
+        }
     }
 
     /// The one tool this feature could break that would matter most. Every runtime the
@@ -174,14 +176,14 @@ struct ToolPolicyTests {
     /// Codex (047): no `_meta` and no flags, one variable holding the feature switches as
     /// JSON, the same text every launch, and ChatGPT offered first. `multi_agent` was
     /// already on (057) and `goals` came back with the rest of the task trackers
-    /// (2026-09-29), so the two that are off are the ones the app has an answer for.
+    /// (2026-09-29). Memory is left to Codex's own configuration.
     @Test func codexSendsItsFeatureSwitchesInCodexConfig() throws {
         let policy = ToolPolicyCatalog.codex
         #expect(policy.sessionMeta == nil)
         #expect(policy.launchArguments.isEmpty)
         #expect(policy.environmentFiles.isEmpty)
         #expect(policy.launchEnvironment == ["CODEX_CONFIG":
-            #"{"features":{"apps":false,"default_mode_request_user_input":true,"goals":true,"in_app_local_automation":false,"memories":false,"multi_agent":true,"sleep_tool":false}}"#])
+            #"{"features":{"apps":false,"default_mode_request_user_input":true,"goals":true,"in_app_local_automation":false,"multi_agent":true,"sleep_tool":false}}"#])
         #expect(policy.escalationTool == "request_user_input")
         #expect(policy.kept.map(\.name) == ["request_user_input", "goals"])
         #expect(policy.preferredAuthMethods == ["chat-gpt", "chat-gpt-device-code", "api-key"])
@@ -483,7 +485,8 @@ struct ToolPolicyTests {
         let names = try #require(meta["claudeCode"]?["options"]?["disallowedTools"]?.arrayValue).compactMap(\.stringValue)
         #expect(names.contains("EnterWorktree"))
         #expect(names.contains("ExitWorktree"))
-        #expect(RemitCategory.workingFolder.instead.contains(AppTool.enterWorktree))
+        #expect(RemitCategory.workingFolder.instead.contains(AppTool.finishTurn))
+        #expect(RemitCategory.workingFolder.instead.contains("leave_worktree"))
     }
 
     /// The relay table (056): Codex's config reads as it did in 047, Claude's relay is

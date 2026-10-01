@@ -26,40 +26,34 @@ struct TranscriptRow: View {
     }
 }
 
-/// One turn: the ask, answers, and latest work — or every block, with optional
-/// tool detail.
+/// One turn, at the level it is drawn at (069).
 ///
-/// A block is a tool call, drawn as the description the agent gave it, or something the
-/// agent said. Clicking any block of a turn moves it on to the next of the three.
+/// Its outcome — the ask, the answers, the reply and how it went — is drawn at every
+/// level. Between the ask and the outcome, one control opens the steps; it is the only
+/// thing in a turn that does, so the reply's text can be selected like any other.
 struct TurnView: View {
-    enum Detail: Hashable {
-        case concise, normal, verbose
-
-        var next: Detail {
-            switch self {
-            case .concise: return .normal
-            case .normal: return .verbose
-            case .verbose: return .concise
-            }
-        }
-
-        var help: String {
-            switch next {
-            case .concise: return "Show the latest step and its context"
-            case .normal: return "Show every step of this turn"
-            case .verbose: return "Show what each tool was given and gave back"
-            }
-        }
-    }
-
     let turn: ChatTurn
-    let detail: Detail
+    /// The app's default, or what the person chose for this turn.
+    let detail: TurnDetail
     /// A stored turn's own entries, once fetched.
     let fetched: [TranscriptItem]?
+    /// Whether this is the turn still going.
+    let isLive: Bool
     let toggle: () -> Void
+    /// Fetch a stored turn's entries, for a turn drawn with its steps.
+    let fetch: () async -> Void
 
-    private var blocks: [TranscriptItem] {
-        turn.blocks.isEmpty ? (fetched ?? []).filter { $0.isBlock || $0.isUserInput } : turn.blocks
+    private var isWaitingForEntries: Bool { turn.isSummaryOnly && fetched == nil }
+    private var items: [TranscriptItem] { turn.isSummaryOnly ? (fetched ?? []) : turn.items }
+    private var parts: TurnParts? { isWaitingForEntries ? nil : TurnParts(items, isLive: isLive) }
+    private var outcome: [TranscriptItem] { parts?.outcome ?? turn.storedOutcome ?? [] }
+    /// Nil for a summary written before 069, whose steps are not counted.
+    private var stepCount: Int? { parts?.stepCount ?? turn.storedStepCount }
+    /// Open, the steps are drawn in order above the outcome; thinking only at Details.
+    private var steps: [TranscriptItem] {
+        let outcome = Set((parts?.outcome ?? []).map(\.id))
+        return TurnParts.drawn(items, isLive: isLive)
+            .filter { !outcome.contains($0.id) && (detail == .details || !$0.isThought) }
     }
 
     var body: some View {
@@ -67,66 +61,122 @@ struct TurnView: View {
             if let ask = turn.ask {
                 TranscriptRow(item: ask)
             }
-            if detail == .concise {
-                ForEach(turn.concise) { item in
-                    if item.isUserInput { TranscriptRow(item: item) }
-                    else { block(item) }
+            if stepCount != 0 {
+                StepsControl(count: stepCount, isOpen: detail.showsSteps, toggle: toggle)
+            }
+            if detail.showsSteps, stepCount != 0 {
+                if isWaitingForEntries {
+                    ProgressView().controlSize(.small)
+                } else {
+                    // Under a thin rule, one indent in, as the look has them.
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(steps) { StepRow(item: $0, isOpen: detail == .details) }
+                    }
+                    .padding(.leading, 14)
+                    .overlay(alignment: .leading) {
+                        Rectangle().fill(.quaternary).frame(width: 2).padding(.leading, 5)
+                    }
+                    ForEach(outcome) { StepRow(item: $0, isOpen: false) }
                 }
             } else {
-                if blocks.isEmpty, fetched == nil, turn.range != nil {
-                    ProgressView().controlSize(.small)
-                }
-                ForEach(blocks) { item in
-                    if item.isUserInput { TranscriptRow(item: item) }
-                    else { block(item) }
-                }
+                // Under the control, where the steps would be: what it is doing now.
+                if let live = parts?.live { LiveLine(item: live) }
+                ForEach(outcome) { StepRow(item: $0, isOpen: false) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func block(_ item: TranscriptItem) -> some View {
-        BlockRow(item: item, detail: detail)
-            .contentShape(.rect)
-            .onTapGesture(perform: toggle)
-            .help(detail.help)
-            .accessibilityAction(.default, toggle)
-            .accessibilityHint(detail.help)
+        .task(id: detail.showsSteps) {
+            if detail.showsSteps, isWaitingForEntries { await fetch() }
+        }
     }
 }
 
-/// A tool call or something the agent said, as a turn draws it.
-private struct BlockRow: View {
+/// "12 steps", or "Hide steps": the one way into a turn's steps and back out.
+private struct StepsControl: View {
+    let count: Int?
+    let isOpen: Bool
+    let toggle: () -> Void
+    @State private var isHovering = false
+
+    private var words: String {
+        if isOpen { return "Hide steps" }
+        switch count {
+        case nil: return "Show steps"
+        case 1?: return "1 step"
+        case let n?: return "\(n) steps"
+        }
+    }
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 5) {
+                Image(systemName: isOpen ? "chevron.down" : "chevron.right")
+                    .imageScale(.small)
+                    .frame(width: 10)
+                Text(words)
+            }
+            .appText(.fine)
+            .foregroundStyle(isHovering ? .primary : .secondary)
+            .padding(.horizontal, 8)
+            #if os(iOS)
+            .frame(minHeight: 32)
+            #else
+            .padding(.vertical, 3)
+            #endif
+            .background {
+                // A finger has no hover, so on the phone the edge is always there.
+                #if os(iOS)
+                Capsule().strokeBorder(.quaternary)
+                #else
+                Capsule().strokeBorder(.quaternary).opacity(isHovering ? 1 : 0)
+                #endif
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help(isOpen ? "Hide this turn's steps" : "Show every step of this turn")
+        .accessibilityLabel(words)
+    }
+}
+
+/// A running turn's latest step, in one line, until the turn has its outcome.
+private struct LiveLine: View {
     let item: TranscriptItem
-    let detail: TurnView.Detail
+
+    var body: some View {
+        if case .toolRun(_, let calls) = item, let call = calls.last {
+            Text(call.turnLine)
+                .appText(.reading)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            StepRow(item: item, isOpen: false)
+        }
+    }
+}
+
+/// One item of a turn: a call a line of its own, anything else as it is drawn.
+private struct StepRow: View {
+    let item: TranscriptItem
+    /// Every call open from the start, at Details.
+    let isOpen: Bool
 
     var body: some View {
         switch item {
         case .toolRun(_, let calls):
-            VStack(alignment: .leading, spacing: detail == .verbose ? 12 : 4) {
-                ForEach(Array((detail == .concise ? Array(calls.suffix(1)) : calls).enumerated()),
-                        id: \.offset) { _, call in
-                    tool(call)
+            VStack(alignment: .leading, spacing: isOpen ? 12 : 4) {
+                ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
+                    ToolCallLine(call: call, lineText: call.turnLine, isOpen: isOpen, showsChevron: true)
                 }
             }
         case .entry(let entry):
             if case .toolCall(let call) = entry.kind {
-                tool(call)
+                ToolCallLine(call: call, lineText: call.turnLine, isOpen: isOpen, showsChevron: true)
             } else {
                 EntryRow(entry: entry)
             }
-        }
-    }
-
-    @ViewBuilder
-    private func tool(_ call: ToolCall) -> some View {
-        if detail == .verbose {
-            ToolCallLine(call: call, lineText: call.turnLine, isOpen: true)
-        } else {
-            Text(call.turnLine)
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -436,7 +486,11 @@ private struct ToolCallLine: View {
     /// What a click does instead of opening the call, where the line is standing in
     /// for a whole folded run.
     var onClick: (() -> Void)? = nil
+    /// A chevron before the line, as a turn's step draws it (069): on hover on the Mac,
+    /// always on the phone, where nothing hovers.
+    var showsChevron = false
     @State private var isExpanded = false
+    @State private var isHovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -474,13 +528,25 @@ private struct ToolCallLine: View {
     /// wraps to three lines is three lines of a run that reads as one call per line;
     /// the whole of it is a click away in the detail, where the raw input is.
     private var line: some View {
-        Text((lineText ?? call.line) + runsOn)
-            .appText(.reading)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if showsChevron, hasDetail {
+                Image(systemName: isExpanded || isOpen ? "chevron.down" : "chevron.right")
+                    .imageScale(.small)
+                    .frame(width: 10)
+                    .foregroundStyle(.tertiary)
+                    #if os(macOS)
+                    .opacity(isHovering || isExpanded || isOpen ? 1 : 0)
+                    #endif
+            }
+            Text((lineText ?? call.line) + runsOn)
+                .appText(.reading)
+                .foregroundStyle(isHovering ? .primary : .secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
+        .onHover { isHovering = showsChevron && $0 }
     }
 
     /// " · running in the background", while what this call started still runs (057).

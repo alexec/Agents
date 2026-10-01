@@ -1,0 +1,29 @@
+[PASS] 0 bucket: PUT /s4-spike -> 409 BucketAlreadyOwnedByYou
+[PASS] 0 sigv4-negative: PUT with a wrong secret -> 403 SignatureDoesNotMatch (expect 403 SignatureDoesNotMatch)
+[PASS] 1a create: PUT If-None-Match:* on a new key -> 200, ETag "8b04d5e3775d298e78455efc5ca404d5"
+[PASS] 1b create again: second PUT If-None-Match:* -> 412 PreconditionFailed (expect 412)
+[PASS] 1c unchanged: body after refused create = "first"
+[PASS] 2a update: PUT If-Match:<current> -> 200, ETag "8b04d5e3775d298e78455efc5ca404d5" -> "1b267619c4812cc46ee281747884ca50"
+[PASS] 2b stale: PUT If-Match:<stale> -> 412 PreconditionFailed (expect 412)
+[PASS] 2c unchanged: body after refused update = "v2", GET ETag "1b267619c4812cc46ee281747884ca50"
+[PASS] 2d if-match absent key: PUT If-Match on a key that does not exist -> 404 NoSuchKey
+[INFO] 2d detail: 404 NoSuchKey
+[INFO] 5a If-Match unquoted 1b267619c4812cc46ee281747884ca50 -> 200
+[INFO] 5b If-Match quoted "43a03299a3c3fed3d8ce7b820f3aca81" -> 200
+[INFO] 5c If-Match weak W/"5ed3a3ff8e5c29979502b9030e8518e0" -> 412 PreconditionFailed
+[INFO] 5d If-Match:* on an existing key -> 200
+[INFO] 5e If-Match:* on a missing key -> 404 NoSuchKey
+[INFO] 5f If-None-Match:<etag> (not *) on PUT -> 412 PreconditionFailed
+[INFO] 5g If-Match with a well-formed but wrong ETag -> 412 PreconditionFailed
+[INFO] 5h If-Match with the ETag upper-cased -> 412 PreconditionFailed
+[INFO] 5i rewrite identical bytes: ETag "0af45c99beb7a9afc9192665c4a05cd3" -> "0af45c99beb7a9afc9192665c4a05cd3" (200) — same-content writes keep the ETag
+[INFO] 4a DELETE If-Match:<wrong> -> 204; object afterwards GET 404
+[INFO] 4b DELETE If-Match:<current> -> 204; object afterwards GET 404
+[INFO] 4c DELETE If-Match on a missing key -> 204
+[INFO] 4d DELETE unconditional on a missing key -> 204
+[PASS] 3a If-Match race, 2 writers: 100 rounds: exactly-one-winner 100, none 0, several 0, stored body+ETag = winner's 100; replies 200×100, 412 PreconditionFailed×100
+[PASS] 3b If-None-Match race, 2 writers: 100 rounds: exactly-one-winner 100, none 0, several 0, stored body+ETag = winner's 100; replies 200×100, 412 PreconditionFailed×100
+[PASS] 3c If-Match race, 8 writers (extra): 100 rounds: exactly-one-winner 100, none 0, several 0, stored body+ETag = winner's 100; replies 200×100, 412 PreconditionFailed×700
+[PASS] 3d If-None-Match race, 8 writers (extra): 100 rounds: exactly-one-winner 100, none 0, several 0, stored body+ETag = winner's 100; replies 200×100, 412 PreconditionFailed×700
+[PASS] 6 start-up probe: create 200, create again 412 PreconditionFailed, delete 204
+ALL REQUIRED CHECKS PASSED (run 951ec150)

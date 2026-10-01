@@ -217,11 +217,11 @@ public struct TranscriptDisplayBuilder: Sendable {
         last = entry
         switch entry.kind {
         case .toolCall(let call), .toolCallUpdate(let call):
-            // The app's own end-of-turn call is not drawn, by any of its three names.
+            // The app's own end-of-turn call is not drawn, by its name or the two it had.
             // It is not hidden work: what it did is the row of chips above the prompt
             // and the report at the foot of the conversation, and a line here saying
             // so would be the same thing said twice.
-            if call.isFinishingTurn || call.isSuggestingPrompts || call.isReportingOutcome {
+            if call.isFinishingTurn || call.isRetiredEndOfTurn {
                 if let id = call.toolCallID { suppressed.insert(id) }
                 return
             }

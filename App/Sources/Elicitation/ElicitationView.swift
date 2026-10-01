@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// A question from the agent that wants a particular shape of answer.
@@ -38,7 +41,7 @@ struct ElicitationView: View {
                 case .url(let url):
                     HStack(spacing: 8) {
                         Button("Open") {
-                            if let link = URL(string: url) { NSWorkspace.shared.open(link) }
+                            if let link = URL(string: url) { NSWorkspace.shared.open(link) }  // store-ok: a link the agent sent, to the browser
                         }
                         .buttonStyle(.paperProminent)
                         .keyboardShortcut(.defaultAction)

@@ -1,0 +1,12 @@
+# The demo host (058, T092): the Linux agentsd, a demo project, and the echo runtime only.
+FROM debian:stable-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git netcat-openbsd \
+ && rm -rf /var/lib/apt/lists/* && useradd -m -u 10002 demo
+COPY bin/ /bin-in/
+RUN case "$(uname -m)" in aarch64) a=aarch64;; x86_64) a=x86_64;; *) exit 1;; esac \
+ && cp /bin-in/agentsd-linux-$a /usr/local/bin/agentsd && chmod 755 /usr/local/bin/agentsd && rm -rf /bin-in
+COPY host-entry.sh /usr/local/bin/host-entry.sh
+RUN chmod 755 /usr/local/bin/host-entry.sh && mkdir -p /home/demo/root && chown demo /home/demo/root
+USER demo
+ENV AGENTS_ROOT=/home/demo/root HOME=/home/demo
+ENTRYPOINT ["/usr/local/bin/host-entry.sh"]

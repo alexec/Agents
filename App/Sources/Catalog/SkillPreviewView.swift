@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// One skill before it goes in (059, look/ frame C, and frame E's left-hand sheet): who

@@ -15,8 +15,10 @@ struct ChatTranscript: View {
     let agent: Agent
     /// The turn in progress and any since, folded.
     let items: [TranscriptItem]
-    /// The finished turns before `items`, as stored: drawn concise until opened.
+    /// The finished turns before `items`, as stored: drawn from their outcome until opened.
     var stored: [TurnSummary] = []
+    /// The level a turn starts at, the app's one setting (069).
+    var defaultDetail: TurnDetail = .outcome
     /// Whether there is more of the conversation before the first page in hand.
     let hasMore: Bool
     /// How many entries are in hand. Growth is what "something new" means.
@@ -40,8 +42,8 @@ struct ChatTranscript: View {
     /// go only while it is, so nothing leaves from above somebody reading back.
     var onFollowing: (Bool) -> Void = { _ in }
 
-    /// The turns drawn other than concise, by id.
-    @State private var turnViews: [UUID: TurnView.Detail] = [:]
+    /// The turns opened or closed by hand, by id. Kept until the chat is left (069).
+    @State private var turnViews: [UUID: TurnDetail] = [:]
     /// Every entry of a stored turn once it has been opened, folded.
     @State private var fetchedTurns: [UUID: [TranscriptItem]] = [:]
     /// Set once the pane is sitting at the foot of the conversation. Until then the
@@ -105,18 +107,16 @@ struct ChatTranscript: View {
                     }
                     // Folded once by the model as each entry lands, not here on every
                     // redraw: a reply arrives several chunks a second.
-                    // Each turn starts with its ask, answers, and latest work until a
-                    // block is clicked to show every step.
+                    // Each turn at the app's level, or the one chosen for it. A new turn
+                    // leaves the ones before it as they were: one being read stays open.
                     ForEach(rows) { turn in
                         TurnView(turn: turn,
-                                 detail: turnViews[turn.id] ?? .concise,
+                                 detail: turnViews[turn.id] ?? defaultDetail,
                                  fetched: fetchedTurns[turn.id],
-                                 toggle: { toggle(turn) })
+                                 isLive: turn.id == rows.last?.id && isWorking,
+                                 toggle: { toggle(turn) },
+                                 fetch: { await fetch(turn) })
                             .id(turn.id)
-                    }
-                    // A new turn puts the one before it back to concise.
-                    .onChange(of: rows.last?.id) { before, _ in
-                        if let before { turnViews[before] = nil }
                     }
                     .environment(\.backgroundWork, agent.background)
                     ForEach(agent.queuedPrompts) { queued in
@@ -276,8 +276,9 @@ struct ChatTranscript: View {
             // this lands on it.
             .onChange(of: focusedEntry) {
                 guard let focusedEntry else { return }
-                if let turn = rows.first(where: { $0.blocks.contains { $0.id == focusedEntry } }) {
-                    turnViews[turn.id] = .normal
+                if let turn = rows.first(where: { $0.items.contains { $0.id == focusedEntry } }),
+                   !(turnViews[turn.id] ?? defaultDetail).showsSteps {
+                    turnViews[turn.id] = .steps
                 }
                 // Being sent to a line in the middle is being sent away from the end,
                 // and it was asked for. Following on from here would take the reader
@@ -322,16 +323,27 @@ struct ChatTranscript: View {
         }
     }
 
-    /// Concise, then normal, then verbose, then concise again; fetching a stored turn's
-    /// entries the first time it is opened.
+    /// Open a turn's steps, or close them. Open is the app's level when that shows
+    /// steps, and Steps when it does not; closed is always the outcome, never a trip
+    /// through Details.
     private func toggle(_ turn: ChatTurn) {
-        let next = (turnViews[turn.id] ?? .concise).next
-        turnViews[turn.id] = next == .concise ? nil : next
-        guard next != .concise else { return }
-        guard turn.blocks.isEmpty, let range = turn.range, fetchedTurns[turn.id] == nil else { return }
-        Task {
-            let entries = await actions.turnEntries(agent.id, range)
-            fetchedTurns[turn.id] = TranscriptEntry.display(entries)
+        let now = turnViews[turn.id] ?? defaultDetail
+        turnViews[turn.id] = now.showsSteps ? .outcome : (defaultDetail.showsSteps ? defaultDetail : .steps)
+    }
+
+    /// A stored turn's entries, the first time it is drawn with its steps. The ask is
+    /// the turn's own and is drawn already.
+    private func fetch(_ turn: ChatTurn) async {
+        guard turn.isSummaryOnly, let range = turn.range, fetchedTurns[turn.id] == nil else { return }
+        let items = TranscriptEntry.display(await actions.turnEntries(agent.id, range))
+        fetchedTurns[turn.id] = items.first?.isPersonsAsk == true ? Array(items.dropFirst()) : items
+    }
+
+    /// Whether the conversation's last turn is still going.
+    private var isWorking: Bool {
+        switch agent.state {
+        case .running, .starting, .waitingOnUser: return true
+        default: return false
         }
     }
 

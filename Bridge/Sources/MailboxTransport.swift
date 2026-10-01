@@ -25,9 +25,76 @@ final class MailboxTransport {
     private let mailbox = CloudKitMailbox()
     private let client = DaemonClient(link: SocketLink())
     private var prepared = false
+    /// What has already been sealed, so a host saying the same need again does not buzz twice.
+    private struct Posted {
+        var device: UUID
+        var alert: Bool
+        var at: Date
+    }
+    private var postedTo: [NeedID: Posted] = [:]
+    private var plane: ControlPlane?
 
     func start() {
         Task { await run() }
+    }
+
+    /// Notices come from hosts, unsealed, rather than from this Mac's daemon already sealed.
+    func follow(_ plane: ControlPlane) {
+        self.plane = plane
+    }
+
+    /// A host's `attention/need`. Picks the device from every client's presence and seals
+    /// to it (058, R6). A withdrawal, or a person at a screen, takes the banner down.
+    func heard(_ params: JSONValue?) async {
+        guard let plane, let message = try? params?.decode(DaemonAPI.AttentionNeed.self) else { return }
+        if let id = message.withdraw {
+            await withdraw(id)
+            return
+        }
+        guard let need = message.need else { return }
+        let presences = await plane.router.foldedPresences()
+        let devices = await plane.devicesForNotices()
+        let now = Date()
+        guard let chosen = ControlNotices.device(for: need, presences: presences, devices: devices,
+                                                 delivery: delivery(of: need.id), now: now),
+              let device = devices.first(where: { $0.id == chosen.id }),
+              let envelope = try? Envelope.seal(need.headline, to: device.publicKey) else {
+            await withdraw(need.id)
+            return
+        }
+        if let previous = postedTo[need.id], previous.device == chosen.id {
+            // Same device: a later decision that would show it quietly must not replace
+            // the banner, and one that would buzz again is the ladder saying the interval passed.
+            if previous.alert || !chosen.alert { return }
+        }
+        if let previous = postedTo[need.id], previous.device != chosen.id {
+            await post(MailboxItem(needID: need.id, device: previous.device, envelope: nil,
+                                   alert: false, postedAt: now))
+        }
+        postedTo[need.id] = Posted(device: chosen.id, alert: chosen.alert, at: now)
+        await post(MailboxItem(needID: need.id, device: chosen.id, envelope: envelope,
+                               alert: chosen.alert, postedAt: now))
+    }
+
+    private func delivery(of id: NeedID) -> Delivery? {
+        guard let posted = postedTo[id] else { return nil }
+        return Delivery(needID: id, to: .device(posted.device), alertedAt: posted.at,
+                        alertCount: posted.alert ? 1 : 0)
+    }
+
+    private func withdraw(_ id: NeedID) async {
+        guard let previous = postedTo.removeValue(forKey: id) else { return }
+        await post(MailboxItem(needID: id, device: previous.device, envelope: nil, alert: false, postedAt: Date()))
+    }
+
+    private func post(_ item: MailboxItem) async {
+        do {
+            try await prepareOnce()
+            try await mailbox.post(item)
+            log("mailbox: posted \(item.envelope == nil ? "a withdrawal" : "a need") for \(item.device)")
+        } catch {
+            log("mailbox: posting failed: \(error)")
+        }
     }
 
     private func run() async {

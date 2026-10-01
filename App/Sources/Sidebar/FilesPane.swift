@@ -1,4 +1,7 @@
+import AgentsKitCore
+#if !AGENTS_STORE
 import AgentsKit
+#endif
 import SwiftUI
 
 /// The agent's folder, and what is in it.
@@ -19,7 +22,9 @@ struct FilesPane: View {
     @State private var problem: String?
     @State private var probe: FileProbe?
     @State private var fileProblem: String?
+    #if !AGENTS_STORE
     @State private var watch: FolderWatch?
+    #endif
     @State private var touched = TouchedPaths()
     /// Which stretch of whose conversation `touched` has folded, by position in the
     /// whole transcript. Entries outside it — new at the end, or an earlier page in
@@ -39,10 +44,19 @@ struct FilesPane: View {
 
     private var folder: URL { state.folder ?? agent.cwd }
 
-    /// A server agent's folder is read through its server (037). Nil for this Mac's,
-    /// which is read straight off the disk as it always was.
-    private var server: RemoteFiles? { agent.host == .mac ? nil : model.serverFiles(agent.host) }
-    private var serverLabel: String? { agent.host == .mac ? nil : model.hosts.label(agent.host) }
+    /// A host's folder is read through that host (037). Nil for the one on this Mac,
+    /// which is read straight off the disk (058, R11).
+    #if AGENTS_STORE
+    /// The store window reads every host's files through the host, this Mac's included.
+    private var onThisMac: Bool { false }
+    #else
+    private var onThisMac: Bool { model.isOnThisMac(agent.host) }
+    #endif
+    private var server: RemoteFiles? { onThisMac ? nil : model.serverFiles(agent.host) }
+    private var serverLabel: String? { onThisMac ? nil : model.hosts.label(agent.host) }
+    /// Where a file the pane will not draw is, when Finder here cannot show it: nil for
+    /// this Mac's host, whose files the store window reveals and opens through it.
+    private var elsewhere: String? { model.isOnThisMac(agent.host) ? nil : model.hosts.label(agent.host) }
     private var serverChanges: Int { server?.changeCount(agentID: agent.id, folder: folder) ?? 0 }
 
     var body: some View {
@@ -57,7 +71,9 @@ struct FilesPane: View {
         }
         .task(id: agent.id) { await start() }
         .onDisappear {
+            #if !AGENTS_STORE
             watch?.stop(); watch = nil
+            #endif
             if let server { Task { await server.unwatch(agentID: agent.id, folder: agent.cwd) } }
         }
         // A server says `files/changed` where FSEvents would have told this Mac.
@@ -239,10 +255,11 @@ struct FilesPane: View {
                     }
                 }
             case .image(let description):
-                ImageFile(url: url, probe: probe, description: description, server: serverLabel)
+                ImageFile(url: url, probe: probe, description: description, server: serverLabel,
+                          elsewhere: elsewhere, host: agent.host)
             case .binary(let description):
                 // Its bytes are never shown (FR-014). What is shown is the way out.
-                OpenElsewhere(url: url, description: description, server: serverLabel)
+                OpenElsewhere(url: url, description: description, server: elsewhere, host: agent.host)
             }
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -267,11 +284,14 @@ struct FilesPane: View {
     }
 
     private func startWatching() {
+        #if !AGENTS_STORE
         watch?.stop()
+        #endif
         if let server {
             Task { await server.watch(agentID: agent.id, folder: agent.cwd) }
             return
         }
+        #if !AGENTS_STORE
         // The watch is on the agent's whole folder, but the pane only re-reads the
         // directory it is showing and the file it has open. FSEvents coalesces, so a
         // build writing thousands of files is a handful of events, not thousands.
@@ -285,6 +305,7 @@ struct FilesPane: View {
                 if let openFile = state.openFile { reloadFile(openFile) }
             }
         }
+        #endif
     }
 
     private func open(folder url: URL) {
@@ -326,6 +347,7 @@ struct FilesPane: View {
             }
             return
         }
+        #if !AGENTS_STORE
         guard inBackground else {
             show(Result { try DirectoryReader.read(folder) }, of: folder)
             return
@@ -341,6 +363,7 @@ struct FilesPane: View {
             guard request == listingRequest else { return }
             show(read, of: folder)
         }
+        #endif
     }
 
     private func show(_ read: Result<DirectoryListing, any Error>, of folder: URL) {
@@ -348,6 +371,7 @@ struct FilesPane: View {
         case .success(let fresh):
             listing = fresh
             problem = nil
+        #if !AGENTS_STORE
         case .failure(DirectoryReader.Failure.gone):
             // Never leave contents on screen that cannot be vouched for (FR-016).
             listing = nil
@@ -355,6 +379,7 @@ struct FilesPane: View {
         case .failure(DirectoryReader.Failure.notReadable):
             listing = nil
             problem = "\(folder.lastPathComponent) cannot be opened."
+        #endif
         case .failure:
             listing = nil
             problem = "\(folder.lastPathComponent) could not be read."
