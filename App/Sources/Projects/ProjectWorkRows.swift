@@ -4,14 +4,14 @@ import AgentsKit
 #endif
 import SwiftUI
 
-/// What the project is working on besides its sessions, under them in the middle column
-/// and above Archived: its workflows. A list section of rows the size of a session's, so
+/// What the project is working on besides its sessions, under them in the middle column:
+/// its workflows. A list section of rows the size of a session's, so
 /// the column reads as one list, and each opens its page on the right as a session opens
 /// its chat.
 ///
 /// Always there for a project, even with none, so the place to find workflows is always
-/// the same place: an empty one says what a workflow is and offers to have an agent write
-/// one. Archived workflows fold away at its foot, where their pages (and Bring Back) are.
+/// the same place: an empty one says None. Archived workflows fold away at its foot,
+/// where their pages (and Bring Back) are.
 struct ProjectWorkSections: View {
     @Environment(AppModel.self) private var model
     let folder: URL?
@@ -32,7 +32,10 @@ struct ProjectWorkSections: View {
                     WorkflowListRow(summary: summary)
                 }
                 if workflows.isEmpty {
-                    NoWorkflowsLine()
+                    Text("None")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                 }
                 if !archived.isEmpty {
                     DisclosureGroup(isExpanded: $showsArchived) {
@@ -55,34 +58,6 @@ struct ProjectWorkSections: View {
                 }
             }
         }
-    }
-}
-
-/// What a project with no workflows shows under the heading: what one is, and a way to
-/// get one that needs no file format learned — ask an agent, in the prompt beside it.
-private struct NoWorkflowsLine: View {
-    @Environment(AppModel.self) private var model
-    @Environment(WindowRequests.self) private var requests
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("None yet. A workflow gives an agent a prompt by itself: on a schedule, or when something happens in this project.")
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .lineLimit(4)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Ask an agent to write one") {
-                model.selection = nil
-                model.openWorkflow = nil
-                model.offeredPrompt = "Add a workflow to this project. Ask me what it should do and when it should run, then write it into .agents/workflows."
-                requests.focusPrompt()
-            }
-            .buttonStyle(.link)
-            .appText(.fine)
-            .help("Fill the prompt to have an agent ask what the workflow should do, then write it")
-        }
-        .padding(.vertical, 4)
-        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
     }
 }
 

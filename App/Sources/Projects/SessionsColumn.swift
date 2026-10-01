@@ -28,50 +28,34 @@ struct SessionsColumn: View {
 
     var body: some View {
         List(selection: $picked) {
-            // The same headings the project page draws.
-            ForEach(AgentGroup.live, id: \.self) { group in
-                ForEach(group.headings(matching(model.agents(in: model.selectedProjectKey, group: group)))) { part in
-                    Section {
-                        ForEach(part.agents) { agent in
-                            row(agent)
+            // Two groups: the sessions, archived ones folded at their foot, then the
+            // workflows. Not while searching, which is a search of the sessions.
+            if model.selectedProjectSummary != nil {
+                Section {
+                    // The same headings the project page draws, one step down.
+                    ForEach(AgentGroup.live, id: \.self) { group in
+                        ForEach(group.headings(matching(model.agents(in: model.selectedProjectKey, group: group)))) { part in
+                            subheading(part.title, count: part.agents.count)
+                            ForEach(part.agents) { agent in
+                                row(agent)
+                            }
                         }
-                    } header: {
-                        heading(part.title, count: part.agents.count)
                     }
+                    if query.isEmpty, !hasLive {
+                        Text("No sessions yet. Say what you want done on the right.")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.vertical, 6)
+                    }
+                    archivedSessions
+                } header: {
+                    heading("Sessions", count: liveCount)
                 }
             }
-            // A project with no sessions yet says so where they would be, rather than
-            // over the whole column: its workflows are still below.
-            if query.isEmpty, model.selectedProjectSummary != nil, !hasLive {
-                Text("No sessions yet. Say what you want done on the right.")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.vertical, 6)
-            }
-            // Its workflows, above Archived so a long archive never buries them (066).
-            // Not while searching, which is a search of the sessions.
             if query.isEmpty {
                 ProjectWorkSections(folder: model.selectedProject)
-            }
-            let archived = matching(model.agents(in: model.selectedProjectKey, group: .archived))
-            // What has been retired from here (051), as the section's last line.
-            let retiredLine = query.isEmpty
-                ? RetirementWords.retiredLine(model.selectedProjectSummary?.retiredCount) : nil
-            if !archived.isEmpty || retiredLine != nil {
-                Section(isExpanded: $showsArchived) {
-                    ForEach(archived.prefix(Self.archivedShown)) { agent in
-                        row(agent)
-                    }
-                    if let retiredLine {
-                        Text(retiredLine)
-                            .appText(.supporting)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    heading("Archived", count: archived.count)
-                }
             }
         }
         .listStyle(.sidebar)
@@ -199,6 +183,40 @@ struct SessionsColumn: View {
             }
     }
 
+    /// Archived sessions, folded under the live ones, with what has been retired from
+    /// here (051) as the last line.
+    @ViewBuilder
+    private var archivedSessions: some View {
+        let archived = matching(model.agents(in: model.selectedProjectKey, group: .archived))
+        let retiredLine = query.isEmpty
+            ? RetirementWords.retiredLine(model.selectedProjectSummary?.retiredCount) : nil
+        if !archived.isEmpty || retiredLine != nil {
+            DisclosureGroup(isExpanded: $showsArchived) {
+                ForEach(archived.prefix(Self.archivedShown)) { agent in
+                    row(agent)
+                }
+                if let retiredLine {
+                    Text(retiredLine)
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                }
+            } label: {
+                subheading("Archived", count: archived.count)
+            }
+        }
+    }
+
+    /// A group within Sessions: Working, Needs you, Archived.
+    private func subheading(_ title: String, count: Int) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+            Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+        }
+        .appText(.fine)
+        .foregroundStyle(.secondary)
+        .padding(.top, 4)
+    }
+
     private func heading(_ title: String, count: Int) -> some View {
         HStack(spacing: 6) {
             Text(title)
@@ -213,6 +231,11 @@ struct SessionsColumn: View {
             [agent.title, agent.report?.message].compactMap { $0 }
                 .contains { $0.localizedCaseInsensitiveContains(words) }
         }
+    }
+
+    /// The sessions under the Sessions heading that are not archived.
+    private var liveCount: Int {
+        AgentGroup.live.reduce(0) { $0 + matching(model.agents(in: model.selectedProjectKey, group: $1)).count }
     }
 
     /// Whether the project has a session that is not archived.
