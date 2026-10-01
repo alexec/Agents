@@ -12,13 +12,19 @@ public struct HostStore: Sendable {
 
     public init(locations: StoreLocations) { self.file = locations.hosts }
 
-    /// No file, or one that cannot be read, is no servers. The window then shows the
-    /// list it showed before servers existed, which is the safe thing to lose to.
+    /// No file is no servers. One that cannot be read is set aside beside itself
+    /// (`hosts.json.unreadable-<time>`) rather than read as none and then written over
+    /// by the next save: the servers in it are the person's, and a build that can read
+    /// it may still want them.
     public func load() -> HostList {
         guard let data = try? Data(contentsOf: file) else { return HostList() }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode(HostList.self, from: data)) ?? HostList()
+        guard let hosts = try? decoder.decode(HostList.self, from: data) else {
+            StoreCoding.setAside(file)
+            return HostList()
+        }
+        return hosts
     }
 
     public func save(_ hosts: HostList) throws {

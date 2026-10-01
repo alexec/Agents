@@ -1071,7 +1071,7 @@ final class AppModel {
     private func settleProjectSelection() {
         let live = liveProjects
         if let selectedProjectKey, live.contains(where: { $0.key == selectedProjectKey }) { return }
-        // `host|path`, or a bare path from before servers, which is this Mac's.
+        // `host|path`.
         let stored = UserDefaults.standard.string(forKey: Self.selectedProjectDefault)
             .flatMap(ProjectKey.init(stored:))
             .map { ProjectKey(host: $0.host, folder: Project.standardize($0.folder)) }

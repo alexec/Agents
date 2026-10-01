@@ -57,17 +57,18 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
         self.addedAt = addedAt
     }
 
-    /// Written by hand only so that a `hosts.json` from before 043 still reads.
+    /// Written by hand for `facts` alone. They are what the probe found, asked again on
+    /// every connect, so facts this build cannot read cost the facts and not the server.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(HostID.self, forKey: .id)
         sshName = try c.decode(String.self, forKey: .sshName)
         label = try c.decode(String.self, forKey: .label)
         addedAt = try c.decode(Date.self, forKey: .addedAt)
-        facts = try c.decodeIfPresent(ServerFacts.self, forKey: .facts)
+        facts = (try? c.decodeIfPresent(ServerFacts.self, forKey: .facts)) ?? nil
         trustedFingerprint = try c.decodeIfPresent(String.self, forKey: .trustedFingerprint)
-        ownSignInOnly = try c.decodeIfPresent(Bool.self, forKey: .ownSignInOnly) ?? false
-        knownProjects = try c.decodeIfPresent([String].self, forKey: .knownProjects) ?? []
+        ownSignInOnly = try c.decode(Bool.self, forKey: .ownSignInOnly)
+        knownProjects = try c.decode([String].self, forKey: .knownProjects)
     }
 
     /// Not empty, one word, and not something ssh would read as an option. The `--` in
@@ -144,7 +145,8 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         self.hasOwnClaudeSignIn = hasOwnClaudeSignIn
     }
 
-    /// Written by hand only so that facts saved before 043 still read.
+    /// Written by hand for `avx2` alone, which facts saved before 049 do not have. They
+    /// are replaced on the next connect, so this can go once 049 is past the cut-off.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         system = try c.decode(String.self, forKey: .system)
@@ -155,16 +157,14 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         installedSHA256 = try c.decodeIfPresent(String.self, forKey: .installedSHA256)
         streamLocalForwarding = try c.decode(Bool.self, forKey: .streamLocalForwarding)
         probedAt = try c.decode(Date.self, forKey: .probedAt)
-        libc = try c.decodeIfPresent(Libc.self, forKey: .libc) ?? .unknown
+        libc = try c.decode(Libc.self, forKey: .libc)
         downloader = try c.decodeIfPresent(String.self, forKey: .downloader)
         toolsetID = try c.decodeIfPresent(String.self, forKey: .toolsetID)
-        hasNpx = try c.decodeIfPresent(Bool.self, forKey: .hasNpx) ?? false
-        hasOwnClaudeSignIn = try c.decodeIfPresent(Bool.self, forKey: .hasOwnClaudeSignIn) ?? false
-        toolsetIDs = try c.decodeIfPresent([String: String].self, forKey: .toolsetIDs) ?? [:]
-        ownSignIns = try c.decodeIfPresent(Set<String>.self, forKey: .ownSignIns) ?? []
+        hasNpx = try c.decode(Bool.self, forKey: .hasNpx)
+        hasOwnClaudeSignIn = try c.decode(Bool.self, forKey: .hasOwnClaudeSignIn)
+        toolsetIDs = try c.decode([String: String].self, forKey: .toolsetIDs)
+        ownSignIns = try c.decode(Set<String>.self, forKey: .ownSignIns)
         avx2 = try c.decodeIfPresent(Bool.self, forKey: .avx2) ?? true
-        // Facts saved before 046 knew Claude's alone.
-        if toolsetIDs.isEmpty, let toolsetID { toolsetIDs[RuntimeCatalog.claude.id] = toolsetID }
     }
 
     /// The toolset a runtime's `current` points at on this server, when it is whole.
@@ -339,20 +339,15 @@ public struct ProjectKey: Hashable, Sendable, CustomStringConvertible {
         self.folder = folder.standardizedFileURL
     }
 
-    /// How it is kept in defaults: `host|path`. A bare path, which is what every copy
-    /// written before servers looks like, is this Mac's.
+    /// How it is kept in defaults: `host|path`.
     public var stored: String { "\(host.rawValue)|\(folder.path(percentEncoded: false))" }
 
     public init?(stored: String) {
-        if let bar = stored.firstIndex(of: "|") {
-            let host = String(stored[..<bar])
-            let path = String(stored[stored.index(after: bar)...])
-            guard !host.isEmpty, !path.isEmpty else { return nil }
-            self.init(host: HostID(rawValue: host), folder: URL(filePath: path))
-        } else {
-            guard !stored.isEmpty else { return nil }
-            self.init(host: .mac, folder: URL(filePath: stored))
-        }
+        guard let bar = stored.firstIndex(of: "|") else { return nil }
+        let host = String(stored[..<bar])
+        let path = String(stored[stored.index(after: bar)...])
+        guard !host.isEmpty, !path.isEmpty else { return nil }
+        self.init(host: HostID(rawValue: host), folder: URL(filePath: path))
     }
 
     public var description: String { stored }
