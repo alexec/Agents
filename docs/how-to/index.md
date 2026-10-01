@@ -16,6 +16,8 @@ something particular done.
   or an iPad, change what it may do, and forget it.
 - [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
   control plane.
+- [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md): on a
+  machine you rent, at your own domain with a public certificate.
 - [Run the control plane as several copies](run-several-copies.md): over one bucket,
   behind a load balancer, so it stays up when your Mac sleeps.
 - [Move an existing set-up across](move-an-existing-set-up.md): bring the earlier app's

@@ -107,6 +107,10 @@ public enum ControlDial {
         } else if let roots {
             tls.trustRoots = .certificates(roots)
             tls.certificateVerification = .fullVerification
+        } else if let der = TestTrustRoot.der {
+            // A walk's stand-in for a public root (Debug builds only).
+            tls.trustRoots = .certificates([try NIOSSLCertificate(bytes: [UInt8](der), format: .der)])
+            tls.certificateVerification = .fullVerification
         } else {
             tls.certificateVerification = .fullVerification
         }

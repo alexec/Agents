@@ -1,0 +1,38 @@
+# A walk of compose.public.yaml with no real domain and no real CA (#61): Pebble, Let's
+# Encrypt's test CA, issues Caddy's certificate, and its root stands in for a public one on
+# the machines that trust it. deploy/pebble/up.sh runs it all:
+#
+#   deploy/pebble/up.sh            # then deploy/pebble/down.sh
+#
+# The domain is agents.127.0.0.1.sslip.io: public DNS answers 127.0.0.1 for it, so this Mac
+# reaches Caddy on 127.0.0.1:8444. Inside Docker the same name is Caddy, for Pebble's
+# challenge and for the devbox (up.sh puts it in the devbox's /etc/hosts).
+services:
+  control:
+    environment:
+      AGENTS_CONTROL_URL: https://${AGENTS_DOMAIN}:8444
+
+  caddy:
+    depends_on: [control, pebble]
+    ports: !override ["127.0.0.1:8444:8444"]
+    environment:
+      PEBBLE_PROFILE: ${PEBBLE_PROFILE:-default}
+      RENEW_INTERVAL: ${RENEW_INTERVAL:-10m}
+    networks:
+      default:
+        aliases: ["${AGENTS_DOMAIN}"]
+    volumes:
+      - ./pebble/acme.caddy:/etc/caddy/acme.d/pebble.caddy:ro
+      - ./secrets/pebble-minica.pem:/etc/caddy/pebble-minica.pem:ro
+
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:latest
+    command: ["-config", "/config/pebble-config.json"]
+    environment:
+      PEBBLE_VA_NOSLEEP: "1"
+      PEBBLE_WFE_NONCEREJECT: "0"
+      PEBBLE_AUTHZREUSE: "0"
+    volumes:
+      - ./pebble/pebble-config.json:/config/pebble-config.json:ro
+    # Its management side, for the root it made when it started.
+    ports: ["127.0.0.1:15000:15000"]

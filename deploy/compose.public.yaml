@@ -1,0 +1,53 @@
+# The control plane on a machine of its own, at a real domain with a publicly trusted
+# certificate (#61): one copy over a folder on this machine, and Caddy in front, getting the
+# certificate from Let's Encrypt. Codes carry no pin. The how-to is
+# docs/how-to/run-the-control-plane-in-the-cloud.md.
+#
+#   scripts/build-linux-control.sh x86_64        # or aarch64, for the machine it runs on
+#   scripts/build-linux-agentsd.sh               # the Linux host, handed to servers that join
+#   deploy/make-secrets.sh --public
+#   AGENTS_DOMAIN=agents.example.com ACME_EMAIL=you@example.com \
+#       docker compose -f deploy/compose.public.yaml up -d --build
+#
+# AGENTS_DOMAIN must already point at this machine, with ports 80 and 443 open to the
+# internet. The two variables may also go in deploy/.env.
+name: agents-control
+
+services:
+  control:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: agents-control:latest
+    restart: unless-stopped
+    environment:
+      AGENTS_STORE: file:///data/store
+      AGENTS_CONTROL_URL: https://${AGENTS_DOMAIN:?set AGENTS_DOMAIN to the name that points at this machine}
+      AGENTS_CONTROL_KEY_FILE: /run/secrets/control-key
+      AGENTS_CONTROL_NAME: ${AGENTS_CONTROL_NAME:-${AGENTS_DOMAIN}}
+    secrets: [control-key]
+    volumes:
+      - data:/data
+      # The Linux host, served at /v1/servers/… to servers joining with the install command.
+      - ../App/Resources/servers:/servers:ro
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [control]
+    ports: ["80:80", "443:443"]
+    environment:
+      AGENTS_DOMAIN: ${AGENTS_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL for Let's Encrypt's notices}
+    volumes:
+      - ./Caddyfile.public:/etc/caddy/Caddyfile:ro
+      # The certificate and the ACME account: kept, so a restart doesn't ask for a new one.
+      - caddy:/data
+
+secrets:
+  control-key:
+    file: ./secrets/control-key
+
+volumes:
+  data:
+  caddy:

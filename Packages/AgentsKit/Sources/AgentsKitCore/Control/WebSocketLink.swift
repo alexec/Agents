@@ -165,7 +165,17 @@ public final class WebSocketLink: NSObject, LineTransport, URLSessionWebSocketDe
               let trust = challenge.protectionSpace.serverTrust else {
             return completionHandler(.performDefaultHandling, nil)
         }
-        guard let pin else { return completionHandler(.performDefaultHandling, nil) }
+        guard let pin else {
+            // A walk's stand-in for a public root (Debug builds only): trusted beside the system's.
+            if let der = TestTrustRoot.der, let root = SecCertificateCreateWithData(nil, der as CFData) {
+                SecTrustSetAnchorCertificates(trust, [root] as CFArray)
+                SecTrustSetAnchorCertificatesOnly(trust, false)
+                return SecTrustEvaluateWithError(trust, nil)
+                    ? completionHandler(.useCredential, URLCredential(trust: trust))
+                    : completionHandler(.cancelAuthenticationChallenge, nil)
+            }
+            return completionHandler(.performDefaultHandling, nil)
+        }
         if let leaf = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])?.first, Self.pin(of: leaf) == pin {
             completionHandler(.useCredential, URLCredential(trust: trust))
         } else {

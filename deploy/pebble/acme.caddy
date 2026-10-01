@@ -1,0 +1,10 @@
+# Pebble, the ACME CA for a walk, in place of Let's Encrypt (compose.pebble.yaml). For a
+# renewal walk, PEBBLE_PROFILE=renewal-walk gives ten-minute certificates, and Caddy looks
+# at them every RENEW_INTERVAL.
+cert_issuer acme {
+	dir https://pebble:14000/dir
+	trusted_roots /etc/caddy/pebble-minica.pem
+	profile {$PEBBLE_PROFILE:default}
+}
+https_port 8444
+renew_interval {$RENEW_INTERVAL:10m}

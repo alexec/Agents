@@ -115,7 +115,9 @@ trying it out only.
    - use `/readyz` as the health check, so a copy that cannot reach the bucket gets no new
      connections.
 
-   If its certificate is publicly trusted, you are done. If it is self-signed, give every
+   If its certificate is publicly trusted, you are done: codes carry no pin, and renewals
+   need nothing (see [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md),
+   which uses Caddy and Let's Encrypt). If it is self-signed, give every
    copy its pin as `AGENTS_CONTROL_PIN`, so every code carries it; `deploy/make-secrets.sh`
    shows how to work a pin out.
 

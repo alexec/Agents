@@ -297,7 +297,8 @@ proxy understands (FR-011). Keeping the lines inside means the router, the host 
   name.
 - **The host app's single copy** listens on port 8791. Its address is
   `https://<this Mac's .local name>:8791`, plus whatever name the person adds (for example
-  their Tailscale name).
+  their Tailscale name). A fully qualified name under a pin fails App Transport Security
+  in the apps; see R15.
 - **Codes and records** carry the URL and the pin.
 - **Bonjour** (`_agents-control._tcp`) stays only so a window on the same network finds the
   host app's control plane without typing (US2-2). The app declares it in
@@ -481,6 +482,67 @@ and question delivery are measured three ways, each against the direct socket:
 SC-004 applies to the one-copy path. The two-copy path is reported. If it fails badly, the
 first fix is a client preferring the copy that holds its hosts, via a hint in `hello`, which
 needs no change to the wire.
+
+## R15 — A publicly trusted certificate, and renewal (#61, 2026-09-30)
+
+**Decision**: behind a publicly trusted certificate, **codes carry no pin**, and a renewal
+needs nothing from anyone.
+- `agents-control` puts a pin in its codes only when it is given one: `AGENTS_CONTROL_PIN`,
+  or a certificate it made itself (`--self-signed`, `--home`). `deploy/compose.public.yaml`
+  gives neither, so every code's pin field is `-`.
+- **Without a pin, every client checks the certificate the ordinary way**: the chain to a
+  trusted root and the name.
+  - *Linux hosts* (`ControlDial`): NIOSSL's default roots, which are the system's
+    (`ca-certificates`). `host-install.sh` refuses to start without them, and with no pin
+    in the code its `curl` has no `--insecure`.
+  - *Mac hosts* (`ControlDial` on Darwin): the system's trust.
+  - *The Mac window and the Remote* (`WebSocketLink`): `URLSession`'s default handling,
+    which is the system's trust and App Transport Security's.
+- **When the certificate renews**, nothing changes for anyone. A live WebSocket keeps its
+  TLS session, and the next dial checks the new certificate against the same roots.
+- **`AGENTS_CONTROL_PIN` must not be set with a public certificate.** A pin is the hash
+  of the leaf's key, and Caddy makes a new key at every renewal (`reuse_private_keys` is
+  off by default). The walk saw a new pin at each of three renewals in thirteen minutes.
+  A pin would stop every client and host at the first renewal, about 60 days in.
+
+**Rationale**:
+- *A pin adds nothing here.* R6's exchange already proves the control plane's own key,
+  carried in the code, so a client knows it reached its own control plane. TLS has to
+  stop a relay in the middle, and a publicly trusted certificate for the name does that,
+  as for any HTTPS.
+- *Pinning something that outlives a renewal is brittle.* An intermediate (Let's Encrypt
+  rotates them, and picks among several) or a root (Caddy falls back to ZeroSSL) would
+  break at the CA's convenience. Reusing the leaf key would hold a key for years, which
+  is what renewal is for.
+
+**Proof without a real domain** ([walks/public-cert.md](walks/public-cert.md)):
+- Pebble stood in for Let's Encrypt (`deploy/compose.pebble.yaml`, `deploy/pebble/up.sh`).
+  Its root was a system root in the devbox, and was given to Debug builds on this Mac
+  through `AGENTS_TEST_TRUST_ROOT` (`TestTrustRoot`). The Mac's trust settings were never
+  touched.
+- A Linux host, a Mac host and the store window all enrolled or paired with pinless codes.
+  Each was refused without the root, and connected again by itself after a renewal.
+
+**Found on the way: App Transport Security and pins.** In the sandboxed window, ATS checks
+a server's trust itself after the delegate has accepted it. For a fully qualified name it
+wants a chain to a *system* root: the log says `ATS failed system trust`, and the dial
+fails with -1200.
+- A pinned code whose pin matched, for `agents.127.0.0.1.sslip.io`, was refused this way.
+- ATS leaves IP addresses and `.local` names alone, which is why S2 (loopback, a LAN
+  address) and Agents Host's `https://<name>.local:8791` work under a pin.
+- **R8's "plus whatever name the person adds (for example their Tailscale name)" does not
+  hold in the apps.** A self-signed, pinned certificate at a `*.ts.net` name would be
+  refused by the Mac window and the Remote. Such a name needs a publicly trusted
+  certificate (Tailscale's own HTTPS certificates are Let's Encrypt's), or an ATS
+  exception, which App Review asks to be justified. This is open for #61's "away from home".
+
+**Open**:
+- *A membership made with a pin keeps it.* A control plane that moves from a self-signed
+  certificate to a public one must tell its members to drop the pin, or they stop
+  connecting. This is part of #61's move.
+- *The Remote on a phone* was not walked against a public certificate. Its dial is the
+  same `WebSocketLink`, with the system's roots, so a real Let's Encrypt certificate is
+  where it gets walked.
 
 ## Spikes
 

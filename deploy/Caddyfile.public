@@ -1,0 +1,20 @@
+# The front door for a control plane on the internet (#61): a publicly trusted certificate
+# for AGENTS_DOMAIN, from Let's Encrypt, renewed by Caddy on its own, and WebSockets passed
+# through to the copy. Codes carry no pin: see specs/research/public-certificate.md.
+#
+# Port 443 must be open for the certificate (TLS-ALPN), and port 80 too for Caddy's other
+# challenge and its redirect to https.
+{
+	email {$ACME_EMAIL}
+	admin off
+	# Settings for another ACME CA. None in production; compose.pebble.yaml mounts one here
+	# for a walk with a stand-in CA.
+	import /etc/caddy/acme.d/*.caddy
+}
+
+{$AGENTS_DOMAIN} {
+	reverse_proxy control:8791 {
+		health_uri /readyz
+		health_interval 5s
+	}
+}

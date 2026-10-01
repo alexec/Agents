@@ -65,6 +65,7 @@ nav:
       - how-to/set-up-on-this-mac.md
       - how-to/connect-a-window-or-phone.md
       - how-to/add-a-server.md
+      - how-to/run-the-control-plane-in-the-cloud.md
       - how-to/run-several-copies.md
       - how-to/move-an-existing-set-up.md
       - how-to/add-a-project.md
