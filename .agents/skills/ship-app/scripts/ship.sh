@@ -13,6 +13,7 @@
 #
 #   ship.sh                 everything
 #   ship.sh --no-build      reuse build/DD-host, build/DD-store and build/DD-ios as they are
+#   ship.sh --no-linux      skip rebuilding the Linux hosts in App/Resources/servers
 #   ship.sh --no-devices    skip the iPhone/iPad
 #   ship.sh --no-mac        skip the Mac
 #   ship.sh --device UDID   only this device (repeatable)
@@ -110,11 +111,12 @@ if [[ ${1:-} == --restart ]]; then
   exit
 fi
 
-BUILD=1 DEVICES=1 MAC=1 DELAY=20
+BUILD=1 DEVICES=1 MAC=1 DELAY=20 LINUX=1
 typeset -a ONLY
 while (( $# )); do
   case $1 in
     --no-build) BUILD=0 ;;
+    --no-linux) LINUX=0 ;;
     --no-devices) DEVICES=0 ;;
     --no-mac) MAC=0 ;;
     --device) ONLY+=$2; shift ;;
@@ -170,6 +172,9 @@ if (( BUILD )); then
   # of its own.
   run xcodegen xcodegen generate
   if (( MAC )); then
+    # The Linux hosts a server is given, which Agents Host carries and its control plane
+    # serves: gitignored build outputs, so stale until rebuilt here.
+    (( LINUX )) && run build-linux scripts/build-linux-agentsd.sh
     run build-host xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
     run build-window xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-store $XFLAGS build
   fi

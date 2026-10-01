@@ -12,7 +12,9 @@ checks or write a watcher around it. Say in your report that you shipped it.
 .claude/skills/ship-app/scripts/ship.sh
 ```
 
-`--no-mac` installs the iPhone and iPad only. `--no-devices --no-build` only
+`--no-mac` installs the iPhone and iPad only. `--no-linux` skips rebuilding the Linux
+hosts (`scripts/build-linux-agentsd.sh`, into `App/Resources/servers`), which the build
+otherwise does first, since Agents Host carries them and a stale one cannot join. `--no-devices --no-build` only
 relaunches the Mac. `--device <UDID>` (repeatable) picks one device. `--now`
 relaunches the Mac after 3s instead of 20s.
 
