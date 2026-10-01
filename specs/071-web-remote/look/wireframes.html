@@ -1,0 +1,328 @@
+<!doctype html><html><head><meta charset="utf-8"><title>071 wireframes</title><style>
+/* Wireframes for the web remote's first version (071). Lo-fi on purpose, in 066's paper style,
+   inside a plain browser window. Open with #a … #f to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:1200px;line-height:1.4}
+.note{font:italic 12px -apple-system;color:#c2185b;border:1px dashed #c2185b;border-radius:4px;padding:4px 8px;background:rgba(255,255,255,.6)}
+.abs{position:absolute;z-index:3}
+/* the browser around the page */
+.browser{background:#f7f5f0;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.chrome{height:40px;flex:none;background:#dedad2;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.1)}
+.dot{width:11px;height:11px;border-radius:6px;background:#c6c2b9;display:inline-block}
+.url{flex:1;height:24px;border-radius:6px;background:#f4f2ed;display:flex;align-items:center;padding:0 10px;color:#555;font:12px "SF Mono",Menlo,monospace;gap:6px}
+.url b{font-weight:400;color:#1d1d1d}
+.tab{font-size:12px;color:#444;background:#f4f2ed;border-radius:6px 6px 0 0;padding:5px 12px;align-self:flex-end}
+.page{flex:1;display:flex;min-height:0;position:relative}
+/* the three columns */
+.side{width:220px;flex:none;background:#ebe8e1;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:6px 8px}
+.side .h{font:600 11px -apple-system;color:#8a877f;padding:12px 8px 4px;display:flex;justify-content:space-between}
+.side .p{padding:6px 8px;border-radius:6px;display:flex;justify-content:space-between;align-items:center}
+.side .p.on{background:rgba(0,0,0,.08)}
+.side .p small{display:block;color:#8a877f;font-size:11px}
+.side .p.off{color:#a8a59d}
+.side .foot{margin-top:auto;padding:10px 8px;color:#8a877f;font-size:11px;line-height:1.5}
+.badge{width:7px;height:7px;border-radius:4px;background:#e07b39;display:inline-block}
+.mid{width:340px;flex:none;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;background:#f3f0ea}
+.tb{height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.06)}
+.tb .title{font:600 13px -apple-system;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb .grow{flex:1}
+.icon{width:26px;height:24px;border-radius:6px;border:1px solid rgba(0,0,0,.12);display:inline-flex;align-items:center;justify-content:center;color:#555;font-size:13px;background:#faf8f4;flex:none}
+.search{flex:1;height:24px;border-radius:6px;background:#e6e2da;color:#8a877f;display:flex;align-items:center;padding:0 8px;font-size:12px}
+.lh{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 2px;font:600 11px -apple-system;color:#8a877f}
+.row{margin:2px 6px;padding:7px 8px;border-radius:7px;display:flex;gap:8px}
+.row.on{background:#d9d4c8}
+.row .ic{width:16px;color:#888;text-align:center;flex:none}
+.row .ic.need{color:#e07b39;font-weight:700}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .d{color:#8a877f;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .body{min-width:0;flex:1}
+.lab{display:inline-block;border:1px solid rgba(0,0,0,.18);border-radius:8px;padding:0 6px;font-size:10.5px;color:#555;margin-top:3px}
+.lab.mine{background:#e3dfd6;border-color:#e3dfd6}
+.chat{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.btn{border:1px solid rgba(0,0,0,.15);border-radius:6px;padding:3px 10px;background:#faf8f4;font-size:12px;color:#333;white-space:nowrap}
+.btn.primary{background:#3b6fd8;color:#fff;border-color:#3b6fd8}
+.btn.danger{color:#b3261e}
+.btn[disabled]{opacity:.45}
+.msgs{flex:1;overflow:hidden;padding:18px 26px;display:flex;flex-direction:column;gap:12px}
+.you{align-self:flex-end;background:#e3dfd6;border-radius:12px;padding:8px 12px;max-width:70%}
+.turn{display:flex;flex-direction:column;gap:5px;max-width:92%}
+.turn .o{font-weight:600}
+.turn .steps{color:#8a877f;font-size:12px}
+.turn .live{color:#8a877f;font-size:12px;font-style:italic}
+.bar{height:9px;border-radius:5px;background:#e3dfd6}
+.ask{margin:0 22px 8px;border:1px solid #eed7ad;background:#fdf6e8;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.ask .k{font:600 11px -apple-system;color:#9a6a1d;text-transform:uppercase;letter-spacing:.04em}
+.ask code{font:12px "SF Mono",Menlo,monospace;background:#fff;border:1px solid #efe6d3;border-radius:5px;padding:4px 7px;display:block}
+.ask .acts{display:flex;gap:6px;justify-content:flex-end}
+.prompt{margin:0 22px 16px;border:1px solid rgba(0,0,0,.14);border-radius:14px;background:#fff;padding:9px 12px;display:flex;flex-direction:column;gap:8px}
+.prompt .ph{color:#a09d95;height:30px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:2px 9px;font-size:11px;color:#555;background:#faf8f4;white-space:nowrap}
+.chip.att{background:#eef3fb;border-color:#cddcf3}
+.send{margin-left:auto;width:26px;height:26px;border-radius:13px;background:#3b6fd8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+.queued{margin:0 22px 6px;border:1px dashed rgba(0,0,0,.2);border-radius:10px;padding:6px 10px;display:flex;align-items:center;gap:8px;color:#555;font-size:12px}
+.files{width:420px;flex:none;border-left:1px solid rgba(0,0,0,.08);background:#fbfaf7;display:flex;flex-direction:column}
+.seg{display:flex;margin:10px 12px 6px;border-radius:7px;background:#e3dfd6;padding:2px}
+.seg span{flex:1;text-align:center;padding:4px 6px;border-radius:5px;font-size:12px;color:#444}
+.seg span.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15);font-weight:600}
+.doc{padding:12px 22px;display:flex;flex-direction:column;gap:9px}
+.doc h2{font:600 17px -apple-system;margin:4px 0}
+.doc .changed{background:#fff6c9;border-radius:3px}
+.strip{flex:none;padding:7px 16px;background:#fbefd9;border-bottom:1px solid #eed7ad;display:flex;gap:10px;align-items:center;font-size:12px}
+.grey{opacity:.45;filter:grayscale(1)}
+.menu{position:absolute;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:4px;z-index:4;min-width:200px}
+.menu div{padding:5px 10px;border-radius:5px}
+.menu .on{background:#3b6fd8;color:#fff}
+.menu .h{font:600 11px -apple-system;color:#8a877f;padding:6px 10px 2px}
+.center{flex:1;display:flex;align-items:center;justify-content:center}
+.pair{width:440px;display:flex;flex-direction:column;gap:12px}
+.pair h1{font:600 22px -apple-system;margin:0}
+.pair p{color:#555;line-height:1.45;margin:0}
+.field{border:1px solid rgba(0,0,0,.18);border-radius:8px;background:#fff;padding:9px 10px;font:12px "SF Mono",Menlo,monospace;color:#a09d95;height:54px}
+.err{color:#b3261e;font-size:12px}
+.fine{color:#8a877f;font-size:12px;line-height:1.45}
+.phone{width:390px;height:780px}
+.phone .page{flex-direction:column}
+.back{color:#3b6fd8;font-size:13px}
+.big .row{padding:10px 10px}
+.trio{display:flex;gap:28px;align-items:flex-start}
+.mini{font:600 12px -apple-system;color:#555;margin-bottom:6px}
+</style></head><body>
+
+<!-- A ───────────────────────────────────────────────────────────── -->
+<div class="frame" id="a">
+<div class="cap">A · Desktop, 1440 wide: three columns, a question waiting</div>
+<div class="sub">The Mac window's layout in a browser tab. Projects under host headings, the chosen project's sessions in the Mac window's groups with its workflows below them, and the chat with the prompt at its foot. A permission request sits above the prompt; answering it here answers it everywhere. The tab's title carries the Needs you count.</div>
+<div class="browser" style="width:1440px;height:820px">
+ <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="tab">(2) Agents</span><div class="url">ⓘ <b>localhost</b>:&lt;port&gt;</div></div>
+ <div class="page">
+  <div class="side">
+   <div class="h">THIS MAC</div>
+   <div class="p on"><span>Agents<small>Needs you</small></span><span class="badge"></span></div>
+   <div class="p"><span>www.alexecollins.com</span></div>
+   <div class="p"><span>Scribe</span></div>
+   <div class="h">DEVBOX</div>
+   <div class="p"><span>api-service</span></div>
+   <div class="p off"><span>infra<small>Offline</small></span></div>
+   <div class="foot">Safari on Alex's MacBook · Device<br><span style="color:#3b6fd8">Forget This Browser…</span></div>
+  </div>
+  <div class="mid">
+   <div class="tb"><div class="search">⌕ Search sessions</div><span class="icon">✎</span></div>
+   <div class="lh"><span>Needs you</span><span>2</span></div>
+   <div class="row on"><span class="ic need">!</span><div class="body"><div class="t">Web remote spec</div><div class="d">Wants to run gh issue view 45</div><span class="lab">spec</span></div></div>
+   <div class="row"><span class="ic need">!</span><div class="body"><div class="t">Flaky test sweep</div><div class="d">Partly done · 3 of 5 fixed</div></div></div>
+   <div class="lh"><span>Waiting</span><span>1</span></div>
+   <div class="row"><span class="ic">⧗</span><div class="body"><div class="t">058 T106</div><div class="d">Waiting on 2 agents</div></div></div>
+   <div class="lh"><span>Working</span><span>1</span></div>
+   <div class="row"><span class="ic">◌</span><div class="body"><div class="t">Public certificate (#61)</div><div class="d">Editing deploy/compose.yaml</div></div></div>
+   <div class="lh"><span>Parked</span><span>1</span></div>
+   <div class="row"><span class="ic">◇</span><div class="body"><div class="t">Copilot route</div><div class="d">Parked 3 days ago</div></div></div>
+   <div class="lh"><span>Workflows</span><span>2</span></div>
+   <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Nightly build</div><div class="d">Every day at 03:00 · last ran 03:00</div></div></div>
+   <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Merge when green</div><div class="d">On custom.build_green</div></div></div>
+   <div class="lh"><span>Archived ›</span><span>407</span></div>
+  </div>
+  <div class="chat">
+   <div class="tb"><span class="title">Web remote spec</span><span class="grow"></span><span class="btn">Files</span><span class="btn">Changes</span><span class="icon">···</span></div>
+   <div class="msgs">
+    <div class="you">Write the spec for the first version of #45…</div>
+    <div class="turn"><div class="o">Read #45, #61 and 058's contracts.</div><div class="steps">› 14 steps</div><div class="bar" style="width:80%"></div><div class="bar" style="width:62%"></div></div>
+    <div class="turn"><div class="steps">› 3 steps</div><div class="live">Asking to run a command…</div></div>
+   </div>
+   <div class="ask"><div class="k">Wants to run a command</div><code>gh issue view 45 --comments</code><div class="acts"><span class="btn">Deny</span><span class="btn">Always Allow</span><span class="btn primary">Allow Once</span></div></div>
+   <div class="prompt"><div class="ph">Reply…</div><div class="chips"><span class="chip">⌂ Agents</span><span class="chip">⑂ write-spec-first-version</span><span class="chip">+ label</span><span class="chip">Claude ▾</span><span class="chip">Opus ▾</span><span class="chip">Ask ▾</span><span class="chip">📎</span><span class="send">↑</span></div></div>
+  </div>
+ </div>
+ <div class="note abs" style="left:242px;top:770px">Who this browser is and its grant; Forget This Browser… (FR-015)</div>
+ <div class="note abs" style="left:1080px;top:575px">The first answer from any client wins (FR-024)</div>
+</div>
+</div>
+
+<!-- B ───────────────────────────────────────────────────────────── -->
+<div class="frame" id="b">
+<div class="cap">B · Desktop, 1600 wide: the files pane as a fourth column, a live page open</div>
+<div class="sub">When the agent calls show_file on a Markdown page, it opens beside the chat and follows each write; the changed part is marked and the page goes there. Files and Changes are the pane's other two tabs. Below 1440 the pane opens over the chat instead, with a close button. A prompt queued while the agent works shows above the prompt with Send now.</div>
+<div class="browser" style="width:1600px;height:780px">
+ <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="tab">(1) Agents</span><div class="url">ⓘ <b>localhost</b>:&lt;port&gt;</div></div>
+ <div class="page">
+  <div class="side">
+   <div class="h">THIS MAC</div>
+   <div class="p on"><span>Agents</span><span class="badge"></span></div>
+   <div class="p"><span>Scribe</span></div>
+   <div class="h">DEVBOX</div>
+   <div class="p"><span>api-service</span></div>
+  </div>
+  <div class="mid" style="width:300px">
+   <div class="tb"><div class="search">⌕ Search sessions</div><span class="icon">✎</span></div>
+   <div class="lh"><span>Working</span><span>2</span></div>
+   <div class="row on"><span class="ic">◌</span><div class="body"><div class="t">Web remote spec</div><div class="d">Writing specs/071-web-remote/spec.md</div></div></div>
+   <div class="row"><span class="ic">◌</span><div class="body"><div class="t">Public certificate (#61)</div><div class="d">Editing deploy/compose.yaml</div></div></div>
+   <div class="lh"><span>Workflows</span><span>1</span></div>
+   <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Nightly build</div><div class="d">Every day at 03:00</div></div></div>
+  </div>
+  <div class="chat">
+   <div class="tb"><span class="title">Web remote spec</span><span class="grow"></span><span class="btn">Stop</span><span class="icon">···</span></div>
+   <div class="msgs">
+    <div class="turn"><div class="o">Spec drafted; writing the look gate.</div><div class="steps">› 22 steps</div><div class="bar" style="width:70%"></div></div>
+    <div class="turn"><div class="steps">› 4 steps</div><div class="live">Editing specs/071-web-remote/spec.md</div></div>
+   </div>
+   <div class="queued">↥ Queued: “also cover the tab title”<span class="grow" style="flex:1"></span><span class="btn">Send now</span><span class="btn">✕</span></div>
+   <div class="prompt"><div class="ph">Reply…</div><div class="chips"><span class="chip att">▣ layout.png ✕</span><span class="chip">Claude ▾</span><span class="chip">Opus ▾</span><span class="chip">Ask ▾</span><span class="send">↑</span></div></div>
+  </div>
+  <div class="files">
+   <div class="seg"><span class="on">spec.md</span><span>Files</span><span>Changes 2</span></div>
+   <div class="doc">
+    <div class="fine">specs/071-web-remote/spec.md · live</div>
+    <h2>The Web Remote, First Version</h2>
+    <div class="bar" style="width:92%"></div><div class="bar" style="width:84%"></div>
+    <h2>Decisions</h2>
+    <div class="bar changed" style="width:88%;height:30px"></div>
+    <div class="bar" style="width:76%"></div><div class="bar" style="width:90%"></div>
+    <h2>User Scenarios</h2>
+    <div class="bar" style="width:80%"></div><div class="bar" style="width:70%"></div>
+   </div>
+  </div>
+ </div>
+ <div class="note abs" style="left:1190px;top:250px">The part just written, marked, and scrolled to</div>
+ <div class="note abs" style="left:620px;top:600px">Send now steers the turn (FR-025)</div>
+</div>
+</div>
+
+<!-- C ───────────────────────────────────────────────────────────── -->
+<div class="frame" id="c">
+<div class="cap">C · Medium, 1000 wide: projects fold into a menu</div>
+<div class="sub">Between 760 and 1200 the projects column folds into a menu at the top of the sessions column, under host headings, with the Needs you dot on any project that needs the person. Sessions and the chat stay side by side.</div>
+<div class="browser" style="width:1000px;height:700px">
+ <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="tab">(2) Agents</span><div class="url">ⓘ <b>localhost</b>:&lt;port&gt;</div></div>
+ <div class="page">
+  <div class="mid" style="width:320px">
+   <div class="tb"><span class="btn" style="font-weight:600">Agents ▾ <span class="badge"></span></span><span class="grow"></span><span class="icon">⌕</span><span class="icon">✎</span></div>
+   <div class="lh"><span>Needs you</span><span>2</span></div>
+   <div class="row on"><span class="ic need">!</span><div class="body"><div class="t">Web remote spec</div><div class="d">Wants to run gh issue view 45</div></div></div>
+   <div class="row"><span class="ic need">!</span><div class="body"><div class="t">Flaky test sweep</div><div class="d">Partly done</div></div></div>
+   <div class="lh"><span>Working</span><span>1</span></div>
+   <div class="row"><span class="ic">◌</span><div class="body"><div class="t">Public certificate (#61)</div><div class="d">Editing deploy/compose.yaml</div></div></div>
+   <div class="lh"><span>Workflows</span><span>2</span></div>
+   <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Nightly build</div><div class="d">Every day at 03:00</div></div></div>
+  </div>
+  <div class="chat">
+   <div class="tb"><span class="title">Web remote spec</span><span class="grow"></span><span class="btn">Files</span><span class="icon">···</span></div>
+   <div class="msgs"><div class="you">Write the spec…</div><div class="turn"><div class="o">Read #45 and #61.</div><div class="steps">› 14 steps</div><div class="bar" style="width:76%"></div></div></div>
+   <div class="ask"><div class="k">Wants to run a command</div><code>gh issue view 45 --comments</code><div class="acts"><span class="btn">Deny</span><span class="btn primary">Allow Once</span></div></div>
+   <div class="prompt"><div class="ph">Reply…</div><div class="chips"><span class="chip">Claude ▾</span><span class="chip">Opus ▾</span><span class="chip">Ask ▾</span><span class="send">↑</span></div></div>
+  </div>
+  <div class="menu" style="left:12px;top:44px">
+   <div class="h">THIS MAC</div><div class="on">Agents ●</div><div>www.alexecollins.com</div><div>Scribe</div>
+   <div class="h">DEVBOX</div><div>api-service</div><div style="color:#a8a59d">infra · Offline</div>
+  </div>
+ </div>
+</div>
+</div>
+
+<!-- D ───────────────────────────────────────────────────────────── -->
+<div class="frame" id="d">
+<div class="cap">D · Narrow, 390 wide: one column at a time</div>
+<div class="sub">Below 760 the page shows one column at a time, in the iPhone Remote's order. Each step has a back control, and the browser's own Back moves between them too. Cards and the prompt stay pinned to the foot of the chat.</div>
+<div class="trio">
+ <div><div class="mini">1 · Projects</div>
+ <div class="browser phone"><div class="chrome"><div class="url">ⓘ <b>localhost</b></div></div><div class="page big">
+  <div class="tb"><span class="title" style="font-size:17px">Agents</span></div>
+  <div class="lh"><span>THIS MAC</span></div>
+  <div class="row"><div class="body"><div class="t">Agents</div><div class="d">2 need you</div></div><span class="badge" style="align-self:center"></span></div>
+  <div class="row"><div class="body"><div class="t">www.alexecollins.com</div></div></div>
+  <div class="row"><div class="body"><div class="t">Scribe</div></div></div>
+  <div class="lh"><span>DEVBOX</span></div>
+  <div class="row"><div class="body"><div class="t">api-service</div></div></div>
+  <div class="row" style="color:#a8a59d"><div class="body"><div class="t">infra</div><div class="d">Offline</div></div></div>
+ </div></div></div>
+ <div><div class="mini">2 · Sessions</div>
+ <div class="browser phone"><div class="chrome"><div class="url">ⓘ <b>localhost</b></div></div><div class="page big">
+  <div class="tb"><span class="back">‹ Projects</span><span class="grow"></span><span class="title">Agents</span><span class="grow"></span><span class="icon">✎</span></div>
+  <div class="lh"><span>Needs you</span><span>2</span></div>
+  <div class="row"><span class="ic need">!</span><div class="body"><div class="t">Web remote spec</div><div class="d">Wants to run gh issue view 45</div></div></div>
+  <div class="row"><span class="ic need">!</span><div class="body"><div class="t">Flaky test sweep</div><div class="d">Partly done</div></div></div>
+  <div class="lh"><span>Working</span><span>1</span></div>
+  <div class="row"><span class="ic">◌</span><div class="body"><div class="t">Public certificate (#61)</div><div class="d">Editing deploy/compose.yaml</div></div></div>
+  <div class="lh"><span>Workflows</span><span>2</span></div>
+  <div class="row"><span class="ic">◷</span><div class="body"><div class="t">Nightly build</div><div class="d">Every day at 03:00</div></div></div>
+ </div></div></div>
+ <div><div class="mini">3 · Chat</div>
+ <div class="browser phone"><div class="chrome"><div class="url">ⓘ <b>localhost</b></div></div><div class="page">
+  <div class="tb"><span class="back">‹ Agents</span><span class="grow"></span><span class="title">Web remote spec</span><span class="grow"></span><span class="icon">···</span></div>
+  <div class="chat">
+   <div class="msgs" style="padding:14px"><div class="you">Write the spec…</div><div class="turn"><div class="o">Read #45 and #61.</div><div class="steps">› 14 steps</div><div class="bar" style="width:80%"></div></div></div>
+   <div class="ask" style="margin:0 10px 8px"><div class="k">Wants to run a command</div><code>gh issue view 45</code><div class="acts"><span class="btn">Deny</span><span class="btn primary">Allow Once</span></div></div>
+   <div class="prompt" style="margin:0 10px 12px"><div class="ph">Reply…</div><div class="chips"><span class="chip">Opus ▾</span><span class="chip">Ask ▾</span><span class="chip">📎</span><span class="send">↑</span></div></div>
+  </div>
+ </div></div></div>
+</div>
+</div>
+
+<!-- E ───────────────────────────────────────────────────────────── -->
+<div class="frame" id="e">
+<div class="cap">E · Pairing a browser</div>
+<div class="sub">With no key, the page shows this and nothing else (US1). The code comes from the Mac window's Settings ▸ Control plane ▸ Clients ▸ Pair a Browser…, or Agents Host's Pair a Window or Phone… ▸ A browser on this Mac, as text to copy, with the grant chosen first. Never from a link: a code is never put in a URL.</div>
+<div class="trio">
+ <div class="browser" style="width:900px;height:560px">
+  <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="tab">Agents</span><div class="url">ⓘ <b>localhost</b>:&lt;port&gt;</div></div>
+  <div class="page"><div class="center"><div class="pair">
+   <h1>Connect this browser to your agents</h1>
+   <p>Get a code from Agents on this Mac: in the window, <b>Settings ▸ Control plane ▸ Clients ▸ Pair a Browser…</b>, or in Agents Host, <b>Pair a Window or Phone…</b>. Paste it here.</p>
+   <div class="field">agents-control:2:c:device:…</div>
+   <div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn primary">Connect</span></div>
+   <div class="err">This code has been used. Ask for a new one.</div>
+   <div class="fine">This browser keeps a key of its own, which can't be copied out of it. Clearing this site's data, or closing a private window, loses it, and you pair again.</div>
+  </div></div></div>
+ </div>
+ <div class="browser" style="width:440px;height:560px;background:#ece9e2">
+  <div class="chrome" style="justify-content:center"><span style="font-weight:600;font-size:12px">Pair a Browser</span></div>
+  <div class="page"><div class="center"><div class="pair" style="width:360px">
+   <div class="fine" style="font-weight:600">IT MAY</div>
+   <div class="card" style="background:#fff;border:1px solid #e3dfd6;border-radius:9px;padding:8px 12px;line-height:2">◉ what a phone can (Device)<br>○ do everything (Operator)</div>
+   <div class="fine" style="font-weight:600">CODE · works once, for five minutes</div>
+   <div class="field" style="color:#333;height:70px;word-break:break-all">agents-control:2:c:device:BHk…:3f9…:https://mini.local:8791:-:Alex's control plane</div>
+   <div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn">Done</span><span class="btn primary">Copy</span></div>
+   <div class="fine">Paste it into Agents in a browser on this Mac, at localhost.</div>
+  </div></div></div>
+ </div>
+</div>
+</div>
+
+<!-- F ───────────────────────────────────────────────────────────── -->
+<div class="frame" id="f">
+<div class="cap">F · The control plane can't be reached; and this browser was forgotten</div>
+<div class="sub">Left: Agents Host stopped mid-turn. What the page last showed stays, greyed out; sending is off but what is typed is kept. It reconnects by itself and catches up (US7). Right: the browser was forgotten in Settings. The page deletes its key and shows the pairing screen with one line saying why.</div>
+<div class="trio">
+ <div class="browser" style="width:1000px;height:560px">
+  <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="tab">Agents</span><div class="url">ⓘ <b>localhost</b>:&lt;port&gt;</div></div>
+  <div class="strip">⚠︎ <b>Can't reach the control plane</b> at localhost:&lt;port&gt;. Trying again in 4 s.<span style="flex:1"></span><span class="btn">Try Now</span></div>
+  <div class="page">
+   <div class="mid grey" style="width:300px">
+    <div class="tb"><span class="btn">Agents ▾</span></div>
+    <div class="lh"><span>Needs you</span><span>2</span></div>
+    <div class="row on"><span class="ic">!</span><div class="body"><div class="t">Web remote spec</div><div class="d">Wants to run gh issue view 45</div></div></div>
+    <div class="row"><span class="ic">!</span><div class="body"><div class="t">Flaky test sweep</div></div></div>
+   </div>
+   <div class="chat">
+    <div class="msgs grey"><div class="you">Write the spec…</div><div class="turn"><div class="bar" style="width:80%"></div><div class="bar" style="width:60%"></div></div></div>
+    <div class="prompt"><div style="height:30px">also cover the tab title</div><div class="chips"><span class="chip">Opus ▾</span><span class="send" style="background:#c9c6bf">↑</span></div></div>
+   </div>
+  </div>
+ </div>
+ <div class="browser" style="width:520px;height:560px">
+  <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="tab">Agents</span><div class="url">ⓘ <b>localhost</b></div></div>
+  <div class="page"><div class="center"><div class="pair" style="width:400px">
+   <div class="strip" style="border-radius:8px;border:1px solid #eed7ad">This browser was forgotten. Pair it again to carry on.</div>
+   <h1>Connect this browser to your agents</h1>
+   <div class="field">Paste a code</div>
+   <div style="display:flex;justify-content:flex-end"><span class="btn primary">Connect</span></div>
+  </div></div></div>
+ </div>
+</div>
+</div>
+
+<script>if(location.hash)document.body.classList.add('one')</script>
+</body></html>
