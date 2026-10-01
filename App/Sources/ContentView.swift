@@ -29,6 +29,8 @@ struct ContentView: View {
         state.folder = file.url.deletingLastPathComponent()
         state.openFile = file.url
         state.openLine = file.line
+        // An agent showing a page means the page (#67).
+        if HTMLPageScope.isHTML(file.url) { state.htmlShowsSource = false }
         frame.pane = .files
         if !frame.isOpen { frame.open() }
     }

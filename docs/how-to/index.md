@@ -54,6 +54,8 @@ something particular done.
   conversation, and the files pane.
 - [Follow a live document](follow-a-live-document.md): watch a document take shape as an
   agent writes it, and type on it yourself.
+- [Look at an HTML page an agent wrote](look-at-an-html-page.md): a report or wireframe as a
+  page, with its stylesheet and pictures, and what it is not allowed to do.
 - [Stop, park and archive agents](archive-park-stop.md): what each does, and what each
   keeps.
 - [Sign a runtime in](sign-a-runtime-in.md): sign Claude Code, Codex, Copilot, Cursor, Grok

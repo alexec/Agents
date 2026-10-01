@@ -13,6 +13,8 @@ import SwiftUI
 struct FilesPane: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
+    @Environment(WebHolders.self) private var holders
+    @Environment(\.openURL) private var openURL
     let agent: Agent
     let state: AgentPaneState
 
@@ -181,9 +183,70 @@ struct FilesPane: View {
                 .lineLimit(1)
                 .truncationMode(.head)
             Spacer()
+            if let openFile = state.openFile, canDrawPage(openFile) {
+                pageControls(openFile)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+    }
+
+    /// An HTML file's two ways of being read (#67): the page or its source, one choice
+    /// for the pane; and, on the page, whether this file may run scripts.
+    @ViewBuilder
+    private func pageControls(_ url: URL) -> some View {
+        @Bindable var state = state
+        let path = url.path(percentEncoded: false)
+        if !state.htmlShowsSource {
+            Toggle(isOn: Binding(get: { state.scriptsAllowed.contains(path) },
+                                 set: { allowed in
+                                     if allowed { state.scriptsAllowed.insert(path) } else { state.scriptsAllowed.remove(path) }
+                                 })) {
+                Label("Allow scripts", systemImage: "curlybraces")
+                    .labelStyle(.iconOnly)
+            }
+            .toggleStyle(.button)
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .help(state.scriptsAllowed.contains(path)
+                  ? "Scripts run on this page, with no network. Click to stop them."
+                  : "Scripts are off on this page. Click to let them run, with no network.")
+        }
+        Picker("Show", selection: $state.htmlShowsSource) {
+            Text("Page").tag(false)
+            Text("Source").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .fixedSize()
+    }
+
+    /// An HTML file the pane has whole: one cut at the read limit is source only, with
+    /// the note saying so, never half a page.
+    private func canDrawPage(_ url: URL) -> Bool {
+        guard HTMLPageScope.isHTML(url), fileProblem == nil, let probe else { return false }
+        return probe.kind.isText && !probe.isTruncated
+    }
+
+    /// Where a link the person clicked on a page goes. Never into the file view itself.
+    private func follow(_ link: HTMLPageScope.LinkDecision) {
+        switch link {
+        case .openFile(let path):
+            open(file: URL(filePath: path))
+        case .openOutside(let url):
+            // The person's own click, so the Browser pane may go there (FR-035 is about
+            // the agent driving it, which this is not); mail and the rest go to their app.
+            if BrowserPolicy.decide(url).isAllowed, ["http", "https"].contains(url.scheme?.lowercased()) {
+                state.browserURL = url
+                holders.holder(for: agent.id).load(url)
+                frame.pane = .browser
+            } else {
+                openURL(url)
+            }
+        case .stay, .ignore:
+            break
+        }
     }
 
     // MARK: The folder
@@ -411,6 +474,19 @@ struct FilesPane: View {
                         .padding(10)
                 }
             }
+        } else if canDrawPage(url), !state.htmlShowsSource, let probe {
+            // HTML reads as a page by default (#67), live as the Markdown page is: it
+            // reloads, in place, when the file or anything beside it changes. What the
+            // page may do is decided in `HTMLPage`.
+            let server = server
+            let agentID = agent.id
+            let path = url.path(percentEncoded: false)
+            HTMLPage(text: probe.text ?? "", path: path,
+                     scope: HTMLPageScope(file: url, agentFolder: agent.cwd),
+                     allowsScripts: state.scriptsAllowed.contains(path),
+                     folderEvent: folderEvents,
+                     read: { try await server.read(agentID: agentID, path: $0) },
+                     follow: follow)
         } else if let fileProblem {
             Gone(message: fileProblem) { reloadFile(url) }
         } else if let probe {
