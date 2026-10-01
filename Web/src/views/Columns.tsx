@@ -17,6 +17,8 @@ import { NewAgent } from "./NewAgent";
 import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { SessionRow } from "./SessionRow";
+import { WorkflowRow } from "./WorkflowRow";
+import { workflowSummary } from "../model/workflows";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
@@ -44,7 +46,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <Problem store={store} />
       <div class="columns" aria-busy={down}>
         <ProjectsColumn session={session} store={store} />
-        <SessionsColumn store={store} />
+        <SessionsColumn store={store} linkDown={down} />
         {r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
           : r.host && r.project && project ? (
             <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
@@ -126,8 +128,9 @@ function ProjectsColumn({ session, store }: { session: Session; store: Store }) 
 /** Enough archived sessions to find last week's, as the window shows. */
 const archivedShown = 50;
 
-function SessionsColumn({ store }: { store: Store }) {
+function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }) {
   const r = route.value;
+  const down = linkDown || (r.host ? !store.hostIsOnline(r.host) : true);
   const menu = useSignal(false);
   const search = useSignal("");
   const showsArchived = useSignal(false);
@@ -147,10 +150,15 @@ function SessionsColumn({ store }: { store: Store }) {
     .filter((h) => h.agents.length > 0) : [];
   const liveCount = groups.reduce((total, h) => total + h.agents.length, 0);
   const archived = folder ? matching(agentsIn(agents, folder, "archived")) : [];
-  const workflows = (host && folder ? store.workflows.value[`${host}|${folderKey(folder)}`] ?? [] : [])
-    .filter((w) => !w.isArchived && (!search.value.trim() || query.label === null
-      && w.workflow.name.toLowerCase().includes(query.text.toLowerCase())))
+  // A search narrows workflows by name and what they are; one asking for a label leaves them out
+  // (SessionLabelQuery.matches(_: WorkflowSummary)).
+  const runtimeName = (id: string) => (host ? store.runtimes.value[host] ?? [] : []).find((r) => r.runtime.id === id)?.runtime.name;
+  const allWorkflows = (host && folder ? store.workflows.value[`${host}|${folderKey(folder)}`] ?? [] : [])
+    .filter((w) => !search.value.trim() || query.label === null && (!query.text
+      || [w.workflow.name, workflowSummary(w.workflow, runtimeName)].some((t) => t.toLowerCase().includes(query.text.toLowerCase()))))
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
+  const workflows = allWorkflows.filter((w) => !w.isArchived);
+  const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const pick = (agent: Agent) => go({ host, project: folder, session: agent.id });
   const openArchived = (open: boolean) => {
     showsArchived.value = open;
@@ -218,12 +226,18 @@ function SessionsColumn({ store }: { store: Store }) {
         {project && (
           <section class="workflows" aria-label="Workflows">
             <h2 class="section-head">Workflows <span class="count">{workflows.length}</span></h2>
-            {workflows.length === 0 && !search.value && <p class="hint">Ask an agent to write one.</p>}
+            {workflows.length === 0 && !search.value && <p class="hint">None</p>}
             {workflows.map((summary) => (
-              <div key={summary.workflow.workflowID} class="row workflow">
-                <span class="title">{summary.workflow.name}</span>
-              </div>
+              <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down} />
             ))}
+            {archivedWorkflows.length > 0 && (
+              <details class="archived" open={!!search.value}>
+                <summary class="subhead">Archived workflows <span class="count">{archivedWorkflows.length}</span></summary>
+                {archivedWorkflows.map((summary) => (
+                  <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down} />
+                ))}
+              </details>
+            )}
           </section>
         )}
       </div>

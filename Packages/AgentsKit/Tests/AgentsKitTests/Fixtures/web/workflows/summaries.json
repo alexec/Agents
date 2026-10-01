@@ -1,0 +1,663 @@
+[
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "Every day at 2am, in a new agent"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Nightly",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "nightly"
+      }
+    },
+    "name" : "nightly, at a time"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "Every weekday on the hour and half hour between 9:30am and 5:30pm, in its own standing agent"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "standing",
+        "name" : "Office",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  9,
+                  17
+                ],
+                "minutes" : [
+                  0,
+                  30
+                ],
+                "startMinute" : 30
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "office"
+      }
+    },
+    "name" : "office hours on the half hour"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "Mon on the half hour, in a new agent"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Days",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "mon"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  0,
+                  23
+                ],
+                "minutes" : [
+                  30
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "days"
+      }
+    },
+    "name" : "a few days, all hours"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When an agent finishes, and When an agent stops without finishing, in a new agent, in plan mode, on Grok, using grok-4, at high effort, without beta, with fast, with voice calm"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Review",
+        "prompt" : "Do it.",
+        "settings" : {
+          "effort" : "high",
+          "labels" : [
+
+          ],
+          "model" : "grok-4",
+          "options" : {
+            "beta" : "off",
+            "fast" : "true",
+            "voice" : "calm"
+          },
+          "permissionMode" : "plan",
+          "runtimeID" : "grok"
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          },
+          {
+            "agentStopped" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "review"
+      }
+    },
+    "name" : "agent events, with settings"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When an agent asks for permission, and When an agent raises a form, in the agent that triggered it"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : true,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "triggering",
+        "name" : "Answer",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          },
+          "permissionMode" : "plan"
+        },
+        "triggers" : [
+          {
+            "agentAskedPermission" : {
+
+            }
+          },
+          {
+            "agentAskedForm" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "answer"
+      }
+    },
+    "name" : "asked, triggering, settings left unsaid"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When nightly finishes, and When any workflow finishes, in a new agent, on mystery"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Chain",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          },
+          "runtimeID" : "mystery"
+        },
+        "triggers" : [
+          {
+            "workflowCompleted" : {
+              "id" : "nightly"
+            }
+          },
+          {
+            "workflowCompleted" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "chain"
+      }
+    },
+    "name" : "after another, on an unknown runtime"
+  },
+  {
+    "expected" : {
+      "canFire" : false,
+      "needsAPerson" : false,
+      "summary" : "Waits for \"on-push\", which this version does not know about yet"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Future",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "unrecognised" : {
+              "keys" : {
+
+              },
+              "name" : "on-push"
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "future"
+      }
+    },
+    "name" : "only an unknown trigger"
+  },
+  {
+    "expected" : {
+      "canFire" : false,
+      "needsAPerson" : false,
+      "summary" : "Nothing makes this run"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Handmade",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "handmade"
+      }
+    },
+    "name" : "no triggers"
+  },
+  {
+    "expected" : {
+      "canFire" : false,
+      "needsAPerson" : true,
+      "summary" : "Line 3: no closing ---"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Broken",
+        "problem" : {
+          "unreadable" : {
+            "_0" : "Line 3: no closing ---"
+          }
+        },
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "broken"
+      }
+    },
+    "name" : "unreadable"
+  },
+  {
+    "expected" : {
+      "canFire" : false,
+      "needsAPerson" : false,
+      "summary" : "Runs \"swarm\", which this version does not know about yet"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Odd",
+        "problem" : {
+          "unsupportedMode" : {
+            "_0" : "swarm"
+          }
+        },
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "odd"
+      }
+    },
+    "name" : "an unknown mode"
+  },
+  {
+    "expected" : {
+      "canFire" : false,
+      "needsAPerson" : false,
+      "summary" : "bad"
+    },
+    "input" : {
+      "isArchived" : true,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Old",
+        "problem" : {
+          "unreadable" : {
+            "_0" : "bad"
+          }
+        },
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "old"
+      }
+    },
+    "name" : "archived and unreadable"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : true,
+      "summary" : "When an agent finishes, in a new agent"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "overLimit" : "project",
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Many",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "many"
+      }
+    },
+    "name" : "over the limit"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : true,
+      "summary" : "When an agent finishes, in a new agent"
+    },
+    "input" : {
+      "awaitingApproval" : {
+        "digest" : "abc",
+        "isNew" : true
+      },
+      "isArchived" : false,
+      "isRunning" : false,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "New",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "new"
+      }
+    },
+    "name" : "waiting for approval"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When an agent finishes, in a new agent"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "lastOutcome" : {
+        "refused" : {
+          "_0" : {
+            "runInFlight" : {
+
+            }
+          },
+          "at" : 812500000,
+          "repeats" : 2
+        }
+      },
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Busy",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "busy"
+      }
+    },
+    "name" : "refused, sorting itself out"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : true,
+      "summary" : "When an agent finishes, in a new agent"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isRunning" : false,
+      "lastOutcome" : {
+        "refused" : {
+          "_0" : {
+            "chainTooDeep" : {
+              "depth" : 3
+            }
+          },
+          "at" : 812500000,
+          "repeats" : 1
+        }
+      },
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Deep",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "deep"
+      }
+    },
+    "name" : "refused, needing a person"
+  }
+]

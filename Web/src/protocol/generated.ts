@@ -1294,6 +1294,11 @@ export type WorkflowRefusal =
   | { settingRefused: { setting: string; detail: string } }
   | { awaitingApproval: Record<string, never> };
 
+export interface WorkflowRemovedNotification {
+  folder: URLString;
+  workflowID: string;
+}
+
 export interface WorkflowRequest {
   folder: URLString;
   workflowID: string;
@@ -1499,6 +1504,8 @@ export interface Notifications {
   "files/changed": FilesChangedNotification;
   "modes/changed": Record<string, JSONValue>;
   "project/changed": ProjectSummary;
+  "workflow/changed": WorkflowSummary;
+  "workflow/removed": WorkflowRemovedNotification;
 }
 
 /** Each interface's keys, for checking Swift-encoded fixtures against these types. */
@@ -1629,6 +1636,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: [] },
+  WorkflowRemovedNotification: { required: ["folder", "workflowID"], optional: [] },
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },

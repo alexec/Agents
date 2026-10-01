@@ -692,6 +692,68 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: workflows/
+
+    /// Swift Sets encode in no fixed order; sorted here so the file is the same every time.
+    static func sortingSets(_ value: JSONValue) -> JSONValue {
+        switch value {
+        case .object(let fields):
+            return .object(fields.reduce(into: [:]) { result, field in
+                if field.key == "days" || field.key == "minutes", let items = field.value.arrayValue {
+                    result[field.key] = .array(items.sorted { "\($0)" < "\($1)" })
+                } else {
+                    result[field.key] = sortingSets(field.value)
+                }
+            })
+        case .array(let items): return .array(items.map(sortingSets))
+        default: return value
+        }
+    }
+
+    /// A workflow's row under the sessions: `Workflow.summary`, `canFire`, and
+    /// `WorkflowSummary.needsAPerson`. Event triggers are left out: their words come from
+    /// the event catalogue, which the web remote does not carry.
+    @Test func workflows() throws {
+        func flow(_ id: String, _ triggers: [WorkflowTrigger], mode: WorkflowMode = .new,
+                  problem: WorkflowProblem? = nil, settings: WorkflowSettings = WorkflowSettings()) -> Workflow {
+            Workflow(workflowID: id, folder: Self.folderURL, triggers: triggers, mode: mode, prompt: "Do it.",
+                     problem: problem, settings: settings)
+        }
+        let nightly = WorkflowSchedule(minutes: [0], hours: 2...2, days: Weekday.everyDay)
+        let office = WorkflowSchedule(minutes: [0, 30], hours: 9...17, startMinute: 30, endMinute: 30, days: Weekday.weekdays)
+        let all: [(String, WorkflowSummary)] = [
+            ("nightly, at a time", WorkflowSummary(workflow: flow("nightly", [.schedule(nightly)]))),
+            ("office hours on the half hour", WorkflowSummary(workflow: flow("office", [.schedule(office)], mode: .standing))),
+            ("a few days, all hours", WorkflowSummary(workflow: flow("days", [.schedule(WorkflowSchedule(minutes: [30], days: [.mon]))]))),
+            ("agent events, with settings", WorkflowSummary(workflow: flow("review", [.agentFinished, .agentStopped],
+                settings: WorkflowSettings(permissionMode: "plan", runtimeID: "grok", model: "grok-4", effort: "high",
+                                           options: ["fast": "true", "beta": "off", "voice": "calm"])))),
+            ("asked, triggering, settings left unsaid", WorkflowSummary(workflow: flow("answer", [.agentAskedPermission, .agentAskedForm],
+                mode: .triggering, settings: WorkflowSettings(permissionMode: "plan")),
+                isRunning: true)),
+            ("after another, on an unknown runtime", WorkflowSummary(workflow: flow("chain", [.workflowCompleted(id: "nightly"), .workflowCompleted(id: nil)],
+                settings: WorkflowSettings(runtimeID: "mystery")))),
+            ("only an unknown trigger", WorkflowSummary(workflow: flow("future", [.unrecognised(name: "on-push", keys: [:])]))),
+            ("no triggers", WorkflowSummary(workflow: flow("handmade", []))),
+            ("unreadable", WorkflowSummary(workflow: flow("broken", [], problem: .unreadable("Line 3: no closing ---")))),
+            ("an unknown mode", WorkflowSummary(workflow: flow("odd", [.agentFinished], problem: .unsupportedMode("swarm")))),
+            ("archived and unreadable", WorkflowSummary(workflow: flow("old", [], problem: .unreadable("bad")), isArchived: true)),
+            ("over the limit", WorkflowSummary(workflow: flow("many", [.agentFinished]), overLimit: .project)),
+            ("waiting for approval", WorkflowSummary(workflow: flow("new", [.agentFinished]),
+                                                     awaitingApproval: WorkflowApproval(digest: "abc", isNew: true))),
+            ("refused, sorting itself out", WorkflowSummary(workflow: flow("busy", [.agentFinished]),
+                                                            lastOutcome: .refused(.runInFlight, at: Self.base, repeats: 2))),
+            ("refused, needing a person", WorkflowSummary(workflow: flow("deep", [.agentFinished]),
+                                                          lastOutcome: .refused(.chainTooDeep(depth: 3), at: Self.base, repeats: 1))),
+        ]
+        let cases = try all.map { Case(name: $0.0, input: Self.sortingSets(try Self.encode($0.1))) }
+        try pin("workflows/summaries.json", cases) { input in
+            let summary = try input.decode(WorkflowSummary.self)
+            return .object(["summary": .string(summary.workflow.summary), "canFire": .bool(summary.workflow.canFire),
+                            "needsAPerson": .bool(summary.needsAPerson)])
+        }
+    }
+
     // MARK: overrides/
 
     /// A Swift-encoded sample of every case of each type whose TypeScript is hand-written

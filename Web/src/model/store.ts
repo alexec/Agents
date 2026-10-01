@@ -5,7 +5,7 @@ import { batch, signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
-  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
+  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp,
 } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -64,6 +64,15 @@ export class Work {
   /** The last folders said to have changed, for a pane watching them (`files/changed`). */
   readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; at: number } | null>(null);
 
+  /** Each project's workflows by `host|folder`, listed when the project is chosen. */
+  readonly workflows = signal<Record<string, WorkflowSummary[]>>({});
+
+  upsertWorkflow(summary: WorkflowSummary, host: string): void {
+    const key = `${host}|${folderKey(summary.workflow.folder)}`;
+    const list = (this.workflows.value[key] ?? []).filter((w) => w.workflow.workflowID !== summary.workflow.workflowID);
+    this.workflows.value = { ...this.workflows.value, [key]: [...list, summary] };
+  }
+
   /** The latest correction to a new agent's form, for the form holding that draft. */
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
   /** The mode last chosen for each runtime, by host (029). */
@@ -110,6 +119,16 @@ export class Work {
       case "agents/draftOptions":
         this.draftOptions.value = params as DraftOptionsNotification;
         return true;
+      case "workflow/changed":
+        this.upsertWorkflow(params as WorkflowSummary, host);
+        return true;
+      case "workflow/removed": {
+        const note = params as WorkflowRemovedNotification;
+        const key = `${host}|${folderKey(note.folder)}`;
+        this.workflows.value = { ...this.workflows.value,
+          [key]: (this.workflows.value[key] ?? []).filter((w) => w.workflow.workflowID !== note.workflowID) };
+        return true;
+      }
       case "agent/showFile": {
         const note = params as ShowFileNotification;
         this.shownFile.value = { host, agentID: note.agentID, path: note.file.path, line: note.file.line, at: Date.now() };
@@ -331,8 +350,6 @@ export class Store extends Work {
   /** The projects whose archived sessions have been listed since this connection opened. */
   private archivedLoaded = new Set<string>();
 
-  /** Each project's workflows by `host|folder`, listed when the project is chosen (names only until US5). */
-  readonly workflows = signal<Record<string, WorkflowSummary[]>>({});
 
   async loadWorkflows(host: string, folder: string): Promise<void> {
     const listed = await this.link.call("workflows/list", { folder: folder as never }, host).catch(() => null);
@@ -487,6 +504,12 @@ export class Store extends Work {
   /** What the person typed on a live page, written to the file as the window writes it. */
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
+  }
+
+  /** Run now (US5). The session it starts arrives as any other does, by agent/changed. */
+  async runWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
+    const ran = await this.act("workflows/run", { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID }, host);
+    if (ran) this.upsertWorkflow(ran, host);
   }
 
   /** Mark as Unread / Mark as Read (#70). */
