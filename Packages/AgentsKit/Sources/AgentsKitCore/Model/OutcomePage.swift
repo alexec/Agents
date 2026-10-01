@@ -145,7 +145,7 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     /// The last work block, retained for clients built before 069 (after the #58
     /// cut-off of 051).
     public var last: TranscriptEntry?
-    /// The latest work and its context, retained for clients built before 069.
+    /// The latest work and its context, retained for clients built before 069, likewise.
     public var concise: [TranscriptEntry]?
     /// The answers, the reply and how it went (069). Nil in a summary written before.
     public var outcome: [TranscriptEntry]?
