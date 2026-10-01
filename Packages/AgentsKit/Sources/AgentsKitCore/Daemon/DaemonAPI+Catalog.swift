@@ -17,11 +17,6 @@ extension DaemonAPI.Method {
     public static let skillsUpdatePreview = "skills/update-preview"
     public static let skillsRemove = "skills/remove"
 
-    /// All of 059's methods, for the test that none of them is open to anyone but the window.
-    public static let catalogMethods: [String] = [
-        catalogSearch, catalogPreview, catalogDestinationState, skillsAdd, skillsList,
-        skillsCheckUpdates, skillsUpdatePreview, skillsRemove,
-    ]
 }
 
 extension DaemonAPI.Failure {

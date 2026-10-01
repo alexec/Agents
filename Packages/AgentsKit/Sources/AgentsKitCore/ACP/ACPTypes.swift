@@ -227,7 +227,6 @@ public enum ACP {
         public var supportsList: Bool { agentCapabilities?.sessionCapabilities?.list != nil }
         public var supportsFork: Bool { agentCapabilities?.sessionCapabilities?.fork != nil }
         public var supportsDelete: Bool { agentCapabilities?.sessionCapabilities?.delete != nil }
-        public var supportsClose: Bool { agentCapabilities?.sessionCapabilities?.close != nil }
         public var supportsAdditionalDirectories: Bool {
             agentCapabilities?.sessionCapabilities?.additionalDirectories != nil
         }

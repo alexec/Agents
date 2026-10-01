@@ -102,9 +102,6 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
         return authMethods.first { $0.terminalCommand == nil } ?? authMethods.first
     }
 
-    public var needsTerminal: Bool {
-        preferredMethod?.terminalCommand != nil
-    }
 }
 
 extension ACP.AuthMethod: Encodable {

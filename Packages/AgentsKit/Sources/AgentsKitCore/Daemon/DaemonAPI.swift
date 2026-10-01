@@ -347,7 +347,6 @@ public enum DaemonAPI {
         /// The window answers it with the sign-in sheet rather than an error.
         public static let signInNeeded = "runtime/signInNeeded"
         public static let agentUsage = "agent/usage"
-        public static let agentPlan = "agent/plan"
         public static let agentElicitation = "agent/elicitation"
         public static let agentTerminalOutput = "agent/terminalOutput"
         /// An agent has asked that a file be shown. Unlike a suggested prompt, which
@@ -1689,6 +1688,10 @@ public enum DaemonAPI {
     }
 
     public enum Failure {
+        // Retired: nothing raises these any more, and they are not to be given out again:
+        // -32006 (a prompt to a working agent), -32019 (already answered), -32020 (no
+        // such device), -32021 (no such need), -32037 (credential refused, now a
+        // notification), -32046 (stop the turn first, 052).
         public static let runtimeNotFound = -32001
         public static let runtimeWillNotStart = -32002
         /// The runtime would not start because its command sandbox could not be set up
@@ -1704,9 +1707,6 @@ public enum DaemonAPI {
         /// Retire now on an agent that is not archived, or that something still holds
         /// (051). The message is the reason.
         public static let retireRefused = -32051
-        /// No longer raised: a prompt sent to a working agent waits its turn rather
-        /// than being refused. The number is kept so an older window still reads it.
-        public static let alreadyRunning = -32006
         /// The user's login shell is missing, or the agent's folder has gone (FR-024).
         public static let shellWillNotStart = -32010
         /// A restart was asked for on a shell that is still running.
@@ -1746,28 +1746,12 @@ public enum DaemonAPI {
         /// waits on that agent's queue, because losing what somebody typed because a
         /// budget was reached would be the worst possible reading of "control cost".
         public static let dayLimitReached = -32018
-        /// A question that was already settled — by another device, by the Mac, or by
-        /// the agent giving up on it. Raised instead of `noSuchAgent`, which is what a
-        /// second answer used to be told and which reads as though the agent had gone.
-        ///
-        /// 013's tasks proposed -32018 for this. Feature 010 took that number first,
-        /// so it is -32019 here and `noSuchDevice` is -32020. The file already carries
-        /// one collision at -32010; it does not need a second.
-        public static let alreadyAnswered = -32019
-        /// A device id that is not in the store — never paired, or revoked since.
-        public static let noSuchDevice = -32020
-        /// A need id that is not outstanding — met, or never existed (021).
-        public static let noSuchNeed = -32021
         /// A daemon asked to quit while a turn is in flight (037).
         public static let busy = -32040
-        /// A chat asked to move to another runtime while its turn is running (052, US5).
-        public static let stopTheTurnFirst = -32046
         /// A server daemon had to start a runtime for this request and has no sign-in to
         /// start it with. Nothing was started, so the same request (same `sendID`) can be
         /// sent again after `credentials/lend` (043). `data`: `runtime`, `offered`.
         public static let credentialWanted = -32036
-        /// The provider refused the credential a runtime was started with (043, FR-016).
-        public static let credentialRefused = -32037
         /// `credentials/lend` to a daemon that is not a server's (043, D5).
         public static let notAServer = -32038
         /// `credentials/lend` for a runtime this connection did not offer, or on a

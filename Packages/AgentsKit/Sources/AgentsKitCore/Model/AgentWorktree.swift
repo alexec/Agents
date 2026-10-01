@@ -72,11 +72,6 @@ public enum WorktreeName {
 
     public static func branch(for name: String) -> String { branchPrefix + name }
 
-    /// A stable, readable worktree name for an issue assignment.
-    public static func issue(number: Int, title: String, now: Date = Date()) -> String {
-        from(prompt: "issue-\(number)-\(title)", keepingFiller: true, now: now)
-    }
-
     /// The folder a worktree on someone's branch goes in: the branch, less the app's
     /// own prefix, with every `/` a `-`, so `feature/login` is `feature-login`.
     public static func folder(forBranch branch: String) -> String {

@@ -137,8 +137,6 @@ public enum EventCatalogue {
         EventKind("server.online", .mac, ["server"], "A server came back."),
     ]
 
-    /// What every custom event carries besides what its publisher adds.
-    public static let customDetails = ["publisher", "message"]
     public static let customMeaning = "An agent in this project published this."
 
     private static let byName: [String: EventKind] = Dictionary(uniqueKeysWithValues: all.map { ($0.name, $0) })

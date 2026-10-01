@@ -9,20 +9,6 @@ import Foundation
 extension DaemonCore {
     // MARK: The account
 
-    public func refreshAccount(runtimeID: String) async throws -> RuntimeAccount {
-        let (session, handshake) = try await handshakeOnly(runtimeID: runtimeID)
-        defer { Task { await session.end(gracePeriod: .seconds(2)) } }
-        noteAccount(runtimeID: runtimeID, from: handshake)
-        if handshake.supportsProviders, let providers = try? await session.providers() {
-            var account = account(for: runtimeID)
-            account.providers = providers.providers ?? []
-            account.currentProviderID = providers.currentProviderId
-            accounts[runtimeID] = account
-            broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
-        }
-        return account(for: runtimeID)
-    }
-
     public func authenticate(runtimeID: String, methodID: String) async throws -> RuntimeAccount {
         let (session, handshake) = try await handshakeOnly(runtimeID: runtimeID)
         defer { Task { await session.end(gracePeriod: .seconds(2)) } }
