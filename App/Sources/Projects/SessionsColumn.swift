@@ -245,12 +245,14 @@ struct SessionsColumn: View {
                         .foregroundStyle(.secondary)
                 }
             } label: {
-                subheading("Archived", count: archived.count)
+                // Named for what it holds, as Workflows' own is: the section heading is
+                // often scrolled away by the time this is read.
+                subheading("Archived sessions", count: archived.count)
             }
         }
     }
 
-    /// A group within Sessions: Working, Needs you, Archived.
+    /// A group within Sessions: Working, Needs you, Archived sessions.
     private func subheading(_ title: String, count: Int) -> some View {
         HStack(spacing: 6) {
             Text(title)

@@ -9,7 +9,7 @@ description: Every status an agent can have, the group it is listed under, and w
 This page lists every status an agent can show, and the group it sits under on its
 project's page. The groups appear in this order: **Needs you**, **Waiting**,
 **Working**, **Done**, **Paused**, **Parked**. A group with no agents in it is not
-shown. Archived chats stay under **Archived**, folded away until you open it.
+shown. Archived chats stay under **Archived sessions**, folded away until you open it.
 
 The status is what the agent's icon says when you hover over it, and what a screen reader
 reads. The Mac, iPhone and iPad use the same words. Only **Needs you** is drawn in

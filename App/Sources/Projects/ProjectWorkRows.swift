@@ -48,7 +48,7 @@ struct ProjectWorkSections: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            Text("Archived")
+                            Text("Archived workflows")
                             Text("\(archived.count)").monospacedDigit().foregroundStyle(.tertiary)
                         }
                         .appText(.fine)

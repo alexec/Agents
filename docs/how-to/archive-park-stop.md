@@ -11,7 +11,7 @@ Three ways to put an agent down, each keeping its whole conversation:
 - **Stop** ends what it is doing now. The chat stays where it is, and you can tell it what
   to do next.
 - **Park** puts a chat you have finished with *for now* in its own group, to come back to.
-- **Archive** puts away a chat you are done with. It folds out of sight under **Archived**.
+- **Archive** puts away a chat you are done with. It folds out of sight under **Archived sessions**.
   Any of them can be brought back.
 
 ## Before you start
@@ -66,7 +66,7 @@ Three ways to put an agent down, each keeping its whole conversation:
 | | Stop | Park | Archive |
 |---|---|---|---|
 | Conversation, cost, settings and labels | Kept | Kept | Kept |
-| Where it is listed | **Stopped** | **Parked** | **Archived**, folded away |
+| Where it is listed | **Stopped** | **Parked** | **Archived sessions**, folded away |
 | Asks for your attention | No | Never | Never |
 | Worktree | Kept | Kept | Removed if everything in it is committed |
 | Afterwards | | | Retired after 30 days, or sooner when archived agents take more than 2 GB |

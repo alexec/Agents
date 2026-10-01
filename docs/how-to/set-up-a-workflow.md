@@ -86,7 +86,7 @@ were approved as they stood.
 **Turn it off**
 
 - Archive it: on the Mac, swipe the row left with two fingers, right-click it and choose
-  **Archive**, or click **Archive** on its page. It stays listed under **Archived** and
+  **Archive**, or click **Archive** on its page. It stays listed under **Archived workflows** and
   does not run until you click **Bring Back**. The file is kept.
 - To remove it for good, delete its file. **Show in Finder** on the row's menu finds it.
 
