@@ -65,6 +65,8 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                                 title: title, waitingOn: words.waitingOn,
                                                 checkAgainInMinutes: words.checkAgainInMinutes,
                                                 afterwards: words.afterwards?.rawValue,
+                                                addLabels: words.addLabels,
+                                                removeLabels: words.removeLabels,
                                                 move: words.move.map {
                                                     switch $0 {
                                                     case .move(let target, let removeLeft, let discardChanges):
@@ -88,12 +90,12 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                     fallback: "Done.")
     } agents: { call in
         switch call {
-        case .start(let prompt, let runtime, let model, let permissionMode, let worktree):
+        case .start(let prompt, let runtime, let model, let permissionMode, let worktree, let labels):
             return await relay(DaemonAPI.Method.agentsStartHelper,
                                DaemonAPI.StartHelperRequest(token: token, prompt: prompt,
                                                             runtime: runtime, model: model,
                                                             permissionMode: permissionMode,
-                                                            worktree: worktree),
+                                                            worktree: worktree, labels: labels),
                                fallback: "Started.")
         case .stop(let agentID):
             return await relay(DaemonAPI.Method.agentsStopHelper,

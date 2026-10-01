@@ -104,6 +104,8 @@ public enum DaemonAPI {
         /// right after `mailbox/carry`.
         public static let relayRegister = "relay/register"
         public static let agentsStart = "agents/start"
+        public static let agentsSetLabels = "agents/setLabels"
+        public static let agentsLabelVocabulary = "agents/labelVocabulary"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
         /// Stop one shell or task an agent left running in the background, and nothing
@@ -665,13 +667,15 @@ public enum DaemonAPI {
         public var requestID: UUID?
         /// The new agent's own sandbox choice (064). Nil follows the runtime's default.
         public var sandbox: SandboxChoice?
+        /// Labels chosen by the person on the new-session form.
+        public var labels: [String]
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
                     startOptions: StartOptions = .none, draftID: UUID? = nil,
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
                     worktree: WorktreeChoice? = nil, requestID: UUID? = nil,
-                    sandbox: SandboxChoice? = nil) {
+                    sandbox: SandboxChoice? = nil, labels: [String] = []) {
             self.sandbox = sandbox
             self.worktree = worktree
             self.runtimeID = runtimeID
@@ -683,6 +687,7 @@ public enum DaemonAPI {
             self.additionalDirectories = additionalDirectories
             self.mcpServers = mcpServers
             self.requestID = requestID
+            self.labels = labels
         }
 
         /// Fields with a sensible default may be left out. A caller that wants an
@@ -701,6 +706,7 @@ public enum DaemonAPI {
             worktree = try c.decodeIfPresent(WorktreeChoice.self, forKey: .worktree)
             requestID = try c.decodeIfPresent(UUID.self, forKey: .requestID)
             sandbox = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandbox)
+            labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
         }
 
         /// What goes to the runtime: the words, then whatever was attached.
@@ -712,6 +718,24 @@ public enum DaemonAPI {
     public struct AgentRequest: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    /// A person changes one session's labels. Ownership is assigned by the daemon.
+    public struct SetLabelsRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var add: [String]
+        public var remove: [String]
+
+        public init(agentID: UUID, add: [String] = [], remove: [String] = []) {
+            self.agentID = agentID
+            self.add = add
+            self.remove = remove
+        }
+    }
+
+    public struct LabelVocabularyRequest: Codable, Sendable {
+        public var folder: URL
+        public init(folder: URL) { self.folder = folder }
     }
 
     public struct ChangesListRequest: Codable, Sendable {
@@ -880,6 +904,8 @@ public enum DaemonAPI {
         /// `park` or `archive`: where the agent asked to be put once the turn is over.
         /// A string, checked at the daemon, and optional for the reason `title` is.
         public var afterwards: String?
+        public var addLabels: [String]
+        public var removeLabels: [String]
         /// Where the agent asked to move once the turn ends (053). None clears a move
         /// the agent asked for earlier in the same turn: the last call is the whole
         /// account of it.
@@ -888,7 +914,9 @@ public enum DaemonAPI {
         public init(token: String, outcome: String, message: String,
                     prompts: [SuggestedPrompt], title: String? = nil,
                     waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
-                    afterwards: String? = nil, move: MoveAsk? = nil) {
+                    afterwards: String? = nil,
+                    addLabels: [String] = [], removeLabels: [String] = [],
+                    move: MoveAsk? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
@@ -897,7 +925,24 @@ public enum DaemonAPI {
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
             self.afterwards = afterwards
+            self.addLabels = addLabels
+            self.removeLabels = removeLabels
             self.move = move
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            token = try c.decode(String.self, forKey: .token)
+            outcome = try c.decode(String.self, forKey: .outcome)
+            message = try c.decode(String.self, forKey: .message)
+            prompts = try c.decode([SuggestedPrompt].self, forKey: .prompts)
+            title = try c.decodeIfPresent(String.self, forKey: .title)
+            waitingOn = try c.decodeIfPresent([String].self, forKey: .waitingOn)
+            checkAgainInMinutes = try c.decodeIfPresent(Int.self, forKey: .checkAgainInMinutes)
+            afterwards = try c.decodeIfPresent(String.self, forKey: .afterwards)
+            addLabels = try c.decodeIfPresent([String].self, forKey: .addLabels) ?? []
+            removeLabels = try c.decodeIfPresent([String].self, forKey: .removeLabels) ?? []
+            move = try c.decodeIfPresent(MoveAsk.self, forKey: .move)
         }
     }
 
@@ -1943,16 +1988,29 @@ public enum DaemonAPI {
         /// `"new"`, or the name of a worktree of the caller's repository, as the agent
         /// wrote it (030). Resolved by the daemon, which alone can say what exists.
         public var worktree: String?
+        public var labels: [String]
 
         public init(token: String, prompt: String, runtime: String? = nil,
                     model: String? = nil, permissionMode: String? = nil,
-                    worktree: String? = nil) {
+                    worktree: String? = nil, labels: [String] = []) {
             self.worktree = worktree
             self.token = token
             self.prompt = prompt
             self.runtime = runtime
             self.model = model
             self.permissionMode = permissionMode
+            self.labels = labels
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            token = try c.decode(String.self, forKey: .token)
+            prompt = try c.decode(String.self, forKey: .prompt)
+            runtime = try c.decodeIfPresent(String.self, forKey: .runtime)
+            model = try c.decodeIfPresent(String.self, forKey: .model)
+            permissionMode = try c.decodeIfPresent(String.self, forKey: .permissionMode)
+            worktree = try c.decodeIfPresent(String.self, forKey: .worktree)
+            labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
         }
     }
 

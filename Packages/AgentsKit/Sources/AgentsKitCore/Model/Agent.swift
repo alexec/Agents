@@ -13,6 +13,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var runtimeID: String
     public var cwd: URL
     public var title: String?
+    /// The names attached to this conversation, with person or agent ownership.
+    /// Empty for records written before session labels existed.
+    public var labels: [SessionLabel]
     /// What it is doing. Defaults to `starting` in the memberwise `init`, with no
     /// ending and no reason for one (FR-002).
     ///
@@ -244,6 +247,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         runtimeID = try c.decode(String.self, forKey: .runtimeID)
         cwd = try c.decode(URL.self, forKey: .cwd)
         title = try c.decodeIfPresent(String.self, forKey: .title)
+        labels = try c.decodeIfPresent([SessionLabel].self, forKey: .labels) ?? []
         // Lenient, because the alternative is losing the agent. `state` is a
         // `String` raw-value enum, so an unknown value thrown from here fails the
         // whole `Agent`, and `loadAll` files it under `unreadable` — the agent simply
@@ -376,6 +380,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encode(runtimeID, forKey: .runtimeID)
         try c.encode(cwd, forKey: .cwd)
         try c.encodeIfPresent(title, forKey: .title)
+        if !labels.isEmpty { try c.encode(labels, forKey: .labels) }
         // The original string where there was one, so a state from a newer build
         // survives a round trip through this one instead of being silently downgraded
         // to `stopped` (FR-021).
@@ -435,7 +440,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case id, runtimeID, cwd, title, state, runtimeSessionID, startOptions
+        case id, runtimeID, cwd, title, labels, state, runtimeSessionID, startOptions
         case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread, reportSeenAt
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
@@ -466,6 +471,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 runtimeID: String,
                 cwd: URL,
                 title: String? = nil,
+                labels: [SessionLabel] = [],
                 state: AgentState = .starting,
                 runtimeSessionID: String? = nil,
                 startOptions: StartOptions = .none,
@@ -509,6 +515,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.runtimeID = runtimeID
         self.cwd = cwd
         self.title = title
+        self.labels = labels
         self.state = state
         self.runtimeSessionID = runtimeSessionID
         self.startOptions = startOptions

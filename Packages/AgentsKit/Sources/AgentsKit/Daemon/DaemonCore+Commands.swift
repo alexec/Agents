@@ -205,7 +205,18 @@ extension DaemonCore {
     /// `chainDepth` is how deep a workflow fire this agent causes would be, read off
     /// the starter before any of the awaits here — see `Agent.chainDepth`.
     func start(_ request: DaemonAPI.StartRequest, startedBy starter: UUID?,
-               chainDepth: Int? = nil) async throws -> UUID {
+               chainDepth: Int? = nil,
+               labelOwner: SessionLabel.Owner? = nil) async throws -> UUID {
+        let initialLabels: [SessionLabel]
+        do {
+            initialLabels = try SessionLabelPolicy.change(
+                current: [], add: request.labels,
+                actor: labelOwner ?? (starter == nil ? .person : .agent),
+                projectLabels: SessionLabelPolicy.vocabulary(in: request.cwd, agents: agents.values))
+        } catch {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: error.localizedDescription)
+        }
         // Before the session is made. Refusing after spawning a runtime costs a
         // process for a turn that was never going to run. A new agent has no queue
         // to wait on, which is why this is a refusal where a prompt is a hold — and
@@ -303,6 +314,7 @@ extension DaemonCore {
                           chainDepth: chainDepth,
                           worktree: placed?.worktree,
                           startRequestID: request.requestID)
+        agent.labels = initialLabels
         agent.sandboxOverride = request.sandbox
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,

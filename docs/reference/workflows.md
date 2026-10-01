@@ -23,6 +23,7 @@ on:
       days: [mon, tue, wed, thu, fri]
 agent: new
 permission-mode: plan
+labels: [build, morning]
 ---
 
 Check the build and say whether it is green.
@@ -46,6 +47,7 @@ Check the build and say whether it is green.
 | `runtime:` | `claude`, `codex`, `gemini`, `antigravity`, `grok`, `copilot`, `cursor` | The runtime the agent runs on. Without it, Claude. A name this version does not know stops the workflow running, and its page names the runtimes it knows. See [Runtimes](runtimes.md). |
 | `model:` | One of the runtime's models | The model the agent uses. Without it, the runtime's own default. |
 | `effort:` | One of the runtime's levels, such as `low` or `high` | How hard the agent thinks. Without it, the runtime's own default. |
+| `labels:` | A list of up to five names, each 1–24 characters | Each newly started workflow session gets these agent-owned labels. A standing or triggering run reusing an existing session keeps that session’s labels. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
 
 For example, to start a new agent whenever `main` moves, or another agent publishes

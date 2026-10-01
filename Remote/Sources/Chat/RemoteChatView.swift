@@ -70,6 +70,12 @@ struct RemoteChatView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 StaleBanner()
+                if let agent {
+                    RemoteSessionLabels(agent: agent, compact: false)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 // Why it is under Parked, and since when (040, FR-011).
                 if let line = ParkWords.line(agent?.parking) {
                     Label(line, systemImage: ParkWords.symbol)

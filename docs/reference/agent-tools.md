@@ -35,6 +35,12 @@ if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool c
 | `cancel_wait` | Stops the agent's wait, so nothing starts it again for it. | The runtime decides. |
 | `publish_event` | Says that something happened, as a `custom.` event such as `custom.build_green`, with a short message and up to 10 details. Agents waiting on it are started and workflows that trigger on it run, and the agent is told which. At most 30 an hour per agent. | The runtime decides. |
 
+`finish_turn` can also add or remove labels owned by the agent. `start_agent` can give
+the helper up to five labels, which the helper owns from its first moment. Labels are
+unique within a session without regard to case. An agent cannot remove or claim a
+person-owned label; the whole `finish_turn` call is refused if it tries. See
+[Label a session](../how-to/label-a-session.md).
+
 `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` are given only to an
 agent that you or a workflow started. An agent started by another agent cannot start
 agents of its own. Only you can archive an agent. `list_sessions` and `read_session` are

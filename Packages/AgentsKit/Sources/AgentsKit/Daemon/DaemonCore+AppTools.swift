@@ -177,6 +177,17 @@ extension DaemonCore {
         // the record. No title — the goal has not changed, or a helper from an older
         // binary sent none — leaves the name as it was.
         let title = request.title.flatMap(Agent.cleanedTitle)
+        let labels: [SessionLabel]
+        do {
+            labels = try SessionLabelPolicy.change(
+                current: checked.agent.labels, add: request.addLabels,
+                remove: request.removeLabels, actor: .agent,
+                projectLabels: SessionLabelPolicy.vocabulary(
+                    in: checked.agent.projectFolder, agents: agents.values))
+        } catch {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: "Nothing was recorded: \(error.localizedDescription)")
+        }
         // Last of the checks, since it is the one that writes: a move refused here (a
         // name it cannot use, a removal that would lose work) refuses the whole call,
         // and one accepted is kept on the agent for when the turn ends.
@@ -194,6 +205,7 @@ extension DaemonCore {
         }
         let noted = await land(checked.report, prompts: prompts, title: title,
                                afterwards: afterwards,
+                               labels: labels,
                                on: agents[checked.agentID] ?? checked.agent, id: checked.agentID)
         let asked = afterwards.map { " " + Self.afterTurnNote($0) } ?? ""
         let kept = declinedArchive ? " " + AfterTurn.keptVisible : ""
@@ -269,12 +281,14 @@ extension DaemonCore {
     /// put away work that needs somebody.
     private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?, title: String? = nil,
                       afterwards: AfterTurn? = nil,
+                      labels: [SessionLabel]? = nil,
                       on agent: Agent, id agentID: UUID) async -> String {
         var agent = agent
         // Replacing whatever this turn said before it changed its mind (FR-005).
         agent.report = report
         if let prompts { agent.suggestedPrompts = prompts }
         agent.afterTurn = afterwards
+        if let labels { agent.labels = labels }
         // Said in front of the person, so already seen: no banner for what they watched.
         if isWatched(agentID) { agent.reportSeenAt = report.at }
         // In the same write as the report, so no window ever sees the new account of

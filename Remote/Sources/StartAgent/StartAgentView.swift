@@ -15,6 +15,8 @@ struct StartAgentView: View {
 
     @State private var text = ""
     @State private var attachments: [Attachment] = []
+    @State private var draftLabels: [String] = []
+    @State private var labelInput = ""
     /// Why something picked could not be attached, or that a kept picture was too big
     /// to keep and needs picking again.
     @State private var attachNote: String?
@@ -24,6 +26,30 @@ struct StartAgentView: View {
         NavigationStack {
             Form {
                 ChoiceRows()
+                Section("Labels") {
+                    ForEach(draftLabels, id: \.self) { value in
+                        HStack {
+                            Text(value)
+                            Spacer()
+                            Button("Remove", systemImage: "xmark.circle") {
+                                draftLabels.removeAll { $0 == value }
+                            }
+                        }
+                    }
+                    if draftLabels.count < SessionLabelPolicy.maximumCount {
+                        HStack {
+                            TextField("Add label", text: $labelInput)
+                                .onSubmit(addDraftLabel)
+                            Button("Add") { addDraftLabel() }
+                        }
+                        ForEach(model.labelSuggestions(in: project), id: \.self) { value in
+                            Button(value) {
+                                labelInput = value
+                                addDraftLabel()
+                            }
+                        }
+                    }
+                }
             }
             .paperForm()
             .navigationTitle(model.work.project(project)?.name ?? "New session")
@@ -124,6 +150,15 @@ struct StartAgentView: View {
     private func send() {
         let words = text
         let attached = attachments
-        Task { _ = await model.startAgent(prompt: words, attachments: attached) }
+        Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels) }
+    }
+
+    private func addDraftLabel() {
+        guard let value = try? SessionLabelPolicy.cleaned(labelInput),
+              draftLabels.count < SessionLabelPolicy.maximumCount,
+              !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) })
+        else { return }
+        draftLabels.append(value)
+        labelInput = ""
     }
 }

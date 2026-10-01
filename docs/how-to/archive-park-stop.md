@@ -65,7 +65,7 @@ Three ways to put an agent down, each keeping its whole conversation:
 
 | | Stop | Park | Archive |
 |---|---|---|---|
-| Conversation, cost and settings | Kept | Kept | Kept |
+| Conversation, cost, settings and labels | Kept | Kept | Kept |
 | Where it is listed | **Stopped** | **Parked** | **Archived**, folded away |
 | Asks for your attention | No | Never | Never |
 | Worktree | Kept | Kept | Removed if everything in it is committed |
@@ -74,7 +74,7 @@ Three ways to put an agent down, each keeping its whole conversation:
 
 ## How long archived chats are kept
 
-An archived chat is kept whole, and can be brought back or branched from, for **30 days**.
+An archived chat, including its labels and their owners, is kept whole and can be brought back or branched from for **30 days**.
 After that it is **retired**: its conversation is deleted, and a short record of who the agent
 was is kept, so an event or a chat that names it still says who it was. Archived chats may also
 take up to **2 GB** between them; past that, the ones archived longest ago are retired first.

@@ -392,6 +392,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.StartRequest.self)
                 return .success(try JSONValue.encoding(try await start(request)))
 
+            case DaemonAPI.Method.agentsSetLabels:
+                let request = try require(params, as: DaemonAPI.SetLabelsRequest.self)
+                return .success(try JSONValue.encoding(try setSessionLabels(request)))
+
+            case DaemonAPI.Method.agentsLabelVocabulary:
+                let request = try require(params, as: DaemonAPI.LabelVocabularyRequest.self)
+                return .success(try JSONValue.encoding(labelVocabulary(request)))
+
             case DaemonAPI.Method.agentsPrompt:
                 let request = try require(params, as: DaemonAPI.PromptRequest.self)
                 // Only the Mac and the phone send this, so a person's prompt here is a

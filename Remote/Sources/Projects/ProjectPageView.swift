@@ -15,6 +15,7 @@ struct ProjectPageView: View {
     @Environment(RemoteModel.self) private var model
     @State private var showsArchived = false
     @State private var archivedShown = pageSize
+    @State private var query = ""
     private static let pageSize = 10
     private var pageSize: Int { Self.pageSize }
 
@@ -28,6 +29,7 @@ struct ProjectPageView: View {
             }
         }
         .navigationTitle(model.selectedSummary?.name ?? "Project")
+        .searchable(text: $query, prompt: "Search sessions or label:name")
         .navigationBarTitleDisplayMode(.large)
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         .toolbar {
@@ -41,6 +43,14 @@ struct ProjectPageView: View {
             }
         }
         .onChange(of: model.selectedProject) { archivedShown = pageSize }
+        .task(id: model.selectedProject) {
+            if let folder = model.selectedProject { await model.loadLabelVocabulary(in: folder) }
+        }
+        .task(id: query.isEmpty ? "" : (model.selectedProject?.absoluteString ?? "")) {
+            guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let folder = model.selectedProject else { return }
+            await model.loadAllArchivedAgents(in: folder)
+        }
         .sheet(isPresented: Binding(get: { model.startingIn != nil },
                                     set: { if !$0 { model.startingIn = nil } })) {
             if let project = model.startingIn {
@@ -68,7 +78,7 @@ struct ProjectPageView: View {
                 }
 
                 ForEach(AgentGroup.live, id: \.self) { group in
-                    ForEach(group.headings(model.agents(group: group))) { heading in
+                    ForEach(group.headings(matching(model.agents(group: group)))) { heading in
                         GroupHeading(title: heading.title, count: heading.agents.count)
                         ForEach(heading.agents) { agent in
                             AgentCard(agent: agent)
@@ -77,6 +87,11 @@ struct ProjectPageView: View {
                 }
 
                 archivedSection
+
+                if !query.isEmpty, !hasMatches {
+                    ContentUnavailableView("No matching sessions", systemImage: "magnifyingglass",
+                                           description: Text("No session matches “\(query)”."))
+                }
 
                 WorkflowsSection()
 
@@ -108,6 +123,16 @@ struct ProjectPageView: View {
         AgentGroup.allCases.allSatisfy { model.agents(group: $0).isEmpty }
     }
 
+    private func matching(_ agents: [Agent]) -> [Agent] {
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return agents }
+        let matcher = SessionLabelQuery(query)
+        return agents.filter(matcher.matches)
+    }
+
+    private var hasMatches: Bool {
+        AgentGroup.allCases.contains { !matching(model.agents(group: $0)).isEmpty }
+    }
+
     /// The archived agents fetched so far — none until the section is opened.
     private var archived: [Agent] { model.agents(group: .archived) }
 
@@ -122,12 +147,16 @@ struct ProjectPageView: View {
     @ViewBuilder
     private var archivedSection: some View {
         if archivedCount > 0 {
-            DisclosureHeading(title: "Archived", count: archivedCount, isOpen: $showsArchived)
-            if showsArchived {
-                ForEach(archived.prefix(archivedShown)) { agent in
+            if query.isEmpty {
+                DisclosureHeading(title: "Archived", count: archivedCount, isOpen: $showsArchived)
+            } else if !matching(archived).isEmpty {
+                GroupHeading(title: "Archived", count: matching(archived).count)
+            }
+            if showsArchived || !query.isEmpty {
+                ForEach(query.isEmpty ? Array(archived.prefix(archivedShown)) : matching(archived)) { agent in
                     AgentCard(agent: agent)
                 }
-                if archivedCount > archivedShown {
+                if query.isEmpty, archivedCount > archivedShown {
                     Button("Show more") { archivedShown += pageSize }
                         .appText(.reading)
                         .padding(.top, 4)

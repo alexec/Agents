@@ -59,15 +59,18 @@ struct SessionsColumn: View {
             }
         }
         .listStyle(.sidebar)
+        .onChange(of: query) {
+            if !query.isEmpty { showsArchived = true }
+        }
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
         .overlay {
             if model.selectedProjectSummary == nil {
                 EmptyState.noProject
             } else if !hasAny, !query.isEmpty {
-                ContentUnavailableView("No matches",
+                ContentUnavailableView("No matching sessions",
                                        systemImage: "bubble.left.and.bubble.right",
-                                       description: Text("Nothing here says “\(query)”."))
+                                       description: Text("No session matches “\(query)”."))
             }
         }
         // ⌫ archives every highlighted session that is not already archived (one or many).
@@ -192,7 +195,7 @@ struct SessionsColumn: View {
             ? RetirementWords.retiredLine(model.selectedProjectSummary?.retiredCount) : nil
         if !archived.isEmpty || retiredLine != nil {
             DisclosureGroup(isExpanded: $showsArchived) {
-                ForEach(archived.prefix(Self.archivedShown)) { agent in
+                ForEach(query.isEmpty ? Array(archived.prefix(Self.archivedShown)) : archived) { agent in
                     row(agent)
                 }
                 if let retiredLine {
@@ -225,12 +228,10 @@ struct SessionsColumn: View {
     }
 
     private func matching(_ agents: [Agent]) -> [Agent] {
-        let words = query.trimmingCharacters(in: .whitespaces)
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !words.isEmpty else { return agents }
-        return agents.filter { agent in
-            [agent.title, agent.report?.message].compactMap { $0 }
-                .contains { $0.localizedCaseInsensitiveContains(words) }
-        }
+        let matcher = SessionLabelQuery(words)
+        return agents.filter(matcher.matches)
     }
 
     /// The sessions under the Sessions heading that are not archived.

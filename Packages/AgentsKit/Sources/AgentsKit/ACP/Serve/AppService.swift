@@ -90,13 +90,19 @@ public actor AppService {
         public var waitingOn: [String]?
         public var checkAgainInMinutes: Int?
         public var afterwards: AfterTurn?
+        public var addLabels: [String]
+        public var removeLabels: [String]
         public var move: MoveCall?
 
         public init(waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
-                    afterwards: AfterTurn? = nil, move: MoveCall? = nil) {
+                    afterwards: AfterTurn? = nil,
+                    addLabels: [String] = [], removeLabels: [String] = [],
+                    move: MoveCall? = nil) {
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
             self.afterwards = afterwards
+            self.addLabels = addLabels
+            self.removeLabels = removeLabels
             self.move = move
         }
 
@@ -108,7 +114,7 @@ public actor AppService {
     /// is what knows whose agent is whose.
     public enum AgentCall: Sendable, Equatable {
         case start(prompt: String, runtime: String?, model: String?, permissionMode: String?,
-                   worktree: String? = nil)
+                   worktree: String? = nil, labels: [String] = [])
         case stop(agentID: String)
         case park(agentID: String)
         case archive(agentID: String)
@@ -286,6 +292,17 @@ public actor AppService {
                 case .success(let read): words.afterwards = read
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 }
+                for (key, assign) in [("add_labels", true), ("remove_labels", false)] {
+                    if arguments?[key] != nil && arguments?[key]?.arrayValue == nil {
+                        return .success(Self.reply("Nothing was recorded: `\(key)` must be an array of label strings.", isError: true))
+                    }
+                    let values = arguments?[key]?.arrayValue ?? []
+                    guard values.allSatisfy({ $0.stringValue != nil }) else {
+                        return .success(Self.reply("Nothing was recorded: `\(key)` must contain only strings.", isError: true))
+                    }
+                    if assign { words.addLabels = values.compactMap(\.stringValue) }
+                    else { words.removeLabels = values.compactMap(\.stringValue) }
+                }
                 switch Self.moveCall(arguments) {
                 case .success(let read): words.move = read
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
@@ -389,9 +406,14 @@ public actor AppService {
             guard let prompt = text("prompt") else {
                 return .failure("Nothing was started: say what the agent is to do, in `prompt`.")
             }
+            guard arguments?["labels"] == nil || arguments?["labels"]?.arrayValue != nil,
+                  (arguments?["labels"]?.arrayValue ?? []).allSatisfy({ $0.stringValue != nil }) else {
+                return .failure("Nothing was started: `labels` must contain only strings.")
+            }
             return .success(.start(prompt: prompt, runtime: text("runtime"), model: text("model"),
                                    permissionMode: text("permission_mode"),
-                                   worktree: text("worktree")))
+                                   worktree: text("worktree"),
+                                   labels: arguments?["labels"]?.arrayValue?.compactMap(\.stringValue) ?? []))
         }
         if name.hasSuffix(stopAgentToolName)
             || name.hasSuffix(parkAgentToolName)
@@ -853,6 +875,10 @@ public actor AppService {
                         archive a session.
                         """,
                 ],
+                "add_labels": ["type": "array", "items": ["type": "string"],
+                               "description": "Agent-owned labels to add to this session."],
+                "remove_labels": ["type": "array", "items": ["type": "string"],
+                                  "description": "Agent-owned labels to remove. Person labels are protected."],
                 // One, since 031. The list this replaced is still read by the
                 // handler, for a conversation told about it before, but no longer
                 // offered: a fresh agent shown both would send both.
@@ -1148,6 +1174,8 @@ public actor AppService {
                         remote, to make a fresh worktree on that branch.
                         """,
                 ],
+                "labels": ["type": "array", "items": ["type": "string"],
+                           "description": "Labels for the helper, owned by that helper."],
             ],
             "required": .array(["prompt"]),
         ],
@@ -1208,7 +1236,7 @@ public actor AppService {
         "title": "List the agents you started",
         "description": """
             The agents you started with start_agent that have not been archived: each \
-            one's id, what it is doing, and what it last said about its work. Also how \
+            one's id, what it is doing, what it last said, and its labels with owners. Also how \
             many of this project's three places are in use.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
@@ -1221,7 +1249,7 @@ public actor AppService {
         "title": "List the sessions in this project",
         "description": """
             Every session in this project, most recent first, yours included: each one's \
-            id, title, runtime, status, and what it last said. Use it to find a session \
+            id, title, runtime, status, labels with owners, and what it last said. Use it to find a session \
             the person asks you to continue, then read it with read_session.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],

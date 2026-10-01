@@ -122,13 +122,25 @@ public enum WorkflowFile {
             }
             return named
         }
+        func labels() throws -> [String] {
+            guard let node = mapping["labels"] else { return [] }
+            guard let values = node.sequenceValues else {
+                throw YAMLNode.Failure("`labels:` must be a list of names")
+            }
+            do {
+                return try SessionLabelPolicy.change(current: [], add: values, actor: .agent,
+                                                     projectLabels: []).map(\.value)
+            } catch {
+                throw YAMLNode.Failure("`labels:` \(error.localizedDescription)")
+            }
+        }
         let settings: WorkflowSettings
         do {
             settings = WorkflowSettings(permissionMode: try setting("permission-mode"),
                                         runtimeID: try setting("runtime"),
                                         model: try setting("model"),
                                         effort: try setting("effort"),
-                                        options: try options())
+                                        options: try options(), labels: try labels())
         } catch let error as YAMLNode.Failure {
             return broken(error.message)
         } catch {
@@ -140,7 +152,7 @@ public enum WorkflowFile {
         // the catalog is actually consulted — and not into a file marked broken, which
         // is what a person would have to go and edit. See research.md §4.
 
-        let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model",
+        let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model", "labels",
                                    "effort", "options"]
         let unknown = mapping.filter { !known.contains($0.key) }.mapValues(\.jsonValue)
 

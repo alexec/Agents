@@ -118,6 +118,14 @@ struct SessionLookupTests {
 
     // MARK: Listing
 
+    @Test func listIncludesValuesAndOwners() {
+        var labeled = agent("Review")
+        labeled.labels = [SessionLabel(value: "Urgent", owner: .person),
+                          SessionLabel(value: "Build", owner: .agent)]
+        let text = SessionLookup.list(in: project, agents: [labeled], caller: nil)
+        #expect(text.contains("Urgent (person), Build (agent)"))
+    }
+
     @Test func theListIsThisProjectsSessionsNewestFirst() {
         let a = agent("Alpha", minutesAgo: 30)
         let b = agent("Beta", minutesAgo: 1)

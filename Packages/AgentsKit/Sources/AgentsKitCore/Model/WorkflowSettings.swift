@@ -32,14 +32,18 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
     /// as the file wrote it: `fast: true`, `allow_all: on`. What the text means — a
     /// choice, or a boolean — is the runtime's to say, and is only known once it has.
     public var options: [String: String]
+    /// Session labels attached to each new run, owned by that workflow's agent.
+    public var labels: [String]
 
     public init(permissionMode: String? = nil, runtimeID: String? = nil, model: String? = nil,
-                effort: String? = nil, options: [String: String] = [:]) {
+                effort: String? = nil, options: [String: String] = [:],
+                labels: [String] = []) {
         self.permissionMode = permissionMode
         self.runtimeID = runtimeID
         self.model = model
         self.effort = effort
         self.options = options
+        self.labels = labels
     }
 
     /// Read leniently, because a phone or window a version behind sends settings
@@ -51,6 +55,7 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
         model = try c.decodeIfPresent(String.self, forKey: .model)
         effort = try c.decodeIfPresent(String.self, forKey: .effort)
         options = try c.decodeIfPresent([String: String].self, forKey: .options) ?? [:]
+        labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
     }
 
     /// Whether this workflow says nothing about how it runs.

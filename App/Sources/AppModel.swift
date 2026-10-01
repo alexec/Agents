@@ -2395,7 +2395,7 @@ final class AppModel {
     /// Whether the agent was started, so the prompt bar can give back what it sent
     /// when it was not.
     @discardableResult
-    func startDraft(prompt: String, attachments: [Attachment] = []) async -> Bool {
+    func startDraft(prompt: String, attachments: [Attachment] = [], labels: [String] = []) async -> Bool {
         guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return false }
         let request = DaemonAPI.StartRequest(runtimeID: runtimeID,
                                              cwd: cwd,
@@ -2406,7 +2406,7 @@ final class AppModel {
                                              additionalDirectories: draftFolders,
                                              mcpServers: draftServers,
                                              worktree: draftWorktree,
-                                             sandbox: draftSandbox)
+                                             sandbox: draftSandbox, labels: labels)
         do {
             let id = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
@@ -2474,16 +2474,30 @@ final class AppModel {
     /// What the prompt at the top of a project does. There is no separate button for
     /// it because there is nothing else the prompt could mean: you are looking at a
     /// folder and saying what you want done in it.
-    func startAgent(in folder: URL, prompt: String) async {
+    func startAgent(in folder: URL, prompt: String, labels: [String] = []) async {
         let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !words.isEmpty, let runtimeID = defaultRuntimeID else { return }
         await attempt {
             let id = try await self.selectedHostClient.call(
                 DaemonAPI.Method.agentsStart,
-                DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: words),
+                DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: words,
+                                       labels: labels),
                 returning: UUID.self)
             self.selection = id
         }
+    }
+
+    func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async {
+        await attempt(on: work.agent(id)?.host ?? .mac) {
+            try await self.client(forAgent: id).call(
+                DaemonAPI.Method.agentsSetLabels,
+                DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove))
+        }
+    }
+
+    func labelSuggestions(in folder: URL, on host: HostID) -> [String] {
+        SessionLabelPolicy.vocabulary(
+            in: folder, agents: work.agents.filter { $0.host == host }).map(\.value)
     }
 
     /// Which runtime a new agent gets when nobody has said. The rule is the kit's, so
