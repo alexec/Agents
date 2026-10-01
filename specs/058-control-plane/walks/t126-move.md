@@ -34,6 +34,25 @@ fix below. **The sequence is walked; the sheet itself is not yet**: see *Not wal
 | S | `freeze`, `copy --from self --to <cloud>`, `take`, `forward` | 9 records copied; the cloud copy took over at epoch 4; this Mac's copy forwarding **until 31 October** (30 days). |
 | T | `status --at <cloud>` | This Mac's host online there within a second, holding epoch 4, its membership saved with the new address only. |
 
+## Again, with Pebble and a Linux host (19:30–19:36 UTC)
+
+After Alex's go-ahead Colima was restarted (its disk errors were gone afterwards), and the
+same sequence ran against the real thing:
+- **The other machine:** `deploy/pebble/up.sh --devbox` with `AGENTS_CONTROL_RECEIVE=1`:
+  `compose.public.yaml`'s copy, receiving, behind Caddy with a certificate from Pebble.
+- **This Mac:** its copy and host as above, the host trusting Pebble's root through the
+  Debug hook.
+- **A Linux host:** in the devbox, installed with the pinned command from this Mac's copy
+  (`code --host --command`, `curl --pinnedpubkey`), reaching `alexs-macbook-air.local`
+  through a line in the devbox's `/etc/hosts`; Pebble's root a system root there.
+
+| Step | Result |
+|---|---|
+| Q | Receiving, no records, after the key went into `deploy/secrets/control-key` and the copy was recreated. |
+| R | Epoch 1. Both hosts, this Mac's and the Linux one, **knew it at once**. |
+| S | Frozen; 11 records copied through Caddy; the cloud copy took over at epoch 2; forwarding until 31 October. |
+| T | Both hosts online at the cloud copy within two seconds, each holding epoch 2, each membership saved with only `https://agents.127.0.0.1.sslip.io:8444`. Caddy's log and the copy's: `host u74lkd2u connected`, `host mac connected`. |
+
 ## Found and fixed
 
 - **A member that had just been told showed as not knowing.** It reports its epoch on the
@@ -48,13 +67,11 @@ fix below. **The sequence is walked; the sheet itself is not yet**: see *Not wal
 
 ## Not walked
 
-- **The sheet on screen (frames O–T).** This session lost Accessibility and Screen
-  Recording when the app restarted: `ui.swift press` says "No Accessibility permission",
-  and a screen capture is black. The window's walk copy also opened no window, so it
+- **The sheet on screen (frames O–T).** This session lost Accessibility when the app
+  restarted: `ui.swift press` says "No Accessibility permission". It runs under
+  `~/Applications/Agents Host.app/Contents/Helpers/agentsd` (a launch agent), which is the
+  entry Accessibility needs; Screen Recording works again. The window's walk copy also opened no window, so it
   couldn't pair. The sheet is built and compiles; its commands are the ones above. A
   look needs those permissions back for whatever runs this session.
-- **A Linux host following, and Pebble itself**, with Colima broken. The Linux host follows
-  through the same `ControlJoin.hostDial` as this Mac's host, covered by
-  `aHandoverMovesEveryMemberWithoutPairingAgain`.
 - **The window and the Remote following** (T125), for the same reasons.
 - **Save Key…'s panel**, which needs a click.
