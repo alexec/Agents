@@ -8,7 +8,8 @@ import { hostStateWords, type Store } from "../model/store";
 import { agentsIn, counts, folderKey, headings, projectSubtitle, showsUnread } from "../model/groups";
 import { parseQuery, queryMatches } from "../model/labels";
 import type { Agent, ControlHost, ProjectSummary } from "../protocol/generated";
-import { go, route } from "../route";
+import { go, replace, route } from "../route";
+import { setPane } from "./files/paneState";
 import { browserName, type Session } from "../session";
 import { Banner } from "./Banner";
 import { Chat } from "./Chat";
@@ -29,6 +30,14 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     if (r.host && r.session) void store.openSession(r.host, r.session);
     else store.closeSession();
   }, [r.host, r.session]);
+  // A file the agent asks to be put in front of the person: the page beside the open chat,
+  // as the window does (US4 scenario 3). Shown for another session, it waits for that one.
+  const shown = store.shownFile.value;
+  useEffect(() => {
+    if (!shown || shown.host !== r.host || shown.agentID !== r.session) return;
+    setPane(shown.agentID, { tab: "page", page: shown.path, line: shown.line });
+    if (!route.peek().files) replace({ ...route.peek(), files: true });
+  }, [shown?.at, r.session]);
   return (
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}
