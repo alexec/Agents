@@ -1,6 +1,6 @@
 import AgentsKit
 import AgentsKitCore
-import Foundation
+import AppKit
 import Observation
 
 /// What frame L shows and does (058, US2): this Mac's host, the single copy of the control
@@ -371,6 +371,36 @@ final class HostModel {
         kill(controlPID, SIGUSR1)
         try? await Task.sleep(for: .seconds(1))
         await refresh()
+    }
+
+    /// **Open in Browser** (#109): the page in the default browser, pairing it in the same
+    /// step with a browser code in the fragment if no browser of its kind is paired yet
+    /// (`BrowserOpening`). Why not goes to `problem`.
+    func openInBrowser() async {
+        problem = nil
+        let listed = await ControlTool.run(["clients"], paths: paths, settings: settings, key: false)
+        // `<id>\t<name>\t<kind>` a line.
+        let browsers = listed.output.split(separator: "\n").map { $0.split(separator: "\t").map(String.init) }
+            .filter { $0.count >= 3 && $0[2] == ClientRecord.Kind.browser.rawValue }.map { $0[1] }
+        let app = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "http://localhost")!)
+        let family = BrowserOpening.family(bundleID: app.flatMap { Bundle(url: $0)?.bundleIdentifier })
+        let web = settings.servesWebRemote && controlRunning ? webRemote : nil
+        switch BrowserOpening.step(web: web, browsers: browsers, family: family) {
+        case .notServed(let why):
+            problem = why
+        case .open(let url):
+            NSWorkspace.shared.open(url)
+        case .pair:
+            // A browser's code is good only through the page's own listener (071 R2).
+            let made = await ControlTool.run(["code", "--client", "--browser", "--home", paths.controlHome.path],
+                                             paths: paths, settings: settings)
+            guard made.ok, let web, let text = made.output.split(separator: "\n").last.map(String.init),
+                  let url = BrowserOpening.pairingURL(web, code: text) else {
+                problem = made.problem.isEmpty ? "No code could be made." : made.problem
+                return
+            }
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func restartControl() async {

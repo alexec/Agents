@@ -107,6 +107,9 @@ struct HostWindow: View {
                     .toggleStyle(.switch)
                     if model.webRemoteFailed {
                         Button("Try Again") { Task { await model.retryWebRemote() } }
+                    } else if model.webRemote?.served == true, model.settings.servesWebRemote {
+                        // The page itself, paired the first time (#109).
+                        Button("Open in Browser") { Task { await model.openInBrowser() } }
                     }
                 }
                 .disabled(model.busy != nil)

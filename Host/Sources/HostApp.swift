@@ -53,6 +53,17 @@ struct AgentsHostApp: App {
                     NSApp.activate()
                     model.showingPairing = true
                 }
+                // The page in a browser on this Mac, paired the first time (#109); why not,
+                // in the window.
+                Button("Open in Browser") {
+                    Task {
+                        await model.openInBrowser()
+                        if model.problem != nil {
+                            openWindow(id: "host")
+                            NSApp.activate()
+                        }
+                    }
+                }
             }
             Divider()
             Button("Quit Agents Host") { NSApp.terminate(nil) }
