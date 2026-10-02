@@ -178,8 +178,16 @@ final class LoopbackListener: @unchecked Sendable {
         channels = [v4]
         do {
             channels.append(try await bootstrap().bind(host: "::1", port: port).get())
+        } catch let error as IOError where error.errnoCode == EADDRNOTAVAIL || error.errnoCode == EAFNOSUPPORT {
+            // No IPv6 loopback on this Mac, so nothing else can answer a browser there either.
+            log("web: no ::1 on this Mac (\(error)); serving 127.0.0.1 only")
         } catch {
-            log("web: ::1 port \(port) not bound (\(error)); serving 127.0.0.1 only")
+            // Something else holds ::1 on this port, where a browser may well go for localhost.
+            // Serving 127.0.0.1 alone would send the page's visitors to it, at this page's own
+            // origin, with the browser's key to use (071 security review, R1).
+            try? await v4.close()
+            channels = []
+            throw error
         }
         self.port = port
         return port

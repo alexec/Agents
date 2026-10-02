@@ -241,6 +241,23 @@ struct LoopbackListenerTests {
         #expect(response.statusCode == 200)
     }
 
+    /// Taken on ::1 alone, by anyone, the listener stays off: a browser may go to ::1 for
+    /// localhost, and would find whatever holds it at this page's origin.
+    @Test func aPortTakenOnIPv6AloneLeavesTheListenerOff() async throws {
+        let taken = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+            .bind(host: "::1", port: 0).get()
+        defer { taken.close(promise: nil) }
+        let (service, port) = try await start(web: .init(folder: Self.dist, port: taken.localAddress?.port ?? 0))
+        defer { Task { await service.stop() } }
+        #expect(service.webPort == nil)
+        let (_, response) = try await Self.get("http://127.0.0.1:\(port)/healthz")
+        #expect(response.statusCode == 200)
+        // And 127.0.0.1 on that port was let go, not left holding a half-served page.
+        let again = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+            .bind(host: "127.0.0.1", port: taken.localAddress?.port ?? 0).get()
+        try await again.close()
+    }
+
     // MARK: Helpers
 
     /// A GET that stops at a redirect rather than following it.
