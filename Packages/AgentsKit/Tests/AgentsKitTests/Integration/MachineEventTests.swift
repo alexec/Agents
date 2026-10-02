@@ -57,6 +57,21 @@ struct MachineEventTests {
         #expect(await core.eventLog.events.allSatisfy { $0.scope == .mac })
     }
 
+    /// A wake tells the uplink to dial now (#82, #113): `agentsd` has no AppKit to hear it.
+    @Test func aWakeIsToldToWhoeverAsked() async throws {
+        let (locations, _, _) = try temporary()
+        let core = try await core(locations)
+        let woke = ManagedAtomicFlag()
+        await core.onWake { _ = woke.set() }
+        let watch = FakeMachineWatch()
+        await core.startWatchingMachine(watch)
+        watch.send(.sleep)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(!woke.isSet)
+        watch.send(.wake)
+        try await eventually("the wake was told") { woke.isSet }
+    }
+
     @Test func aWaitInOneProjectAndAWorkflowInAnotherBothHearTheWake() async throws {
         let (locations, p, q) = try temporary()
         let folder = WorkflowFile.folder(in: q)

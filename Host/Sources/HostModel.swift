@@ -16,6 +16,9 @@ final class HostModel {
 
     private(set) var controlRunning = false
     private(set) var daemonRunning = false
+    private var daemonPID: Int32?
+    /// How this Mac's host's join stands, as it wrote it (#113); nil until it has.
+    private(set) var hostJoin: DaemonAPI.HostJoinStatus?
     private(set) var runningSince: Date?
     private var controlPID: Int32?
     private(set) var clients: Int?
@@ -76,11 +79,7 @@ final class HostModel {
     }
 
     /// `https://<this Mac>.local:8791`: what codes carry and clients dial.
-    var controlURL: String {
-        let name = ProcessInfo.processInfo.hostName
-        let host = name.hasSuffix(".local") ? name : (name.split(separator: ".").first.map { "\($0).local" } ?? name)
-        return "https://\(host.lowercased()):\(paths.port)"
-    }
+    var controlURL: String { "https://\(LocalHostName.current):\(paths.port)" }
 
     var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -101,7 +100,10 @@ final class HostModel {
         let services = self.services
         let control = await services.running(.control)
         controlRunning = control != nil
-        daemonRunning = await services.running(.daemon) != nil
+        let daemon = await services.running(.daemon)
+        daemonRunning = daemon != nil
+        daemonPID = daemon
+        hostJoin = daemon.flatMap { HostJoinFile.read(paths.hostLocations.controlJoinStatus, pid: $0) }
         // Read again whenever the process is another one: a restart or a store switch.
         if let control, control != controlPID { runningSince = Self.started(control) }
         if control == nil { runningSince = nil }
@@ -179,13 +181,13 @@ final class HostModel {
         guard await start(.control) else { return }
         // The copy writes its settings to the store as it starts; a code can be made
         // once they are there.
-        var code: ControlTool.Result?
+        var code: String?
         for _ in 0..<40 {
-            let made = await ControlTool.run(["code", "--host", "--home", paths.controlHome.path], paths: paths, settings: settings)
-            if made.ok { code = made; break }
+            code = await makeOwnHostCode()
+            if code != nil { break }
             try? await Task.sleep(for: .milliseconds(500))
         }
-        guard let code, let text = code.output.split(separator: "\n").last.map(String.init) else {
+        guard let text = code else {
             problem = "The control plane did not start. Its log is at \(paths.controlLog.path)."
             return
         }
@@ -198,6 +200,35 @@ final class HostModel {
         guard await start(.daemon) else { return }
         // A host already running read no code; started again, it does.
         if wasRunning, !services.hostJoined { _ = await services.restart(.daemon) }
+        await refresh()
+    }
+
+    /// A host code for this Mac's own host. It lives a day, not five minutes: the host keeps
+    /// trying with it until the control plane answers, and only it ever sees it (#113).
+    private func makeOwnHostCode() async -> String? {
+        let made = await ControlTool.run(["code", "--host", "--minutes", String(Self.ownHostCodeMinutes),
+                                          "--home", paths.controlHome.path], paths: paths, settings: settings)
+        guard made.ok else { return nil }
+        return made.output.split(separator: "\n").last.map(String.init)
+    }
+
+    static let ownHostCodeMinutes = 24 * 60
+
+    /// This Mac's host couldn't join or reach its control plane, and is trying again.
+    var hostJoinFailed: Bool { daemonRunning && hostJoin?.failed == true }
+
+    /// *Try Again* on a join that failed (#113): a fresh code if it hasn't joined the
+    /// control plane here (the one it has may have run out), then SIGUSR1 to dial now.
+    func retryJoin() async {
+        guard let daemonPID else { return }
+        busy = "Trying again…"
+        defer { busy = nil }
+        if settings.role == .runHere, controlRunning, !services.hostJoined, let code = await makeOwnHostCode() {
+            lastHostCode = ControlCode(text: code)
+            try? services.leaveCode(code)
+        }
+        kill(daemonPID, SIGUSR1)
+        try? await Task.sleep(for: .seconds(2))
         await refresh()
     }
 

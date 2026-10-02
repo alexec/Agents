@@ -66,6 +66,9 @@ public actor ControlMethods: ControlHandling {
     /// The web remote's listener as it stands (071 R3), set by the service as it binds.
     public private(set) var web: DaemonAPI.WebRemoteStatus?
     public func setWeb(_ status: DaemonAPI.WebRemoteStatus?) { web = status }
+    /// How this Mac's host's join stands (#113), read when asked; nil when there is none.
+    private var thisMacHost: (@Sendable () -> DaemonAPI.HostJoinStatus?)?
+    public func setThisMacHost(_ read: (@Sendable () -> DaemonAPI.HostJoinStatus?)?) { thisMacHost = read }
 
     /// `settings` is what `records` has, or made (`ControlRecords.settings(orMake:)`):
     /// the records are read before this is made, so every accessor below is current.
@@ -226,6 +229,7 @@ public actor ControlMethods: ControlHandling {
                                                                   awayFromHome: awayFromHome)
             status.you = caller.client
             status.web = web
+            status.thisMacHost = thisMacHost?()
             status.relayKey = await records.hosts.first { $0.relay == true }?.publicKey
             // A relay host is what takes devices out of the house (T096).
             if status.relayKey != nil { status.awayFromHome = true }

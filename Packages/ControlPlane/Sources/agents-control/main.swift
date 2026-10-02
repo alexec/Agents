@@ -14,6 +14,7 @@ import Musl
 //   agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
 //   agents-control serve --home DIR [--no-bonjour] [--key-fd N] [--store-credentials-fd N]
 //   agents-control serve … [--web DIR] [--web-port N] [--no-web]
+//   agents-control serve … [--host-root DIR]    this Mac's host's root: its join in control/status (#113)
 //   agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
 //   agents-control move --from ROOT     an old set-up's devices into this store, once (T084)
@@ -101,11 +102,9 @@ func localName() -> String {
     #endif
 }
 
-/// `<name>.local`, the address a Mac on the same network reaches this one at.
-func localHost() -> String {
-    let name = ProcessInfo.processInfo.hostName
-    return name.hasSuffix(".local") ? name : name.split(separator: ".").first.map { "\($0).local" } ?? name
-}
+/// `<name>.local`, the address a Mac on the same network reaches this one at: its Bonjour
+/// name, not its Unix host name (#113).
+func localHost() -> String { LocalHostName.current }
 
 /// The web remote's listener, or nil: a folder and a port both, and no `--no-web` (071).
 func web() -> ControlService.Configuration.Web? {
@@ -158,8 +157,24 @@ func serve() async {
                 }
             }
         }
+        // This Mac's host, beside it (#113): how its join stands, from its own root.
+        let joinFile = value("--host-root").map {
+            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true).appendingPathComponent(HostJoinFile.name)
+        }
+        if let joinFile { configuration.thisMacHost = { HostJoinFile.read(joinFile) } }
         let service = try ControlService(configuration)
         let listening = try await service.start()
+        if let joinFile {
+            Task {
+                var last = HostJoinFile.read(joinFile)
+                while true {
+                    try? await Task.sleep(for: .seconds(2))
+                    let now = HostJoinFile.read(joinFile)
+                    if now != last { await service.thisMacHostChanged(now) }
+                    last = now
+                }
+            }
+        }
         if let pin { print("pin \(pin)") }
         #if canImport(dnssd)
         // Found by the window on this network (frame K2). Not for a walk that must stay
@@ -411,6 +426,7 @@ default:
            agents-control code (--client [--browser] | --host) [--minutes N]
            agents-control serve --home DIR [--no-bonjour]
            agents-control serve … [--web DIR] [--web-port N] [--no-web]
+           agents-control serve … [--host-root DIR]
            agents-control hosts | clients
            agents-control store check [--store URL]
            agents-control store copy --from URL --to URL

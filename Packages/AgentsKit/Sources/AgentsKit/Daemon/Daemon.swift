@@ -21,6 +21,8 @@ public final class Daemon: @unchecked Sendable {
     private var uplink: ControlUplink?
     /// What tells the uplink to dial now on a network change (#82).
     private var uplinkTriggers: ReconnectTriggers?
+    /// SIGUSR1: Agents Host's *Try Again* on a join that failed (#113).
+    private var dialNowSignal: (any DispatchSourceSignal)?
 
     /// How this host joins its control plane: over a WebSocket, as the control plane
     /// names it, with a host code the first time.
@@ -219,59 +221,76 @@ public final class Daemon: @unchecked Sendable {
             DaemonLog.shared.write("uplink: this host's membership is from before the control plane's WebSocket; enrol it again with a new host code")
             return
         }
-        let code = (control.code ?? takeLeftCode()).flatMap(ControlCode.init(text:))
-        if kept == nil, let code, code.url == nil {
-            DaemonLog.shared.write("uplink: that host code is from before the control plane's WebSocket; ask for a new one")
-            return
+        if kept == nil {
+            let code = (control.code ?? readLeftCode()).flatMap(ControlCode.init(text:))
+            guard let code else {
+                DaemonLog.shared.write("uplink: no control plane to join; start with --control <code>")
+                return
+            }
+            if code.url == nil {
+                DaemonLog.shared.write("uplink: that host code is from before the control plane's WebSocket; ask for a new one")
+                return
+            }
         }
-        await joinOverWebSocket(code: kept == nil ? code : nil, server: server, hello: hello)
+        await joinOverWebSocket(given: control.code, server: server, hello: hello)
     }
 
-    /// A code Agents Host left in the root, taken once: it is spent by the first join.
-    private func takeLeftCode() -> String? {
-        let file = locations.controlJoinCode
-        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
-        try? FileManager.default.removeItem(at: file)
+    /// A code Agents Host left in the root. Kept until a join has saved a membership, so a
+    /// first dial that fails tries again with it (#113).
+    private func readLeftCode() -> String? {
+        guard let text = try? String(contentsOf: locations.controlJoinCode, encoding: .utf8) else { return nil }
         let code = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return code.isEmpty ? nil : code
     }
 
-    /// Enrols with a version 2 host code if there is no membership yet, then dials as this
-    /// host with its own key, kept beside the membership in this root.
-    private func joinOverWebSocket(code: ControlCode?, server: DaemonServer, hello: DaemonAPI.HostHello) async {
+    /// How the join stands, for Agents Host and the control plane beside it (#113).
+    private func sayJoin(_ status: DaemonAPI.HostJoinStatus) {
+        HostJoinFile(pid: getpid(), status: status).write(to: locations.controlJoinStatus)
+    }
+
+    /// Dials as this host with its own key, kept beside the membership in this root,
+    /// enrolling first with the host code while there is no membership yet. Both are one
+    /// dial of the uplink, so a first join that fails is tried again on the same backoff,
+    /// and at once on a wake or a network change, as a dial after it has joined is (#113).
+    private func joinOverWebSocket(given: String?, server: DaemonServer, hello: DaemonAPI.HostHello) async {
         let membershipFile = locations.controlHostMembership
+        let privateKey: Data
         do {
-            let privateKey = try ControlAgreement.loadOrMake(file: locations.controlHostKey)
-            var membership = ControlMembership.load(membershipFile)
-            if membership == nil, let code {
-                let joined = try await ControlJoin.enrollHost(code, privateKey: privateKey, hello: hello)
-                try joined.save(membershipFile)
-                membership = joined
-                DaemonLog.shared.write("uplink: enrolled with \(joined.name) as \(joined.host?.rawValue ?? "?")")
-            }
-            guard let membership else {
-                DaemonLog.shared.write("uplink: no control plane to join; start with --control <code>")
-                return
-            }
-            let uplink = ControlUplink(server: server, hello: hello,
-                                       dial: try ControlJoin.hostDial(membership, privateKey: privateKey) { newer in
-                                           // The control plane moved or changed its certificate (R16).
-                                           try? newer.save(membershipFile)
-                                           DaemonLog.shared.write("uplink: the control plane is now at \(newer.url ?? "?")")
-                                       })
-            self.uplink = uplink
-            await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
-            await lendAndBorrowSignIns(through: uplink)
-            uplink.start()
-            let triggers = ReconnectTriggers(queue: DispatchQueue(label: "uplink.triggers")) { [uplink] reason in
-                let nudged = uplink.goBackNow()
-                if nudged != .idle { DaemonLog.shared.write("uplink: \(reason.rawValue): dialling now (\(nudged))") }
-            }
-            uplinkTriggers = triggers
-            triggers.start()
-            DaemonLog.shared.write("uplink: a host of \(membership.name) at \(membership.url ?? "?"), as \(membership.host?.rawValue ?? "?")")
+            privateKey = try ControlAgreement.loadOrMake(file: locations.controlHostKey)
         } catch {
-            DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
+            DaemonLog.shared.write("uplink: could not join the control plane: this host's key: \(error)")
+            sayJoin(.init(member: false, connected: false, problem: "this host's key: \(error)"))
+            return
+        }
+        let dialer = HostDialer(membershipFile: membershipFile, codeFile: locations.controlJoinCode, given: given,
+                                privateKey: privateKey, hello: hello, say: { [weak self] in self?.sayJoin($0) })
+        let uplink = ControlUplink(server: server, hello: hello,
+                                   onChange: { [dialer] up in dialer.connected(up) },
+                                   dial: { [dialer] in try await dialer.dial() })
+        self.uplink = uplink
+        await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+        await lendAndBorrowSignIns(through: uplink)
+        uplink.start()
+        let nudge: @Sendable (ReconnectTriggers.Reason) -> Void = { [uplink] reason in
+            let nudged = uplink.goBackNow()
+            if nudged != .idle { DaemonLog.shared.write("uplink: \(reason.rawValue): dialling now (\(nudged))") }
+        }
+        let queue = DispatchQueue(label: "uplink.triggers")
+        let triggers = ReconnectTriggers(queue: queue, onTrigger: nudge)
+        uplinkTriggers = triggers
+        triggers.start()
+        // SIGUSR1: Agents Host's Try Again (#113), as the control plane's is for its page.
+        signal(SIGUSR1, SIG_IGN)
+        let asked = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: queue)
+        asked.setEventHandler { [uplink] in
+            DaemonLog.shared.write("uplink: asked to try again: dialling now (\(uplink.goBackNow()))")
+        }
+        asked.resume()
+        dialNowSignal = asked
+        // A wake, heard by the machine watch: `agentsd` has no AppKit to hear it from.
+        await core.onWake { nudge(.wake) }
+        if let membership = ControlMembership.load(membershipFile) {
+            DaemonLog.shared.write("uplink: a host of \(membership.name) at \(membership.url ?? "?"), as \(membership.host?.rawValue ?? "?")")
         }
     }
 
@@ -284,6 +303,7 @@ public final class Daemon: @unchecked Sendable {
     public func shutDown() async {
         DaemonLog.shared.write("shutting down")
         uplinkTriggers?.stop()
+        dialNowSignal?.cancel()
         uplink?.stop()
         server?.stop()
         await core.shutDown()
