@@ -128,6 +128,7 @@ All figures are from a **Debug** build on this Mac (Apple M5, macOS 27.0) while 
 | Chat open, 97 messages of 2 KB (window) | 1154 ms the first time, 267–347 ms after | 500 ms | **over the first time** (#90) |
 | Chat open, 100k entries, 50 turns shown (window) | 287–552 ms | 500 ms | **at or over** (#90) |
 | Host part of a chat open: turns plus the open turn, 100k entries | 33 ms warm, 79 ms after a host restart, **3,490 ms the very first time** | 500 ms | **over the first time** (#91) |
+| The same after #91 (2026-10-02, another load: main measured 1,983 ms first, 41 after a restart, 17 warm) | 13 ms warm, 37 ms after a host restart, about 130 ms the very first time; the window's `chat-open` 2,150 → about 250 ms the first time | 500 ms | ok |
 | Remote's page: the last 500 of 100k entries (host) | 41 ms | 500 ms | ok |
 | Files: root of a 40,000-file repo (host) | 0.4 ms | 250 ms | ok |
 | Files: a deep folder (host) | 0.7 ms | 100 ms | ok |
