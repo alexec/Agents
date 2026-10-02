@@ -1,8 +1,10 @@
-// A new session (071 FR-026): the project's empty pane is the new chat, as in the window (066).
-// Where it works (the project folder, a new worktree, or one already there), the runtime, the
-// runtime's own menus and the first prompt, started on the project's host with `agents/start`.
-// A runtime is started behind the form so its choices are real ones (`agents/options`); a form
-// answered from memory is put right by `agents/draftOptions`.
+// A new session (071 FR-026): the project's empty pane is the new chat, as in the window (066):
+// the project's name and folder in the middle, and the prompt bar at the foot (#108). Over the
+// input, where it works (the project folder, a new worktree, or one already there), what else it
+// may reach and its labels on the left, and the runtime on the right; under it, the runtime's own
+// menus. Started on the project's host with `agents/start`. A runtime is started behind the bar
+// so its choices are real ones (`agents/options`); a bar answered from memory is put right by
+// `agents/draftOptions`.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Attachment, ConfigOption, JSONValue, StartRequest, UUID, WorktreeSummary } from "../protocol/generated";
@@ -10,6 +12,8 @@ import type { Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn, choices, same } from "../model/options";
 import { folderKey } from "../model/groups";
 import { go } from "../route";
+import { LabelField } from "./Labels";
+import { Reach } from "./Reach";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
 
@@ -45,15 +49,21 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const where = useSignal<Where>({ kind: "project" });
   const worktrees = useSignal<WorktreeSummary[]>([]);
   const canMakeNew = useSignal(false);
+  const isRepository = useSignal(false);
+  const folders = useSignal<string[]>([]);
+  const labels = useSignal<string[]>([]);
   const form = useSignal<Form>({ options: [], chosen: {}, state: "loading" });
 
   useEffect(() => {
     // What each runtime takes changes once it has run: asked again as the form opens.
     void store.loadRuntimes(host);
     where.value = { kind: "project" };
+    folders.value = [];
+    labels.value = [];
     void store.worktrees(host, folder).then((list) => {
       worktrees.value = (list?.worktrees ?? []).filter((w) => !w.isProjectFolder && w.exists);
       canMakeNew.value = list?.canMakeNew ?? false;
+      isRepository.value = list?.isRepository ?? false;
     });
   }, [host, folder]);
 
@@ -110,7 +120,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       runtimeID: chosenRuntime, cwd: folder as never, prompt: text, attachments,
       startOptions: { values: form.value.chosen, extraArguments: [] },
       ...(form.value.draftID ? { draftID: form.value.draftID as UUID } : {}),
-      additionalDirectories: [], mcpServers: [], labels: [],
+      additionalDirectories: folders.value as never[], mcpServers: [], labels: labels.value,
       ...(w.kind === "new" ? { worktree: { new: {} } } : w.kind === "existing" ? { worktree: { existing: { _0: w.root as never } } } : {}),
       requestID: crypto.randomUUID().toUpperCase() as UUID,
     };
@@ -124,48 +134,77 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   };
 
   const state = form.value.state;
+  const runtimeName = runtimes.find((r) => r.runtime.id === chosenRuntime)?.runtime.name ?? "the runtime";
+  const hostRecord = store.hosts.value.find((h) => h.id === host);
+  const machine = host === "mac" ? "this Mac" : hostRecord?.name ?? host;
+  const path = decodeURI(folderKey(folder).replace(/^file:\/\//, ""));
+  // What the area under the input says when it has no menus, as the window's OptionsNote does.
+  const note = !chosenRuntime ? <p class="quiet small">No runtime can start on this host.</p>
+    : state === "loading" ? <p class="quiet small">Asking {runtimeName} what it offers…</p>
+    : typeof state === "object" ? <p class="failure small">{state.failed}</p>
+    : !form.value.options.length ? <p class="quiet small">This runtime has no settings to choose.</p>
+    : null;
   return (
     <section class="chat new-agent" aria-label="New session">
-      <header class="column-head">
+      <header class="column-head narrow-only">
         <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>
-        <h1>New session in {projectName}</h1>
       </header>
       {!down && !store.hostIsOnline(host) && <p class="offline-strip" role="status">This host is offline. A session can start here once it's back.</p>}
-      <div class="scroll new-form">
-        <label class="field">
-          <span class="quiet small">Works in</span>
-          <select aria-label="Works in" value={where.value.kind === "existing" ? `existing:${where.value.root}` : where.value.kind}
-            onChange={(e) => {
-              const v = (e.currentTarget as HTMLSelectElement).value;
-              where.value = v === "project" ? { kind: "project" } : v === "new" ? { kind: "new" } : { kind: "existing", root: v.slice(9) };
-            }}>
-            <option value="project">The project folder</option>
-            {canMakeNew.value && <option value="new">A new worktree</option>}
-            {worktrees.value.map((w) => (
-              <option key={w.root} value={`existing:${w.root}`}>Worktree {w.name}{w.branch ? ` (${w.branch})` : ""}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="quiet small">Runtime</span>
-          <select aria-label="Runtime" value={chosenRuntime ?? ""} disabled={!runtimes.length}
-            onChange={(e) => (runtimeID.value = (e.currentTarget as HTMLSelectElement).value)}>
-            {!runtimes.length && <option value="">No runtime can start on this host</option>}
-            {runtimes.map((r) => <option key={r.runtime.id} value={r.runtime.id}>{r.runtime.name}</option>)}
-          </select>
-        </label>
-        {state === "loading" && chosenRuntime && <p class="quiet small">Asking {runtimes.find((r) => r.runtime.id === chosenRuntime)?.runtime.name ?? "the runtime"} what it offers…</p>}
-        {typeof state === "object" && <p class="failure small">{state.failed}</p>}
-        {state === "ready" && !form.value.options.length && <p class="quiet small">This runtime has no settings to choose.</p>}
-        <p class="hint">Say what you want done. It starts on {folderKey(folder).split("/").pop()}{where.value.kind === "new" ? ", in a new worktree" : ""}.</p>
+      <div class="scroll new-heading">
+        <h1>{projectName}</h1>
+        <p class="quiet" title={path}>{path} · {machine}</p>
       </div>
       <footer class="foot">
         <Prompt store={store} draftKey={`new|${host}|${folderKey(folder)}`} placeholder="What should it do?"
-          capabilities={capabilities} disabled={down || !chosenRuntime || !store.hostIsOnline(host)} send={start}>
-          <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]}
-            onChange={(o, v) => (form.value = { ...form.value, chosen: { ...form.value.chosen, [o.id]: v } })} disabled={down} />
+          capabilities={capabilities} disabled={down || !chosenRuntime || !store.hostIsOnline(host)} send={start}
+          where={(
+            <>
+              {isRepository.value && (
+                <label class="pill select" title="Where it works">
+                  <span aria-hidden="true">{whereTitle(where.value, worktrees.value)} ▾</span>
+                  <select aria-label="Works in" disabled={down} value={where.value.kind === "existing" ? `existing:${where.value.root}` : where.value.kind}
+                    onChange={(e) => {
+                      const v = (e.currentTarget as HTMLSelectElement).value;
+                      where.value = v === "project" ? { kind: "project" } : v === "new" ? { kind: "new" } : { kind: "existing", root: v.slice(9) };
+                    }}>
+                    <option value="project">Project folder</option>
+                    {canMakeNew.value && <option value="new">New worktree</option>}
+                    {worktrees.value.map((w) => (
+                      <option key={w.root} value={`existing:${w.root}`}>Worktree {w.name}{w.branch ? ` (${w.branch})` : ""}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <Reach folders={folders.value} change={(f) => (folders.value = f)} disabled={down} />
+              <LabelField store={store} host={host} folder={folder} disabled={down} listID={`labels-new-${folderKey(folder)}`}
+                labels={labels.value.map((value) => ({ value, owner: "person" }))}
+                add={(values) => (labels.value = [...labels.value, ...values])}
+                remove={(value) => (labels.value = labels.value.filter((l) => l.toLowerCase() !== value.toLowerCase()))} />
+            </>
+          )}
+          runtime={(
+            <label class="pill select" title="Runtime">
+              <span aria-hidden="true">{chosenRuntime ? runtimeName : "Runtime"} ▾</span>
+              <select aria-label="Runtime" value={chosenRuntime ?? ""} disabled={!runtimes.length || down}
+                onChange={(e) => (runtimeID.value = (e.currentTarget as HTMLSelectElement).value)}>
+                {!runtimes.length && <option value="">No runtime can start on this host</option>}
+                {runtimes.map((r) => <option key={r.runtime.id} value={r.runtime.id}>{r.runtime.name}</option>)}
+              </select>
+            </label>
+          )}>
+          {note ?? (
+            <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]}
+              onChange={(o, v) => (form.value = { ...form.value, chosen: { ...form.value.chosen, [o.id]: v } })} disabled={down} />
+          )}
         </Prompt>
       </footer>
     </section>
   );
+}
+
+/** What the Works in chip says: the window's words for the place. */
+function whereTitle(where: Where, worktrees: WorktreeSummary[]): string {
+  if (where.kind === "project") return "Project folder";
+  if (where.kind === "new") return "New worktree";
+  return worktrees.find((w) => w.root === where.root)?.name ?? "Worktree";
 }

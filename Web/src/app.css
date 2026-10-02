@@ -452,15 +452,25 @@ button.call-line:hover { opacity: 1; }
 
 .foot { padding: 0 12px 12px; }
 
+/* The prompt bar, as the window's (#108): where and labels over the input on the left, the runtime
+   on the right; attach and send inside the input; the runtime's menus under it. */
+.bar { display: flex; flex-direction: column; gap: 10px; }
+.bar-head { display: flex; align-items: center; gap: 12px; }
+.bar-where { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bar-runtime { flex: none; margin-left: auto; }
+
 .prompt {
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-floating);
-  padding: 10px 12px;
+  padding: 12px 12px 12px 14px;
 }
 
+.prompt-field { display: flex; align-items: flex-end; gap: 8px; }
+
 .prompt textarea {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   border: none;
   resize: none;
@@ -468,18 +478,17 @@ button.call-line:hover { opacity: 1; }
   font: inherit;
   color: inherit;
   outline: none;
+  align-self: stretch;
 }
 
-.prompt-row { display: flex; justify-content: flex-end; }
-
-.send {
+.send, .prompt .attach {
+  flex: none;
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  background: var(--paper-ink);
-  color: var(--paper-ground);
 }
+.send { background: var(--paper-ink); color: var(--paper-ground); }
 
 .files .tabs { flex: 1; display: flex; gap: 4px; }
 .files .tab { padding: 3px 10px; border-radius: var(--radius-control); }
@@ -559,11 +568,11 @@ button.call-line:hover { opacity: 1; }
 }
 
 /* US3: the prompt's menus, attachments, labels, the session menu, the new-session form. */
-.prompt-row { align-items: center; gap: 6px; }
-.prompt .attach { background: none; border: none; font-size: 15px; opacity: 0.7; }
+.prompt .attach { background: var(--paper-raised); border: 1px solid var(--paper-rule); font-size: 14px; }
 .prompt.off { opacity: 0.6; }
-.menus { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.menus { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .menus .spacer { flex: 1; }
+.menus-right { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
 .pill {
   position: relative;
   flex: none;
@@ -601,9 +610,9 @@ button.call-line:hover { opacity: 1; }
 }
 button.remove { background: none; border: none; padding: 0 2px; opacity: 0.55; font-size: 13px; line-height: 1; }
 button.remove:hover { opacity: 1; }
-.labels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 16px; border-bottom: 1px solid var(--paper-rule); }
-.labels .chip { display: inline-flex; align-items: center; gap: 2px; }
-.label-field { flex: 1; min-width: 80px; border: none; background: none; font: inherit; font-size: 12px; color: inherit; outline: none; }
+.labels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.labels .chip { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; padding: 2px 8px; }
+.label-field { flex: 0 1 auto; width: 7em; min-width: 4em; border: none; background: none; font: inherit; font-size: 12px; color: inherit; outline: none; }
 .popover.right { right: 0; left: auto; min-width: 160px; display: flex; flex-direction: column; }
 .popover [role=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
 .popover [role=menuitem]:hover { background: var(--paper-wash); }
@@ -618,16 +627,19 @@ button.remove:hover { opacity: 1; }
   background: color-mix(in srgb, var(--tint-failure) 10%, var(--paper-ground));
   border-bottom: 1px solid var(--paper-rule);
 }
-.new-form { display: flex; flex-direction: column; gap: 12px; padding: 20px; max-width: 560px; }
-.new-form .field { display: flex; flex-direction: column; gap: 4px; }
-.new-form select {
-  font: inherit;
-  padding: 5px 8px;
-  border: 1px solid var(--paper-rule);
-  border-radius: var(--radius-control);
-  background: var(--paper-raised);
-  color: inherit;
-}
+/* A new session: the project's name and folder in the middle, the bar at the foot (#108). */
+.new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }
+.new-heading h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.new-heading p { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-anchor.reach { margin-right: 0; }
+.popover.up { top: auto; bottom: 32px; }
+.reach-popover { width: 300px; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.reach-popover p { margin: 0; }
+.reach-folders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.reach-folders li { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.reach-folders li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reach-add { display: flex; gap: 6px; }
+.reach-add input { flex: 1; min-width: 0; font: inherit; font-size: 12px; padding: 4px 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); color: inherit; }
 .menu-anchor.session-menu { margin-right: 0; }
 
 /* Unread (#70): a grey dot and a heavier title; never the attention colour. */
