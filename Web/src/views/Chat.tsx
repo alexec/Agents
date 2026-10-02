@@ -13,6 +13,7 @@ import { toWireDate } from "../protocol/dates";
 import type { Agent } from "../protocol/generated";
 import { go, replace, route } from "../route";
 import { Cards } from "./Cards";
+import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
@@ -181,6 +182,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <BackgroundRows agent={agent} />
         <Cards store={store} host={host} session={session} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder="Reply…" disabled={down || !agent}
+          recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
           send={(text, attachments) => store.prompt(host, session, text, attachments)}
           where={agent && (
@@ -233,23 +235,28 @@ function RuntimeLabel({ store, host, runtimeID }: { store: Store; host: string; 
 function Queued({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent; disabled: boolean }) {
   const canSendNow = (agent.state === "running" || agent.state === "waitingOnUser")
     && store.account(host, agent.runtimeID)?.canSteer === true;
+  // Held while anything is on its way to this agent; the one going, said (#87).
+  const acting = store.onItsWay.value[agent.id];
   return (
     <>
-      {(agent.queuedPrompts ?? []).map((queued) => (
+      {(agent.queuedPrompts ?? []).map((queued) => {
+        const going = typeof acting === "object" && acting.sendNow === queued.id;
+        return (
         <div key={queued.id} class="queued">
           <div class="queued-head">
             <p class="faint">Waiting its turn</p>
-            {canSendNow && (
-              <button class="link" disabled={disabled} title="Send this into the turn that is running, without waiting for it to end"
+            {canSendNow && (going ? <Telling recipient={store.recipient(host)} doing="Sending" /> : (
+              <button class="link" disabled={disabled || !!acting} title="Send this into the turn that is running, without waiting for it to end"
                 onClick={() => void store.sendNow(host, agent.id, queued.id)}>↑ Send now</button>
-            )}
-            <button class="remove" aria-label="Remove queued prompt" title="Do not send this" disabled={disabled}
+            ))}
+            <button class="remove" aria-label="Remove queued prompt" title="Do not send this" disabled={disabled || going}
               onClick={() => void store.unqueue(host, agent.id, queued.id)}>×</button>
           </div>
           <p class="quiet">{queued.text}</p>
           {queued.attachments.length > 0 && <p class="faint small">📎 {queued.attachments.map((a) => a.displayName).join(", ")}</p>}
         </div>
-      ))}
+        );
+      })}
     </>
   );
 }

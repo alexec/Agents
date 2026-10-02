@@ -4,7 +4,7 @@
 // a fourth from 1440; from 760 the projects fold into a menu; below 760 one column at a time.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { hostStateWords, type Store } from "../model/store";
+import { actDoing, hostStateWords, type Store } from "../model/store";
 import { agentsIn, counts, folderKey, headings, projectSubtitle, showsUnread } from "../model/groups";
 import { parseQuery, queryMatches } from "../model/labels";
 import type { Agent, ControlHost, ProjectSummary } from "../protocol/generated";
@@ -164,6 +164,10 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
   const workflows = allWorkflows.filter((w) => !w.isArchived);
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const pick = (agent: Agent) => go({ host, project: folder, session: agent.id });
+  const going = (agent: Agent) => {
+    const act = store.onItsWay.value[agent.id];
+    return act && typeof act === "string" && host ? { doing: actDoing(act), recipient: store.recipient(host) } : undefined;
+  };
   const pickWorkflow = (id: string) => go({ host, project: folder, workflow: id });
   const openArchived = (open: boolean) => {
     showsArchived.value = open;
@@ -205,7 +209,7 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
                   {group.agents.some(showsUnread) && <span> · {group.agents.filter(showsUnread).length} unread</span>}
                 </h3>
                 {group.agents.map((agent) => (
-                  <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} />
+                  <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)} />
                 ))}
               </div>
             ))}
@@ -219,7 +223,7 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
               onToggle={(e) => openArchived((e.currentTarget as HTMLDetailsElement).open)}>
               <summary class="subhead">Archived sessions{showsArchived.value && <span class="count"> {archived.length}</span>}</summary>
               {(search.value ? archived : archived.slice(0, archivedShown)).map((agent) => (
-                <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} />
+                <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)} />
               ))}
               {showsArchived.value && project.retiredCount > 0 && !search.value && (
                 <p class="hint">{project.retiredCount === 1 ? "1 older agent has been retired."

@@ -728,3 +728,9 @@ button.remove:hover { opacity: 1; }
 .workflow-page .last-ran { margin: 2px 0 0; }
 .workflow-page .prompt-text { margin: 0; white-space: pre-wrap; font: 12.5px/1.5 var(--font-mono); padding: 12px 14px;
   background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+
+/* On its way (#87): a spinner and "telling your Mac", in a row's report line, over the prompt and in a queued row. */
+.telling { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; opacity: 0.75; }
+.telling .spinner, .send .spinner { width: 10px; height: 10px; }
+.bar > .telling { margin: 0 4px 6px; }
+.send .spinner { border-color: color-mix(in srgb, var(--paper-ground) 35%, transparent); border-top-color: var(--paper-ground); }

@@ -157,6 +157,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       <footer class="foot">
         <Prompt store={store} draftKey={`new|${host}|${folderKey(folder)}`} placeholder="What should it do?"
           capabilities={capabilities} disabled={down || !chosenRuntime || !store.hostIsOnline(host)} send={start}
+          recipient={store.recipient(host)} starting
           where={(
             <>
               {isRepository.value && (

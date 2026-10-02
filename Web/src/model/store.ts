@@ -317,6 +317,22 @@ export class Work {
   }
 }
 
+/** Something a person asked of a whole agent, on its way to its host (#87; AgentAct.swift). */
+export type AgentAct = "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
+  | { sendNow: string };
+
+/** What the pending mark says it is doing, before "telling your Mac" (AgentAct.doing). */
+export function actDoing(act: AgentAct): string {
+  if (typeof act !== "string") return "Sending";
+  return { "agents/stop": "Stopping", "agents/park": "Parking", "agents/unpark": "Unparking", "agents/archive": "Archiving",
+    "agents/unarchive": "Bringing back" }[act];
+}
+
+/** Telling.words: "Parking — telling your Mac", or "telling your Mac" beside a button that says what. */
+export function tellingWords(doing: string | null, recipient: string): string {
+  return doing ? `${doing} — telling ${recipient}` : `telling ${recipient}`;
+}
+
 /** The reducer, fed by the link: everything loaded on each connection, then kept by notifications. */
 export class Store extends Work {
   constructor(readonly link: Link) {
@@ -483,7 +499,30 @@ export class Store extends Work {
   }
 
   async sendNow(host: string, agentID: string, promptID: string): Promise<void> {
-    await this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host);
+    await this.acting(agentID, { sendNow: promptID }, () =>
+      this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host));
+  }
+
+  /**
+   * What is on its way to each agent (#87; AgentsModel's acting): stop, park, unpark, archive or
+   * Send now, one at a time. Every control that would send a second sees the first is going.
+   */
+  readonly onItsWay = signal<Record<string, AgentAct>>({});
+
+  /** Who an action goes to, as the pending mark says it: "your Mac", or the host's name. */
+  recipient(host: string): string {
+    return host === "mac" ? "your Mac" : this.hosts.value.find((h) => h.id === host)?.name ?? "the host";
+  }
+
+  private async acting(agentID: string, act: AgentAct, run: () => Promise<unknown>): Promise<void> {
+    if (this.onItsWay.value[agentID]) return;
+    this.onItsWay.value = { ...this.onItsWay.value, [agentID]: act };
+    try {
+      await run();
+    } finally {
+      const { [agentID]: _done, ...rest } = this.onItsWay.value;
+      this.onItsWay.value = rest;
+    }
   }
 
   async unqueue(host: string, agentID: string, promptID: string): Promise<void> {
@@ -492,7 +531,7 @@ export class Store extends Work {
 
   async perform(host: string, agentID: string,
                 action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<void> {
-    await this.act(action, { agentID: agentID as UUID }, host);
+    await this.acting(agentID, action, () => this.act(action, { agentID: agentID as UUID }, host));
   }
 
   // MARK: Files, changes and live pages (071 US4)
