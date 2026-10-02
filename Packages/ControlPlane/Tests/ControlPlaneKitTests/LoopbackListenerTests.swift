@@ -226,6 +226,8 @@ struct LoopbackListenerTests {
         let (service, port) = try await start(web: .init(folder: folder, port: 0))
         defer { Task { await service.stop() } }
         #expect(service.webPort == nil)
+        // And it says why (071 R3).
+        #expect(try await Self.status(of: service).web?.reason == DaemonAPI.WebRemoteStatus.build)
         let (_, response) = try await Self.get("http://127.0.0.1:\(port)/healthz")
         #expect(response.statusCode == 200, "the TLS listener carries on")
     }
@@ -250,12 +252,80 @@ struct LoopbackListenerTests {
         let (service, port) = try await start(web: .init(folder: Self.dist, port: taken.localAddress?.port ?? 0))
         defer { Task { await service.stop() } }
         #expect(service.webPort == nil)
+        // And it says so, as a port in use: the R3 row (071).
+        #expect(try await Self.status(of: service).web?.reason == DaemonAPI.WebRemoteStatus.portInUse)
         let (_, response) = try await Self.get("http://127.0.0.1:\(port)/healthz")
         #expect(response.statusCode == 200)
         // And 127.0.0.1 on that port was let go, not left holding a half-served page.
         let again = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
             .bind(host: "127.0.0.1", port: taken.localAddress?.port ?? 0).get()
         try await again.close()
+    }
+
+    // MARK: Saying whether it serves (071 R3)
+
+    /// `control/status` as a device would get it.
+    static func status(of service: ControlService) async throws -> DaemonAPI.ControlStatus {
+        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), grant: .device, kind: .browser)
+        let answer = try await service.methods.handle(method: DaemonAPI.Method.controlStatus, params: nil, from: caller)
+        return try answer.decode(DaemonAPI.ControlStatus.self)
+    }
+
+    @Test func aTakenPortIsReportedAsNotServedAndTryingAgainServesOnceItIsFree() async throws {
+        var taken: (any Channel)? = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+            .bind(host: "127.0.0.1", port: 0).get()
+        let port = try #require(taken?.localAddress?.port)
+        defer { taken?.close(promise: nil) }
+        let lines = Lines()
+        let told = Lines()
+        var configuration = ControlService.Configuration(
+            store: MemoryStore(), privateKey: ControlAgreement.generate().privateKey,
+            url: URL(string: "http://127.0.0.1:\(try await freePort())")!, bind: "127.0.0.1", port: 0, name: "test")
+        configuration.web = .init(folder: Self.dist, port: port)
+        configuration.log = { lines.add($0) }
+        configuration.webChanged = { told.add($0.summary) }
+        let service = try ControlService(configuration)
+        try await service.start()
+        defer { Task { await service.stop() } }
+
+        let off = try #require(try await Self.status(of: service).web)
+        #expect(off == .init(port: port, served: false, reason: DaemonAPI.WebRemoteStatus.portInUse, detail: off.detail))
+        #expect(off.summary == "Not serving: port \(port) is in use by another app.")
+        #expect(told.all == [off.summary])
+        #expect(lines.all.contains { $0.contains("web: port \(port) not bound") })
+
+        try await taken?.close()
+        taken = nil
+        await service.retryWeb()
+        let on = try #require(try await Self.status(of: service).web)
+        #expect(on == .init(port: port, served: true))
+        #expect(on.summary == "At http://localhost:\(port), for a browser on this Mac only.")
+        #expect(told.all.last == on.summary)
+        let (_, response) = try await Self.get("http://localhost:\(port)/")
+        #expect(response.statusCode == 200)
+    }
+
+    @Test func aCopyAskedForNoWebRemoteReportsNone() async throws {
+        let (service, _) = try await start(web: nil)
+        defer { Task { await service.stop() } }
+        #expect(try await Self.status(of: service).web == nil)
+    }
+
+    @Test func webJSONIsReadOnlyForTheRunThatWroteIt() throws {
+        let home = FileManager.default.temporaryDirectory.appending(path: "web-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let status = DaemonAPI.WebRemoteStatus(port: 8792, served: false, reason: DaemonAPI.WebRemoteStatus.portInUse)
+        try JSONEncoder().encode(WebRemoteFile(pid: 41, status: status)).write(to: home.appending(path: WebRemoteFile.name))
+        #expect(WebRemoteFile.read(in: home, pid: 41) == status)
+        #expect(WebRemoteFile.read(in: home, pid: 42) == nil)
+    }
+
+    final class Lines: @unchecked Sendable {
+        private let lock = NSLock()
+        private var lines: [String] = []
+        func add(_ line: String) { lock.withLock { lines.append(line) } }
+        var all: [String] { lock.withLock { lines } }
     }
 
     // MARK: Helpers

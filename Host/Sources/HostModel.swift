@@ -116,6 +116,7 @@ final class HostModel {
         if let control, control != controlPID { runningSince = Self.started(control) }
         if control == nil { runningSince = nil }
         controlPID = control
+        webRemote = control.flatMap { WebRemoteFile.read(in: paths.controlHome, pid: $0) }
         if controlRunning, settings.role == .runHere {
             let listed = await ControlTool.run(["clients"], paths: paths, settings: settings, key: false)
             clients = listed.ok ? listed.output.split(separator: "\n").count : nil
@@ -354,6 +355,32 @@ final class HostModel {
 
     /// Where the web remote is, while it is served.
     var webRemoteAddress: String { "http://localhost:\(paths.webPort)" }
+
+    /// Whether the running control plane serves the page, and why not (071 R3), as it wrote
+    /// it to `web.json`; nil until it has, or while it isn't running.
+    private(set) var webRemote: DaemonAPI.WebRemoteStatus?
+
+    /// The toggle's line: what the control plane says, else the address it was asked for.
+    var webRemoteLine: String {
+        guard settings.servesWebRemote, controlRunning, let webRemote else {
+            return "At \(webRemoteAddress), for a browser on this Mac only."
+        }
+        return webRemote.summary
+    }
+
+    /// The person turned it on and the control plane couldn't serve it.
+    var webRemoteFailed: Bool { settings.servesWebRemote && controlRunning && webRemote?.served == false }
+
+    /// Asks the running control plane to bind the page's port again, keeping every
+    /// connection it has: SIGUSR1 to `agents-control serve` (071 R3).
+    func retryWebRemote() async {
+        guard let controlPID else { return }
+        busy = "Trying again…"
+        defer { busy = nil }
+        kill(controlPID, SIGUSR1)
+        try? await Task.sleep(for: .seconds(1))
+        await refresh()
+    }
 
     func restartControl() async {
         busy = "Restarting…"

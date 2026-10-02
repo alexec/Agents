@@ -18,7 +18,7 @@ It ends with what #42 must add when #61 serves the page publicly. The tests that
 |---|---|---|---|
 | R1 | Another account could take `[::1]:<port>` and receive the page's visitors | Medium (another account on this Mac) | **Fixed** here |
 | R2 | A browser's pairing code also pairs a phone or a Mac over TLS | Low now; higher once the page is public | **Fixed** here, at Alex's call |
-| R3 | Agents Host doesn't say when the page isn't being served | Low | Open |
+| R3 | Agents Host doesn't say when the page isn't being served | Low | **Fixed** (#106) |
 | R4 | Script in the page holds the grant's full power, as the spec says | Accepted | By design; device by default |
 
 ### R1. The page's address could be taken on IPv6 alone (fixed)
@@ -57,14 +57,19 @@ It ends with what #42 must add when #61 serves the page publicly. The tests that
 - The page shows the control plane's words: "That code is for a window or a phone. Get one from Pair a Browser…."
 - Tests: `aCodeIsGoodOnlyThroughTheListenerItWasMadeFor` (Swift), and "a code the control plane won't pair a browser with is refused in its own words (R2)" (`auth.test.mjs`).
 
-### R3. Not serving is said only in a log (open)
+### R3. Not serving was said only in a log (fixed)
 
 **The problem:**
 - When the port is taken, or now when `::1` is, the control plane logs `web: port 8792 not bound …; not serving the web remote`, and carries on.
-- Agents Host's row still says **At http://localhost:8792, for a browser on this Mac only.**
+- Agents Host's row still said **At http://localhost:8792, for a browser on this Mac only.**
 - Someone who finds a page there that asks for a code has no sign that it isn't Agents.
 
-**Suggested:** `control/status` reports whether the page is served, and Agents Host's row says **Not serving: something else has port 8792** when it isn't.
+**The fix (#106):**
+- `control/status` carries `web`: the port, whether it is served and, if not, why (`portInUse`, `build` or `failed`). `control/webChanged` says when that changes.
+- `serve --home` writes the same to `web.json` in its home, with its pid, for Agents Host, which isn't a client. A file left by an earlier run is ignored.
+- Agents Host's row says **Not serving: port 8792 is in use by another app.** in place of the address, with **Try Again**, which sends the control plane `SIGUSR1` to bind again without dropping anyone.
+- **Settings ▸ Control plane** in the window has a **Browsers on this Mac** row that says the same.
+- Tests: `aTakenPortIsReportedAsNotServedAndTryingAgainServesOnceItIsFree`, the `portInUse` and `build` checks in the two tests above it, and `webJSONIsReadOnlyForTheRunThatWroteIt`.
 
 ### R4. Script in the page has the grant's power (accepted)
 

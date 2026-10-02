@@ -48,6 +48,8 @@ public extension DaemonAPI.Notification {
     static let controlHostChanged = "control/hostChanged"
     static let controlClientChanged = "control/clientChanged"
     static let controlPairingChanged = "control/pairingChanged"
+    /// `WebRemoteStatus`: the web remote's listener started, or could not (071 R3).
+    static let controlWebChanged = "control/webChanged"
     static let controlInstallProgress = "control/installProgress"
     /// To a device on the old way, after the move (058, T085): `ControlMoved`.
     static let controlMoved = "control/moved"
@@ -71,6 +73,9 @@ public extension DaemonAPI {
         /// The public key of the host that relays through iCloud, if one does (T077): what a
         /// device keeps so it can reach the control plane through the relay when away.
         public var relayKey: Data?
+        /// The web remote's loopback listener (071 R3): whether the page is served, and why
+        /// not. Nil when this copy was not asked to serve it.
+        public var web: WebRemoteStatus?
 
         public init(name: String, version: String, homeHost: HostID?, machineID: String,
                     startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {
@@ -81,6 +86,41 @@ public extension DaemonAPI {
             self.startedAt = startedAt
             self.port = port
             self.awayFromHome = awayFromHome
+        }
+    }
+
+    /// Whether the control plane serves the web remote on its loopback port (071 R3): what
+    /// Agents Host's row and the window's Settings say, rather than the address regardless.
+    struct WebRemoteStatus: Codable, Sendable, Hashable {
+        /// The port asked for: 8792 for Agents Host's copy.
+        public var port: Int
+        public var served: Bool
+        /// Why not, when it isn't: `portInUse`, `build` or `failed`.
+        public var reason: String?
+        /// The error as the control plane met it.
+        public var detail: String?
+
+        public static let portInUse = "portInUse"
+        public static let build = "build"
+        public static let failed = "failed"
+
+        public init(port: Int, served: Bool, reason: String? = nil, detail: String? = nil) {
+            self.port = port
+            self.served = served
+            self.reason = reason
+            self.detail = detail
+        }
+
+        public var address: String { "http://localhost:\(port)" }
+
+        /// In plain words, for the row that would otherwise give the address.
+        public var summary: String {
+            if served { return "At \(address), for a browser on this Mac only." }
+            switch reason {
+            case Self.portInUse: return "Not serving: port \(port) is in use by another app."
+            case Self.build: return "Not serving: this copy of Agents Host’s web app is damaged or missing."
+            default: return "Not serving: port \(port) couldn’t be opened\(detail.map { " (\($0))" } ?? "")."
+            }
         }
     }
 

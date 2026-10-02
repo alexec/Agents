@@ -26,10 +26,11 @@ while [ $# -gt 0 ]; do
     --first-run) FIRST_RUN=1 ;;      # the window unpaired, on frame K; pair it by hand with PAIR_CODE
     --lan)       LAN=1 ;;            # the control plane at this Mac's LAN address, for a container
     --slug)      SLUG="$2"; shift ;;
+    --web-port)  WEB_PORT="$2"; shift ;;   # the web remote's port, e.g. one held already (071 R3)
     --seeded)    SEEDED=1 ;;         # the root exists, filled beforehand (scripts/seed-archived.swift), with no control/ yet
     --env)       EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the host, e.g. AGENTS_TEST_…=…
     --control-env) CONTROL_ENV+=("$2"); shift ;;  # KEY=VALUE for the control plane, e.g. AGENTS_SSH=…
-    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--env KEY=VALUE]… [--control-env KEY=VALUE]…" >&2; exit 2 ;;
+    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]…" >&2; exit 2 ;;
   esac
   shift
 done
@@ -74,7 +75,7 @@ CLEAN=(env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" TMPDIR="${TMPDIR:-/tmp}"
 PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
 # The web remote (071): the checked-in Web/dist on a free loopback port of the root's own,
 # never the live 8792, so a scratch browser's key is bound to a scratch origin.
-WEB_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+WEB_PORT="${WEB_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')}"
 URL="https://127.0.0.1:$PORT"
 if [ "$LAN" = 1 ]; then
   # A container cannot reach this Mac's loopback (test-servers).
