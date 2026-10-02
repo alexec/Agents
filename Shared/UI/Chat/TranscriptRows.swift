@@ -393,67 +393,80 @@ struct QueuedPromptRow: View {
         // Held while anything is on its way to this agent; this one, said (#87).
         let acting = actions.acting(agentID)
         let going = acting == .sendNow(prompt.id)
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Waiting its turn")
-                        .appText(.reading)
-                        .foregroundStyle(.tertiary)
-                    Spacer(minLength: 8)
-                    if canSendNow {
-                        Button {
-                            Task { await actions.sendNow(prompt, agentID) }
-                        } label: {
-                            Group {
-                                if going {
-                                    Telling(host: actions.recipient(agentID), doing: acting?.doing)
-                                } else {
-                                    Label("Send now", systemImage: "arrow.up")
-                                        .appText(.reading)
-                                }
-                            }
-                            #if os(iOS)
-                            .frame(minHeight: 44)
-                            .contentShape(.rect)
-                            #endif
-                        }
-                        .buttonStyle(.borderless)
-                        // The one going stays bright, as on the answer cards (#86); the
-                        // model refuses a second press of it.
-                        .disabled(acting != nil && !going)
-                        .help("Send this into the turn that is running, without waiting for it to end")
-                    }
+        // The person's bubble (TranscriptRow's .userMessage), dashed and dimmed: at the
+        // right, as wide as its words, with what can be done to it underneath, so the
+        // buttons never push it off the edge (#95).
+        VStack(alignment: .trailing, spacing: 2) {
+            BlocksView(blocks: prompt.blocks)
+                .environment(\.textFillsWidth, false)
+                .appText(.reading)
+                .foregroundStyle(.secondary)
+                .padding(12)
+                .paperWell(in: RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 }
-                BlocksView(blocks: prompt.blocks)
-                    .appText(.reading)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .paperWell(in: RoundedRectangle(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-            }
+                // No title says it is waiting, so the label does; one element, so the
+                // label never sits over a child's (stacked labels crash AppKit).
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Queued: \(prompt.text)")
+                .accessibilityAction(named: "Send now") {
+                    guard canSendNow, acting == nil else { return }
+                    Task { await actions.sendNow(prompt, agentID) }
+                }
+                .accessibilityAction(named: "Remove") {
+                    guard !going else { return }
+                    Task { await actions.unqueue(prompt, agentID) }
+                }
 
-            Button {
-                Task { await actions.unqueue(prompt, agentID) }
-            } label: {
-                Image(systemName: "xmark")
-                    .appText(.reading)
-                    .frame(width: 18, height: 18)
-                    #if os(iOS)
-                    // A finger, not a pointer: the glyph stays small and the target does not.
-                    .frame(width: 44, height: 44)
-                    .contentShape(.rect)
-                    #endif
+            // A step down from the words, so the row under the bubble stays quiet.
+            HStack(spacing: 12) {
+                if canSendNow {
+                    Button {
+                        Task { await actions.sendNow(prompt, agentID) }
+                    } label: {
+                        Group {
+                            if going {
+                                Telling(host: actions.recipient(agentID), doing: acting?.doing)
+                            } else {
+                                Label("Send now", systemImage: "arrow.up")
+                                    .appText(.supporting)
+                            }
+                        }
+                        #if os(iOS)
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
+                        #endif
+                    }
+                    .buttonStyle(.borderless)
+                    // The one going stays bright, as on the answer cards (#86); the
+                    // model refuses a second press of it.
+                    .disabled(acting != nil && !going)
+                    .help("Send this into the turn that is running, without waiting for it to end")
+                }
+
+                Button {
+                    Task { await actions.unqueue(prompt, agentID) }
+                } label: {
+                    Image(systemName: "xmark")
+                        .appText(.supporting)
+                        .frame(width: 18, height: 18)
+                        #if os(iOS)
+                        // A finger, not a pointer: the glyph stays small and the target does not.
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
+                        #endif
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.tertiary)
+                .disabled(going)
+                .help("Do not send this")
+                .accessibilityLabel("Remove queued prompt")
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.tertiary)
-            .disabled(going)
-            .help("Do not send this")
-            .accessibilityLabel("Remove queued prompt")
         }
+        .padding(.leading, 60)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 
