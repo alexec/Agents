@@ -72,6 +72,13 @@ As built in T012:
 - **`clients/announce`** refuses with `invalidParams` a `browser` through TLS, or any other kind
   through the loopback listener.
 
+- **A code is good only through the listener it was made for** (security review, R2): one made
+  with `clients/startPairing {kind: "browser"}`, or `agents-control code --browser`, only
+  through the loopback listener; any other client code only through TLS. `announce` refuses
+  the wrong one with `invalidParams` before spending it, in words the page shows: "That code is
+  for a window or a phone. Get one from Pair a Browser…." here, and "That code is for a
+  browser on this Mac." over TLS.
+
 ## Closing
 
 | Close | Meaning to the page |

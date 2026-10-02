@@ -17,7 +17,7 @@ It ends with what #42 must add when #61 serves the page publicly. The tests that
 | # | Finding | Severity | Status |
 |---|---|---|---|
 | R1 | Another account could take `[::1]:<port>` and receive the page's visitors | Medium (another account on this Mac) | **Fixed** here |
-| R2 | A browser's pairing code also pairs a phone or a Mac over TLS | Low now; higher once the page is public | Open: a decision for Alex |
+| R2 | A browser's pairing code also pairs a phone or a Mac over TLS | Low now; higher once the page is public | **Fixed** here, at Alex's call |
 | R3 | Agents Host doesn't say when the page isn't being served | Low | Open |
 | R4 | Script in the page holds the grant's full power, as the spec says | Accepted | By design; device by default |
 
@@ -35,9 +35,9 @@ It ends with what #42 must add when #61 serves the page publicly. The tests that
 - Only a Mac with no IPv6 loopback at all (`EADDRNOTAVAIL`, `EAFNOSUPPORT`) falls back to 127.0.0.1 alone. There, nothing else can answer at `::1` either.
 - Test: `aPortTakenOnIPv6AloneLeavesTheListenerOff`. It also checks that 127.0.0.1 on that port is let go.
 
-**What remains:** an account that takes **both** addresses first gets the origin, but no real listener behind it to proxy to. A browser key works only through the loopback listener, so it can't be used at the TLS address. The squatter's page can still ask for a code, which is R2.
+**What remains:** an account that takes **both** addresses first gets the origin, but no real listener behind it to proxy to. A browser key works only through the loopback listener, so it can't be used at the TLS address. The squatter's page can still ask for a code, but since R2's fix a browser's code is good only through the real loopback listener, which isn't running while the squatter holds its port.
 
-### R2. A code isn't bound to the kind of client it was made for (open)
+### R2. A code wasn't bound to the kind of client it was made for (fixed)
 
 **The problem:**
 - **Pair a Browser…** and **A browser on this Mac** make an ordinary client code: a grant, a five-minute life, one use.
@@ -50,10 +50,12 @@ It ends with what #42 must add when #61 serves the page publicly. The tests that
 - With **do everything (Operator)** chosen, that is an operator.
 - Codes are 16 random bytes, tagged by the control plane's key, so they can't be guessed. They can only be phished or seen.
 
-**The fix:**
-- Record the kind, or the listener, a client code is for, when it is made. `clients/startPairing` gains an optional `kind`; `Pair a Browser…` and Agents Host's browser target pass `browser`.
-- `announce` then refuses a code used through the wrong listener, as it refuses the kind.
-- This touches 058's control API and both apps' pairing sheets, so it is left for Alex to decide. It isn't made here.
+**The fix (Alex chose to make it before merge):**
+- A client code records whether it is for a browser, when it is made. `clients/startPairing` takes an optional `kind: "browser"`, and `agents-control code` takes `--browser`.
+- The window's **Pair a Browser…** and Agents Host's **A browser on this Mac** ask for one.
+- `announce` refuses a browser's code over TLS, and any other code through the loopback listener. It refuses before spending the code, so a code tried in the wrong place still pairs the browser it was made for.
+- The page shows the control plane's words: "That code is for a window or a phone. Get one from Pair a Browser…."
+- Tests: `aCodeIsGoodOnlyThroughTheListenerItWasMadeFor` (Swift), and "a code the control plane won't pair a browser with is refused in its own words (R2)" (`auth.test.mjs`).
 
 ### R3. Not serving is said only in a log (open)
 
@@ -108,7 +110,7 @@ Once the page is served at the control plane's public address, the third row of 
 1. **The key works from anywhere.**
    - A copied profile, or malware that can drive the browser, is a session from anywhere.
    - Consider binding the browser client to an expiry with re-pairing, or a second factor for an operator grant. Also show each browser's last address and time in **Clients**, so a stranger's use is visible.
-2. **R2 must be fixed first.** A phished browser code would pair any kind of client from anywhere.
+2. **Keep R2's binding.** It is what stops a phished browser code pairing any kind of client from anywhere. Once the page is public, a browser's code is good at the public listener only, and that listener must stay the one place it works.
 3. **Origins and certificates.**
    - The canonical origin becomes the public `https://` name. The origin binding, the `Host` check and the `Origin` check must use it.
    - `connect-src` changes from `ws://localhost:<port>` to the `wss://` name.

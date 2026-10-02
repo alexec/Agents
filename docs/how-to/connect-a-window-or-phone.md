@@ -72,7 +72,8 @@ first.
    paste the code, and click **Connect**.
 
 In Agents Host, **Pair a Window or Phone…** with **A browser on this Mac** chosen gives the
-same code. Only a browser on that Mac can use it. See
+same code. Only a browser on that Mac can use it, and a code from **Pair a Device…** or
+**Pair a Mac…** won't pair a browser. See
 [Use Agents in a browser](use-agents-in-a-browser.md) for what the page can do.
 
 ### Change what a client may do

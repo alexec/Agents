@@ -2,7 +2,7 @@
 // unpaired, pairing, connecting, open, down, forgotten. Views read `session.state`.
 import { signal } from "@preact/signals";
 import { log } from "./log";
-import { BadServerProof, pair, Refused, type RefusalReason, WrongControlPlane } from "./wire/auth";
+import { AnnounceRefused, BadServerProof, pair, Refused, type RefusalReason, WrongControlPlane } from "./wire/auth";
 import { base64url } from "./wire/bytes";
 import { parseCode } from "./wire/code";
 import { IndexedKeyStore, type KeyStore, makeKeyPair, newClientID, UnsupportedBrowser } from "./wire/keys";
@@ -133,6 +133,7 @@ export class Session {
       else if (error instanceof WrongControlPlane) words = pairingWords.otherControlPlane;
       else if (error instanceof BadServerProof) words = pairingWords.badProof;
       else if (error instanceof UnsupportedBrowser) words = pairingWords.unsupported;
+      else if (error instanceof AnnounceRefused) words = error.message;
       log("pair.failed", error instanceof Refused ? error.reason : undefined);
       this.pairingError.value = words;
     }

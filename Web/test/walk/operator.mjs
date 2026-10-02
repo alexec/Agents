@@ -5,7 +5,7 @@
 // clients/forget. Walks only; never pointed at the real control plane.
 //
 //   const op = await Operator.pair(controlURL, operatorCode);
-//   const code = await op.call("clients/startPairing", { grant: "device" });
+//   const code = await op.call("clients/startPairing", { grant: "device", kind: "browser" });
 
 import { load } from "../load.mjs";
 

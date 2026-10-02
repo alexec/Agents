@@ -29,6 +29,12 @@ export class WrongControlPlane extends Error {
   }
 }
 
+/**
+ * The control plane wouldn't pair this browser with that code, and said why: a code made for a
+ * window or a phone, say, which is good only over TLS (071 R2). Its words are the page's to show.
+ */
+export class AnnounceRefused extends Error {}
+
 /** The control plane's proof didn't check out: not ours, or not who it says. */
 export class BadServerProof extends Error {
   constructor() {
@@ -109,7 +115,7 @@ export async function pair(socket: LineSocket, code: ClientCode, origin: string,
   const reply = parse(await socket.next(15_000));
   if (reply["error"]) {
     const error = reply["error"] as { message?: string };
-    throw new Error(error.message ?? "the control plane wouldn't pair this browser");
+    throw new AnnounceRefused(error.message ?? "The control plane wouldn't pair this browser.");
   }
   const result = reply["result"] as { grant?: string } | undefined;
   return { grant: result?.grant === "operator" ? "operator" : grant, name: hello.name, client: made.client };

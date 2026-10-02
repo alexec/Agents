@@ -28,7 +28,7 @@ Sent with no `h`. Grant column: which client grant may call it. Params and resul
 | `hosts/update` | operator | `{host}` → `{}`: asks the host to update itself over its uplink |
 | `hosts/remove` | operator | `{host, purge?: Bool}` → `{}`; revokes key, closes uplink |
 | `clients/list` | operator | → `[ClientRecord]` (was `devices/list`) |
-| `clients/startPairing` | operator | `{grant}` → `PairingCode{purpose: client(grant)}` |
+| `clients/startPairing` | operator | `{grant, kind?}` → `PairingCode{purpose: client(grant)}`; `kind: "browser"` (071) makes a code good only through the loopback listener, and any other code is good only over TLS (071 security review, R2) |
 | `clients/stopPairing` | operator | → `{}` |
 | `clients/announce` | pairing | `{id, publicKey, name, kind}` → `{client, controlKey, grant}` (was `devices/announce`) |
 | `clients/setGrant` | operator | `{client, grant}` → `{}`; refuses to leave no operator |

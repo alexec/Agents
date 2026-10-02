@@ -372,7 +372,7 @@ This comes before US4 and US5, because Agents Host restarts on every ship (plan.
   - the `clients/forgetSelf` row in `specs/058-control-plane/contracts/control-api.md`.
 
   Run `scripts/docs.sh check`.
-- [x] T073 (R1 fixed: ::1 taken leaves the listener off; R2 codes and R3 status open) Write a security review in `specs/071-web-remote/walks/security-review.md`: the listener, the `browser` kind, the origin binding, the CSP and rendering, and the stolen-session table, with what #42 must add when #61 serves the page publicly.
+- [x] T073 (R1 and R2 fixed; R3, not serving said only in a log, open) Write a security review in `specs/071-web-remote/walks/security-review.md`: the listener, the `browser` kind, the origin binding, the CSP and rendering, and the stolen-session table, with what #42 must add when #61 serves the page publicly.
 - [ ] T074 Compare six full suite runs against main on both commits (memory: the suite is flaky under load), and record the result in `walks/suite-compare.md`.
 - [ ] T075 Final check:
   - `scripts/web.sh check`;

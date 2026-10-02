@@ -66,7 +66,8 @@ nothing has changed since the last one. The build log is at
 into **Connect…**. To walk Agents Host itself, open a scratch build of it with
 `AGENTS_ROOT=$ROOT` (its plists and jobs are the root's, and `stop.sh` boots them out). Make
 more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client device
---home $ROOT/control`, where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents
+--home $ROOT/control` (add `--browser` for a code the web remote pairs with: a browser's code
+works only through the loopback listener, and any other only over TLS), where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents
 Host.app`.
 
 ## Rules that are not optional
@@ -220,6 +221,6 @@ control plane; the phone's look is the user's.
 `WEB_URL` is the scratch control plane's web remote. Walk it in headless Chrome with a
 throwaway profile, never Alex's own browser: `node Web/test/walk/cdp.mjs` is a dependency-free
 DevTools client (launch, open, set the viewport, press by accessible name, type, screenshot,
-read the console and network). Pair it with a code made as above (`code --client device`).
+read the console and network). Pair it with a code made as above (`code --client device --browser`).
 Safari is walked only with Alex's go-ahead, asked with the question tool.
 

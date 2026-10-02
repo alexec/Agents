@@ -15,7 +15,7 @@ const say = (line) => { notes.push(line); console.log(line); };
 const profile = `/tmp/071-us1-chrome-${process.pid}`;
 
 const op = await Operator.pair(controlURL, operatorCode);
-const newCode = async (grant = "device") => (await op.call("clients/startPairing", { grant })).text;
+const newCode = async (grant = "device") => (await op.call("clients/startPairing", { grant, kind: "browser" })).text;
 const browsers = async () => (await op.call("clients/list")).filter((c) => c.kind === "browser");
 
 async function pairIn(page, code) {

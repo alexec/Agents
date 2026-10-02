@@ -15,7 +15,7 @@ struct PairingReplyTests {
         let methods = ControlMethods(records: ControlRecords(store: MemoryStore()),
                                      settings: ControlSettings(name: "test", machineID: "m"), version: "1")
         var hooks = ControlMethods.Hooks()
-        hooks.startPairing = { grant in
+        hooks.startPairing = { grant, _ in
             try JSONValue.encoding(DaemonAPI.ControlCodeShown(
                 text: grant == .device ? code.text : "", expires: Date(timeIntervalSince1970: 1_000)))
         }

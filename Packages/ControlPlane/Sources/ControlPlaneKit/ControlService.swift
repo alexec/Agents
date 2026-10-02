@@ -229,7 +229,7 @@ public final class ControlService: @unchecked Sendable {
         await methods.attach(router)
         let codes = self.codes
         var hooks = ControlMethods.Hooks(
-            startPairing: { grant in try JSONValue.encoding(try await codes.issue(.client(grant))) },
+            startPairing: { grant, browser in try JSONValue.encoding(try await codes.issue(.client(grant), browser: browser)) },
             startEnroll: { try JSONValue.encoding(try await codes.issue(.host)) })
         hooks.changed = { [weak self] event in await self?.announce(event) }
         // hosts/install (T072): once over ssh with the key given, then the host is on its own.
@@ -603,6 +603,13 @@ public final class ControlService: @unchecked Sendable {
                 guard (announce.kind == .browser) == (arrival != .tls) else {
                     throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Pair that kind of client elsewhere.")
                 }
+                // And with a code made for one, which is good nowhere else (R2). Refused before
+                // it is spent, so the browser it was made for can still use it.
+                guard (stored.browser == true) == (arrival != .tls) else {
+                    throw JSONRPCError(code: JSONRPCError.invalidParams, message: stored.browser == true
+                        ? "That code is for a browser on this Mac."
+                        : "That code is for a window or a phone. Get one from Pair a Browser….")
+                }
                 let grant = stored.grant ?? .device
                 let name = announce.kind == .browser ? Self.browserName(announce.name) : announce.name
                 try await codes.spend(id)
@@ -767,6 +774,10 @@ public actor ControlCodes {
     public struct Stored: Codable, Sendable {
         public var purpose: Purpose
         public var grant: Grant?
+        /// Made for a browser on this Mac (071 security review, R2): good only through the
+        /// loopback listener, as any other client code is good only over TLS. A code read
+        /// through a page that wasn't Agents' can't then pair a phone or a Mac elsewhere.
+        public var browser: Bool?
         public var owner: PersonID?
         public var expires: Date
     }
@@ -800,12 +811,12 @@ public actor ControlCodes {
 
     /// A new code, written to the store, for `clients/startPairing` or `hosts/startEnroll`
     /// or `agents-control code`.
-    public func issue(_ purpose: ControlCode.Purpose, lifetime: TimeInterval = ControlCode.lifetime)
-        async throws -> DaemonAPI.ControlCodeShown {
+    public func issue(_ purpose: ControlCode.Purpose, lifetime: TimeInterval = ControlCode.lifetime,
+                      browser: Bool = false) async throws -> DaemonAPI.ControlCodeShown {
         let (id, secret) = ControlAuth.makeCodeSecret(controlPrivateKey: privateKey)
         let expires = Date().addingTimeInterval(lifetime)
         let stored: Stored = switch purpose {
-        case .client(let grant): Stored(purpose: .client, grant: grant, expires: expires)
+        case .client(let grant): Stored(purpose: .client, grant: grant, browser: browser ? true : nil, expires: expires)
         case .host: Stored(purpose: .host, expires: expires)
         }
         _ = try await store.put(Self.key(id), try ControlRecords.encoder.encode(stored), when: .absent)

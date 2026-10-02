@@ -456,7 +456,9 @@ final class HostModel {
         pairing = nil
         let grant = pairingGrant
         let target = pairingTarget
-        let made = await ControlTool.run(["code", "--client", grant.rawValue, "--home", paths.controlHome.path],
+        // A browser's code is good only through the page's own listener (071 R2).
+        let made = await ControlTool.run(["code", "--client", grant.rawValue, "--home", paths.controlHome.path]
+                                             + (target == .browser ? ["--browser"] : []),
                                          paths: paths, settings: settings)
         guard made.ok, let text = made.output.split(separator: "\n").last.map(String.init) else {
             problem = made.problem.isEmpty ? "No code could be made." : made.problem

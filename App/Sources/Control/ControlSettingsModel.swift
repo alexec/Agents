@@ -141,13 +141,16 @@ final class ControlSettingsModel {
         }
     }
 
-    /// A code for a new client with `grant`, or for a new host (frame G, Add by Code).
-    func startCode(forHost: Bool, grant: Grant = .operator) async -> DaemonAPI.ControlCodeShown? {
+    /// A code for a new client with `grant`, or for a new host (frame G, Add by Code). A
+    /// browser's is good only through the page's own listener (071 R2).
+    func startCode(forHost: Bool, grant: Grant = .operator, browser: Bool = false) async -> DaemonAPI.ControlCodeShown? {
         do {
             let shown: DaemonAPI.ControlCodeShown = if forHost {
                 try await client.call(DaemonAPI.Method.hostsStartEnroll, returning: DaemonAPI.ControlCodeShown.self)
             } else {
-                try await client.call(DaemonAPI.Method.clientsStartPairing, ["grant": JSONValue.string(grant.rawValue)],
+                try await client.call(DaemonAPI.Method.clientsStartPairing,
+                                      ["grant": JSONValue.string(grant.rawValue)]
+                                          .merging(browser ? ["kind": .string(ClientRecord.Kind.browser.rawValue)] : [:]) { a, _ in a },
                                       returning: DaemonAPI.ControlCodeShown.self)
             }
             problem = nil

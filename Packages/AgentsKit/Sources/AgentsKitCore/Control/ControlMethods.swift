@@ -8,8 +8,9 @@ import Foundation
 /// and rules.
 public actor ControlMethods: ControlHandling {
     public struct Hooks: Sendable {
-        /// `clients/startPairing` / `devices/startPairing`: a code for a new client.
-        public var startPairing: @Sendable (Grant) async throws -> JSONValue
+        /// `clients/startPairing` / `devices/startPairing`: a code for a new client, and
+        /// whether it is for a browser on this Mac (071 R2: good only through loopback).
+        public var startPairing: @Sendable (Grant, Bool) async throws -> JSONValue
         public var stopPairing: @Sendable () async -> Void
         /// `hosts/startEnroll`: a code for a new host.
         public var startEnroll: @Sendable () async throws -> JSONValue
@@ -29,7 +30,7 @@ public actor ControlMethods: ControlHandling {
         /// A host started or stopped relaying, or a relay host said hello (T096).
         public var relayChanged: @Sendable (HostID) async -> Void = { _ in }
 
-        public init(startPairing: @escaping @Sendable (Grant) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
+        public init(startPairing: @escaping @Sendable (Grant, Bool) async throws -> JSONValue = { _, _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
                     startEnroll: @escaping @Sendable () async throws -> JSONValue = { throw ControlMethods.notHere },
                     install: @escaping @Sendable (JSONValue?) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
@@ -250,9 +251,9 @@ public actor ControlMethods: ControlHandling {
             }.sorted { $0.client.uuidString < $1.client.uuidString })
         case DaemonAPI.Method.clientsStartPairing:
             let grant = (params?["grant"]?.stringValue).flatMap(Grant.init(rawValue:)) ?? .device
-            return try await hooks.startPairing(grant)
+            return try await hooks.startPairing(grant, params?["kind"]?.stringValue == ClientRecord.Kind.browser.rawValue)
         case DaemonAPI.Method.devicesStartPairing:
-            return try await hooks.startPairing(.device)
+            return try await hooks.startPairing(.device, false)
         case DaemonAPI.Method.clientsStopPairing, DaemonAPI.Method.devicesStopPairing:
             await hooks.stopPairing()
             return [:]

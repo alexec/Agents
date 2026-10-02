@@ -68,7 +68,7 @@ struct BrowserClientTests {
     func pairBrowser(_ running: Running, grant: Grant = .device) async throws -> (UUID, ControlAuth.Credentials) {
         let key = ControlAgreement.generate()
         let id = UUID()
-        _ = try await announce(try await running.service.codes.issue(.client(grant)).text, kind: .browser, id: id,
+        _ = try await announce(try await running.service.codes.issue(.client(grant), browser: true).text, kind: .browser, id: id,
                                publicKey: key.publicKey) { try await joinWeb(running, $0) }
         let shared = try ControlAuth.clientKey(privateKey: key.privateKey, peer: control.publicKey, client: id)
         return (id, .init(identity: .client(id), key: shared, kind: "browser", controlKey: control.publicKey))
@@ -145,10 +145,33 @@ struct BrowserClientTests {
     @Test func aBrowserCodeWorksOnceOnTheLoopbackListener() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
-        let code = try await running.service.codes.issue(.client(.device)).text
+        let code = try await running.service.codes.issue(.client(.device), browser: true).text
         #expect(await announceRefusal(code, running) == nil)
         #expect(await announceRefusal(code, running) == .spent)
         #expect(await running.service.records.clients.count == 1)
+    }
+
+    /// A code is good only where it was made for (R2): a browser's not over TLS, even
+    /// announced as a phone, and a phone's or a Mac's not through loopback. Neither is spent
+    /// by the wrong use, so the browser it was made for can still pair.
+    @Test func aCodeIsGoodOnlyThroughTheListenerItWasMadeFor() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        let forBrowser = try await running.service.codes.issue(.client(.operator), browser: true).text
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await announce(forBrowser, kind: .iPhone, publicKey: ControlAgreement.generate().publicKey) {
+                try await joinTLS(running, $0)
+            }
+        }
+        let forPhone = try await running.service.codes.issue(.client(.device)).text
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await announce(forPhone, kind: .browser, publicKey: ControlAgreement.generate().publicKey) {
+                try await joinWeb(running, $0)
+            }
+        }
+        #expect(await running.service.records.clients.isEmpty)
+        #expect(await announceRefusal(forBrowser, running) == nil)
+        #expect(await running.service.records.clients.map(\.kind) == [.browser])
     }
 
     /// And for five minutes: one past its time is refused before anything is made.
@@ -156,7 +179,7 @@ struct BrowserClientTests {
         let running = try await start()
         defer { Task { await running.service.stop() } }
         #expect(ControlCode.lifetime == 5 * 60)
-        let code = try await running.service.codes.issue(.client(.device), lifetime: -1).text
+        let code = try await running.service.codes.issue(.client(.device), lifetime: -1, browser: true).text
         #expect(await announceRefusal(code, running) == .expired)
         #expect(await running.service.records.clients.isEmpty)
     }
@@ -180,7 +203,7 @@ struct BrowserClientTests {
         let lines = OSAllocatedUnfairLock<[String]>(initialState: [])
         let running = try await start(log: { line in lines.withLock { $0.append(line) } })
         defer { Task { await running.service.stop() } }
-        let shown = try await running.service.codes.issue(.client(.device)).text
+        let shown = try await running.service.codes.issue(.client(.device), browser: true).text
         let code = try #require(ControlCode(text: shown))
         let browser = ControlAgreement.generate()
         let id = UUID()

@@ -14,7 +14,7 @@ import Musl
 //   agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
 //   agents-control serve --home DIR [--no-bonjour] [--key-fd N] [--store-credentials-fd N]
 //   agents-control serve … [--web DIR] [--web-port N] [--no-web]
-//   agents-control code (--client operator|device | --host) [--minutes N] [--home DIR]
+//   agents-control code (--client operator|device [--browser] | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
 //   agents-control move --from ROOT     an old set-up's devices into this store, once (T084)
 //   agents-control install-script      the script a server runs to become a host
@@ -200,7 +200,8 @@ func code() async {
         }
         let codes = ControlCodes.forCommandLine(store: store, privateKey: key, url: url, pin: settings.pin, name: settings.name)
         let minutes = value("--minutes").flatMap(Double.init) ?? ControlCode.lifetime / 60
-        let shown = try await codes.issue(purpose, lifetime: minutes * 60)
+        // --browser: for a browser on this Mac, good only through the loopback listener (071 R2).
+        let shown = try await codes.issue(purpose, lifetime: minutes * 60, browser: arguments.contains("--browser"))
         print(shown.text)
         // The line a server runs to join with it (T070), for Agents Host to run over ssh.
         if arguments.contains("--command"), case .host = purpose {
@@ -390,7 +391,7 @@ case "--version", "version": print("agents-control \(ControlPlaneKit.version)")
 default:
     fail("""
     usage: agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
-           agents-control code (--client operator|device | --host) [--minutes N]
+           agents-control code (--client operator|device [--browser] | --host) [--minutes N]
            agents-control serve --home DIR [--no-bonjour]
            agents-control serve … [--web DIR] [--web-port N] [--no-web]
            agents-control hosts | clients

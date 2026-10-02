@@ -88,6 +88,10 @@ The control plane still lists the browser until you forget it there.
   code for a host. Copy the code again from **Pair a Browser…**.
 - **This code is for another control plane.** The code came from a different set-up from the
   one serving this page.
+- **That code is for a window or a phone. Get one from Pair a Browser….** A code from **Pair a
+  Device…** or **Pair a Mac…** works only for those. Get one made for a browser. It works the
+  other way too: a browser's code pasted into a phone or a window says **That code is for a
+  browser on this Mac.**
 - **Can't reach the control plane at localhost:8792. Trying again.** Agents Host's control
   plane has stopped. The page shows what it last knew, and catches up by itself when the
   control plane is back, with no reload.

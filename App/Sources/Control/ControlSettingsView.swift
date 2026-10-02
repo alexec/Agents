@@ -347,7 +347,7 @@ struct CodeSheet: View {
         .frame(width: 560)
         .task(id: grant) {
             before = members
-            shown = await control.startCode(forHost: purpose == .host, grant: grant)
+            shown = await control.startCode(forHost: purpose == .host, grant: grant, browser: purpose == .browser)
         }
         .onDisappear { Task { await control.stopCodes() } }
     }
