@@ -15,3 +15,5 @@ session.start();
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") session.link.retryNow();
 });
+// And so does the network coming back, as the window and the Remote do on a network change (#82).
+addEventListener("online", () => session.link.retryNow());

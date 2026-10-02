@@ -57,3 +57,13 @@ test("a write the host could not keep is said in its words (#88)", () => {
   assert.equal(work.apply("storage/writeFailed", { cause: "diskFull", what: "the transcript", message }, host), true);
   assert.equal(work.problem.value, message);
 });
+
+test("a host down is noted from when the page first heard it, and forgotten once back (#83)", () => {
+  const work = new Work();
+  const mac = (state) => ({ id: "mac", name: "Mac", platform: "macOS", version: "1", state, reach: "local" });
+  work.takeHosts([mac("offline")], 1000);
+  work.takeHosts([mac("offline")], 5000);
+  assert.deepEqual(work.downSince.value, { mac: 1000 });
+  work.takeHosts([mac("online")], 9000);
+  assert.deepEqual(work.downSince.value, {});
+});

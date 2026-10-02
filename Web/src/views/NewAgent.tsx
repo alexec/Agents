@@ -15,6 +15,7 @@ import { go } from "../route";
 import { LabelField } from "./Labels";
 import { Reach } from "./Reach";
 import { Prompt } from "./Prompt";
+import { OfflineStrip } from "./OfflineStrip";
 import { PromptMenus } from "./PromptMenus";
 
 type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string };
@@ -149,7 +150,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       <header class="column-head narrow-only">
         <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>
       </header>
-      {!down && !store.hostIsOnline(host) && <p class="offline-strip" role="status">This host is offline. A session can start here once it's back.</p>}
+      {/* The same strip as over a chat: a prompt here goes to that host too (#83). */}
+      {!down && <OfflineStrip store={store} host={host} />}
       <div class="scroll new-heading">
         <h1>{projectName}</h1>
         <p class="quiet" title={path}>{path} · {machine}</p>

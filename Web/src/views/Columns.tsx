@@ -84,7 +84,13 @@ function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
         return (
           <div class={`host${offline ? " host-offline" : ""}`} key={host.id}>
             <h2>{hostHeading(host)}</h2>
-            {offline && <p class="row offline">{hostStateWords(host.state)}: what's shown is from when it was last heard.</p>}
+            {/* This Mac's host down is said whole, in the window's words (#83); a server's state as before. */}
+            {offline && (host.id === "mac" ? (
+              <div class="host-down" role="status">
+                <p class="strong">⚠︎ This Mac’s host isn’t answering</p>
+                <p class="quiet small">What’s listed is what it last said. The control plane is trying again by itself.</p>
+              </div>
+            ) : <p class="row offline">{hostStateWords(host.state)}: what's shown is from when it was last heard.</p>)}
             {projectsOf(store, host).map((project) => {
               const folder = project.project.folder;
               const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);
@@ -174,7 +180,8 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
     if (open && host && folder) void store.loadArchived(host, folder);
   };
   return (
-    <section class="sessions" aria-label="Sessions">
+    // Greyed while its host is down, as the window's rows are (#83): what they show is what it last said.
+    <section class={`sessions${r.host && !linkDown && !store.hostIsOnline(r.host) ? " greyed" : ""}`} aria-label="Sessions">
       <header class="column-head">
         <button class="back narrow-only" onClick={() => go({})}>‹ Projects</button>
         <span class="medium-only menu-anchor">

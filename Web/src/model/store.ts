@@ -294,6 +294,22 @@ export class Work {
     return this.hasMoreBefore.value || this.firstTurn.value > 0;
   }
 
+  /**
+   * Since when each host has not been online, as this page first heard it (#83; the window's
+   * macDownSince). Kept while it stays down, dropped once it is back.
+   */
+  readonly downSince = signal<Record<string, number>>({});
+
+  /** The hosts as listed, with when each one went down noted. */
+  takeHosts(hosts: ControlHost[], now = Date.now()): void {
+    const since: Record<string, number> = {};
+    for (const host of hosts) if (host.state !== "online") since[host.id] = this.downSince.value[host.id] ?? now;
+    batch(() => {
+      this.hosts.value = hosts;
+      this.downSince.value = since;
+    });
+  }
+
   /** Whether a host answers: online, or held back for a reason the page says. */
   hostIsOnline(host: string): boolean {
     return this.hosts.value.find((h) => h.id === host)?.state === "online";
@@ -356,7 +372,7 @@ export class Store extends Work {
   async load(): Promise<void> {
     this.archivedLoaded.clear();
     const hosts = await this.link.call("hosts/list", {});
-    this.hosts.value = hosts;
+    this.takeHosts(hosts);
     await Promise.all(hosts.filter((host) => host.state === "online").map((host) => this.loadHost(host.id)));
     const watching = this.watching.value;
     if (watching) await this.loadTranscript(watching.host, watching.session);
