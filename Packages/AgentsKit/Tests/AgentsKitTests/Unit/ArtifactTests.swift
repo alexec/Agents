@@ -19,26 +19,26 @@ struct ArtifactTests {
     /// Both directions, on purpose. A file you attached is the one artifact the list is
     /// sure to have while no runtime hands anything over, and it is worth finding again
     /// whichever way it went.
-    @Test func aFileAttachedToAPromptIsAnArtifactToo() {
+    @Test func aFileAttachedToAPromptIsAnArtifactToo() throws {
         let sent = Attachment.file(URL(fileURLWithPath: "/tmp/brief.md")).block
         let artifacts = Artifact.all(in: [prompt([.text("have a look"), sent])])
-        #expect(artifacts.count == 1)
+        try #require(artifacts.count == 1)
         #expect(artifacts[0].name == "brief.md")
     }
 
-    @Test func aResourceLinkIsAnArtifact() {
+    @Test func aResourceLinkIsAnArtifact() throws {
         let artifacts = Artifact.all(in: [message([link])])
-        #expect(artifacts.count == 1)
+        try #require(artifacts.count == 1)
         #expect(artifacts[0].name == "report.md")
         #expect(artifacts[0].mimeType == "text/markdown")
         #expect(artifacts[0].size == 400)
     }
 
-    @Test func anEmbeddedResourceIsAnArtifact() {
+    @Test func anEmbeddedResourceIsAnArtifact() throws {
         let block = ContentBlock.resource(uri: "file:///tmp/notes.txt", text: "hello",
                                           blob: nil, mimeType: "text/plain")
         let artifacts = Artifact.all(in: [message([block])])
-        #expect(artifacts.count == 1)
+        try #require(artifacts.count == 1)
         #expect(artifacts[0].embedded)
         #expect(artifacts[0].text == "hello")
         #expect(artifacts[0].destination == .inPlace)
@@ -109,21 +109,23 @@ struct ArtifactTests {
         #expect(artifact.entryID == entry.id)
     }
 
-    @Test func twoArtifactsInOneMessageGetDifferentIdentities() {
+    @Test func twoArtifactsInOneMessageGetDifferentIdentities() throws {
         let entry = message([
             link,
             .resourceLink(uri: "file:///tmp/second.md", name: "second.md", mimeType: nil, size: nil),
         ])
         let artifacts = Artifact.all(in: [entry])
-        #expect(artifacts.count == 2)
+        try #require(artifacts.count == 2)
         #expect(artifacts[0].id != artifacts[1].id)
     }
 
-    @Test func aFileUriOpensInTheFilesPaneAndHttpInTheBrowser() {
-        #expect(Artifact.all(in: [message([link])])[0].destination == .file(URL(string: "file:///tmp/report.md")!))
+    @Test func aFileUriOpensInTheFilesPaneAndHttpInTheBrowser() throws {
+        let file = try #require(Artifact.all(in: [message([link])]).first)
+        #expect(file.destination == .file(URL(string: "file:///tmp/report.md")!))
         let web = ContentBlock.resourceLink(uri: "https://example.com/report", name: "report",
                                             mimeType: nil, size: nil)
-        #expect(Artifact.all(in: [message([web])])[0].destination == .web(URL(string: "https://example.com/report")!))
+        let page = try #require(Artifact.all(in: [message([web])]).first)
+        #expect(page.destination == .web(URL(string: "https://example.com/report")!))
     }
 
     @Test func anAddressWeCannotOpenGoesNowhereRatherThanCrashing() {
@@ -137,11 +139,11 @@ struct ArtifactTests {
         try Data("x".utf8).write(to: url)
         let block = ContentBlock.resourceLink(uri: url.absoluteString, name: url.lastPathComponent,
                                               mimeType: nil, size: nil)
-        var artifact = Artifact.all(in: [message([block])])[0]
+        var artifact = try #require(Artifact.all(in: [message([block])]).first)
         #expect(artifact.isMissing == false)
 
         try FileManager.default.removeItem(at: url)
-        artifact = Artifact.all(in: [message([block])])[0]
+        artifact = try #require(Artifact.all(in: [message([block])]).first)
         #expect(artifact.isMissing)
     }
 

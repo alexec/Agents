@@ -143,14 +143,14 @@ struct LeaseBookTests {
         #expect(holder(book) == c)
     }
 
-    @Test func handingOnSaysWhetherTheWaitersCallIsOpen() {
+    @Test func handingOnSaysWhetherTheWaitersCallIsOpen() throws {
         var book = LeaseBook()
         ask(&book, a)
         let call = UUID()
         ask(&book, b, minutes: 10, waitID: call)
         let later = t0.addingTimeInterval(minutes(3))
         let events = book.release(screen, by: a, now: later)
-        #expect(events.count == 2)
+        try #require(events.count == 2)
         guard case .granted(let lease, let waiter?, _) = events[1] else {
             Issue.record("expected a hand-on, got \(events)"); return
         }

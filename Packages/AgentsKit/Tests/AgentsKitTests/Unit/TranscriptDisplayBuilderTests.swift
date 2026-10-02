@@ -107,12 +107,12 @@ struct TranscriptDisplayBuilderTests {
         #expect(shown.first { if case .toolRun = $0 { return true }; return false }?.id == first.id)
     }
 
-    @Test func aChunkReplacesTheMessageItContinues() {
+    @Test func aChunkReplacesTheMessageItContinues() throws {
         var builder = TranscriptDisplayBuilder()
         builder.add(message("Hel"))
         let id = builder.items.first?.id
         builder.add(message("lo"))
-        #expect(builder.items.count == 1)
+        try #require(builder.items.count == 1)
         #expect(builder.items.first?.id == id)
         if case .entry(let entry) = builder.items[0] { #expect(entry.text == "Hello") }
     }

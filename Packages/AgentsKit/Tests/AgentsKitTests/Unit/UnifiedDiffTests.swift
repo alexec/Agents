@@ -12,7 +12,7 @@ struct UnifiedDiffTests {
         #expect(GitChanges.hunkStarts("@@ -0,0 +1,3 @@") == (0, 1))
     }
 
-    @Test func linesAreNumberedInTheNewFile() {
+    @Test func linesAreNumberedInTheNewFile() throws {
         let text = """
         diff --git a/a.swift b/a.swift
         index 1..2 100644
@@ -25,15 +25,17 @@ struct UnifiedDiffTests {
          three
         """
         let hunks = GitChanges.parseUnified(text)
-        #expect(hunks.count == 1)
+        try #require(hunks.count == 1)
         #expect(hunks[0].lines.map(\.kind) == [.context, .removed, .added, .context])
         #expect(hunks[0].lines.map(\.newLine) == [1, nil, 2, 3])
+        try #require(hunks[0].lines.count > 2)
         #expect(hunks[0].lines[2].text == "TWO")
     }
 
-    @Test func noNewlineAtEndIsAFlagNotALine() {
+    @Test func noNewlineAtEndIsAFlagNotALine() throws {
         let text = "@@ -1 +1 @@\n-a\n\\ No newline at end of file\n+b\n\\ No newline at end of file"
         let hunks = GitChanges.parseUnified(text)
+        try #require(!hunks.isEmpty)
         #expect(hunks[0].lines.count == 2)
         #expect(hunks[0].noNewlineAtEnd)
     }

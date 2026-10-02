@@ -242,7 +242,7 @@ struct WorkflowRefusalTests {
         // Ten projects of three is thirty, which is the whole reason the total exists
         // beside the per-project one.
         let (locations, root) = try temporary()
-        var folders: [URL] = []
+        var folders: [URL] = []  // index-ok: the loop adds four
         for index in 0..<4 {
             let work = try project(root, "p\(index)")
             folders.append(work)

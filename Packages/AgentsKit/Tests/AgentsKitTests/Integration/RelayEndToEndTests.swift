@@ -97,6 +97,7 @@ struct RelayEndToEndTests {
         let pending = try await client.call(DaemonAPI.Method.permissionsPending, Optional<String>.none,
                                             returning: [PermissionRequest].self)
         #expect(pending.map(\.toolCall.title) == ["Write hello.txt"])
+        try #require(!pending.isEmpty)
         let answer = DaemonAPI.AnswerRequest(permissionID: pending[0].id, optionID: "allow", sendID: UUID())
         _ = try await client.call(DaemonAPI.Method.permissionsAnswer, answer)
         // The same answer again, as a retry across a link change sends it. Carried out a

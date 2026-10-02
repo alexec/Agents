@@ -95,7 +95,7 @@ struct BroadcastIsolationTests {
             }
             return await group.reduce(into: []) { $0.append($1) }
         }
-        #expect(streams.count == 3)
+        try #require(streams.count == 3)
         #expect(Set(streams).count == 1, "every client got the same bytes")
         let numbers = String(decoding: streams[0], as: UTF8.self)
             .split(separator: "\n")

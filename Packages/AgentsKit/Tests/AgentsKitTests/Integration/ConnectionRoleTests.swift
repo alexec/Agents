@@ -303,7 +303,7 @@ struct ConnectionRoleTests {
     /// This test binary is not the app, the bridge or the helper, so under the real
     /// requirements it is what an agent's shell is.
     @Test func anUnsignedCallerIsAStrangerByItsSignature() throws {
-        var pair: [Int32] = [0, 0]
+        var pair: [Int32] = [0, 0]  // index-ok: two descriptors, filled by socketpair
         #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
         defer { close(pair[0]); close(pair[1]) }
 

@@ -38,10 +38,10 @@ struct OutcomePageTests {
         TranscriptEntry.display(entries).turns()[0]
     }
 
-    @Test func aTurnIsItsAskAndEverythingAfterIt() {
+    @Test func aTurnIsItsAskAndEverythingAfterIt() throws {
         let turns = TranscriptEntry.display([ask("Fix it"), said("Looking."), call("1", "List files"),
                                              call("2"), said("Fixed.")]).turns()
-        #expect(turns.count == 1)
+        try #require(turns.count == 1)
         #expect(text(turns[0].ask) == "Fix it")
         #expect(turns[0].items.count == 3)
     }

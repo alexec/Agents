@@ -299,3 +299,14 @@ jobs:
       - run: npm run build
       - name: Web/dist and generated.ts are what this source builds
         run: git diff --exit-code -- dist src/protocol/generated.ts
+
+  # Tests that index or force-unwrap after an #expect (#94): a failed check carries on, and
+  # the trap after it ends the whole `swift test` run, so every later test goes unreported.
+  # A text check, so it runs on every change and needs no Mac.
+  test-indexing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 scripts/check-test-indexing.py --selftest
+      - run: python3 scripts/check-test-indexing.py

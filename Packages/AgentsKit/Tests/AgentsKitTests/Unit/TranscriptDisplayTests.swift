@@ -38,20 +38,20 @@ struct TranscriptDisplayTests {
         #expect(drawn.map(\.name) == ["read_file"])
     }
 
-    @Test func oneToolCallIsOneLine() {
+    @Test func oneToolCallIsOneLine() throws {
         let items = TranscriptEntry.display([call("t1", "Write hello.txt")])
-        #expect(items.count == 1)
+        try #require(items.count == 1)
         #expect(items[0].latestToolCall?.title == "Write hello.txt")
         #expect(items[0].hiddenToolCallCount == 0)
     }
 
-    @Test func aCallAndItsUpdatesAreStillOneCall() {
+    @Test func aCallAndItsUpdatesAreStillOneCall() throws {
         let items = TranscriptEntry.display([
             call("t1", "Write hello.txt", status: "pending"),
             update("t1", status: "in_progress"),
             update("t1", status: "completed"),
         ])
-        #expect(items.count == 1)
+        try #require(items.count == 1)
         #expect(items[0].hiddenToolCallCount == 0, "an update is the same call further along")
         #expect(items[0].latestToolCall?.status == "completed")
         #expect(items[0].latestToolCall?.title == "Write hello.txt", "the update does not lose the title")
@@ -59,7 +59,7 @@ struct TranscriptDisplayTests {
 
     /// Claude's background Agent call never sends its tool_call, only one bare update
     /// (057). Drawn, it was a line reading "Tool call" and nothing more.
-    @Test func anUpdateForNoCallThatSaysNothingIsNotDrawn() {
+    @Test func anUpdateForNoCallThatSaysNothingIsNotDrawn() throws {
         let bare = ToolCall(toolCallID: "agent", title: "Tool call",
                             raw: .object(["sessionUpdate": .string("tool_call_update")]))
         let items = TranscriptEntry.display([
@@ -71,7 +71,7 @@ struct TranscriptDisplayTests {
         // The same bare update for a call already on the page is merged, as before.
         let merged = TranscriptEntry.display([call("t1", "Write hello.txt"),
                                               TranscriptEntry(kind: .toolCallUpdate(ToolCall(toolCallID: "t1", title: "Tool call")))])
-        #expect(merged.count == 1)
+        try #require(merged.count == 1)
         #expect(merged[0].latestToolCall?.title == "Write hello.txt")
     }
 
@@ -94,13 +94,13 @@ struct TranscriptDisplayTests {
         #expect(runs.first?.first?.status == "completed")
     }
 
-    @Test func aRunOfCallsShowsTheLatestAndKeepsTheRest() {
+    @Test func aRunOfCallsShowsTheLatestAndKeepsTheRest() throws {
         let items = TranscriptEntry.display([
             call("t1", "Read the file"),
             call("t2", "Patch the file"),
             call("t3", "Run the tests"),
         ])
-        #expect(items.count == 1)
+        try #require(items.count == 1)
         #expect(items[0].latestToolCall?.title == "Run the tests")
         #expect(items[0].hiddenToolCallCount == 2)
         if case .toolRun(_, let calls) = items[0] {
@@ -108,24 +108,24 @@ struct TranscriptDisplayTests {
         }
     }
 
-    @Test func anythingSaidBetweenThemStartsANewRun() {
+    @Test func anythingSaidBetweenThemStartsANewRun() throws {
         let items = TranscriptEntry.display([
             call("t1", "Read the file"),
             message("Here is what I found"),
             call("t2", "Patch the file"),
             call("t3", "Run the tests"),
         ])
-        #expect(items.count == 3)
+        try #require(items.count == 3)
         #expect(items[0].hiddenToolCallCount == 0)
         if case .entry(let entry) = items[1] { #expect(entry.text == "Here is what I found") }
         #expect(items[2].hiddenToolCallCount == 1)
     }
 
-    @Test func messageChunksAreStillJoined() {
+    @Test func messageChunksAreStillJoined() throws {
         let items = TranscriptEntry.display([
             message("Created ", "m1"), message("hello.txt", "m1"),
         ])
-        #expect(items.count == 1)
+        try #require(items.count == 1)
         if case .entry(let entry) = items[0] { #expect(entry.text == "Created hello.txt") }
     }
 
@@ -171,7 +171,7 @@ struct TranscriptDisplayTests {
         #expect(texts(items) == ["<tools>", "and again", "<tools>"])
     }
 
-    @Test func aReadTheAppServedIsQuietAndAWriteIsNot() {
+    @Test func aReadTheAppServedIsQuietAndAWriteIsNot() throws {
         let read = ServedRequest(kind: .readFile(path: "/tmp/a.md"), outcome: .served)
         let refusedRead = ServedRequest(kind: .readFile(path: "/tmp/b.md"), outcome: .refused(reason: "outside the folder"))
         let write = ServedRequest(kind: .writeFile(path: "/tmp/c.md", byteCount: 3), outcome: .served)
@@ -183,6 +183,7 @@ struct TranscriptDisplayTests {
             TranscriptEntry(kind: .servedRequest(write)),
         ])
         #expect(texts(items) == ["<tools>", "Read b.md", "Wrote c.md"])
+        try #require(!items.isEmpty)
         #expect(items[0].hiddenToolCallCount == 1, "a quiet read does not split the run")
     }
 
@@ -253,13 +254,14 @@ struct TranscriptDisplayTests {
         #expect(texts(items) == ["go", "state:running:-"])
     }
 
-    @Test func aModeSwitchDoesNotSplitARunOfToolCalls() {
+    @Test func aModeSwitchDoesNotSplitARunOfToolCalls() throws {
         let items = TranscriptEntry.display([
             call("t1", "Read the file"),
             TranscriptEntry(kind: .optionChanged(id: "mode", value: .string("plan"))),
             call("t2", "Write the file"),
         ])
         #expect(texts(items) == ["<tools>"])
+        try #require(!items.isEmpty)
         #expect(items[0].hiddenToolCallCount == 1)
     }
 

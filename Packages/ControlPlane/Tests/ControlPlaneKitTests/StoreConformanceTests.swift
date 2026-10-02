@@ -106,10 +106,10 @@ struct StoreConformanceTests {
         try await records.save(ClientRecord(id: UUID(), name: "mac", kind: .mac, publicKey: Data(repeating: 2, count: 65),
                                             grant: .operator, paired: Date()))
         try await records.save(client)
-        let seenAtA = try await store.get(ControlRecords.clientKey(id))!.etag
+        let seenAtA = try #require(try await store.get(ControlRecords.clientKey(id))).etag
         try await records.setGrant(.operator, of: id)
         try await records.setGrant(.device, of: id)
-        let backAtA = try await store.get(ControlRecords.clientKey(id))!.etag
+        let backAtA = try #require(try await store.get(ControlRecords.clientKey(id))).etag
         #expect(backAtA != seenAtA)
         await #expect(throws: StoreError.conflict(key: ControlRecords.clientKey(id))) {
             _ = try await store.put(ControlRecords.clientKey(id), Data("{}".utf8),

@@ -166,6 +166,7 @@ struct HelperAgentTests {
         let message = error?.message ?? ""
         #expect(message.hasPrefix("Nothing was started: "))
         #expect(message.contains("abacus"))
+        try #require(!RuntimeCatalog.builtIn.isEmpty)
         #expect(message.contains(RuntimeCatalog.builtIn[0].id))
         #expect(await core.allAgents().count == 1, "no agent left behind")
         #expect(await core.reservedStarts.values.allSatisfy { $0 == 0 }, "and its place given back")
@@ -424,6 +425,7 @@ struct HelperAgentTests {
         let error = await refusal { _ = try await start(core, token, "Delta") }
         #expect(error?.message.contains("3 of 3 agents started by agents running") == true)
 
+        try #require(!helpers.isEmpty)
         let parked = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: helpers[0].uuidString)) }
         #expect(parked.hasSuffix("This project now has 2 of 3 running, 3 of 5 not archived."))
         _ = try await start(core, token, "Delta")

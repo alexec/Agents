@@ -80,6 +80,7 @@ struct AppServiceTests {
             == ["label", "prompt"])
         #expect(finish?["properties"]?["next_prompts"] == nil)
 
+        try #require(tools.count > 2)
         let showFile = tools[1]["inputSchema"]
         #expect(showFile?["properties"]?["path"] != nil)
         #expect(showFile?["properties"]?["line"] != nil)

@@ -111,7 +111,7 @@ struct CopiesTests {
 
     /// A need raised at one copy reaches the relay host another copy holds (T097).
     @Test func aNeedReachesTheRelayHeldByAnotherCopy() async throws {
-        let copies = try await copies(2)
+        let copies = try await copies(2)  // index-ok: one per copy, or it throws
         defer { Task { await stop(copies) } }
         let (host, uplink) = try await host(code: try await copies[0].service.codes.issue(.host).text, dialling: [copies[0].url])
         defer { uplink.stop() }
@@ -156,7 +156,7 @@ struct CopiesTests {
 
     @Test func aClientOnEachCopySeesEveryHost() async throws {
         let store = MemoryStore()
-        let all = try await copies(store: store)
+        let all = try await copies(store: store)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let (host, uplink) = try await host(code: try await all[0].service.codes.issue(.host).text, dialling: [all[0].url])
         defer { uplink.stop() }
@@ -177,7 +177,7 @@ struct CopiesTests {
     /// The grant is checked where the client is: a device on another copy is refused before
     /// anything reaches the holder.
     @Test func aDeviceIsRefusedAtItsOwnCopy() async throws {
-        let all = try await copies(2)
+        let all = try await copies(2)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let (host, uplink) = try await host(code: try await all[0].service.codes.issue(.host).text, dialling: [all[0].url])
         defer { uplink.stop() }
@@ -193,7 +193,7 @@ struct CopiesTests {
 
     @Test func killingTheHolderMovesTheLeaseAndTheHostRedials() async throws {
         let store = MemoryStore()
-        let all = try await copies(store: store)
+        let all = try await copies(store: store)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let (host, uplink) = try await host(code: try await all[0].service.codes.issue(.host).text,
                                             dialling: all.map(\.url))
@@ -217,7 +217,7 @@ struct CopiesTests {
     }
 
     @Test func aCodeShownAtOneCopyWorksOnceAtAnother() async throws {
-        let all = try await copies(2)
+        let all = try await copies(2)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let code = try await all[0].service.codes.issue(.client(.device)).text
         _ = try await client(at: all[1].url, code: code, kind: .iPhone)
@@ -225,7 +225,7 @@ struct CopiesTests {
     }
 
     @Test func aForgetReachesEveryCopyWithinTwoSeconds() async throws {
-        let all = try await copies()
+        let all = try await copies()  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let (phone, phoneLink) = try await client(at: all[2].url,
                                                   code: try await all[2].service.codes.issue(.client(.device)).text, kind: .iPhone)
@@ -246,7 +246,7 @@ struct CopiesTests {
     }
 
     @Test func twoGrantChangesRaceAndOneIsToldChangedElsewhere() async throws {
-        let all = try await copies(2)
+        let all = try await copies(2)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let (phone, link) = try await client(at: all[0].url, code: try await all[0].service.codes.issue(.client(.device)).text,
                                              kind: .iPhone)
@@ -273,7 +273,7 @@ struct CopiesTests {
     /// Frame N across copies (T080): a client connected at one copy is listed as connected
     /// at another, and no longer once it goes.
     @Test func howAClientConnectsIsKnownAtEveryCopy() async throws {
-        let all = try await copies(2)
+        let all = try await copies(2)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let (phone, link) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client(.device)).text,
                                              kind: .iPhone)
@@ -294,7 +294,7 @@ struct CopiesTests {
     /// Two operators each demote the other at the same moment, at two copies (FR-016,
     /// T081): one is refused, and there is always an operator left.
     @Test func theLastOperatorHoldsAcrossCopies() async throws {
-        let all = try await copies(2)
+        let all = try await copies(2)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         for round in 0..<5 {
             let (first, firstLink) = try await client(at: all[0].url, code: try await all[0].service.codes.issue(.client(.operator)).text)
@@ -339,7 +339,7 @@ struct CopiesTests {
 
     @Test func withTheStoreDownLiveCallsCarryOnAndPairingIsRefused() async throws {
         let store = MemoryStore()
-        let all = try await copies(2, store: store)
+        let all = try await copies(2, store: store)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let (host, uplink) = try await host(code: try await all[0].service.codes.issue(.host).text, dialling: [all[0].url])
         defer { uplink.stop() }

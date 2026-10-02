@@ -33,7 +33,7 @@ struct PeerCheckTests {
     }
 
     @Test func theKernelNamesWhoIsOnTheOtherEnd() {
-        var pair: [Int32] = [0, 0]
+        var pair: [Int32] = [0, 0]  // index-ok: two descriptors, filled by socketpair
         #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
         defer { close(pair[0]); close(pair[1]) }
 

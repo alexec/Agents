@@ -63,7 +63,7 @@ struct ToolsetTests {
     @Test func theShimRunsThePinnedPackageAndForwardsArgumentsOnlyWhenAsked() throws {
         var toolset = try Toolset.load(from: Self.bundled)
         #expect(toolset.shimName == "npx")
-        #expect(toolset.shimLines.count == 4)
+        try #require(toolset.shimLines.count == 4)
         #expect(toolset.shimLines[1] == "# Agents: runs the @agentclientprotocol/claude-agent-acp this toolset was installed with.")
         #expect(toolset.shimLines[3].hasSuffix(#"/claude-agent-acp/dist/index.js""#))
         #expect(!toolset.shimLines.joined().contains("'"))

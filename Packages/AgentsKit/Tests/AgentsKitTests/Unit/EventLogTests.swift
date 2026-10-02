@@ -41,12 +41,12 @@ struct EventLogTests {
         #expect(log.events.count == 1)
     }
 
-    @Test func theWindowRunsFromTheLastRepeat() {
+    @Test func theWindowRunsFromTheLastRepeat() throws {
         var log = EventLog()
         add(&log, draft("mac.wake", .mac))
         add(&log, draft("mac.wake", .mac), at: 50)
         add(&log, draft("mac.wake", .mac), at: 100)
-        #expect(log.events.count == 1)
+        try #require(log.events.count == 1)
         #expect(log.events[0].count == 3)
         add(&log, draft("mac.wake", .mac), at: 161)
         #expect(log.events.count == 2)

@@ -96,8 +96,8 @@ struct GeminiContinueTests {
         // Refused, signed in, loaded: the sign-in only once it was needed.
         let loads = order.indices.filter { order[$0] == ACP.Method.loadSession }
         let signedIn = try #require(order.firstIndex(of: ACP.Method.authenticate))
-        #expect(loads.count == 2)
-        #expect(loads.first! < signedIn && signedIn < loads.last!)
+        try #require(loads.count == 2)
+        #expect(loads[0] < signedIn && signedIn < loads[1])
         let page = try await core.transcript(.init(agentID: id))
         let notes = page.entries.compactMap { if case .runtimeNote(let t) = $0.kind { t } else { nil } }
         #expect(!notes.contains { $0.contains("no longer has this conversation") }, "\(notes)")

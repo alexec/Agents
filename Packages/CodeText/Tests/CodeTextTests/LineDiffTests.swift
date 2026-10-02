@@ -14,7 +14,7 @@ struct LineDiffTests {
         #expect(Self.kinds(LineDiff.rows(old: text, new: text)) == "   ")
     }
 
-    @Test func oneChangedLineInFortyIsOneRemovedAndOneAdded() {
+    @Test func oneChangedLineInFortyIsOneRemovedAndOneAdded() throws {
         let old = (1...40).map { "let v\($0) = \($0)" }
         var new = old
         new[19] = "let v20 = 2000"
@@ -23,6 +23,7 @@ struct LineDiffTests {
         #expect(rows.filter { $0.kind == .context }.count == 39)
         let changed = rows.enumerated().filter { $0.element.kind != .context }
         #expect(changed.map(\.element.kind) == [.removed, .added])
+        try #require(changed.count == 2)
         #expect(changed[0].offset + 1 == changed[1].offset)
         #expect(changed[0].element.text == "let v20 = 20")
         #expect(changed[1].element.text == "let v20 = 2000")
@@ -104,7 +105,7 @@ struct LineDiffTests {
 
     // MARK: Whole file (US3)
 
-    @Test func wholeFileRowsKeepTheirKindsAndNumbersAndGainWordMarks() {
+    @Test func wholeFileRowsKeepTheirKindsAndNumbersAndGainWordMarks() throws {
         let rows = LineDiff.rows(whole: [
             (kind: .context, text: "let a = 1", newLine: 1),
             (kind: .removed, text: "let b = 2", newLine: nil),
@@ -113,6 +114,7 @@ struct LineDiffTests {
         ])
         #expect(Self.kinds(rows) == " -+ ")
         #expect(rows.map(\.newLine) == [1, nil, 2, 3])
+        try #require(rows.count == 4)
         #expect(!rows[1].changed.isEmpty)
         #expect(!rows[2].changed.isEmpty)
     }

@@ -79,7 +79,7 @@ struct SessionLabelTests {
                                                     actor: .agent, projectLabels: [])
         let byPerson = try SessionLabelPolicy.change(current: byAgent, add: ["URGENT"],
                                                      actor: .person, projectLabels: byAgent)
-        #expect(byPerson.count == 1)
+        try #require(byPerson.count == 1)
         #expect(byPerson[0].owner == .person)
         #expect(throws: SessionLabelPolicy.Refusal.self) {
             try SessionLabelPolicy.change(current: byPerson, add: ["urgent"],

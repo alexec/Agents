@@ -521,6 +521,7 @@ struct LeaseTests {
         _ = try await lease(core, second)
         let snapshot = await core.leaseSnapshot()
         #expect(snapshot.resources.map(\.kind) == [.screen, .simulator])
+        try #require(snapshot.resources.count > 1)
         #expect(snapshot.resources[0].lease?.holder == a)
         #expect(snapshot.resources[0].line.map(\.agentID) == [b])
         #expect(snapshot.resources[0].line.first?.isCallOpen == false)

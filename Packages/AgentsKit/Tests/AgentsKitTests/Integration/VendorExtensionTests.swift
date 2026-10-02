@@ -122,7 +122,8 @@ struct VendorExtensionTests {
             }
             #expect(schema.properties.map(\.name) == ["lang", "extras"], "in Cursor's order, keyed by its ids")
             #expect(schema.properties.map(\.title) == ["Which language?", "Also do"])
-            guard case .string(_, _, _, let one) = schema.properties[0].kind,
+            guard schema.properties.count == 2,
+                  case .string(_, _, _, let one) = schema.properties[0].kind,
                   case .multiSelect(let many, _, _) = schema.properties[1].kind else {
                 Issue.record("allowMultiple was not a multi-select")
                 return

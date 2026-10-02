@@ -86,6 +86,7 @@ struct ChangesTests {
 
         let listed = try #require(await list(core, id, count: 2, edits: 3))
         #expect(listed.files.map(\.path) == [a, b])
+        try #require(listed.files.count > 1)
         #expect(listed.files[0].editCount == 2, "the failed edit is not one")
         #expect(listed.files[0].state == .modified)
         #expect(listed.files[0].source == .reported)
@@ -183,6 +184,7 @@ struct ChangesTests {
         #expect(listed.git == .shared(since: head))
         #expect(listed.files.map(\.path) == [a, b])
         #expect(listed.files.map(\.source) == [.reportedAndSeen, .reportedAndSeen])
+        try #require(listed.files.count > 1)
         #expect(listed.files[0].beyondReported == false, "the edit accounts for the file")
         #expect(listed.files[1].state == .untracked, "git's word, though the agent made it (#63)")
 
@@ -191,6 +193,7 @@ struct ChangesTests {
         let c = try write("let c = 1\n", to: "c.swift", in: work)
         listed = try await core.changesList(.init(agentID: id))
         #expect(listed.files.map(\.path) == [a, b, c])
+        try #require(listed.files.count > 2)
         #expect(listed.files[0].beyondReported)
         #expect(listed.files[2].source == .seen)
         #expect(listed.files[2].added == 1)

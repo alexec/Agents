@@ -16,6 +16,7 @@ struct CatalogSourcesTests {
         let results = try await SkillsCatalog(session: session, endpoints: CatalogStub.endpoints).search("fixture")
         #expect(results.map(\.skillID) == ["nested", "plain", "mixed"])
         #expect(results.map(\.installs) == [5120, 812, 42])
+        try #require(!results.isEmpty)
         #expect(results[0].owner == "fixture-owner" && results[0].repo == "fixture-skills")
     }
 
