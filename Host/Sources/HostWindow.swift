@@ -502,7 +502,17 @@ struct PairingSheet: View {
         case .phone:
             "In Agents on the iPhone or iPad, tap Scan the Code and point it at this, or copy the text and tap Paste there. It works once, for five minutes, and lets that device do everything."
         case .browser:
-            "Paste it into Agents in a browser on this Mac, at localhost. It works once, for five minutes, and lets that browser do everything."
+            "For a browser on this Mac only. \(browserWhere) It works once, for five minutes, and lets that browser do everything."
         }
+    }
+
+    /// Where to paste a browser's code: the page's address while it is served, else why it
+    /// isn't, as the switch's own line says (071 R3).
+    private var browserWhere: String {
+        guard model.settings.servesWebRemote else {
+            return "Turn on Serve Agents to browsers on this Mac first, then open \(model.webRemoteAddress) there and paste it in."
+        }
+        if model.webRemoteFailed { return "\(model.webRemoteLine) Press Try Again, then open \(model.webRemoteAddress) there and paste it in." }
+        return "Open \(model.webRemoteAddress) there and paste it in."
     }
 }

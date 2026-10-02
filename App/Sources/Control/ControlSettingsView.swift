@@ -363,9 +363,19 @@ struct CodeSheet: View {
         case .mac:
             return "On the other Mac, open Agents, choose Connect to a control plane and paste this. That Mac can then do all this window can. \(time)"
         case .browser:
-            return "Paste it into Agents in a browser on this Mac, at localhost. That browser can then do all this window can. \(time)"
+            return "For a browser on this Mac only. \(browserWhere) That browser can then do all this window can. \(time)"
         case .host:
             return "On the other machine, start its agents with agentsd --control-code and this code. \(time)"
         }
+    }
+
+    /// Where to paste a browser's code: the page's address while it is served, else why it
+    /// isn't, as the Overview's row says (071 R3).
+    private var browserWhere: String {
+        guard let web = control.status?.web else {
+            return "Turn on Serve Agents to browsers on this Mac in Agents Host first."
+        }
+        if !web.served { return "\(web.summary) Try again in Agents Host, then open \(web.address) there and paste it in." }
+        return "Open \(web.address) there and paste it in."
     }
 }
