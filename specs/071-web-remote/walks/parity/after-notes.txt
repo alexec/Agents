@@ -17,3 +17,8 @@ new session: ["This Mac’s host hasn’t answered since 2:44 AM. Nothing here c
 shot after-hostdown-new.png
 back after 56.1 s
 errors: []
+— margin
+chevrons in the margin: 0
+opened: ["Read file"]
+shot after-margin.png
+errors: []

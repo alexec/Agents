@@ -11,3 +11,8 @@ new session: ["This host is offline. A session can start here once it's back."]
 shot before-hostdown-new.png
 back after 55.3 s
 errors: ["rendering: Autofocus processing was blocked because a document already has a focused element."]
+— margin
+chevrons in the margin: 6
+opened: ["▾Read file"]
+shot before-margin.png
+errors: []
