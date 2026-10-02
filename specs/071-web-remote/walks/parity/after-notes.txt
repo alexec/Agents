@@ -1,0 +1,5 @@
+— starting
+while starting: ["Starting — telling your Mac"], field {"text":"Reply with one word: started.","readOnly":true}
+shot after-starting.png
+after: opened ["Reply with one word: started."]
+errors: []

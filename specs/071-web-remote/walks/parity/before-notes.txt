@@ -1,0 +1,13 @@
+— acting
+row while parking: ["✓ Repo notes Wrote notes.md with two lines: the repo has only a title-only README in one commit, and its untracked agent config sets out how agents work here. 3m"]
+menu while parking: false
+bar while sending: ["↑"]
+shot before-acting.png
+after: ["Repo notes now","✓ Ready check Replied \"ready\" as asked; waiting for the next instruction. ⑂ reply-one-word-ready audit ui 2m","✓ Park conversation Replied \"parked\" as asked and put this conversation down. Parked 3 minutes ago 2m"]
+— hostdown
+said after 52.8 s: ["Offline: what's shown is from when it was last heard.","This Mac's host isn't answering. What's shown is what it last said, and nothing here can change until it's back."]
+shot before-hostdown-chat.png
+new session: ["This host is offline. A session can start here once it's back."]
+shot before-hostdown-new.png
+back after 55.3 s
+errors: ["rendering: Autofocus processing was blocked because a document already has a focused element."]
