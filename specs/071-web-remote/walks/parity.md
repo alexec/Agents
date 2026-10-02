@@ -65,7 +65,7 @@
 | Archive stays on the chat when it did not archive (073) | 073 | has | has | — | — | Archive never leaves the chat on the page; a failure says why. |
 | Pairing a phone, the window shows the code | 058 | n/a | n/a | — | — | The window's own pairing. |
 | One grant: no "It may" choice on the pairing sheets (2026-10-02) | #111 | lacks (footer said "· Device") | **has** | `after111-identity.png` | #111's walk | The footer reads "Chrome on this Mac", no grant. A browser may do what the window may; Settings, pairing and hosts still have no screens on the page (by design, below). Scene `identity` in `parity.mjs`. |
-| New project: Add Folder…, Clone Git URL…, the empty list's two buttons, a clone's row | #115 | lacks (nothing could add a project) | **has** | `walks/115/addproject-*.png` | `ProjectListView` + #115's walk | + at the head of the projects column, and the same items under the projects menu at medium width. Add Folder… browses the host over `files/browse` for every host (the window does this for servers only). Not on the page: a folder dragged in from Finder, the clipboard's URL filled in (web: by design, no clipboard read), Add Server…. See `walks/115.md`. |
+| New project: Add Folder…, Clone Git URL…, the empty list's two buttons, a clone's row | #115 | lacks (nothing could add a project) | **has** | `walks/115/addproject-*.png` | `walks/115/window-projects.png` | + at the head of the projects column, and the same items under the projects menu at medium width. Add Folder… browses the host over `files/browse` for every host (the window does this for servers only). Not on the page: a folder dragged in from Finder, the clipboard's URL filled in (web: by design, no clipboard read), Add Server…. See `walks/115.md`. |
 
 ## Left out by design
 
