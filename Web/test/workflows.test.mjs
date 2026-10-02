@@ -32,4 +32,6 @@ test("the status mark follows WorkflowStatusIcon's order", () => {
   assert.equal(w.workflowStatus({ ...input, isEnabled: false }).words, "Turned off");
   assert.equal(w.workflowStatus({ ...input, isEnabled: false }).tinted, false);
   assert.equal(w.workflowStatus({ ...input, isEnabled: false, isArchived: true }).words, "Archived");
+  const { isEnabled, ...fromBefore100 } = input;
+  assert.equal(w.workflowStatus(fromBefore100).words, "Waiting for its trigger", "a host from before #100 sends no isEnabled: on");
 });

@@ -134,12 +134,20 @@ export function workflowNeedsAPerson(s: WorkflowSummary): boolean {
   return false;
 }
 
+/**
+ * Whether it is on (#100). Read leniently, as Swift reads it: a host from before #100 sends no
+ * `isEnabled`, and every workflow it has is on.
+ */
+export function isOn(s: WorkflowSummary): boolean {
+  return (s as { isEnabled?: boolean }).isEnabled !== false;
+}
+
 /** The window's WorkflowStatusIcon: what the mark beside the name says. */
 export function workflowStatus(s: WorkflowSummary): { mark: string; words: string; tinted: boolean } {
   const tinted = workflowNeedsAPerson(s);
   if (s.isArchived) return { mark: "▣", words: "Archived", tinted };
   if (s.awaitingApproval) return { mark: "✋", words: "Waiting for your OK", tinted };
-  if (!s.isEnabled) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
+  if (!isOn(s)) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
   if (tinted) return { mark: "!", words: "Needs attention", tinted };
   if (s.isRunning) return { mark: "◌", words: "Running", tinted };

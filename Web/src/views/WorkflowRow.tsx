@@ -5,7 +5,7 @@
 import { useSignal } from "@preact/signals";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { workflowStatus, workflowSummary } from "../model/workflows";
+import { isOn, workflowStatus, workflowSummary } from "../model/workflows";
 
 export function WorkflowRow({ store, host, summary, disabled }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean;
@@ -21,7 +21,7 @@ export function WorkflowRow({ store, host, summary, disabled }: {
         <span class="title">
           {summary.workflow.name}
           {/* Marked where it stands, rather than moved (#100): off is not put away. */}
-          {!summary.isEnabled && !summary.isArchived && <span class="faint"> · Off</span>}
+          {!isOn(summary) && !summary.isArchived && <span class="faint"> · Off</span>}
         </span>
         <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK on the Mac" : workflowSummary(summary.workflow, name)}</span>
       </span>
