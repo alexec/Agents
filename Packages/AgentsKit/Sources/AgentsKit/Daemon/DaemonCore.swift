@@ -314,6 +314,8 @@ public actor DaemonCore {
     var branchChecks: [URL: Task<Void, Never>] = [:]
     /// What says the Mac slept, woke, or was left (042 R10). Nil until started.
     var machineWatch: (any MachineWatch)?
+    /// Told when the Mac wakes: the uplink dials at once (#82, #113).
+    var wakeHandlers: [@Sendable () -> Void] = []
     /// How long a `wait_for_event` call may stay open: the lease call's limit, so there
     /// is one number to measure against the runtimes (research R5). A test shortens it.
     var eventHoldLimit: Duration = LeaseLimits.waitLimit

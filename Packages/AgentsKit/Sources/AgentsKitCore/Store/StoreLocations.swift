@@ -145,8 +145,12 @@ public struct StoreLocations: Sendable {
     public var controlMoved: URL { root.appendingPathComponent("control-moved.json") }
     public var controlHostKey: URL { root.appendingPathComponent("control-host-key") }
     /// A host code left for this daemon by Agents Host (058, T055): its launch agent's
-    /// arguments are fixed, so the one-time code comes this way. Read once and removed.
+    /// arguments are fixed, so the one-time code comes this way. Read on every try, and
+    /// removed once the join has saved a membership (#113).
     public var controlJoinCode: URL { root.appendingPathComponent("control-join-code") }
+    /// How this host's joining its control plane stands (#113): `HostJoinFile`, written by
+    /// the daemon, read by Agents Host and by the control plane on this Mac.
+    public var controlJoinStatus: URL { root.appendingPathComponent(HostJoinFile.name) }
     /// Each connected server's ssh control socket and forwarded daemon socket,
     /// `<id>.ctl` and `<id>.sock`. Short names, because both count against the same
     /// 104 bytes as `daemon.sock`.
