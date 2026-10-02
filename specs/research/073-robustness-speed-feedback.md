@@ -22,7 +22,7 @@ Every finding is its own issue, #74–#94, all of them linked from #73.
   - Agents Host and agents-control have no crash reports.
 - **Robustness.** The pattern behind "stuck" states is a wait with no deadline inside a loop that only one task may run.
   - This branch bounds the reconnect catch-up (#78) and adds a missed-pong deadline (#80).
-  - The rest of the Remote's reconnect hang is the control plane silently dropping a call in flight when the host goes (#77), the relay (#79), and a transient refusal that wipes the pairing (#81).
+  - The rest of the Remote's reconnect hang was the control plane silently dropping a call in flight when the host goes (#77) and a transient refusal that wiped the pairing (#81), both since fixed on this branch. The relay (#79) is still open.
 - **Speed.** The host is fast everywhere; the slowest host answer is Changes on 1,800 files at 0.34 s. The window is where time goes.
   - Opening a chat costs 270–550 ms, with a 371 ms main-thread hang on the first open (#90).
   - The first open of a very long chat costs 3.5 s (#91).
@@ -60,7 +60,7 @@ These are filed as **#94**. They are part of why the suite looks flaky under loa
 | Remote `tryOnce`: announce, identify, about 16 refreshes inside the `reconnecting` task | None before this branch | Wedged the loop; coming to the front could not help | #78, fixed on this branch |
 | Window `connect()`: `refreshEverything` inside `reconnect()` | None before this branch | Same | #78, fixed on this branch |
 | Remote `sendOnce` waiting on the reconnect loop | None | The start sheet spins as long as the Mac is gone | #78 and #87, open |
-| `ControlRouter.dropHost`: requests in flight | None, and the request is dropped | The phone (bare wire) waits for ever and is never told the host changed | **#77**, open; a known-issue test is on this branch |
+| `ControlRouter.dropHost`: requests in flight | None, and the request is dropped | The phone (bare wire) waits for ever and is never told the host changed | **#77**, fixed on this branch (ca67c79d) |
 | Relay session after a Mac restart | None | The phone's relayed link stays open with nothing behind it | **#79**, open |
 | `WebSocketLink` ping | Ping every 20 s, no pong deadline | A half-open socket looked alive for minutes | **#80**, fixed on this branch: an unanswered ping ends the link |
 | `ControlDial` connect and upgrade | 10 s plus 10 s | Fails | Fine since 868f4d8b |
@@ -75,10 +75,10 @@ These are filed as **#94**. They are part of why the suite looks flaky under loa
 
 - **Host or daemon restart.**
   - Mac window: good. `control/hostChanged` ends the route; measured 0.6–1.2 s from the host coming back to the window catching up.
-  - Remote: broken by #77 and, before this branch, #78.
+  - Remote: broken by #77 and #78, both fixed on this branch. A fake iPhone is answered again 0.55 s after the host comes back.
 - **Sleep and wake, and network changes.** Nothing listens for them on any platform. Recovery waits out the backoff, up to 30 s (**#82**). A half-open socket is now dropped within about 40 s (#80).
 - **The phone coming to the front.** `cameToTheFront` pings with a 4 s limit, but only when no reconnect is running, which is exactly the case that was stuck (#78).
-- **Pairing lost to a hiccup.** A store that can't be read for a moment answers `.unknown`, and the Remote then forgets its pairing and stops dialling for good (**#81**).
+- **Pairing lost to a hiccup.** A store that can't be read for a moment answers `.unknown`, and the Remote then forgot its pairing and stopped dialling for good (**#81**, fixed on this branch: `unavailable`, and a forget only on a verdict that lasts).
 
 ### Errors that vanish
 
@@ -188,6 +188,8 @@ Each commit is small and built for the window, Agents Host and the Remote (gener
 | 88a4a152 | Remote: agent actions go to the agent's own host | (found by the feedback audit) |
 | f3dcee1e | Mac: silent failures say why; Archive stays on failure; unreadable is not "too big" | #85 (part) |
 | 2498681f | `Perf.swift` signposts, `perf-budgets.py`, `perf-window.sh` and the seeders | — |
+| ca67c79d | Router: a call in flight when its host goes is answered `hostOffline`; the phone's bare session ends with the home host. `HostRestartLiveTests`: the connection ended 11 ms after the host stopped, answered again 0.55 s after it came back | #77 |
+| 965ff42b | `unavailable` refusal when the store can't be read; the Remote forgets only `forgotten`, or `unknown` lasting two minutes; the loop clears itself | #81 |
 
 Walked: on a scratch window, Archive with the host stopped shows "Could not finish that / Could not reach the helper that runs the agents" and keeps the chat. The window reconnects 0.6–1.2 s after a host restart.
 
@@ -222,4 +224,4 @@ Not walked: the WebSocket pong deadline (it needs a far end that stops answering
 | #91 | First open of a very long chat builds its turn index (3.5 s) |
 | #94 | Tests that crash the whole run |
 
-**Suggested order, bugs first**: #77 and #81 (together with #78 they are the Remote's reconnect hang), then #74, #83, #86, #88, #79, #84, #93, #92, #89 and #76.
+**Suggested order, bugs first**: #77 and #81 are now fixed on the branch (with #78, the Remote's reconnect hang). Next: #74, #83, #86, #88, #79, #84, #93, #92, #89 and #76.
