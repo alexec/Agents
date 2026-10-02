@@ -188,10 +188,11 @@ struct PersonalSnapshotTests {
         #expect(String(decoding: source, as: UTF8.self) == #"["personal",{"plugin":"p"}]"#)
     }
 
-    // T039: the window's, and nobody else's.
-    @Test func onlyAWindowMayAsk() async throws {
+    // T039: a person's (the window's, and since #111 a paired client's), and nobody else's.
+    @Test func onlyAPersonMayAsk() async throws {
         #expect(ConnectionRole.control.allows(DaemonAPI.Method.personalShared))
-        for role in [ConnectionRole.agent, .device, .pairing, .stranger] {
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.personalShared))
+        for role in [ConnectionRole.agent, .pairing, .stranger] {
             #expect(!role.allows(DaemonAPI.Method.personalShared), "\(role)")
         }
         let root = try home()

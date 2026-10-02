@@ -143,7 +143,7 @@ struct Walk2LiveTests {
 
     /// Many connections through Caddy, one after another: each must finish the key exchange.
     @Test func connectionsThroughTheBalancer() async throws {
-        let (_, link) = try await client(try code(["--client", "operator"]), kind: .mac)
+        let (_, link) = try await client(try code(["--client"]), kind: .mac)
         var failures = 0
         for n in 0..<20 {
             let started = Date()
@@ -168,9 +168,9 @@ struct Walk2LiveTests {
         // 1–3: a host, an operator window and a device, all through Caddy.
         let (host, uplink) = try await host(try code(["--host"]))
         defer { uplink.stop() }
-        let (_, window) = try await client(try code(["--client", "operator"]), kind: .mac)
+        let (_, window) = try await client(try code(["--client"]), kind: .mac)
         defer { window.disconnect() }
-        let (phone, device) = try await client(try code(["--client", "device"]), kind: .iPhone)
+        let (phone, device) = try await client(try code(["--client"]), kind: .iPhone)
         defer { device.disconnect() }
         let toHost = DaemonClient(link: window.link(for: host))
         try await toHost.connect(startIfNeeded: false)
@@ -216,7 +216,7 @@ struct Walk2LiveTests {
         }
 
         // 7: a code from one copy, used through Caddy wherever it lands: once only.
-        let once = try code(["--client", "device"])
+        let once = try code(["--client"])
         _ = try await client(once, kind: .iPhone)
         await #expect(throws: (any Error).self) { _ = try await client(once, kind: .iPhone) }
         note("a code works once across copies")
@@ -228,25 +228,7 @@ struct Walk2LiveTests {
             (try? await phoneControl.call(DaemonAPI.Method.hostsList)) == nil
         }
 
-        // 9: two grant changes at once, from two operator windows.
-        let (target, targetLink) = try await client(try code(["--client", "device"]), kind: .iPad)
-        targetLink.disconnect()
-        let (_, second) = try await client(try code(["--client", "operator"]), kind: .mac)
-        defer { second.disconnect() }
-        let other = DaemonClient(link: second.controlLink)
-        try await other.connect(startIfNeeded: false)
-        async let a: Result<JSONValue, any Error> = Result {
-            try await call(control, DaemonAPI.Method.clientsSetGrant,
-                                   JSONValue.object(["client": .string(target.uuidString), "grant": "operator"]))
-        }
-        async let b: Result<JSONValue, any Error> = Result {
-            try await call(other, DaemonAPI.Method.clientsSetGrant,
-                                 JSONValue.object(["client": .string(target.uuidString), "grant": "device"]))
-        }
-        let results = await [a, b]
-        let refused = results.compactMap { if case .failure(let e as JSONRPCError) = $0 { e.code } else { nil } }
-        note("race: \(results.map { if case .success = $0 { "ok" } else { "refused" } }) codes \(refused)")
-        #expect(refused.allSatisfy { $0 == DaemonAPI.Failure.changedElsewhere })
+        // 9 raced two grant changes; grants are retired (#111).
 
         // 10: the store stops. Live calls carry on, pairing is refused, and /readyz says so.
         try docker(["stop", "minio"])

@@ -101,7 +101,8 @@ struct ServerAllowanceTests {
         #expect(status.shared == [])
     }
 
-    @Test func onlyTheMacsWindowMayCarryIt() {
-        #expect(!ConnectionRole.device.allows(DaemonAPI.Method.poolApplyAllowances))
+    @Test func anyPersonsConnectionMayCarryItAndNoAgent() {
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.poolApplyAllowances))
+        #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.poolApplyAllowances))
     }
 }

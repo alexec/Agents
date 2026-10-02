@@ -1069,8 +1069,9 @@ extension DaemonCore {
 
         // A save through the app is the person's own change, so it is approved as it is
         // written — but only if what it changed was approved already, and only from a
-        // control connection. A phone rewriting permission-mode on an approved file must
-        // not keep that approval (security review S6); the new text waits for the Mac.
+        // person's connection. Security review S6 kept a phone's edit waiting for the
+        // Mac; since #111 a phone may approve as the Mac may, so the phone's save is the
+        // person's too. An agent's never is.
         let before = workflowStore.load()
         let wasApproved = awaitingApproval(existing, state: before.state(folder: existing.folder,
                                                                          workflowID: existing.workflowID),
@@ -1083,7 +1084,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
                                message: "\(url.lastPathComponent) could not be written: \(error.localizedDescription)")
         }
-        if wasApproved, RequestConnection.role == .control {
+        if wasApproved, RequestConnection.role.isPerson {
             var records = workflowStore.load()
             approve(existing, digest: ContentDigest.sha256(Data(edited.utf8)), in: &records)
             try keep("this workflow's settings") { try workflowStore.save(records) }

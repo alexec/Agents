@@ -5,8 +5,8 @@ import Foundation
 /// Nothing else in Swift ties a method to its params and result, so this table does, for the
 /// methods the web remote uses and no others. It is plain Swift, so a renamed or deleted type
 /// breaks the build here; Packages/WebTypes reads it as source and generates the web remote's
-/// TypeScript from the types it names. `WebSignaturesTests` holds every host request to the
-/// device grant, so the web remote can be typed only against what a device may do (FR-016).
+/// TypeScript from the types it names. `WebSignaturesTests` keeps every host request to what
+/// a person's connection may ask, and none of an agent's tools.
 public extension DaemonAPI {
     /// A result that is an empty object.
     struct Empty: Codable, Sendable, Hashable {

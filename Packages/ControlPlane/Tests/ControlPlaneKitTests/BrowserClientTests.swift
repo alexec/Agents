@@ -64,11 +64,11 @@ struct BrowserClientTests {
         }
     }
 
-    /// A browser paired by a device code through the loopback listener, and its credentials.
-    func pairBrowser(_ running: Running, grant: Grant = .device) async throws -> (UUID, ControlAuth.Credentials) {
+    /// A browser paired by a browser's code through the loopback listener, and its credentials.
+    func pairBrowser(_ running: Running) async throws -> (UUID, ControlAuth.Credentials) {
         let key = ControlAgreement.generate()
         let id = UUID()
-        _ = try await announce(try await running.service.codes.issue(.client(grant), browser: true).text, kind: .browser, id: id,
+        _ = try await announce(try await running.service.codes.issue(.client, browser: true).text, kind: .browser, id: id,
                                publicKey: key.publicKey) { try await joinWeb(running, $0) }
         let shared = try ControlAuth.clientKey(privateKey: key.privateKey, peer: control.publicKey, client: id)
         return (id, .init(identity: .client(id), key: shared, kind: "browser", controlKey: control.publicKey))
@@ -96,7 +96,6 @@ struct BrowserClientTests {
 
         let record = try #require(await running.service.records.client(id))
         #expect(record.kind == .browser)
-        #expect(record.grant == .device)
         #expect(record.name.hasPrefix("Chrome on "))
         #expect(record.name.count > "Chrome on ".count)
 
@@ -145,7 +144,7 @@ struct BrowserClientTests {
     @Test func aBrowserCodeWorksOnceOnTheLoopbackListener() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
-        let code = try await running.service.codes.issue(.client(.device), browser: true).text
+        let code = try await running.service.codes.issue(.client, browser: true).text
         #expect(await announceRefusal(code, running) == nil)
         #expect(await announceRefusal(code, running) == .spent)
         #expect(await running.service.records.clients.count == 1)
@@ -157,13 +156,13 @@ struct BrowserClientTests {
     @Test func aCodeIsGoodOnlyThroughTheListenerItWasMadeFor() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
-        let forBrowser = try await running.service.codes.issue(.client(.operator), browser: true).text
+        let forBrowser = try await running.service.codes.issue(.client, browser: true).text
         await #expect(throws: JSONRPCError.self) {
             _ = try await announce(forBrowser, kind: .iPhone, publicKey: ControlAgreement.generate().publicKey) {
                 try await joinTLS(running, $0)
             }
         }
-        let forPhone = try await running.service.codes.issue(.client(.device)).text
+        let forPhone = try await running.service.codes.issue(.client).text
         await #expect(throws: JSONRPCError.self) {
             _ = try await announce(forPhone, kind: .browser, publicKey: ControlAgreement.generate().publicKey) {
                 try await joinWeb(running, $0)
@@ -179,7 +178,7 @@ struct BrowserClientTests {
         let running = try await start()
         defer { Task { await running.service.stop() } }
         #expect(ControlCode.lifetime == 5 * 60)
-        let code = try await running.service.codes.issue(.client(.device), lifetime: -1, browser: true).text
+        let code = try await running.service.codes.issue(.client, lifetime: -1, browser: true).text
         #expect(await announceRefusal(code, running) == .expired)
         #expect(await running.service.records.clients.isEmpty)
     }
@@ -203,7 +202,7 @@ struct BrowserClientTests {
         let lines = OSAllocatedUnfairLock<[String]>(initialState: [])
         let running = try await start(log: { line in lines.withLock { $0.append(line) } })
         defer { Task { await running.service.stop() } }
-        let shown = try await running.service.codes.issue(.client(.device), browser: true).text
+        let shown = try await running.service.codes.issue(.client, browser: true).text
         let code = try #require(ControlCode(text: shown))
         let browser = ControlAgreement.generate()
         let id = UUID()
@@ -243,7 +242,7 @@ struct BrowserClientTests {
         let running = try await start()
         defer { Task { await running.service.stop() } }
         let (_, window, credentials) = try await base.pairedClient(at: running.tls,
-            code: try await running.service.codes.issue(.client(.operator)).text)
+            code: try await running.service.codes.issue(.client).text)
         window.disconnect()
         #expect(await refusal { try await joinTLS(running, credentials, origin: running.webOrigin) } == .badProof)
     }
@@ -261,7 +260,7 @@ struct BrowserClientTests {
         let running = try await start()
         defer { Task { await running.service.stop() } }
         let (_, window, credentials) = try await base.pairedClient(at: running.tls,
-            code: try await running.service.codes.issue(.client(.operator)).text)
+            code: try await running.service.codes.issue(.client).text)
         window.disconnect()
         #expect(await refusal { try await joinWeb(running, credentials) } == .unknown)
     }
@@ -271,11 +270,11 @@ struct BrowserClientTests {
         defer { Task { await running.service.stop() } }
         let key = ControlAgreement.generate().publicKey
         await #expect(throws: JSONRPCError.self) {
-            _ = try await announce(try await running.service.codes.issue(.client(.device)).text, kind: .browser,
+            _ = try await announce(try await running.service.codes.issue(.client).text, kind: .browser,
                                    publicKey: key) { try await joinTLS(running, $0) }
         }
         await #expect(throws: JSONRPCError.self) {
-            _ = try await announce(try await running.service.codes.issue(.client(.device)).text, kind: .iPhone,
+            _ = try await announce(try await running.service.codes.issue(.client).text, kind: .iPhone,
                                    publicKey: key) { try await joinWeb(running, $0) }
         }
         #expect(await running.service.records.clients.isEmpty)
@@ -304,15 +303,20 @@ struct BrowserClientTests {
     // MARK: Forgetting (FR-014, FR-015)
 
     /// Sends a control plane method on a joined socket and reads its reply.
-    func ask(_ reader: PrefixReader, _ method: String, id: Int = 9) async throws -> JSONRPCMessage {
+    func ask(_ reader: PrefixReader, _ method: String, _ params: JSONValue? = nil, id: Int = 9) async throws -> JSONRPCMessage {
         try reader.write(line: ControlWire.wrap(host: nil, message: JSONRPCCodec.encode(.request(id: .number(id), method: method,
-                                                                                                     params: nil))))
-        // A reply from the control plane itself is {"m": …}, with no "h".
-        guard let line = try await reader.next(within: 10),
-              let message = try JSONValue.parse(Data(line.utf8))["m"] else {
-            throw ControlService.Failure("no reply to \(method)")
+                                                                                                     params: params))))
+        // A reply from the control plane itself is {"m": …}, with no "h". A notification
+        // the control plane tells every client (a client paired or forgotten) is passed over.
+        while true {
+            guard let line = try await reader.next(within: 10),
+                  let message = try JSONValue.parse(Data(line.utf8))["m"] else {
+                throw ControlService.Failure("no reply to \(method)")
+            }
+            let decoded = try JSONRPCCodec.decode(line: String(decoding: try JSONEncoder().encode(message), as: UTF8.self))
+            if case .notification = decoded { continue }
+            return decoded
         }
-        return try JSONRPCCodec.decode(line: String(decoding: try JSONEncoder().encode(message), as: UTF8.self))
     }
 
     /// Whether the socket ends within `seconds`.
@@ -344,39 +348,63 @@ struct BrowserClientTests {
         #expect(await refusal { try await joinWeb(running, credentials) } == .forgotten)
     }
 
-    /// A window paired as an operator: a set-up always has one, and the store refuses to
-    /// forget anything that would leave none (058 FR-016).
+    /// A window paired as well, so the browser is not the only client.
     func operatorWindow(_ running: Running) async throws -> UUID {
         let (window, link, _) = try await base.pairedClient(at: running.tls,
-            code: try await running.service.codes.issue(.client(.operator)).text)
+            code: try await running.service.codes.issue(.client).text)
         link.disconnect()
         return window
     }
 
-    @Test func theLastOperatorCannotForgetItself() async throws {
+    /// No client is kept as the last that may change things (#111): Agents Host can always
+    /// make another code, so even the only client may forget itself.
+    @Test func theOnlyClientMayForgetItself() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
-        let (id, credentials) = try await pairBrowser(running, grant: .operator)
+        let (id, credentials) = try await pairBrowser(running)
         let tab = try await joinWeb(running, credentials)
         defer { tab.close() }
-        guard case .failure(_, let error) = try await ask(tab, DaemonAPI.Method.clientsForgetSelf) else {
-            Issue.record("the last operator forgot itself"); return
+        guard case .success = try await ask(tab, DaemonAPI.Method.clientsForgetSelf) else {
+            Issue.record("the only client could not forget itself"); return
         }
-        #expect(error.code == DaemonAPI.Failure.lastOperator)
-        #expect(await running.service.records.client(id) != nil)
+        await eventually { await running.service.records.client(id) == nil }
+    }
+
+    /// One grant (#111): a browser asks the control plane what only an operator could,
+    /// pairs another client, and forgets one.
+    @Test func aBrowserMayDoWhatTheWindowMay() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        let window = try await operatorWindow(running)
+        let (_, credentials) = try await pairBrowser(running)
+        let tab = try await joinWeb(running, credentials)
+        defer { tab.close() }
+        guard case .success(_, let listed) = try await ask(tab, DaemonAPI.Method.clientsList) else {
+            Issue.record("a browser could not list clients"); return
+        }
+        #expect(listed.arrayValue?.count == 2)
+        guard case .success(_, let shown) = try await ask(tab, DaemonAPI.Method.clientsStartPairing) else {
+            Issue.record("a browser could not make a code"); return
+        }
+        #expect(shown["text"]?.stringValue?.hasPrefix("agents-control:2:c:operator:") == true)
+        guard case .success = try await ask(tab, DaemonAPI.Method.clientsForget,
+                                            ["client": .string(window.uuidString)]) else {
+            Issue.record("a browser could not forget a window"); return
+        }
+        await eventually { await running.service.records.client(window) == nil }
     }
 
     @Test func forgettingFromSettingsCutsTheBrowserOffWithinTwoSeconds() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
         let (window, _, _) = try await base.pairedClient(at: running.tls,
-            code: try await running.service.codes.issue(.client(.operator)).text)
+            code: try await running.service.codes.issue(.client).text)
         let (id, credentials) = try await pairBrowser(running)
         let tab = try await joinWeb(running, credentials)
         let started = Date()
         _ = try await running.service.methods.handle(
             method: DaemonAPI.Method.clientsForget, params: ["client": .string(id.uuidString)],
-            from: .init(session: UUID(), client: window, grant: .operator, kind: .mac))
+            from: .init(session: UUID(), client: window, kind: .mac))
         #expect(await ends(tab, within: 2))
         #expect(Date().timeIntervalSince(started) < 2)
         #expect(await refusal { try await joinWeb(running, credentials) } == .forgotten)

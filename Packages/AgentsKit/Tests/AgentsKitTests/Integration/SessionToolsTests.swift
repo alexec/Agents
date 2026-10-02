@@ -206,7 +206,6 @@ struct SessionToolsTests {
         #expect(AppTool.isServedByTheApp("mcp__agents__read_session"))
         #expect(ConnectionRole.agentMethods.contains(DaemonAPI.Method.agentsListSessions))
         #expect(ConnectionRole.agentMethods.contains(DaemonAPI.Method.agentsReadSession))
-        #expect(!ConnectionRole.deviceMethods.contains(DaemonAPI.Method.agentsReadSession))
     }
 
     @Test func aReadWithoutASessionIsRefusedBeforeItReachesTheDaemon() {

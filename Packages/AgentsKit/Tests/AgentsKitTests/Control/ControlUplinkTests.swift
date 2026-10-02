@@ -3,8 +3,8 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// The host's side (T016): each channel is a connection with its grant's rights, and the
-/// host refuses what a device may not ask even if the control plane let it through.
+/// The host's side (T016): each channel is a connection with a window's rights (one grant,
+/// #111), and a phone's or a browser's is that device's own.
 @Suite("A host's uplink to the control plane", .timeLimit(.minutes(1)))
 struct ControlUplinkTests {
     final class Heard: @unchecked Sendable {
@@ -45,8 +45,8 @@ struct ControlUplinkTests {
             }
         }
 
-        func open(_ channel: Int, _ grant: Grant, device: UUID? = nil) throws {
-            try transport.write(line: ControlWire.open(channel, .init(grant: grant, client: UUID().uuidString, device: device)))
+        func open(_ channel: Int, device: UUID? = nil) throws {
+            try transport.write(line: ControlWire.open(channel, .init(client: UUID().uuidString, device: device)))
         }
 
         func ask(_ channel: Int, id: Int, _ method: String) throws {
@@ -107,7 +107,7 @@ struct ControlUplinkTests {
         await eventually { dials.all.first?.lines(on: 0).first?.contains(DaemonAPI.Method.hostHello) == true }
     }
 
-    @Test func anOperatorsChannelMayLendAndADevicesIsRefusedAtTheHost() async throws {
+    @Test func aWindowsChannelAndAPhonesMayBothLend() async throws {
         let heard = Heard()
         let dials = Dials()
         let (_, uplink) = host(heard: heard, dials: dials)
@@ -116,8 +116,8 @@ struct ControlUplinkTests {
         try #require(!dials.all.isEmpty)
         let control = dials.all[0]
         let phone = UUID()
-        try control.open(1, .operator)
-        try control.open(2, .device, device: phone)
+        try control.open(1)
+        try control.open(2, device: phone)
         await eventually { uplink.openChannels == [1, 2] }
 
         try control.ask(1, id: 1, DaemonAPI.Method.credentialsLend)
@@ -126,10 +126,9 @@ struct ControlUplinkTests {
         await eventually { control.lines(on: 1).count == 1 && control.lines(on: 2).count == 2 }
 
         #expect(control.lines(on: 1).first?.contains(#""ok":true"#) == true)
-        #expect(control.lines(on: 2).contains { $0.contains("\(DaemonAPI.Failure.notPermitted)") })
+        #expect(control.lines(on: 2).allSatisfy { $0.contains(#""ok":true"#) })
         let lends = heard.all.filter { $0.method == DaemonAPI.Method.credentialsLend }
-        #expect(lends.count == 1)
-        #expect(lends.first?.role == .control)
+        #expect(Set(lends.map(\.role)) == [.control, .device])
         // The device's channel is that device, as the bridge would have made it.
         let list = heard.all.first { $0.method == DaemonAPI.Method.agentsList }
         #expect(list?.role == .device)
@@ -143,8 +142,8 @@ struct ControlUplinkTests {
         await eventually { !dials.all.isEmpty }
         try #require(!dials.all.isEmpty)
         let control = dials.all[0]
-        try control.open(1, .operator)
-        try control.open(2, .device, device: UUID())
+        try control.open(1)
+        try control.open(2, device: UUID())
         await eventually { server.connectionCount == 2 }
         server.broadcast(DaemonAPI.Notification.agentChanged, ["x": 1])
         await eventually { control.lines(on: 1).count == 1 && control.lines(on: 2).count == 1 }
@@ -157,8 +156,8 @@ struct ControlUplinkTests {
         await eventually { !dials.all.isEmpty }
         try #require(!dials.all.isEmpty)
         let control = dials.all[0]
-        try control.open(1, .operator)
-        try control.open(2, .operator)
+        try control.open(1)
+        try control.open(2)
         await eventually { server.connectionCount == 2 }
         try control.transport.write(line: ControlWire.close(1))
         await eventually { server.connectionCount == 1 }
@@ -171,7 +170,7 @@ struct ControlUplinkTests {
         defer { uplink.stop() }
         await eventually { !dials.all.isEmpty }
         try #require(!dials.all.isEmpty)
-        try dials.all[0].open(1, .operator)
+        try dials.all[0].open(1)
         await eventually { server.connectionCount == 1 }
         dials.all[0].transport.close()
         await eventually { server.connectionCount == 0 }
@@ -180,10 +179,24 @@ struct ControlUplinkTests {
         await eventually { dials.all[1].lines(on: 0).count == 1 }
     }
 
+    /// `open` says no role: whatever word an older control plane puts in its `grant`,
+    /// `device` included, the channel is a person's, a window's or that device's.
     @Test func nothingOnTheUplinkMakesAChannelAnAgentOrAStranger() async throws {
-        // `open` carries a grant, and a grant is operator or device: there is no way to
-        // say anything else, so a line claiming another role does not decode.
-        let line = #"{"c":5,"open":{"grant":"agent","client":"x"}}"#
-        #expect(throws: (any Error).self) { _ = try ControlWire.readHost(line) }
+        let heard = Heard()
+        let dials = Dials()
+        let (_, uplink) = host(heard: heard, dials: dials)
+        defer { uplink.stop() }
+        await eventually { !dials.all.isEmpty }
+        try #require(!dials.all.isEmpty)
+        let control = dials.all[0]
+        let phone = UUID()
+        try control.transport.write(line: #"{"c":5,"open":{"grant":"agent","client":"x"}}"#)
+        try control.transport.write(line: #"{"c":6,"open":{"grant":"device","client":"y","device":"\#(phone.uuidString)"}}"#)
+        await eventually { uplink.openChannels == [5, 6] }
+        try control.ask(5, id: 1, DaemonAPI.Method.daemonQuit)
+        try control.ask(6, id: 1, DaemonAPI.Method.daemonQuit)
+        await eventually { heard.all.count == 2 }
+        #expect(Set(heard.all.map(\.role)) == [.control, .device])
+        #expect(heard.all.contains { $0.surface == .device(phone) })
     }
 }

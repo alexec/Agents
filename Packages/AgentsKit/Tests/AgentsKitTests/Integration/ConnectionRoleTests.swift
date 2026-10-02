@@ -127,12 +127,12 @@ struct ConnectionRoleTests {
     }
 
     /// A ceiling something can raise for itself is not a ceiling (#64): an agent, and a
-    /// workflow's agent with it, may not set its project's helper limits, and neither
-    /// may a phone. Refused at the socket, so the daemon never hears the request; only
-    /// an operator's connection — the Mac's window — reaches it.
-    @Test func onlyAnOperatorSetsTheHelperLimits() async throws {
+    /// workflow's agent with it, may not set its project's helper limits. Refused at the
+    /// socket, so the daemon never hears the request. A person's connection reaches it:
+    /// the Mac's window, and since #111 a phone or a browser too.
+    @Test func onlyAPersonSetsTheHelperLimits() async throws {
         let request = #"{"folder":"file:///tmp/p","limits":{"running":10,"notArchived":20}}"#
-        for role in [ConnectionRole.agent, .device, .pairing, .stranger] {
+        for role in [ConnectionRole.agent, .pairing, .stranger] {
             let path = path()
             let heard = Heard()
             let server = try server(role, at: path, heard: heard)
@@ -143,9 +143,16 @@ struct ConnectionRoleTests {
                     == DaemonAPI.Failure.notPermitted, "\(role)")
             #expect(!heard.all.contains(DaemonAPI.Method.projectsSetHelperLimits), "\(role)")
         }
-        #expect(ConnectionRole.control.allows(DaemonAPI.Method.projectsSetHelperLimits))
-        #expect(Grant.operator.allows(DaemonAPI.Method.projectsSetHelperLimits))
-        #expect(!Grant.device.allows(DaemonAPI.Method.projectsSetHelperLimits))
+        for role in [ConnectionRole.control, .device] {
+            let path = path()
+            let heard = Heard()
+            let server = try server(role, at: path, heard: heard)
+            defer { server.stop() }
+            let fd = connect(path)
+            defer { close(fd) }
+            #expect(errorCode(await ask(fd, DaemonAPI.Method.projectsSetHelperLimits, request)) == nil, "\(role)")
+            #expect(heard.all.contains(DaemonAPI.Method.projectsSetHelperLimits), "\(role)")
+        }
     }
 
     /// Transcripts and terminal output go by as notifications; only a window hears them.
@@ -172,9 +179,9 @@ struct ConnectionRoleTests {
         "{\"id\":\"\(id.uuidString)\",\"name\":\"Phone\",\"kind\":\"iPhone\",\"publicKey\":\"\"}"
     }
 
-    /// The bridge's connection is signed as the app's, so without this a phone had
-    /// every right the Mac's window has.
-    @Test func aDeviceDoesWhatTheRemoteDoesAndNothingPastIt() async throws {
+    /// A phone the bridge carries may do what the Mac's window may (#111), and is still
+    /// that one phone: it can't be bound again, or speak as an agent's helper.
+    @Test func aDeviceMayDoWhatAWindowMay() async throws {
         let path = path()
         let heard = Heard()
         let server = try server(.control, at: path, heard: heard)
@@ -185,19 +192,19 @@ struct ConnectionRoleTests {
         #expect(errorCode(await ask(fd, DaemonAPI.Method.connectionBindDevice, "{\"id\":\"\(UUID().uuidString)\"}")) == nil)
         for method in [DaemonAPI.Method.agentsList, DaemonAPI.Method.agentsStart, DaemonAPI.Method.agentsPrompt,
                        DaemonAPI.Method.permissionsAnswer, DaemonAPI.Method.shellInput, DaemonAPI.Method.filesRead,
-                       DaemonAPI.Method.workflowsRun, DaemonAPI.Method.ping] {
-            #expect(errorCode(await ask(fd, method)) == nil, "\(method)")
-        }
-        for method in [DaemonAPI.Method.credentialsLend, DaemonAPI.Method.credentialsOffer,
+                       DaemonAPI.Method.workflowsRun, DaemonAPI.Method.ping,
+                       // What only the window could ask before #111.
+                       DaemonAPI.Method.credentialsLend, DaemonAPI.Method.credentialsOffer,
                        DaemonAPI.Method.runtimeAuthenticate, DaemonAPI.Method.runtimeLogOut,
                        DaemonAPI.Method.filesBrowse, DaemonAPI.Method.filesWrite, DaemonAPI.Method.daemonQuit,
                        DaemonAPI.Method.devicesForget, DaemonAPI.Method.devicesList, DaemonAPI.Method.relayRegister,
-                       DaemonAPI.Method.workflowsApprove, DaemonAPI.Method.projectsAdd,
-                       DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.connectionBindDevice] {
-            #expect(errorCode(await ask(fd, method)) == DaemonAPI.Failure.notPermitted, "\(method)")
+                       DaemonAPI.Method.workflowsApprove, DaemonAPI.Method.projectsAdd] {
+            #expect(errorCode(await ask(fd, method)) == nil, "\(method)")
+            #expect(heard.all.contains(method), "\(method)")
         }
+        #expect(errorCode(await ask(fd, DaemonAPI.Method.connectionBindDevice, "{\"id\":\"\(UUID().uuidString)\"}"))
+                == DaemonAPI.Failure.notPermitted, "bound once, for good")
         #expect(!heard.all.contains(DaemonAPI.Method.connectionBindDevice), "the binding is the server's alone")
-        #expect(!heard.all.contains(DaemonAPI.Method.credentialsLend))
     }
 
     /// After a move (058, T085): a device that connects the old way is told where the
@@ -252,7 +259,6 @@ struct ConnectionRoleTests {
         let first = UUID()
 
         #expect(errorCode(await ask(fd, DaemonAPI.Method.connectionBindDevice)) == nil)
-        #expect(errorCode(await ask(fd, DaemonAPI.Method.credentialsLend)) == DaemonAPI.Failure.notPermitted)
         #expect(errorCode(await ask(fd, DaemonAPI.Method.devicesAnnounce, named(first))) == nil)
         #expect(errorCode(await ask(fd, DaemonAPI.Method.surfaceIdentify, named(UUID()))) == DaemonAPI.Failure.notPermitted)
         #expect(errorCode(await ask(fd, DaemonAPI.Method.surfaceIdentify, named(first))) == nil)
@@ -271,7 +277,8 @@ struct ConnectionRoleTests {
     }
 
     /// What the bridge and the relay host do with every connection they open: the
-    /// answer is theirs and never reaches the device, and nothing after it is a window's.
+    /// answer is theirs and never reaches the device, and the connection is the device's
+    /// from then on, with a window's rights (#111).
     @Test func theBinderWaitsForTheDaemonAndKeepsTheAnswerFromTheDevice() async throws {
         let path = path()
         let heard = Heard()
@@ -283,10 +290,11 @@ struct ConnectionRoleTests {
         let client = JSONRPCConnection(transport: bound)
         await client.start()
         await #expect(throws: JSONRPCError.self) {
-            _ = try await client.call(DaemonAPI.Method.daemonQuit)
+            _ = try await client.call(DaemonAPI.Method.connectionBindDevice)
         }
+        _ = try await client.call(DaemonAPI.Method.daemonQuit)
         _ = try await client.call(DaemonAPI.Method.agentsList)
-        #expect(heard.all == [DaemonAPI.Method.agentsList])
+        #expect(heard.all == [DaemonAPI.Method.daemonQuit, DaemonAPI.Method.agentsList])
     }
 
     @Test func theBinderSaysSoWhenTheConnectionWasNotAWindows() async throws {
@@ -334,7 +342,7 @@ struct ConnectionRoleTests {
         let helper = try String(contentsOf: package.appending(path: "../../Daemon/Sources/main.swift"), encoding: .utf8)
         let roles = try String(contentsOf: package.appending(path: "Sources/AgentsKitCore/Daemon/ConnectionRole.swift"),
                                encoding: .utf8)
-        let allowed = roles.components(separatedBy: "public static let deviceMethods")[0]
+        let allowed = roles.components(separatedBy: "public static let pairingMethods")[0]
         let relayed = helper.matches(of: /relay\(DaemonAPI\.Method\.(\w+)/).map { String($0.output.1) }
         #expect(relayed.count >= 16)
         for name in Set(relayed) {
@@ -357,7 +365,6 @@ struct ConnectionRoleTests {
         #expect(ConnectionRole.agent.allows(DaemonAPI.Method.agentsMoveSelf))
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.agentsMove))
         #expect(ConnectionRole.device.allows(DaemonAPI.Method.agentsMove))
-        #expect(!ConnectionRole.device.allows(DaemonAPI.Method.agentsMoveSelf))
         #expect(!ConnectionRole.stranger.allows(DaemonAPI.Method.agentsMove))
         #expect(!ConnectionRole.stranger.allows(DaemonAPI.Method.agentsMoveSelf))
     }

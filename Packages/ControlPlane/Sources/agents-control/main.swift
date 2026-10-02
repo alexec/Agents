@@ -14,7 +14,7 @@ import Musl
 //   agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
 //   agents-control serve --home DIR [--no-bonjour] [--key-fd N] [--store-credentials-fd N]
 //   agents-control serve … [--web DIR] [--web-port N] [--no-web]
-//   agents-control code (--client operator|device [--browser] | --host) [--minutes N] [--home DIR]
+//   agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
 //   agents-control move --from ROOT     an old set-up's devices into this store, once (T084)
 //   agents-control install-script      the script a server runs to become a host
@@ -196,10 +196,13 @@ func code() async {
     let purpose: ControlCode.Purpose
     if arguments.contains("--host") {
         purpose = .host
-    } else if let grant = value("--client").flatMap(Grant.init(rawValue:)) {
-        purpose = .client(grant)
+    } else if arguments.contains("--client") {
+        // Every client may do everything (#111). `--client operator` or `--client device`,
+        // from a script or an Agents Host written before, is the same code: the word after
+        // is let go.
+        purpose = .client
     } else {
-        fail("say what the code is for: --client operator, --client device, or --host")
+        fail("say what the code is for: --client or --host")
     }
     let store = store()
     let records = ControlRecords(store: store)
@@ -281,7 +284,7 @@ func list(hosts: Bool) async {
         if hosts {
             for host in await records.hosts { print("\(host.id)\t\(host.name)\t\(host.platform)\t\(host.version)") }
         } else {
-            for client in await records.clients { print("\(client.id)\t\(client.name)\t\(client.kind.rawValue)\t\(client.grant.rawValue)") }
+            for client in await records.clients { print("\(client.id)\t\(client.name)\t\(client.kind.rawValue)") }
         }
     } catch {
         fail("\(error)")
@@ -405,7 +408,7 @@ case "--version", "version": print("agents-control \(ControlPlaneKit.version)")
 default:
     fail("""
     usage: agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
-           agents-control code (--client operator|device [--browser] | --host) [--minutes N]
+           agents-control code (--client [--browser] | --host) [--minutes N]
            agents-control serve --home DIR [--no-bonjour]
            agents-control serve … [--web DIR] [--web-port N] [--no-web]
            agents-control hosts | clients

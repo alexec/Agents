@@ -6,8 +6,8 @@ public protocol ControlHandling: Sendable {
     /// Whether a method with no host named is the control plane's own. A legacy client's
     /// bare line for any other method goes to the home host.
     func handles(_ method: String) -> Bool
-    /// A request from a client for the control plane itself. The grant has not been
-    /// checked: each method has its own rule, in the handler.
+    /// A request from a client for the control plane itself. Any paired client may ask
+    /// any of them (#111); a method with a rule of its own keeps it in the handler.
     func handle(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
     /// A request on a host's channel 0: `host/hello`, `attention/need`.
     func hostSaid(_ host: HostID, method: String, params: JSONValue?) async throws -> JSONValue
@@ -18,8 +18,8 @@ public protocol ControlHandling: Sendable {
 ///
 /// It routes connections, not calls. For each client and each online host it opens a
 /// channel on the host's uplink, which the host turns into one virtual connection with
-/// everything a `daemon.sock` connection has today. A request is checked against the
-/// client's grant, then passed down its channel as the bytes it arrived as; whatever
+/// everything a `daemon.sock` connection has today. A request is passed down its
+/// channel as the bytes it arrived as (every paired client may ask anything, #111); whatever
 /// the host says on that channel goes back to that client with the host's id on it.
 /// Credential lending, broadcast filtering and device pinning are the host's, per
 /// connection, as they always were, so none of them is here.
@@ -28,15 +28,13 @@ public actor ControlRouter {
     public struct Caller: Sendable, Hashable {
         public var session: UUID
         public var client: UUID
-        public var grant: Grant
         public var kind: ClientRecord.Kind
         /// The device came through `agents-relay` (T096), not straight here.
         public var relayed: Bool
-        public init(session: UUID, client: UUID, grant: Grant, kind: ClientRecord.Kind, relayed: Bool = false) {
+        public init(session: UUID, client: UUID, kind: ClientRecord.Kind, relayed: Bool = false) {
             self.relayed = relayed
             self.session = session
             self.client = client
-            self.grant = grant
             self.kind = kind
         }
     }
@@ -97,7 +95,8 @@ public actor ControlRouter {
     /// Told when a client here connects, or its last session ends (nil), so other copies know.
     private var linkChanged: (@Sendable (UUID, Bool?) -> Void)?
     /// Told each presence report a client here makes, so other copies fold it too.
-    private var presenceHeard: (@Sendable (UUID, Grant, DaemonAPI.PresenceReport) -> Void)?
+    /// The `Bool` says whether the client is a device (`ClientRecord.Kind.isDevice`).
+    private var presenceHeard: (@Sendable (UUID, Bool, DaemonAPI.PresenceReport) -> Void)?
 
     private struct NotedPresence {
         var client: UUID
@@ -160,18 +159,18 @@ public actor ControlRouter {
     }
 
     /// A presence report made at another copy (US3): folded here as the client's own.
-    public func notePeerPresence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport, at: Date = Date()) {
-        notePresence(client: client, grant: grant, report: report, at: at)
+    public func notePeerPresence(client: UUID, device: Bool, report: DaemonAPI.PresenceReport, at: Date = Date()) {
+        notePresence(client: client, device: device, report: report, at: at)
     }
 
-    public func onPresence(_ heard: @escaping @Sendable (UUID, Grant, DaemonAPI.PresenceReport) -> Void) {
+    public func onPresence(_ heard: @escaping @Sendable (UUID, Bool, DaemonAPI.PresenceReport) -> Void) {
         presenceHeard = heard
     }
 
     /// `session` is the socket the report came on; nil for one made at another copy.
-    private func notePresence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport,
+    private func notePresence(client: UUID, device: Bool, report: DaemonAPI.PresenceReport,
                               session: UUID? = nil, at: Date = Date()) {
-        let surface: Surface = grant == .device ? .device(client) : .mac
+        let surface: Surface = device ? .device(client) : .mac
         let key = session ?? client
         let previous = notedPresence[key]
         notedPresence[key] = NotedPresence(client: client, surface: surface, watching: report.watching,
@@ -195,12 +194,10 @@ public actor ControlRouter {
     /// Whether the host is reachable from here at all, directly or through a peer.
     public func reaches(_ host: HostID) -> Bool { hosts[host] != nil }
 
-    /// Every client session here and its grant, for the backstop that catches a change
-    /// another copy made while its event was missed (T066).
-    public func connectedClients() -> [UUID: Grant] {
-        var grants: [UUID: Grant] = [:]
-        for session in clients.values { grants[session.caller.client] = session.caller.grant }
-        return grants
+    /// Every client with a session here, for the backstop that catches a forget another
+    /// copy made while its event was missed (T066).
+    public func connectedClients() -> Set<UUID> {
+        Set(clients.values.map(\.caller.client))
     }
 
     // MARK: Hosts
@@ -286,7 +283,7 @@ public actor ControlRouter {
     public func dropPeer(_ id: String) {
         peers[id] = nil
         if let gone = peerLinks.removeValue(forKey: id), !gone.isEmpty {
-            broadcastControl(DaemonAPI.Notification.controlClientChanged, [:], operatorsOnly: true)
+            broadcastControl(DaemonAPI.Notification.controlClientChanged, [:])
         }
         for (host, session) in hosts where session.local {
             for (target, channel) in session.proxied {
@@ -297,7 +294,6 @@ public actor ControlRouter {
     }
 
     /// A peer opens a stream to a host held here: a fresh channel on the real uplink.
-    /// Its grant was checked at the peer, where the client is.
     public func openFromPeer(_ peer: String, host: HostID, channel: Int, _ open: ControlWire.ChannelOpen) {
         guard relays[host] == nil, var session = hosts[host], session.local else {
             peers[peer]?(PeerWire.frame(host, ControlWire.close(channel)))
@@ -521,7 +517,7 @@ public actor ControlRouter {
     @discardableResult
     public func attachClient(_ client: ClientRecord, transport: any LineTransport, relayed: Bool = false) -> UUID {
         let id = UUID()
-        clients[id] = ClientSession(caller: Caller(session: id, client: client.id, grant: client.grant, kind: client.kind,
+        clients[id] = ClientSession(caller: Caller(session: id, client: client.id, kind: client.kind,
                                                    relayed: relayed),
                                     transport: transport)
         for host in hosts.keys { openChannel(for: id, to: host) }
@@ -574,7 +570,7 @@ public actor ControlRouter {
         guard toldLinks[client] != now else { return }
         toldLinks[client] = now
         linkChanged?(client, now)
-        broadcastControl(DaemonAPI.Notification.controlClientChanged, ["client": .string(client.uuidString)], operatorsOnly: true)
+        broadcastControl(DaemonAPI.Notification.controlClientChanged, ["client": .string(client.uuidString)])
     }
 
     public func onLinkChanged(_ changed: @escaping @Sendable (UUID, Bool?) -> Void) { linkChanged = changed }
@@ -585,7 +581,7 @@ public actor ControlRouter {
     /// A peer copy said how one of its clients reaches it.
     public func notePeerLink(_ peer: String, client: UUID, relayed: Bool?) {
         peerLinks[peer, default: [:]][client] = relayed
-        broadcastControl(DaemonAPI.Notification.controlClientChanged, ["client": .string(client.uuidString)], operatorsOnly: true)
+        broadcastControl(DaemonAPI.Notification.controlClientChanged, ["client": .string(client.uuidString)])
     }
 
     /// How every connected client reaches the control plane, at any copy: true when only
@@ -605,23 +601,6 @@ public actor ControlRouter {
         for id in sessions(of: client) { detachClient(id, closing: Self.forgottenCloseCode) }
     }
 
-    /// `clients/setGrant`: the next call is judged by the new grant, and every channel is
-    /// reopened so each host judges it by the new one too.
-    public func setGrant(_ grant: Grant, of client: UUID) {
-        for id in sessions(of: client) {
-            guard var session = clients[id] else { continue }
-            session.caller.grant = grant
-            clients[id] = session
-            for host in Array(session.channels.keys) {
-                if let channel = clients[id]?.channels.removeValue(forKey: host) {
-                    hosts[host]?.channels[channel] = nil
-                    try? hosts[host]?.transport.write(line: ControlWire.close(channel))
-                }
-                openChannel(for: id, to: host)
-            }
-        }
-    }
-
     private func openChannel(for sessionID: UUID, to host: HostID) {
         guard relays[host] == nil, var hostSession = hosts[host], let caller = clients[sessionID]?.caller else { return }
         let channel = hostSession.nextChannel
@@ -629,8 +608,10 @@ public actor ControlRouter {
         hostSession.channels[channel] = .session(sessionID)
         hosts[host] = hostSession
         clients[sessionID]?.channels[host] = channel
-        let open = ControlWire.ChannelOpen(grant: caller.grant, client: caller.client.uuidString,
-                                           device: caller.grant == .device ? caller.client : nil,
+        // Bound to the client unless it is a Mac's window, which is the Mac, as a window
+        // on the socket is: presence is reported as it, and it names no other device.
+        let open = ControlWire.ChannelOpen(client: caller.client.uuidString,
+                                           device: caller.kind == .mac ? nil : caller.client,
                                            relayed: caller.relayed ? true : nil)
         try? hostSession.transport.write(line: ControlWire.open(channel, open))
     }
@@ -670,14 +651,9 @@ public actor ControlRouter {
         case .request(let id, let method, let params)?:
             if method == DaemonAPI.Method.presenceReport, let params,
                let report = try? params.decode(DaemonAPI.PresenceReport.self) {
-                notePresence(client: session.caller.client, grant: session.caller.grant, report: report,
+                notePresence(client: session.caller.client, device: session.caller.kind.isDevice, report: report,
                              session: sessionID)
-                presenceHeard?(session.caller.client, session.caller.grant, report)
-            }
-            guard session.caller.grant.allows(method) else {
-                return reply(to: sessionID, host: host, id: id, wrapped: wrapped,
-                             error: JSONRPCError(code: DaemonAPI.Failure.notPermitted,
-                                                 message: "\(method) is not open to this client (\(session.caller.grant.rawValue))."))
+                presenceHeard?(session.caller.client, session.caller.kind.isDevice, report)
             }
             guard known.contains(host) else {
                 return reply(to: sessionID, host: host, id: id, wrapped: wrapped,
@@ -695,17 +671,12 @@ public actor ControlRouter {
                 reply(to: sessionID, host: host, id: id, wrapped: wrapped,
                       error: JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline."))
             }
-        case .notification(let method, _)?:
-            // A notification from a client is held to the same grant; there is nobody
-            // to tell when it is refused.
-            guard session.caller.grant.allows(method), let channel = session.channels[host] else { return }
-            try? hosts[host]?.transport.write(line: ControlWire.channel(channel, message: message))
-        case .success?, .failure?:
-            // An answer to something the host asked this client. It can invoke nothing.
+        case .notification?, .success?, .failure?:
+            // A notification, or an answer to something the host asked this client.
             guard let channel = session.channels[host] else { return }
             try? hosts[host]?.transport.write(line: ControlWire.channel(channel, message: message))
         case nil:
-            // Unreadable, so its grant cannot be checked: it goes nowhere.
+            // Unreadable, so nobody can say what it asks: it goes nowhere.
             return
         }
     }
@@ -772,9 +743,9 @@ public actor ControlRouter {
         hosts[borrower] = near
         hosts[lender] = far
         try? far.transport.write(line: ControlWire.open(farChannel, ControlWire.ChannelOpen(
-            grant: .operator, client: "tunnel:" + borrower.rawValue, tunnel: runtime)))
+            client: "tunnel:" + borrower.rawValue, tunnel: runtime)))
         try? near.transport.write(line: ControlWire.open(nearChannel, ControlWire.ChannelOpen(
-            grant: .operator, client: "tunnel:" + lender.rawValue, tunnel: runtime, tunnelRef: ref)))
+            client: "tunnel:" + lender.rawValue, tunnel: runtime, tunnelRef: ref)))
         return true
     }
 
@@ -832,11 +803,11 @@ public actor ControlRouter {
 
     // MARK: The control plane's own notifications
 
-    /// Tells every client that speaks the wrapped wire, or only operators.
-    public func broadcastControl(_ method: String, _ params: JSONValue, operatorsOnly: Bool = false) {
+    /// Tells every client that speaks the wrapped wire.
+    public func broadcastControl(_ method: String, _ params: JSONValue) {
         guard let line = try? JSONRPCCodec.encode(.notification(method: method, params: params)) else { return }
         let wrapped = ControlWire.wrap(host: nil, message: line)
-        for (id, session) in clients where session.wrapped && (!operatorsOnly || session.caller.grant == .operator) {
+        for (id, session) in clients where session.wrapped {
             write(wrapped, to: id)
         }
     }

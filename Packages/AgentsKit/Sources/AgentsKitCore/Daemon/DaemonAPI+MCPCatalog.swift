@@ -1,7 +1,7 @@
 import Foundation
 
 /// Searching the MCP Registry and adding servers (060, contracts/mcp-methods.md).
-/// Control-only: none of these is in `deviceMethods` or `agentMethods`.
+/// A person's: none of these is in `agentMethods`.
 extension DaemonAPI.Method {
     public static let mcpPreview = "mcp/preview"
     public static let mcpAdd = "mcp/add"

@@ -125,13 +125,13 @@ struct DroppedReplyTests {
     private let home = HostID(rawValue: "mac")
 
     /// A home host that never answers, and a phone on the bare wire, as today's Remote is.
-    private func silentHomeAndPhone(_ grant: Grant = .device)
+    private func silentHomeAndPhone(_ kind: ClientRecord.Kind = .iPhone)
         async -> (ControlRouter, PairedTransport, FakeControlClient, PairedTransport) {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let (ours, theirs) = PairedTransport.pair()
         await router.attachHost(home, transport: ours)
         let (phoneOurs, phoneTheirs) = PairedTransport.pair()
-        await router.attachClient(client(grant), transport: phoneOurs)
+        await router.attachClient(client(kind), transport: phoneOurs)
         _ = await eventually { await router.channels(of: home).count == 1 }
         return (router, theirs, FakeControlClient(transport: phoneTheirs), phoneTheirs)
     }
@@ -170,7 +170,7 @@ struct DroppedReplyTests {
         let (ours, theirs) = PairedTransport.pair()
         await router.attachHost(home, transport: ours)
         let (windowOurs, windowTheirs) = PairedTransport.pair()
-        await router.attachClient(client(.operator), transport: windowOurs)
+        await router.attachClient(client(.mac), transport: windowOurs)
         let window = FakeControlClient(transport: windowTheirs)
         _ = await eventually { await router.channels(of: home).count == 1 }
         try window.request(9, DaemonAPI.Method.agentsList, host: home)
@@ -190,7 +190,7 @@ struct DroppedReplyTests {
         await router.attachHost(home, transport: ours)
         let host = FakeUplinkHost(transport: theirs)
         let (phoneOurs, phoneTheirs) = PairedTransport.pair()
-        await router.attachClient(client(.device), transport: phoneOurs)
+        await router.attachClient(client(.iPhone), transport: phoneOurs)
         let phone = FakeControlClient(transport: phoneTheirs)
         _ = await eventually { host.openChannels.count == 1 }
         try phone.send(#"{"jsonrpc":"2.0","id":5,"method":"agents/list"}"#)

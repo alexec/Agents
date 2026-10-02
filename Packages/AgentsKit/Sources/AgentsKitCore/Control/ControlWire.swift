@@ -7,8 +7,8 @@ import Foundation
 /// each line is `{"c":<channel>,…}`: a message, an `open` or a `close`. The message in
 /// `m` is a JSON-RPC line exactly as a `daemon.sock` client sends it today, and it is
 /// carried as the bytes it arrived as. The control plane reads a request's method to
-/// check the grant and nothing else, so a method added to the daemon later passes
-/// through without the control plane knowing of it.
+/// tell its own from a host's and nothing else, so a method added to the daemon later
+/// passes through without the control plane knowing of it.
 ///
 /// Lines this side writes always put `m` last, so reading one back is a matter of
 /// finding where `m` starts. A line from anywhere else that is laid out differently is
@@ -33,11 +33,13 @@ public enum ControlWire {
         case close(channel: Int)
     }
 
-    /// What a channel is opened as. The host makes it a `control` connection for an
-    /// operator and a `device` connection, bound to `device`, for a device. Nothing else
-    /// on the uplink can set a connection's role.
+    /// What a channel is opened as: a connection that may do everything a window's may,
+    /// bound to `device` when it carries a phone, an iPad or a browser, so presence and a
+    /// device's own name are its. Nothing else on the uplink can set who a connection is.
     public struct ChannelOpen: Codable, Equatable, Sendable {
-        public var grant: Grant
+        /// Always `operator`, which an older host needs to open the channel at all and
+        /// which gives a client everything there, as it now has (#111). Not read.
+        public var grant: String = LegacyGrant.everything
         public var client: String
         public var device: UUID?
         /// The device reached the control plane through `agents-relay` (T096).
@@ -49,12 +51,11 @@ public enum ControlWire {
         /// its waiting connections this is.
         public var tunnelRef: String?
 
-        public init(grant: Grant, client: String, device: UUID? = nil, relayed: Bool? = nil,
+        public init(client: String, device: UUID? = nil, relayed: Bool? = nil,
                     tunnel: String? = nil, tunnelRef: String? = nil) {
             self.relayed = relayed
             self.tunnel = tunnel
             self.tunnelRef = tunnelRef
-            self.grant = grant
             self.client = client
             self.device = device
         }
@@ -137,7 +138,7 @@ public enum ControlWire {
     }
 
     /// Whether a message is a request at all, including one too broken to read: those
-    /// are refused rather than passed on, since the grant could not be checked.
+    /// are refused rather than passed on, since nobody could say what they ask.
     public static func isNotification(_ message: String) -> Bool {
         if case .notification? = try? JSONRPCCodec.decode(line: message) { return true }
         return false

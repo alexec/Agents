@@ -4,11 +4,14 @@ import Foundation
 /// it (058, data-model.md `PairingCode`, T019/T029).
 ///
 /// What it holds is what the new party needs and nothing more: the control plane's
-/// public key, a one-time secret, what the code lets its holder become, and where to
-/// reach the control plane. Its text is one line, to paste or to put in a QR code:
+/// public key, a one-time secret, whether its holder becomes a client or a host, and
+/// where to reach the control plane. Its text is one line, to paste or to put in a QR code:
 ///
-///     agents-control:2:<c|h>:<grant or ->:<key>:<secret>:<url>:<pin or ->:<name>
+///     agents-control:2:<c|h>:<operator or ->:<key>:<secret>:<url>:<pin or ->:<name>
 ///
+/// The fourth field was a client's grant. Every client may do everything now (#111), so
+/// it is always `operator`, which an older Remote or web page needs to read the code,
+/// and whatever is there is not read.
 /// with the key and the secret in base64url, and the URL and name percent-encoded. The
 /// URL is the control plane's one address (R8); the pin is the SHA-256 of its
 /// certificate's public key, base64url, when that certificate is not publicly trusted
@@ -16,8 +19,8 @@ import Foundation
 /// still read.
 public struct ControlCode: Sendable, Hashable {
     public enum Purpose: Sendable, Hashable {
-        /// A window or a device, and what it may do.
-        case client(Grant)
+        /// A window, a phone, an iPad or a browser.
+        case client
         /// A machine that runs agents.
         case host
     }
@@ -57,7 +60,7 @@ public struct ControlCode: Sendable, Hashable {
         let kind: String
         let grant: String
         switch purpose {
-        case .client(let given): kind = "c"; grant = given.rawValue
+        case .client: kind = "c"; grant = LegacyGrant.everything
         case .host: kind = "h"; grant = "-"
         }
         if let url {
@@ -90,7 +93,7 @@ public struct ControlCode: Sendable, Hashable {
             self.pin = pin == "-" ? nil : pin
         }
         switch (parts[2], parts[3]) {
-        case ("c", let grant): guard let grant = Grant(rawValue: grant) else { return nil }; purpose = .client(grant)
+        case ("c", let grant) where !grant.isEmpty: purpose = .client
         case ("h", "-"): purpose = .host
         default: return nil
         }
@@ -176,15 +179,16 @@ public extension DaemonAPI {
         }
     }
 
-    /// What either announce is answered with: who the new party now is, and what it may do.
+    /// What either announce is answered with: who the new party now is. A client's says
+    /// `grant: operator` for an older web page, which shows it (#111).
     struct Admitted: Codable, Sendable, Hashable {
         public var client: UUID?
         public var host: HostID?
-        public var grant: Grant?
-        public init(client: UUID? = nil, host: HostID? = nil, grant: Grant? = nil) {
+        public var grant: String?
+        public init(client: UUID? = nil, host: HostID? = nil) {
             self.client = client
             self.host = host
-            self.grant = grant
+            self.grant = client == nil ? nil : LegacyGrant.everything
         }
     }
 }

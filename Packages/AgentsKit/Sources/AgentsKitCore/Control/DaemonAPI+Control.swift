@@ -24,9 +24,11 @@ public extension DaemonAPI.Method {
     static let clientsStartPairing = "clients/startPairing"
     static let clientsStopPairing = "clients/stopPairing"
     static let clientsAnnounce = "clients/announce"
+    /// Retired with grants (#111): an older window that asks is told there is nothing to
+    /// set.
     static let clientsSetGrant = "clients/setGrant"
     static let clientsForget = "clients/forget"
-    /// A client forgets itself, whatever its grant, and only itself (071 FR-015).
+    /// A client forgets itself, and only itself (071 FR-015).
     static let clientsForgetSelf = "clients/forgetSelf"
     /// How each client reaches the control plane now (frame N, T080).
     static let clientsConnections = "clients/connections"
@@ -210,15 +212,6 @@ public extension DaemonAPI {
         }
     }
 
-    /// `clients/setGrant`.
-    struct ClientGrantRequest: Codable, Sendable, Hashable {
-        public var client: UUID
-        public var grant: Grant
-        public init(client: UUID, grant: Grant) {
-            self.client = client
-            self.grant = grant
-        }
-    }
 
     /// `clients/forget`, `hosts/remove`.
     struct ClientRequest: Codable, Sendable, Hashable {

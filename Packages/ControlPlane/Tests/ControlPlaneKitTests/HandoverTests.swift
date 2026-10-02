@@ -48,7 +48,7 @@ extension ControlServiceTests {
 
         // A device, paired at the old place.
         let (client, _, credentials) = try await pairedClient(at: old.url,
-                                                              code: try await old.service.codes.issue(.client(.device)).text)
+                                                              code: try await old.service.codes.issue(.client).text)
         let clientBook = EndpointBook(ControlMembership(client: client, controlKey: control.publicKey, addresses: [],
                                                         name: "test", url: old.url.absoluteString))
 
@@ -90,12 +90,12 @@ extension ControlServiceTests {
         #expect(saved.get?.endpointsToDial == [place])
         #expect(await new.service.methods.host(host) != nil)
 
-        // The device too: through the forwarding copy, then to the new one, same id and grant.
+        // The device too: through the forwarding copy, then to the new one, same id.
         do { try await ControlCodeUse.dialEach(clientBook, as: credentials, dial: ControlJoin.nio).close() } catch {}
         let reader = try await ControlCodeUse.dialEach(clientBook, as: credentials, dial: ControlJoin.nio)
         reader.close()
         #expect(clientBook.current.endpointsToDial == [place])
-        #expect(await new.service.methods.client(client)?.grant == .device)
+        #expect(await new.service.methods.client(client) != nil)
 
         await fromOld.close()
         await intoNew.close()
@@ -104,7 +104,7 @@ extension ControlServiceTests {
     @Test func aFrozenCopyRefusesWhatWouldChangeRecordsAndUnfreezes() async throws {
         let old = try await start()
         defer { Task { await old.service.stop() } }
-        let (_, link) = try await client(at: old.url, code: try await old.service.codes.issue(.client(.operator)).text)
+        let (_, link) = try await client(at: old.url, code: try await old.service.codes.issue(.client).text)
         let control = DaemonClient(link: link.controlLink)
         try await control.connect(startIfNeeded: false)
 
@@ -148,7 +148,7 @@ extension ControlServiceTests {
         let old = try await start()
         defer { Task { await old.service.stop() } }
         let (client, _, credentials) = try await pairedClient(at: old.url,
-                                                              code: try await old.service.codes.issue(.client(.device)).text)
+                                                              code: try await old.service.codes.issue(.client).text)
         let book = EndpointBook(ControlMembership(client: client, controlKey: control.publicKey, addresses: [],
                                                   name: "test", url: old.url.absoluteString))
         let handover = try await Handover.Link(old.url, pin: nil, privateKey: control.privateKey)

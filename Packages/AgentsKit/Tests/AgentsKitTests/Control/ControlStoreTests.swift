@@ -142,7 +142,7 @@ struct ControlCodeVersion2Tests {
 
     @Test func itReadsBackWithItsURLAndPin() throws {
         let pin = ControlCode.base64url(Data(repeating: 1, count: 32))
-        let code = ControlCode(purpose: .client(.operator), controlKey: key, secret: secret,
+        let code = ControlCode(purpose: .client, controlKey: key, secret: secret,
                                url: "https://mini.local:8791", pin: pin, name: "Alex's Mac: mini")
         #expect(code.text.hasPrefix("agents-control:2:c:operator:"))
         let back = try #require(ControlCode(text: code.text))

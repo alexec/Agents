@@ -110,7 +110,7 @@ struct UnreadableClientLineTests {
     private func connected() async -> (ControlRouter, FakeControlClient) {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let (ours, theirs) = PairedTransport.pair()
-        await router.attachClient(client(.operator), transport: ours)
+        await router.attachClient(client(.mac), transport: ours)
         return (router, FakeControlClient(transport: theirs))
     }
 

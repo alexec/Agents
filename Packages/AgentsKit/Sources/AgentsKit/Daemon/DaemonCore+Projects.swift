@@ -271,8 +271,8 @@ extension DaemonCore {
         return summary
     }
 
-    /// The person setting a project's two helper limits (#64). Only an operator's
-    /// connection reaches this: `ConnectionRole` keeps it from agents and devices.
+    /// The person setting a project's two helper limits (#64), from any window or paired
+    /// client (#111): `ConnectionRole` keeps it from agents.
     ///
     /// Refused outside the hard maximums rather than clamped, so the person reads what
     /// was kept rather than finding out later. Lowering a limit below what is in use

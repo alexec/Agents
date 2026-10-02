@@ -52,7 +52,7 @@ struct TunnelTests {
     }
 
     func operatorControl(_ running: ControlServiceTests.Running) async throws -> (DaemonClient, ControlLink) {
-        let (_, link) = try await base.client(at: running.url, code: try await running.service.codes.issue(.client(.operator)).text)
+        let (_, link) = try await base.client(at: running.url, code: try await running.service.codes.issue(.client).text)
         let control = DaemonClient(link: link.controlLink)
         try await control.connect(startIfNeeded: false)
         return (control, link)
@@ -103,21 +103,22 @@ struct TunnelTests {
         await #expect(throws: JSONRPCError.self) { _ = try await borrowerUplink.openTunnel(runtime: "claude") }
     }
 
-    @Test func onlyAnOperatorAllowsALend() async throws {
+    /// Any client may allow a lend (#111), a phone as the window may.
+    @Test func aPhoneMayAllowALend() async throws {
         let running = try await base.start()
         defer { Task { await running.service.stop() } }
         let (lender, lenderUplink) = try await base.host(at: running.url, code: try await running.service.codes.issue(.host).text)
         defer { lenderUplink.stop() }
         let (borrower, borrowerUplink) = try await base.host(at: running.url, code: try await running.service.codes.issue(.host).text)
         defer { borrowerUplink.stop() }
-        let (_, deviceLink) = try await base.client(at: running.url, code: try await running.service.codes.issue(.client(.device)).text)
+        let (_, deviceLink) = try await base.client(at: running.url, code: try await running.service.codes.issue(.client).text,
+                                                    kind: .iPhone)
         defer { deviceLink.disconnect() }
         let device = DaemonClient(link: deviceLink.controlLink)
         try await device.connect(startIfNeeded: false)
-        await #expect(throws: JSONRPCError.self) {
-            _ = try await device.call(DaemonAPI.Method.hostsLendSignIn,
-                                      DaemonAPI.LendSignIn(host: borrower, from: lender, runtime: "claude", allowed: true))
-        }
+        _ = try await device.call(DaemonAPI.Method.hostsLendSignIn,
+                                  DaemonAPI.LendSignIn(host: borrower, from: lender, runtime: "claude", allowed: true))
+        #expect(await running.service.records.host(borrower)?.signInFrom?["claude"] == lender)
     }
 
     @Test func aChunkIsAJSONStringOfItsBase64() {

@@ -15,7 +15,7 @@ struct ControlEndToEndTests {
     }
 
     /// Each host answers any call with its own name and the role it was asked with.
-    func rig(hosts: [HostID], grant: Grant = .operator) async -> Rig {
+    func rig(hosts: [HostID], kind: ClientRecord.Kind = .mac) async -> Rig {
         let methods = ControlMethods(records: ControlRecords(store: MemoryStore()),
                                      settings: ControlSettings(name: "test", machineID: "m"), version: "1")
         let router = ControlRouter(handler: methods, homeHost: hosts.first)
@@ -36,7 +36,7 @@ struct ControlEndToEndTests {
             uplink.start()
             uplinks.append(uplink)
         }
-        let record = ClientRecord(id: UUID(), name: "window", kind: .mac, publicKey: Data(), grant: grant, paired: Date())
+        let record = ClientRecord(id: UUID(), name: "window", kind: kind, publicKey: Data(), paired: Date())
         let link = ControlLink {
             let (ours, theirs) = PairedTransport.pair()
             await router.attachClient(record, transport: theirs)
@@ -113,18 +113,20 @@ struct ControlEndToEndTests {
         _ = try await toMac.call(DaemonAPI.Method.agentsList)
     }
 
-    @Test func aDeviceIsRefusedAtTheControlPlaneForWhatOnlyAnOperatorMayAsk() async throws {
-        let rig = await rig(hosts: [.mac], grant: .device)
+    /// One grant (#111): a phone or a browser reaches the host with what only the Mac's
+    /// window could ask before, on a connection that is still that device's own.
+    @Test(arguments: [ClientRecord.Kind.iPhone, .browser])
+    func aPhoneOrABrowserAsksWhatOnlyTheWindowMightBefore(_ kind: ClientRecord.Kind) async throws {
+        let rig = await rig(hosts: [.mac], kind: kind)
         defer { rig.uplinks.forEach { $0.stop() } }
         let client = DaemonClient(link: rig.link.link(for: .mac))
         try await client.connect(startIfNeeded: false)
         let list = try await client.call(DaemonAPI.Method.agentsList)
         #expect(list["role"]?.stringValue == "device")
-        do {
-            _ = try await client.call(DaemonAPI.Method.credentialsLend)
-            Issue.record("a device lent a credential")
-        } catch let error as JSONRPCError {
-            #expect(error.code == DaemonAPI.Failure.notPermitted)
+        for method in [DaemonAPI.Method.credentialsLend, DaemonAPI.Method.projectsSetHelperLimits,
+                       DaemonAPI.Method.filesBrowse, DaemonAPI.Method.workflowsApprove] {
+            let answer = try await client.call(method)
+            #expect(answer["method"]?.stringValue == method)
         }
     }
 

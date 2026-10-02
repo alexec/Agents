@@ -218,7 +218,7 @@ public enum Handover {
             let connected = await service.router.connectedClients()
             for client in await service.methods.allClients {
                 members.append(.init(id: client.id.uuidString, name: client.name, kind: client.kind.rawValue,
-                                     knownEpoch: client.knownEpoch, online: connected[client.id] != nil,
+                                     knownEpoch: client.knownEpoch, online: connected.contains(client.id),
                                      lastSeen: client.lastSeen))
             }
             for host in await service.methods.allHosts {

@@ -100,15 +100,14 @@ struct StoreConformanceTests {
         let records = ControlRecords(store: store)
         try await records.load()
         let id = UUID()
-        let client = ClientRecord(id: id, name: "phone", kind: .iPhone, publicKey: Data(repeating: 1, count: 65),
-                                  grant: .device, paired: Date())
-        // Another operator, so the last-operator rule lets this one's grant move.
-        try await records.save(ClientRecord(id: UUID(), name: "mac", kind: .mac, publicKey: Data(repeating: 2, count: 65),
-                                            grant: .operator, paired: Date()))
+        let client = ClientRecord(id: id, name: "phone", kind: .iPhone, publicKey: Data(repeating: 1, count: 65), paired: Date())
+        try await records.save(ClientRecord(id: UUID(), name: "mac", kind: .mac, publicKey: Data(repeating: 2, count: 65), paired: Date()))
         try await records.save(client)
         let seenAtA = try #require(try await store.get(ControlRecords.clientKey(id))).etag
-        try await records.setGrant(.operator, of: id)
-        try await records.setGrant(.device, of: id)
+        var renamed = client
+        renamed.name = "renamed"
+        try await records.save(renamed)
+        try await records.save(client)
         let backAtA = try #require(try await store.get(ControlRecords.clientKey(id))).etag
         #expect(backAtA != seenAtA)
         await #expect(throws: StoreError.conflict(key: ControlRecords.clientKey(id))) {

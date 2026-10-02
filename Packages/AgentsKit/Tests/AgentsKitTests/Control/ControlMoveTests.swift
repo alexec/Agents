@@ -43,7 +43,7 @@ struct ControlMoveTests {
         try #require(clients.count == 1)
         #expect(clients[0].id == phone.id)
         #expect(clients[0].publicKey == phone.publicKey)
-        #expect(clients[0].grant == .device)
+        #expect(clients[0].kind == .iPhone)
         #expect(try await records(control).settings?.homeHost == .mac)
         // The old root is only read.
         #expect(DeviceStore(locations: locations).load().map(\.id) == [phone.id])
@@ -63,7 +63,7 @@ struct ControlMoveTests {
         let (locations, control) = try roots()
         defer { try? FileManager.default.removeItem(at: control.deletingLastPathComponent()) }
         try await records(control).save(ClientRecord(id: UUID(), name: "Studio", kind: .mac,
-                                                     publicKey: Data([1]), grant: .operator, paired: Date()))
+                                                     publicKey: Data([1]), paired: Date()))
         await #expect(throws: ControlMove.Refusal.alreadyUsed) { try await prepare(control, from: locations) }
     }
 
@@ -99,7 +99,6 @@ struct ControlMoveTests {
         try await fresh.load()
         #expect(await fresh.clients.map(\.id) == [phone.id])
         #expect(await fresh.clients.first?.publicKey == phone.publicKey)
-        #expect(await fresh.clients.first?.grant == .device)
         #expect(await fresh.settings?.homeHost == .mac)
         #expect(await fresh.settings?.controlKey == key)
         #expect(await fresh.settings?.url == "https://mini.local:8791")
@@ -118,7 +117,7 @@ struct ControlMoveTests {
         let before = try FileManager.default.contentsOfDirectory(atPath: locations.root.path).sorted()
         let devicesBefore = try Data(contentsOf: locations.devices)
         try await records(control).save(ClientRecord(id: UUID(), name: "Studio", kind: .mac,
-                                                     publicKey: Data([1]), grant: .operator, paired: Date()))
+                                                     publicKey: Data([1]), paired: Date()))
 
         await #expect(throws: ControlMove.Refusal.alreadyUsed) { try await prepare(control, from: locations) }
 

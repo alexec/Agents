@@ -176,9 +176,9 @@ public enum DaemonAPI {
         public static let projectsAdd = "projects/add"
         public static let projectsArchive = "projects/archive"
         public static let projectsUnarchive = "projects/unarchive"
-        /// The person setting a project's two helper limits (#64). An operator's alone:
-        /// in neither `ConnectionRole.agentMethods` nor `deviceMethods`, so no agent, no
-        /// workflow and no phone can raise a ceiling over agents.
+        /// The person setting a project's two helper limits (#64), from any window or
+        /// paired client (#111). Not in `ConnectionRole.agentMethods`, so no agent and no
+        /// workflow can raise a ceiling over agents.
         public static let projectsSetHelperLimits = "projects/setHelperLimits"
         /// Clone a Git URL into the home folder and add it (027). Answers when the
         /// project exists, which for a big repository is minutes: the window shows the
@@ -1846,8 +1846,9 @@ public enum DaemonAPI {
         public static let hostOffline = -32090
         /// A call naming a host the control plane has never enrolled, or has removed.
         public static let noSuchHost = -32091
-        /// Demoting or forgetting the last client allowed to do everything: nobody could
-        /// then change it back (058, FR-016).
+        /// Was demoting or forgetting the last operator (058, FR-016). Never said since
+        /// grants were retired (#111); kept so the number is not given to anything else
+        /// an older build would read as this.
         public static let lastOperator = -32092
         /// A change another copy of the control plane made first: the store refused this
         /// one's write, and nothing was changed. Try again (058, contracts/store.md).

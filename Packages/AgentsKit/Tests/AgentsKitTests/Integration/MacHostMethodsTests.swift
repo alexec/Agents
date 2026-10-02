@@ -40,11 +40,11 @@ struct MacHostMethodsTests {
         #expect(error.code == DaemonAPI.Failure.fileGone)
     }
 
-    /// Only an operator: a phone must not open things on the Mac or write its files.
-    @Test func aDeviceMayAskNoneOfThem() {
+    /// A person's: the window, and since #111 a phone or a browser too. Never an agent.
+    @Test func noAgentMayAskThem() {
         for method in [DaemonAPI.Method.macReveal, DaemonAPI.Method.macOpen, DaemonAPI.Method.macTerminal,
                        DaemonAPI.Method.filesReadText, DaemonAPI.Method.filesSaveText] {
-            #expect(!ConnectionRole.device.allows(method), "\(method)")
+            #expect(ConnectionRole.device.allows(method), "\(method)")
             #expect(ConnectionRole.control.allows(method), "\(method)")
             #expect(!ConnectionRole.agent.allows(method), "\(method)")
         }

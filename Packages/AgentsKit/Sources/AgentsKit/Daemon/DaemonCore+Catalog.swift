@@ -2,8 +2,7 @@
 import Foundation
 
 /// Searching a catalogue and adding skills to the person or a project (059,
-/// contracts/catalog-methods.md). Control-only: none of these is in `deviceMethods` or
-/// `agentMethods`.
+/// contracts/catalog-methods.md). A person's: none of these is in `agentMethods`.
 extension DaemonCore {
 
     /// At start: undo an add the last daemon died in the middle of (SC-003).
