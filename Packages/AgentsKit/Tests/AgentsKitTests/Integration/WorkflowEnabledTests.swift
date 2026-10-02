@@ -128,6 +128,24 @@ struct WorkflowEnabledTests {
         }
     }
 
+    @Test func eachScheduleHasItsOwnNextTimeAndOffHasNone() async throws {
+        let (locations, work) = try temporary()
+        try write("  - agent-finished\n  - schedule:\n      at: [\":00\"]\n  - schedule:\n      at: [\":30\"]",
+                  as: "two-clocks", in: work)
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let on = try #require(await summary(core, work, "two-clocks"))
+        #expect(on.nextFireAtByTrigger.count == 3)
+        #expect(on.nextFireAtByTrigger[0] == nil)
+        let hour = try #require(on.nextFireAtByTrigger[1]), half = try #require(on.nextFireAtByTrigger[2])
+        #expect(Calendar.current.component(.minute, from: hour) == 0)
+        #expect(Calendar.current.component(.minute, from: half) == 30)
+        #expect(on.nextFireAt == min(hour, half))
+
+        try await turn(core, work, "two-clocks", on: false)
+        #expect(await summary(core, work, "two-clocks")?.nextFireAtByTrigger.isEmpty == true)
+    }
+
     @Test func runNowStillRunsAnOffWorkflowAndSaysItWasByHand() async throws {
         let (locations, work) = try temporary()
         try write(halfHourly, as: "nightly", in: work)

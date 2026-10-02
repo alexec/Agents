@@ -177,6 +177,10 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var overLimit: WorkflowLimit?
     /// When a clock will next make it run. `nil` when nothing will.
     public var nextFireAt: Date?
+    /// The same, for each trigger in the file's order (#98): a time for each schedule
+    /// and `nil` for the rest, or empty when nothing will run it. Resolved here, by the
+    /// host's clock, because a server's day may not be the window's.
+    public var nextFireAtByTrigger: [Date?]
     /// What happened the last time it was asked to run. The only evidence a refused
     /// fire leaves, which is why it is here rather than derived.
     public var lastOutcome: WorkflowOutcome?
@@ -203,7 +207,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false,
                 causingEvent: EventPosition? = nil, causingEventName: String? = nil,
                 awaitingApproval: WorkflowApproval? = nil,
-                lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil) {
+                lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil,
+                nextFireAtByTrigger: [Date?] = []) {
+        self.nextFireAtByTrigger = nextFireAtByTrigger
         self.awaitingApproval = awaitingApproval
         self.isEnabled = isEnabled
         self.lastFiredAt = lastFiredAt
@@ -254,6 +260,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
         overLimit = try? c.decodeIfPresent(WorkflowLimit.self, forKey: .overLimit)
         nextFireAt = try c.decodeIfPresent(Date.self, forKey: .nextFireAt)
+        nextFireAtByTrigger = (try? c.decodeIfPresent([Date?].self, forKey: .nextFireAtByTrigger)) ?? []
         lastOutcome = (try? c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)) ?? nil
         causingEvent = try? c.decodeIfPresent(EventPosition.self, forKey: .causingEvent)
         causingEventName = try c.decodeIfPresent(String.self, forKey: .causingEventName)

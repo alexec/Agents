@@ -204,20 +204,22 @@ extension DaemonCore {
         let overLimit = archived ? nil : limitReached(by: workflow, records: records)
         // A file waiting for the person has no next run: nothing fires until they approve.
         let waiting = archived ? nil : awaitingApproval(workflow, state: state, records: records)
+        let runs = !archived && enabled && overLimit == nil && waiting == nil && workflow.problem == nil
+        let now = Date()
         return WorkflowSummary(
             workflow: workflow,
             isArchived: archived,
             isEnabled: enabled,
             overLimit: overLimit,
-            nextFireAt: archived || !enabled || overLimit != nil || waiting != nil
-                ? nil : workflow.nextDue(after: Date()),
+            nextFireAt: runs ? workflow.nextDue(after: now) : nil,
             lastOutcome: state?.lastOutcome,
             isRunning: isRunning(workflow),
             causingEvent: state?.lastCausingEvent,
             causingEventName: state?.lastCausingEvent.flatMap { eventLog.event(at: $0) }.map(Self.eventLabel),
             awaitingApproval: waiting,
             lastFiredAt: state?.lastFiredAt,
-            lastFiredBy: state?.lastFiredBy)
+            lastFiredBy: state?.lastFiredBy,
+            nextFireAtByTrigger: runs ? workflow.triggers.map { $0.schedule?.nextDue(after: now) } : [])
     }
 
     /// Whether a run of it is in flight.
