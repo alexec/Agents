@@ -4,7 +4,7 @@
 // a fourth from 1440; from 760 the projects fold into a menu; below 760 one column at a time.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { hostStateWords, type Store } from "../model/store";
+import { actDoing, hostStateWords, type Store } from "../model/store";
 import { agentsIn, counts, folderKey, headings, projectSubtitle, showsUnread } from "../model/groups";
 import { parseQuery, queryMatches } from "../model/labels";
 import type { Agent, ControlHost, ProjectSummary } from "../protocol/generated";
@@ -18,13 +18,14 @@ import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { SessionRow } from "./SessionRow";
 import { WorkflowRow } from "./WorkflowRow";
+import { WorkflowPage } from "./WorkflowPage";
 import { workflowSummary } from "../model/workflows";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
   const down = session.state.value.kind === "down";
   // Which single column a narrow window shows: the deepest one the route names.
-  const depth = r.session || r.compose ? "chat" : r.project ? "sessions" : "projects";
+  const depth = r.session || r.workflow || r.compose ? "chat" : r.project ? "sessions" : "projects";
   const project = r.host && r.project
     ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
     : undefined;
@@ -48,7 +49,10 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
         <ProjectsColumn session={session} store={store} />
         <SessionsColumn store={store} linkDown={down} />
         {r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
-          : r.host && r.project && project ? (
+          : r.host && r.project && project && r.workflow ? (
+            <WorkflowPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
+              workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
+          ) : r.host && r.project && project ? (
             <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
           ) : <section class="chat empty" aria-label="Chat"><p>Choose a project.</p></section>}
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
@@ -80,7 +84,13 @@ function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
         return (
           <div class={`host${offline ? " host-offline" : ""}`} key={host.id}>
             <h2>{hostHeading(host)}</h2>
-            {offline && <p class="row offline">{hostStateWords(host.state)}: what's shown is from when it was last heard.</p>}
+            {/* This Mac's host down is said whole, in the window's words (#83); a server's state as before. */}
+            {offline && (host.id === "mac" ? (
+              <div class="host-down" role="status">
+                <p class="strong">⚠︎ This Mac’s host isn’t answering</p>
+                <p class="quiet small">What’s listed is what it last said. The control plane is trying again by itself.</p>
+              </div>
+            ) : <p class="row offline">{hostStateWords(host.state)}: what's shown is from when it was last heard.</p>)}
             {projectsOf(store, host).map((project) => {
               const folder = project.project.folder;
               const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);
@@ -160,12 +170,18 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
   const workflows = allWorkflows.filter((w) => !w.isArchived);
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const pick = (agent: Agent) => go({ host, project: folder, session: agent.id });
+  const going = (agent: Agent) => {
+    const act = store.onItsWay.value[agent.id];
+    return act && typeof act === "string" && host ? { doing: actDoing(act), recipient: store.recipient(host) } : undefined;
+  };
+  const pickWorkflow = (id: string) => go({ host, project: folder, workflow: id });
   const openArchived = (open: boolean) => {
     showsArchived.value = open;
     if (open && host && folder) void store.loadArchived(host, folder);
   };
   return (
-    <section class="sessions" aria-label="Sessions">
+    // Greyed while its host is down, as the window's rows are (#83): what they show is what it last said.
+    <section class={`sessions${r.host && !linkDown && !store.hostIsOnline(r.host) ? " greyed" : ""}`} aria-label="Sessions">
       <header class="column-head">
         <button class="back narrow-only" onClick={() => go({})}>‹ Projects</button>
         <span class="medium-only menu-anchor">
@@ -200,7 +216,7 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
                   {group.agents.some(showsUnread) && <span> · {group.agents.filter(showsUnread).length} unread</span>}
                 </h3>
                 {group.agents.map((agent) => (
-                  <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} />
+                  <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)} />
                 ))}
               </div>
             ))}
@@ -214,7 +230,7 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
               onToggle={(e) => openArchived((e.currentTarget as HTMLDetailsElement).open)}>
               <summary class="subhead">Archived sessions{showsArchived.value && <span class="count"> {archived.length}</span>}</summary>
               {(search.value ? archived : archived.slice(0, archivedShown)).map((agent) => (
-                <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} />
+                <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)} />
               ))}
               {showsArchived.value && project.retiredCount > 0 && !search.value && (
                 <p class="hint">{project.retiredCount === 1 ? "1 older agent has been retired."
@@ -228,13 +244,15 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
             <h2 class="section-head">Workflows <span class="count">{workflows.length}</span></h2>
             {workflows.length === 0 && !search.value && <p class="hint">None</p>}
             {workflows.map((summary) => (
-              <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down} />
+              <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down}
+                chosen={r.workflow === summary.workflow.workflowID} onPick={() => pickWorkflow(summary.workflow.workflowID)} />
             ))}
             {archivedWorkflows.length > 0 && (
               <details class="archived" open={!!search.value}>
                 <summary class="subhead">Archived workflows <span class="count">{archivedWorkflows.length}</span></summary>
                 {archivedWorkflows.map((summary) => (
-                  <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down} />
+                  <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down}
+                chosen={r.workflow === summary.workflow.workflowID} onPick={() => pickWorkflow(summary.workflow.workflowID)} />
                 ))}
               </details>
             )}

@@ -6,7 +6,7 @@ import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, FileStamp,
+  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure,
 } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { describe } from "./errors";
@@ -15,6 +15,9 @@ import { folderKey } from "./groups";
 import { DisplayBuilder, type Item } from "./turns";
 
 export { folderKey } from "./groups";
+
+/** How many finished turns a chat opens with, as the window's (#90). */
+const openingTurns = 12;
 
 /** How many entries heard as they happened are kept to lay over a page that arrives late. */
 const heardSincePageLimit = 1_000;
@@ -78,6 +81,23 @@ export class Work {
   /** The mode last chosen for each runtime, by host (029). */
   readonly rememberedModes = signal<Record<string, Record<string, JSONValue>>>({});
 
+  /**
+   * What didn't work, in one sentence, shown until its own OK closes it. Another arriving
+   * meanwhile waits its turn rather than replacing it, as the window's alerts do (#101).
+   */
+  readonly problem = signal<string | null>(null);
+  private problemsWaiting: string[] = [];
+
+  say(sentence: string): void {
+    if (this.problem.value === null) this.problem.value = sentence;
+    else if (this.problem.value !== sentence && !this.problemsWaiting.includes(sentence)) this.problemsWaiting.push(sentence);
+  }
+
+  /** The shown problem's OK: the next one waiting, if any. */
+  dismissProblem(): void {
+    this.problem.value = this.problemsWaiting.shift() ?? null;
+  }
+
   private display = new DisplayBuilder();
   private entryIDs = new Set<string>();
   private heardSincePage: TranscriptEntry[] = [];
@@ -139,6 +159,11 @@ export class Work {
         this.filesChanged.value = { host, agentID: note.agentID, folders: note.folders, at: Date.now() };
         return true;
       }
+      case "storage/writeFailed":
+        // Something nobody was waiting on was not kept: a full disk, or a folder refusing
+        // writes. Said, as the window and the Remote say it (#88).
+        this.say((params as WriteFailure).message);
+        return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
         return true;
@@ -272,6 +297,22 @@ export class Work {
     return this.hasMoreBefore.value || this.firstTurn.value > 0;
   }
 
+  /**
+   * Since when each host has not been online, as this page first heard it (#83; the window's
+   * macDownSince). Kept while it stays down, dropped once it is back.
+   */
+  readonly downSince = signal<Record<string, number>>({});
+
+  /** The hosts as listed, with when each one went down noted. */
+  takeHosts(hosts: ControlHost[], now = Date.now()): void {
+    const since: Record<string, number> = {};
+    for (const host of hosts) if (host.state !== "online") since[host.id] = this.downSince.value[host.id] ?? now;
+    batch(() => {
+      this.hosts.value = hosts;
+      this.downSince.value = since;
+    });
+  }
+
   /** Whether a host answers: online, or held back for a reason the page says. */
   hostIsOnline(host: string): boolean {
     return this.hosts.value.find((h) => h.id === host)?.state === "online";
@@ -293,6 +334,22 @@ export class Work {
   allAgents(): Agent[] {
     return Object.values(this.agents.value).flat();
   }
+}
+
+/** Something a person asked of a whole agent, on its way to its host (#87; AgentAct.swift). */
+export type AgentAct = "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
+  | { sendNow: string };
+
+/** What the pending mark says it is doing, before "telling your Mac" (AgentAct.doing). */
+export function actDoing(act: AgentAct): string {
+  if (typeof act !== "string") return "Sending";
+  return { "agents/stop": "Stopping", "agents/park": "Parking", "agents/unpark": "Unparking", "agents/archive": "Archiving",
+    "agents/unarchive": "Bringing back" }[act];
+}
+
+/** Telling.words: "Parking — telling your Mac", or "telling your Mac" beside a button that says what. */
+export function tellingWords(doing: string | null, recipient: string): string {
+  return doing ? `${doing} — telling ${recipient}` : `telling ${recipient}`;
 }
 
 /** The reducer, fed by the link: everything loaded on each connection, then kept by notifications. */
@@ -318,7 +375,7 @@ export class Store extends Work {
   async load(): Promise<void> {
     this.archivedLoaded.clear();
     const hosts = await this.link.call("hosts/list", {});
-    this.hosts.value = hosts;
+    this.takeHosts(hosts);
     await Promise.all(hosts.filter((host) => host.state === "online").map((host) => this.loadHost(host.id)));
     const watching = this.watching.value;
     if (watching) await this.loadTranscript(watching.host, watching.session);
@@ -379,7 +436,8 @@ export class Store extends Work {
   /** The finished turns first, as summaries, then the transcript from where the open turn starts. */
   private async loadTranscript(host: string, session: string): Promise<void> {
     const agentID = session as never;
-    const turns = await this.link.call("agents/turns", { agentID, limit: 50 }, host)
+    // The last 12, as the window opens a chat (#90); the rest come as the top is reached.
+    const turns = await this.link.call("agents/turns", { agentID, limit: openingTurns }, host)
       .catch(() => ({ turns: [], firstTurn: 0, openStart: 0 }));
     const page = await this.link.call("agents/transcript", { agentID, limit: 200, from: turns.openStart }, host)
       .catch(() => null);
@@ -419,8 +477,6 @@ export class Store extends Work {
 
   // MARK: What the browser sends (071 US3)
 
-  /** The last thing that didn't work, in one sentence; the page shows it until dismissed. */
-  readonly problem = signal<string | null>(null);
   /** Each runtime and what each says it can take, by host. */
   readonly runtimes = signal<Record<string, RuntimeStatus[]>>({});
   readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
@@ -435,7 +491,7 @@ export class Store extends Work {
       return await this.link.call(method, params, host);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
-      this.problem.value = describe(error);
+      this.say(describe(error));
       return null;
     }
   }
@@ -463,7 +519,30 @@ export class Store extends Work {
   }
 
   async sendNow(host: string, agentID: string, promptID: string): Promise<void> {
-    await this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host);
+    await this.acting(agentID, { sendNow: promptID }, () =>
+      this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host));
+  }
+
+  /**
+   * What is on its way to each agent (#87; AgentsModel's acting): stop, park, unpark, archive or
+   * Send now, one at a time. Every control that would send a second sees the first is going.
+   */
+  readonly onItsWay = signal<Record<string, AgentAct>>({});
+
+  /** Who an action goes to, as the pending mark says it: "your Mac", or the host's name. */
+  recipient(host: string): string {
+    return host === "mac" ? "your Mac" : this.hosts.value.find((h) => h.id === host)?.name ?? "the host";
+  }
+
+  private async acting(agentID: string, act: AgentAct, run: () => Promise<unknown>): Promise<void> {
+    if (this.onItsWay.value[agentID]) return;
+    this.onItsWay.value = { ...this.onItsWay.value, [agentID]: act };
+    try {
+      await run();
+    } finally {
+      const { [agentID]: _done, ...rest } = this.onItsWay.value;
+      this.onItsWay.value = rest;
+    }
   }
 
   async unqueue(host: string, agentID: string, promptID: string): Promise<void> {
@@ -472,7 +551,7 @@ export class Store extends Work {
 
   async perform(host: string, agentID: string,
                 action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<void> {
-    await this.act(action, { agentID: agentID as UUID }, host);
+    await this.acting(agentID, action, () => this.act(action, { agentID: agentID as UUID }, host));
   }
 
   // MARK: Files, changes and live pages (071 US4)
@@ -510,6 +589,13 @@ export class Store extends Work {
   async runWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
     const ran = await this.act("workflows/run", { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID }, host);
     if (ran) this.upsertWorkflow(ran, host);
+  }
+
+  /** Turn Off / Turn On (#100): it keeps its place on the list either way. */
+  async setWorkflowEnabled(host: string, summary: WorkflowSummary, enabled: boolean): Promise<void> {
+    const changed = await this.act("workflows/enable",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, enabled }, host);
+    if (changed) this.upsertWorkflow(changed, host);
   }
 
   /** Mark as Unread / Mark as Read (#70). */

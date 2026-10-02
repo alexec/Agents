@@ -36,7 +36,11 @@ const questionWentUnanswered = "Nobody answered this question before the agent e
 /** How long a card answered elsewhere stays to say so. */
 const answeredElsewhereShownFor = 4_000;
 
-export function Cards({ store, host, session }: { store: Store; host: string; session: string }) {
+export function Cards({ store, host, session, down = false }: {
+  store: Store; host: string; session: string;
+  /** Its host is down: the answers are held, greyed, until it is back, as the window's are (#83). */
+  down?: boolean;
+}) {
   // A question taken away because its runtime went is said in the conversation first, then
   // withdrawn (RuntimeNote.questionWentUnanswered): that line, after it was asked, is the tell.
   const unansweredSince = (askedAt: number) => store.entries.value.some((e) =>
@@ -101,7 +105,7 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
       // The host refusing means it was no longer waiting; the link dropping, or the host
       // being away, means try again.
       const away = !(error instanceof CallFailed) || error.code === Failure.hostOffline;
-      if (away) store.problem.value = describe(error);
+      if (away) store.say(describe(error));
       mark(id, away ? null : "elsewhere");
     }
   };
@@ -113,11 +117,11 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
     <div class="cards" aria-label="Waiting for you">
       {cards.map((card) => card.kind === "permission"
         ? <PermissionCard key={card.request.id} request={card.request}
-            hold={{ answered: card.answered, chosen: card.chosen, recipient }}
+            hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
             answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
               { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
         : <ElicitationCard key={card.request.id} request={card.request}
-            hold={{ answered: card.answered, chosen: card.chosen, recipient }}
+            hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
             answer={(key, action, content) => send(card.request.id, key, (sendID) => store.link.call("elicitations/answer",
               { requestID: card.request.id, action, content, sendID }, host))} />)}
     </div>
@@ -131,7 +135,7 @@ function AnsweredNote({ answered }: { answered: Answered }) {
 }
 
 /** Where a card stands: its answer, and while one is on its way, which and to whom. */
-interface Hold { answered: Answered; chosen: string | undefined; recipient: string }
+interface Hold { answered: Answered; chosen: string | undefined; recipient: string; down: boolean }
 
 /**
  * A button's part in that: the one sent keeps its look and says where it is going; the others
@@ -139,9 +143,10 @@ interface Hold { answered: Answered; chosen: string | undefined; recipient: stri
  */
 function holding(hold: Hold, key: string) {
   const sending = hold.answered === "sending";
+  const off = hold.down && hold.answered === null;
   return {
-    class: sending && hold.chosen !== key ? "held" : "",
-    disabled: hold.answered !== null,
+    class: (sending && hold.chosen !== key) || off ? "held" : "",
+    disabled: hold.answered !== null || off,
     telling: sending && hold.chosen === key
       ? <span class="telling" role="status"><span class="spinner" aria-hidden="true" />telling {hold.recipient}</span>
       : null,
@@ -248,7 +253,7 @@ function defaultsOf(request: ElicitationRequest): Record<string, JSONValue> {
 function ElicitationCard({ request, hold, answer }: {
   request: ElicitationRequest; hold: Hold; answer: (key: string, action: Action, content: Record<string, JSONValue>) => void;
 }) {
-  const inert = hold.answered !== null;
+  const inert = hold.answered !== null || hold.down;
   // Each card is its own request (keyed by its id above), so its defaults are where it starts.
   // Filled in an effect instead, they landed after the first paint, and a choice made before
   // then was wiped: the form went back empty (the closing walk, T071).

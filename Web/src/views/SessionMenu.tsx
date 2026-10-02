@@ -48,7 +48,7 @@ export function SessionMenu({ store, host, agent, disabled }: { store: Store; ho
   return (
     <span class="menu-anchor session-menu" ref={anchor}>
       <button class="icon" aria-label="More" title="More" aria-haspopup="menu" aria-expanded={open.value}
-        disabled={!agent || disabled} onClick={() => (open.value = !open.value)}>···</button>
+        disabled={!agent || disabled || (agent && !!store.onItsWay.value[agent.id])} onClick={() => (open.value = !open.value)}>···</button>
       {open.value && agent && (
         <div class="popover right" role="menu">
           {sessionActions(agent).map(({ action, label, help }) => (

@@ -1281,6 +1281,12 @@ export type WorkflowCause =
   | { byHand: Record<string, never> }
   | { trigger: { _0: WorkflowTrigger } };
 
+export interface WorkflowEnableRequest {
+  folder: URLString;
+  workflowID: string;
+  enabled: boolean;
+}
+
 export type WorkflowLimit = "project" | "total";
 
 export type WorkflowMode = "new" | "standing" | "triggering";
@@ -1407,6 +1413,15 @@ export interface WorktreesListResponse {
   branches: BranchSummary[];
 }
 
+export interface WriteFailure {
+  cause: WriteFailureCause;
+  path?: string;
+  what: string;
+  message: string;
+}
+
+export type WriteFailureCause = "diskFull" | "notAllowed" | "readOnly";
+
 /** Every method the web remote may call: its params and its result. */
 export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
@@ -1455,6 +1470,7 @@ export interface Methods {
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
+  "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
   "worktrees/list": { params: WorktreesListRequest; result: WorktreesListResponse };
@@ -1508,6 +1524,7 @@ export const MethodTarget = {
   "runtimes/accounts": "host",
   "runtimes/list": "host",
   "surface/identify": "host",
+  "workflows/enable": "host",
   "workflows/list": "host",
   "workflows/run": "host",
   "worktrees/list": "host",
@@ -1527,6 +1544,7 @@ export interface Notifications {
   "files/changed": FilesChangedNotification;
   "modes/changed": Record<string, JSONValue>;
   "project/changed": ProjectSummary;
+  "storage/writeFailed": WriteFailure;
   "workflow/changed": WorkflowSummary;
   "workflow/removed": WorkflowRemovedNotification;
 }
@@ -1660,6 +1678,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: [] },
+  WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
   WorkflowRemovedNotification: { required: ["folder", "workflowID"], optional: [] },
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
@@ -1670,4 +1689,5 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },
   WorktreesListRequest: { required: ["folder"], optional: [] },
   WorktreesListResponse: { required: ["isRepository", "canMakeNew", "worktrees", "branches"], optional: ["whyNot"] },
+  WriteFailure: { required: ["cause", "what", "message"], optional: ["path"] },
 };

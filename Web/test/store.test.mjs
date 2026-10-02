@@ -38,3 +38,32 @@ test("a host's notifications touch only that host's lists", () => {
   assert.deepEqual(work.agents.value.A, []);
   assert.equal(work.agents.value.B[0].title, "Other");
 });
+
+test("a problem stays until its own OK, and the next waits its turn (#101)", () => {
+  const work = new Work();
+  work.say("first");
+  work.say("second");
+  work.say("first");
+  assert.equal(work.problem.value, "first");
+  work.dismissProblem();
+  assert.equal(work.problem.value, "second");
+  work.dismissProblem();
+  assert.equal(work.problem.value, null);
+});
+
+test("a write the host could not keep is said in its words (#88)", () => {
+  const work = new Work();
+  const message = "Your Mac is out of disk space, so the transcript could not be saved. Free some space, then try again.";
+  assert.equal(work.apply("storage/writeFailed", { cause: "diskFull", what: "the transcript", message }, host), true);
+  assert.equal(work.problem.value, message);
+});
+
+test("a host down is noted from when the page first heard it, and forgotten once back (#83)", () => {
+  const work = new Work();
+  const mac = (state) => ({ id: "mac", name: "Mac", platform: "macOS", version: "1", state, reach: "local" });
+  work.takeHosts([mac("offline")], 1000);
+  work.takeHosts([mac("offline")], 5000);
+  assert.deepEqual(work.downSince.value, { mac: 1000 });
+  work.takeHosts([mac("online")], 9000);
+  assert.deepEqual(work.downSince.value, {});
+});

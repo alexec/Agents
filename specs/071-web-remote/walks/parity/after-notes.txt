@@ -1,0 +1,19 @@
+— starting
+while starting: ["Starting — telling your Mac"], field {"text":"Reply with one word: started.","readOnly":true}
+shot after-starting.png
+after: opened ["Reply with one word: started."]
+errors: []
+— changes
+changes: ["▾ .agents/workflows +31","? after-build.md +11","? greeting.md +10","? nightly.md +10","? notes.md · being edited +2"]
+shot after-changes.png
+files: ["📁 .agents +31","📁 .claude","📁 .git","📄 AGENTS.md","📄 CLAUDE.md","? notes.md +2","📄 README.md"]
+shot after-files.png
+back: marked ["? notes.md +2"]
+shot after-files-back.png
+— hostdown
+said after 53.7 s: ["⚠︎ This Mac’s host isn’t answering What’s listed is what it last said. The control plane is trying again by itself.","This Mac’s host hasn’t answered since 2:44 AM. Nothing here can change until it’s back. Trying again…"]
+shot after-hostdown-chat.png
+new session: ["This Mac’s host hasn’t answered since 2:44 AM. Nothing here can change until it’s back. Trying again…"]
+shot after-hostdown-new.png
+back after 56.1 s
+errors: []

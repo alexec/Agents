@@ -6,6 +6,7 @@ import { backgroundMark } from "../model/background";
 import { parkedAt, showsUnread } from "../model/groups";
 import { rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
+import { Telling } from "./Telling";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "⧗", done: "✓", stopped: "■" };
 
@@ -53,7 +54,11 @@ export function shortAgo(date: Date, now = new Date()): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-export function SessionRow({ agent, chosen, onPick }: { agent: Agent; chosen: boolean; onPick: () => void }) {
+export function SessionRow({ agent, chosen, onPick, going }: {
+  agent: Agent; chosen: boolean; onPick: () => void;
+  /** Stop, park or archive on its way (#87): what it is doing, and to whom. */
+  going?: { doing: string; recipient: string } | undefined;
+}) {
   const running = backgroundMark(agent.background ?? []);
   const park = parkLine(agent);
   const activity = fromWireDate(agent.lastActivityAt);
@@ -66,7 +71,9 @@ export function SessionRow({ agent, chosen, onPick }: { agent: Agent; chosen: bo
         <span class={`title${showsUnread(agent) ? " unread" : ""}`} aria-description={showsUnread(agent) ? "unread" : undefined}>
           {showsUnread(agent) && <span class="unread-dot" aria-hidden="true" />}{agent.title ?? "Untitled"}
         </span>
-        {agent.report && <span class="subtitle report">{agent.report.message}</span>}
+        {/* In the report's place, as the window's row has it (#87). */}
+        {going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
+          : agent.report && <span class="subtitle report">{agent.report.message}</span>}
         {(agent.worktree || labels.length > 0) && (
           <span class="chips">
             {agent.worktree && <span class="chip worktree" title={agent.worktree.branch ?? "detached"}>⑂ {agent.worktree.name}</span>}

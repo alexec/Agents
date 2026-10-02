@@ -8,7 +8,7 @@ export function Problem({ store }: { store: Store }) {
   return (
     <div class="problem" role="alert">
       <span>{problem}</span>
-      <button class="link" onClick={() => (store.problem.value = null)}>OK</button>
+      <button class="link" onClick={() => store.dismissProblem()}>OK</button>
     </div>
   );
 }

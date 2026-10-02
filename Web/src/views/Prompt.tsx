@@ -11,8 +11,12 @@ import type { ComponentChildren } from "preact";
 import type { ACPPromptCapabilities, Attachment } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { attach, refusal, totalRefusal } from "../model/attachments";
+import { Telling } from "./Telling";
 
-export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, where, runtime, children }: {
+/** A send usually lands before anyone could read a word; words only for one still going after this. */
+const slowSend = 400;
+
+export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, children }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -22,6 +26,10 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   /** Sending and attaching are off; typing never is. */
   /** Answers whether it went, so a refused prompt keeps what was typed. */
   send: (text: string, attachments: Attachment[]) => Promise<boolean>;
+  /** Who it goes to, as the pending mark says it (#87). */
+  recipient: string;
+  /** A new session's bar: what is typed stays, held, until the agent exists (#87). */
+  starting?: boolean;
   /** Where it works, and its labels: above the input, on the left. */
   where?: ComponentChildren;
   /** The runtime: above the input, on the right. */
@@ -34,6 +42,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   const attachments = useSignal<Attachment[]>(kept?.attachments ?? []);
   const said = useSignal<string | null>(null);
   const sending = useSignal(false);
+  const slow = useSignal(false);
   const picker = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,15 +71,38 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   const refused = attachments.value.map((a) => refusal(a, capabilities)).find((r) => r !== null) ?? null;
   const canSend = !disabled && !sending.value && text.value.trim() !== "" && !tooMuch && !refused;
 
+  useEffect(() => {
+    slow.value = false;
+    if (!sending.value) return;
+    const timer = setTimeout(() => (slow.value = true), slowSend);
+    return () => clearTimeout(timer);
+  }, [sending.value]);
+
+  /**
+   * A prompt to an agent leaves the field at once, so sending feels immediate, and is given back
+   * if it did not go and nothing new was typed. A new session has no chat to show it in, so its
+   * words stay in the held field under "Starting — telling your Mac" until it exists (#87).
+   */
   const submit = async () => {
     if (!canSend) return;
-    sending.value = true;
-    const went = await send(text.value.trim(), attachments.value);
-    sending.value = false;
-    if (went) {
+    const outgoing = text.value.trim();
+    const going = attachments.value;
+    if (!starting) {
       text.value = "";
       attachments.value = [];
       store.drafts.delete(draftKey);
+    }
+    sending.value = true;
+    const went = await send(outgoing, going);
+    sending.value = false;
+    if (starting && went) {
+      text.value = "";
+      attachments.value = [];
+      store.drafts.delete(draftKey);
+    } else if (!starting && !went && text.value === "" && attachments.value.length === 0) {
+      text.value = outgoing;
+      attachments.value = going;
+      keep();
     }
   };
 
@@ -81,6 +113,9 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
           <div class="bar-where">{where}</div>
           {runtime && <div class="bar-runtime">{runtime}</div>}
         </div>
+      )}
+      {sending.value && (starting || slow.value) && (
+        <Telling recipient={recipient} doing={starting ? "Starting" : "Sending"} />
       )}
       <div class={`prompt${disabled ? " off" : ""}`}
         onDragOver={(e) => { e.preventDefault(); }}
@@ -106,6 +141,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
         <div class="prompt-field">
           {/* Never disabled: what is typed while the link is down is kept and sent once it's back (US7). */}
           <textarea aria-label="Prompt" placeholder={placeholder} rows={2} value={text.value}
+            readOnly={starting && sending.value}
             onInput={(e) => { text.value = (e.currentTarget as HTMLTextAreaElement).value; keep(); }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
@@ -127,11 +163,19 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
             if (input.files) void take(Array.from(input.files));
             input.value = "";
           }} />
-          <button class="send" aria-label="Send" title="Send (Return)" disabled={!canSend} onClick={() => void submit()}>↑</button>
+          {/* Bright while its own spinner turns, as the answer that went stays bright on the cards (#86). */}
+          <button class={`send${sending.value ? " going" : ""}`} aria-label={sending.value ? tellingLabel(starting, recipient) : "Send"}
+            title="Send (Return)" disabled={!canSend && !sending.value} onClick={() => void submit()}>
+            {sending.value ? <span class="spinner" aria-hidden="true" /> : "↑"}
+          </button>
         </div>
       </div>
       {(said.value || tooMuch) && <p class="failure small" role="status">{said.value ?? tooMuch}</p>}
       {children && <div class="bar-foot">{children}</div>}
     </div>
   );
+}
+
+function tellingLabel(starting: boolean, recipient: string): string {
+  return `${starting ? "Starting" : "Sending"} — telling ${recipient}`;
 }
