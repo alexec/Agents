@@ -266,7 +266,7 @@ struct LoopbackListenerTests {
 
     /// `control/status` as a device would get it.
     static func status(of service: ControlService) async throws -> DaemonAPI.ControlStatus {
-        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), grant: .device, kind: .browser)
+        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), kind: .browser)
         let answer = try await service.methods.handle(method: DaemonAPI.Method.controlStatus, params: nil, from: caller)
         return try answer.decode(DaemonAPI.ControlStatus.self)
     }

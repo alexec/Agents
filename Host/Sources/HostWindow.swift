@@ -456,15 +456,6 @@ struct PairingSheet: View {
             }
             .pickerStyle(.segmented)
             .onChange(of: model.pairingTarget) { Task { await model.makeCode() } }
-            if model.pairingTarget == .browser {
-                // Chosen first, and a device unless chosen otherwise (071 FR-012, frame E).
-                Picker("It may", selection: $model.browserGrant) {
-                    Text("what a phone can (Device)").tag(Grant.device)
-                    Text("do everything (Operator)").tag(Grant.operator)
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: model.browserGrant) { Task { await model.makeCode() } }
-            }
             if let code = model.pairing {
                 if code.target == .phone {
                     // What the Remote's Scan the Code reads; the text below is for Paste.
@@ -503,9 +494,9 @@ struct PairingSheet: View {
         case .window:
             "Paste it into Agents under Connect to a control plane. It works once, for five minutes, and lets that window do everything."
         case .phone:
-            "In Agents on the iPhone or iPad, tap Scan the Code and point it at this, or copy the text and tap Paste there. It works once, for five minutes. A device can answer and watch; it can't change who may do what."
+            "In Agents on the iPhone or iPad, tap Scan the Code and point it at this, or copy the text and tap Paste there. It works once, for five minutes, and lets that device do everything."
         case .browser:
-            "Paste it into Agents in a browser on this Mac, at localhost. It works once, for five minutes."
+            "Paste it into Agents in a browser on this Mac, at localhost. It works once, for five minutes, and lets that browser do everything."
         }
     }
 }

@@ -203,7 +203,7 @@ public final class ControlUplink: @unchecked Sendable {
             let channel = Channel(number: number, uplink: transport)
             let replaced = lock.withLock { channels.updateValue(channel, forKey: number) }
             replaced?.end(tellingTheControlPlane: false)
-            server.acceptVirtual(channel, grant: open.grant, device: open.device) { [weak self] in
+            server.acceptVirtual(channel, device: open.device) { [weak self] in
                 self?.ended(channel)
             }
         case .close(let number):

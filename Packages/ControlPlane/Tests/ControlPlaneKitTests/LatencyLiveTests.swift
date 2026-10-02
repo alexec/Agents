@@ -152,7 +152,7 @@ struct LatencyLiveTests {
     /// A window paired at `url`, dialling as the apps do.
     func window(service: ControlService, url: URL, pin: String?) async throws -> ControlLink {
         let (_, _, credentials) = try await base.pairedClient(
-            at: url, code: try await service.codes.issue(.client(.operator)).text, pin: pin)
+            at: url, code: try await service.codes.issue(.client).text, pin: pin)
         return ControlLink {
             let socket = try await WebSocketLink.connect(url, pin: pin)
             return try await ControlAuth.join(socket, origin: ControlAuth.origin(url)!, as: credentials).transport

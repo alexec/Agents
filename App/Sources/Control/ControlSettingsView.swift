@@ -162,7 +162,7 @@ struct ControlOverviewPage: View {
             SharedSectionLabel("Clients")
             ControlCard {
                 ControlRow(dot: .none,
-                           title: "\(count(control.clients.count, "client")) · \(count(control.operatorCount, "operator"))",
+                           title: count(control.clients.count, "client"),
                            detail: control.clients.map { $0.id == control.status?.you ? "This window" : $0.name }
                                .joined(separator: ", ")) {
                     Button("Show") { page = .clients }.buttonStyle(.link)
@@ -273,23 +273,15 @@ struct ControlHostsPage: View {
 
 // MARK: - G · Pair a Mac, and Add by Code
 
-/// Frame G: the grant first, then the code as text, since a Mac has no camera; and the
-/// same sheet for a host's code. A new code each time the grant changes, replacing the
-/// last, so only the code on screen works.
+/// Frame G: the code as text, since a Mac has no camera; and the same sheet for a host's
+/// code. Every client may do everything (#111), so there is nothing to choose first.
 struct CodeSheet: View {
-    /// A browser is a client like a Mac, on this Mac only, and a device unless chosen (071, frame E).
+    /// A browser is a client like a Mac, on this Mac only (071, frame E).
     enum Purpose { case mac, browser, host }
 
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
     let purpose: Purpose
-    @State private var grant: Grant
-
-    init(control: ControlSettingsModel, purpose: Purpose) {
-        self.control = control
-        self.purpose = purpose
-        _grant = State(initialValue: purpose == .browser ? .device : .operator)
-    }
     @State private var shown: DaemonAPI.ControlCodeShown?
     /// Who was there when the code was made, so whoever it lets in can be named.
     @State private var before: Set<String> = []
@@ -297,26 +289,6 @@ struct CodeSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(title).appText(.reading).fontWeight(.semibold)
-            if purpose != .host {
-                HStack {
-                    Text("It may")
-                    Spacer()
-                    Picker("It may", selection: $grant) {
-                        // A browser offers the safer choice first, and starts on it (071 FR-012).
-                        if purpose == .browser {
-                            Text("what a phone can (Device)").tag(Grant.device)
-                            Text("do everything (Operator)").tag(Grant.operator)
-                        } else {
-                            Text("do everything (Operator)").tag(Grant.operator)
-                            Text("what a phone can (Device)").tag(Grant.device)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                Divider()
-            }
             if let joined {
                 Text("\(joined) joined with this code. It can’t be used again.")
                     .appText(.reading)
@@ -355,9 +327,9 @@ struct CodeSheet: View {
         }
         .padding(24)
         .frame(width: 560)
-        .task(id: grant) {
+        .task {
             before = members
-            shown = await control.startCode(forHost: purpose == .host, grant: grant, browser: purpose == .browser)
+            shown = await control.startCode(forHost: purpose == .host, browser: purpose == .browser)
         }
         .onDisappear { Task { await control.stopCodes() } }
     }
@@ -389,9 +361,9 @@ struct CodeSheet: View {
         let time = left == 0 ? "It has run out; close this and ask again." : "It works once, for \(left / 60):\(String(format: "%02d", left % 60))."
         switch purpose {
         case .mac:
-            return "On the other Mac, open Agents, choose Connect to a control plane and paste this. \(time)"
+            return "On the other Mac, open Agents, choose Connect to a control plane and paste this. That Mac can then do all this window can. \(time)"
         case .browser:
-            return "Paste it into Agents in a browser on this Mac, at localhost. \(time)"
+            return "Paste it into Agents in a browser on this Mac, at localhost. That browser can then do all this window can. \(time)"
         case .host:
             return "On the other machine, start its agents with agentsd --control-code and this code. \(time)"
         }

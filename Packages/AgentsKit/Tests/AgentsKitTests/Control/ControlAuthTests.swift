@@ -29,7 +29,7 @@ struct ControlAuthTests {
             throw ControlAuth.Refusal(.badMessage)
         }
         let (who, mac) = try await ControlAuth.verify(got, serverNonce: serverNonce, origin: serverOrigin ?? origin, key: key)
-        try ControlAuth.check(ControlAuth.OK(mac: ControlCode.base64url(mac), grant: .operator), expect: expect)
+        try ControlAuth.check(ControlAuth.OK(mac: ControlCode.base64url(mac)), expect: expect)
         return who
     }
 

@@ -47,28 +47,10 @@ struct ControlClientsPage: View {
         let line = clientLine(client, isYou: isYou)
         return ControlRow(dot: .none, title: isYou ? "This window" : client.name, chip: isYou ? "you" : away ? "away" : nil,
                           chipTone: away ? .attention : .source, detail: line.plain, detailText: line.drawn) {
-            HStack(spacing: 8) {
-                grantPicker(client.grant) { grant in
-                    Task { await control.setGrant(grant, of: client.id) }
-                }
-                // A refused change leaves the record as it was, which a Binding alone would
-                // not redraw: the segment clicked would stay lit.
-                .id("\(client.grant.rawValue)-\(control.revision)")
-                if !isYou {
-                    Button("Forget…") { forgettingClient = client }.buttonStyle(.paper)
-                }
+            if !isYou {
+                Button("Forget…") { forgettingClient = client }.buttonStyle(.paper)
             }
         }
-    }
-
-    private func grantPicker(_ grant: Grant, change: @escaping (Grant) -> Void) -> some View {
-        Picker("Grant", selection: Binding(get: { grant }, set: { if $0 != grant { change($0) } })) {
-            Text("Operator").tag(Grant.operator)
-            Text("Device").tag(Grant.device)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .fixedSize()
     }
 
     /// Frame N: what it is, then how it reaches the control plane now: directly, through

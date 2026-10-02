@@ -3,7 +3,7 @@
 //
 //   node Web/test/walk/bar.mjs <WEB_URL> <browser code> <project name> <session title> <out dir> <prefix>
 //
-// The code is a browser's (`agents-control code --client device --browser`).
+// The code is a browser's (`agents-control code --client --browser`).
 
 import { writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";

@@ -60,17 +60,18 @@ public enum ControlAuth {
 
     public struct OK: Codable, Sendable, Equatable {
         public var mac: String
-        public var grant: Grant?
+        /// `operator` for a client, for an older web page that shows it (#111). Not read.
+        public var grant: String?
         public var host: HostID?
         public var relayed: Bool?
         /// Where the control plane answers now, and from when (R16): a member with an older
         /// epoch keeps this list in place of its own. Sent once one has been announced.
         public var endpoints: [ControlEndpoint]?
         public var epoch: Int?
-        public init(mac: String, grant: Grant? = nil, host: HostID? = nil, relayed: Bool? = nil,
+        public init(mac: String, client: Bool = false, host: HostID? = nil, relayed: Bool? = nil,
                     endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil) {
             self.mac = mac
-            self.grant = grant
+            self.grant = client ? LegacyGrant.everything : nil
             self.host = host
             self.relayed = relayed
             self.endpoints = endpoints

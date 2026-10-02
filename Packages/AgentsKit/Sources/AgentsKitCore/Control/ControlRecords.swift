@@ -12,11 +12,6 @@ public actor ControlRecords {
     public static let clientsPrefix = "v1/clients/"
     public static let hostsPrefix = "v1/hosts/"
     public static let settingsKey = "v1/control.json"
-    /// Who is an operator, in one object (FR-016, T081). Each client's record is written
-    /// on its own, so two copies each demoting a different operator would both pass a
-    /// check made on their own reading; every change to who is an operator also rewrites
-    /// this, conditionally, so one of the two is `conflict` and the last operator stays.
-    public static let operatorsKey = "v1/operators.json"
     public static func clientKey(_ id: UUID) -> String { clientsPrefix + id.uuidString.lowercased() + ".json" }
     public static func hostKey(_ id: HostID) -> String { hostsPrefix + id.rawValue + ".json" }
     public static func personKey(_ id: PersonID) -> String { "v1/people/\(id.rawValue).json" }
@@ -139,74 +134,17 @@ public actor ControlRecords {
             record.rev = 1
             condition = Self.overTombstone(tombstones[key])
         }
-        let isNew = clientsHeld[record.id] == nil
         let (kept, etag) = try await write(record, to: key, when: condition)
         clientsHeld[record.id] = Held(record: kept, etag: etag)
         tombstones[key] = nil
-        // A new operator is one more that may be left; saying so can wait for a quiet
-        // moment, since a list short of one only ever refuses more.
-        if isNew, kept.grant == .operator {
-            for _ in 0..<3 {
-                do { try await changeOperators { $0.insert(kept.id) }; break } catch StoreError.conflict {}
-            }
-        }
     }
 
-    private struct Operators: Codable {
-        var ids: [UUID]
-    }
-
-    /// The operators as the store has them now, and the condition to write them back on.
-    /// A store from before this object has it made from the clients.
-    private func operatorList() async throws -> (Set<UUID>, StoreCondition) {
-        if let object = try await store.get(Self.operatorsKey),
-           let list = try? Self.decoder.decode(Operators.self, from: object.data) {
-            return (Set(list.ids), .matching(object.etag))
-        }
-        try await load()
-        return (Set(clientsHeld.values.filter { $0.record.grant == .operator }.map(\.record.id)), .absent)
-    }
-
-    /// Changes who is an operator, refusing to leave none. Another copy's change in
-    /// between is `conflict`, and nothing was changed.
-    private func changeOperators(_ change: (inout Set<UUID>) -> Void) async throws {
-        var (ids, condition) = try await operatorList()
-        change(&ids)
-        guard !ids.isEmpty else { try Self.requireOperator(in: []) ; return }
-        let data = try Self.encoder.encode(Operators(ids: ids.sorted { $0.uuidString < $1.uuidString }))
-        _ = try await store.put(Self.operatorsKey, data, when: condition)
-    }
-
-    /// `clients/setGrant`, refused if it would leave no operator (FR-016). The check is
-    /// made on the records as read; a change elsewhere in between is `conflict`.
-    public func setGrant(_ grant: Grant, of id: UUID) async throws {
-        // Paired at another copy since this one last read the store (US3).
-        if clientsHeld[id] == nil { try await load() }
-        guard var record = clientsHeld[id]?.record else {
-            throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: "No client has that id.")
-        }
-        let was = record.grant
-        record.grant = grant
-        var after = clientsHeld.mapValues(\.record)
-        after[id] = record
-        try Self.requireOperator(in: Array(after.values))
-        if was != grant {
-            try await changeOperators { ids in
-                if grant == .operator { ids.insert(id) } else { ids.remove(id) }
-            }
-        }
-        try await save(record)
-    }
-
-    /// `clients/forget`: a tombstone against the version read, refused for the last
-    /// operator. Nothing happens for a client that is not known.
+    /// `clients/forget`: a tombstone against the version read. Nothing happens for a
+    /// client that is not known. The last client may go too (#111): Agents Host, on the
+    /// control plane's own Mac, can always make a code for another.
     public func forget(_ id: UUID) async throws {
         if clientsHeld[id] == nil { try await load() }
         guard let held = clientsHeld[id] else { return }
-        var after = clientsHeld.mapValues(\.record)
-        after[id] = nil
-        try Self.requireOperator(in: Array(after.values))
-        if held.record.grant == .operator { try await changeOperators { _ = $0.remove(id) } }
         var tombstone = held.record
         tombstone.forgotten = true
         tombstone.rev += 1
@@ -266,13 +204,6 @@ public actor ControlRecords {
     }
 
     // MARK: Rules
-
-    static func requireOperator(in clients: [ClientRecord]) throws {
-        guard clients.contains(where: { $0.grant == .operator }) else {
-            throw JSONRPCError(code: DaemonAPI.Failure.lastOperator,
-                               message: "That would leave no client that can change grants. Make another client an operator first.")
-        }
-    }
 
     /// A daemon's `devices.json`, read as device clients (the move, R11). The file is left
     /// as it is.

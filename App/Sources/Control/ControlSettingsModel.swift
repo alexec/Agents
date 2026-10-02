@@ -44,12 +44,7 @@ final class ControlSettingsModel {
     /// Every other host, and this Mac's relay: it shares the Mac's machine but is not its host.
     var otherHosts: [DaemonAPI.ControlHost] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
 
-    /// Bumped by every action, so a control that showed a refused change is drawn again
-    /// from the records even when they did not change.
-    private(set) var revision = 0
-
     var onlineCount: Int { hosts.filter { $0.state == "online" }.count }
-    var operatorCount: Int { clients.filter { $0.grant == .operator }.count }
 
     func start() async {
         await refresh()
@@ -96,10 +91,6 @@ final class ControlSettingsModel {
 
     // MARK: Actions
 
-    func setGrant(_ grant: Grant, of client: UUID) async {
-        await perform(DaemonAPI.Method.clientsSetGrant, DaemonAPI.ClientGrantRequest(client: client, grant: grant))
-    }
-
     func forget(_ client: UUID) async {
         await perform(DaemonAPI.Method.clientsForget, DaemonAPI.ClientRequest(client: client))
     }
@@ -141,16 +132,15 @@ final class ControlSettingsModel {
         }
     }
 
-    /// A code for a new client with `grant`, or for a new host (frame G, Add by Code). A
-    /// browser's is good only through the page's own listener (071 R2).
-    func startCode(forHost: Bool, grant: Grant = .operator, browser: Bool = false) async -> DaemonAPI.ControlCodeShown? {
+    /// A code for a new client, or for a new host (frame G, Add by Code). A browser's is
+    /// good only through the page's own listener (071 R2).
+    func startCode(forHost: Bool, browser: Bool = false) async -> DaemonAPI.ControlCodeShown? {
         do {
             let shown: DaemonAPI.ControlCodeShown = if forHost {
                 try await client.call(DaemonAPI.Method.hostsStartEnroll, returning: DaemonAPI.ControlCodeShown.self)
             } else {
                 try await client.call(DaemonAPI.Method.clientsStartPairing,
-                                      ["grant": JSONValue.string(grant.rawValue)]
-                                          .merging(browser ? ["kind": .string(ClientRecord.Kind.browser.rawValue)] : [:]) { a, _ in a },
+                                      JSONValue.object(browser ? ["kind": .string(ClientRecord.Kind.browser.rawValue)] : [:]),
                                       returning: DaemonAPI.ControlCodeShown.self)
             }
             problem = nil
@@ -174,7 +164,6 @@ final class ControlSettingsModel {
     }
 
     private func perform(_ method: String, _ params: some Encodable & Sendable) async {
-        defer { revision += 1 }
         do {
             _ = try await client.call(method, params)
             problem = nil

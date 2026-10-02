@@ -14,7 +14,7 @@ struct StoreCopyTests {
         _ = try await records.settings { ControlSettings(name: "mini", machineID: "m") }
         for n in 0..<3 {
             try await records.save(ClientRecord(id: UUID(), name: "client \(n)", kind: .iPhone,
-                                                publicKey: Data(repeating: UInt8(n), count: 65), grant: .device, paired: Date()))
+                                                publicKey: Data(repeating: UInt8(n), count: 65), paired: Date()))
         }
         try await records.save(HostRecord(id: .mac, name: "This Mac"))
         _ = try await store.put("v1/leases/mac.json", Data("{}".utf8), when: .absent)

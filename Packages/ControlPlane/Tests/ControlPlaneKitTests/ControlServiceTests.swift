@@ -75,19 +75,20 @@ struct ControlServiceTests {
     }
 
     /// A client paired by code, and a link that dials as it.
-    func client(at url: URL, code: String, pin: String? = nil) async throws -> (UUID, ControlLink) {
-        let (id, link, _) = try await pairedClient(at: url, code: code, pin: pin)
+    func client(at url: URL, code: String, pin: String? = nil, kind: ClientRecord.Kind = .mac) async throws -> (UUID, ControlLink) {
+        let (id, link, _) = try await pairedClient(at: url, code: code, pin: pin, kind: kind)
         return (id, link)
     }
 
-    func pairedClient(at url: URL, code: String, pin: String? = nil)
+    func pairedClient(at url: URL, code: String, pin: String? = nil, kind: ClientRecord.Kind = .mac)
         async throws -> (UUID, ControlLink, ControlAuth.Credentials) {
         let key = ControlAgreement.generate()
         let id = UUID()
         _ = try await use(code, at: url, method: DaemonAPI.Method.clientsAnnounce, params: try JSONValue.encoding(
-            DaemonAPI.ClientAnnounce(id: id, publicKey: key.publicKey, name: "window", kind: .mac)), pin: pin)
+            DaemonAPI.ClientAnnounce(id: id, publicKey: key.publicKey, name: "window", kind: kind)), pin: pin)
         let shared = try ControlAuth.clientKey(privateKey: key.privateKey, peer: control.publicKey, client: id)
-        let credentials = ControlAuth.Credentials(identity: .client(id), key: shared, kind: "mac", controlKey: control.publicKey)
+        let credentials = ControlAuth.Credentials(identity: .client(id), key: shared, kind: kind.rawValue.lowercased(),
+                                                  controlKey: control.publicKey)
         let link = ControlLink { try await join(url, credentials, pin: pin) }
         return (id, link, credentials)
     }
@@ -99,7 +100,7 @@ struct ControlServiceTests {
         defer { uplink.stop() }
         await eventually { await running.service.router.state(of: host)?.isOnline == true }
 
-        let (_, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client(.operator)).text)
+        let (_, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client).text)
         let toHost = DaemonClient(link: link.link(for: host))
         try await toHost.connect(startIfNeeded: false)
         let answer = try await toHost.call(DaemonAPI.Method.agentsList)
@@ -120,7 +121,7 @@ struct ControlServiceTests {
         let made = try SelfSigned.make(in: dir, name: "127.0.0.1")
         let running = try await start(tls: made.0, pin: made.pin)
         defer { Task { await running.service.stop() } }
-        let (_, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client(.operator)).text,
+        let (_, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client).text,
                                          pin: made.pin)
         var slow = 0
         for _ in 0..<50 {
@@ -143,7 +144,7 @@ struct ControlServiceTests {
         let command = try #require(shown.command)
         #expect(command.hasPrefix("curl -fsSL --insecure --pinnedpubkey sha256//2UzJa/LFGyMNe2ZNiDRxlVlv6+iVoUATcy/Xg7jQW4Y= "))
         #expect(command.hasSuffix("/v1/install.sh | sh -s -- '\(shown.text)'"))
-        #expect(try await running.service.codes.issue(.client(.device)).command == nil)
+        #expect(try await running.service.codes.issue(.client).command == nil)
 
         let (data, response) = try await URLSession.shared.data(from: running.url.appendingPathComponent("v1/install.sh"))
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
@@ -163,34 +164,44 @@ struct ControlServiceTests {
     @Test func aCodeWorksOnce() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
-        let code = try await running.service.codes.issue(.client(.device)).text
+        let code = try await running.service.codes.issue(.client).text
         _ = try await client(at: running.url, code: code)
         await #expect(throws: (any Error).self) { _ = try await client(at: running.url, code: code) }
     }
 
-    @Test func aDeviceIsRefusedWhatOnlyAnOperatorMayDo() async throws {
+    /// One grant (#111): a phone asks the control plane and a host what only an operator
+    /// could before, over TLS, as the window does.
+    @Test func aPhoneMayDoWhatOnlyAnOperatorCouldBefore() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
         let (host, uplink) = try await host(at: running.url, code: try await running.service.codes.issue(.host).text)
         defer { uplink.stop() }
         await eventually { await running.service.router.state(of: host)?.isOnline == true }
-        let (_, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client(.device)).text)
+        let (phone, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client).text,
+                                             kind: .iPhone)
         defer { link.disconnect() }
         let control = DaemonClient(link: link.controlLink)
         try await control.connect(startIfNeeded: false)
-        await #expect(throws: JSONRPCError.self) { _ = try await control.call(DaemonAPI.Method.clientsList) }
+        let clients = try await control.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
+        #expect(clients.map(\.id) == [phone])
+        let code = try await control.call(DaemonAPI.Method.clientsStartPairing, returning: DaemonAPI.ControlCodeShown.self)
+        #expect(ControlCode(text: code.text)?.purpose == .client)
+        let enrol = try await control.call(DaemonAPI.Method.hostsStartEnroll, returning: DaemonAPI.ControlCodeShown.self)
+        #expect(ControlCode(text: enrol.text)?.purpose == .host)
         let toHost = DaemonClient(link: link.link(for: host))
         try await toHost.connect(startIfNeeded: false)
-        await #expect(throws: JSONRPCError.self) { _ = try await toHost.call(DaemonAPI.Method.runtimesInstall) }
+        let installed = try await toHost.call(DaemonAPI.Method.runtimesInstall)
+        #expect(installed["method"]?.stringValue == DaemonAPI.Method.runtimesInstall)
+        #expect(installed["role"]?.stringValue == "device")
     }
 
     @Test func aForgottenClientIsCutOffAndRefusedAfter() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
-        let (_, window) = try await client(at: running.url, code: try await running.service.codes.issue(.client(.operator)).text)
+        let (_, window) = try await client(at: running.url, code: try await running.service.codes.issue(.client).text)
         defer { window.disconnect() }
         let (phoneID, phone, phoneCredentials) = try await pairedClient(
-            at: running.url, code: try await running.service.codes.issue(.client(.device)).text)
+            at: running.url, code: try await running.service.codes.issue(.client).text)
         let phoneControl = DaemonClient(link: phone.controlLink)
         try await phoneControl.connect(startIfNeeded: false)
         await eventually { await running.service.router.sessions(of: phoneID).count == 1 }
@@ -223,7 +234,7 @@ struct ControlServiceTests {
         let first = try await start(store: FolderStore(root: root))
         let (host, uplink) = try await host(at: first.url, code: try await first.service.codes.issue(.host).text)
         defer { uplink.stop() }
-        let (_, link) = try await client(at: first.url, code: try await first.service.codes.issue(.client(.operator)).text)
+        let (_, link) = try await client(at: first.url, code: try await first.service.codes.issue(.client).text)
         await eventually { await first.service.router.state(of: host)?.isOnline == true }
         await first.service.stop()
 
@@ -254,7 +265,7 @@ struct ControlServiceTests {
         let (context, pin) = try SelfSigned.make(in: dir, name: "127.0.0.1")
         let running = try await start(tls: context, pin: pin)
         defer { Task { await running.service.stop() } }
-        let (_, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client(.operator)).text,
+        let (_, link) = try await client(at: running.url, code: try await running.service.codes.issue(.client).text,
                                          pin: pin)
         let control = DaemonClient(link: link.controlLink)
         try await control.connect(startIfNeeded: false)
@@ -282,7 +293,7 @@ struct ControlServiceTests {
         let running = try await start(tls: context, pin: pin)
         defer { Task { await running.service.stop() } }
         let (id, _, credentials) = try await pairedClient(
-            at: running.url, code: try await running.service.codes.issue(.client(.operator)).text, pin: pin)
+            at: running.url, code: try await running.service.codes.issue(.client).text, pin: pin)
         let link = ControlLink { [url = running.url] in
             let socket = try await WebSocketLink.connect(url, pin: pin)
             return try await ControlAuth.join(socket, origin: ControlAuth.origin(url)!, as: credentials).transport

@@ -15,7 +15,7 @@ const say = (line) => { notes.push(line); console.log(line); };
 const profile = `/tmp/071-us1-chrome-${process.pid}`;
 
 const op = await Operator.pair(controlURL, operatorCode);
-const newCode = async (grant = "device") => (await op.call("clients/startPairing", { grant, kind: "browser" })).text;
+const newCode = async () => (await op.call("clients/startPairing", { kind: "browser" })).text;
 const browsers = async () => (await op.call("clients/list")).filter((c) => c.kind === "browser");
 
 async function pairIn(page, code) {
@@ -39,12 +39,12 @@ await a.waitFor(`document.querySelector("[role=alert]")`);
 say(`3a. expired code: ${await a.text("[role=alert]")}`);
 await a.shot(`${out}/us1-3-expired.png`);
 
-// Scenario 2: pairing with a device code.
-const code = await newCode("device");
+// Scenario 2: pairing with a code.
+const code = await newCode();
 await pairIn(a, code);
-await a.waitFor(`document.body.innerText.includes("This browser ·")`);
+await a.waitFor(`document.body.innerText.includes("on this Mac")`);
 const listed = await browsers();
-say(`2. paired: ${JSON.stringify(await a.text(".identity"))}; Settings lists ${JSON.stringify(listed.map((c) => `${c.name} · ${c.kind} · ${c.grant}`))}`);
+say(`2. paired: ${JSON.stringify(await a.text(".identity"))}; Settings lists ${JSON.stringify(listed.map((c) => `${c.name} · ${c.kind}`))}`);
 await a.shot(`${out}/us1-2-paired.png`);
 const id = listed[0].id;
 
@@ -57,21 +57,11 @@ say(`3b. spent code: ${await spent.text("[role=alert]")}`);
 await chrome.close();
 chrome = await launch({ profile });
 a = await chrome.page(webURL);
-await a.waitFor(`document.body.innerText.includes("This browser ·")`);
+await a.waitFor(`document.body.innerText.includes("on this Mac")`);
 say(`4. after a full restart: ${JSON.stringify(await a.text(".identity"))}, with no code`);
 const tab2 = await chrome.page(webURL);
-await tab2.waitFor(`document.body.innerText.includes("This browser ·")`);
+await tab2.waitFor(`document.body.innerText.includes("on this Mac")`);
 say("   a second tab connects too, on the same key");
-
-// Scenario 7: promoted to operator in Settings; the next connection is judged by it.
-await op.call("clients/setGrant", { client: id, grant: "operator" });
-await a.goto(webURL);
-await a.waitFor(`document.body.innerText.includes("This browser · Operator")`);
-say(`7. promoted: after a reload the page says ${JSON.stringify(await a.text(".identity"))}`);
-await op.call("clients/setGrant", { client: id, grant: "device" });
-await a.goto(webURL);
-await a.waitFor(`document.body.innerText.includes("This browser · Device")`);
-say("   demoted again: Device");
 
 // Scenario 5: forgotten in Settings; within 2 s the page says so and drops its key.
 const started = Date.now();
@@ -84,8 +74,8 @@ say(`5. forgotten in Settings: the page said so after ${took} ms; both tabs show
 await a.shot(`${out}/us1-5-forgotten.png`);
 
 // Scenario 6: paired again, then Forget This Browser… in the page.
-await pairIn(a, await newCode("device"));
-await a.waitFor(`document.body.innerText.includes("This browser ·")`);
+await pairIn(a, await newCode());
+await a.waitFor(`document.body.innerText.includes("on this Mac")`);
 await a.press("Forget This Browser…");
 await a.shot(`${out}/us1-6-confirm.png`);
 await a.press("Forget");

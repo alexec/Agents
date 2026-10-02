@@ -44,8 +44,9 @@ struct MoveTests {
         let status = try await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
         #expect(status.you == phone.id)
         #expect(status.homeHost == .mac)
-        // As a device: the control plane's own clients are not its to list.
-        await #expect(throws: JSONRPCError.self) { _ = try await control.call(DaemonAPI.Method.clientsList) }
+        // And, as every client may since #111, it lists the control plane's clients.
+        let clients = try await control.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
+        #expect(clients.contains { $0.id == phone.id })
 
         // Another key under its id is refused.
         let other = try DeviceKey.ephemeral().controlClientKey(controlKey: base.control.publicKey, client: phone.id)

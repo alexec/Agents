@@ -37,7 +37,7 @@ struct NoticesTests {
     /// A device client paired by code, with the key it keeps.
     func device(_ running: ControlServiceTests.Running) async throws -> (UUID, Data, ControlMembership) {
         let key = ControlAgreement.generate()
-        let code = try #require(ControlCode(text: try await running.service.codes.issue(.client(.device)).text))
+        let code = try #require(ControlCode(text: try await running.service.codes.issue(.client).text))
         let id = UUID()
         let membership = try await ControlCodeUse.pairClient(code, privateKey: key.privateKey, id: id, name: "phone",
                                                              kind: .iPhone, dial: ControlJoin.nio)
@@ -55,7 +55,7 @@ struct NoticesTests {
         defer { Task { await running.service.stop() } }
         let relay = try await relay(running)
         defer { relay.relay.stop() }
-        let (_, link) = try await base.client(at: running.url, code: try await running.service.codes.issue(.client(.operator)).text)
+        let (_, link) = try await base.client(at: running.url, code: try await running.service.codes.issue(.client).text)
         defer { link.disconnect() }
         let control = DaemonClient(link: link.controlLink)
         try await control.connect(startIfNeeded: false)
@@ -153,7 +153,7 @@ struct NoticesTests {
         #expect(answer["host"]?.stringValue == host.rawValue)
         #expect(answer["role"]?.stringValue == "device")
         // Frame N: an operator sees it come through the relay, and which Mac relays.
-        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), grant: .operator, kind: .mac)
+        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), kind: .mac)
         let links = try await running.service.methods.handle(method: DaemonAPI.Method.clientsConnections, params: nil, from: caller)
             .decode([DaemonAPI.ClientConnection].self)
         #expect(links.first { $0.client == device } == DaemonAPI.ClientConnection(client: device, relayed: true, through: "relay mac"))
@@ -167,7 +167,7 @@ struct NoticesTests {
         let running = try await base.start()
         defer { Task { await running.service.stop() } }
         let (_, _, credentials) = try await base.pairedClient(at: running.url,
-                                                              code: try await running.service.codes.issue(.client(.operator)).text)
+                                                              code: try await running.service.codes.issue(.client).text)
         guard case .client(let id) = credentials.identity else { return }
         var relayed = credentials
         relayed.kind = "relay"

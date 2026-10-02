@@ -203,17 +203,18 @@ public final class DaemonServer: @unchecked Sendable {
     }
 
     /// A channel the control plane opened on this host's uplink (058, R3): one virtual
-    /// connection, the same in every respect as one accepted on the socket. An
-    /// operator's is a window's; a device's is bound to that device before a line of it
-    /// is read, exactly as the bridge binds one today. Nothing else can make one, and
-    /// nothing on the channel can raise it.
+    /// connection, the same in every respect as one accepted on the socket. It may do
+    /// everything a window may (#111). One for a phone, an iPad or a browser is bound to
+    /// that device before a line of it is read, exactly as the bridge binds one today, so
+    /// it reports presence as itself and speaks for no other device. Nothing else can
+    /// make one.
     ///
     /// `ended` is called once the connection is gone, from either end.
-    public func acceptVirtual(_ transport: any LineTransport, grant: Grant, device: UUID?,
+    public func acceptVirtual(_ transport: any LineTransport, device: UUID?,
                               ended: @escaping @Sendable () -> Void = {}) {
         let identity = ConnectionIdentity(peer: nil, role: .control)
-        if grant == .device { _ = identity.bindDevice(device) }
-        DaemonLog.shared.write("uplink: a channel opened for \(grant == .device ? "device \(device?.uuidString ?? "?")" : "an operator")")
+        if let device { _ = identity.bindDevice(device) }
+        DaemonLog.shared.write("uplink: a channel opened for \(device.map { "device \($0.uuidString)" } ?? "a window")")
         serve(transport, identity: identity, ended: ended)
     }
 
@@ -222,12 +223,12 @@ public final class DaemonServer: @unchecked Sendable {
         let handler = self.handler
         let connection = JSONRPCConnection(transport: transport) { method, params in
             // Refused by the server, before the daemon hears of it: a helper asking for
-            // what only a window may, or a shell asking for anything at all.
+            // what only a person may, or a shell asking for anything at all.
             let role = identity.role
             guard role.allows(method) else {
                 // A phone refused is a phone that does less than it did, and the phone's
                 // own screen is the only other place that would say so.
-                if role == .device || role == .pairing {
+                if role == .pairing {
                     DaemonLog.shared.write("socket: refused \(method) to a \(role.rawValue) connection")
                 }
                 return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,

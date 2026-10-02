@@ -4,7 +4,7 @@
 //
 //   node Web/test/walk/parity.mjs <WEB_URL> <browser code> <ROOT> <out dir> <prefix> [scene…]
 //
-// The code is a browser's (`agents-control code --client device --browser`). The root is a
+// The code is a browser's (`agents-control code --client --browser`). The root is a
 // run-app scratch root seeded as parity.md says: a git project `work`, three workflows (one
 // turned off), a finished unread session "Repo notes", one in a worktree with two labels, and
 // one parked. Scenes that need the host away pause the root's own agentsd (its daemon.lock pid)
@@ -185,6 +185,10 @@ for (const scene of scenes) {
       }
       await page.waitFor(`document.querySelector(".chat .transcript")`, 60_000).catch(() => {});
       say(`after: opened ${JSON.stringify(await visible(".chat .column-head h1"))}`);
+    } else if (scene === "identity") {
+      // #111: the footer names the browser, and no grant.
+      say(`footer: ${JSON.stringify(await page.text(".identity"))}`);
+      await shot("identity");
     } else if (scene === "hostdown") {
       // #83: the host down is plain and said at once.
       await openProject();

@@ -1,29 +1,22 @@
 import Foundation
 
-/// What a paired client may do (058, R4).
+/// What every paired client may do: everything the Mac's own window may (#111, 2026-10-02).
 ///
-/// Two, and only two, because both already exist and have been reviewed: an operator may
-/// do what the Mac's own window may, which is everything, and a device may do what a
-/// paired phone may. The control plane checks a client's grant with the very allowlists
-/// the daemon uses for its own connections, and each host checks it again.
-public enum Grant: String, Codable, Hashable, Sendable, CaseIterable {
-    case `operator`
-    case device
-
-    /// The daemon role a channel opened with this grant becomes on the host.
-    public var role: ConnectionRole {
-        switch self {
-        case .operator: .control
-        case .device: .device
-        }
-    }
-
-    public func allows(_ method: String) -> Bool { role.allows(method) }
+/// There were two grants, operator and device (058, R4). A device could already start
+/// agents and open terminals on any host, so it could run any command there, and the
+/// split protected the hosts very little while asking a question on every pairing sheet.
+/// Now there is one. The word stays on the wire, always `operator`, for builds from
+/// before: an older control plane copy reading `clients.json`, an older host opening a
+/// channel, an older Remote or web page reading a code. Nothing here reads it.
+public enum LegacyGrant {
+    /// What is written where an older build expects a grant: the one that may do
+    /// everything, which is what every client now may.
+    public static let everything = "operator"
 }
 
 /// A paired screen: the Mac window, an iPhone, an iPad, a browser on the control plane's
 /// own Mac (071). `clients.json` under the control root, which is today's `devices.json`
-/// with a grant added and a Mac allowed.
+/// with a Mac allowed.
 public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     public enum Kind: String, Codable, Hashable, Sendable {
         case mac, iPhone, iPad, unknown
@@ -36,6 +29,16 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
         public init(from decoder: any Decoder) throws {
             self = Kind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .unknown
         }
+
+        /// A phone or an iPad, or a device paired before kinds were said: what presence
+        /// is reported under as itself, and what a notice may be sealed to. Not the Mac's
+        /// window, and not a browser, which has no mailbox (071).
+        public var isDevice: Bool {
+            switch self {
+            case .iPhone, .iPad, .unknown: true
+            case .mac, .browser: false
+            }
+        }
     }
 
     /// The pre-shared key's identity is `d:<id>`, as it is for a device today.
@@ -44,7 +47,6 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     public var kind: Kind
     /// P256, x963. The key the client's PSK is derived from and notices are sealed to.
     public var publicKey: Data
-    public var grant: Grant
     public var paired: Date
     public var lastSeen: Date?
     /// A device's own report of whether it may show a notification (021).
@@ -60,7 +62,7 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     /// keeps none.
     public var knownEpoch: Int?
 
-    public init(id: UUID, name: String, kind: Kind, publicKey: Data, grant: Grant,
+    public init(id: UUID, name: String, kind: Kind, publicKey: Data,
                 paired: Date, lastSeen: Date? = nil, mayNotify: Bool? = nil,
                 owner: PersonID? = nil, rev: Int = 0, forgotten: Bool? = nil) {
         self.owner = owner
@@ -70,10 +72,48 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
         self.name = name
         self.kind = kind
         self.publicKey = publicKey
-        self.grant = grant
         self.paired = paired
         self.lastSeen = lastSeen
         self.mayNotify = mayNotify
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, kind, publicKey, grant, paired, lastSeen, mayNotify, owner, rev, forgotten, knownEpoch
+    }
+
+    /// A record's `grant`, `device` or `operator`, is not read: every client may do
+    /// everything (#111).
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        kind = try c.decode(Kind.self, forKey: .kind)
+        publicKey = try c.decode(Data.self, forKey: .publicKey)
+        paired = try c.decode(Date.self, forKey: .paired)
+        lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen)
+        mayNotify = try c.decodeIfPresent(Bool.self, forKey: .mayNotify)
+        owner = try c.decodeIfPresent(PersonID.self, forKey: .owner)
+        rev = try c.decode(Int.self, forKey: .rev)
+        forgotten = try c.decodeIfPresent(Bool.self, forKey: .forgotten)
+        knownEpoch = try c.decodeIfPresent(Int.self, forKey: .knownEpoch)
+    }
+
+    /// Written with `grant: operator`, which an older copy of the control plane needs to
+    /// read the record at all, and which tells it the truth.
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(publicKey, forKey: .publicKey)
+        try c.encode(LegacyGrant.everything, forKey: .grant)
+        try c.encode(paired, forKey: .paired)
+        try c.encodeIfPresent(lastSeen, forKey: .lastSeen)
+        try c.encodeIfPresent(mayNotify, forKey: .mayNotify)
+        try c.encodeIfPresent(owner, forKey: .owner)
+        try c.encode(rev, forKey: .rev)
+        try c.encodeIfPresent(forgotten, forKey: .forgotten)
+        try c.encodeIfPresent(knownEpoch, forKey: .knownEpoch)
     }
 
     /// A device paired before the control plane existed. It keeps its id and key, so its
@@ -85,7 +125,7 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
         case .unknown: .unknown
         }
         self.init(id: device.id, name: device.name, kind: kind, publicKey: device.publicKey,
-                  grant: .device, paired: device.announcedAt, lastSeen: device.lastSeenAt,
+                  paired: device.announcedAt, lastSeen: device.lastSeenAt,
                   mayNotify: device.mayNotify)
     }
 }
@@ -170,7 +210,7 @@ public enum HostState: Codable, Hashable, Sendable {
 /// A one-time code the control plane shows, and what it lets its holder become.
 public struct PairingCode: Codable, Hashable, Sendable {
     public enum Purpose: Codable, Hashable, Sendable {
-        case client(Grant)
+        case client
         case host
     }
 
@@ -291,6 +331,7 @@ public struct CopyRecord: Codable, Hashable, Sendable {
 /// `events/<day>/<ulid>.json`: a change, for a copy that missed its broadcast.
 public struct ControlEvent: Codable, Hashable, Sendable {
     public enum Kind: String, Codable, Sendable {
+        /// `grantChanged` is from a copy older than #111; read, and nothing follows from it.
         case clientForgotten, grantChanged, clientPaired, hostEnrolled, hostRemoved, hostMoved
         /// The control plane's endpoints changed (R16): members reconnect for the list.
         case endpointsChanged

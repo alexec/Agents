@@ -3,10 +3,10 @@ import Foundation
 /// Searching a catalogue and adding skills to the person or a project (059,
 /// contracts/catalog-methods.md).
 ///
-/// Every one of these is for the Mac's own window. None is in `deviceMethods` or
-/// `agentMethods`, so a phone, an agent's helper or a stranger is refused before the daemon
-/// looks at the request: what an agent may do is its business, and adding a skill changes
-/// what every agent after it is told.
+/// Every one of these is for a person's window or paired client (#111). None is in
+/// `agentMethods`, so an agent's helper or a stranger is refused before the daemon looks
+/// at the request: what an agent may do is its business, and adding a skill changes what
+/// every agent after it is told.
 extension DaemonAPI.Method {
     public static let catalogSearch = "catalog/search"
     public static let catalogPreview = "catalog/preview"

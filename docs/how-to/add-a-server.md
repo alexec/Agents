@@ -16,7 +16,7 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
 
 ## Before you start
 
-- A window paired with your control plane as an operator. See
+- A window paired with your control plane. See
   [Set up Agents on this Mac](set-up-on-this-mac.md).
 - A Linux machine on x86-64 or ARM64. This guide calls it `devbox.example.com`.
 - The server can reach the control plane's address over HTTPS. If the control plane runs

@@ -114,14 +114,12 @@ function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
 
 function ProjectsColumn({ session, store }: { session: Session; store: Store }) {
   const confirming = useSignal(false);
-  const state = session.state.value;
-  const grant = state.kind === "open" && state.grant === "operator" ? "Operator" : "Device";
   return (
     <nav class="projects" aria-label="Projects">
       <header class="column-head narrow-only"><h1>Agents</h1></header>
       <div class="scroll"><ProjectList store={store} /></div>
       <footer class="identity">
-        <span>{browserName()} on this Mac · {grant}</span>
+        <span>{browserName()} on this Mac</span>
         {confirming.value ? (
           <span class="confirm">
             <button onClick={() => void session.forgetThisBrowser()}>Forget</button>

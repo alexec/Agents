@@ -1,11 +1,10 @@
 // A stand-in for the window's Settings ▸ Control plane ▸ Clients, for walks where the window
-// can't be pressed (no Accessibility permission): an operator client over the control plane's
+// can't be pressed (no Accessibility permission): a client over the control plane's
 // TLS address, speaking the same wire with the web remote's own code, as kind "mac". It makes
-// the calls Settings makes: clients/startPairing, clients/list, clients/setGrant,
-// clients/forget. Walks only; never pointed at the real control plane.
+// the calls Settings makes: clients/startPairing, clients/list, clients/forget. Walks only; never pointed at the real control plane.
 //
 //   const op = await Operator.pair(controlURL, operatorCode);
-//   const code = await op.call("clients/startPairing", { grant: "device", kind: "browser" });
+//   const code = await op.call("clients/startPairing", { kind: "browser" });
 
 import { load } from "../load.mjs";
 
@@ -25,7 +24,7 @@ export class Operator {
       const { pair, publicRaw } = await w.makeKeyPair();
       const client = w.newClientID();
       keys.record = { privateKey: pair.privateKey, publicKey: pair.publicKey, client,
-        control: w.base64url(code.controlKey), grant: code.grant, paired: "" };
+        control: w.base64url(code.controlKey), paired: "" };
       return { client, publicRaw };
     }, undefined, "mac");
     socket.close();

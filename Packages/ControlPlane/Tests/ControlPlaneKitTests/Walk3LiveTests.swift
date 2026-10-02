@@ -50,7 +50,7 @@ struct Walk3LiveTests {
 
     /// An operator window, paired with a code from the control plane's own command.
     func operatorLink() async throws -> ControlLink {
-        let (_, out) = try run(tool, ["code", "--client", "operator", "--home", home])
+        let (_, out) = try run(tool, ["code", "--client", "--home", home])
         let text = try #require(out.split(separator: "\n").last { $0.hasPrefix("agents-control:2:") }).description
         let code = try #require(ControlCode(text: text))
         let id = try #require(ControlAuth.codeID(secret: code.secret))

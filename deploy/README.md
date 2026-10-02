@@ -28,7 +28,7 @@ The control plane is at `https://127.0.0.1:8443`, pinned by `deploy/secrets/pin`
 from any copy:
 
 ```sh
-docker compose -f deploy/compose.yaml exec -T cp1 /agents-control code --client operator
+docker compose -f deploy/compose.yaml exec -T cp1 /agents-control code --client
 docker compose -f deploy/compose.yaml exec -T cp1 /agents-control code --host
 ```
 

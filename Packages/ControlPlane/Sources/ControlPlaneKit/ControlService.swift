@@ -232,13 +232,13 @@ public final class ControlService: @unchecked Sendable {
         await methods.attach(router)
         let codes = self.codes
         var hooks = ControlMethods.Hooks(
-            startPairing: { grant, browser in try JSONValue.encoding(try await codes.issue(.client(grant), browser: browser)) },
+            startPairing: { browser in try JSONValue.encoding(try await codes.issue(.client, browser: browser)) },
             startEnroll: { try JSONValue.encoding(try await codes.issue(.host)) })
         hooks.changed = { [weak self] event in await self?.announce(event) }
         // hosts/install (T072): once over ssh with the key given, then the host is on its own.
         let install = HostInstall(codes: codes, servers: ServerFiles.folder()) { [router = self.router] name, step in
             await router.broadcastControl(DaemonAPI.Notification.controlInstallProgress,
-                                          ["name": .string(name), "step": .string(step)], operatorsOnly: true)
+                                          ["name": .string(name), "step": .string(step)])
         }
         hooks.install = { params in try await install.run(params) }
         // Notices (T097): a need goes to the relay host, wherever it is held.
@@ -260,8 +260,8 @@ public final class ControlService: @unchecked Sendable {
         }
         await leases.start()
         // Copies (T064, T066).
-        await router.onPresence { client, grant, report in
-            Task { await mesh?.broadcast(PeerWire.presence(client: client, grant: grant, report: report)) }
+        await router.onPresence { client, device, report in
+            Task { await mesh?.broadcast(PeerWire.presence(client: client, device: device, report: report)) }
         }
         await mesh?.onEvent { [weak self] event in await self?.apply(event) }
         await mesh?.onNeed { [weak self] need in await self?.deliver(need, fromPeer: true) }
@@ -325,9 +325,8 @@ public final class ControlService: @unchecked Sendable {
         case .clientForgotten:
             if let id = UUID(uuidString: event.subject) { await router.forgetClient(id) }
         case .grantChanged:
-            if let id = UUID(uuidString: event.subject), let client = await methods.client(id) {
-                await router.setGrant(client.grant, of: id)
-            }
+            // From a copy older than #111. A grant changes nothing here.
+            break
         case .hostRemoved:
             await router.forgetHost(HostID(rawValue: event.subject))
         case .clientPaired, .hostEnrolled, .hostMoved:
@@ -344,12 +343,8 @@ public final class ControlService: @unchecked Sendable {
     /// The backstop for an event missed: every session here is held to the records as
     /// they are now (R4, re-listed every 15 s and whenever a peer link comes up).
     func reconcile() async {
-        for (client, grant) in await router.connectedClients() {
-            guard let record = await methods.client(client) else {
-                await router.forgetClient(client)
-                continue
-            }
-            if record.grant != grant { await router.setGrant(record.grant, of: client) }
+        for client in await router.connectedClients() where await methods.client(client) == nil {
+            await router.forgetClient(client)
         }
         let known = Set(await methods.knownHosts)
         for host in await router.hostStates.keys where !known.contains(host) { await router.forgetHost(host) }
@@ -477,7 +472,7 @@ public final class ControlService: @unchecked Sendable {
             // and it says it came that way, for itself only.
             let relayed = auth.kind == "relay"
             if relayed {
-                guard case .client(let id) = identity, auth.for == id.uuidString, admitted.client?.grant == .device else {
+                guard case .client(let id) = identity, auth.for == id.uuidString, admitted.client?.kind.isDevice == true else {
                     throw ControlAuth.Refusal(.badMessage)
                 }
             }
@@ -485,7 +480,7 @@ public final class ControlService: @unchecked Sendable {
             // which it holds (R16).
             let announced = settings.epoch != nil
             try reader.write(line: ControlAuth.Message.ok(ControlAuth.OK(
-                mac: ControlCode.base64url(mac), grant: admitted.client?.grant, host: admitted.host,
+                mac: ControlCode.base64url(mac), client: admitted.client != nil, host: admitted.host,
                 relayed: relayed ? true : nil, endpoints: announced ? settings.currentEndpoints : nil,
                 epoch: settings.epoch)).line)
             // A member that says an epoch keeps a list, and takes the one just given: it
@@ -506,7 +501,7 @@ public final class ControlService: @unchecked Sendable {
                 guard let client = admitted.client else { throw ControlAuth.Refusal(.unknown) }
                 await router.attachClient(client, transport: reader, relayed: relayed)
                 try? await methods.admit(client)
-                log("client \(client.name) (\(client.grant.rawValue)) connected\(relayed ? " through the relay" : "") from \(socket.remote)")
+                log("client \(client.name) (\(client.kind.rawValue)) connected\(relayed ? " through the relay" : "") from \(socket.remote)")
             case .host(let host):
                 await hostArrived(host, reader)
             case .pairing(let id), .enrolling(let id):
@@ -632,13 +627,12 @@ public final class ControlService: @unchecked Sendable {
                         ? "That code is for a browser on this Mac."
                         : "That code is for a window or a phone. Get one from Pair a Browser….")
                 }
-                let grant = stored.grant ?? .device
                 let name = announce.kind == .browser ? Self.browserName(announce.name) : announce.name
                 try await codes.spend(id)
                 try await methods.admit(ClientRecord(id: announce.id, name: name, kind: announce.kind,
-                                                     publicKey: announce.publicKey, grant: grant, paired: Date()))
-                admitted = DaemonAPI.Admitted(client: announce.id, grant: grant)
-                log("\(name) paired as \(grant.rawValue)")
+                                                     publicKey: announce.publicKey, paired: Date()))
+                admitted = DaemonAPI.Admitted(client: announce.id)
+                log("\(name) paired (\(announce.kind.rawValue))")
                 // Known at every copy at once: the relay host may be held at another.
                 await self.announce(ControlEvent(kind: .clientPaired, subject: announce.id.uuidString, at: Date(), by: "code"))
                 Task { await self.tellRelayDevices() }
@@ -710,8 +704,8 @@ public final class ControlService: @unchecked Sendable {
         let relays = await router.relaysHeldHere()
         guard !relays.isEmpty else { return }
         let devices = await methods.allClients.compactMap { record -> DaemonAPI.RelayDevices.Device? in
-            // A browser has no mailbox to carry for (071).
-            guard record.grant == .device, record.kind != .browser, !record.publicKey.isEmpty else { return nil }
+            // A browser has no mailbox to carry for (071), and a Mac's window no relay.
+            guard record.kind.isDevice, !record.publicKey.isEmpty else { return nil }
             return .init(id: record.id, publicKey: record.publicKey)
         }
         guard let params = try? JSONValue.encoding(DaemonAPI.RelayDevices(devices: devices)) else { return }
@@ -733,7 +727,7 @@ public final class ControlService: @unchecked Sendable {
         }
         let flags = await router.notifyFlags()
         let devices = await methods.allClients.compactMap { record -> Device? in
-            guard record.grant == .device, record.kind != .browser, !record.publicKey.isEmpty else { return nil }
+            guard record.kind.isDevice, !record.publicKey.isEmpty else { return nil }
             let kind: Device.Kind = switch record.kind {
             case .iPhone: .iPhone
             case .iPad: .iPad
@@ -795,7 +789,6 @@ public actor ControlCodes {
 
     public struct Stored: Codable, Sendable {
         public var purpose: Purpose
-        public var grant: Grant?
         /// Made for a browser on this Mac (071 security review, R2): good only through the
         /// loopback listener, as any other client code is good only over TLS. A code read
         /// through a page that wasn't Agents' can't then pair a phone or a Mac elsewhere.
@@ -838,7 +831,7 @@ public actor ControlCodes {
         let (id, secret) = ControlAuth.makeCodeSecret(controlPrivateKey: privateKey)
         let expires = Date().addingTimeInterval(lifetime)
         let stored: Stored = switch purpose {
-        case .client(let grant): Stored(purpose: .client, grant: grant, browser: browser ? true : nil, expires: expires)
+        case .client: Stored(purpose: .client, browser: browser ? true : nil, expires: expires)
         case .host: Stored(purpose: .host, expires: expires)
         }
         _ = try await store.put(Self.key(id), try ControlRecords.encoder.encode(stored), when: .absent)

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build (unless --no-build) and launch a scratch set-up of its own: a control plane, this
-# Mac's host on a root of its own, and the window paired with them as an operator.
+# Mac's host on a root of its own, and the window paired with them.
 #
 # Prints the root, the window, host and control plane pids, and the control plane's URL.
 # Everything else in this skill takes the root as its first argument.
@@ -118,16 +118,16 @@ DAEMON_PID="$(tr -d '[:space:]' < "$ROOT/daemon.lock" 2>/dev/null || true)"
 APP_PID=""
 PAIR_CODE=""
 if [ "$WINDOW" = 1 ]; then
-  # The window pairs as an operator on its own (AGENTS_CONTROL), into a folder of its own in
+  # The window pairs on its own (AGENTS_CONTROL), into a folder of its own in
   # its container (--walk), so it never takes the person's own window's pairing. env -i,
   # because `open` hands this session's environment to the app. --first-run leaves it
   # unpaired, on frame K, with a code to paste into Connect….
   OPEN_FLAGS=(-n)
   [ "$FRONT" = 1 ] || OPEN_FLAGS+=(-g)   # -g: launch behind whatever the person is doing
   if [ "$FIRST_RUN" = 1 ]; then
-    PAIR_CODE="$(code --client operator)"
+    PAIR_CODE="$(code --client)"
   else
-    OPEN_FLAGS+=(--env AGENTS_CONTROL="$(code --client operator)")
+    OPEN_FLAGS+=(--env AGENTS_CONTROL="$(code --client)")
   fi
   "${CLEAN[@]}" open "${OPEN_FLAGS[@]}" "$APP" --args --walk "run-$SLUG" -ApplePersistenceIgnoreState YES
   for _ in $(seq 1 100); do

@@ -35,8 +35,8 @@ plane, and nothing connects in to a host.
                       ┌───────────────────────── CLIENTS ──────────────────────────┐
                       │                                                            │
                       │   Agents window (Mac)              Agents (iPhone, iPad)   │
-                      │   sandboxed, runs nothing          grant: device           │
-                      │   grant: operator                                          │
+                      │   sandboxed, runs nothing          a browser on this Mac   │
+                      │   each may do everything                                   │
                       └─────────────┬──────────────────────────────┬───────────────┘
                                     │ wss://, paired by code       │ wss://
                                     ▼                              ▼
@@ -47,10 +47,10 @@ plane, and nothing connects in to a host.
 │   ┌──────▼───────┐   copies link   ┌──────────────┐     one or more copies:         │
 │   │ copy A       │◄───────────────►│ copy B       │     - a channel for each        │
 │   │              │   to each other │              │       client and host pair      │
-│   └──────┬───────┘                 └──────┬───────┘     - checks the grant on       │
-│          └──────────────┬─────────────────┘               every call                │
+│   └──────┬───────┘                 └──────┬───────┘     - checks each client's      │
+│          └──────────────┬─────────────────┘               key, and nothing else     │
 │                         ▼                                                           │
-│              ┌─────────────────────┐   who is paired, with which grant; which       │
+│              ┌─────────────────────┐   who is paired, and of what kind; which       │
 │              │ store: folder or S3 │   hosts there are; codes not yet used;         │
 │              └─────────────────────┘   settings                                     │
 └──────────────▲───────────────────────────────▲──────────────────────────────▲───────┘
@@ -75,22 +75,33 @@ Your agents, their conversations, files and terminals, and the runtimes' sign-in
 the host they belong to. The control plane's store only remembers who is paired and which
 hosts there are.
 
-## Operators and devices
+## One grant for every client
 
-Each client is paired once, with a code the control plane shows, and is given a grant that
-says what it may do.
+Each client is paired once, with a code the control plane shows, and may then do
+everything the Mac's own window may: start and stop agents on any host, open terminals,
+sign runtimes in, add and remove hosts and projects, set helper limits, and pair or forget
+other clients. A window, an iPhone, an iPad and a browser are all the same in this.
 
-- An **operator** may do everything: start and stop agents on any host, sign runtimes in,
-  add and remove hosts, and pair or forget other clients. A window on a Mac is usually an
-  operator.
-- A **device** may do what a phone does: follow and answer agents, start and stop them,
-  and use their files and terminals. It cannot sign runtimes in, browse a host's folders,
-  add or rename projects, or change who may do what. An iPhone or iPad is usually a device.
+There used to be two grants, **operator** and **device**, and a phone was a device. That
+was retired on 2026-10-02 (#111): a device could already start agents and open terminals
+on any host, so it could run any command there, and the split protected the hosts very
+little while asking a question on every pairing sheet. What it cost, accepted: a lost
+phone or a hijacked browser tab can pair more clients, forget yours, add hosts or sign
+runtimes in, until you forget it from another screen.
 
-The control plane checks the grant before a request reaches a host, and the host checks it
-again. You can change a grant, or forget a client, in **Settings ▸ Control plane ▸
-Clients**; forgetting cuts the client off at once. The app will not let you demote or
-forget the last operator, because nothing could then undo it.
+What still tells clients apart is who they are, not what they may do. A phone's or a
+browser's connection to a host is bound to that one client: it reports where you are as
+itself, and can't speak as another. An agent's own connection to its host still reaches
+only its tools, and anything else on the Mac reaches nothing.
+
+You can forget a client in **Settings ▸ Control plane ▸ Clients**; forgetting cuts it off at
+once, at home and away. Any client may be forgotten, the last one too: Agents Host, on the
+control plane's own Mac, can always make a new code.
+
+Older builds keep working. A record, a code or a channel still carries the word `grant`,
+always `operator`, which an older copy, host, Remote or web page reads as everything; a
+record written before as `device` is read as a full client. An older window that tries to
+change a grant is told there is nothing to change.
 
 ## A browser on this Mac
 
@@ -111,7 +122,8 @@ relies on nothing the browser sends by itself.
 What someone holding a browser's session could do, in brief:
 
 - **Script running in the page**, such as a malicious extension, can do whatever the
-  browser's grant allows while the page is open. On a host that includes running commands.
+  window can while the page is open: on a host that includes running commands, and at the
+  control plane pairing or forgetting clients and adding hosts.
   The page draws nothing an agent wrote as HTML, and loads nothing from anywhere else.
   Forgetting the browser stops it at once.
 - **A copy of the browser's profile on another computer** can do nothing: the listener is
@@ -121,12 +133,13 @@ What someone holding a browser's session could do, in brief:
 - **A website** can do nothing: its requests are refused on their address and origin, and
   it has no key.
 
-This is why a browser is paired as a device unless you choose otherwise. Serving the page
-at a public address, for a browser elsewhere, waits on issue #61.
+Since every client may do everything (#111), the listener's address and origin checks and
+the key that can't be read are what keep a browser's session its own. Serving the page at a
+public address, for a browser elsewhere, waits on issue #61.
 
 ## Copies and the store
 
-The control plane itself remembers little: the clients and their grants, the hosts, the
+The control plane itself remembers little: the clients, the hosts, the
 codes it has handed out, and which of its copies is holding each host's connection. That
 is its **store**. It is either a folder on disk or an S3-compatible bucket. Nothing else,
 no database, is needed. Your agents and their conversations are not in it: they stay on
@@ -189,12 +202,12 @@ that reason, rather than left to time out.
 
 If the copies are running but cannot reach their store, the live connections carry on:
 you can still follow, answer and start agents. What cannot happen is anything the control
-plane must remember. Pairing a client, changing a grant, adding a host or removing one is
+plane must remember. Pairing or forgetting a client, adding a host or removing one is
 refused, and the window says the control plane can't reach where it keeps its records, so
 nothing was changed. Nothing is ever half done.
 
 When two copies change the same record at the same moment, for instance two windows
-changing one client's grant, one change goes through and the other is refused and asked to
+changing one host's settings, one change goes through and the other is refused and asked to
 try again. Neither is lost without a word.
 
 ## Why it is built this way

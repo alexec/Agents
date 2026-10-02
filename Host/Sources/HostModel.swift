@@ -48,26 +48,16 @@ final class HostModel {
     struct PairingCode: Identifiable, Equatable {
         let id = UUID()
         var text: String
-        var grant: Grant
         var target: PairingTarget
     }
 
-    /// What the code is for: each says what it may do, and a browser's is chosen (071 FR-012).
+    /// What the code is for, which decides how it is shown and where it works. Each may
+    /// do everything once paired (#111).
     enum PairingTarget: Hashable {
         case window, phone, browser
     }
     var pairing: PairingCode?
     var pairingTarget: PairingTarget = .window
-    /// A browser on this Mac is a device unless the person says otherwise.
-    var browserGrant: Grant = .device
-
-    var pairingGrant: Grant {
-        switch pairingTarget {
-        case .window: .operator
-        case .phone: .device
-        case .browser: browserGrant
-        }
-    }
     var showingPairing = false
 
     /// The host code `runHere` made last: what the move tells devices, with its address,
@@ -478,21 +468,19 @@ final class HostModel {
 
     // MARK: Pairing
 
-    /// A code to type into a window or phone. Operator for a window of the person's own,
-    /// device for a phone (FR-014): the code decides what it may do.
+    /// A code to type into a window, a phone or a browser.
     func makeCode() async {
         pairing = nil
-        let grant = pairingGrant
         let target = pairingTarget
         // A browser's code is good only through the page's own listener (071 R2).
-        let made = await ControlTool.run(["code", "--client", grant.rawValue, "--home", paths.controlHome.path]
+        let made = await ControlTool.run(["code", "--client", "--home", paths.controlHome.path]
                                              + (target == .browser ? ["--browser"] : []),
                                          paths: paths, settings: settings)
         guard made.ok, let text = made.output.split(separator: "\n").last.map(String.init) else {
             problem = made.problem.isEmpty ? "No code could be made." : made.problem
             return
         }
-        pairing = PairingCode(text: text, grant: grant, target: target)
+        pairing = PairingCode(text: text, target: target)
     }
 }
 

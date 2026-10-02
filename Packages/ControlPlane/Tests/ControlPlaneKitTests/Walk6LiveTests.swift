@@ -10,13 +10,14 @@ import Testing
 /// certificate, and clients at the second copy while the window is at the first.
 ///
 ///   AGENTS_WALK6_B=https://127.0.0.1:18852 AGENTS_WALK6_PIN=<pin> \
-///   AGENTS_WALK6_IPAD=<device code> AGENTS_WALK6_OTHER=<operator code> AGENTS_WALK6_THIRD=<operator code> \
+///   AGENTS_WALK6_IPAD=<client code> AGENTS_WALK6_OTHER=<client code> AGENTS_WALK6_THIRD=<client code> \
 ///   AGENTS_WALK6_HOLD=<seconds> swift test --filter Walk6
 ///
-/// It pairs an iPad and two more operator windows, connects the iPad at the second copy
-/// and lets it go (so the window says when it was seen), races two grant changes on the
-/// iPad from the two copies, and holds the second window connected at the second copy.
-@Suite("Walk 6: grants over two copies", .serialized, .timeLimit(.minutes(30)),
+/// It pairs an iPad and two more windows, connects the iPad at the second copy and lets it
+/// go (so the window says when it was seen), reads the clients at both copies, and holds
+/// the second window connected at the second copy. (It raced two grant changes until
+/// grants were retired, #111.)
+@Suite("Walk 6: clients over two copies", .serialized, .timeLimit(.minutes(30)),
        .enabled(if: ProcessInfo.processInfo.environment["AGENTS_WALK6_B"] != nil))
 struct Walk6LiveTests {
     let environment = ProcessInfo.processInfo.environment
@@ -76,29 +77,14 @@ struct Walk6LiveTests {
         let atFirst = DaemonClient(link: thirdLink.controlLink)
         try await atFirst.connect(startIfNeeded: false)
 
-        for round in 1...3 {
-            async let one: String = setGrant(atFirst, of: iPad.id, to: round % 2 == 1 ? .operator : .device)
-            async let two: String = setGrant(atSecond, of: iPad.id, to: round % 2 == 1 ? .device : .operator)
-            let (first, second) = await (one, two)
-            let clients = try await atFirst.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
-            note("race \(round): first copy \(first), second copy \(second); the iPad is now \(clients.first { $0.id == iPad.id }?.grant.rawValue ?? "?")")
-        }
+        let atOne = try await atFirst.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
+        let atTwo = try await atSecond.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
+        note("clients at the first copy \(atOne.count), at the second \(atTwo.count); the iPad at both: \([atOne, atTwo].allSatisfy { $0.contains { $0.id == iPad.id } })")
         thirdLink.disconnect()
 
         let seconds = environment["AGENTS_WALK6_HOLD"].flatMap(Double.init) ?? 0
         note("holding the other window at the second copy for \(Int(seconds)) s")
         try await Task.sleep(for: .seconds(seconds))
         otherLink.disconnect()
-    }
-
-    func setGrant(_ client: DaemonClient, of id: UUID, to grant: Grant) async -> String {
-        do {
-            _ = try await client.call(DaemonAPI.Method.clientsSetGrant, DaemonAPI.ClientGrantRequest(client: id, grant: grant))
-            return "set \(grant.rawValue)"
-        } catch let error as JSONRPCError {
-            return "refused \(error.code) (\(error.message))"
-        } catch {
-            return "failed \(error)"
-        }
     }
 }

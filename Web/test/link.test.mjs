@@ -27,14 +27,14 @@ function sockets() {
 
 function paired() {
   const keys = new w.MemoryKeyStore();
-  keys.record = { privateKey: {}, publicKey: {}, client: "C", control: "K", grant: "device", paired: "" };
+  keys.record = { privateKey: {}, publicKey: {}, client: "C", control: "K", paired: "" };
   return keys;
 }
 
 function link(keys, net, extra = {}) {
   return new w.Link({ url: "ws://localhost:1/v1/connect", origin: "http://localhost:1", keys, open: () => net.open(),
     backoff: [0.01], heartbeat: { every: 60_000, within: 1_000 }, random: () => 0,
-    authenticate: async () => ({ grant: "device", name: "test" }), ...extra });
+    authenticate: async () => ({ name: "test" }), ...extra });
 }
 
 async function opened(l) {

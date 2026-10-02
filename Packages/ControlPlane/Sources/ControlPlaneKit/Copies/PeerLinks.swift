@@ -214,8 +214,8 @@ public actor CopyMesh {
             }
         case .event(let event):
             await applyEvent?(event)
-        case .presence(let client, let grant, let report):
-            await router.notePeerPresence(client: client, grant: grant, report: report)
+        case .presence(let client, let device, let report):
+            await router.notePeerPresence(client: client, device: device, report: report)
         case .need(let need):
             await heardNeed?(need)
         case .link(let client, let relayed):

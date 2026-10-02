@@ -83,14 +83,13 @@ final class FakeControlClient: @unchecked Sendable {
 struct StubControl: ControlHandling {
     func handles(_ method: String) -> Bool { method == DaemonAPI.Method.hostsList }
     func handle(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
-        ["answeredBy": "control", "grant": .string(caller.grant.rawValue)]
+        ["answeredBy": "control", "kind": .string(caller.kind.rawValue)]
     }
     func hostSaid(_ host: HostID, method: String, params: JSONValue?) async throws -> JSONValue { [:] }
 }
 
-func client(_ grant: Grant, id: UUID = UUID()) -> ClientRecord {
-    ClientRecord(id: id, name: "test", kind: grant == .operator ? .mac : .iPhone, publicKey: Data(),
-                 grant: grant, paired: Date())
+func client(_ kind: ClientRecord.Kind, id: UUID = UUID()) -> ClientRecord {
+    ClientRecord(id: id, name: "test", kind: kind, publicKey: Data(), paired: Date())
 }
 
 @Suite("The control plane's router")
@@ -113,7 +112,7 @@ struct ControlRouterTests {
     @Test func aRequestReachesItsHostUntouchedAndTheReplyComesBackTagged() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)
-        let window = await connectClient(router, client(.operator))
+        let window = await connectClient(router, client(.mac))
         await eventually { host.openChannels.count == 1 }
 
         // Spacing and key order a re-encoding would not keep.
@@ -136,8 +135,8 @@ struct ControlRouterTests {
     @Test func eachClientHearsAHostsBroadcastOnceTaggedWithTheHost() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)
-        let a = await connectClient(router, client(.operator))
-        let b = await connectClient(router, client(.device))
+        let a = await connectClient(router, client(.mac))
+        let b = await connectClient(router, client(.iPhone))
         // A client is wrapped from its first wrapped line, so each says hello first.
         try a.request(1, DaemonAPI.Method.ping, host: nil)
         try b.request(1, DaemonAPI.Method.ping, host: nil)
@@ -158,9 +157,9 @@ struct ControlRouterTests {
     @Test func presenceFromAnyHostIsFoldedForNotices() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)
-        let window = await connectClient(router, client(.operator))
+        let window = await connectClient(router, client(.mac))
         let phoneID = UUID()
-        let phone = await connectClient(router, client(.device, id: phoneID))
+        let phone = await connectClient(router, client(.iPhone, id: phoneID))
         await eventually { host.openChannels.count == 2 }
 
         let atMac = DaemonAPI.PresenceReport(watching: nil, active: true)
@@ -185,7 +184,7 @@ struct ControlRouterTests {
     @Test func aClientIsActiveWhileAnyOfItsSocketsIs() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, home)
-        let browser = client(.device)
+        let browser = client(.iPhone)
         var tabs: [(session: UUID, client: FakeControlClient)] = []  // index-ok: the loop adds two
         for _ in 0..<2 {
             let (ours, theirs) = PairedTransport.pair()
@@ -214,22 +213,28 @@ struct ControlRouterTests {
         host.stop()
     }
 
-    @Test func aDeviceChannelIsOpenedAsThatDeviceAndAnOperatorsAsNone() async throws {
+    /// Every channel says `operator` for an older host, which then gives it everything;
+    /// a phone's or a browser's names it, and a Mac's window names nobody.
+    @Test func aDeviceChannelIsOpenedAsThatDeviceAndAWindowsAsNone() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)
-        let phone = client(.device)
-        _ = await connectClient(router, client(.operator))
+        let phone = client(.iPhone)
+        let browser = client(.browser)
+        _ = await connectClient(router, client(.mac))
         _ = await connectClient(router, phone)
-        await eventually { host.allOpened.count == 2 }
+        _ = await connectClient(router, browser)
+        await eventually { host.allOpened.count == 3 }
         let opens = Array(host.allOpened.values)
-        #expect(opens.contains { $0.grant == .device && $0.device == phone.id })
-        #expect(opens.contains { $0.grant == .operator && $0.device == nil })
+        #expect(opens.allSatisfy { $0.grant == "operator" })
+        #expect(opens.contains { $0.device == phone.id })
+        #expect(opens.contains { $0.device == browser.id })
+        #expect(opens.contains { $0.device == nil })
         host.stop()
     }
 
     @Test func anOfflineHostIsRefusedAtOnceAndAnUnknownOneByName() async throws {
         let router = ControlRouter(handler: StubControl(), knownHosts: [server], homeHost: home)
-        let window = await connectClient(router, client(.operator))
+        let window = await connectClient(router, client(.mac))
         try window.request(1, DaemonAPI.Method.agentsList, host: server)
         try window.request(2, DaemonAPI.Method.agentsList, host: HostID(rawValue: "nobody"))
         await eventually { window.lines.count == 2 }
@@ -243,7 +248,7 @@ struct ControlRouterTests {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let (ours, theirs) = PairedTransport.pair()
         await router.attachHost(server, transport: ours)
-        let window = await connectClient(router, client(.operator))
+        let window = await connectClient(router, client(.mac))
         await eventually { await router.channels(of: server).count == 1 }
         ours.close()
         try window.request(1, DaemonAPI.Method.filesList, host: server)
@@ -255,7 +260,7 @@ struct ControlRouterTests {
     @Test func aBareLineIsTheHomeHostsAndItsReplyComesBackBare() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, home)
-        let remote = await connectClient(router, client(.device))
+        let remote = await connectClient(router, client(.iPhone))
         await eventually { host.openChannels.count == 1 }
         let bare = #"{"jsonrpc":"2.0","id":3,"method":"agents/list"}"#
         try remote.send(bare)
@@ -269,7 +274,7 @@ struct ControlRouterTests {
     @Test func aBareLineForTheControlPlanesOwnMethodIsAnsweredThere() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, home)
-        let remote = await connectClient(router, client(.device))
+        let remote = await connectClient(router, client(.iPhone))
         try remote.send(#"{"jsonrpc":"2.0","id":4,"method":"hosts/list"}"#)
         await eventually { !remote.lines.isEmpty }
         try #require(!remote.lines.isEmpty)
@@ -282,7 +287,7 @@ struct ControlRouterTests {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let a = await connectHost(router, home)
         let b = await connectHost(router, server)
-        let phone = client(.device)
+        let phone = client(.iPhone)
         _ = await connectClient(router, phone)
         _ = await connectClient(router, phone)
         await eventually { a.openChannels.count == 2 && b.openChannels.count == 2 }
@@ -296,11 +301,11 @@ struct ControlRouterTests {
     /// key at once (071 FR-014); a client that merely leaves is closed plainly.
     @Test func aForgottenClientsSocketsCloseWith4403() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
-        let browser = client(.device)
+        let browser = client(.iPhone)
         let tabs = [ClosingRecorder(), ClosingRecorder()]
         for tab in tabs { await router.attachClient(browser, transport: tab) }
         let other = ClosingRecorder()
-        let session = await router.attachClient(client(.device), transport: other)
+        let session = await router.attachClient(client(.iPhone), transport: other)
         await router.forgetClient(browser.id)
         #expect(tabs.map(\.closes) == [[4403], [4403]])
         await router.detachClient(session)
@@ -313,7 +318,7 @@ struct ControlRouterTests {
         var seen: Set<Int> = []
         for _ in 0..<5 {
             let (ours, theirs) = PairedTransport.pair()
-            let session = await router.attachClient(client(.operator), transport: ours)
+            let session = await router.attachClient(client(.mac), transport: ours)
             let expected = seen.count + 1
             await eventually { host.allOpened.count == expected }
             await router.detachClient(session)
@@ -326,8 +331,8 @@ struct ControlRouterTests {
 
     @Test func aHostComingOnlineOpensAChannelForEveryClientAlreadyThere() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
-        _ = await connectClient(router, client(.operator))
-        _ = await connectClient(router, client(.device))
+        _ = await connectClient(router, client(.mac))
+        _ = await connectClient(router, client(.iPhone))
         let host = await connectHost(router, server)
         await eventually { host.openChannels.count == 2 }
         host.stop()
@@ -336,35 +341,12 @@ struct ControlRouterTests {
     @Test func aHostGoingAwayIsToldToEveryWrappedClient() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)
-        let window = await connectClient(router, client(.operator))
+        let window = await connectClient(router, client(.mac))
         try window.request(1, DaemonAPI.Method.ping, host: nil)
         await eventually { window.lines.count == 1 }
         host.stop()
         await eventually { window.lines.contains { $0.contains(DaemonAPI.Notification.controlHostChanged) && $0.contains("offline") } }
         #expect(await router.state(of: server)?.isOnline == false)
-    }
-
-    @Test func changingAGrantReopensTheChannelsWithTheNewOne() async throws {
-        let router = ControlRouter(handler: StubControl(), homeHost: home)
-        let host = await connectHost(router, server)
-        let phone = client(.device)
-        let remote = await connectClient(router, phone)
-        await eventually { host.openChannels.count == 1 }
-        try remote.request(1, DaemonAPI.Method.credentialsLend, host: server)
-        await eventually { remote.lines.count == 1 }
-        try #require(!remote.lines.isEmpty)
-        #expect(remote.lines[0].contains("\(DaemonAPI.Failure.notPermitted)"))
-
-        await router.setGrant(.operator, of: phone.id)
-        await eventually { host.openChannels.count == 1 && host.closedChannels.count == 1 }
-        try #require(!host.openChannels.isEmpty)
-        let reopened = host.openChannels[0]
-        #expect(host.allOpened[reopened]?.grant == .operator)
-        try remote.request(2, DaemonAPI.Method.credentialsLend, host: server)
-        await eventually { remote.lines.count == 2 }
-        try #require(remote.lines.count > 1)
-        #expect(remote.lines[1].contains(DaemonAPI.Method.credentialsLend))
-        host.stop()
     }
 }
 

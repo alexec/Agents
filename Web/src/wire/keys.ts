@@ -9,7 +9,6 @@ export interface KeyRecord {
   client: string;
   /** The control plane's key from the code, base64url; every hello must show the same. */
   control: string;
-  grant: "operator" | "device";
   paired: string;
 }
 

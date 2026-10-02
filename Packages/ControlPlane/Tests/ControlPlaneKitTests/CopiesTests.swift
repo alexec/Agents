@@ -131,7 +131,7 @@ struct CopiesTests {
 
         // A phone at the first copy says it may be notified.
         let key = ControlAgreement.generate()
-        let phoneCode = try #require(ControlCode(text: try await copies[0].service.codes.issue(.client(.device)).text))
+        let phoneCode = try #require(ControlCode(text: try await copies[0].service.codes.issue(.client).text))
         let membership = try await ControlCodeUse.pairClient(phoneCode, privateKey: key.privateKey, id: UUID(), name: "phone",
                                                              kind: .iPhone, dial: ControlJoin.nio)
         let device = try #require(membership.client)
@@ -164,7 +164,7 @@ struct CopiesTests {
         #expect(try await leaseHolder(host, in: store)?.copy == all[0].service.copyID)
 
         for copy in all {
-            let (_, link) = try await client(at: copy.url, code: try await copy.service.codes.issue(.client(.operator)).text)
+            let (_, link) = try await client(at: copy.url, code: try await copy.service.codes.issue(.client).text)
             defer { link.disconnect() }
             let toHost = DaemonClient(link: link.link(for: host))
             try await toHost.connect(startIfNeeded: false)
@@ -182,13 +182,14 @@ struct CopiesTests {
         let (host, uplink) = try await host(code: try await all[0].service.codes.issue(.host).text, dialling: [all[0].url])
         defer { uplink.stop() }
         await eventually(within: 10) { await all[1].service.router.state(of: host)?.isOnline == true }
-        let (_, link) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client(.device)).text,
+        let (_, link) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client).text,
                                          kind: .iPhone)
         defer { link.disconnect() }
         let toHost = DaemonClient(link: link.link(for: host))
         try await toHost.connect(startIfNeeded: false)
         #expect(try await toHost.call(DaemonAPI.Method.agentsList)["role"]?.stringValue == "device")
-        await #expect(throws: JSONRPCError.self) { _ = try await toHost.call(DaemonAPI.Method.runtimesInstall) }
+        // What only an operator could ask before #111 reaches the host too.
+        #expect(try await toHost.call(DaemonAPI.Method.runtimesInstall)["method"]?.stringValue == DaemonAPI.Method.runtimesInstall)
     }
 
     @Test func killingTheHolderMovesTheLeaseAndTheHostRedials() async throws {
@@ -209,7 +210,7 @@ struct CopiesTests {
         #expect(moved.epoch > first.epoch)
         await eventually(within: 10) { await all[2].service.router.state(of: host)?.isOnline == true }
 
-        let (_, link) = try await client(at: all[2].url, code: try await all[2].service.codes.issue(.client(.operator)).text)
+        let (_, link) = try await client(at: all[2].url, code: try await all[2].service.codes.issue(.client).text)
         defer { link.disconnect() }
         let toHost = DaemonClient(link: link.link(for: host))
         try await toHost.connect(startIfNeeded: false)
@@ -219,7 +220,7 @@ struct CopiesTests {
     @Test func aCodeShownAtOneCopyWorksOnceAtAnother() async throws {
         let all = try await copies(2)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
-        let code = try await all[0].service.codes.issue(.client(.device)).text
+        let code = try await all[0].service.codes.issue(.client).text
         _ = try await client(at: all[1].url, code: code, kind: .iPhone)
         await #expect(throws: (any Error).self) { _ = try await client(at: all[0].url, code: code, kind: .iPhone) }
     }
@@ -228,14 +229,14 @@ struct CopiesTests {
         let all = try await copies()  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
         let (phone, phoneLink) = try await client(at: all[2].url,
-                                                  code: try await all[2].service.codes.issue(.client(.device)).text, kind: .iPhone)
+                                                  code: try await all[2].service.codes.issue(.client).text, kind: .iPhone)
         defer { phoneLink.disconnect() }
         let control = DaemonClient(link: phoneLink.controlLink)
         try await control.connect(startIfNeeded: false)
         await eventually { await !all[2].service.router.sessions(of: phone).isEmpty }
 
         let (_, operatorLink) = try await client(at: all[0].url,
-                                                 code: try await all[0].service.codes.issue(.client(.operator)).text)
+                                                 code: try await all[0].service.codes.issue(.client).text)
         defer { operatorLink.disconnect() }
         let mine = DaemonClient(link: operatorLink.controlLink)
         try await mine.connect(startIfNeeded: false)
@@ -245,41 +246,16 @@ struct CopiesTests {
         #expect(Date().timeIntervalSince(asked) < 2)
     }
 
-    @Test func twoGrantChangesRaceAndOneIsToldChangedElsewhere() async throws {
-        let all = try await copies(2)  // index-ok: one per copy, or it throws
-        defer { Task { await stop(all) } }
-        let (phone, link) = try await client(at: all[0].url, code: try await all[0].service.codes.issue(.client(.device)).text,
-                                             kind: .iPhone)
-        link.disconnect()
-        let (admin, adminLink) = try await client(at: all[0].url, code: try await all[0].service.codes.issue(.client(.operator)).text)
-        adminLink.disconnect()
-        // Both copies have read the phone's record as it is now.
-        for copy in all { try await copy.service.methods.refresh() }
-        let caller = ControlRouter.Caller(session: UUID(), client: admin, grant: .operator, kind: .mac)
-        let params: JSONValue = ["client": .string(phone.uuidString), "grant": "operator"]
-        _ = try await all[0].service.methods.handle(method: DaemonAPI.Method.clientsSetGrant, params: params, from: caller)
-        do {
-            _ = try await all[1].service.methods.handle(method: DaemonAPI.Method.clientsSetGrant,
-                                                        params: ["client": .string(phone.uuidString), "grant": "device"],
-                                                        from: caller)
-            // The event may have reached the second copy first, in which case its change
-            // came second rather than at once: then it is simply the last word.
-            #expect(await all[1].service.methods.client(phone)?.grant == .device)
-        } catch let error as JSONRPCError {
-            #expect(error.code == DaemonAPI.Failure.changedElsewhere)
-        }
-    }
-
     /// Frame N across copies (T080): a client connected at one copy is listed as connected
     /// at another, and no longer once it goes.
     @Test func howAClientConnectsIsKnownAtEveryCopy() async throws {
         let all = try await copies(2)  // index-ok: one per copy, or it throws
         defer { Task { await stop(all) } }
-        let (phone, link) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client(.device)).text,
+        let (phone, link) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client).text,
                                              kind: .iPhone)
         let control = DaemonClient(link: link.controlLink)
         try await control.connect(startIfNeeded: false)
-        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), grant: .operator, kind: .mac)
+        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), kind: .mac)
         func links() async -> [DaemonAPI.ClientConnection] {
             (try? await all[0].service.methods.handle(method: DaemonAPI.Method.clientsConnections, params: nil, from: caller)
                 .decode([DaemonAPI.ClientConnection].self)) ?? []
@@ -291,52 +267,6 @@ struct CopiesTests {
         #expect(await !links().contains { $0.client == phone })
     }
 
-    /// Two operators each demote the other at the same moment, at two copies (FR-016,
-    /// T081): one is refused, and there is always an operator left.
-    @Test func theLastOperatorHoldsAcrossCopies() async throws {
-        let all = try await copies(2)  // index-ok: one per copy, or it throws
-        defer { Task { await stop(all) } }
-        for round in 0..<5 {
-            let (first, firstLink) = try await client(at: all[0].url, code: try await all[0].service.codes.issue(.client(.operator)).text)
-            firstLink.disconnect()
-            let (second, secondLink) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client(.operator)).text)
-            secondLink.disconnect()
-            // Every other operator from earlier rounds steps down first, so these two are the last.
-            for copy in all { try await copy.service.methods.refresh() }
-            let caller = ControlRouter.Caller(session: UUID(), client: first, grant: .operator, kind: .mac)
-            for other in await all[0].service.methods.allClients where other.grant == .operator && other.id != first && other.id != second {
-                _ = try await all[0].service.methods.handle(method: DaemonAPI.Method.clientsSetGrant,
-                                                            params: ["client": .string(other.id.uuidString), "grant": "device"],
-                                                            from: caller)
-            }
-            for copy in all { try await copy.service.methods.refresh() }
-
-            async let a: Bool = demote(first, at: all[0], by: second)
-            async let b: Bool = demote(second, at: all[1], by: first)
-            let (one, two) = await (a, b)
-            #expect(!(one && two), "round \(round): both operators stepped down")
-            for copy in all { try await copy.service.methods.refresh() }
-            let operators = await all[0].service.methods.allClients.filter { $0.grant == .operator }
-            #expect(!operators.isEmpty, "round \(round): no operator left")
-        }
-    }
-
-    /// Whether the demotion went through; a refusal is lastOperator or changedElsewhere.
-    func demote(_ client: UUID, at copy: Copy, by caller: UUID) async -> Bool {
-        let who = ControlRouter.Caller(session: UUID(), client: caller, grant: .operator, kind: .mac)
-        do {
-            _ = try await copy.service.methods.handle(method: DaemonAPI.Method.clientsSetGrant,
-                                                      params: ["client": .string(client.uuidString), "grant": "device"], from: who)
-            return true
-        } catch let error as JSONRPCError {
-            #expect([DaemonAPI.Failure.lastOperator, DaemonAPI.Failure.changedElsewhere].contains(error.code))
-            return false
-        } catch {
-            Issue.record("\(error)")
-            return false
-        }
-    }
-
     @Test func withTheStoreDownLiveCallsCarryOnAndPairingIsRefused() async throws {
         let store = MemoryStore()
         let all = try await copies(2, store: store)  // index-ok: one per copy, or it throws
@@ -344,7 +274,7 @@ struct CopiesTests {
         let (host, uplink) = try await host(code: try await all[0].service.codes.issue(.host).text, dialling: [all[0].url])
         defer { uplink.stop() }
         await eventually(within: 10) { await all[1].service.router.state(of: host)?.isOnline == true }
-        let (_, link) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client(.operator)).text)
+        let (_, link) = try await client(at: all[1].url, code: try await all[1].service.codes.issue(.client).text)
         defer { link.disconnect() }
         let toHost = DaemonClient(link: link.link(for: host))
         try await toHost.connect(startIfNeeded: false)

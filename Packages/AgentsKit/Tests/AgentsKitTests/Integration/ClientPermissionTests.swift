@@ -246,8 +246,8 @@ struct ClientPermissionTests {
     @Test func controlOnlyRoles() {
         #expect(ConnectionRole.control.allows(DaemonAPI.Method.clientPermissionsState))
         #expect(ConnectionRole.control.allows(DaemonAPI.Method.clientPermissionsSet))
-        #expect(!ConnectionRole.device.allows(DaemonAPI.Method.clientPermissionsState))
-        #expect(!ConnectionRole.device.allows(DaemonAPI.Method.clientPermissionsSet))
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.clientPermissionsState))
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.clientPermissionsSet))
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.clientPermissionsSet))
     }
 

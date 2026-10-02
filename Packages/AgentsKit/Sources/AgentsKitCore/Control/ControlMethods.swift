@@ -8,9 +8,9 @@ import Foundation
 /// and rules.
 public actor ControlMethods: ControlHandling {
     public struct Hooks: Sendable {
-        /// `clients/startPairing` / `devices/startPairing`: a code for a new client, and
+        /// `clients/startPairing` / `devices/startPairing`: a code for a new client, said
         /// whether it is for a browser on this Mac (071 R2: good only through loopback).
-        public var startPairing: @Sendable (Grant, Bool) async throws -> JSONValue
+        public var startPairing: @Sendable (Bool) async throws -> JSONValue
         public var stopPairing: @Sendable () async -> Void
         /// `hosts/startEnroll`: a code for a new host.
         public var startEnroll: @Sendable () async throws -> JSONValue
@@ -30,7 +30,7 @@ public actor ControlMethods: ControlHandling {
         /// A host started or stopped relaying, or a relay host said hello (T096).
         public var relayChanged: @Sendable (HostID) async -> Void = { _ in }
 
-        public init(startPairing: @escaping @Sendable (Grant, Bool) async throws -> JSONValue = { _, _ in throw ControlMethods.notHere },
+        public init(startPairing: @escaping @Sendable (Bool) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
                     startEnroll: @escaping @Sendable () async throws -> JSONValue = { throw ControlMethods.notHere },
                     install: @escaping @Sendable (JSONValue?) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
@@ -112,7 +112,7 @@ public actor ControlMethods: ControlHandling {
         }
         let changed = await records.clients
         Task { await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
-                                              ["client": .string(client.id.uuidString)], operatorsOnly: true) }
+                                              ["client": .string(client.id.uuidString)]) }
         Task { await hooks.clientsChanged(changed) }
     }
 
@@ -185,13 +185,6 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.devicesForget,
     ]
 
-    /// Anyone connected may ask these. Everything else of the control plane's is an
-    /// operator's.
-    static let anyGrant: Set<String> = [
-        DaemonAPI.Method.ping, DaemonAPI.Method.controlStatus, DaemonAPI.Method.hostsList,
-        DaemonAPI.Method.clientsForgetSelf,
-    ]
-
     public nonisolated func handles(_ method: String) -> Bool {
         // A bare `daemon/ping` from today's Remote is the home host's to answer: that is
         // how the Remote knows its Mac is there.
@@ -214,7 +207,7 @@ public actor ControlMethods: ControlHandling {
     private static let writes: Set<String> = [
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsUpdate,
         DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay, DaemonAPI.Method.hostsLendSignIn,
-        DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget,
+        DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsForget,
         DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesForget,
     ]
 
@@ -222,10 +215,6 @@ public actor ControlMethods: ControlHandling {
         if frozen, Self.writes.contains(method) {
             throw JSONRPCError(code: DaemonAPI.Failure.storeUnavailable,
                                message: "The control plane is moving to another machine. Nothing was changed; try again in a minute.")
-        }
-        guard Self.anyGrant.contains(method) || caller.grant == .operator else {
-            throw JSONRPCError(code: DaemonAPI.Failure.notPermitted,
-                               message: "\(method) is not open to this client (\(caller.grant.rawValue)).")
         }
         switch method {
         case DaemonAPI.Method.ping:
@@ -254,22 +243,19 @@ public actor ControlMethods: ControlHandling {
                 DaemonAPI.ClientConnection(client: client, relayed: relayed, through: relayed ? relay : nil)
             }.sorted { $0.client.uuidString < $1.client.uuidString })
         case DaemonAPI.Method.clientsStartPairing:
-            let grant = (params?["grant"]?.stringValue).flatMap(Grant.init(rawValue:)) ?? .device
-            return try await hooks.startPairing(grant, params?["kind"]?.stringValue == ClientRecord.Kind.browser.rawValue)
+            // A `grant` an older window still sends is let go: every client may do
+            // everything (#111).
+            return try await hooks.startPairing(params?["kind"]?.stringValue == ClientRecord.Kind.browser.rawValue)
         case DaemonAPI.Method.devicesStartPairing:
-            return try await hooks.startPairing(.device, false)
+            return try await hooks.startPairing(false)
         case DaemonAPI.Method.clientsStopPairing, DaemonAPI.Method.devicesStopPairing:
             await hooks.stopPairing()
             return [:]
         case DaemonAPI.Method.clientsSetGrant:
-            let request = try Self.require(params, as: DaemonAPI.ClientGrantRequest.self)
-            try await records.setGrant(request.grant, of: request.client)
-            await router?.setGrant(request.grant, of: request.client)
-            await hooks.changed(ControlEvent(kind: .grantChanged, subject: request.client.uuidString, at: Date(),
-                                             by: caller.client.uuidString))
-            await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
-                                           ["client": .string(request.client.uuidString)], operatorsOnly: true)
-            return [:]
+            // An older window's grant picker. Refused in words rather than done, since
+            // there is nothing left to set.
+            throw JSONRPCError(code: DaemonAPI.Failure.notSupported,
+                               message: "Every paired client may do everything now, so there is no grant to change. Update this window to lose the choice.")
         case DaemonAPI.Method.clientsForget, DaemonAPI.Method.devicesForget:
             let id: UUID
             if let client = params?["client"]?.stringValue.flatMap(UUID.init(uuidString:)) {
@@ -284,8 +270,8 @@ public actor ControlMethods: ControlHandling {
                                              by: caller.client.uuidString))
             return [:]
         case DaemonAPI.Method.clientsForgetSelf:
-            // Only itself, and the last operator still can't (058 FR-016). The reply goes
-            // before the sockets close, so the caller hears it was done.
+            // Only itself. The reply goes before the sockets close, so the caller hears it
+            // was done.
             try await forget(caller.client, closingAfter: .milliseconds(200))
             await hooks.changed(ControlEvent(kind: .clientForgotten, subject: caller.client.uuidString, at: Date(),
                                              by: caller.client.uuidString))
@@ -404,7 +390,7 @@ public actor ControlMethods: ControlHandling {
             if let delay { try? await Task.sleep(for: delay) }
             await router?.forgetClient(id)
             await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
-                                           ["client": .string(id.uuidString), "removed": true], operatorsOnly: true)
+                                           ["client": .string(id.uuidString), "removed": true])
             await hooks.clientsChanged(changed)
         }
     }

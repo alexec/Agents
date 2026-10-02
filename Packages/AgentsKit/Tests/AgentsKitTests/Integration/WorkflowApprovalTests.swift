@@ -163,8 +163,8 @@ struct WorkflowApprovalTests {
         #expect(saved.workflow.settings.model == "sonnet")
     }
 
-    /// A phone can rewrite settings, but must not keep an approved file approved (S6).
-    @Test func aSaveFromADeviceDoesNotKeepApproval() async throws {
+    /// A phone's save is the person's, as the window's is (#111, replacing S6's rule).
+    @Test func aSaveFromADeviceKeepsAnApprovedFileApproved() async throws {
         let (core, work, _) = try await started()
 
         let saved = try await RequestConnection.$role.withValue(.device) {
@@ -173,6 +173,19 @@ struct WorkflowApprovalTests {
         }
 
         #expect(saved.workflow.settings.model == "opus")
+        #expect(saved.awaitingApproval == nil)
+    }
+
+    /// Anything that is not a person's connection never keeps an approval: the socket
+    /// refuses an agent this method, and the daemon would not approve for one either.
+    @Test func aSaveFromAnAgentDoesNotKeepApproval() async throws {
+        let (core, work, _) = try await started()
+
+        let saved = try await RequestConnection.$role.withValue(.agent) {
+            try await core.setWorkflowSettings(
+                .init(folder: work, workflowID: "tests", settings: WorkflowSettings(model: "opus")))
+        }
+
         #expect(saved.awaitingApproval != nil)
     }
 

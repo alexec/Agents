@@ -264,10 +264,10 @@ struct RetirementTests {
         #expect(await again.retentionState().settings.isOff)
     }
 
-    @Test func onlyThePersonsWindowMayChangeTheSettingsOrRetire() {
+    @Test func onlyAPersonMayChangeTheSettingsOrRetire() {
         for method in [DaemonAPI.Method.retentionSet, DaemonAPI.Method.agentsRetire] {
             #expect(ConnectionRole.control.allows(method))
-            #expect(!ConnectionRole.device.allows(method))
+            #expect(ConnectionRole.device.allows(method))
             #expect(!ConnectionRole.agent.allows(method))
             #expect(!ConnectionRole.stranger.allows(method))
         }
