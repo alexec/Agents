@@ -2078,14 +2078,21 @@ final class AppModel {
         work.setResuming(response?.agentIDs ?? [])
     }
 
+    /// How many finished turns a chat opens with (#90).
+    static let firstTurns = 12
+
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
         await attempt {
             let client = self.client(forAgent: selection)
             // The finished turns first, as summaries; then the transcript from where the
             // turn in progress starts. A daemon too old to keep turns gives the lot.
+            // A few turns rather than a full page: a screen holds two or three, the rest
+            // come as the reader nears the top, and fifty replies were a quarter of a
+            // megabyte to carry and decode before anything could be drawn (#90).
             let turns = (try? await client.call(DaemonAPI.Method.agentsTurns,
-                                                DaemonAPI.TurnsRequest(agentID: selection),
+                                                DaemonAPI.TurnsRequest(agentID: selection,
+                                                                       limit: Self.firstTurns),
                                                 returning: TurnsPage.self))
                 ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
             let page = try await client.call(DaemonAPI.Method.agentsTranscript,
