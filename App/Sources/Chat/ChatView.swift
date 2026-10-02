@@ -72,6 +72,8 @@ struct ChatView: View {
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in runtimeID.flatMap { model.accounts[$0]?.canSteer } ?? false },
+            acting: { [model] agentID in model.acting(agentID) },
+            recipient: { [model] agentID in model.answerRecipient(agentID) },
             // The sidebar's Changes pane, open at that edit (035 FR-014).
             showEdit: { [frame, states, agent] diff, toolCallID in
                 guard let agent else { return }

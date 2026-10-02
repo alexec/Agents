@@ -42,6 +42,10 @@ struct PromptBar: View {
     /// A draft came back without something it held by value — a pasted picture too large
     /// to keep — and the bar says so until the next thing is sent (025 US5).
     @State private var draftLostSomething = false
+    /// Prompts this bar has sent that the host has not yet taken (#87). The send button
+    /// spins meanwhile; past a beat, the bar says so in words too.
+    @State private var sending = 0
+    @State private var sendingIsSlow = false
 
     private var agent: Agent? { model.selectedAgent }
     private var isNew: Bool { agent == nil }
@@ -113,9 +117,24 @@ struct PromptBar: View {
                 if agent == nil, let refusal = model.draftSandboxRefusal {
                     sandboxRefusal(refusal)
                 }
+                // On its way (#87): a start can take seconds, making a worktree and a
+                // runtime, and a send to a slow host as long.
+                if agent == nil, model.isStarting {
+                    Telling(host: recipient, doing: "Starting")
+                } else if agent != nil, sending > 0, sendingIsSlow {
+                    Telling(host: recipient, doing: "Sending")
+                }
                 field
                 options
             }
+        }
+        // A send is usually back before anyone could read a word; the spinner in the
+        // button is enough for that. Words only for one still going after a beat.
+        .task(id: sending > 0) {
+            sendingIsSlow = false
+            guard sending > 0 else { return }
+            try? await Task.sleep(for: .milliseconds(400))
+            if !Task.isCancelled { sendingIsSlow = true }
         }
         // The same column the transcript draws in, so the bar's edges track its edges
         // at every width (FR-021).
@@ -357,6 +376,8 @@ struct PromptBar: View {
                 .appText(.reading)
                 .lineLimit(2...12)
                 .focused($focused)
+                // Held, words and all, while they start an agent (#87).
+                .disabled(agent == nil && model.isStarting)
                 // Return sends. Option and Return is left alone, and the field
                 // editor inserts a line break the way it does everywhere else.
                 .onKeyPress(.return, phases: .down) { press in
@@ -448,27 +469,48 @@ struct PromptBar: View {
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
-            if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               sending == 0 {
+                let acting = model.acting(agent.id)
                 Button {
                     Task { await model.stop(agent.id) }
                 } label: {
-                    Image(systemName: PromptWords.stopSymbol)
-                        .appText(.reading).fontWeight(.semibold)
-                        .frame(width: 22, height: 22)
+                    Group {
+                        if acting == .stop {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: PromptWords.stopSymbol)
+                                .appText(.reading).fontWeight(.semibold)
+                        }
+                    }
+                    .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.paperProminent)
                 .buttonBorderShape(.circle)
-                .help(PromptWords.stopHelp)
+                // Held while something else is on its way to this agent. Not while it is Stop:.
+                // the one that went stays bright, as on the answer cards (#86), and the
+                // model refuses a second press.
+                .disabled(acting != nil && acting != .stop)
+                .help(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : PromptWords.stopHelp)
                 .accessibilityLabel("Stop")
+                .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : "")
             } else {
                 Button(action: send) {
-                    Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                        .appText(.reading).fontWeight(.semibold)
-                        .frame(width: 22, height: 22)
+                    Group {
+                        if isGoing {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                                .appText(.reading).fontWeight(.semibold)
+                        }
+                    }
+                    .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.paperProminent)
                 .buttonBorderShape(.circle)
-                .disabled(!canSend)
+                // Bright while its own spinner turns, as the answer that went stays bright
+                // on the cards (#86); `send()` refuses the press meanwhile.
+                .disabled(!canSend && !isGoing)
                 .keyboardShortcut(.return, modifiers: .command)
                 .help(targetOffline ? model.hosts.offlineHelp(targetHost)
                                     : PromptWords.sendHelp(willQueue: willQueue))
@@ -874,8 +916,19 @@ struct PromptBar: View {
     private var targetHost: HostID { agent?.host ?? model.selectedProjectHost }
     private var targetOffline: Bool { model.hosts.isOffline(targetHost) }
 
+    /// Who the prompt goes to, as the pending mark says it.
+    private var recipient: String {
+        if let agent { return model.answerRecipient(agent.id) }
+        return targetHost == .mac ? "your Mac" : model.hosts.label(targetHost)
+    }
+
+    /// Something from this bar is on its way: the agent being started, or a prompt.
+    private var isGoing: Bool { agent == nil ? model.isStarting : sending > 0 }
+
     private var canSend: Bool {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        // One new agent at a time: a second Return is not a second agent (#87).
+        if agent == nil, model.isStarting { return false }
         // Kept in the field, never sent into nothing.
         guard !targetOffline else { return false }
         if agent != nil { return true }
@@ -932,10 +985,19 @@ struct PromptBar: View {
         let outgoing = text
         let going = attachments
         let labels = draftLabels
-        text = ""
-        attachments = []
-        // A draft exists only until it becomes a prompt. Given back below if it did not go.
-        DraftKeeper.shared.clear(draftKey)
+        let starting = agent == nil
+        // Read now: once started, this bar is the new agent's.
+        let key = draftKey
+        // A prompt to an agent leaves the field at once, so sending feels immediate:
+        // the chat has somewhere to show it. A new agent has no chat yet, so its words
+        // stay in the held field, under "Starting — telling your Mac", until it exists
+        // (#87).
+        if !starting {
+            text = ""
+            attachments = []
+            // A draft exists only until it becomes a prompt. Given back below if it did not go.
+            DraftKeeper.shared.clear(draftKey)
+        }
         draftLostSomething = false
         // Whatever was suggested has been answered, by being taken or by being typed
         // past. The daemon clears it when the turn begins, but the field empties now,
@@ -945,20 +1007,24 @@ struct PromptBar: View {
         // back to its end even if you were reading three screens up.
         model.scrollToEnd()
         Task {
-            let went: Bool
-            if agent == nil {
-                went = await model.startDraft(prompt: outgoing, attachments: going, labels: labels)
-            } else {
-                went = await model.send(outgoing, attachments: going)
+            if starting {
+                // Kept in the field if it did not start, with the reason over it.
+                guard await model.startDraft(prompt: outgoing, attachments: going, labels: labels) else { return }
+                if text == outgoing { text = "" }
+                attachments = []
+                draftLabels = []
+                DraftKeeper.shared.clear(key)
+                return
             }
+            sending += 1
+            let went = await model.send(outgoing, attachments: going)
+            sending -= 1
             // The field empties at once so sending feels immediate, but a prompt that
             // did not go is given back rather than lost, unless something new has been
             // typed in the meantime.
             if !went, text.isEmpty, attachments.isEmpty {
                 text = outgoing
                 attachments = going
-            } else if went, agent == nil {
-                draftLabels = []
             }
         }
     }

@@ -120,23 +120,25 @@ struct AgentsCommands: Commands {
 
         CommandMenu("Session") {
             let agent = model.selectedAgent
+            // Held while something is already on its way to it (#87).
+            let acting = agent.flatMap { model.acting($0.id) } != nil
             Button("Stop") { act { await model.stop($0.id) } }
                 .keyboardShortcut(".")
-                .disabled(agent.map { !model.canStop($0) } ?? true)
+                .disabled(agent.map { !model.canStop($0) } ?? true || acting)
             // Title case, as menu items are; the button says it in a sentence.
             Button("Carry On") { act { await model.carryOn($0.id) } }
                 .keyboardShortcut(.return, modifiers: [.command, .shift])
                 .disabled(agent.map { !model.isBlocked($0) } ?? true)
             Button(agent?.parkAction.map(ParkWords.label) ?? ParkWords.label(.park)) { park() }
                 .keyboardShortcut("p", modifiers: [.command, .control])
-                .disabled(agent?.parkAction == nil)
+                .disabled(agent?.parkAction == nil || acting)
             if agent?.state == .archived {
                 Button("Bring Back") { act { await model.unarchive($0.id) } }
                     .keyboardShortcut(.delete, modifiers: [.command, .option])
             } else {
                 Button("Archive") { archive() }
                     .keyboardShortcut(.delete, modifiers: [.command, .option])
-                    .disabled(agent == nil)
+                    .disabled(agent == nil || acting)
             }
             Divider()
             Button("Branch") { act { await model.fork($0.id) } }
@@ -220,8 +222,9 @@ struct AgentsCommands: Commands {
     private func park() {
         guard let agent = model.selectedAgent, let action = agent.parkAction else { return }
         Task {
-            await model.perform(action, on: agent.id)
-            if action == .park, model.selection == agent.id { model.selection = nil }
+            // Not when it failed, or was a second press: the chat stays, under the reason.
+            if await model.perform(action, on: agent.id), action == .park,
+               model.selection == agent.id { model.selection = nil }
         }
     }
 

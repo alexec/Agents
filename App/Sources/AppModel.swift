@@ -389,6 +389,10 @@ final class AppModel {
     /// Why the last start of a new agent did not happen, when its sandbox is why (064):
     /// shown over the prompt with **Start without sandbox**.
     var draftSandboxRefusal: DaemonAPI.SandboxWillNotStart?
+    /// A new agent is on its way to its host (#87): a worktree to make and a runtime to
+    /// start can take seconds, and the bar shows it rather than nothing. One at a time,
+    /// so a second Return is not a second agent.
+    private(set) var isStarting = false
     /// Folders beyond the working one, and MCP servers, for the agent about to start.
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
@@ -2378,7 +2382,9 @@ final class AppModel {
     /// when it was not.
     @discardableResult
     func startDraft(prompt: String, attachments: [Attachment] = [], labels: [String] = []) async -> Bool {
-        guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return false }
+        guard !isStarting, let runtimeID = draftRuntimeID, let cwd = draftCwd else { return false }
+        isStarting = true
+        defer { isStarting = false }
         let request = DaemonAPI.StartRequest(runtimeID: runtimeID,
                                              cwd: cwd,
                                              prompt: prompt,
@@ -2497,12 +2503,28 @@ final class AppModel {
     }
 
     /// Send a queued prompt into the turn that is running, where the runtime takes one.
+    /// Once: the row shows it going, and a second press is not a second send (#87).
     func sendNow(_ prompt: QueuedPrompt, to agentID: UUID) async {
-        await attempt {
+        await act(.sendNow(prompt.id), on: agentID) {
             try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsSendNow,
                                        DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
         }
     }
+
+    /// Something asked of a whole agent, sent once (#87). Held in `work.acting` until the
+    /// host has answered, so whichever control sent it shows it on its way, and the menu,
+    /// the row, the swipe and the key all refuse a second until it is back. False when it
+    /// did not go, or was a second press of something already going.
+    @discardableResult
+    private func act(_ act: AgentAct, on id: UUID, _ call: () async throws -> Void) async -> Bool {
+        guard work.begin(act, on: id) else { return false }
+        defer { work.end(act, on: id) }
+        return await attempt(on: work.agent(id)?.host ?? .mac, call)
+    }
+
+    /// What is on its way to this agent, if anything: for the control that sent it to
+    /// show, and the others to hold.
+    func acting(_ id: UUID) -> AgentAct? { work.acting[id] }
 
     /// What the runtime behind the current agent, or the draft, says it will take.
     /// Nothing is refused on a guess: this is what the runtime advertised.
@@ -2519,7 +2541,9 @@ final class AppModel {
     }
 
     func stop(_ id: UUID) async {
-        await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: id)) }
+        await act(.stop, on: id) {
+            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: id))
+        }
     }
 
     /// Stop one shell an agent left running, and nothing else it is doing (057).
@@ -2531,7 +2555,7 @@ final class AppModel {
     }
 
     func archive(_ id: UUID, andLeave: Bool = false) async {
-        let archived = await attempt {
+        let archived = await act(.archive, on: id) {
             try await self.client(forAgent: id).call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id))
         }
         // One path for menu, strip, swipe, ⌫ and the row: leave the chat when asked,
@@ -2553,9 +2577,12 @@ final class AppModel {
     }
 
     /// Park or unpark, whichever `Agent.parkAction` offers (040).
-    func perform(_ action: ParkAction, on id: UUID) async {
+    @discardableResult
+    func perform(_ action: ParkAction, on id: UUID) async -> Bool {
         let method = action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark
-        await attempt { try await self.client(forAgent: id).call(method, DaemonAPI.AgentRequest(agentID: id)) }
+        return await act(AgentAct(action), on: id) {
+            try await self.client(forAgent: id).call(method, DaemonAPI.AgentRequest(agentID: id))
+        }
     }
 
     /// Whether the answer went, so the card can give its buttons back when it did not.

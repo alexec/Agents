@@ -19,6 +19,10 @@ struct ChatActions {
     /// there at all: what it advertised, by runtime id.
     var sendNow: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
     var canSendNow: @MainActor (String?) -> Bool = { _ in false }
+    /// What is on its way to an agent, by its id (#87): Send now shows it going and holds,
+    /// and who it is going to, as the pending mark names it.
+    var acting: @MainActor (UUID) -> AgentAct? = { _ in nil }
+    var recipient: @MainActor (UUID) -> String = { _ in "your Mac" }
     /// Show an edit among the rest of what the agent changed (035): the Mac's Changes
     /// pane, at that file and that tool call. Nil where there is no such pane, and then
     /// the edit offers nothing.

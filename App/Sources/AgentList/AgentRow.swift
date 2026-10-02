@@ -108,7 +108,13 @@ struct AgentRow: View {
                 // thing depending on state is a row nobody can read at a glance. The
                 // state is the icon's; what it is doing is the title, which the agent
                 // keeps current; this is what it said.
-                if let report = agent.report?.message {
+                // Stop, park or archive on its way, from whichever control sent it (#87).
+                // In the report's place, so the row keeps its height: a list row keeps the
+                // height of its first draw.
+                if let acting = model.acting(agent.id) {
+                    Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
+                        .frame(height: isCompact ? 14 : nil)
+                } else if let report = agent.report?.message {
                     Text(report)
                         .appText(isCompact ? .fine : .supporting)
                         .foregroundStyle(.secondary)
@@ -204,6 +210,7 @@ struct AgentRow: View {
             }
             if model.canStop(agent) {
                 Button("Stop") { Task { await model.stop(agent.id) } }
+                    .disabled(isActing)
             }
             if agent.state == .archived {
                 Button("Bring Back") { Task { await model.unarchive(agent.id) } }
@@ -238,8 +245,10 @@ struct AgentRow: View {
                         Task { await model.perform(action, on: agent.id) }
                     }
                     .help(ParkWords.help(action))
+                    .disabled(isActing)
                 }
                 Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
+                    .disabled(isActing)
             }
             // Finder only sees this Mac's disk (058, FR-019).
             if model.isOnThisMac(agent.host) {
@@ -250,6 +259,9 @@ struct AgentRow: View {
             }
         }
     }
+
+    /// Something is on its way to this agent; its menu holds until it is back (#87).
+    private var isActing: Bool { model.acting(agent.id) != nil }
 
     @State private var retiring: DaemonAPI.RetirePreview?
     @State private var cannotRetire: String?

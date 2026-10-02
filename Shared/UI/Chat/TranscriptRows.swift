@@ -382,6 +382,9 @@ struct QueuedPromptRow: View {
     var canSendNow = false
 
     var body: some View {
+        // Held while anything is on its way to this agent; this one, said (#87).
+        let acting = actions.acting(agentID)
+        let going = acting == .sendNow(prompt.id)
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
@@ -393,14 +396,23 @@ struct QueuedPromptRow: View {
                         Button {
                             Task { await actions.sendNow(prompt, agentID) }
                         } label: {
-                            Label("Send now", systemImage: "arrow.up")
-                                .appText(.reading)
-                                #if os(iOS)
-                                .frame(minHeight: 44)
-                                .contentShape(.rect)
-                                #endif
+                            Group {
+                                if going {
+                                    Telling(host: actions.recipient(agentID), doing: acting?.doing)
+                                } else {
+                                    Label("Send now", systemImage: "arrow.up")
+                                        .appText(.reading)
+                                }
+                            }
+                            #if os(iOS)
+                            .frame(minHeight: 44)
+                            .contentShape(.rect)
+                            #endif
                         }
                         .buttonStyle(.borderless)
+                        // The one going stays bright, as on the answer cards (#86); the
+                        // model refuses a second press of it.
+                        .disabled(acting != nil && !going)
                         .help("Send this into the turn that is running, without waiting for it to end")
                     }
                 }
@@ -430,6 +442,7 @@ struct QueuedPromptRow: View {
             }
             .buttonStyle(.borderless)
             .foregroundStyle(.tertiary)
+            .disabled(going)
             .help("Do not send this")
             .accessibilityLabel("Remove queued prompt")
         }
