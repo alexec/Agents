@@ -277,7 +277,8 @@ struct AgentRow: View {
     @State private var worktreeGone = false
 
     private var worktreeWatch: String {
-        "\(agent.host.rawValue)|\(agent.worktree?.root.path ?? "")|\(model.controlPlaneAway)"
+        // The host's mark too (#119), so a worktree made again is asked about again.
+        "\(agent.host.rawValue)|\(agent.worktree?.root.path ?? "")|\(model.controlPlaneAway)|\(agent.missingFolder != nil)"
     }
 
     private func refreshWorktree() async {
