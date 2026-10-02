@@ -853,6 +853,7 @@ public actor DaemonCore {
         // queued since. Any other ending drops the ask. An ask to be archived, from a
         // conversation told it could, is dropped with it: an agent cannot put a session
         // away.
+        let wasParked = agent.parking?.isParked == true
         switch next {
         case .finished, .stopped:
             let pickingUp = event == .foundDead && agent.mayBePickedUpAfterRestart
@@ -883,6 +884,11 @@ public actor DaemonCore {
             agent.archivedAt = nil
             agent.retirement = nil
         }
+        let parkedNow = !wasParked && agent.parking?.isParked == true
+        let archivedNow = next == .archived && agents[agentID]?.state != .archived
+        // Read before the ending below releases the run, as that ending's own depth is:
+        // a workflow that parks its agent must not fire on that park from depth zero.
+        let putAwayDepth = parkedNow || archivedNow ? workflowChainDepth(causedBy: agentID) : 0
         let wasStarting = agents[agentID]?.state == .starting
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
@@ -940,6 +946,15 @@ public actor DaemonCore {
         // running — it is about to be.
         case .starting, .waitingOnUser, .running, .archived:
             break
+        }
+        // Put away (#96), after the ending it came with, so a wait hears the finish first.
+        if parkedNow {
+            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.", depth: putAwayDepth)
+        }
+        if archivedNow {
+            let by = agent.archivedReason == .byAgent ? "another agent" : "you"
+            raiseAgentEvent("agent.archived", agentID, sentence: "was archived.",
+                            details: ["by": by], depth: putAwayDepth)
         }
         // Anything blocked on this agent (039). Closing is one write per blocked agent;
         // the resume it may clear is queued in that same moment and sent behind this

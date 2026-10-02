@@ -329,4 +329,46 @@ struct ParkingTests {
         try await settle(core, id)
         #expect(await core.agent(id)?.group(wantsEyes: false) != .parked)
     }
+
+    // MARK: #96 — parking and archiving are events
+
+    private func events(_ core: DaemonCore, _ id: UUID) async -> [String] {
+        await core.eventLog.events
+            .filter { $0.details["agent"] == id.uuidString && ["agent.parked", "agent.archived"].contains($0.name) }
+            .map(\.name)
+    }
+
+    @Test func parkingASettledChatRaisesAgentParkedOnce() async throws {
+        let (locations, work) = try temporary()
+        let seed = finished(work)
+        let core = try await core(locations, seeded: [seed])
+        try await call(core, DaemonAPI.Method.agentsPark, seed.id)
+        try await call(core, DaemonAPI.Method.agentsPark, seed.id)
+        #expect(await events(core, seed.id) == ["agent.parked"])
+    }
+
+    @Test func aWorkingChatRaisesAgentParkedWhenItsTurnEnds() async throws {
+        let (locations, work) = try temporary()
+        let core = try await core(locations, launcher: midTurn())
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+        try await call(core, DaemonAPI.Method.agentsPark, id)
+        #expect(!(await events(core, id)).contains("agent.parked"), "not while only marked")
+        try await settle(core, id)
+        #expect(await events(core, id) == ["agent.parked"])
+    }
+
+    @Test func archivingRaisesAgentArchivedByYouAndNotAgainWhenAlreadyArchived() async throws {
+        let (locations, work) = try temporary()
+        let seed = finished(work)
+        let core = try await core(locations, seeded: [seed])
+        try await core.archive(seed.id)
+        try await core.archive(seed.id)
+        let archived = await core.eventLog.events.filter {
+            $0.name == "agent.archived" && $0.details["agent"] == seed.id.uuidString
+        }
+        #expect(archived.count == 1)
+        #expect(archived.first?.details["by"] == "you")
+        try await core.unarchive(seed.id)
+        #expect(await events(core, seed.id) == ["agent.archived"], "unarchiving raises neither")
+    }
 }

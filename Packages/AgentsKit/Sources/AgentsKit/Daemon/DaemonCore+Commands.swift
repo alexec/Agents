@@ -1695,6 +1695,9 @@ extension DaemonCore {
         case (_, false): agent.parking = .parked(at: now())
         }
         changed(agent)
+        if agent.parking?.isParked == true {
+            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.")
+        }
         reconsider()
     }
 
