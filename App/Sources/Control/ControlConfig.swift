@@ -30,6 +30,9 @@ enum ControlConfig {
         guard !name.isEmpty, name.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
         return name
     }()
+    /// Where a walk's window writes the page Open in Browser would open (#109), for the
+    /// walk's headless browser to go to: a walk never opens the person's own browser.
+    static var walkOpenedURL: URL? { walk == nil ? nil : folder.appendingPathComponent("opened-url") }
     private static var membershipFile: URL { folder.appendingPathComponent("control-client.json") }
     private static var keyFile: URL { folder.appendingPathComponent("control-client-key") }
 
