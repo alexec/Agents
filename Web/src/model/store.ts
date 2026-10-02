@@ -8,7 +8,9 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing,
 } from "../protocol/generated";
+import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
+import type { FolderGoneAsk } from "./missingFolder";
 import { describe } from "./errors";
 import { log } from "../log";
 import { folderKey } from "./groups";
@@ -583,7 +585,37 @@ export class Store extends Work {
   }
 
   async prompt(host: string, agentID: string, text: string, attachments: Attachment[]): Promise<boolean> {
-    return (await this.act("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host)) !== null;
+    try {
+      await this.link.call("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host);
+      return true;
+    } catch (error) {
+      // Its folder has gone (#119): said with the ways on, carrying what was typed.
+      if (error instanceof CallFailed && error.code === Failure.folderGone) {
+        this.folderGone.value = { host, agentID, message: error.message, text, attachments };
+        return false;
+      }
+      log("call.failed", error instanceof CallFailed ? error.code : undefined);
+      this.say(describe(error));
+      return false;
+    }
+  }
+
+  /** A send refused because the agent's folder has gone (#119), until a way on or Cancel. */
+  readonly folderGone = signal<FolderGoneAsk | null>(null);
+
+  /**
+   * Continue in the project folder (#119): a successor that reads this session and carries on,
+   * with whatever was typed. Answers its id, or null with `problem` saying why.
+   */
+  async continueInProject(host: string, agentID: string, text = "", attachments: Attachment[] = []): Promise<string | null> {
+    return this.act("agents/continueInProject",
+      { agentID: agentID as UUID, text, attachments, requestID: crypto.randomUUID().toUpperCase() as UUID }, host);
+  }
+
+  /** Recreate the worktree from its branch (#119); the row follows from `agent/changed`. */
+  async recreateWorktree(host: string, agentID: string): Promise<void> {
+    const agent = await this.act("agents/recreateWorktree", { agentID: agentID as UUID }, host);
+    if (agent) this.apply("agent/changed", agent, host);
   }
 
   async sendNow(host: string, agentID: string, promptID: string): Promise<void> {
