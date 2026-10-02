@@ -85,6 +85,10 @@ were approved as they stood.
 
 **Turn it off**
 
+- Turn it off for a while: switch off **Enabled** on its page, or right-click its row and
+  choose **Turn Off**. On iPhone and iPad, the switch is on its page and **Turn Off** is on
+  a long press. It stays where it is, marked **Off**, none of its triggers run it, and
+  **Run now** still does. Switch it back on to have it run again.
 - Archive it: on the Mac, swipe the row left with two fingers, right-click it and choose
   **Archive**, or click **Archive** on its page. It stays listed under **Archived workflows** and
   does not run until you click **Bring Back**. The file is kept.

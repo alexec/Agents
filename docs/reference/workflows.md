@@ -81,6 +81,9 @@ A workflow does not run, and its page says why, when:
 
 - a run of it is still going;
 - it is archived;
+- it is turned off. Unlike archived, this is recorded on its row, as **Did not run — it
+  is turned off**, counted on one line however many times it is skipped. **Run now**
+  still runs it;
 - its file is new, or has changed since you approved it, and you have not approved it.
   Its row and page say **waiting for your OK** and offer **Approve**. Approval is of the
   file as you saw it: a file that changes afterwards waits again. Changes made on the
@@ -88,7 +91,7 @@ A workflow does not run, and its page says why, when:
   and workflows that existed before this version were approved as they stood;
 - it is not one of the first three workflows in its project that are not archived, taken
   in order of file name, or not one of the first ten of those across every project.
-  Archiving one makes room;
+  Archiving one makes room; turning one off does not;
 - it was set off by a chain of workflows already three deep;
 - the day's spending limit has been reached;
 - the project folder is not there;
@@ -98,8 +101,29 @@ A workflow does not run, and its page says why, when:
   know. The page says what is wrong with the file.
 
 On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve**
-while it is waiting for your OK), **Archive** (**Bring Back** once archived) and **Show in
-Finder**.
+while it is waiting for your OK), **Turn Off** (**Turn On** once off), **Archive**
+(**Bring Back** once archived) and **Show in Finder**. Its page has the **Enabled** switch
+beside **Run now**, and a **Triggers** section listing each trigger on its own line: the
+filters on it, whether it listens in this project or on the whole Mac or server, which
+agent a `triggering` run resumes, when a schedule is next due, and a trigger this
+version does not know marked **Unknown**. Under them it says when the workflow last ran
+and what set it off. A file that cannot be read still lists the triggers it could read.
+
+## Off and archived
+
+Both stop a workflow running, and neither touches its file. They differ in what else
+they do:
+
+| | Turned off | Archived |
+| --- | --- | --- |
+| Where it is listed | In its place, marked **Off** | Under **Archived workflows** |
+| Its triggers | Do not run it; each one skipped is counted on its row | Do not run it; nothing is recorded |
+| **Run now** | Runs it, to try it | Refuses |
+| The three-per-project ceiling | Still counts, so turning it off and on again moves nothing | Frees its place |
+| Turned back on by | **Enabled**, **Turn On**, the phone, or an agent if an agent turned it off | **Bring Back** |
+
+Off is for a workflow you still use but want quiet for a while: while a test is flaky,
+or while you are away. Archive is for one you are putting away.
 
 ## See also
 
