@@ -356,8 +356,8 @@ This comes before US4 and US5, because Agents Host restarts on every ship (plan.
 
 **Independent Test**: quickstart.md §7, second half.
 
-- [ ] T067 [US5] In `SessionsColumn.tsx`, list workflows (`workflows/list`) with their trigger, archived ones folded under **Archived workflows**, and **Run Now** (`workflows/run`). The new session appears under the project (FR-028).
-- [ ] T068 [US5] Walk US5 on scratch with a seeded workflow. Record it in `walks/us5.md`.
+- [x] T067 [US5] In `SessionsColumn.tsx`, list workflows (`workflows/list`) with their trigger, archived ones folded under **Archived workflows**, and **Run Now** (`workflows/run`). The new session appears under the project (FR-028).
+- [x] T068 [US5] Walk US5 on scratch with a seeded workflow. Record it in `walks/us5.md`.
 
 ---
 

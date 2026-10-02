@@ -2,7 +2,7 @@
 // ElicitationView.swift). Answering one here answers it everywhere. One answered somewhere else
 // while it is on screen says so, and its buttons do nothing (US2 scenario 5).
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type {
   ElicitationRequest, ElicitationSchema, ElicitationSchemaProperty, ElicitationSchemaPropertyChoice, JSONValue,
   PermissionOption, PermissionRequest,
@@ -41,7 +41,15 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
 
   // What the host holds, merged with what is on screen: a card the host withdrew and this page
   // did not answer was answered somewhere else.
+  // Which session `held` is for: a new one starts from nothing, in this same effect. A second
+  // effect clearing it ran after this one on the first render and wiped the cards a chat opened
+  // with, so a question already waiting when the chat was opened was never shown.
+  const heldFor = useRef<string | null>(null);
   useEffect(() => {
+    if (heldFor.current !== session) {
+      heldFor.current = session;
+      held.value = [];
+    }
     const before = held.value;
     const next: Held[] = [];
     for (const card of before) {
@@ -64,7 +72,6 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
     }
   }, [[...live].join(","), session]);
 
-  useEffect(() => { held.value = []; }, [session]);
 
   const mark = (id: string, answered: Answered) => {
     held.value = held.value.map((c) => (c.request.id === id ? { ...c, answered } : c));

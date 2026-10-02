@@ -21,7 +21,7 @@ export function WorkflowRow({ store, host, summary, disabled }: {
         <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK on the Mac" : workflowSummary(summary.workflow, name)}</span>
       </span>
       {canRun && (
-        <button class="run" disabled={disabled || running.value || summary.isRunning}
+        <button class="run-now" disabled={disabled || running.value || summary.isRunning}
           title={`Run ${summary.workflow.name} now`} aria-label={`Run ${summary.workflow.name} now`}
           onClick={async () => {
             running.value = true;

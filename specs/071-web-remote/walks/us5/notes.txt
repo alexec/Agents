@@ -1,0 +1,11 @@
+listed: [{"mark":"Waiting for its trigger","name":"After the build","what":"When custom.build_green, in a new agent, in plan mode","run":true},{"mark":"Waiting for its trigger","name":"Write a greeting","what":"Sun at 3am, in a new agent","run":true}]
+folded: {"label":"Archived workflows 1","open":false}
+archived, opened: ["Archived: An old one"]
+Run Now: a new agent on the host after 4.7 s: 51928688-76D4-4F95-A589-6B0FD0AF52F1, started by greeting, labels ["workflow"]
+its session under the project in the page: ["Working: Write a greeting"]
+a permission already pending when the chat opened: shown at once: true
+answered its permission in the page
+the run ended: finished, done: Created greeting.txt in the project folder containing the word "hello".
+greeting.txt: "hello"
+the row after: {"mark":"Waiting for its trigger","name":"Write a greeting","what":"Sun at 3am, in a new agent","run":true}
+page errors: []
