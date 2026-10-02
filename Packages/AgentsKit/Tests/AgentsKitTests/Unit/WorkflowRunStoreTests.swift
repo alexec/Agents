@@ -56,7 +56,7 @@ struct WorkflowRunStoreTests {
         records.update(folder: written.folder, workflowID: "nightly") { $0.isArchived = true }
         records.runs = [written]
 
-        store.save(records)
+        try store.save(records)
         let read = store.load()
 
         #expect(read.runs == [written])
@@ -75,7 +75,7 @@ struct WorkflowRunStoreTests {
             $0.isArchived = true
         }
         records.runs = [run("good")]
-        store.save(records)
+        try store.save(records)
 
         // Break one run by hand, the way a future build's field might.
         var text = try String(contentsOf: locations.workflows, encoding: .utf8)
@@ -95,13 +95,13 @@ struct WorkflowRunStoreTests {
         let store = WorkflowStore(locations: locations)
         var records = WorkflowRecords()
         records.runs = [run()]
-        store.save(records)
+        try store.save(records)
 
         var again = store.load()
         again.lastTickAt = Date()
         again.record(.refused(.runInFlight, at: Date(), repeats: 1),
                      folder: URL(filePath: "/tmp/somewhere/api"), workflowID: "other")
-        store.save(again)
+        try store.save(again)
 
         #expect(store.load().runs.count == 1)
     }

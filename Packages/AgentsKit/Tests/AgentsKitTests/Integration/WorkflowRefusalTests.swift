@@ -496,7 +496,7 @@ struct WorkflowRefusalTests {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         try LimitStore(locations: locations)
             .save(CostLimits(daily: Cost(amount: 1, currency: "USD")))
-        SpendLedger(locations: locations).add(Cost(amount: 5, currency: "USD"), on: Date())
+        try SpendLedger(locations: locations).add(Cost(amount: 5, currency: "USD"), on: Date())
 
         try write(onSchedule, as: "nightly", in: work)
         let core = try await core(locations)
@@ -531,7 +531,7 @@ struct WorkflowRefusalTests {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         try LimitStore(locations: locations)
             .save(CostLimits(daily: Cost(amount: 1, currency: "USD")))
-        SpendLedger(locations: locations).add(Cost(amount: 5, currency: "USD"), on: Date())
+        try SpendLedger(locations: locations).add(Cost(amount: 5, currency: "USD"), on: Date())
 
         try write(onSchedule, as: "nightly", in: work)
         let core = try await core(locations)

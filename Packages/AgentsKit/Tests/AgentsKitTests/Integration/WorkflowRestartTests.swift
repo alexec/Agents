@@ -103,7 +103,7 @@ struct WorkflowRestartTests {
         let store = WorkflowStore(locations: locations)
         var records = store.load()
         records.runs = runs
-        store.save(records)
+        try? store.save(records)
     }
 
     private func runsOnDisk(_ locations: StoreLocations) -> [WorkflowRun] {

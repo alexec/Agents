@@ -24,38 +24,38 @@ struct SpendLedgerTests {
     private func usd(_ amount: Decimal) -> Cost { Cost(amount: amount, currency: "USD") }
 
     @Test("banking on one day and reading on the next returns nothing")
-    func theDayRollsOverByItself() {
+    func theDayRollsOverByItself() throws {
         let (ledger, _) = temporary()
-        ledger.add(usd(4), on: day("2026-09-19 14:00"))
+        try ledger.add(usd(4), on: day("2026-09-19 14:00"))
         #expect(ledger.total(on: day("2026-09-19 23:59")) == ["USD": 4])
         #expect(ledger.total(on: day("2026-09-20 00:01")).isEmpty,
                 "a new day is a key that is not there yet, and no timer resets anything")
     }
 
     @Test("two currencies on the same day stay apart and are never summed")
-    func currenciesAreNeverAdded() {
+    func currenciesAreNeverAdded() throws {
         let (ledger, _) = temporary()
         let when = day("2026-09-19 10:00")
-        ledger.add(usd(12.34), on: when)
-        ledger.add(Cost(amount: 0.81, currency: "GBP"), on: when)
+        try ledger.add(usd(12.34), on: when)
+        try ledger.add(Cost(amount: 0.81, currency: "GBP"), on: when)
         #expect(ledger.total(on: when) == ["USD": 12.34, "GBP": 0.81])
     }
 
     @Test("a turn banked after midnight counts against the day it ended in")
-    func aSpendBelongsToTheDayItsTurnEnded() {
+    func aSpendBelongsToTheDayItsTurnEnded() throws {
         let (ledger, _) = temporary()
-        ledger.add(usd(1), on: day("2026-09-19 23:59"))
-        ledger.add(usd(2), on: day("2026-09-20 00:01"))
+        try ledger.add(usd(1), on: day("2026-09-19 23:59"))
+        try ledger.add(usd(2), on: day("2026-09-20 00:01"))
         #expect(ledger.total(on: day("2026-09-19 12:00")) == ["USD": 1])
         #expect(ledger.total(on: day("2026-09-20 12:00")) == ["USD": 2],
                 "an agent running across midnight spends into the new day")
     }
 
     @Test("the day's total survives a restart")
-    func aSecondLedgerOnTheSameRootSeesTheSameDay() {
+    func aSecondLedgerOnTheSameRootSeesTheSameDay() throws {
         let (ledger, locations) = temporary()
         let when = day("2026-09-19 09:00")
-        ledger.add(usd(3.5), on: when)
+        try ledger.add(usd(3.5), on: when)
         // A new daemon, the same root.
         let afterRestart = SpendLedger(locations: locations)
         #expect(afterRestart.total(on: when) == ["USD": 3.5],
@@ -63,12 +63,12 @@ struct SpendLedgerTests {
     }
 
     @Test("pruning keeps the last seven days and drops the eighth")
-    func onlyEnoughDaysToAnswerTheBoundaryQuestions() {
+    func onlyEnoughDaysToAnswerTheBoundaryQuestions() throws {
         let (ledger, locations) = temporary()
         for offset in 0..<10 {
             let when = Calendar.current.date(byAdding: .day, value: offset,
                                              to: day("2026-09-01 12:00"))!
-            ledger.add(usd(1), on: when)
+            try ledger.add(usd(1), on: when)
         }
         let data = try! Data(contentsOf: locations.spend)
         let contents = try! StoreCoding.decoder.decode(SpendLedger.Contents.self, from: data)
@@ -79,7 +79,7 @@ struct SpendLedgerTests {
     }
 
     @Test("a missing file reads as an empty ledger")
-    func nothingWrittenYetIsZero() {
+    func nothingWrittenYetIsZero() throws {
         let (ledger, _) = temporary()
         #expect(ledger.total(on: Date()).isEmpty)
     }
@@ -92,12 +92,12 @@ struct SpendLedgerTests {
         #expect(ledger.total(on: Date()).isEmpty)
         // And it can still bank, which is the part that matters: under-counting today
         // is bad, refusing to work because of it is worse.
-        ledger.add(usd(1), on: day("2026-09-19 12:00"))
+        try ledger.add(usd(1), on: day("2026-09-19 12:00"))
         #expect(ledger.total(on: day("2026-09-19 12:00")) == ["USD": 1])
     }
 
     @Test("a day stamp is the machine's local calendar day")
-    func theStampFollowsTheMachinesOwnDay() {
+    func theStampFollowsTheMachinesOwnDay() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Pacific/Auckland")!
         let noonInLondon = ISO8601DateFormatter().date(from: "2026-09-19T12:00:00Z")!
@@ -111,7 +111,7 @@ struct SpendLedgerTests {
     }
 
     @Test("a clock change makes a short or long day, and it is still one day")
-    func aDayThatMovedIsStillOneDay() {
+    func aDayThatMovedIsStillOneDay() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Europe/London")!
         // The 2026 spring-forward: 01:00 becomes 02:00 on 29 March. Twenty-three

@@ -391,6 +391,10 @@ public enum DaemonAPI {
         /// A clone began, or ended either way (027). Every window hears it, because a
         /// clone belongs to the Mac and not to the window that asked for it.
         public static let cloneChanged = "clone/changed"
+        /// A write nobody was waiting on was refused: a line of a chat, an agent's record,
+        /// the day's spend (#88). Carries `WriteFailure`; a window shows its message.
+        /// Sent once in a while per cause, not once per write.
+        public static let writeFailed = "storage/writeFailed"
 
         /// A workflow appeared, changed, ran, was refused, or was archived. Carries the
         /// whole resolved summary rather than a delta, for the reason `project/changed`
@@ -1851,6 +1855,9 @@ public enum DaemonAPI {
         /// The control plane's store cannot be reached. Live connections carry on;
         /// nothing new can be remembered until it is back.
         public static let storeUnavailable = -32094
+        /// A write the disk refused: full, or a folder this may not write to (#88). The
+        /// message says what was not kept and what to do; the data is `WriteFailure`.
+        public static let couldNotSave = -32095
     }
 
     // MARK: Workflows

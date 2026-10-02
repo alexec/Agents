@@ -44,11 +44,11 @@ public struct SpendLedger: Sendable {
     ///
     /// Called once per turn from `finishTurn`, before the agent is broadcast, so a
     /// daemon killed between the two comes back having counted the money.
-    public func add(_ cost: Cost, on date: Date) {
+    public func add(_ cost: Cost, on date: Date) throws {
         var contents = read()
         let day = Self.stamp(for: date)
         contents.days[day, default: [:]][cost.currency, default: 0] += cost.amount
-        write(contents, keeping: day)
+        try write(contents, keeping: day)
     }
 
     /// What was spent on that local day, per currency. Empty when nothing was, so a
@@ -70,12 +70,12 @@ public struct SpendLedger: Sendable {
 
     /// Pruned on write, relative to the day being written rather than to the clock,
     /// so banking a late figure does not drop the day it belongs to.
-    private func write(_ contents: Contents, keeping day: String) {
+    private func write(_ contents: Contents, keeping day: String) throws {
         var contents = contents
         let keep = contents.days.keys.sorted().suffix(Self.daysKept)
         contents.days = contents.days.filter { keep.contains($0.key) || $0.key == day }
-        guard let data = try? StoreCoding.encoder.encode(contents) else { return }
-        try? FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try? data.write(to: locations.spend, options: .atomic)
+        let data = try StoreCoding.encoder.encode(contents)
+        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        try data.write(to: locations.spend, options: .atomic)
     }
 }

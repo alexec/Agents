@@ -318,7 +318,7 @@ extension DaemonCore {
             try await store.save(agent)
         } catch {
             await session.end(gracePeriod: .seconds(2))
-            throw error
+            throw couldNotSave(error, keeping: "the new session")
         }
         agents[agent.id] = agent
         live[agent.id] = session
@@ -534,9 +534,30 @@ extension DaemonCore {
     /// runtime's, because a `session/prompt` sent mid-turn means something different
     /// to each of the three and none of that belongs in the window.
     public func prompt(_ request: DaemonAPI.PromptRequest) async throws {
+        try await keepPrompt(request)
         // New words go first: a chat waiting for an allowance waits no more (052, FR-017).
         dropAllowanceWait(request.agentID)
         try await enqueue(request, first: false)
+    }
+
+    /// The words written down before anything acts on them (#88). Every prompt joins
+    /// the queue on the agent's record, and that record is saved in the background; on
+    /// a full disk the words would be in memory only, and gone at the next restart with
+    /// the window having cleared them. So the record with them on it is written first,
+    /// and a refusal fails the send with nothing changed: the prompt bar keeps them.
+    func keepPrompt(_ request: DaemonAPI.PromptRequest) async throws {
+        guard var agent = agents[request.agentID] else { return }
+        agent.queuedPrompts.append(QueuedPrompt(text: request.text, attachments: request.attachments,
+                                                from: request.from))
+        await saveTail?.value
+        do {
+            try await store.save(agent)
+        } catch where WriteFailure(error, keeping: "") != nil {
+            throw couldNotSave(error, keeping: "your message")
+        } catch {
+            // Anything else is the store refusing a record it thinks wrong, which the
+            // background save logs as it always has; the words still go.
+        }
     }
 
     /// The one prompt that goes to the front of the queue: the news, after a restart,
@@ -833,7 +854,7 @@ extension DaemonCore {
         // The ledger before the windows: a daemon killed between here and the next
         // broadcast comes back having counted the money rather than having forgotten
         // it. It is also the only copy that survives the agent being archived.
-        spendLedger.add(Cost(amount: added, currency: cost.currency), on: now())
+        keepQuietly("today's spend") { try spendLedger.add(Cost(amount: added, currency: cost.currency), on: now()) }
     }
 
     /// Send what is waiting to every agent that has something waiting.
@@ -856,7 +877,7 @@ extension DaemonCore {
 
     public func costState() async -> DaemonAPI.CostState { currentCostState() }
 
-    public func setLimits(_ request: DaemonAPI.SetLimitsRequest) async -> DaemonAPI.CostState {
+    public func setLimits(_ request: DaemonAPI.SetLimitsRequest) async throws -> DaemonAPI.CostState {
         var limits = limitStore.load()
         let dayWasReached = isDayLimitReached(under: limits)
         // Absent leaves it alone; present-and-null clears it. A zero is a limit and
@@ -867,7 +888,7 @@ extension DaemonCore {
         // lower than what is already spent is allowed and is not an error: the reply
         // carries the new state, from which the caller can see it is already reached
         // and say so at the moment it is set.
-        try? limitStore.save(limits)
+        try keep("the spending limit") { try limitStore.save(limits) }
         broadcastCostState()
         // Raising the daily limit takes effect now, without a restart.
         if dayWasReached && !isDayLimitReached(under: limits) {
@@ -1171,7 +1192,7 @@ extension DaemonCore {
                     // The record before the windows: a daemon killed between these
                     // two lines comes back having counted the money rather than
                     // having forgotten it.
-                    spendLedger.add(cost, on: now())
+                    keepQuietly("today's spend") { try spendLedger.add(cost, on: now()) }
                 }
                 let limits = limitStore.load()
                 crossedItsLimit = agent.isAtCostLimit(under: limits)

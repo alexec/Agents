@@ -337,7 +337,7 @@ struct LeaseTests {
         _ = try await lease(core, first)
         _ = try await lease(core, second)
         _ = try await lease(core, third)
-        _ = await core.setLimits(.init(daily: .some(Cost(amount: 0, currency: "USD"))))
+        _ = try await core.setLimits(.init(daily: .some(Cost(amount: 0, currency: "USD"))))
 
         // The day's limit holds every agent, so it passes b, then c, and ends free.
         _ = try await release(core, first)

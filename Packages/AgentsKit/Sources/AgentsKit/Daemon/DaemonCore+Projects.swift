@@ -99,9 +99,11 @@ extension DaemonCore {
         return byFolder
     }
 
-    func saveProjectRecords(_ records: [URL: Project]) {
+    /// Written first and held after, so a change the disk refused does not look kept
+    /// until the next restart (#88). The refusal is in words for the call that asked.
+    func saveProjectRecords(_ records: [URL: Project]) throws {
+        try keep("the project list") { try projectStore.save(Array(records.values)) }
         projectRecordsCache = records
-        try? projectStore.save(Array(records.values))
     }
 
     static func isDirectory(_ folder: URL) -> Bool {
@@ -136,7 +138,7 @@ extension DaemonCore {
         var records = projectRecords()
         if records[standardized] == nil {
             records[standardized] = Project(folder: standardized)
-            saveProjectRecords(records)
+            try saveProjectRecords(records)
         }
         layOutOnce(standardized)
         guard let summary = projectSummary(for: standardized) else {
@@ -175,7 +177,13 @@ extension DaemonCore {
         record.laidOutAt = record.laidOutAt ?? Date()
         record.layoutVersion = DotAgents.version
         records[standardized] = record
-        saveProjectRecords(records)
+        // Nobody waits on this: a session is starting. Told, and tried again next time.
+        do {
+            try projectStore.save(Array(records.values))
+            projectRecordsCache = records
+        } catch {
+            lost(error, keeping: "the project list")
+        }
     }
 
     /// The `_meta` a session in `cwd` is made with: the runtime's tool scoping, and the
@@ -243,7 +251,7 @@ extension DaemonCore {
         var record = records[standardized] ?? Project(folder: standardized)
         record.archivedAt = Date()
         records[standardized] = record
-        saveProjectRecords(records)
+        try saveProjectRecords(records)
 
         // Its workflows stop being watched and stop being scheduled. Their files are
         // untouched — putting a project away is not editing it — and unarchiving reads
@@ -284,7 +292,7 @@ extension DaemonCore {
         var record = records[standardized] ?? derived
         record.helperLimits = request.limits.orNilIfDefault
         records[standardized] = record
-        saveProjectRecords(records)
+        try saveProjectRecords(records)
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) is not a project.")
@@ -309,7 +317,7 @@ extension DaemonCore {
         }
         record.archivedAt = nil
         records[standardized] = record
-        saveProjectRecords(records)
+        try saveProjectRecords(records)
         adoptWorkflows(in: standardized)
 
         guard let summary = projectSummary(for: standardized) else {

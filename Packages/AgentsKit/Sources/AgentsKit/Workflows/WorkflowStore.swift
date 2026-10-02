@@ -143,10 +143,10 @@ public struct WorkflowStore: Sendable {
         return records
     }
 
-    func save(_ records: WorkflowRecords) {
-        guard let data = try? StoreCoding.encoder.encode(records) else { return }
-        try? FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try? data.write(to: locations.workflows, options: .atomic)
+    func save(_ records: WorkflowRecords) throws {
+        let data = try StoreCoding.encoder.encode(records)
+        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        try data.write(to: locations.workflows, options: .atomic)
     }
 }
 
