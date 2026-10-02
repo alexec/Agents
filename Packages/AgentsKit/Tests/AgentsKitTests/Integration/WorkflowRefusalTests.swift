@@ -380,8 +380,9 @@ struct WorkflowRefusalTests {
 
     @Test func aWorkflowThatFiresOnItsOwnOutputComesToRestOnItsOwn() async throws {
         // The trap every first workflow falls into: an agent started by a workflow
-        // finishing is exactly what `agent-finished` watches for. Nobody intervenes
-        // here — the depth limit is what stops it, and it must say so.
+        // finishing is exactly what `agent-finished` watches for. Since #102 a workflow
+        // is never fired by news of its own agents, so it runs once for the person's
+        // agent and then rests — no loop, and no chain-depth refusal on the way.
         let (locations, root) = try temporary()
         let work = try project(root)
         try write("---\non: agent-finished\n---\n\nGo again.", as: "loop", in: work)
@@ -391,23 +392,18 @@ struct WorkflowRefusalTests {
         _ = try await core.start(DaemonAPI.StartRequest(
             runtimeID: "claude", cwd: work, prompt: "Start it off"))
 
-        // For the depth limit specifically. A loop this tight refuses for other reasons
-        // on the way — a run still in flight, most often — and the first refusal of any
-        // kind is not the one this test is about.
-        await eventually("the loop came to rest on the depth limit") {
-            if case .chainTooDeep = await refusal(core, work, "loop") { return true }
-            return false
+        await eventually("the workflow's own agent finished") {
+            let made = await core.allAgents().filter { $0.startedByWorkflow == "loop" }
+            return made.count == 1 && made.allSatisfy { $0.state == .finished }
         }
+        // Long enough for a fire on that finish to have started an agent, if it were going to.
+        try await Task.sleep(for: .milliseconds(500))
 
-        guard case .chainTooDeep = await refusal(core, work, "loop") else {
-            Issue.record("expected chainTooDeep, got \(String(describing: await refusal(core, work, "loop")))")
-            return
-        }
-        // Four runs, one per allowed depth, plus the agent that started it all. The
-        // count is the assertion that matters: a refusal at the end proves nothing if
-        // a hundred agents ran to reach it.
         let made = await core.allAgents().filter { $0.startedByWorkflow == "loop" }
-        #expect(made.count == Workflow.chainDepthLimit + 1)
+        #expect(made.count == 1)
+        if case .chainTooDeep = await refusal(core, work, "loop") {
+            Issue.record("the workflow looped on its own agent until the depth limit")
+        }
     }
 
     // MARK: Missed while nothing was listening
