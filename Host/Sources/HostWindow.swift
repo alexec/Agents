@@ -93,21 +93,25 @@ struct HostWindow: View {
                 Divider()
                 // The web remote (071 FR-002): on unless turned off, and only ever on loopback.
                 // Its line says what the control plane says: never the address of a page it
-                // isn't serving (071 R3).
+                // isn't serving (071 R3). The switch sits at the trailing edge, as Relay's does,
+                // named by its own title.
                 HStack(spacing: 12) {
-                    Toggle(isOn: Binding(get: { model.settings.servesWebRemote },
-                                         set: { on in Task { await model.setServeWebRemote(on) } })) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Serve Agents to browsers on this Mac")
-                            Text(model.webRemoteLine)
-                                .font(.callout)
-                                .foregroundStyle(model.webRemoteFailed ? AnyShapeStyle(Color.orange) : AnyShapeStyle(.secondary))
-                        }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Serve Agents to browsers on this Mac")
+                        Text(model.webRemoteLine)
+                            .font(.callout)
+                            .foregroundStyle(model.webRemoteFailed ? AnyShapeStyle(Color.orange) : AnyShapeStyle(.secondary))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .toggleStyle(.switch)
+                    Spacer()
                     if model.webRemoteFailed {
                         Button("Try Again") { Task { await model.retryWebRemote() } }
                     }
+                    Toggle("Serve Agents to browsers on this Mac",
+                           isOn: Binding(get: { model.settings.servesWebRemote },
+                                         set: { on in Task { await model.setServeWebRemote(on) } }))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
                 }
                 .disabled(model.busy != nil)
                 .padding(16)
@@ -512,7 +516,7 @@ struct PairingSheet: View {
         guard model.settings.servesWebRemote else {
             return "Turn on Serve Agents to browsers on this Mac first, then open \(model.webRemoteAddress) there and paste it in."
         }
-        if model.webRemoteFailed { return "\(model.webRemoteLine) Press Try Again, then open \(model.webRemoteAddress) there and paste it in." }
+        if model.webRemoteFailed { return "\(model.webRemoteLine) Free it, press Try Again beside Serve Agents to browsers on this Mac, then open \(model.webRemoteAddress) there and paste it in." }
         return "Open \(model.webRemoteAddress) there and paste it in."
     }
 }
