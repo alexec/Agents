@@ -620,7 +620,13 @@ public actor ControlRouter {
     }
 
     private func clientLine(_ line: String, from sessionID: UUID) {
-        guard let frame = try? ControlWire.readClient(line) else { return }
+        let frame: ControlWire.ClientFrame
+        do {
+            frame = try ControlWire.readClient(line)
+        } catch {
+            unreadable(line, error, from: sessionID)
+            return
+        }
         switch frame {
         case .toControl(let message):
             clients[sessionID]?.wrapped = true
@@ -705,6 +711,21 @@ public actor ControlRouter {
             guard let line = try? JSONRPCCodec.encode(reply) else { return }
             await self?.write(wrapped ? ControlWire.wrap(host: nil, message: line) : line, to: sessionID)
         }
+    }
+
+    /// A line from a client that is not a frame. JSON-RPC's answer to a request it cannot
+    /// read is a parse error with no id, and the client fails what it has in flight
+    /// rather than waiting for a reply that will not come (#93). It goes back on the
+    /// route the line named, when it named one, so it reaches the connection that sent it.
+    private func unreadable(_ line: String, _ error: any Error, from sessionID: UUID) {
+        WireLog.write("control: unreadable line from client \(sessionID) (\(error)): \(WireLog.excerpt(line))")
+        guard let session = clients[sessionID] else { return }
+        let object = try? JSONValue.parse(Data(line.utf8)).objectValue
+        let host = object?["h"]?.stringValue.flatMap { ControlWire.isHostID($0) ? HostID(rawValue: $0) : nil }
+        let wrapped = session.wrapped || object?["m"] != nil || object?["h"] != nil
+        let failure = JSONRPCError(code: JSONRPCError.parseError, message: "The control plane could not read that message.")
+        guard let reply = try? JSONRPCCodec.encode(.failure(id: nil, error: failure)) else { return }
+        write(wrapped ? ControlWire.wrap(host: host, message: reply) : reply, to: sessionID)
     }
 
     private func reply(to sessionID: UUID, host: HostID?, id: JSONRPCID, wrapped: Bool, error: JSONRPCError) {

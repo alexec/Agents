@@ -158,7 +158,7 @@ struct ChatView: View {
     }
 
     private var offlineHelp: String {
-        "\(model.hosts.label(model.selectedAgent?.host ?? .mac)) is offline"
+        model.hosts.offlineHelp(model.selectedAgent?.host ?? .mac)
     }
 
     private var form: some View {

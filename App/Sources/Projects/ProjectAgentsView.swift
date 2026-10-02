@@ -38,6 +38,8 @@ struct ProjectAgentsView: View {
     private var page: some View {
         VStack(spacing: 0) {
             WaitingForOKBanner(folder: folder)
+            // The same strip as over a chat: a prompt here goes to that host too (#83).
+            if let summary { OfflineStrip(host: summary.host) }
             Spacer(minLength: 24)
             heading
             Spacer(minLength: 24)

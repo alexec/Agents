@@ -57,6 +57,7 @@ public final class Daemon: @unchecked Sendable {
         guard let lock = DaemonLock(at: locations.lock) else { throw StartError.alreadyRunning }
         self.lock = lock
         DaemonLog.shared.setDestination(locations.log)
+        WireLog.sink = { DaemonLog.shared.write($0) }
         // Before any runtime starts, so every helper is started from the copy.
         if let own = DaemonCore.ownExecutable,
            let pinned = PinnedHelper.pin(own, in: locations.helpers) {

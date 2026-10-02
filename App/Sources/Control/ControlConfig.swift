@@ -70,6 +70,9 @@ enum ControlConfig {
         let membership = try await ControlCodeUse.pairClient(code, privateKey: key, id: UUID(),
                                                              name: Host.current().localizedName ?? "A Mac",
                                                              kind: .mac, dial: dial)
+        // Given up on (Cancel, or the sheet's deadline): not kept, so the window does
+        // not wake up paired with something the person walked away from (#84).
+        try Task.checkCancellation()
         try membership.save(membershipFile)
         return membership
     }

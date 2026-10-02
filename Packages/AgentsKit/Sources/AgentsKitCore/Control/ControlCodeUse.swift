@@ -6,9 +6,12 @@ import Foundation
 public enum ControlCodeUse {
     public typealias Dial = @Sendable (URL, String?) async throws -> any LineTransport
 
-    public struct Failure: Error, Sendable, CustomStringConvertible {
+    public struct Failure: Error, Sendable, CustomStringConvertible, Equatable {
         public var description: String
         public init(_ description: String) { self.description = description }
+
+        /// Joined, announced, and then nothing.
+        public static let noAnswer = Failure("the control plane did not answer")
     }
 
     /// A socket to `url`, dialled with `dial`, with `credentials` proved on it.
@@ -29,7 +32,7 @@ public enum ControlCodeUse {
                                                                  kind: kind, controlKey: code.controlKey), dial: dial)
         defer { reader.close() }
         try reader.write(line: JSONRPCCodec.encode(.request(id: .number(1), method: method, params: params)))
-        guard let line = try await reader.next(within: 15) else { throw Failure("the control plane did not answer") }
+        guard let line = try await reader.next(within: 15) else { throw Failure.noAnswer }
         switch try JSONRPCCodec.decode(line: line) {
         case .success(_, let result): return try result.decode(DaemonAPI.Admitted.self)
         case .failure(_, let error): throw error

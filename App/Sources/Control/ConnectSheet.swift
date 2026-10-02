@@ -17,6 +17,8 @@ struct ConnectSheet: View {
     @State private var chosen: String?
     @State private var answer: String?
     @State private var joined: String?
+    /// The pairing in flight, so Cancel stops it rather than leaving it to land later.
+    @State private var attempt: Task<Void, Never>?
 
     /// What the pasted code is for, as soon as it reads as one.
     private var parsed: ControlCode? { ControlCode(text: code.trimmingCharacters(in: .whitespacesAndNewlines)) }
@@ -78,9 +80,12 @@ struct ConnectSheet: View {
                 if joined != nil {
                     Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
                 } else {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        attempt?.cancel()
+                        dismiss()
+                    }
                     if connecting { ProgressView().controlSize(.small) }
-                    Button("Connect") { connect() }
+                    Button(answer == nil ? "Connect" : "Try Again") { connect() }
                         .keyboardShortcut(.defaultAction)
                         .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || connecting || isHostCode)
                 }
@@ -89,7 +94,10 @@ struct ConnectSheet: View {
         .padding(24)
         .frame(width: 520)
         .onAppear { browser.start() }
-        .onDisappear { browser.stop() }
+        .onDisappear {
+            browser.stop()
+            attempt?.cancel()
+        }
     }
 
     private func connect() {
@@ -102,13 +110,18 @@ struct ConnectSheet: View {
         }
         connecting = true
         answer = nil
-        Task {
+        attempt = Task {
             do {
-                let membership = try await ControlConfig.pair(with: parsed)
-                await model.adopt(.remote(membership))
+                let membership = try await PairingAttempt.run { try await ControlConfig.pair(with: parsed) }
+                guard !Task.isCancelled else { return }
+                // Paired is done here. Reaching this Mac's host is the window's own
+                // business from now on, and its connection state says how that goes:
+                // the sheet does not wait on it (#84).
+                Task { await model.adopt(.remote(membership)) }
                 dismiss()
             } catch {
-                answer = "\(error)"
+                guard !Task.isCancelled else { return }
+                answer = PairingAttempt.sentence(for: error, device: "this Mac")
             }
             connecting = false
         }

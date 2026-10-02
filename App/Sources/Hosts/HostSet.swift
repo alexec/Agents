@@ -41,18 +41,32 @@ final class HostSet {
 
     func host(_ id: HostID) -> ServerHost? { nil }
 
+    /// What an action aimed at this Mac's host says when it is down (#83).
+    static let macDownProblem = "This Mac’s host isn’t answering, so that didn’t happen. The window is trying again by itself; Try Again tries now."
+
+    /// Why a button aimed at `id` does nothing now, in a tooltip's few words.
+    func offlineHelp(_ id: HostID) -> String {
+        id == .mac ? "This Mac’s host isn’t answering" : "\(label(id)) is offline"
+    }
+
     func label(_ id: HostID) -> String {
         id == .mac ? "This Mac" : controlled[id]?.label ?? "a host"
     }
 
     func state(_ id: HostID) -> ServerConnection.State {
-        guard id != .mac else { return .connected }
+        guard id != .mac else { return macDownSince.map { .offline(since: $0) } ?? .connected }
         guard let controlled = controlled[id] else { return .idle }
         return controlled.online ? .connected : .offline(since: Date())
     }
 
+    /// Since when this Mac's host has not answered the window, or nil while it does
+    /// (#83). Servers are judged by what the control plane says; this Mac's host by the
+    /// window's own connection to it, which AppModel keeps here so every view that
+    /// greys out or holds back for an offline server does the same for this Mac.
+    var macDownSince: Date?
+
     func isOffline(_ id: HostID) -> Bool {
-        guard id != .mac else { return false }
+        guard id != .mac else { return macDownSince != nil }
         if case .connected = state(id) { return false }
         return true
     }

@@ -159,15 +159,15 @@ final class RemoteModel {
             }
             pairing = .pairing
             do {
-                try await RemoteControl.pair(with: control, id: deviceID)
+                let id = deviceID
+                _ = try await PairingAttempt.run { try await RemoteControl.pair(with: control, id: id) }
                 pairing = .paired
                 note("pairing: paired with the control plane \(control.name)")
                 pairedWithControlPlane = true
-            } catch let error as JSONRPCError {
-                pairing = .failed(error.message)
             } catch {
                 note("pairing: failed: \(error)")
-                pairing = .failed("The control plane didn't take that code. It may have run out: show a new one and try again.")
+                // The same words as the Mac's Connect… sheet (#84).
+                pairing = .failed(PairingAttempt.sentence(for: error, device: "this \(UIDevice.current.model)"))
             }
             return
         }

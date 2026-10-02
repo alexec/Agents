@@ -61,6 +61,8 @@ enum RemoteControl {
         let key = try ControlAgreement.loadOrMake(file: keyFile)
         let membership = try await ControlCodeUse.pairClient(code, privateKey: key, id: id,
                                                              name: UIDevice.current.name, kind: kind, dial: dial)
+        // Given up on before it answered (#84): not kept.
+        try Task.checkCancellation()
         try membership.save(membershipFile)
         return membership
     }

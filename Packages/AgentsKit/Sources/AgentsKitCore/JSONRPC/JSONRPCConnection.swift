@@ -94,8 +94,16 @@ public actor JSONRPCConnection {
         switch message {
         case .success(let id, let result):
             pending.removeValue(forKey: id)?.resume(returning: result)
-        case .failure(let id, let error):
-            if let id { pending.removeValue(forKey: id)?.resume(throwing: error) }
+        case .failure(let id?, let error):
+            pending.removeValue(forKey: id)?.resume(throwing: error)
+        case .failure(nil, let error):
+            // The far end could not tie this to a request: one of ours it could not
+            // read. Which one cannot be known, and a caller left waiting waits for
+            // good, so every call in flight is told (#93). Retrying is theirs to decide.
+            WireLog.write("json-rpc: a failure with no id (\(error.code) \(error.message)) ends \(pending.count) call(s) in flight")
+            let waiting = pending
+            pending.removeAll()
+            for (_, continuation) in waiting { continuation.resume(throwing: error) }
         case .notification(let method, let params):
             notificationsContinuation.yield((method, params))
         case .request(let id, let method, let params):
