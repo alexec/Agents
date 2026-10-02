@@ -70,6 +70,36 @@ struct ControlUplinkTests {
         return (server, uplink)
     }
 
+    /// A control plane that cannot be reached, then a network change (#82): the uplink dials
+    /// at once, not when its half-minute wait is up.
+    @Test func aNetworkChangeDialsAtOnceRatherThanAfterTheWait() async throws {
+        final class Count: @unchecked Sendable {
+            let lock = NSLock()
+            var dials = 0
+            var naps: [Duration] = []
+        }
+        let count = Count()
+        let server = DaemonServer(url: URL(fileURLWithPath: "/tmp/unused-\(UUID()).sock")) { _, _, _ in .success(["ok": true]) }
+        // A wait that never ends by itself: only a nudge ends it.
+        let backoff = Backoff(first: .seconds(30), longest: .seconds(30)) { duration in
+            count.lock.withLock { count.naps.append(duration) }
+            try await Task.sleep(for: .seconds(3600))
+        }
+        let uplink = ControlUplink(server: server,
+                                   hello: DaemonAPI.HostHello(host: .mac, version: "1", platform: "test", machineID: "m"),
+                                   backoff: backoff) {
+            count.lock.withLock { count.dials += 1 }
+            throw URLError(.cannotConnectToHost)
+        }
+        uplink.start()
+        defer { uplink.stop() }
+        await eventually { count.lock.withLock { count.dials == 1 && count.naps.count == 1 } }
+        #expect(uplink.goBackNow() == .cutShort)
+        await eventually { count.lock.withLock { count.dials == 2 } }
+        // And back to waiting, from the first wait again.
+        await eventually { count.lock.withLock { count.naps.count == 2 } }
+    }
+
     @Test func itSaysHelloOnChannelZeroWhenItConnects() async throws {
         let dials = Dials()
         let (_, uplink) = host(heard: Heard(), dials: dials)

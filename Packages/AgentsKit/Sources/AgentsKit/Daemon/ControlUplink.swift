@@ -33,10 +33,15 @@ public final class ControlUplink: @unchecked Sendable {
 
     public static let firstWait: Duration = .seconds(1)
     public static let longestWait: Duration = .seconds(30)
+    /// The wait between dials, which `goBackNow()` cuts short (#82).
+    private let backoff: Backoff
 
     public init(server: DaemonServer, hello: DaemonAPI.HostHello,
-                onChange: @escaping @Sendable (Bool) -> Void = { _ in }, dial: @escaping Dial) {
+                onChange: @escaping @Sendable (Bool) -> Void = { _ in },
+                backoff: Backoff = Backoff(first: ControlUplink.firstWait, longest: ControlUplink.longestWait),
+                dial: @escaping Dial) {
         self.server = server
+        self.backoff = backoff
         self.hello = hello
         self.dial = dial
         self.onChange = onChange
@@ -126,15 +131,22 @@ public final class ControlUplink: @unchecked Sendable {
         }
     }
 
+    /// The network changed or the machine woke (#82): a wait between dials ends now, and
+    /// the next is a second again. A dial in flight is left to finish.
+    @discardableResult
+    public func goBackNow() -> Backoff.Nudged {
+        backoff.nudge()
+    }
+
     /// The channels open now, for tests.
     public var openChannels: [Int] { lock.withLock { channels.keys.sorted() } }
 
     private func run() async {
-        var wait = Self.firstWait
         while !stopped.isSet && !Task.isCancelled {
+            backoff.trying()
             do {
                 let transport = try await dial()
-                wait = Self.firstWait
+                backoff.settle()
                 lock.withLock { uplink = transport }
                 try? sayHello(on: transport)
                 DaemonLog.shared.write("uplink: connected to the control plane")
@@ -154,8 +166,7 @@ public final class ControlUplink: @unchecked Sendable {
                 DaemonLog.shared.write("uplink: could not reach the control plane: \(error)")
             }
             guard !stopped.isSet else { return }
-            try? await Task.sleep(for: wait)
-            wait = min(wait * 2, Self.longestWait)
+            await backoff.wait()
         }
     }
 

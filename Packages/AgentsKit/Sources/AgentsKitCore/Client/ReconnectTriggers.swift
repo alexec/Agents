@@ -36,7 +36,8 @@ public struct PathChange: Sendable {
 ///
 /// A network path that became usable or changed, and whatever wake notifications the
 /// app names (the Mac window's `NSWorkspace.didWakeNotification`). Each says so to
-/// `onTrigger`, on the main queue; what to do about it is the caller's.
+/// `onTrigger`, on `queue` (the main queue unless a process without one names another);
+/// what to do about it is the caller's.
 public final class ReconnectTriggers: @unchecked Sendable {
     public enum Reason: String, Sendable {
         case wake
@@ -56,6 +57,7 @@ public final class ReconnectTriggers: @unchecked Sendable {
     private let onTrigger: @Sendable (Reason) -> Void
     private let wakes: [Wake]
     private let watchesPaths: Bool
+    private let queue: DispatchQueue
     private let lock = NSLock()
     private var observers: [(NotificationCenter, any NSObjectProtocol)] = []
     private var paths = PathChange()
@@ -64,9 +66,11 @@ public final class ReconnectTriggers: @unchecked Sendable {
     #endif
 
     /// `watchesPaths` false leaves the system's paths out, for a test that gives its own.
-    public init(wakes: [Wake] = [], watchesPaths: Bool = true, onTrigger: @escaping @Sendable (Reason) -> Void) {
+    public init(wakes: [Wake] = [], watchesPaths: Bool = true, queue: DispatchQueue = .main,
+                onTrigger: @escaping @Sendable (Reason) -> Void) {
         self.wakes = wakes
         self.watchesPaths = watchesPaths
+        self.queue = queue
         self.onTrigger = onTrigger
     }
 
@@ -74,8 +78,9 @@ public final class ReconnectTriggers: @unchecked Sendable {
         lock.withLock {
             guard observers.isEmpty else { return }
             for wake in wakes {
-                let observer = wake.center.addObserver(forName: wake.name, object: nil, queue: .main) { [weak self] _ in
-                    self?.fire(.wake)
+                let observer = wake.center.addObserver(forName: wake.name, object: nil, queue: nil) { [weak self] _ in
+                    guard let self else { return }
+                    self.queue.async { self.fire(.wake) }
                 }
                 observers.append((wake.center, observer))
             }
@@ -83,7 +88,7 @@ public final class ReconnectTriggers: @unchecked Sendable {
             guard watchesPaths else { return }
             let monitor = NWPathMonitor()
             monitor.pathUpdateHandler = { [weak self] path in self?.pathChanged(Self.describe(path)) }
-            monitor.start(queue: .main)
+            monitor.start(queue: queue)
             self.monitor = monitor
             #endif
         }
