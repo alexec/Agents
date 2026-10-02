@@ -76,6 +76,10 @@ struct RemoteChatView: View {
                         .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                // Its folder gone (#119): which, and the ways on, before anything is typed.
+                if let agent, agent.missingFolder != nil, agent.state != .archived {
+                    RemoteMissingFolderStrip(agent: agent)
+                }
                 // Why it is under Parked, and since when (040, FR-011).
                 if let line = ParkWords.line(agent?.parking) {
                     Label(line, systemImage: ParkWords.symbol)

@@ -128,6 +128,15 @@ struct AgentRow: View {
                         .accessibilityHidden(true)
                 }
 
+                // Its folder gone (#119): said before anybody types, as a project's row
+                // says it.
+                if agent.missingFolder != nil, agent.state != .archived {
+                    Label(MissingFolderWords.label, systemImage: "exclamationmark.triangle")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .help(agent.folderGoneMessage)
+                }
+
                 // Working in a worktree (030): named, because with two agents in one
                 // project the worktree is how you tell whose changes are whose. On this
                 // line, not the title's, so a long branch never cuts the title short (#68).
@@ -135,7 +144,7 @@ struct AgentRow: View {
                 if agent.worktree != nil || !agent.labels.isEmpty {
                     WrappingHStack(spacing: 5) {
                         if let worktree = agent.worktree {
-                            WorktreeBadge(worktree: worktree, isGone: worktreeGone)
+                            WorktreeBadge(worktree: worktree, isGone: worktreeGone || agent.missingFolder != nil)
                         }
                         ForEach(agent.labels, id: \.normalizedValue) { LabelChip(label: $0) }
                     }

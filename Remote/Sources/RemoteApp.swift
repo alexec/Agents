@@ -119,6 +119,22 @@ struct RemoteView: View {
         } message: {
             Text(model.problem ?? "")
         }
+        // A send refused because the folder has gone (#119), with the ways on.
+        .alert("This agent’s folder isn’t there",
+               isPresented: Binding(get: { model.folderGone != nil && model.problem == nil },
+                                    set: { if !$0 { model.folderGone = nil } }),
+               presenting: model.folderGone) { ask in
+            Button(MissingFolderWords.continueInProject) {
+                Task { await model.continueInProject(ask.agentID, text: ask.text, attachments: ask.attachments) }
+            }
+            if model.work.agent(ask.agentID)?.mayRecreateWorktree == true {
+                Button(MissingFolderWords.recreateWorktree) { Task { await model.recreateWorktree(ask.agentID) } }
+            }
+            Button(MissingFolderWords.archive, role: .destructive) { Task { await model.archive(ask.agentID) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { ask in
+            Text(ask.message + " What you typed is still there.")
+        }
     }
 }
 

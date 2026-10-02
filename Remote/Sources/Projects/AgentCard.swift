@@ -94,9 +94,14 @@ struct AgentCard: View {
                                 .appText(.fine)
                                 .foregroundStyle(.tertiary)
                         }
-                        // Working in a worktree (030), named as on the Mac's row. The
-                        // phone cannot see the Mac's disk, so a worktree that has gone
-                        // is not marked here.
+                        // Its folder gone (#119), as the Mac's row and a project's say it.
+                        if agent.missingFolder != nil, agent.state != .archived {
+                            Label(MissingFolderWords.label, systemImage: "exclamationmark.triangle")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                        }
+                        // Working in a worktree (030), named as on the Mac's row. A
+                        // folder that has gone is the Mac's to say, above.
                         if let worktree = agent.worktree {
                             HStack(spacing: 3) {
                                 Image(systemName: "arrow.triangle.branch")
