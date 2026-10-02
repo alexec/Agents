@@ -65,6 +65,7 @@
 | Archive stays on the chat when it did not archive (073) | 073 | has | has | — | — | Archive never leaves the chat on the page; a failure says why. |
 | Pairing a phone, the window shows the code | 058 | n/a | n/a | — | — | The window's own pairing. |
 | One grant: no "It may" choice on the pairing sheets (2026-10-02) | #111 | lacks (footer said "· Device") | **has** | `after111-identity.png` | #111's walk | The footer reads "Chrome on this Mac", no grant. A browser may do what the window may; Settings, pairing and hosts still have no screens on the page (by design, below). Scene `identity` in `parity.mjs`. |
+| Open in Browser in View, atop Settings ▸ Control plane and in Agents Host (2026-10-02) | #109 | n/a | **has** (the page's side) | `109/first-open-pairs.png`, `109/paired-opens-directly.png` | `109/settings-control-plane.png` | These are the window's ways into the page; the page has nothing to open. Its side: it pairs from `#code=` in its address and takes the code out at once (`pairLink.ts`). See [109.md](109.md). |
 
 ## Left out by design
 

@@ -1,0 +1,21 @@
+Show Sidebar (off)
+Hide Inspector (off)
+—
+Files (off)
+Changes (off)
+Terminal (off)
+Browser (off)
+Exchanged (off)
+Background (off)
+—
+Events
+Resources
+Runtimes
+Spending
+Open in Browser
+—
+Jump to Latest (off)
+Turns
+—
+Find Session (off)
+Enter Full Screen (off)
