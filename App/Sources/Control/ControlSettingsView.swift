@@ -136,6 +136,16 @@ struct ControlOverviewPage: View {
                         .appText(.reading)
                         .foregroundStyle(.secondary)
                 }
+                // What the control plane says of its web remote, never just the address (071 R3).
+                if let web = control.status?.web {
+                    Divider()
+                    ControlRow(dot: web.served ? .none : .attention, title: "Browsers on this Mac",
+                               detail: web.served ? web.summary : "\(web.summary) Try again in Agents Host.") {
+                        Text(web.served ? "On" : "Not serving")
+                            .appText(.reading)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             if control.isOnThisMac {
                 Text("While this Mac sleeps, no window or device can reach any of your agents. Agents on servers keep working.")
