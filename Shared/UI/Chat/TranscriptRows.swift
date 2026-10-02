@@ -176,12 +176,12 @@ private struct StepRow: View {
         case .toolRun(_, let calls):
             VStack(alignment: .leading, spacing: isOpen ? 12 : 4) {
                 ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
-                    ToolCallLine(call: call, lineText: call.turnLine, isOpen: isOpen, showsChevron: true)
+                    ToolCallLine(call: call, lineText: call.turnLine, isOpen: isOpen, brightensOnHover: true)
                 }
             }
         case .entry(let entry):
             if case .toolCall(let call) = entry.kind {
-                ToolCallLine(call: call, lineText: call.turnLine, isOpen: isOpen, showsChevron: true)
+                ToolCallLine(call: call, lineText: call.turnLine, isOpen: isOpen, brightensOnHover: true)
             } else {
                 EntryRow(entry: entry)
             }
@@ -515,9 +515,9 @@ private struct ToolCallLine: View {
     /// What a click does instead of opening the call, where the line is standing in
     /// for a whole folded run.
     var onClick: (() -> Void)? = nil
-    /// A chevron before the line, as a turn's step draws it (069): on hover on the Mac,
-    /// always on the phone, where nothing hovers.
-    var showsChevron = false
+    /// Brighter under the pointer, as a turn's step is (069): the step is a line of
+    /// text like the rest of the turn's margin, with no chevron in front of it (#112).
+    var brightensOnHover = false
     @State private var isExpanded = false
     @State private var isHovering = false
 
@@ -557,25 +557,14 @@ private struct ToolCallLine: View {
     /// wraps to three lines is three lines of a run that reads as one call per line;
     /// the whole of it is a click away in the detail, where the raw input is.
     private var line: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            if showsChevron, hasDetail {
-                Image(systemName: isExpanded || isOpen ? "chevron.down" : "chevron.right")
-                    .imageScale(.small)
-                    .frame(width: 10)
-                    .foregroundStyle(.tertiary)
-                    #if os(macOS)
-                    .opacity(isHovering || isExpanded || isOpen ? 1 : 0)
-                    #endif
-            }
-            Text((lineText ?? call.line) + runsOn)
-                .appText(.reading)
-                .foregroundStyle(isHovering ? .primary : .secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(.rect)
-        .onHover { isHovering = showsChevron && $0 }
+        Text((lineText ?? call.line) + runsOn)
+            .appText(.reading)
+            .foregroundStyle(isHovering ? .primary : .secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
+            .onHover { isHovering = brightensOnHover && $0 }
     }
 
     /// " · running in the background", while what this call started still runs (057).
