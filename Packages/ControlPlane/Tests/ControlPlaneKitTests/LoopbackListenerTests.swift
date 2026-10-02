@@ -111,6 +111,37 @@ struct LoopbackListenerTests {
         #expect(csp.contains("default-src 'none'"))
         #expect(csp.contains("trusted-types 'none'"))
         #expect(!csp.contains("unsafe"))
+        // FR-030, clause by clause: own-origin scripts, styles, fonts and images (and blob: and
+        // data: pictures), no frames either way, no plugins, no form posting, no base to move.
+        for clause in ["script-src 'self';", "style-src 'self';", "font-src 'self';", "img-src 'self' blob: data:;",
+                       "frame-ancestors 'none';", "frame-src 'none';", "object-src 'none';", "form-action 'none';",
+                       "base-uri 'none';"] {
+            #expect(csp.contains(clause), "CSP lacks \(clause)")
+        }
+        let value = { (name: String) in gate.headers.first { $0.0 == name }?.1 }
+        #expect(value("X-Content-Type-Options") == "nosniff")
+        #expect(value("Referrer-Policy") == "no-referrer")
+        #expect(value("Cross-Origin-Opener-Policy") == "same-origin")
+        #expect(value("Cross-Origin-Resource-Policy") == "same-origin")
+        #expect(value("X-Frame-Options") == "DENY")
+    }
+
+    /// FR-032: nothing ambient. No answer sets a cookie or asks for HTTP authentication, and a
+    /// request carrying either is answered exactly as one without, so a cross-site request has
+    /// nothing to ride on.
+    @Test func noCookieAndNoHTTPAuthenticationEitherWay() {
+        for (uri, upgrade) in [("/", false), ("/app.js", false), ("/nope", false), ("/v1/connect", false), ("/v1/connect", true)] {
+            var carrying = head(uri, origin: upgrade ? "http://localhost:8899" : nil, upgrade: upgrade)
+            carrying.headers.add(name: "Cookie", value: "session=stolen")
+            carrying.headers.add(name: "Authorization", value: "Basic c3RvbGVu")
+            let plain = gate.reply(head(uri, origin: upgrade ? "http://localhost:8899" : nil, upgrade: upgrade))
+            let with = gate.reply(carrying)
+            #expect(plain.status == with.status && plain.body == with.body, "\(uri)")
+            for reply in [plain, with] {
+                let names = Set(reply.headers.map { $0.0.lowercased() })
+                #expect(!names.contains("set-cookie") && !names.contains("www-authenticate"), "\(uri)")
+            }
+        }
     }
 
     // MARK: The files from the manifest

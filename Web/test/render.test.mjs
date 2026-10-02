@@ -65,3 +65,16 @@ test("only http, https and mailto are safe", () => {
   assert.ok(isSafeLink("https://a.b") && isSafeLink("http://a.b") && isSafeLink("mailto:a@b.c"));
   assert.ok(!isSafeLink("javascript:x") && !isSafeLink("vbscript:x") && !isSafeLink("/relative") && !isSafeLink("data:x"));
 });
+
+const { textShownAs } = await load("src/views/files/paneState.ts");
+
+test("an HTML file is its source, an SVG only a picture (FR-031)", () => {
+  assert.equal(textShownAs("/w/page.html"), "source");
+  assert.equal(textShownAs("/w/PAGE.HTM"), "source");
+  assert.equal(textShownAs("/w/a.xhtml"), "source");
+  assert.equal(textShownAs("/w/picture.svg"), "picture");
+  assert.equal(textShownAs("/w/Picture.SVG"), "picture");
+  assert.equal(textShownAs("/w/plan.md"), "page");
+  assert.equal(textShownAs("/w/notes.txt"), "text");
+  assert.equal(textShownAs("/w/.html"), "text");
+});

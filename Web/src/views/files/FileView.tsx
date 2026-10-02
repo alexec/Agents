@@ -8,7 +8,7 @@ import type { FileReading } from "../../protocol/generated";
 import type { Store } from "../../model/store";
 import { describe } from "../../model/errors";
 import { Markdown } from "../../render/markdown";
-import { extensionOf, nameOf } from "./paneState";
+import { extensionOf, nameOf, textShownAs } from "./paneState";
 
 const pictureTypes: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
@@ -61,9 +61,10 @@ export function FileView({ store, host, agentID, path }: { store: Store; host: s
       return null;
     case "text": {
       const note = r.isTruncated ? <p class="quiet small">Only the start of {name} is shown.</p> : null;
-      if (ext === "svg") return <>{note}<Picture bytes={r.text} type="image/svg+xml" name={name} /></>;
-      if (ext === "md" || ext === "markdown") return <>{note}<div class="file-page"><Markdown text={r.text} /></div></>;
-      if (ext === "html" || ext === "htm") {
+      const shown = textShownAs(path);
+      if (shown === "picture") return <>{note}<Picture bytes={r.text} type="image/svg+xml" name={name} /></>;
+      if (shown === "page") return <>{note}<div class="file-page"><Markdown text={r.text} /></div></>;
+      if (shown === "source") {
         return (
           <>
             <p class="quiet small">HTML is shown as its source here, so nothing in it runs.</p>

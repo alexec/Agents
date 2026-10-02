@@ -363,7 +363,7 @@ This comes before US4 and US5, because Agents Host restarts on every ship (plan.
 
 ## Phase 11: Polish and cross-cutting concerns
 
-- [ ] T069 Security tests for every row of the spec's stolen-session table and FR-030 to FR-034 (SC-007). Audit T015, T016, T023, T025, T029 and T048 against the table, add any missing case, and write the mapping (row → test) to `specs/071-web-remote/walks/security.md`.
+- [x] T069 (5 new Swift cases, 1 widened; a render case; a lint rule; a log sink on Configuration) Security tests for every row of the spec's stolen-session table and FR-030 to FR-034 (SC-007). Audit T015, T016, T023, T025, T029 and T048 against the table, add any missing case, and write the mapping (row → test) to `specs/071-web-remote/walks/security.md`.
 - [ ] T070 [P] Measure SC-004: seed 20 projects and 200 sessions, and time from navigation to the sessions column painted, in headless Chrome. Also record the gzipped bundle size (aim: under 150 KB). Put both in `walks/performance.md`.
 - [ ] T071 Run the closing walk (quickstart §8) at 1440 in headless Chrome: SC-002's whole list, plus the SC-008 network and console capture. Then ask Alex with the question tool how Safari is walked (by him, or under the screen lease while he is away), and walk §2, §4 and §6 in Safari. Record it in `walks/closing.md`. Firefox is not walked (not installed).
 - [ ] T072 [P] Write the docs, from the spec's Docs section:

@@ -125,7 +125,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     chosen.value = { ...chosen.value, [turn.id]: now !== "outcome" ? "outcome" : open };
   };
 
-  const fetch = async (turn: ChatTurn) => {
+  const loadDetail = async (turn: ChatTurn) => {
     if (!turn.range || fetched.value[turn.id]) return;
     const items = display(await store.turnEntries(host, session, turn.range));
     fetched.value = { ...fetched.value, [turn.id]: items[0] && isPersonsAsk(items[0]) ? items.slice(1) : items };
@@ -161,7 +161,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {rows.map((turn, index) => (
           <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value} fetched={fetched.value[turn.id]}
             isLive={index === rows.length - 1 && live} background={background}
-            toggle={() => toggle(turn)} fetch={() => void fetch(turn)} />
+            toggle={() => toggle(turn)} loadDetail={() => void loadDetail(turn)} />
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
         {agent && (agent.state === "running" || agent.state === "starting") && (

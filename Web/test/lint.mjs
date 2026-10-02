@@ -1,4 +1,4 @@
-// Keeps agent output inert and the page to its own origin (spec 071 FR-030, FR-031, FR-034;
+// Keeps agent output inert and the page to its own origin (spec 071 FR-030 to FR-032, FR-034;
 // research R12). Run by `npm run check` and by CI's web job.
 //
 // Our own source may not touch an HTML sink or build code from strings. Preact's bundle
@@ -53,9 +53,14 @@ const sinks = [
   [/\bcreateContextualFragment\b|\bDOMParser\b/g, "no HTML parsing"],
   [/\bimportScripts\b|\bimport\s*\(\s*[^"'`]/g, "no loading code at run time"],
 ];
+// FR-032: no ambient credential, and nothing but the one WebSocket to talk on.
+const ambient = [
+  [/\bdocument\.cookie\b|\bcredentials\s*:/g, "no cookies or ambient credentials"],
+  [/\bfetch\s*\(|\bXMLHttpRequest\b|\bsendBeacon\b|\bEventSource\b/g, "no requests but the page's own WebSocket"],
+];
 
 for (const path of files(join(web, "src"))) {
-  scan(path, [...strings, ...sinks, [/https?:\/\/[^\s"'`)]+/g, "no addresses in source; the page reaches only its own origin"]]);
+  scan(path, [...strings, ...sinks, ...ambient, [/https?:\/\/[^\s"'`)]+/g, "no addresses in source; the page reaches only its own origin"]]);
 }
 
 for (const path of files(join(web, "dist"))) {

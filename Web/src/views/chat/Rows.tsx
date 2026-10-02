@@ -311,9 +311,9 @@ function stepsWords(count: number | undefined, open: boolean): string {
 }
 
 /** One turn: the ask, the control into its steps, and its outcome (TurnView). */
-export function TurnView({ turn, detail, fetched, isLive, background, toggle, fetch }: {
+export function TurnView({ turn, detail, fetched, isLive, background, toggle, loadDetail }: {
   turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; isLive: boolean;
-  background: readonly BackgroundItem[]; toggle: () => void; fetch: () => void;
+  background: readonly BackgroundItem[]; toggle: () => void; loadDetail: () => void;
 }) {
   const waiting = isSummaryOnly(turn) && fetched === undefined;
   const items = isSummaryOnly(turn) ? fetched ?? [] : turn.items;
@@ -324,7 +324,7 @@ export function TurnView({ turn, detail, fetched, isLive, background, toggle, fe
   const outcomeIDs = new Set((parts?.outcome ?? []).map((i) => i.id));
   const steps = drawnInTurn(items, isLive).filter((i) => !outcomeIDs.has(i.id) && (detail === "details" || !isThought(i)));
   useEffect(() => {
-    if (open && waiting) fetch();
+    if (open && waiting) loadDetail();
   }, [open, waiting]);
   return (
     <article class="turn" aria-label="Turn">

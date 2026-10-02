@@ -3,6 +3,7 @@ import AgentsKitCore
 import ControlDial
 @testable import ControlPlaneKit
 import Foundation
+import os
 import Testing
 
 /// A browser as a client (071, contracts/browser-auth.md): it pairs and connects through the
@@ -20,12 +21,13 @@ struct BrowserClientTests {
         var webOrigin: String { ControlAuth.origin(web)! }
     }
 
-    func start() async throws -> Running {
+    func start(log: (@Sendable (String) -> Void)? = nil) async throws -> Running {
         let port = try await freePort()
         let url = URL(string: "http://127.0.0.1:\(port)")!
         var configuration = ControlService.Configuration(store: MemoryStore(), privateKey: control.privateKey, url: url,
                                                          bind: "127.0.0.1", port: port, name: "test", machineID: "m")
         configuration.web = .init(folder: LoopbackListenerTests.dist, port: 0)
+        configuration.log = log
         let service = try ControlService(configuration)
         try await service.start()
         let web = try #require(service.webPort)
@@ -120,6 +122,89 @@ struct BrowserClientTests {
             let line = try #require(try await reader.next(within: 10))
             guard case .success = try JSONRPCCodec.decode(line: line) else { Issue.record("tab \(n + 1): \(line)"); return }
         }
+    }
+
+    // MARK: Codes and keys on the loopback listener (the stolen-session table)
+
+    /// The reason `announce` was refused with, if it was.
+    func announceRefusal(_ code: String, _ running: Running) async -> ControlAuth.Reason? {
+        do {
+            _ = try await announce(code, kind: .browser, publicKey: ControlAgreement.generate().publicKey) {
+                try await joinWeb(running, $0)
+            }
+            return nil
+        } catch let refusal as ControlAuth.Refusal {
+            return refusal.reason
+        } catch {
+            Issue.record("not a refusal: \(error)")
+            return nil
+        }
+    }
+
+    /// Another account on this Mac reaches the listener, but a code works once.
+    @Test func aBrowserCodeWorksOnceOnTheLoopbackListener() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        let code = try await running.service.codes.issue(.client(.device)).text
+        #expect(await announceRefusal(code, running) == nil)
+        #expect(await announceRefusal(code, running) == .spent)
+        #expect(await running.service.records.clients.count == 1)
+    }
+
+    /// And for five minutes: one past its time is refused before anything is made.
+    @Test func anExpiredCodeIsRefusedOnTheLoopbackListener() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        #expect(ControlCode.lifetime == 5 * 60)
+        let code = try await running.service.codes.issue(.client(.device), lifetime: -1).text
+        #expect(await announceRefusal(code, running) == .expired)
+        #expect(await running.service.records.clients.isEmpty)
+    }
+
+    /// A website, or anyone without a paired key, gets nowhere even past `Host` and `Origin`.
+    @Test func aKeyNobodyPairedIsRefusedOnTheLoopbackListener() async throws {
+        let running = try await start()
+        defer { Task { await running.service.stop() } }
+        _ = try await pairBrowser(running)
+        let stranger = ControlAgreement.generate()
+        let id = UUID()
+        let key = try ControlAuth.clientKey(privateKey: stranger.privateKey, peer: control.publicKey, client: id)
+        #expect(await refusal {
+            try await joinWeb(running, .init(identity: .client(id), key: key, kind: "browser", controlKey: control.publicKey))
+        } == .unknown)
+    }
+
+    /// FR-033: pairing, connecting, a refused proof and a call carrying a message leave no code,
+    /// key or message text in the control plane's log.
+    @Test func theLogHoldsNoCodeKeyOrMessage() async throws {
+        let lines = OSAllocatedUnfairLock<[String]>(initialState: [])
+        let running = try await start(log: { line in lines.withLock { $0.append(line) } })
+        defer { Task { await running.service.stop() } }
+        let shown = try await running.service.codes.issue(.client(.device)).text
+        let code = try #require(ControlCode(text: shown))
+        let browser = ControlAgreement.generate()
+        let id = UUID()
+        _ = try await announce(shown, kind: .browser, id: id, publicKey: browser.publicKey) { try await joinWeb(running, $0) }
+        let shared = try ControlAuth.clientKey(privateKey: browser.privateKey, peer: control.publicKey, client: id)
+        let credentials = ControlAuth.Credentials(identity: .client(id), key: shared, kind: "browser", controlKey: control.publicKey)
+        _ = await refusal { try await joinWeb(running, credentials, origin: ControlAuth.origin(running.tls)!) }
+
+        let marker = "the person's private words 7c1f"
+        let reader = try await joinWeb(running, credentials)
+        defer { reader.close() }
+        try reader.write(line: JSONRPCCodec.encode(.request(id: .number(3), method: "agents/prompt",
+            params: .object(["text": .string(marker)]))))
+        _ = try await reader.next(within: 10)
+        try await Task.sleep(for: .milliseconds(200))
+
+        let log = lines.withLock { $0.joined(separator: "\n") }
+        #expect(!log.isEmpty)
+        var secrets = [shown, marker]
+        for bytes in [code.secret, shared, browser.privateKey, control.privateKey] {
+            secrets.append(bytes.base64EncodedString())
+            secrets.append(bytes.map { String(format: "%02x", $0) }.joined())
+        }
+        for secret in secrets { #expect(!log.contains(secret), "the log holds \(secret.prefix(12))…") }
     }
 
     // MARK: The origin each proof is bound to (FR-006)

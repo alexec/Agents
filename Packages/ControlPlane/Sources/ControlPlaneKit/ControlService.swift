@@ -37,6 +37,9 @@ public final class ControlService: @unchecked Sendable {
         /// The web remote's loopback listener (071): the built app and the port, or nil
         /// for none, which is the container's default.
         public var web: Web?
+        /// Where each log line goes, already prefixed with this copy; standard error unless a
+        /// test listens (071 FR-033: no line may hold a code, a key, a MAC or a message).
+        public var log: (@Sendable (String) -> Void)?
 
         public struct Web: Sendable {
             /// `Web/dist`, with its MANIFEST.
@@ -121,7 +124,10 @@ public final class ControlService: @unchecked Sendable {
             CopyMesh(.init(copy: copy, peerURL: url, privateKey: configuration.privateKey, publicKey: publicKey,
                            beat: configuration.copyBeat, pin: configuration.pin),
                      store: configuration.store, router: router, leases: leases,
-                     log: { FileHandle.standardError.write(Data("agents-control[\(copy)]: \($0)\n".utf8)) })
+                     log: { [sink = configuration.log] line in
+                         let line = "agents-control[\(copy)]: \(line)"
+                         if let sink { sink(line) } else { FileHandle.standardError.write(Data((line + "\n").utf8)) }
+                     })
         }
         codes = ControlCodes(store: configuration.store, privateKey: configuration.privateKey,
                              publicKey: publicKey, url: configuration.url.absoluteString, pin: configuration.pin,
@@ -717,7 +723,8 @@ public final class ControlService: @unchecked Sendable {
     }
 
     func log(_ line: String) {
-        FileHandle.standardError.write(Data("agents-control[\(copyID)]: \(line)\n".utf8))
+        let line = "agents-control[\(copyID)]: \(line)"
+        if let sink = configuration.log { sink(line) } else { FileHandle.standardError.write(Data((line + "\n").utf8)) }
     }
 }
 

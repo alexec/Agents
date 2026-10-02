@@ -46,3 +46,17 @@ export function extensionOf(path: string): string {
   const dot = name.lastIndexOf(".");
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
 }
+
+/**
+ * How a file read as text is drawn (FR-031): SVG only as a picture made from its bytes, Markdown
+ * through the renderer, HTML as its source, and anything else as monospace text. There is no
+ * way here to draw a file as markup.
+ */
+export type TextShownAs = "picture" | "page" | "source" | "text";
+export function textShownAs(path: string): TextShownAs {
+  const ext = extensionOf(path);
+  if (ext === "svg") return "picture";
+  if (ext === "md" || ext === "markdown") return "page";
+  if (ext === "html" || ext === "htm" || ext === "xhtml") return "source";
+  return "text";
+}
