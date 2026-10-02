@@ -1,4 +1,5 @@
-// Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>.
+// Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
+// /w/<workflow> for a workflow's page in the chat's place (#98).
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
 import { signal } from "@preact/signals";
 
@@ -7,6 +8,8 @@ export interface Route {
   /** The project's folder URL, as the host writes it. */
   project?: string | undefined;
   session?: string | undefined;
+  /** A workflow's page, in the chat's place, as the window opens one from the same list (#98). */
+  workflow?: string | undefined;
   /** The files pane, open beside or over the chat. */
   files?: boolean | undefined;
   /** A new session's form, which is the project's empty pane: shown on a narrow window too. */
@@ -22,6 +25,7 @@ export function parseRoute(hash: string): Route {
       case "h": route.host = value; break;
       case "p": route.project = value; break;
       case "s": route.session = value; break;
+      case "w": route.workflow = value; break;
       case "f": route.files = value === "1"; break;
       case "n": route.compose = value === "1"; break;
     }
@@ -34,8 +38,9 @@ export function routeHash(route: Route): string {
   if (route.host) parts.push("h", route.host);
   if (route.host && route.project) parts.push("p", route.project);
   if (route.host && route.project && route.session) parts.push("s", route.session);
+  else if (route.host && route.project && route.workflow) parts.push("w", route.workflow);
   if (route.session && route.files) parts.push("f", "1");
-  if (route.host && route.project && !route.session && route.compose) parts.push("n", "1");
+  if (route.host && route.project && !route.session && !route.workflow && route.compose) parts.push("n", "1");
   return "#/" + parts.map(encodeURIComponent).join("/");
 }
 

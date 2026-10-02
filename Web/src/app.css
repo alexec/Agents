@@ -696,10 +696,35 @@ button.remove:hover { opacity: 1; }
 }
 
 /* US5: a workflow row: mark, name and what it is, Run Now on the right. */
-.row.workflow { box-sizing: border-box; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 8px; align-items: center; padding: 6px 10px; cursor: default; }
+.row.workflow { box-sizing: border-box; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 4px; align-items: center; padding: 0 4px 0 0; cursor: default; }
+/* The row's name and line open its page (#98): a button of its own, so Run Now and ··· keep their clicks. */
+.row.workflow .pick { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; align-items: center; min-width: 0;
+  text-align: left; border: none; background: none; padding: 6px 0 6px 10px; color: inherit; font: inherit; }
+.row.workflow .workflow-menu { margin-right: 0; }
+.row.workflow .workflow-menu > button { border: none; background: none; padding: 3px 6px; opacity: 0.6; }
 .row.workflow:hover { background: none; }
 .row.workflow .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .row.workflow .subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .workflow-mark { opacity: 0.55; text-align: center; }
 .workflow-mark.tinted { color: var(--tint-attention); opacity: 1; }
 .row.workflow .run-now { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--paper-rule); background: var(--paper-raised); white-space: nowrap; }
+
+/* A workflow's page (#98, #100), in the chat's place. */
+.workflow-page .workflow-body { max-width: 760px; margin: 0 auto; padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 8px; }
+.workflow-page .heading p { margin: 0 0 4px; }
+.workflow-page .controls { display: flex; align-items: center; gap: 16px; margin: 6px 0 4px; }
+.workflow-page .run-now { padding: 5px 16px; border-radius: 999px; }
+.workflow-page .switch { display: inline-flex; align-items: center; gap: 6px; }
+.workflow-page .section-head { margin: 14px 0 2px; font-size: 13px; }
+.triggers { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+.trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
+.trigger + .trigger { border-top: 1px solid var(--paper-rule); }
+.trigger .glyph { opacity: 0.6; text-align: center; }
+.trigger .what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.trigger .filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.trigger .filters code { font: 11px var(--font-mono); padding: 0 6px; border-radius: 5px; background: var(--paper-wash); }
+.trigger .unknown { font-size: 11px; font-weight: 600; opacity: 0.6; border: 1px solid var(--paper-rule); border-radius: 999px; padding: 0 6px; margin-left: 6px; }
+.trigger .next { text-align: right; max-width: 180px; }
+.workflow-page .last-ran { margin: 2px 0 0; }
+.workflow-page .prompt-text { margin: 0; white-space: pre-wrap; font: 12.5px/1.5 var(--font-mono); padding: 12px 14px;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }

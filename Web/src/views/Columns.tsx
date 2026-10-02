@@ -18,13 +18,14 @@ import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { SessionRow } from "./SessionRow";
 import { WorkflowRow } from "./WorkflowRow";
+import { WorkflowPage } from "./WorkflowPage";
 import { workflowSummary } from "../model/workflows";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
   const down = session.state.value.kind === "down";
   // Which single column a narrow window shows: the deepest one the route names.
-  const depth = r.session || r.compose ? "chat" : r.project ? "sessions" : "projects";
+  const depth = r.session || r.workflow || r.compose ? "chat" : r.project ? "sessions" : "projects";
   const project = r.host && r.project
     ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
     : undefined;
@@ -48,7 +49,10 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
         <ProjectsColumn session={session} store={store} />
         <SessionsColumn store={store} linkDown={down} />
         {r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
-          : r.host && r.project && project ? (
+          : r.host && r.project && project && r.workflow ? (
+            <WorkflowPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
+              workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
+          ) : r.host && r.project && project ? (
             <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
           ) : <section class="chat empty" aria-label="Chat"><p>Choose a project.</p></section>}
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
@@ -160,6 +164,7 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
   const workflows = allWorkflows.filter((w) => !w.isArchived);
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const pick = (agent: Agent) => go({ host, project: folder, session: agent.id });
+  const pickWorkflow = (id: string) => go({ host, project: folder, workflow: id });
   const openArchived = (open: boolean) => {
     showsArchived.value = open;
     if (open && host && folder) void store.loadArchived(host, folder);
@@ -228,13 +233,15 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
             <h2 class="section-head">Workflows <span class="count">{workflows.length}</span></h2>
             {workflows.length === 0 && !search.value && <p class="hint">None</p>}
             {workflows.map((summary) => (
-              <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down} />
+              <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down}
+                chosen={r.workflow === summary.workflow.workflowID} onPick={() => pickWorkflow(summary.workflow.workflowID)} />
             ))}
             {archivedWorkflows.length > 0 && (
               <details class="archived" open={!!search.value}>
                 <summary class="subhead">Archived workflows <span class="count">{archivedWorkflows.length}</span></summary>
                 {archivedWorkflows.map((summary) => (
-                  <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down} />
+                  <WorkflowRow key={summary.workflow.workflowID} store={store} host={host!} summary={summary} disabled={down}
+                chosen={r.workflow === summary.workflow.workflowID} onPick={() => pickWorkflow(summary.workflow.workflowID)} />
                 ))}
               </details>
             )}

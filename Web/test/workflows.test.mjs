@@ -35,3 +35,55 @@ test("the status mark follows WorkflowStatusIcon's order", () => {
   const { isEnabled, ...fromBefore100 } = input;
   assert.equal(w.workflowStatus(fromBefore100).words, "Waiting for its trigger", "a host from before #100 sends no isEnabled: on");
 });
+
+// The workflow page's words (#98, #100), held to WorkflowTriggerWordsTests.swift's cases.
+const event = (name, keys = {}) => ({ unrecognised: { name, keys } });
+const schedule = { schedule: { _0: { minutes: [0], hours: [3, 3], days: ["sun"], startMinute: 0, endMinute: 0 } } };
+
+test("each trigger listens where its events are", () => {
+  assert.equal(w.listensIn({ agentFinished: {} }), "project");
+  assert.equal(w.listensIn({ workflowCompleted: {} }), "project");
+  assert.equal(w.listensIn(event("branch.moved")), "project");
+  assert.equal(w.listensIn(event("mac.wake")), "mac");
+  assert.equal(w.listensIn(event("cost.limit_reached")), "either");
+  assert.equal(w.listensIn(event("custom.build_green")), "project");
+  assert.equal(w.listensIn(event("cost.*")), "either");
+  assert.equal(w.listensIn(event("agent.*")), "project");
+  assert.equal(w.listensIn(schedule), null);
+  assert.equal(w.listensIn(event("x")), null);
+  assert.equal(w.scopeLine(event("mac.wake"), "work", "this Mac"), "Anywhere on this Mac, so it runs in every project");
+  assert.equal(w.scopeLine(schedule, "work", "this Mac"), "By the clock on this Mac");
+});
+
+test("filters are the file's own, including a workflow id", () => {
+  assert.deepEqual(w.triggerFilters(event("branch.moved", { branch: "main" })), [["branch", "main"]]);
+  assert.deepEqual(w.triggerFilters({ workflowCompleted: { id: "nightly" } }), [["workflow", "nightly"]]);
+  assert.deepEqual(w.triggerFilters({ agentFinished: {} }), []);
+});
+
+test("a triggering run says which agent it resumes, or that there is none", () => {
+  assert.equal(w.resumedAgent({ agentFinished: {} }), "Resumes the agent that finished");
+  assert.equal(w.resumedAgent(event("custom.ready")), "Resumes the agent that published it");
+  assert.match(w.resumedAgent(event("mac.wake")), /never runs/);
+  assert.match(w.resumedAgent(schedule), /never runs/);
+  assert.equal(w.resumedAgent(event("agent.started")), "Resumes the agent it is about");
+});
+
+test("what set a run off reads after Last ran", () => {
+  assert.equal(w.causePhrase({ byHand: {} }), "by hand, with Run now");
+  assert.equal(w.causePhrase({ trigger: { _0: schedule } }), "on its schedule");
+  assert.equal(w.causePhrase({ trigger: { _0: event("branch.moved", { branch: "main" }) } }), "on branch.moved branch main");
+  assert.equal(w.causePhrase({ trigger: { _0: { agentFinished: {} } } }), "when an agent finishes");
+});
+
+test("off says so in place of a next time, and in what is happening (#100)", () => {
+  const summary = { workflow: { workflowID: "n", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
+    isArchived: false, isEnabled: false, isRunning: false, nextFireAtByTrigger: [] };
+  assert.equal(w.nextLine(summary, 0), "Off — no next time");
+  assert.equal(w.happening(summary), w.turnedOffSentence);
+  const on = { ...summary, isEnabled: true, nextFireAtByTrigger: [] };
+  assert.equal(w.nextLine(on, 0), "No next time");
+  assert.equal(w.lastRanLine(on), "Has not run yet.");
+  const refused = { ...on, lastOutcome: { refused: { _0: { missedWhileClosed: {} }, at: 0, repeats: 2 } } };
+  assert.equal(w.happening(refused), "Missed 2 times — the app was closed");
+});

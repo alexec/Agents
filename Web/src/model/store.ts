@@ -532,6 +532,13 @@ export class Store extends Work {
     if (ran) this.upsertWorkflow(ran, host);
   }
 
+  /** Turn Off / Turn On (#100): it keeps its place on the list either way. */
+  async setWorkflowEnabled(host: string, summary: WorkflowSummary, enabled: boolean): Promise<void> {
+    const changed = await this.act("workflows/enable",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, enabled }, host);
+    if (changed) this.upsertWorkflow(changed, host);
+  }
+
   /** Mark as Unread / Mark as Read (#70). */
   async setUnread(host: string, agentID: string, unread: boolean): Promise<void> {
     await this.act("agents/setUnread", { agentID: agentID as UUID, unread }, host);
