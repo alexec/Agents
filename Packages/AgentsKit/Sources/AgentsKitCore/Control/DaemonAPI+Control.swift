@@ -52,6 +52,8 @@ public extension DaemonAPI.Notification {
     static let controlPairingChanged = "control/pairingChanged"
     /// `WebRemoteStatus`: the web remote's listener started, or could not (071 R3).
     static let controlWebChanged = "control/webChanged"
+    /// `HostJoinStatus`: this Mac's host's join changed, as it said it (#113).
+    static let controlThisMacHostChanged = "control/thisMacHostChanged"
     static let controlInstallProgress = "control/installProgress"
     /// To a device on the old way, after the move (058, T085): `ControlMoved`.
     static let controlMoved = "control/moved"
@@ -78,6 +80,9 @@ public extension DaemonAPI {
         /// The web remote's loopback listener (071 R3): whether the page is served, and why
         /// not. Nil when this copy was not asked to serve it.
         public var web: WebRemoteStatus?
+        /// This Mac's host, as it says its join stands (#113), when the control plane runs
+        /// beside it: "Couldn't join the control plane: …". Nil elsewhere.
+        public var thisMacHost: HostJoinStatus?
 
         public init(name: String, version: String, homeHost: HostID?, machineID: String,
                     startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {

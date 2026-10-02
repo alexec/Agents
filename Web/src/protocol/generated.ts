@@ -409,6 +409,7 @@ export interface ControlStatus {
   you?: UUID;
   relayKey?: Base64;
   web?: WebRemoteStatus;
+  thisMacHost?: HostJoinStatus;
 }
 
 export interface Cost {
@@ -674,6 +675,13 @@ export interface HelperLimits {
 export type Hold = "firstDay" | "worktreeHasWork" | "workflowRunning" | "openInWindow";
 
 export type HostID = string & { readonly __brand: "HostID" };
+
+export interface HostJoinStatus {
+  member: boolean;
+  connected: boolean;
+  problem?: string;
+  at: WireDate;
+}
 
 export interface LabelVocabularyRequest {
   folder: URLString;
@@ -1582,7 +1590,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: [] },
@@ -1616,6 +1624,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived"] },
+  HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
