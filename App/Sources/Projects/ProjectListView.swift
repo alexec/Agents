@@ -42,13 +42,13 @@ struct ProjectListView: View {
             }
             // Where the project will be once it is one (027).
             ForEach(model.clones) { clone in
-                CloningRow(clone: clone)
+                CloningRow(clone: clone).font(.body)
             }
 
             if !model.archivedProjects.isEmpty {
                 Section(isExpanded: $showsArchived) {
                     ForEach(model.archivedProjects, id: \.key) { summary in
-                        ArchivedProjectRow(summary: summary)
+                        ArchivedProjectRow(summary: summary).font(.body)
                     }
                 } header: {
                     Text("Archived")
@@ -64,11 +64,13 @@ struct ProjectListView: View {
                     MacHostDownNotice()
                 } else {
                     Text("Connecting…")
+                        .font(.body)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 }
             } else if model.projects.isEmpty, model.clones.isEmpty, model.hasLoadedProjects {
                 EmptyProjectList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
+                    .font(.body)
             }
 
             // Pages about all the work rather than one project: rows of the list like
@@ -76,13 +78,19 @@ struct ProjectListView: View {
             // buttons pinned under it painting a highlight of their own. Always there,
             // so each can be found before it has anything to say.
             Section("Activity") {
-                EventsRow().tag(SidebarItem.events)
-                ResourcesRow().tag(SidebarItem.resources)
-                RuntimesRow().tag(SidebarItem.runtimes)
-                SpendingRow(selection: $selection).tag(SidebarItem.spending)
+                EventsRow().font(.body).tag(SidebarItem.events)
+                ResourcesRow().font(.body).tag(SidebarItem.resources)
+                RuntimesRow().font(.body).tag(SidebarItem.runtimes)
+                SpendingRow(selection: $selection).font(.body).tag(SidebarItem.spending)
             }
         }
         .listStyle(.sidebar)
+        // Rows as tall as their lines (#104). The sidebar's row size sets the least a row
+        // may be, and at the system's medium a project of one line stood 32pt tall around
+        // 16pt of name; nothing short of the whole list's size moves that floor. Small
+        // also makes the sidebar's own text small, so each row says `.font(.body)` to
+        // keep the size it was read at.
+        .environment(\.sidebarRowSize, .small)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
         // Why the Mac is awake, pinned at the foot: a status line rather than somewhere
@@ -162,8 +170,11 @@ struct ProjectListView: View {
     private func projectRows(_ summaries: [DaemonAPI.ProjectSummary]) -> some View {
         ForEach(summaries, id: \.key) { summary in
             ProjectRow(summary: summary)
+                .font(.body)
                 .tag(SidebarItem.project(summary.key))
                 .contextMenu { menu(for: summary) }
+                // As tall as its one or two lines and a little air (#104).
+                .listRowInsets(.vertical, 3)
                 // Last known, not current: the server is not answering (037).
                 .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
         }
@@ -435,6 +446,7 @@ private struct GoneProjectRows: View {
                 Button("Remove") { model.hosts.forgetGoneProject(host, path: path) }
                     .controlSize(.small)
             }
+            .font(.body)
             .help(path)
         }
     }
