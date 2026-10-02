@@ -417,6 +417,25 @@ struct AgentsModelTests {
         #expect(model.pendingOptions[agent.id]?["mode"]?.value == "default")
     }
 
+    /// A double click, or Archive from the menu while the swipe's is still going, is
+    /// not a second call; once the first comes back the agent takes another (#87).
+    @Test func oneActionAtATimeForAnAgent() {
+        let model = AgentsModel()
+        let id = UUID(), other = UUID()
+        #expect(model.begin(.archive, on: id))
+        #expect(!model.begin(.archive, on: id))
+        #expect(!model.begin(.stop, on: id))
+        #expect(model.begin(.stop, on: other))
+        #expect(model.acting[id] == .archive)
+        // An end for something that is not what is in flight leaves it be.
+        model.end(.stop, on: id)
+        #expect(model.acting[id] == .archive)
+        model.end(.archive, on: id)
+        #expect(model.acting[id] == nil)
+        #expect(model.begin(.park, on: id))
+        #expect(AgentAct(.unpark) == .unpark)
+    }
+
     @Test func aCommandsOutputIsKeptPerTerminalAndByItsTail() throws {
         let model = AgentsModel()
         let id = UUID()

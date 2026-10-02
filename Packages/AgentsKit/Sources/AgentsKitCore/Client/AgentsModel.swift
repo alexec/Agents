@@ -211,6 +211,12 @@ public final class AgentsModel {
     public private(set) var pendingOptions: [UUID: [String: PendingOption]] = [:]
     @ObservationIgnored private var pendingOptionSequence = 0
 
+    /// What each agent has been asked to do and has not yet answered (#87): the control
+    /// that sent it shows it is on its way, and every control that would send another is
+    /// held. Kept here, not in a view, so the menu, the row, the swipe and the strip all
+    /// hold together, and both apps the same way.
+    public private(set) var acting: [UUID: AgentAct] = [:]
+
     public init() {}
 
     // MARK: What each notification means
@@ -636,6 +642,23 @@ public final class AgentsModel {
         guard pendingOptions[agentID]?[optionID]?.sequence == sequence else { return }
         pendingOptions[agentID]?[optionID] = nil
         if pendingOptions[agentID]?.isEmpty == true { pendingOptions[agentID] = nil }
+    }
+
+    // MARK: Actions in flight (#87)
+
+    /// Begin one, unless another is already on its way to this agent. False means the
+    /// press is the second of a pair, or a different button pressed while the first is
+    /// still going, and is not to be sent: whichever surface it came from (menu, row,
+    /// swipe, strip, key), it is one agent and one answer at a time.
+    public func begin(_ act: AgentAct, on agentID: UUID) -> Bool {
+        guard acting[agentID] == nil else { return false }
+        acting[agentID] = act
+        return true
+    }
+
+    /// The call came back, sent or not. The record arriving says what became of it.
+    public func end(_ act: AgentAct, on agentID: UUID) {
+        if acting[agentID] == act { acting[agentID] = nil }
     }
 
     /// What this agent has left before it stops, under the limits as they stand.
