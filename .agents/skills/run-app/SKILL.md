@@ -224,3 +224,11 @@ DevTools client (launch, open, set the viewport, press by accessible name, type,
 read the console and network). Pair it with a code made as above (`code --client device --browser`).
 Safari is walked only with Alex's go-ahead, asked with the question tool.
 
+**Before handing back a change to the window's or the Remote's UI**, check the page against it:
+1. Run the scene of `node Web/test/walk/parity.mjs <WEB_URL> <browser code> <ROOT> <out dir> <prefix> [scene…]`
+   that covers the change, or add a scene. Make a fresh browser code for each run; a code is spent once
+   used. The control plane reads `Web/dist` once at start, so after rebuilding the page restart only
+   your root's control plane (its `control/control.pid`) with the arguments `launch.sh` used.
+2. Add or update the change's row in `specs/071-web-remote/walks/parity.md`: the page's shot, the
+   window's shot, and has, partly, lacks or by design.
+3. A gap you don't close in the same branch gets a parity issue, named in the commit.
