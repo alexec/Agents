@@ -1,0 +1,5 @@
+new-1440 (1440×900): ["Attach: below the input, left","Mode: below the input, left","Model: below the input, right","Effort: below the input, right","Fast mode: below the input, right","Send: below the input, right"]; problems []
+new-390 (390×844): ["Attach: below the input, left","Mode: below the input, left","Model: below the input, right","Effort: below the input, left","Fast mode: below the input, left","Send: below the input, right"]; problems []
+session-1440 (1440×900): ["Attach: below the input, left","Mode: below the input, left","Model: below the input, right","Effort: below the input, right","Fast mode: below the input, right","Send: below the input, right"]; problems []
+session-390 (390×844): ["Attach: below the input, left","Mode: below the input, left","Model: below the input, right","Effort: below the input, left","Fast mode: below the input, left","Send: below the input, right"]; problems []
+checks: errors []

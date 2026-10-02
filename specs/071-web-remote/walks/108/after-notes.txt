@@ -1,0 +1,6 @@
+new-1440 (1440×900): ["Works in: above the input, left","Reach: this folder ▾: above the input, left","Add a label: above the input, left","Runtime: above the input, right","Attach: beside the input, right","Send: beside the input, right","Mode: below the input, left","Model: below the input, right","Effort: below the input, right","Fast mode: below the input, right"]; problems []
+reach: "Reach: 2 folders ▾"
+new-390 (390×844): ["Works in: above the input, left","Reach: 2 folders ▾: above the input, right","Add a label: above the input, left","Runtime: above the input, right","Attach: beside the input, right","Send: beside the input, right","Mode: below the input, left","Model: below the input, left","Effort: below the input, right","Fast mode: below the input, right"]; problems []
+session-1440 (1440×900): ["Add a label: above the input, left","Attach: beside the input, right","Send: beside the input, right","Mode: below the input, left","Model: below the input, right","Effort: below the input, right","Fast mode: below the input, right"]; problems []
+session-390 (390×844): ["Add a label: above the input, left","Attach: beside the input, right","Send: beside the input, right","Mode: below the input, left","Model: below the input, left","Effort: below the input, right","Fast mode: below the input, right"]; problems []
+checks: errors []
