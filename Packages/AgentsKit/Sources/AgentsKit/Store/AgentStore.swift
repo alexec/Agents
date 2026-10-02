@@ -14,8 +14,9 @@ public actor AgentStore {
     /// transcript used to have the daemon read the whole file for every page, with
     /// every append to every transcript waiting behind it.
     private var lineIndexes: [UUID: TranscriptReader.Index] = [:]
-    /// Each read conversation's finished turns, as `turns.jsonl` holds them.
-    private var turnCache: [UUID: [TurnSummary]] = [:]
+    /// Each read conversation's finished turns: where they start, and the summaries made
+    /// so far.
+    private var turnCache: [UUID: Turns] = [:]
     /// How many transcripts are indexed at once. Eight bytes a line, so an index is
     /// small, but the daemon lives for weeks and this is a memo, not a record.
     private static let indexedTranscripts = 16
@@ -347,66 +348,222 @@ public actor AgentStore {
         return try reader.page(index, before: before, limit: limit)
     }
 
-    /// Finished turns, oldest first, from `turns.jsonl`, brought up to the end of the
-    /// transcript first.
+    /// What is known of one conversation's turns.
+    private struct Turns {
+        /// The lines of the transcript that are a person's ask, up to `scanned`.
+        var asks: [Int] = []
+        var scanned = 0
+        /// The summaries of the first turns, without a gap: what `turns.jsonl` holds.
+        var known: [TurnSummary] = []
+        /// Summaries of later turns, by their position, made for a page asked for
+        /// before the ones ahead of them were (#91). Kept in memory only, and moved into
+        /// `known` once the gap before them is filled.
+        var later: [Int: TurnSummary] = [:]
+
+        /// Where each turn starts: the first line, then every ask after it. The last
+        /// is the turn still going.
+        func starts(total: Int) -> [Int] {
+            guard total > 0 else { return [] }
+            return [0] + asks.drop { $0 == 0 }
+        }
+    }
+
+    /// Finished turns, oldest first, and where the turn in progress starts.
     ///
-    /// Built lazily: the file holds every turn up to the one still going, and asking
-    /// reads only the transcript after it — the turn in progress, and any that finished
-    /// since. A transcript with no file yet is read once, a chunk at a time, to make it.
+    /// Where turns start is found by looking through the transcript's bytes for an ask,
+    /// and decoding only the lines that might be one: a conversation of 100,000 entries
+    /// costs a few hundred decodes rather than all of them (#91). A summary is made only
+    /// for a turn on the page asked for, and `fillTurns` makes the rest. The ones from
+    /// the first turn on, without a gap, are kept in `turns.jsonl`, so the next start
+    /// reads them rather than makes them; one that no longer matches where its turn
+    /// starts is made again.
     public func turns(for agentID: UUID, before: Int? = nil, limit: Int = 50) throws -> TurnsPage {
         let reader = TranscriptReader(url: locations.transcript(agentID))
         let index = try lineIndex(for: agentID, with: reader)
-        let total = index.count
-        var known = try turnCache[agentID] ?? readTurns(agentID)
-        // Built from some other transcript than this one: start again.
-        if (known.last?.end ?? 0) > total {
-            known = []
-            try? FileManager.default.removeItem(at: locations.turns(agentID))
-        }
-        var openStart = known.last?.end ?? 0
-        var pending: [TranscriptEntry] = []
-        var cursor = openStart
-        while cursor < total {
-            let end = min(total, cursor + Self.turnChunk)
-            let page = try reader.page(index, before: end, limit: end - cursor)
-            pending += page.entries
-            cursor = end
-            let (closed, next) = TurnSummary.split(pending, start: openStart)
-            if !closed.isEmpty {
-                try appendTurns(closed, for: agentID)
-                known += closed
-                pending.removeFirst(next - openStart)
-                openStart = next
+        var turns = try currentTurns(agentID, reader, index)
+        let starts = turns.starts(total: index.count)
+        let closed = max(0, starts.count - 1)
+
+        let end = min(before ?? closed, closed)
+        let start = max(0, end - limit)
+        try make((start..<end).filter { $0 >= turns.known.count && turns.later[$0] == nil },
+                 in: &turns, starts: starts, reader, index)
+        var page: [TurnSummary] = []
+        page.reserveCapacity(end - start)
+        for position in start..<end {
+            if position < turns.known.count {
+                // Older turn files kept only the last block, or no outcome (069). Restore
+                // both for the requested page from the transcript, kept for this reader.
+                let turn = turns.known[position]
+                if turn.concise == nil || turn.outcome == nil {
+                    let entries = try reader.entries(index, lines: turn.start..<turn.end).compactMap { $0 }
+                    let fresh = TurnSummary.of(entries, start: turn.start)
+                    turns.known[position].concise = fresh.concise
+                    turns.known[position].outcome = fresh.outcome
+                    turns.known[position].steps = fresh.steps
+                }
+                page.append(turns.known[position])
+            } else if let summary = turns.later[position] {
+                page.append(summary)
             }
         }
-        let end = min(before ?? known.count, known.count)
-        let start = max(0, end - limit)
-        // Older turn files kept only the last block, or no outcome (069). Restore both
-        // for the requested page from the transcript, then cache them for this reader.
-        for offset in start..<end where known[offset].concise == nil || known[offset].outcome == nil {
-            let turn = known[offset]
-            let entries = try reader.page(index, before: turn.end,
-                                          limit: turn.end - turn.start).entries
-            let fresh = TurnSummary.of(entries, start: turn.start)
-            known[offset].concise = fresh.concise
-            known[offset].outcome = fresh.outcome
-            known[offset].steps = fresh.steps
-        }
+        try keepWhatFollows(&turns, for: agentID)
+
         if turnCache[agentID] == nil, turnCache.count >= Self.indexedTranscripts {
             turnCache.removeAll(keepingCapacity: true)
         }
-        turnCache[agentID] = known
-        return TurnsPage(turns: Array(known[start..<end]), firstTurn: start, openStart: openStart)
+        turnCache[agentID] = turns
+        return TurnsPage(turns: page, firstTurn: start, openStart: starts.last ?? 0)
     }
 
-    /// How much transcript is read at once while turns are being made from it.
-    private static let turnChunk = 2_000
+    /// Make the summaries a page did not need, oldest first and one turn at a time, so
+    /// `turns.jsonl` is whole by the next start and nothing waits long behind it (#91).
+    /// Stops when there is no gap left, or the conversation is no longer in hand.
+    public func fillTurns(for agentID: UUID) async {
+        guard filling.insert(agentID).inserted else { return }
+        defer { filling.remove(agentID) }
+        while var turns = turnCache[agentID] {
+            let starts = turns.starts(total: turns.scanned)
+            let position = turns.known.count
+            guard position + 1 < starts.count else { return }
+            do {
+                if turns.later[position] == nil {
+                    let reader = TranscriptReader(url: locations.transcript(agentID))
+                    try make([position], in: &turns, starts: starts, reader,
+                             lineIndex(for: agentID, with: reader))
+                }
+                try keepWhatFollows(&turns, for: agentID)
+            } catch {
+                return
+            }
+            turnCache[agentID] = turns
+            await Task.yield()
+        }
+    }
+
+    /// The conversations whose turns are being filled in.
+    private var filling: Set<UUID> = []
+
+    /// What is known of a conversation's turns, brought up to the end of its transcript.
+    private func currentTurns(_ agentID: UUID, _ reader: TranscriptReader,
+                              _ index: TranscriptReader.Index) throws -> Turns {
+        let total = index.count
+        var turns: Turns
+        if let cached = turnCache[agentID] {
+            turns = cached
+        } else {
+            turns = Turns(known: try readTurns(agentID))
+            try checkKept(&turns, for: agentID, reader, index)
+        }
+        // Read from some other transcript than this one: look again.
+        if turns.scanned > total {
+            turns.asks = []
+            turns.scanned = 0
+            turns.later = [:]
+        }
+        let candidates = try reader.lines(containing: "\"userMessage\"", index, from: turns.scanned)
+        for line in candidates where try isAsk(line, reader, index) {
+            turns.asks.append(line)
+        }
+        turns.scanned = total
+
+        // The kept summaries hold only while each still starts and ends where its turn
+        // does. From the first that does not, they are made again.
+        let starts = turns.starts(total: total)
+        let closed = max(0, starts.count - 1)
+        let valid = zip(turns.known.indices, turns.known).prefix {
+            $0 < closed && $1.start == starts[$0] && $1.end == starts[$0 + 1]
+        }.count
+        if valid < turns.known.count {
+            turns.known.removeLast(turns.known.count - valid)
+            try writeTurns(turns.known, for: agentID)
+        }
+        turns.later = turns.later.filter {
+            $0.key < closed && $0.value.start == starts[$0.key] && $0.value.end == starts[$0.key + 1]
+        }
+        return turns
+    }
+
+    /// Kept turns read back from `turns.jsonl`, checked against the transcript before
+    /// they are trusted, so it is looked through only after the last of them.
+    ///
+    /// A turn holds while the line it starts on is still the entry it began with, and an
+    /// ask is still where it ends. The last is checked first: a file for some other
+    /// transcript, or one that counted lines differently, fails there. Only then is each
+    /// looked at, for the first that does not hold, and the file cut back to before it.
+    private func checkKept(_ turns: inout Turns, for agentID: UUID, _ reader: TranscriptReader,
+                       _ index: TranscriptReader.Index) throws {
+        let known = turns.known
+        guard let last = known.last else { return }
+        func begins(_ turn: TurnSummary) throws -> Bool {
+            guard turn.start < index.count else { return false }
+            return try reader.entries(index, lines: turn.start..<turn.start + 1).first??.id == turn.id
+        }
+        let joined = known[0].start == 0 && zip(known, known.dropFirst()).allSatisfy { $0.end == $1.start }
+        var holding = known.count
+        if !(try joined && begins(last) && isAsk(last.end, reader, index)) {
+            holding = 0
+            while holding < known.count,
+                  known[holding].start == (holding == 0 ? 0 : known[holding - 1].end),
+                  try begins(known[holding]) {
+                holding += 1
+            }
+            if holding > 0, !(try isAsk(known[holding - 1].end, reader, index)) { holding -= 1 }
+            turns.known = Array(known.prefix(holding))
+            try writeTurns(turns.known, for: agentID)
+        }
+        turns.asks = turns.known.dropFirst().map(\.start)
+        turns.scanned = turns.known.last?.end ?? 0
+    }
+
+    private func isAsk(_ line: Int, _ reader: TranscriptReader, _ index: TranscriptReader.Index) throws -> Bool {
+        guard line < index.count, let entry = try reader.entries(index, lines: line..<line + 1).first ?? nil else {
+            return false
+        }
+        return TranscriptItem.entry(entry).isPersonsAsk
+    }
+
+    /// The summaries of the turns at these positions, made from one read of the
+    /// transcript, for `later`.
+    private func make(_ positions: [Int], in turns: inout Turns, starts: [Int],
+                      _ reader: TranscriptReader, _ index: TranscriptReader.Index) throws {
+        guard let first = positions.first, let last = positions.last else { return }
+        let entries = try reader.entries(index, lines: starts[first]..<starts[last + 1])
+        for position in positions {
+            let lines = (starts[position] - starts[first])..<(starts[position + 1] - starts[first])
+            var summary = TurnSummary.of(entries[lines].compactMap { $0 }, start: starts[position])
+            // By the line, as `agents/transcript` counts: a line that did not decode is
+            // still one.
+            summary.end = starts[position + 1]
+            turns.later[position] = summary
+        }
+    }
+
+    /// The made summaries that follow the kept ones without a gap are kept too.
+    private func keepWhatFollows(_ turns: inout Turns, for agentID: UUID) throws {
+        var gained: [TurnSummary] = []
+        while let next = turns.later.removeValue(forKey: turns.known.count) {
+            turns.known.append(next)
+            gained.append(next)
+        }
+        if !gained.isEmpty { try appendTurns(gained, for: agentID) }
+    }
 
     private func readTurns(_ agentID: UUID) throws -> [TurnSummary] {
         guard let data = FileManager.default.contents(atPath: locations.turns(agentID).path) else { return [] }
         return data.split(separator: 0x0A).compactMap {
             try? StoreCoding.decoder.decode(TurnSummary.self, from: Data($0))
         }
+    }
+
+    /// The kept summaries, in place of what the file held.
+    private func writeTurns(_ turns: [TurnSummary], for agentID: UUID) throws {
+        let url = locations.turns(agentID)
+        guard !turns.isEmpty else {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        try encoded(turns).write(to: url, options: .atomic)
     }
 
     private func appendTurns(_ turns: [TurnSummary], for agentID: UUID) throws {
@@ -417,12 +574,16 @@ public actor AgentStore {
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
         try handle.seekToEnd()
+        try handle.write(contentsOf: encoded(turns))
+    }
+
+    private func encoded(_ turns: [TurnSummary]) throws -> Data {
         var data = Data()
         for turn in turns {
             data.append(try StoreCoding.encoder.encode(turn))
             data.append(0x0A)
         }
-        try handle.write(contentsOf: data)
+        return data
     }
 
     public func transcriptCount(for agentID: UUID) throws -> Int {

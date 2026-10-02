@@ -1850,6 +1850,9 @@ extension DaemonCore {
                                message: RetirementWords.retiredSentence(tombstone))
         }
         if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
-        return try await store.turns(for: request.agentID, before: request.before, limit: request.limit)
+        let page = try await store.turns(for: request.agentID, before: request.before, limit: request.limit)
+        // The turns before the page are made after it is answered, not before (#91).
+        Task(priority: .utility) { [store] in await store.fillTurns(for: request.agentID) }
+        return page
     }
 }
