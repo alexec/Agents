@@ -57,7 +57,7 @@ nothing has changed since the last one. The build log is at
    the live 8792);
 2. starts `agentsd --control-code <host code>` on `$ROOT`, as Agents Host's launch agent
    would, with this session's `CLAUDE_*` and `AGENTS_*` taken out of its environment;
-3. opens the window with `AGENTS_CONTROL=<operator code>` and `--walk run-<slug>`: it
+3. opens the window with `AGENTS_CONTROL=<client code>` and `--walk run-<slug>`: it
    pairs by itself, into `walks/run-<slug>/` in its container, so it never touches the
    user's own window's pairing, which lives in the same container.
 
@@ -65,7 +65,7 @@ nothing has changed since the last one. The build log is at
 `--first-run` opens the window unpaired, on frame K, and prints `PAIR_CODE` to paste
 into **Connect…**. To walk Agents Host itself, open a scratch build of it with
 `AGENTS_ROOT=$ROOT` (its plists and jobs are the root's, and `stop.sh` boots them out). Make
-more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client device
+more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client
 --home $ROOT/control` (add `--browser` for a code the web remote pairs with: a browser's code
 works only through the loopback listener, and any other only over TLS), where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents
 Host.app`.
@@ -221,7 +221,7 @@ control plane; the phone's look is the user's.
 `WEB_URL` is the scratch control plane's web remote. Walk it in headless Chrome with a
 throwaway profile, never Alex's own browser: `node Web/test/walk/cdp.mjs` is a dependency-free
 DevTools client (launch, open, set the viewport, press by accessible name, type, screenshot,
-read the console and network). Pair it with a code made as above (`code --client device --browser`).
+read the console and network). Pair it with a code made as above (`code --client --browser`).
 Safari is walked only with Alex's go-ahead, asked with the question tool.
 
 **Before handing back a change to the window's or the Remote's UI**, check the page against it:

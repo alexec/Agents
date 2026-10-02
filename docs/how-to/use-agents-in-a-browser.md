@@ -37,12 +37,12 @@ serving it at a public address (issue #61).
      click **Pair a Browser…**.
    - In Agents Host, click **Pair a Window or Phone…** and choose **A browser on this Mac**.
 
-   Under **It may**, leave **what a phone can (Device)** chosen unless the browser needs to
-   do everything. Click **Copy**.
+   Click **Copy**. Whoever pastes the code can then do everything the window can, so paste
+   it only into this page.
 2. Paste the code into the page and click **Connect**.
 
-   The page lists the projects on every host. Its footer names the browser and its grant, as
-   **Chrome on this Mac · Device**. The window lists it under **Clients** as
+   The page lists the projects on every host. Its footer names the browser, as
+   **Chrome on this Mac**. The window lists it under **Clients** as
    **Chrome on** followed by this Mac's name.
 
 The browser keeps a key of its own, which can't be copied out of it. Next time you open the
@@ -50,7 +50,8 @@ address, it connects with that key, and nothing needs pasting.
 
 ### What you can do there
 
-With the device grant, the page does what the iPhone and iPad do, on every host:
+A paired browser may do everything the window may (#111). The page itself shows what the
+iPhone and iPad do, on every host:
 
 - read a conversation as it happens, at **Outcome**, **Steps** or **Details**, and answer
   permission requests and questions;
@@ -65,8 +66,8 @@ With the device grant, the page does what the iPhone and iPad do, on every host:
 
 The tab's title counts the sessions that need you, as **(2) Agents**.
 
-Settings, adding projects, signing runtimes in, pairing and hosts stay in the window. The
-page has no terminal and no dictation.
+Settings, adding projects, signing runtimes in, pairing and hosts have no screens on the
+page yet, so do them in the window. The page has no terminal and no dictation.
 
 ### Forget the browser
 
@@ -103,8 +104,9 @@ The control plane still lists the browser until you forget it there.
   and **Settings ▸ Control plane** says it too, when something else had the port first. Whatever
   answers at that address isn't Agents: don't paste a code into it. Quit what holds the port
   (`lsof -nP -iTCP:8792`) and press **Try Again**.
-- **This browser's grant doesn't allow that.** The browser was paired as a device. Change it
-  to **Operator** in **Settings ▸ Control plane ▸ Clients** if it needs to.
+- **That isn't allowed from this browser. The Mac's Agents may need updating.** An older
+  Agents Host still judges the browser by a grant. Update it.
+- **That host can't do that yet. It may need updating.** The host is older than the page.
 
 ## Related
 

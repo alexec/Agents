@@ -49,8 +49,8 @@ services:
       - |
         until /agents-control code --host --minutes 86400 > /codes/host.new 2>/dev/null; do sleep 1; done
         mv /codes/host.new /codes/host
-        /agents-control code --client device --minutes 86400 > /codes/device
-        /agents-control code --client operator --minutes 86400 > /codes/operator
+        /agents-control code --client --minutes 86400 > /codes/device
+        /agents-control code --client --minutes 86400 > /codes/operator
         echo "codes written to /codes"
 
   demo-host:

@@ -29,7 +29,7 @@ Each row of the spec's "What a stolen browser session could do" table, and each 
 - `auth.test.mjs` "a proof made for another origin doesn't match", "a code for another control plane sends nothing" and "a control plane that can't prove the code is refused before a key is made";
 - each refusal word: `auth.test.mjs` "each refusal is said as itself".
 
-**An operator grant** adds the operator's powers to the first row. A device can't do what only an operator may: `aDeviceIsRefusedWhatOnlyAnOperatorMayDo`. And the last operator can't forget itself: `theLastOperatorCannotForgetItself`.
+**One grant** (#111, [security-review.md](security-review.md) R5): every paired client has the window's powers, so the first row is everything the window may do. A browser and a phone call what was operator-only: `aBrowserMayDoWhatTheWindowMay`, `aPhoneMayDoWhatOnlyAnOperatorCouldBefore`, `everyMethodFromAPhoneOrABrowserReachesTheHost`. Even the only client may forget itself: `theOnlyClientMayForgetItself`.
 
 ## FR-030 to FR-034
 

@@ -19,7 +19,8 @@ It ends with what #42 must add when #61 serves the page publicly. The tests that
 | R1 | Another account could take `[::1]:<port>` and receive the page's visitors | Medium (another account on this Mac) | **Fixed** here |
 | R2 | A browser's pairing code also pairs a phone or a Mac over TLS | Low now; higher once the page is public | **Fixed** here, at Alex's call |
 | R3 | Agents Host doesn't say when the page isn't being served | Low | **Fixed** (#106) |
-| R4 | Script in the page holds the grant's full power, as the spec says | Accepted | By design; device by default |
+| R4 | Script in the page holds the grant's full power, as the spec says | Accepted | By design; **every client is an operator since #111** (2026-10-02), see R5 |
+| R5 | One grant for every paired client: a stolen phone or a hijacked tab may do everything the window may | Accepted (Alex, 2026-10-02) | By decision, #111 |
 
 ### R1. The page's address could be taken on IPv6 alone (fixed)
 
@@ -40,7 +41,7 @@ It ends with what #42 must add when #61 serves the page publicly. The tests that
 ### R2. A code wasn't bound to the kind of client it was made for (fixed)
 
 **The problem:**
-- **Pair a Browser…** and **A browser on this Mac** make an ordinary client code: a grant, a five-minute life, one use.
+- **Pair a Browser…** and **A browser on this Mac** make an ordinary client code: a grant (none since #111), a five-minute life, one use.
 - The store records the purpose `client` and the grant, not the kind.
 - The control plane refuses `kind: browser` through TLS and any other kind through loopback (`aBrowserCannotPairThroughTLSNorAnythingElseThroughLoopback`). But that check is on the kind announced, not on the code.
 - So a code made for a browser can be announced over TLS as an iPhone or a Mac.
@@ -80,7 +81,30 @@ As the table says, script running in the page can do anything the grant allows w
 - **Lint:** the source may not touch any HTML sink, evaluate strings, set cookies or make any request but its WebSocket.
 - **Walks:** the US4 walk opened a hostile `.html` and `.svg` with CDP listening. Nothing logged, and nothing went anywhere.
 
-Extensions are the browser's to police. The defaults keep this row small: a browser is a **Device** unless chosen otherwise, and **Forget This Browser…** cuts it off at once, in every tab.
+Extensions are the browser's to police. **Forget This Browser…** cuts it off at once, in every tab. The default that kept this row small, a browser paired as a **Device** unless chosen otherwise, went with #111 (R5): the grant is now everything the window may do.
+
+### R5. One grant for every paired client (accepted, 2026-10-02)
+
+**The decision:** Alex retired the `operator`/`device` split (#111). Every paired client (the Mac window, an iPhone, an iPad, a browser) may do what the window may. The pairing sheets no longer ask, `agents-control code --client` takes no grant, and the control plane and each host stop checking a per-grant allowlist.
+
+**Why:** a device could already start agents and open terminals on any host, so it could run any command there: the device grant held back the screens (credentials, hosts, pairing, helper limits) but not the hosts themselves. It protected little and asked a question on every pairing sheet.
+
+**The risk accepted:** a lost phone, a copied phone key, or script in a hijacked browser tab (R4) may also:
+- pair more clients, which then outlive the theft until forgotten;
+- forget the person's other clients, the last one included, so recovery is from Agents Host on the control plane's Mac (`agents-control code --client` there always works);
+- add or remove hosts, lend a sign-in between hosts, sign runtimes in or out, change spending, helper and retention settings, approve workflows and plugins, and quit a host's daemon.
+
+Until forgotten from another screen, or from Agents Host.
+
+**What still holds:**
+- Each client is still its own key. A phone's or a browser's connection to a host is bound to that client: presence is its own, and it can't name another device (`aDeviceMayDoWhatAWindowMay`, `nothingOnTheUplinkMakesAChannelAnAgentOrAStranger`).
+- An agent's helper still reaches only its tools, and anything else of the account on the Mac reaches nothing: the socket's code-signature roles are unchanged.
+- R1 and R2 are unchanged. R2 matters more now: a browser's code that paired a phone over TLS would be everything either way, so binding codes to their listener is what keeps a phished browser code on this Mac.
+- Forgetting cuts a client off at once, on every copy.
+
+**Older builds:** records, codes, channel opens and `ok` still carry `grant: operator`, which every older reader takes as everything. A `clients.json` record written as `device` reads as a full client and is written back as `operator`. An older window's grant picker is refused in words (`settingAGrantIsRefusedInWords`). An older host behind a new control plane gives a phone everything too, and until it updates counts the phone's presence as the Mac's, since it binds a device only for a `device` grant.
+
+**For #42:** item 1 below asked for a second factor on an operator grant. With one grant that becomes a second factor, or an expiry, for every browser served publicly.
 
 ## What was looked at and found sound
 
@@ -114,7 +138,7 @@ Once the page is served at the control plane's public address, the third row of 
 
 1. **The key works from anywhere.**
    - A copied profile, or malware that can drive the browser, is a session from anywhere.
-   - Consider binding the browser client to an expiry with re-pairing, or a second factor for an operator grant. Also show each browser's last address and time in **Clients**, so a stranger's use is visible.
+   - Consider binding the browser client to an expiry with re-pairing, or a second factor (every client may do everything since #111, R5). Also show each browser's last address and time in **Clients**, so a stranger's use is visible.
 2. **Keep R2's binding.** It is what stops a phished browser code pairing any kind of client from anywhere. Once the page is public, a browser's code is good at the public listener only, and that listener must stay the one place it works.
 3. **Origins and certificates.**
    - The canonical origin becomes the public `https://` name. The origin binding, the `Host` check and the `Origin` check must use it.

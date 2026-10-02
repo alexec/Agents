@@ -117,7 +117,7 @@ The first code comes from the machine. After that, every code comes from a paire
 1. On the machine:
 
    ```sh
-   docker compose -f deploy/compose.public.yaml exec control /agents-control code --client operator
+   docker compose -f deploy/compose.public.yaml exec control /agents-control code --client
    ```
 
    It prints a code, which works once, for five minutes. Its eighth field is `-`: it
@@ -125,7 +125,7 @@ The first code comes from the machine. After that, every code comes from a paire
 2. In Agents on your Mac, choose **Connect…** under **Connect to a control plane**,
    paste the code under **CODE**, and click **Connect**.
 
-   The window is paired as an operator. It has no hosts yet.
+   The window is paired. It has no hosts yet.
 
 Pair your iPhone and iPad from that window, as in
 [Connect a window or phone](connect-a-window-or-phone.md).
@@ -169,7 +169,7 @@ control plane across, keeping what is paired, is the next section, still to be w
 ### Move the control plane from your Mac
 
 TODO: moving the live control plane from Agents Host to the machine, and back, with its
-hosts, clients and grants kept (#61).
+hosts and clients kept (#61).
 
 ### Notifications
 
@@ -185,7 +185,7 @@ plane at its address and get no notifications.
 - **Don't set `AGENTS_CONTROL_PIN`** with a publicly trusted certificate. Caddy makes a
   new key at each renewal, so a pin would stop every window, phone and host from
   connecting after the first renewal.
-- **What's kept, and where.** The store, with every host, client and grant, is in the
+- **What's kept, and where.** The store, with every host and client, is in the
   Docker volume `agents-control_data`. The certificate and the ACME account are in
   `agents-control_caddy`. The key is `deploy/secrets/control-key`. Back up the store's
   volume and the key. Without the key, the store's hosts and clients can't connect.

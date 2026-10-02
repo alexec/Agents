@@ -64,9 +64,8 @@ joins. If the command has run out, add the server afresh; see
    It connects the earlier way once, is told where the control plane is, and connects
    there from then on, with the key it paired with. It now sees every host.
 
-A device moved across has the **Device** grant, so it can do what it did before, now on
-your servers too. To let one do everything, change it to **Operator** in **Settings ▸
-Control plane ▸ Clients**; see [Connect a window or phone](connect-a-window-or-phone.md).
+A device moved across may do everything a window may, on your servers too, as every paired
+client may; see [Connect a window or phone](connect-a-window-or-phone.md).
 
 ## If it doesn't work
 

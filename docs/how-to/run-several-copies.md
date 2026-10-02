@@ -55,7 +55,7 @@ them, on one machine with Docker.
 4. Ask any copy for a code to pair a window with:
 
    ```sh
-   docker compose -f deploy/compose.yaml exec -T cp1 /agents-control code --client operator
+   docker compose -f deploy/compose.yaml exec -T cp1 /agents-control code --client
    ```
 
    Paste it into Agents; see [Connect a window or phone](connect-a-window-or-phone.md).
@@ -125,7 +125,7 @@ trying it out only.
    `cp1`:
 
    ```sh
-   docker exec cp1 /agents-control code --client operator
+   docker exec cp1 /agents-control code --client
    ```
 
    From then on, make codes from that window: see
@@ -134,7 +134,7 @@ trying it out only.
 
 ## What to know
 
-- If the bucket cannot be reached, live connections carry on, but pairing, changing a grant
+- If the bucket cannot be reached, live connections carry on, but pairing, forgetting a client
   and adding or removing a host are refused until it is back. Nothing is half done.
 - In any copy, `/agents-control hosts` and `/agents-control clients` list what the store
   holds.

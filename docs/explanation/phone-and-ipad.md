@@ -29,7 +29,7 @@ A paired iPhone or iPad sees the projects on every host, each under its host's h
 the Mac window does. A server you add once appears on your devices within a few seconds,
 with nothing to do on them.
 
-## Pairing and grants
+## Pairing
 
 A device is paired once, with a code your control plane shows. There are two places to
 get one:
@@ -43,14 +43,14 @@ A code works once, for five minutes. The device keeps a key of its own, and prov
 that key each time it connects. A device that has not paired says **Connect to your
 agents**, and sends nothing.
 
-Every client is given a grant. A device is paired with the **device** grant: it can do
-what a phone could always do, on every host, and no more. In **Settings ▸ Control plane ▸
-Clients** you can change a device to **Operator**, and back, without pairing it again; its
-next request is judged by the new grant.
+A paired device may do everything the Mac's window may, on every host (#111). There used
+to be a **device** grant that kept a phone to the Remote's own screens; it protected the
+hosts little, since a phone could already run commands in a terminal, and was retired. See
+[The control plane](control-plane.md#one-grant-for-every-client) for what that risks.
 
 ## What you can do from the phone and iPad
 
-With the device grant, the iPhone and iPad can, on any host:
+The iPhone and iPad have screens for these, on any host:
 
 - see every project and its agents, grouped the same way as on the Mac,
 - read a conversation as it happens, and answer permission requests and questions,
@@ -75,15 +75,15 @@ shut: it is showing you what the app last knew, not what your hosts know now. Wh
 is shut and something starts waiting, the widget keeps showing the number it had, and
 says how long ago it was updated. Tapping it opens the app, which catches up.
 
-## What stays with an operator
+## What has no screen on the phone yet
 
-Some things need the operator grant, which a Mac window has. They are refused for a device
-by the control plane, and again by the host:
+Nothing is refused to a device any more, but some things have screens only in the Mac
+window so far:
 
 - adding, archiving and renaming projects, and browsing a host's folders,
 - signing a runtime in, lending a credential, and changing settings such as spending
-  limits,
-- adding and removing hosts, and pairing, promoting or forgetting clients.
+  limits and helper limits,
+- adding and removing hosts, and pairing or forgetting clients.
 
 The browser pane and the Resources page, where you end a lease, are on the Mac only.
 
@@ -118,15 +118,15 @@ all never has them.
 
 In **Settings ▸ Control plane ▸ Clients** on the Mac, **Forget…** cuts a device off at
 once, directly and through the relay, and on every copy of the control plane. Its next
-attempt to connect is refused. To use it again, pair it again with a new code. The app
-will not let you forget or demote the last operator.
+attempt to connect is refused. To use it again, pair it again with a new code. Any client
+may be forgotten from any other, the last one too; Agents Host can always make a new code.
 
 ## A browser on this Mac
 
 A browser is one more client. Agents Host serves Agents as a web page at
 **http://localhost:8792**, and a browser on the same Mac pairs with a code, as a phone
-does, from **Pair a Browser…**. It is a device unless you choose otherwise, and it does
-what the phone does, except that it has no terminal, no dictation and no notifications.
+does, from **Pair a Browser…**. It may do everything the window may; its page shows what
+the phone does, except that it has no terminal, no dictation and no notifications.
 
 The browser keeps a key that can't be copied out of it, made when it pairs and kept in
 that browser's storage for the page. Clearing the site's data loses it, and the browser
@@ -143,7 +143,7 @@ elsewhere can use it, waits on issue #61. See
 An iPhone or iPad paired with the earlier Agents app on your Mac keeps working after you
 move that set-up across to a control plane, without pairing again. The next time it
 connects the old way, it is told where the control plane is, and connects there from then
-on, with the device grant. See [Move an existing set-up across](../how-to/move-an-existing-set-up.md).
+on. See [Move an existing set-up across](../how-to/move-an-existing-set-up.md).
 
 ## Related
 

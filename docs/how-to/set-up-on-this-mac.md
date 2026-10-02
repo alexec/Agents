@@ -45,7 +45,7 @@ this Mac, with **Agents Host**.
 2. In Agents Host, click **Copy**.
 3. In the window, paste the code under **CODE** and click **Connect**.
 
-   The window is paired as an operator, which may do everything, and shows this Mac under
+   The window is paired, may do everything, and shows this Mac under
    **THIS MAC** in the projects list. Add a project to start; see
    [Add a project](add-a-project.md).
 
