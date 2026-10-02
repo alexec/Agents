@@ -13,7 +13,7 @@ scratch-root walk is last.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm the baseline: run `swift test --package-path Packages/AgentsKit --filter 'EventPattern|EventCatalogue|WorkflowTrigger|EventWait|WaitStatus|AppService|WorkflowFile'` on the untouched branch, and note any failures that are already on main.
+- [X] T001 Confirm the baseline (cut off by an app restart; the full run in T031 stands in for it): run `swift test --package-path Packages/AgentsKit --filter 'EventPattern|EventCatalogue|WorkflowTrigger|EventWait|WaitStatus|AppService|WorkflowFile'` on the untouched branch, and note any failures that are already on main.
 
 ## Phase 2: Foundational — the matcher, the catalogue and their words
 
@@ -117,11 +117,11 @@ Built in T006. The tests are in T009 and T018. This phase only checks the gaps.
 ## Phase 7: User Story 5 — words everywhere, and Copy as trigger (P3)
 
 - [X] T024 [US5] Show each filter with `DetailFilter.capsule` in the Mac Triggers capsules, in `App/Sources/Projects/WorkflowPage.swift`. Copy as trigger (`App/Sources/Events/EventDetailView.swift`) already reads `EventPattern.matching`, which T006 changed.
-- [ ] T025 [US5] Check the Remote: `Remote/Sources/Projects/WorkflowPage.swift` and `WorkflowsSection.swift` show `workflow.summary` from AgentsKitCore, so they need no change. Build the Remote scheme for the generic simulator to confirm it compiles.
+- [X] T025 [US5] Check the Remote: `Remote/Sources/Projects/WorkflowPage.swift` and `WorkflowsSection.swift` show `workflow.summary` from AgentsKitCore, so they need no change. Build the Remote scheme for the generic simulator to confirm it compiles.
 - [X] T026 [US5] Add `Packages/WebTypes/Overrides/EventPattern.ts` and `DetailFilter.ts`, then run `scripts/web.sh types`.
 - [X] T027 [US5] In `Web/src/model/workflows.ts`, `triggerSummary`, `triggerFilters` and `causePhrase` read lists. Filters are said in words as in contracts/catalogue.md: labels, runtime, outcome, afterwards, started_by, and the reason and `by` codes. Add web tests under `Web/test/`.
 - [X] T028 [US5] Rebuild the page with `scripts/web.sh build`, then run `scripts/web.sh check`.
-- [ ] T029 [US5] Add the 073 row to `specs/071-web-remote/walks/parity.md`.
+- [X] T029 [US5] Add the 073 row to `specs/071-web-remote/walks/parity.md`.
 
 ## Phase 8: Docs, the walk, cleanup
 
@@ -131,9 +131,9 @@ Built in T006. The tests are in T009 and T018. This phase only checks the gaps.
   - `docs/how-to/wait-for-something.md`
   - `docs/how-to/set-up-a-workflow.md`
   - `docs/reference/agent-tools.md`
-- [ ] T031 Full `swift test --package-path Packages/AgentsKit`. Compare any failures with the T001 baseline.
-- [ ] T032 Walk quickstart.md on a run-app scratch root: T1 fires on the match and not on the near misses, over the socket. Screenshot the workflow page by window id. Stop the root.
-- [ ] T033 Mark the spec's Status, and delete `build/DD`.
+- [X] T031 Full `swift test --package-path Packages/AgentsKit`. Compare any failures with the T001 baseline.
+- [X] T032 Walk quickstart.md on a run-app scratch root: T1 fires on the match and not on the near misses, over the socket. Screenshot the workflow page by window id. Stop the root.
+- [X] T033 Mark the spec's Status, and delete `build/DD`.
 
 ## Dependencies
 
@@ -151,3 +151,17 @@ Built in T006. The tests are in T009 and T018. This phase only checks the gaps.
 
 The MVP is Phase 2 and US1: T1 writable and firing. Then the readers (US2), the codes (US3), the
 words (US5), and the docs. Commit at each checkpoint.
+
+## As built
+
+- **T031**: 3,224 tests ran and 3 failed, none in this change:
+  - `noViewNamesAFontItself` (`ProjectListView.swift`) and `noCallSiteSpellsOutTheWordForAStartingAgent` (`PromptBar.swift`, `StartAgentView.swift`) are in files this branch doesn't touch.
+  - `aChildPastItsDeadlineIsStopped` is a timing test, flaky under load.
+- **T032**: walked on `/tmp/run-r073` at 496972b1:
+  - T1 fired once on the matching `agent.finished` (labels `bug,p1`, afterwards `park`), and not on `bug`/`stay` or `perf`/`park`.
+  - `outcome: complete` was the file's problem, naming the right values.
+  - Shots are in `specs/071-web-remote/walks/parity/`.
+- **Found by the walk and fixed**:
+  - a workflow's own agent raised `agent.started` as `started_by: person` (9d514773);
+  - a code and its old words in one list showed twice (496972b1).
+

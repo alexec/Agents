@@ -64,6 +64,7 @@
 | Dictation keeps every word through a pause | #69 | by design | by design | — | — | Dictation is the window's. |
 | Archive stays on the chat when it did not archive (073) | 073 | has | has | — | — | Archive never leaves the chat on the page; a failure says why. |
 | Pairing a phone, the window shows the code | 058 | n/a | n/a | — | — | The window's own pairing. |
+| Finer event matching: lists, labels, codes, filters in words (spec 073) | #99 | partly (a list was dropped, so a trigger read wider than written) | **has** | `after-filters-t1.png`, `after-filters-codes.png`, `after-filters-typo.png` | `window/filters-t1.png`, `window/filters-codes.png` | Walked 2026-10-02 at 496972b1 on `/tmp/run-r073`, in headless Chrome (the `filters` scene of `parity.mjs`) and the window by window id. The page says each filter in the window's words: *labelled bug, and parked*; *its allowance ran out or rate limited, and still limited after retrying, on Claude*; *by you, labelled bug or regression*. A list is a capsule joined by ` \| ` (`outcome: stuck \| partly_done`), and a run's cause joins it with `\|`. A wrong value is the workflow's problem, naming the right values. The page still names the event where the window says its meaning (below). |
 
 ## Left out by design
 
@@ -82,5 +83,5 @@ The window's shots found two more, both closed: answer cards held while their ho
 
 What is still different, and why:
 - **#83, "said at once":** neither the window nor the page hears a paused host for about a minute. Both learn of it from the control plane, which is #106's lane.
-- **Event trigger words:** the page says an event's name, not the window's catalogue meaning.
+- **Event trigger words:** the page says an event's name, not the window's catalogue meaning. Its filters read as the window's since 073.
 - **The window's Try Again for its host:** nothing on the page to redial.

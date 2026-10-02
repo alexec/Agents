@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-02
 
-**Status**: Draft
+**Status**: Built (2026-10-02, branch `agents/build-spec-073-finer`)
 
 **Input**: Issue #99, "Events: finer matching for workflow triggers and waits". Step 1 of the recommendation in [`specs/research/099-event-matching.md`](../research/099-event-matching.md), with that doc's four decisions taken as recommended:
 
