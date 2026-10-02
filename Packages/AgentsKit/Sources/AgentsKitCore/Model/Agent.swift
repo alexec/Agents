@@ -702,4 +702,27 @@ extension Agent {
         whole.isSlim = false
         return whole
     }
+
+    /// This agent as a lean `agents/list` sends it (#107): the slim lists, for a client's
+    /// sessions column. Unlike `slimmed()` it is a copy on the wire, not a held state, so
+    /// `isSlim` is not set.
+    public func leaned() -> Agent {
+        var lean = self
+        lean.advertisedOptions = []
+        lean.availableCommands = []
+        lean.plans = []
+        return lean
+    }
+
+    /// This record as listed, keeping the lists `held` already had where it came without
+    /// them: a lean list must not empty the open chat's menus. A runtime never takes its
+    /// lists back to nothing, so an empty list here is one that was left out.
+    public func keepingLists(of held: Agent?) -> Agent {
+        guard let held else { return self }
+        var kept = self
+        if kept.advertisedOptions.isEmpty { kept.advertisedOptions = held.advertisedOptions }
+        if kept.availableCommands.isEmpty { kept.availableCommands = held.availableCommands }
+        if kept.plans.isEmpty { kept.plans = held.plans }
+        return kept
+    }
 }

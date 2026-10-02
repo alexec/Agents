@@ -706,6 +706,8 @@ export interface ListRequest {
   folder?: URLString;
   startedByWorkflow?: string;
   limit?: number;
+  lean: boolean;
+  agentID?: UUID;
 }
 
 export interface MCPServer {
@@ -1618,7 +1620,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
-  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly"], optional: ["folder", "startedByWorkflow", "limit"] },
+  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
   Need: { required: ["id", "agentID", "folder", "kind", "raisedAt", "headline"], optional: [] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },

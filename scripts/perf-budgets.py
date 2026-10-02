@@ -34,6 +34,7 @@ import time
 BUDGETS = {
     "daemon/ping": 20,
     "agents/list": 250,
+    "agents/list, lean": 100,
     "projects/list": 100,
     "open a long chat (turns + open turn)": 500,
     "a long chat, Remote's last 500": 500,
@@ -111,6 +112,8 @@ def main(argv):
     row("daemon/ping", lambda: host.call("daemon/ping")[1])
     row("agents/list", lambda: host.call("agents/list", {"includeArchived": False})[1],
         f"{len(agents)} agents")
+    # What the window, the Remote and the page ask for (#107): no option or command lists.
+    row("agents/list, lean", lambda: host.call("agents/list", {"includeArchived": False, "lean": True})[1])
     row("projects/list", lambda: host.call("projects/list", {})[1])
     if longest:
         lines = sum(1 for _ in open(os.path.join(root, "agents", longest["id"], "transcript.jsonl")))

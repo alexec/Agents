@@ -24,6 +24,21 @@ const heardSincePageLimit = 1_000;
 
 type ByHost<T> = Record<string, T[]>;
 
+/**
+ * A listed record, keeping the lists already held for it where it came without them: a lean
+ * list must not empty the open session's menus (Agent.keepingLists). A runtime never takes
+ * its lists back to nothing, so an empty one is one that was left out.
+ */
+export function keepingLists(listed: Agent, held: Agent | undefined): Agent {
+  if (!held) return listed;
+  return {
+    ...listed,
+    advertisedOptions: listed.advertisedOptions.length ? listed.advertisedOptions : held.advertisedOptions,
+    availableCommands: listed.availableCommands.length ? listed.availableCommands : held.availableCommands,
+    ...(listed.plans?.length || !held.plans ? {} : { plans: held.plans }),
+  };
+}
+
 function newestFirst(agents: Agent[]): Agent[] {
   return agents.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 }
@@ -190,14 +205,16 @@ export class Work {
 
   /** One host's agents as it just listed them; every other host's are left alone. */
   replaceAgents(listed: Agent[], host: string): void {
-    this.agents.value = { ...this.agents.value, [host]: newestFirst([...listed]) };
+    const held = new Map((this.agents.value[host] ?? []).map((a) => [a.id, a]));
+    this.agents.value = { ...this.agents.value, [host]: newestFirst(listed.map((a) => keepingLists(a, held.get(a.id)))) };
   }
 
   /** Archived agents of one project, listed when the fold opens, added beside the live ones. */
   addAgents(listed: Agent[], host: string): void {
-    const ids = new Set(listed.map((a) => a.id));
-    const kept = (this.agents.value[host] ?? []).filter((a) => !ids.has(a.id));
-    this.agents.value = { ...this.agents.value, [host]: newestFirst([...kept, ...listed]) };
+    const held = new Map((this.agents.value[host] ?? []).map((a) => [a.id, a]));
+    const kept = [...held.values()].filter((a) => !listed.some((l) => l.id === a.id));
+    this.agents.value = { ...this.agents.value,
+      [host]: newestFirst([...kept, ...listed.map((a) => keepingLists(a, held.get(a.id)))]) };
   }
 
   /** Which conversation's entries are kept. A change clears the page. */
@@ -387,8 +404,10 @@ export class Store extends Work {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
       return null;
     };
+    // Lean: the columns read none of the option and command lists, 4 MB of 200 agents (#107).
+    // The open session's come with loadWhole.
     const agents = await this.link.call("agents/list",
-      { includeArchived: false, archivedCommands: false, archivedOnly: false }, host).catch(failed("agents/list"));
+      { includeArchived: false, archivedCommands: false, archivedOnly: false, lean: true }, host).catch(failed("agents/list"));
     if (agents) this.replaceAgents(agents, host);
     const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
@@ -419,7 +438,7 @@ export class Store extends Work {
     if (this.archivedLoaded.has(key)) return;
     this.archivedLoaded.add(key);
     const listed = await this.link.call("agents/list", {
-      includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never,
+      includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never, lean: true,
     }, host).catch(() => null);
     if (listed) this.addAgents(listed, host);
   }
@@ -433,8 +452,19 @@ export class Store extends Work {
     this.unwatch();
   }
 
+  /** The open session's record whole, with the menus a lean list leaves out (#107). */
+  private async loadWhole(host: string, session: string): Promise<void> {
+    const listed = await this.link.call("agents/list", {
+      includeArchived: true, archivedCommands: true, archivedOnly: false, lean: false, agentID: session as never, limit: 1,
+    }, host).catch(() => null);
+    // A host from before #107 ignores agentID and answers with its newest, which isn't this one.
+    const whole = listed?.find((a) => a.id === session);
+    if (whole) this.addAgents([whole], host);
+  }
+
   /** The finished turns first, as summaries, then the transcript from where the open turn starts. */
   private async loadTranscript(host: string, session: string): Promise<void> {
+    void this.loadWhole(host, session);
     const agentID = session as never;
     // The last 12, as the window opens a chat (#90); the rest come as the top is reached.
     const turns = await this.link.call("agents/turns", { agentID, limit: openingTurns }, host)

@@ -368,6 +368,8 @@ extension DaemonCore {
 
             case DaemonAPI.Method.agentsList:
                 let request = try decode(params, as: DaemonAPI.ListRequest.self) ?? .init()
+                // The open chat's record, whole: an archived one is read back first (#107).
+                if let id = request.agentID, !request.lean, agents[id]?.isSlim == true { await makeWhole(id) }
                 return .success(try JSONValue.encoding(listAgents(request)))
 
             case DaemonAPI.Method.agentsResuming:

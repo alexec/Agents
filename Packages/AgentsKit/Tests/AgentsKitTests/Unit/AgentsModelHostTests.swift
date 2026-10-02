@@ -95,4 +95,30 @@ struct AgentsModelHostTests {
         #expect(model.project(ProjectKey(folder: path)) != nil)
         #expect(model.project(path) != nil, "the phone's calls read as they always did")
     }
+
+    /// A lean list (#107) does not empty the open chat's menus, read whole a moment before.
+    @Test func aLeanListKeepsTheListsHeldAndANotificationReplacesThem() throws {
+        let model = AgentsModel()
+        var whole = agent(path)
+        whole.availableCommands = [SlashCommand(name: "review", description: "Review")]
+        whole.advertisedOptions = [ConfigOption(id: "model", name: "Model", type: "select")]
+        model.takeListed([whole])
+
+        var renamed = whole.leaned()
+        renamed.title = "renamed"
+        model.replaceAgents([renamed], from: .mac)
+        #expect(model.agent(whole.id)?.title == "renamed")
+        #expect(model.agent(whole.id)?.availableCommands.map(\.name) == ["review"])
+        #expect(model.agent(whole.id)?.advertisedOptions.map(\.id) == ["model"])
+
+        var changed = whole
+        changed.availableCommands = [SlashCommand(name: "compact", description: "Compact")]
+        model.apply(DaemonAPI.Notification.agentChanged, try JSONValue.encoding(changed), from: .mac)
+        #expect(model.agent(whole.id)?.availableCommands.map(\.name) == ["compact"])
+
+        // One never held whole stays lean: nothing is made up for it.
+        let stranger = agent(path, title: "other").leaned()
+        model.takeListed([stranger])
+        #expect(model.agent(stranger.id)?.availableCommands.isEmpty == true)
+    }
 }

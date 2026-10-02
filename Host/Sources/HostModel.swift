@@ -147,7 +147,8 @@ final class HostModel {
             hostClient = client
         }
         let listed = try? await client.call(DaemonAPI.Method.projectsList, [String: String](), returning: JSONValue.self)
-        let agents = try? await client.call(DaemonAPI.Method.agentsList, ["includeArchived": false], returning: JSONValue.self)
+        let agents = try? await client.call(DaemonAPI.Method.agentsList, ["includeArchived": false, "lean": true],
+                                           returning: JSONValue.self)
         if listed == nil, agents == nil {
             // Gone away: connect afresh next time.
             await client.disconnect()
