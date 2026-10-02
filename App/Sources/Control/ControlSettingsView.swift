@@ -146,6 +146,15 @@ struct ControlOverviewPage: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                // This Mac's host trying to join, as it says it (#113): not only in daemon.log.
+                if let join = control.status?.thisMacHost, join.failed {
+                    Divider()
+                    ControlRow(dot: .attention, title: "This Mac’s host", detail: join.summary) {
+                        Text(join.member ? "Reconnecting" : "Not joined yet")
+                            .appText(.reading)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             if control.isOnThisMac {
                 Text("While this Mac sleeps, no window or device can reach any of your agents. Agents on servers keep working.")

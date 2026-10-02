@@ -89,6 +89,19 @@ struct HostWindow: View {
                 }
             }
             .padding(16)
+            // The host's own word on its join, while it keeps failing (#113).
+            if model.hostJoinFailed, let join = model.hostJoin {
+                Divider()
+                HStack(spacing: 12) {
+                    Text(join.summary)
+                        .font(.callout).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button("Try Again") { Task { await model.retryJoin() } }
+                        .disabled(model.busy != nil)
+                }
+                .padding(16)
+            }
             if model.settings.role == .runHere {
                 Divider()
                 // The web remote (071 FR-002): on unless turned off, and only ever on loopback.
