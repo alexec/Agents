@@ -125,7 +125,7 @@ Built in T006. The tests are in T009 and T018. This phase only checks the gaps.
 
 ## Phase 8: Docs, the walk, cleanup
 
-- [ ] T030 [P] Update the docs the spec names:
+- [X] T030 [P] Update the docs the spec names:
   - `docs/reference/events.md`
   - `docs/reference/workflows.md`
   - `docs/how-to/wait-for-something.md`

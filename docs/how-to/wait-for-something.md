@@ -29,6 +29,12 @@ and then carry on.
    You do not need to know the event's name. The agent finds it, here
    `branch.moved` with `branch: main`, and sets a time limit if you gave one.
 
+   A detail can name more than one value, meaning any of them. *Wake me when any agent
+   labelled `deploy` finishes* is `agent.finished` with `{"labels": "deploy"}`, and
+   *when it finishes done or with nothing to do* adds `"outcome": ["done", "nothing_to_do"]`.
+   A value a detail cannot have, such as `outcome: complete`, is refused with the values
+   it can have, so the agent fixes it rather than waiting for something that never comes.
+
 2. If the runtime asks permission to use `wait_for_event`, allow it. Claude and Cursor may
    ask, and Copilot always does.
 
