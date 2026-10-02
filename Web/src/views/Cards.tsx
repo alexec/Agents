@@ -101,7 +101,7 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
       // The host refusing means it was no longer waiting; the link dropping, or the host
       // being away, means try again.
       const away = !(error instanceof CallFailed) || error.code === Failure.hostOffline;
-      if (away) store.problem.value = describe(error);
+      if (away) store.say(describe(error));
       mark(id, away ? null : "elsewhere");
     }
   };

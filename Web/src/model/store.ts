@@ -6,7 +6,7 @@ import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, FileStamp,
+  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure,
 } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { describe } from "./errors";
@@ -78,6 +78,23 @@ export class Work {
   /** The mode last chosen for each runtime, by host (029). */
   readonly rememberedModes = signal<Record<string, Record<string, JSONValue>>>({});
 
+  /**
+   * What didn't work, in one sentence, shown until its own OK closes it. Another arriving
+   * meanwhile waits its turn rather than replacing it, as the window's alerts do (#101).
+   */
+  readonly problem = signal<string | null>(null);
+  private problemsWaiting: string[] = [];
+
+  say(sentence: string): void {
+    if (this.problem.value === null) this.problem.value = sentence;
+    else if (this.problem.value !== sentence && !this.problemsWaiting.includes(sentence)) this.problemsWaiting.push(sentence);
+  }
+
+  /** The shown problem's OK: the next one waiting, if any. */
+  dismissProblem(): void {
+    this.problem.value = this.problemsWaiting.shift() ?? null;
+  }
+
   private display = new DisplayBuilder();
   private entryIDs = new Set<string>();
   private heardSincePage: TranscriptEntry[] = [];
@@ -139,6 +156,11 @@ export class Work {
         this.filesChanged.value = { host, agentID: note.agentID, folders: note.folders, at: Date.now() };
         return true;
       }
+      case "storage/writeFailed":
+        // Something nobody was waiting on was not kept: a full disk, or a folder refusing
+        // writes. Said, as the window and the Remote say it (#88).
+        this.say((params as WriteFailure).message);
+        return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
         return true;
@@ -419,8 +441,6 @@ export class Store extends Work {
 
   // MARK: What the browser sends (071 US3)
 
-  /** The last thing that didn't work, in one sentence; the page shows it until dismissed. */
-  readonly problem = signal<string | null>(null);
   /** Each runtime and what each says it can take, by host. */
   readonly runtimes = signal<Record<string, RuntimeStatus[]>>({});
   readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
@@ -435,7 +455,7 @@ export class Store extends Work {
       return await this.link.call(method, params, host);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
-      this.problem.value = describe(error);
+      this.say(describe(error));
       return null;
     }
   }

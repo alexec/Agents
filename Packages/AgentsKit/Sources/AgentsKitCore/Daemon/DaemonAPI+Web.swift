@@ -86,6 +86,9 @@ public extension DaemonAPI {
                 Row(Method.elicitationsAnswer, params: AnswerElicitationRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsAnswerSandbox, params: AnswerSandboxRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.workflowsRun, params: WorkflowRequest.self, result: WorkflowSummary.self, kind: .hostRequest),
+                // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
+                Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
+                    kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesUnwatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.artifactWrite, params: ArtifactWriteRequest.self, result: Empty.self, kind: .hostRequest),
@@ -118,6 +121,8 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.agentShowFile, params: ShowFileNotification.self, result: Empty.self,
                     kind: .hostNotification),
+                // A write nobody was waiting on that the host could not keep (#88).
+                Row(Notification.writeFailed, params: WriteFailure.self, result: Empty.self, kind: .hostNotification),
                 // An ad-hoc dictionary from ControlRouter.describe.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
             ]

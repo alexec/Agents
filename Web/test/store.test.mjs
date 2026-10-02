@@ -38,3 +38,22 @@ test("a host's notifications touch only that host's lists", () => {
   assert.deepEqual(work.agents.value.A, []);
   assert.equal(work.agents.value.B[0].title, "Other");
 });
+
+test("a problem stays until its own OK, and the next waits its turn (#101)", () => {
+  const work = new Work();
+  work.say("first");
+  work.say("second");
+  work.say("first");
+  assert.equal(work.problem.value, "first");
+  work.dismissProblem();
+  assert.equal(work.problem.value, "second");
+  work.dismissProblem();
+  assert.equal(work.problem.value, null);
+});
+
+test("a write the host could not keep is said in its words (#88)", () => {
+  const work = new Work();
+  const message = "Your Mac is out of disk space, so the transcript could not be saved. Free some space, then try again.";
+  assert.equal(work.apply("storage/writeFailed", { cause: "diskFull", what: "the transcript", message }, host), true);
+  assert.equal(work.problem.value, message);
+});

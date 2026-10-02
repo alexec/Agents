@@ -112,7 +112,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
 
   const start = async (text: string, attachments: Attachment[]) => {
     if (!chosenRuntime) {
-      store.problem.value = "Choose a runtime to start.";
+      store.say("Choose a runtime to start.");
       return false;
     }
     const w = where.value;
