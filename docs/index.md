@@ -45,5 +45,7 @@ them from your iPhone or iPad.
 
 - **Mac**: the app itself. Your agents run here.
 - **iPhone and iPad**: follow, answer and start agents on your Mac from anywhere.
+- **A browser on your Mac**: Safari or Chrome, at `http://localhost:8792`. See
+  [Use Agents in a browser](how-to/use-agents-in-a-browser.md).
 - **Linux servers**: run agents on a machine of your own, which joins your control plane
   and is seen from every window and phone. See [The control plane](explanation/control-plane.md).

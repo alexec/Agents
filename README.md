@@ -27,7 +27,8 @@ On a Mac, Agents is two apps:
   connects to, kept running by macOS.
 
 Beside the window and the iPhone and iPad app, Agents Host serves Agents as a web page for
-a browser on this Mac, at `http://localhost:8792`, paired with a code like a phone. See
+a browser on this Mac, at `http://localhost:8792`. **View ▸ Open in Browser** in the window,
+or **Open in Browser** in Agents Host, opens it and pairs that browser the first time. See
 [Use Agents in a browser](https://alexec.github.io/Agents/how-to/use-agents-in-a-browser/).
 
 The control plane is yours: on your Mac through Agents Host, or as several copies of
