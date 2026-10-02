@@ -273,6 +273,9 @@ struct EventWorkflowTests {
         let own = try #require(await started(core, by: "write-up").first)
         try await eventually("its own agent finished") { await finish(own.id) != nil }
         #expect(await finish(own.id)?.details["started_by"] == "workflow")
+        // Its first event too: the run is on the record before its first turn begins.
+        let began = await core.eventLog.events.first { $0.name == "agent.started" && $0.details["agent"] == own.id.uuidString }
+        #expect(began?.details["started_by"] == "workflow")
 
         // A label added later leaves what the log says happened as it was (US1 scenario 7).
         _ = try await core.setSessionLabels(.init(agentID: bugStays, add: ["regression"]))

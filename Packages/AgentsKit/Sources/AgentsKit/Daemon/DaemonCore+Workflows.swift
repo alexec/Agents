@@ -625,10 +625,9 @@ extension DaemonCore {
         var request = try await startRequest(settings: workflow.settings, folder: workflow.folder,
                                              prompt: prompt, managesAgents: true)
         request.labels = workflow.settings.labels
-        let agentID = try await start(request, startedBy: nil, labelOwner: .agent)
+        let agentID = try await start(request, startedBy: nil, labelOwner: .agent,
+                                      workflow: (workflow.workflowID, run.id))
         if var agent = agents[agentID] {
-            agent.startedByWorkflow = workflow.workflowID
-            agent.startedByRun = run.id
             agent.title = workflow.name
             changed(agent)
         }
