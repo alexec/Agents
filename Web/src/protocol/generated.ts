@@ -324,6 +324,22 @@ export type ChangesUnavailable =
   | { folderGone: Record<string, never> }
   | { failed: { message: string } };
 
+export interface CloneNotification {
+  clone: CloneSummary;
+  finished: boolean;
+}
+
+export interface CloneRequest {
+  url: string;
+}
+
+export interface CloneSummary {
+  id: UUID;
+  url: string;
+  folder: URLString;
+  startedAt: WireDate;
+}
+
 export interface ConfigChoice {
   value: JSONValue;
   name: string;
@@ -409,6 +425,7 @@ export interface ControlStatus {
   you?: UUID;
   relayKey?: Base64;
   web?: WebRemoteStatus;
+  thisMacHost?: HostJoinStatus;
 }
 
 export interface Cost {
@@ -630,6 +647,10 @@ export interface FileStamp {
   modifiedAt: WireDate;
 }
 
+export interface FilesBrowseRequest {
+  path?: string;
+}
+
 export interface FilesChangedNotification {
   agentID: UUID;
   folders: string[];
@@ -680,6 +701,13 @@ export interface HelperLimits {
 export type Hold = "firstDay" | "worktreeHasWork" | "workflowRunning" | "openInWindow";
 
 export type HostID = string & { readonly __brand: "HostID" };
+
+export interface HostJoinStatus {
+  member: boolean;
+  connected: boolean;
+  problem?: string;
+  at: WireDate;
+}
 
 export interface LabelVocabularyRequest {
   folder: URLString;
@@ -835,6 +863,10 @@ export interface Project {
   laidOutAt?: WireDate;
   layoutVersion?: number;
   helperLimits?: HelperLimits;
+}
+
+export interface ProjectRequest {
+  folder: URLString;
 }
 
 export interface ProjectSummary {
@@ -1462,6 +1494,7 @@ export interface Methods {
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
   "elicitations/pending": { params: Empty; result: ElicitationRequest[] };
   "events/list": { params: EventsListRequest; result: EventsPage };
+  "files/browse": { params: FilesBrowseRequest; result: DirectoryListing };
   "files/list": { params: FilesListRequest; result: DirectoryListing };
   "files/mention": { params: FileMentionRequest; result: FileMentionDTO[] };
   "files/read": { params: FilesReadRequest; result: FileReading };
@@ -1474,6 +1507,9 @@ export interface Methods {
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
   "presence/report": { params: PresenceReport; result: Empty };
+  "projects/add": { params: ProjectRequest; result: ProjectSummary };
+  "projects/clone": { params: CloneRequest; result: ProjectSummary };
+  "projects/clones": { params: Empty; result: CloneSummary[] };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -1516,6 +1552,7 @@ export const MethodTarget = {
   "elicitations/answer": "host",
   "elicitations/pending": "host",
   "events/list": "host",
+  "files/browse": "host",
   "files/list": "host",
   "files/mention": "host",
   "files/read": "host",
@@ -1528,6 +1565,9 @@ export const MethodTarget = {
   "permissions/answer": "host",
   "permissions/pending": "host",
   "presence/report": "host",
+  "projects/add": "host",
+  "projects/clone": "host",
+  "projects/clones": "host",
   "projects/list": "host",
   "runtimes/accounts": "host",
   "runtimes/list": "host",
@@ -1548,6 +1588,7 @@ export interface Notifications {
   "agent/showFile": ShowFileNotification;
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
+  "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
   "files/changed": FilesChangedNotification;
   "modes/changed": Record<string, JSONValue>;
@@ -1584,11 +1625,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
   ChangesList: { required: ["files", "git", "reportsEdits"], optional: [] },
   ChangesListRequest: { required: ["agentID"], optional: [] },
+  CloneNotification: { required: ["clone", "finished"], optional: [] },
+  CloneRequest: { required: ["url"], optional: [] },
+  CloneSummary: { required: ["id", "url", "folder", "startedAt"], optional: [] },
   ConfigChoice: { required: ["value", "name"], optional: ["description"] },
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: [] },
@@ -1614,6 +1658,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FileMentionDTO: { required: ["path", "relativePath"], optional: [] },
   FileMentionRequest: { required: ["agentID", "term"], optional: [] },
   FileStamp: { required: ["size", "modifiedAt"], optional: [] },
+  FilesBrowseRequest: { required: [], optional: ["path"] },
   FilesChangedNotification: { required: ["agentID", "folders"], optional: [] },
   FilesListRequest: { required: ["agentID", "folder"], optional: [] },
   FilesReadRequest: { required: ["agentID", "path"], optional: ["knownStamp"] },
@@ -1621,6 +1666,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived"] },
+  HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
@@ -1638,6 +1684,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify"] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits"] },
+  ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: [] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },

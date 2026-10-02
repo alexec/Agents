@@ -43,6 +43,9 @@ public final class ControlService: @unchecked Sendable {
         /// Told whenever the web remote's listener starts or fails to (071 R3): `serve --home`
         /// writes it beside the log for Agents Host.
         public var webChanged: (@Sendable (DaemonAPI.WebRemoteStatus) -> Void)?
+        /// How the host on this Mac says its join stands (#113): `serve --host-root` reads
+        /// its `control-join.json`, for `control/status`.
+        public var thisMacHost: (@Sendable () -> DaemonAPI.HostJoinStatus?)?
 
         public struct Web: Sendable {
             /// `Web/dist`, with its MANIFEST.
@@ -229,6 +232,7 @@ public final class ControlService: @unchecked Sendable {
         for host in await methods.knownHosts { await router.know(host) }
         await router.setHomeHost(await methods.controlSettings.homeHost)
         await syncRelays()
+        await methods.setThisMacHost(configuration.thisMacHost)
         await methods.attach(router)
         let codes = self.codes
         var hooks = ControlMethods.Hooks(
@@ -389,6 +393,12 @@ public final class ControlService: @unchecked Sendable {
     public func retryWeb() async {
         guard let web = configuration.web, await methods.web?.served != true else { return }
         await startWeb(web)
+    }
+
+    /// This Mac's host's join changed (#113): every window's Settings reads it again.
+    public func thisMacHostChanged(_ status: DaemonAPI.HostJoinStatus?) async {
+        await router.broadcastControl(DaemonAPI.Notification.controlThisMacHostChanged,
+                                      (try? JSONValue.encoding(status)) ?? .null)
     }
 
     /// The web remote's listener as it stands, or nil when this copy wasn't asked to serve it.

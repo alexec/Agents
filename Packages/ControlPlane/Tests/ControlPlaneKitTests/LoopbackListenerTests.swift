@@ -95,6 +95,21 @@ struct LoopbackListenerTests {
         }
     }
 
+    /// Chrome DevTools asks for this by itself, to find a project to map (#114). It is answered
+    /// 404 with the headers, and the page's one WebSocket stays all that `connect-src` allows:
+    /// the console's CSP line for it is DevTools', not the page's.
+    @Test func chromeDevToolsProbeIsNotFoundAndWidensNothing() {
+        let probe = head("/.well-known/appspecific/com.chrome.devtools.json")
+        #expect(status(probe) == .notFound)
+        let reply = gate.reply(probe)
+        #expect(reply.body.isEmpty)
+        #expect(reply.headers.contains { $0.0 == "Content-Security-Policy" })
+        let csp = gate.headers.first { $0.0 == "Content-Security-Policy" }?.1 ?? ""
+        let connect = csp.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.hasPrefix("connect-src") }
+        #expect(connect == ["connect-src ws://localhost:8899"])
+    }
+
     @Test func everyAnswerCarriesTheHeaders() {
         let heads = [head("/"), head("/nope"), head("/", method: .POST), head("/", host: "evil:1"),
                      head("/", host: "127.0.0.1:8899"), head("/v1/connect", upgrade: true), head("/v1/connect")]

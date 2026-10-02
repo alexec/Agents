@@ -17,6 +17,11 @@ canonical origin `http://localhost:<port>` (default port 8792). Research R2, R3.
 
 There is no `/healthz`, `/readyz`, `/v1/install.sh` or `/v1/servers/*` on this listener.
 
+Chrome DevTools asks for `/.well-known/appspecific/com.chrome.devtools.json` by itself while it is
+open (#114). That is row 7: `404`, empty, with every header. DevTools also reports it in the console
+as a `connect-src` violation; that line is DevTools', not the page's, and stops nothing. `connect-src`
+stays the page's one WebSocket: neither that URL nor `http://localhost:<port>` is added to clear it.
+
 ### Upgrade
 
 | Condition | Answer |

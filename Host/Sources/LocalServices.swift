@@ -59,7 +59,8 @@ struct LocalServices {
         return nil
     }
 
-    /// Leave a one-time host code where `agentsd` reads it on its next start.
+    /// Leave a one-time host code where `agentsd` reads it: on its next start, and on each
+    /// try to join until one has worked (#113).
     func leaveCode(_ code: String) throws {
         try FileManager.default.createDirectory(at: paths.hostRoot, withIntermediateDirectories: true)
         let file = paths.hostLocations.controlJoinCode

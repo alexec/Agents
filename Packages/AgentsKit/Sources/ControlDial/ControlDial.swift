@@ -19,6 +19,19 @@ public enum ControlDial {
         public init(_ description: String) { self.description = description }
     }
 
+    /// A connect that failed, in words a person can act on (#113): the name that doesn't
+    /// resolve, the port nothing listens on, with NIO's own error after it.
+    static func words(for error: any Error, host: String, port: Int) -> String {
+        guard let failed = error as? NIOConnectionError else { return "\(host):\(port): \(error)" }
+        if let dns = failed.dnsAError ?? failed.dnsAAAAError {
+            return "\(host) can't be found on this network (\(dns))"
+        }
+        let refused = failed.connectionErrors.contains { ($0.error as? IOError)?.errnoCode == ECONNREFUSED }
+        if refused { return "nothing is listening at \(host):\(port)" }
+        if let first = failed.connectionErrors.first { return "\(host):\(port) didn't answer (\(first.error))" }
+        return "\(host):\(port) didn't answer"
+    }
+
     /// One event loop group for every dial in this process.
     public static let group: MultiThreadedEventLoopGroup = .singleton
 
@@ -90,7 +103,7 @@ public enum ControlDial {
         } catch {
             // Nothing will complete the promise now, and NIO traps on one left behind.
             opened.fail(error)
-            throw error
+            throw Failure(Self.words(for: error, host: host, port: port))
         }
         channel.closeFuture.whenComplete { _ in opened.fail(Failure("the connection closed before the WebSocket opened")) }
         let deadline = channel.eventLoop.scheduleTask(in: timeout) {

@@ -112,8 +112,14 @@ extension DaemonCore {
         }
     }
 
+    /// Call `handler` whenever the Mac wakes, as heard by the machine watch.
+    public func onWake(_ handler: @escaping @Sendable () -> Void) {
+        wakeHandlers.append(handler)
+    }
+
     /// One change, as its event, for every project to hear (US5-AS3).
     func machineChanged(_ change: MachineChange) {
+        if change == .wake { for handler in wakeHandlers { handler() } }
         let draft: EventDraft
         switch change {
         case .sleep:

@@ -26,14 +26,17 @@ function scan(path, rules) {
   const text = readFileSync(path, "utf8");
   for (const [pattern, why] of rules) {
     for (const match of text.matchAll(pattern)) {
+      if (allowedURLs.has(match[0])) continue;
       const line = text.slice(0, match.index).split("\n").length;
       failures.push(`${relative(web, path)}:${line}: ${why} (${match[0].slice(0, 60)})`);
     }
   }
 }
 
-// Namespace names and licence links are strings, never fetched.
+// Namespace names, licence links and a field's example text are strings, never fetched.
 const allowedURLs = new Set([
+  // Clone Git URL…'s placeholder, the window's own (CloneSheet, #115).
+  "https://github.com/owner/repository.git",
   "http://www.w3.org/1998/Math/MathML",
   "http://www.w3.org/1999/xhtml",
   "http://www.w3.org/2000/svg",

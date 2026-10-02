@@ -6,7 +6,7 @@ import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure,
+  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing,
 } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { describe } from "./errors";
@@ -61,6 +61,8 @@ export function hostStateWords(state: string): string {
 export class Work {
   readonly hosts = signal<ControlHost[]>([]);
   readonly projects = signal<ByHost<ProjectSummary>>({});
+  /** The clones under way on each host (027), drawn where the project will be. */
+  readonly clones = signal<ByHost<CloneSummary>>({});
   readonly agents = signal<ByHost<Agent>>({});
   readonly permissions = signal<ByHost<PermissionRequest>>({});
   readonly elicitations = signal<ByHost<ElicitationRequest>>({});
@@ -123,11 +125,14 @@ export class Work {
       case "agent/changed":
         this.upsertAgent(params as Agent, host);
         return true;
-      case "project/changed": {
-        const summary = params as ProjectSummary;
-        const list = (this.projects.value[host] ?? [])
-          .filter((p) => folderKey(p.project.folder) !== folderKey(summary.project.folder));
-        this.projects.value = { ...this.projects.value, [host]: [...list, summary] };
+      case "project/changed":
+        this.upsertProject(params as ProjectSummary, host);
+        return true;
+      case "clone/changed": {
+        // Every window hears it: a clone belongs to the host, not to whoever asked (027).
+        const { clone, finished } = params as CloneNotification;
+        const list = (this.clones.value[host] ?? []).filter((c) => c.id !== clone.id);
+        this.clones.value = { ...this.clones.value, [host]: finished ? list : [...list, clone] };
         return true;
       }
       case "agent/entry":
@@ -196,6 +201,12 @@ export class Work {
       default:
         return false;
     }
+  }
+
+  upsertProject(summary: ProjectSummary, host: string): void {
+    const list = (this.projects.value[host] ?? [])
+      .filter((p) => folderKey(p.project.folder) !== folderKey(summary.project.folder));
+    this.projects.value = { ...this.projects.value, [host]: [...list, summary] };
   }
 
   upsertAgent(agent: Agent, host: string): void {
@@ -411,6 +422,8 @@ export class Store extends Work {
     if (agents) this.replaceAgents(agents, host);
     const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
+    const clones = await this.link.call("projects/clones", {}, host).catch(failed("projects/clones"));
+    if (clones) this.clones.value = { ...this.clones.value, [host]: clones };
     void this.loadRuntimes(host);
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
@@ -524,6 +537,31 @@ export class Store extends Work {
       this.say(describe(error));
       return null;
     }
+  }
+
+  /**
+   * A folder on `host` as a project (#115), as the window's Add Folder… does. Answers the
+   * project, or null with `problem` saying why.
+   */
+  async addProject(host: string, folder: string): Promise<ProjectSummary | null> {
+    const summary = await this.act("projects/add", { folder: folder as never }, host);
+    if (summary) this.upsertProject(summary, host);
+    return summary;
+  }
+
+  /**
+   * Clones `url` into the host's home folder and adds it (027, #115). Answers once the clone
+   * has finished; the row meanwhile comes from `clone/changed`.
+   */
+  async cloneProject(host: string, url: string): Promise<ProjectSummary | null> {
+    const summary = await this.act("projects/clone", { url }, host);
+    if (summary) this.upsertProject(summary, host);
+    return summary;
+  }
+
+  /** The folders at `path` on `host`, for choosing one as a project (037). Throws a refusal. */
+  browse(host: string, path: string): Promise<DirectoryListing> {
+    return this.link.call("files/browse", { path }, host);
   }
 
   /** What runs on a host, and what each runtime takes; asked once a connection. */

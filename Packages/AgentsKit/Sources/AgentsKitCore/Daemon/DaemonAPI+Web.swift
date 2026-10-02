@@ -89,6 +89,12 @@ public extension DaemonAPI {
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
+                // New project (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
+                // as the window's projects column has them.
+                Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),
+                Row(Method.projectsAdd, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
+                Row(Method.projectsClone, params: CloneRequest.self, result: ProjectSummary.self, kind: .hostRequest),
+                Row(Method.projectsClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesUnwatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.artifactWrite, params: ArtifactWriteRequest.self, result: Empty.self, kind: .hostRequest),
@@ -109,6 +115,7 @@ public extension DaemonAPI {
                 Row(Notification.agentElicitation, params: ElicitationNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.projectChanged, params: ProjectSummary.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.cloneChanged, params: CloneNotification.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.draftOptions, params: DraftOptionsNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.modesChanged, params: RememberedModes.self, result: Empty.self, kind: .hostNotification),

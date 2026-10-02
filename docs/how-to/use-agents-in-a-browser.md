@@ -31,7 +31,8 @@ serving it at a public address (issue #61).
    The page, **http://localhost:8792**, opens in your default browser. The first time, it
    pairs that browser in the same step: there is nothing to copy or paste.
 
-   The page lists the projects on every host. Its footer names the browser, as
+   The page lists the projects on every host. With none yet, it says **No projects yet**, with
+   **Add Folder…** and **Clone Git URL…** beside it. Its footer names the browser, as
    **Chrome on this Mac**. The window lists it under **Clients** as
    **Chrome on** followed by this Mac's name.
 
@@ -64,6 +65,10 @@ iPhone and iPad do, on every host:
   permission requests and questions;
 - send a prompt with files or pictures attached, use **Send now** on a queued prompt, and
   change the mode, model or runtime;
+- add a project with **+** at the head of the projects column: **Add Folder…** chooses a
+  folder on the host by typing a path or clicking into folders, and **Clone Git URL…** clones
+  an HTTPS or SSH address into the host's home folder. With more than one host, the menu
+  names each one;
 - start an agent in the project folder or in a new or existing worktree;
 - stop, park, unpark, archive and bring back a session, mark it read or unread, and add or
   remove its labels;
@@ -73,8 +78,9 @@ iPhone and iPad do, on every host:
 
 The tab's title counts the sessions that need you, as **(2) Agents**.
 
-Settings, adding projects, signing runtimes in, pairing and hosts have no screens on the
-page yet, so do them in the window. The page has no terminal and no dictation.
+Settings, signing runtimes in, pairing and hosts have no screens on the page yet, so do them
+in the window. A folder can't be dragged in from Finder, and **Clone Git URL…** doesn't fill
+in a copied address, because the page doesn't read the clipboard. The page has no terminal and no dictation.
 
 ### Forget the browser
 
@@ -108,7 +114,12 @@ The control plane still lists the browser until you forget it there.
 - **This browser isn't supported.** The browser can't keep a key that can't be copied out of
   it. Use the current Safari or Chrome.
 - **The page doesn't load at all.** Check that **Serve Agents to browsers on this Mac** is on
-  in Agents Host, and that the address is `localhost`, not this Mac's network name.
+  in Agents Host, and that the address is `localhost`, not this Mac's network name. A page
+  that says only **Connecting…** has a key and is waiting for the control plane to answer.
+- **Chrome's console reports a Content Security Policy violation for
+  `/.well-known/appspecific/com.chrome.devtools.json`.** Chrome DevTools asks for that file by
+  itself while it is open, and the page's policy lets it talk only to its own WebSocket. The
+  page answers it with a 404. It is harmless and doesn't stop the page.
 - **Not serving: port 8792 is in use by another app.** Agents Host says this under the switch,
   and **Settings ▸ Control plane** says it too, when something else had the port first. Whatever
   answers at that address isn't Agents: don't paste a code into it. Quit what holds the port
