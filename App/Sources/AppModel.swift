@@ -2095,11 +2095,13 @@ final class AppModel {
             // arrive after the next was picked. It is dropped, not shown under the
             // wrong name.
             guard self.selection == selection else { return }
+            let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
             self.work.replaceTurns(with: turns)
             self.work.replaceTranscript(with: page)
             if let opening = self.chatOpening, opening.agent == selection {
                 self.chatOpening = nil
-                Perf.endWhenDrawn(opening.timing, "\(turns.turns.count) turns, \(page.entries.count) entries")
+                Perf.endWhenDrawn(opening.timing, "\(turns.turns.count) turns, \(page.entries.count) entries, "
+                                  + "data in \(dataIn ?? 0) ms")
             }
         }
     }
