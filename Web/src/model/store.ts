@@ -16,6 +16,9 @@ import { DisplayBuilder, type Item } from "./turns";
 
 export { folderKey } from "./groups";
 
+/** How many finished turns a chat opens with, as the window's (#90). */
+const openingTurns = 12;
+
 /** How many entries heard as they happened are kept to lay over a page that arrives late. */
 const heardSincePageLimit = 1_000;
 
@@ -433,7 +436,8 @@ export class Store extends Work {
   /** The finished turns first, as summaries, then the transcript from where the open turn starts. */
   private async loadTranscript(host: string, session: string): Promise<void> {
     const agentID = session as never;
-    const turns = await this.link.call("agents/turns", { agentID, limit: 50 }, host)
+    // The last 12, as the window opens a chat (#90); the rest come as the top is reached.
+    const turns = await this.link.call("agents/turns", { agentID, limit: openingTurns }, host)
       .catch(() => ({ turns: [], firstTurn: 0, openStart: 0 }));
     const page = await this.link.call("agents/transcript", { agentID, limit: 200, from: turns.openStart }, host)
       .catch(() => null);
