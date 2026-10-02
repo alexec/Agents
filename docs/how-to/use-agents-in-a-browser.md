@@ -99,6 +99,10 @@ The control plane still lists the browser until you forget it there.
   it. Use the current Safari or Chrome.
 - **The page doesn't load at all.** Check that **Serve Agents to browsers on this Mac** is on
   in Agents Host, and that the address is `localhost`, not this Mac's network name.
+- **Not serving: port 8792 is in use by another app.** Agents Host says this under the switch,
+  and **Settings ▸ Control plane** says it too, when something else had the port first. Whatever
+  answers at that address isn't Agents: don't paste a code into it. Quit what holds the port
+  (`lsof -nP -iTCP:8792`) and press **Try Again**.
 - **This browser's grant doesn't allow that.** The browser was paired as a device. Change it
   to **Operator** in **Settings ▸ Control plane ▸ Clients** if it needs to.
 
