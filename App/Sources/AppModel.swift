@@ -1703,7 +1703,7 @@ final class AppModel {
         } else {
             serverCosts[host] = try? await server.call(DaemonAPI.Method.costState, returning: DaemonAPI.CostState.self)
         }
-        if let listed = try? await server.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(),
+        if let listed = try? await server.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(lean: true),
                                                returning: [Agent].self) {
             work.replaceAgents(listed, from: host)
         }
@@ -1799,8 +1799,10 @@ final class AppModel {
     func refreshAgents() async {
         guard hasMacHost else { return }
         await attempt {
+            // Lean: the sessions column reads none of the option and command lists, and
+            // they were 4 MB of 200 agents (#107). The open chat's come with `loadWholeAgent`.
             let listed = try await self.client.call(DaemonAPI.Method.agentsList,
-                                                    DaemonAPI.ListRequest(),
+                                                    DaemonAPI.ListRequest(lean: true),
                                                     returning: [Agent].self)
             self.work.replaceAgents(listed, from: .mac)
             Perf.sinceLaunch("first-list")
@@ -2121,8 +2123,21 @@ final class AppModel {
     /// How many finished turns a chat opens with (#90).
     static let firstTurns = 12
 
+    /// The open chat's record whole, with the menus and plan a lean list leaves out (#107).
+    /// A host too old to know `agentID` lists its newest instead, which is not this one.
+    func loadWholeAgent(_ id: UUID) async {
+        let host = host(ofAgent: id)
+        guard let listed = try? await client(for: host).call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest.whole(id),
+                                                             returning: [Agent].self),
+              var whole = listed.first(where: { $0.id == id }) else { return }
+        whole.host = host
+        work.takeListed([whole])
+    }
+
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
+        // Beside the transcript rather than before it: neither waits on the other.
+        async let whole: Void = loadWholeAgent(selection)
         await attempt {
             let client = self.client(forAgent: selection)
             // The finished turns first, as summaries; then the transcript from where the
@@ -2151,6 +2166,7 @@ final class AppModel {
                                   + "data in \(dataIn ?? 0) ms")
             }
         }
+        await whole
     }
 
     /// Every entry of a finished turn, for the chat to open it.
