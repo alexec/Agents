@@ -118,6 +118,7 @@ struct ControlOverviewPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if control.isOnThisMac { ControlBrowserCard(control: control) }
             ControlCard {
                 ControlRow(dot: control.isReachable ? .online : .offline,
                            title: control.isOnThisMac ? "This Mac" : (control.status?.name ?? "Control plane"),
@@ -135,16 +136,6 @@ struct ControlOverviewPage: View {
                     Text(control.status?.awayFromHome == true ? "On" : "Off")
                         .appText(.reading)
                         .foregroundStyle(.secondary)
-                }
-                // What the control plane says of its web remote, never just the address (071 R3).
-                if let web = control.status?.web {
-                    Divider()
-                    ControlRow(dot: web.served ? .none : .attention, title: "Browsers on this Mac",
-                               detail: web.served ? web.summary : "\(web.summary) Try again in Agents Host.") {
-                        Text(web.served ? "On" : "Not serving")
-                            .appText(.reading)
-                            .foregroundStyle(.secondary)
-                    }
                 }
             }
             if control.isOnThisMac {
@@ -184,6 +175,41 @@ struct ControlOverviewPage: View {
     private func hostName(_ host: DaemonAPI.ControlHost) -> String {
         let name = host.machineID == MachineID.current && host.relay != true ? "This Mac" : host.name
         return host.state == "online" ? name : "\(name) (\(host.state))"
+    }
+}
+
+/// The page in a browser on this Mac, first on the page so it is found (#109): what the
+/// control plane says of it, never just the address (071 R3), and Open in Browser beside it.
+struct ControlBrowserCard: View {
+    let control: ControlSettingsModel
+    @State private var opening = false
+
+    var body: some View {
+        ControlCard {
+            ControlRow(dot: web?.served == false ? .attention : .none,
+                       title: "Use Agents in Safari or Chrome on this Mac", detail: detail) {
+                if web?.served == true {
+                    Button("Open in Browser") {
+                        opening = true
+                        Task {
+                            control.problem = await control.openInBrowser()
+                            opening = false
+                        }
+                    }
+                    .buttonStyle(.paper)
+                    .disabled(opening)
+                } else {
+                    Text("Not serving").appText(.reading).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var web: DaemonAPI.WebRemoteStatus? { control.status?.web }
+
+    private var detail: String {
+        guard let web else { return BrowserOpening.offWords }
+        return web.served ? "\(web.summary) The first time, it pairs that browser too." : "\(web.summary) Try again in Agents Host."
     }
 }
 

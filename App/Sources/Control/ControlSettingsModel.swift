@@ -1,5 +1,5 @@
 import AgentsKitCore
-import Foundation
+import AppKit
 
 /// What Settings ▸ Control plane shows (058, frames D–F): the control plane itself, its
 /// hosts and its clients, kept true by the control plane's own notifications.
@@ -151,6 +151,46 @@ final class ControlSettingsModel {
             problem = "The control plane can’t be reached."
         }
         return nil
+    }
+
+    /// **Open in Browser** (#109): the page in the default browser, pairing it in the same
+    /// step if no browser of its kind is paired yet (`BrowserOpening`). Nil once opened, else
+    /// why not, in words to show.
+    func openInBrowser() async -> String? {
+        await refresh()
+        guard isReachable, let status else { return "The control plane can’t be reached." }
+        guard isOnThisMac else { return "The page is served only to a browser on the Mac that runs the control plane." }
+        let browsers = clients.filter { $0.kind == .browser }.map(\.name)
+        switch BrowserOpening.step(web: status.web, browsers: browsers, family: Self.defaultBrowserFamily) {
+        case .notServed(let why):
+            return why
+        case .open(let url):
+            Self.open(url)
+            return nil
+        case .pair:
+            guard let web = status.web, let code = await startCode(forHost: false, browser: true) else {
+                return problem ?? "No code could be made."
+            }
+            guard let url = BrowserOpening.pairingURL(web, code: code.text) else { return "No code could be made." }
+            Self.open(url)
+            return nil
+        }
+    }
+
+    /// A walk drives a headless Chrome of its own, never the person's browser.
+    private static var defaultBrowserFamily: String? {
+        if ControlConfig.walk != nil { return "Chrome" }
+        let app = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "http://localhost")!)
+        return BrowserOpening.family(bundleID: app.flatMap { Bundle(url: $0)?.bundleIdentifier })
+    }
+
+    /// The default browser, or for a walk the file its headless browser is pointed at by.
+    private static func open(_ url: URL) {
+        if let file = ControlConfig.walkOpenedURL {
+            try? Data(url.absoluteString.utf8).write(to: file, options: .atomic)  // store-ok: the window's own container
+            return
+        }
+        NSWorkspace.shared.open(url)  // store-ok: a web page
     }
 
     func stopCodes() async {

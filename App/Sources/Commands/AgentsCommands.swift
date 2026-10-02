@@ -98,6 +98,9 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("r", modifiers: [.command, .option])
             Button("Spending") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
+            // Agents as a web page on this Mac, found from here (#109).
+            Button("Open in Browser") { openInBrowser() }
+                .disabled(model.controlPlaneHosts == nil)
             Divider()
             // A menu item rather than a shortcut on the button. The button only
             // exists while you are scrolled away from the end, which is precisely
@@ -172,6 +175,21 @@ struct AgentsCommands: Commands {
     }
 
     // MARK: File
+
+    /// The page in the default browser, paired in the same step the first time; or why not,
+    /// in an alert, rather than a page that isn't there.
+    private func openInBrowser() {
+        guard let control = ControlConfig.endpoint.flatMap({ ControlSettingsModel(endpoint: $0) }) else { return }
+        Task {
+            let why = await control.openInBrowser()
+            control.stop()
+            guard let why else { return }
+            let alert = NSAlert()
+            alert.messageText = "Agents can’t open in a browser"
+            alert.informativeText = why
+            alert.runModal()
+        }
+    }
 
     /// The project's page with the keyboard in its prompt, which is where a session starts.
     private func newSession(inWorktree: Bool = false) {

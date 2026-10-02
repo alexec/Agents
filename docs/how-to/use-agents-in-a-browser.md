@@ -22,15 +22,26 @@ serving it at a public address (issue #61).
 
 ## Steps
 
-### Open the page
+### Open the page and pair the browser
 
-1. Open Agents Host. Under **This Mac**, check that **Serve Agents to browsers on this Mac**
-   is on. The line under it gives the page's address, **http://localhost:8792**.
-2. Open that address in Safari or Chrome on this Mac.
+1. In the window, choose **View ▸ Open in Browser**. The same button is first on
+   **Settings ▸ Control plane**, beside **Use Agents in Safari or Chrome on this Mac**, and in
+   Agents Host beside **Serve Agents to browsers on this Mac** and in its menu.
 
-   The page says **Connect this browser to your agents**.
+   The page, **http://localhost:8792**, opens in your default browser. The first time, it
+   pairs that browser in the same step: there is nothing to copy or paste.
 
-### Pair the browser
+   The page lists the projects on every host. Its footer names the browser, as
+   **Chrome on this Mac**. The window lists it under **Clients** as
+   **Chrome on** followed by this Mac's name.
+
+   If the page isn't being served, nothing opens, and it says why, as **Not serving: port
+   8792 is in use by another app.**
+
+### Pair a browser by hand
+
+For a browser that isn't the default one, open **http://localhost:8792** in it. The page
+says **Connect this browser to your agents**.
 
 1. Get a code, from either place:
    - In the window, open **Settings ▸ Control plane**, click **Show** beside **Clients**, then
@@ -40,10 +51,6 @@ serving it at a public address (issue #61).
    Click **Copy**. Whoever pastes the code can then do everything the window can, so paste
    it only into this page.
 2. Paste the code into the page and click **Connect**.
-
-   The page lists the projects on every host. Its footer names the browser, as
-   **Chrome on this Mac**. The window lists it under **Clients** as
-   **Chrome on** followed by this Mac's name.
 
 The browser keeps a key of its own, which can't be copied out of it. Next time you open the
 address, it connects with that key, and nothing needs pasting.
@@ -85,6 +92,8 @@ The control plane still lists the browser until you forget it there.
 
 - **This code has expired. Ask for a new one.** A code works for five minutes. Get a new one.
 - **This code has been used. Ask for a new one.** A code works once.
+  An address with `#code=` in it, from the browser's history, is one of these: choose **Open in
+  Browser** again instead.
 - **That isn't an Agents code. It starts agents-control:2:c:** Something else was pasted, or a
   code for a host. Copy the code again from **Pair a Browser…**.
 - **This code is for another control plane.** The code came from a different set-up from the

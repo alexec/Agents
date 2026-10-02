@@ -58,6 +58,7 @@ struct FirstRunView: View {
             .fixedSize(horizontal: false, vertical: true)
             Text("Waiting for Agents Host… It appears here as soon as it’s running. Nothing passes through a service of ours.")
                 .appText(.supporting).foregroundStyle(.secondary)
+            browserLine
         }
     }
 
@@ -86,7 +87,15 @@ struct FirstRunView: View {
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Connect to a different control plane…") { connecting = true }.buttonStyle(.link)
+            browserLine
         }
+    }
+
+    /// That there is a web page too, from the first screen on (#109).
+    private var browserLine: some View {
+        Text("Use Agents in Safari or Chrome on this Mac, too. Once this window is paired, View ▸ Open in Browser opens it there and pairs that browser in the same step.")
+            .appText(.supporting).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func card(title: String, body: String, usual: Bool,

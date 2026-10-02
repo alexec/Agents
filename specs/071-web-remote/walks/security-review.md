@@ -21,6 +21,7 @@ It ends with what #42 must add when #61 serves the page publicly. The tests that
 | R3 | Agents Host doesn't say when the page isn't being served | Low | **Fixed** (#106) |
 | R4 | Script in the page holds the grant's full power, as the spec says | Accepted | By design; **every client is an operator since #111** (2026-10-02), see R5 |
 | R5 | One grant for every paired client: a stolen phone or a hijacked tab may do everything the window may | Accepted (Alex, 2026-10-02) | By decision, #111 |
+| R6 | Open in Browser carries a browser code in the page's address (#109) | Low | **Checked**: safe as built, below |
 
 ### R1. The page's address could be taken on IPv6 alone (fixed)
 
@@ -105,6 +106,20 @@ Until forgotten from another screen, or from Agents Host.
 **Older builds:** records, codes, channel opens and `ok` still carry `grant: operator`, which every older reader takes as everything. A `clients.json` record written as `device` reads as a full client and is written back as `operator`. An older window's grant picker is refused in words (`settingAGrantIsRefusedInWords`). An older host behind a new control plane gives a phone everything too, and until it updates counts the phone's presence as the Mac's, since it binds a device only for a `device` grant.
 
 **For #42:** item 1 below asked for a second factor on an operator grant. With one grant that becomes a second factor, or an expiry, for every browser served publicly.
+
+### R6. A code in the address: Open in Browser (#109, checked 2026-10-02)
+
+**What it does:** the window's **View ▸ Open in Browser**, Settings ▸ Control plane's button and Agents Host's open `http://localhost:<port>/#code=<browser code>` in the default browser, when no browser of its family is paired. The page pairs with it in the same step. With one paired, they open the page with no code. If the control plane says the page isn't served, they say why and open nothing.
+
+**Why it is safe:**
+- **It is the same code.** It is made by `clients/startPairing {kind: "browser"}` (or `code --client --browser`): one use, five minutes, and good only through the loopback listener it was made by (R2). Nothing new is accepted anywhere.
+- **It goes only to that listener.** The address is built from the control plane's own `control/status.web`: its port, and only while `served` is true. A squatter on the port (R1's remainder) means the control plane isn't serving, so nothing opens, and the code is never handed to whatever holds the port. A control plane on another Mac gets no address opened at all.
+- **The fragment never leaves the browser.** Browsers don't send it in requests, so it can't reach the listener's access log or any proxy. The walk saw no request URL holding it.
+- **It leaves the address at once.** `pairLink.ts` is imported first, takes `#code=` and calls `history.replaceState` before the router or anything else reads the address. The tab's address and Back hold no code. The page logs only `pair.fromLink`, never the code. The walk saw none in the console or the control plane's log.
+- **What remains: browser history keeps it.** Chrome's History database keeps the address as first opened, code included (seen in the walk). By then the code is spent: replaying it from history in a fresh profile was refused as used. A code that isn't spent (the page never loaded, or a browser that was already paired ignores it) stays in history for at most its five minutes. Only this account can read that history, and that account can already use the browser's own key. Nor can another account use such a code, since R2 limits it to the real listener.
+- **A paired browser doesn't spend it.** The page pairs only when it has no key. If the window guessed wrong (another browser family, or one whose site data was cleared), the code is left to expire, or used to pair, as a pasted one would be.
+
+**Not done:** the control plane can't take an unused code back (`clients/stopPairing` does nothing there), so a code left unused lives its five minutes. That matters again with #61. A public page must not be opened with a code in its address unless one can be cancelled, or made to live for seconds.
 
 ## What was looked at and found sound
 

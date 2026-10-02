@@ -106,6 +106,9 @@ struct HostWindow: View {
                     Spacer()
                     if model.webRemoteFailed {
                         Button("Try Again") { Task { await model.retryWebRemote() } }
+                    } else if model.webRemote?.served == true, model.settings.servesWebRemote {
+                        // The page itself, paired the first time (#109).
+                        Button("Open in Browser") { Task { await model.openInBrowser() } }
                     }
                     Toggle("Serve Agents to browsers on this Mac",
                            isOn: Binding(get: { model.settings.servesWebRemote },

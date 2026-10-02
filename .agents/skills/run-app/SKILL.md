@@ -223,6 +223,10 @@ throwaway profile, never Alex's own browser: `node Web/test/walk/cdp.mjs` is a d
 DevTools client (launch, open, set the viewport, press by accessible name, type, screenshot,
 read the console and network). Pair it with a code made as above (`code --client --browser`).
 Safari is walked only with Alex's go-ahead, asked with the question tool.
+**Open in Browser** (#109) in a walk's window opens no browser: it writes the address, with
+`#code=…` when it pairs, to `walks/run-<slug>/opened-url` in the window's container, and takes
+Chrome as the default browser. `node Web/test/walk/openinbrowser.mjs <that file> <profile> <out.png>`
+opens it in headless Chrome. Run it once per press, on the same profile.
 
 **Before handing back a change to the window's or the Remote's UI**, check the page against it:
 1. Run the scene of `node Web/test/walk/parity.mjs <WEB_URL> <browser code> <ROOT> <out dir> <prefix> [scene…]`
