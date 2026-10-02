@@ -745,6 +745,10 @@ struct WebFixturesTests {
                                                             lastOutcome: .refused(.runInFlight, at: Self.base, repeats: 2))),
             ("refused, needing a person", WorkflowSummary(workflow: flow("deep", [.agentFinished]),
                                                           lastOutcome: .refused(.chainTooDeep(depth: 3), at: Self.base, repeats: 1))),
+            // Turned off (#100): grey, and so is the refusal it gives a trigger.
+            ("turned off", WorkflowSummary(workflow: flow("quiet", [.schedule(nightly)]), isEnabled: false)),
+            ("turned off, a trigger refused", WorkflowSummary(workflow: flow("hushed", [.agentFinished]), isEnabled: false,
+                                                              lastOutcome: .refused(.disabled, at: Self.base, repeats: 1))),
         ]
         let cases = try all.map { Case(name: $0.0, input: Self.sortingSets(try Self.encode($0.1))) }
         try pin("workflows/summaries.json", cases) { input in

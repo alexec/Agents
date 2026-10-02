@@ -29,4 +29,7 @@ test("the status mark follows WorkflowStatusIcon's order", () => {
   assert.equal(w.workflowStatus({ ...input, isRunning: true }).words, "Running");
   assert.equal(w.workflowStatus({ ...input, isArchived: true }).words, "Archived");
   assert.equal(w.workflowStatus({ ...input, awaitingApproval: { digest: "x", isNew: true } }).words, "Waiting for your OK");
+  assert.equal(w.workflowStatus({ ...input, isEnabled: false }).words, "Turned off");
+  assert.equal(w.workflowStatus({ ...input, isEnabled: false }).tinted, false);
+  assert.equal(w.workflowStatus({ ...input, isEnabled: false, isArchived: true }).words, "Archived");
 });

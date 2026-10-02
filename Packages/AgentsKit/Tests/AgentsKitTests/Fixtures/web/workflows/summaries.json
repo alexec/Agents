@@ -7,7 +7,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -63,7 +67,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "standing",
@@ -118,7 +126,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -168,7 +180,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -216,7 +232,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : true,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "triggering",
@@ -259,7 +279,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -302,7 +326,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -342,7 +370,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -375,7 +407,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -413,7 +449,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -455,7 +495,11 @@
     },
     "input" : {
       "isArchived" : true,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -493,7 +537,11 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "overLimit" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
@@ -535,7 +583,11 @@
         "isNew" : true
       },
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -572,6 +624,7 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
       "lastOutcome" : {
         "refused" : {
@@ -584,6 +637,9 @@
           "repeats" : 2
         }
       },
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -620,6 +676,7 @@
     },
     "input" : {
       "isArchived" : false,
+      "isEnabled" : true,
       "isRunning" : false,
       "lastOutcome" : {
         "refused" : {
@@ -632,6 +689,9 @@
           "repeats" : 1
         }
       },
+      "nextFireAtByTrigger" : [
+
+      ],
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -659,5 +719,117 @@
       }
     },
     "name" : "refused, needing a person"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "Every day at 2am, in a new agent"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isEnabled" : false,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Quiet",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "quiet"
+      }
+    },
+    "name" : "turned off"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When an agent finishes, in a new agent"
+    },
+    "input" : {
+      "isArchived" : false,
+      "isEnabled" : false,
+      "isRunning" : false,
+      "lastOutcome" : {
+        "refused" : {
+          "_0" : {
+            "disabled" : {
+
+            }
+          },
+          "at" : 812500000,
+          "repeats" : 1
+        }
+      },
+      "nextFireAtByTrigger" : [
+
+      ],
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Hushed",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "hushed"
+      }
+    },
+    "name" : "turned off, a trigger refused"
   }
 ]

@@ -120,6 +120,7 @@ export function canFire(w: Workflow): boolean {
 
 function refusalNeedsAPerson(refusal: WorkflowRefusal): boolean {
   const key = Object.keys(refusal)[0];
+  // `disabled`, a trigger refused by a workflow turned off (#100), is grey like the rest.
   return ["chainTooDeep", "unreadable", "folderGone", "overLimit", "settingRefused", "awaitingApproval"].includes(key ?? "");
 }
 
@@ -138,6 +139,7 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   const tinted = workflowNeedsAPerson(s);
   if (s.isArchived) return { mark: "▣", words: "Archived", tinted };
   if (s.awaitingApproval) return { mark: "✋", words: "Waiting for your OK", tinted };
+  if (!s.isEnabled) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
   if (tinted) return { mark: "!", words: "Needs attention", tinted };
   if (s.isRunning) return { mark: "◌", words: "Running", tinted };

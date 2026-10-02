@@ -1,6 +1,7 @@
 // One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark, its
 // name, what it is in one line, and Run Now. A workflow waiting for its OK is approved on the
-// Mac, which shows what it would run; the page says so instead of offering to run it.
+// Mac, which shows what it would run; the page says so instead of offering to run it. One turned
+// off still runs now, as the window's does.
 import { useSignal } from "@preact/signals";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -17,7 +18,11 @@ export function WorkflowRow({ store, host, summary, disabled }: {
     <div class="row workflow">
       <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}>{status.mark}</span>
       <span class="body">
-        <span class="title">{summary.workflow.name}</span>
+        <span class="title">
+          {summary.workflow.name}
+          {/* Marked where it stands, rather than moved (#100): off is not put away. */}
+          {!summary.isEnabled && !summary.isArchived && <span class="faint"> · Off</span>}
+        </span>
         <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK on the Mac" : workflowSummary(summary.workflow, name)}</span>
       </span>
       {canRun && (

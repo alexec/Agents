@@ -63,6 +63,7 @@ export const Failure = {
   signInWanted: -32070,
   storeUnavailable: -32094,
   workflowLimitReached: -32017,
+  workflowTurnedOffByPerson: -32041,
   workflowUnreadable: -32015,
   worktreeFailed: -32028,
   worktreeInUse: -32031,
@@ -1266,6 +1267,10 @@ export interface WorkflowApproval {
   isNew: boolean;
 }
 
+export type WorkflowCause =
+  | { byHand: Record<string, never> }
+  | { trigger: { _0: WorkflowTrigger } };
+
 export type WorkflowLimit = "project" | "total";
 
 export type WorkflowMode = "new" | "standing" | "triggering";
@@ -1283,6 +1288,7 @@ export type WorkflowRefusal =
   | { chainTooDeep: { depth: number } }
   | { runInFlight: Record<string, never> }
   | { archived: Record<string, never> }
+  | { disabled: Record<string, never> }
   | { overLimit: { _0: WorkflowLimit } }
   | { unreadable: { _0: string } }
   | { triggerNotSupported: { name: string } }
@@ -1324,13 +1330,17 @@ export interface WorkflowSettings {
 export interface WorkflowSummary {
   workflow: Workflow;
   isArchived: boolean;
+  isEnabled: boolean;
   overLimit?: WorkflowLimit;
   nextFireAt?: WireDate;
+  nextFireAtByTrigger: (WireDate | null)[];
   lastOutcome?: WorkflowOutcome;
   causingEvent?: number;
   causingEventName?: string;
   isRunning: boolean;
   awaitingApproval?: WorkflowApproval;
+  lastFiredAt?: WireDate;
+  lastFiredBy?: WorkflowCause;
 }
 
 export type WorkflowTrigger = WorkflowTriggerStored;
@@ -1640,7 +1650,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isRunning"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },
