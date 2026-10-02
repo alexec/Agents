@@ -365,10 +365,21 @@ button.call-line:hover { opacity: 1; }
 .plan .mark { opacity: 0.6; }
 .plan .completed { opacity: 0.6; }
 .thought { white-space: pre-wrap; }
+/* A queued prompt: the .bubble's place and shape, dashed and dimmed, its buttons underneath (#95). */
 .queued {
+  align-self: flex-end;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.queued-bubble {
+  background: var(--paper-well);
   border: 1px dashed var(--paper-rule);
   border-radius: var(--radius-card);
-  padding: 8px 12px;
+  padding: 6px 11px;
+  opacity: 0.65;
 }
 .queued p { margin: 0; }
 .working, .more { margin: 0; }
@@ -616,8 +627,7 @@ button.remove:hover { opacity: 1; }
 .popover.right { right: 0; left: auto; min-width: 160px; display: flex; flex-direction: column; }
 .popover [role=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
 .popover [role=menuitem]:hover { background: var(--paper-wash); }
-.queued-head { display: flex; align-items: center; gap: 8px; }
-.queued-head .faint { flex: 1; }
+.queued-actions { display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .problem {
   display: flex;
   align-items: center;

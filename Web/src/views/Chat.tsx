@@ -236,9 +236,13 @@ function Queued({ store, host, agent, disabled }: { store: Store; host: string; 
   return (
     <>
       {(agent.queuedPrompts ?? []).map((queued) => (
+        // The person's bubble, dashed and dimmed, with what can be done to it underneath (#95).
         <div key={queued.id} class="queued">
-          <div class="queued-head">
-            <p class="faint">Waiting its turn</p>
+          <div class="queued-bubble" role="group" aria-label={`Queued: ${queued.text}`}>
+            <p>{queued.text}</p>
+            {queued.attachments.length > 0 && <p class="small">📎 {queued.attachments.map((a) => a.displayName).join(", ")}</p>}
+          </div>
+          <div class="queued-actions">
             {canSendNow && (
               <button class="link" disabled={disabled} title="Send this into the turn that is running, without waiting for it to end"
                 onClick={() => void store.sendNow(host, agent.id, queued.id)}>↑ Send now</button>
@@ -246,8 +250,6 @@ function Queued({ store, host, agent, disabled }: { store: Store; host: string; 
             <button class="remove" aria-label="Remove queued prompt" title="Do not send this" disabled={disabled}
               onClick={() => void store.unqueue(host, agent.id, queued.id)}>×</button>
           </div>
-          <p class="quiet">{queued.text}</p>
-          {queued.attachments.length > 0 && <p class="faint small">📎 {queued.attachments.map((a) => a.displayName).join(", ")}</p>}
         </div>
       ))}
     </>
