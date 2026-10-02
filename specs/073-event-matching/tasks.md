@@ -116,11 +116,11 @@ Built in T006. The tests are in T009 and T018. This phase only checks the gaps.
 
 ## Phase 7: User Story 5 — words everywhere, and Copy as trigger (P3)
 
-- [ ] T024 [US5] Show each filter with `DetailFilter.capsule` in the Mac Triggers capsules, in `App/Sources/Projects/WorkflowPage.swift`. Copy as trigger (`App/Sources/Events/EventDetailView.swift`) already reads `EventPattern.matching`, which T006 changed.
+- [X] T024 [US5] Show each filter with `DetailFilter.capsule` in the Mac Triggers capsules, in `App/Sources/Projects/WorkflowPage.swift`. Copy as trigger (`App/Sources/Events/EventDetailView.swift`) already reads `EventPattern.matching`, which T006 changed.
 - [ ] T025 [US5] Check the Remote: `Remote/Sources/Projects/WorkflowPage.swift` and `WorkflowsSection.swift` show `workflow.summary` from AgentsKitCore, so they need no change. Build the Remote scheme for the generic simulator to confirm it compiles.
-- [ ] T026 [US5] Add `Packages/WebTypes/Overrides/EventPattern.ts` and `DetailFilter.ts`, then run `scripts/web.sh types`.
-- [ ] T027 [US5] In `Web/src/model/workflows.ts`, `triggerSummary`, `triggerFilters` and `causePhrase` read lists. Filters are said in words as in contracts/catalogue.md: labels, runtime, outcome, afterwards, started_by, and the reason and `by` codes. Add web tests under `Web/test/`.
-- [ ] T028 [US5] Rebuild the page with `scripts/web.sh build`, then run `scripts/web.sh check`.
+- [X] T026 [US5] Add `Packages/WebTypes/Overrides/EventPattern.ts` and `DetailFilter.ts`, then run `scripts/web.sh types`.
+- [X] T027 [US5] In `Web/src/model/workflows.ts`, `triggerSummary`, `triggerFilters` and `causePhrase` read lists. Filters are said in words as in contracts/catalogue.md: labels, runtime, outcome, afterwards, started_by, and the reason and `by` codes. Add web tests under `Web/test/`.
+- [X] T028 [US5] Rebuild the page with `scripts/web.sh build`, then run `scripts/web.sh check`.
 - [ ] T029 [US5] Add the 073 row to `specs/071-web-remote/walks/parity.md`.
 
 ## Phase 8: Docs, the walk, cleanup

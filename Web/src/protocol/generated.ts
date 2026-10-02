@@ -556,9 +556,15 @@ export interface Event {
 
 export type EventGroup = "agents" | "workflows" | "branches" | "mac" | "custom";
 
+/**
+ * EventPattern (Model/EventPattern.swift), as its encode(to:) writes it (073): `filters` holds
+ * every filter as one string, a list joined by `|` so an older build reads it as a value that
+ * never matches, and `anyOf` holds the lists whole. Read `anyOf` over `filters`.
+ */
 export interface EventPattern {
   name: string;
   filters: Record<string, string>;
+  anyOf?: Record<string, string[]>;
 }
 
 export interface EventPublisher {
@@ -1599,7 +1605,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: [] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message"] },
-  EventPattern: { required: ["name", "filters"], optional: [] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },
   EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },

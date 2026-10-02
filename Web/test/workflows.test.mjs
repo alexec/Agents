@@ -94,3 +94,33 @@ test("off says so in place of a next time, and in what is happening (#100)", () 
   const refused = { ...on, lastOutcome: { refused: { _0: { missedWhileClosed: {} }, at: 0, repeats: 2 } } };
   assert.equal(w.happening(refused), "Missed 2 times — the app was closed");
 });
+
+// Finer matching (073): filters in words, lists included, held to EventPatternFinerTests.swift's
+// summaries. The page names the event where the Mac says its meaning; the filters read the same.
+test("an event trigger's filters are said in the Mac's words, lists included", () => {
+  const runtime = (id) => ({ claude: "Claude", gemini: "Gemini", grok: "Grok" })[id];
+  const say = (name, keys) => w.triggerSummary(event(name, keys), runtime);
+  assert.equal(say("agent.finished", { labels: "bug", afterwards: "park" }), "When agent.finished (labelled bug, and parked)");
+  assert.equal(say("agent.finished", { outcome: ["done", "nothing_to_do"] }), "When agent.finished (done or nothing to do)");
+  assert.equal(say("agent.failed", { runtime: ["gemini", "grok"] }), "When agent.failed (on Gemini or Grok)");
+  assert.equal(say("agent.failed", { runtime: "claude", reason: ["allowance_spent", "rate_limited"] }),
+    "When agent.failed (its allowance ran out or rate limited, and still limited after retrying, on Claude)");
+  assert.equal(say("agent.*", { started_by: "workflow" }), "When agent.* (started by a workflow)");
+  assert.equal(say("agent.finished", { afterwards: "stay" }), "When agent.finished (not parked)");
+  assert.equal(say("agent.archived", { by: "you", labels: ["bug", "regression"] }),
+    "When agent.archived (by you, labelled bug or regression)");
+  assert.equal(say("workflow.completed", { workflow: "nightly", outcome: ["stuck", "partly_done"] }),
+    "When workflow.completed (stuck or partly done, workflow nightly)");
+  assert.equal(say("workflow.refused", { reason: "run_in_flight" }), "When workflow.refused (a run is still going)");
+  assert.equal(say("lease.released", { resource: "simulator", how: "expired" }),
+    "When lease.released (how expired, resource simulator)");
+  assert.equal(say("custom.ship", { labels: "bug" }), "When custom.ship (labels bug)");
+});
+
+test("a list is a capsule joined by | and a cause joined by |", () => {
+  const t = event("agent.finished", { outcome: ["done", "nothing_to_do"], labels: "bug" });
+  assert.deepEqual(w.triggerFilters(t), [["labels", "bug"], ["outcome", "done | nothing_to_do"]]);
+  assert.equal(w.causePhrase({ trigger: { _0: t } }), "on agent.finished labels bug outcome done|nothing_to_do");
+  // A value that is neither one value nor a list is not dropped into a wider trigger's words.
+  assert.deepEqual(w.triggerFilters(event("agent.finished", { outcome: { is: "done" } })), []);
+});
