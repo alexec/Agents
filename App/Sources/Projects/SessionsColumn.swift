@@ -101,6 +101,16 @@ struct SessionsColumn: View {
                 .help("Start a new session in this project (⌘N)")
                 .disabled(model.selectedProjectSummary == nil)
             }
+            // Here rather than on the project's own page, so it stays in reach with a
+            // session open (#97). A session's project is the selected one: opening an
+            // agent selects its project.
+            ToolbarItem {
+                Button { requests.projectSettings = .general } label: {
+                    Label("Project Settings", systemImage: "slider.horizontal.3")
+                }
+                .help("Project Settings (⌥⌘,)")
+                .disabled(model.selectedProjectSummary == nil)
+            }
             if picked.count > 1 {
                 ToolbarSpacer(.fixed)
                 ToolbarItem {

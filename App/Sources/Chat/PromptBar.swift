@@ -486,15 +486,16 @@ struct PromptBar: View {
             for provider in providers { paste(provider) }
         }
         .sheet(isPresented: $isPrimingDictation) { dictationPrimer.paperSheet() }
-        .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
-                                                 set: { if !$0 { dictation.dismissProblem() } })) {
+        // Held while open (#101): a second problem waits for this one's button.
+        .heldAlert({ _ in "Dictation" }, item: { dictation.problem },
+                   dismiss: { if dictation.problem?.id == $0.id { dictation.dismissProblem() } }) { problem in
             // Where a switch would fix it, offer to open the switch.
-            if let permission = dictation.problem?.permission {
+            if let permission = problem.permission {
                 Button("Open System Settings") { NSWorkspace.shared.open(permission.settings) }  // store-ok: System Settings, not a path
             }
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(dictation.problem?.message ?? "")
+        } message: { problem in
+            Text(problem.message)
         }
     }
 
@@ -1249,4 +1250,9 @@ private struct ScrollingChoices<Content: View>: View {
         }
         .frame(height: min(contentHeight, Self.tallest))
     }
+}
+
+/// One dictation problem from the next, for the alert that holds it (#101).
+extension Dictation.Problem: Identifiable {
+    var id: String { message }
 }

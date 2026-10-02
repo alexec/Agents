@@ -50,9 +50,9 @@ struct ArchiveSettingsSection: View {
                      + (model.hosts.isEmpty ? "" : " Each server keeps to the same settings."))
             }
             .paperListRow()
-            .alert("Retire archived agents now?", isPresented: Binding(get: { asking != nil },
-                                                                       set: { if !$0 { asking = nil } }),
-                   presenting: asking) { ask in
+            // Held while open (#101): a later change's answer waits for this one.
+            .heldAlert({ _ in "Retire archived agents now?" }, item: { asking },
+                       dismiss: { if asking?.id == $0.id { asking = nil } }) { ask in
                 Button("Retire", role: .destructive) {
                     Task { _ = await model.setRetention(ask.settings, confirmed: true) }
                 }
