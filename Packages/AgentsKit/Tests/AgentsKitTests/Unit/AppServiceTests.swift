@@ -96,7 +96,7 @@ struct AppServiceTests {
 
         let workflows = tools[2]["inputSchema"]
         #expect(workflows?["properties"]?["action"]?["enum"]?.arrayValue?
-            .compactMap { $0.stringValue } == ["list", "read", "write", "remove"])
+            .compactMap { $0.stringValue } == ["list", "read", "write", "remove", "enable", "disable"])
         // Only the action is required: `list` needs nothing else, which is the call an
         // agent makes first.
         #expect(workflows?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["action"])
