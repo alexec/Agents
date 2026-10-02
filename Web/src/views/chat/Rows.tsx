@@ -117,7 +117,6 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
         <button class="call-line" aria-expanded={onClick ? undefined : showsDetail}
           title={onClick ? "Show the whole run" : showsDetail ? "Hide the argument and the return" : "Show the argument and the return"}
           onClick={onClick ?? (() => (expanded.value = !expanded.value))}>
-          {hasDetail && !onClick && <span class="chevron" aria-hidden="true">{showsDetail ? "▾" : "▸"}</span>}
           {line}
         </button>
       ) : <p class="call-line">{line}</p>}

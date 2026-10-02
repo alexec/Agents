@@ -75,6 +75,22 @@ for (const scene of scenes) {
       await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "steps"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
       await shot("chat-steps");
       await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "outcome"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    } else if (scene === "margin") {
+      // #112: a turn's steps are a run of lines with no chevron; a step still opens. Takes the
+      // first session, so a root with one finished turn is enough.
+      await openProject();
+      await page.eval(`document.querySelector(".sessions .row.session .pick, .sessions .row.session")?.click()`);
+      await page.waitFor(`document.querySelector(".chat .transcript")`, 30_000);
+      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "steps"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+      await sleep(300);
+      say(`chevrons in the margin: ${await page.eval(`document.querySelectorAll(".turn .call-line .chevron").length`)}`);
+      await page.eval(`(() => {
+        const lines = [...document.querySelectorAll(".turn button.call-line")];
+        (lines.find((b) => b.textContent.includes("Read file")) ?? lines[0])?.click();
+      })()`);
+      say(`opened: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".turn button.call-line[aria-expanded=true]")].map((b) => b.textContent)`))}`);
+      await shot("margin");
+      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "outcome"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
     } else if (scene === "workflow") {
       // #98 triggers, next run, last fired; #100 Enabled switch and Turn Off/On.
       await openProject();
