@@ -63,14 +63,36 @@ public enum LeaseWords {
             + (isCapped ? capped : "")
     }
 
+    /// Who holds a resource, as a line is told it: "build is held by “A” until 14:05",
+    /// or for one more than one may hold, every place: "All 2 places on build are held:
+    /// by “A” until 14:05 and “B” until 14:20" (#116).
+    public static func heldBy(_ display: String, holders: [(name: String, until: Date)], places: Int) -> String {
+        guard places > 1, holders.count > 1 else {
+            let first = holders.first
+            return "\(display) is held by \(first?.name ?? "another agent") until \(clock(first?.until ?? Date()))"
+        }
+        let each = holders.map { "\($0.name) until \(clock($0.until))" }
+        let listed = each.count == 2 ? each.joined(separator: " and ")
+            : each.dropLast().joined(separator: ", ") + " and " + each[each.count - 1]
+        return "All \(places) places on \(display) are held: by \(listed)"
+    }
+
     public static func stillInLine(_ display: String, holder: String, until: Date, place: Int) -> String {
-        "\(display) is held by \(holder) until \(clock(until)). You are \(ordinal(place)) in line "
+        stillInLine(held: heldBy(display, holders: [(holder, until)], places: 1), place: place)
+    }
+
+    public static func stillInLine(held: String, place: Int) -> String {
+        "\(held). You are \(ordinal(place)) in line "
             + "and keep your place. Call lease_resource again to go on waiting, or end your turn "
             + "\u{2014} you will be started again when it is yours."
     }
 
     public static func refused(_ display: String, holder: String, until: Date) -> String {
-        "\(display) is held by \(holder) until \(clock(until)). You are not in line."
+        refused(held: heldBy(display, holders: [(holder, until)], places: 1))
+    }
+
+    public static func refused(held: String) -> String {
+        "\(held). You are not in line."
     }
 
     public static func stoppedWhileWaiting(_ display: String) -> String {
@@ -157,4 +179,19 @@ public enum LeaseWords {
         and take several in the same order every time. If you are told you are in line, you \
         may end your turn: you will be started again when it is yours.
         """
+
+    /// What the person declared, said after the briefing (#116): each resource with
+    /// its description, and the rule that goes with them. Nil when nothing is declared.
+    public static func declaredBriefing(_ declared: [DeclaredResource]) -> String? {
+        guard !declared.isEmpty else { return nil }
+        let lines = declared.map { "- \($0.displayName) (\(placesWords($0.holders))): \($0.description)" }
+        return "The person declared these resources on this machine. Lease one with lease_resource "
+            + "whenever its description applies to what you are about to do, and release it the moment "
+            + "you are done:\n" + lines.joined(separator: "\n")
+    }
+
+    /// "one at a time", "3 at once".
+    public static func placesWords(_ places: Int) -> String {
+        places == 1 ? "one at a time" : "\(places) at once"
+    }
 }

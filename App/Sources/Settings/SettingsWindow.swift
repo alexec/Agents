@@ -104,6 +104,7 @@ struct SettingsWindow: View {
         case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
+        case .resources: FormColumn { ResourcesSettingsView() }
         case .controlPlane:
             if let control { ControlSettingsView(control: control, page: $controlPage) }
         }
@@ -115,7 +116,7 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: String, Hashable, CaseIterable {
-    case general, runtimes, shared, spending, controlPlane
+    case general, runtimes, shared, spending, resources, controlPlane
 
     var title: String {
         switch self {
@@ -123,6 +124,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
+        case .resources: "Resources"
         case .controlPlane: "Control plane"
         }
     }
@@ -133,6 +135,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
+        case .resources: "lock"
         case .controlPlane: "point.3.connected.trianglepath.dotted"
         }
     }
@@ -141,7 +144,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// pages; the control plane, whose hosts are the servers and whose clients are the
     /// devices (058, frame D).
     static var groups: [[SettingsPane]] {
-        [[.general], [.runtimes, .spending], [.shared], [.controlPlane]]
+        [[.general], [.runtimes, .spending, .resources], [.shared], [.controlPlane]]
     }
 }
 

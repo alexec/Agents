@@ -231,6 +231,11 @@ public enum DaemonAPI {
         /// hold leases.
         public static let leasesEnd = "leases/end"
         public static let leasesRemoveWaiter = "leases/removeWaiter"
+        /// The person adding or changing a declared resource, and taking one away
+        /// (#116). A person's, never an agent's: an agent reads declarations in
+        /// `list_resources` and does not write them.
+        public static let resourcesDeclare = "resources/declare"
+        public static let resourcesRemove = "resources/remove"
         /// A folder's repository and its worktrees, for the start bar's chooser and the
         /// project page (030). Asked for when something is shown, never polled.
         public static let worktreesList = "worktrees/list"
@@ -2162,8 +2167,32 @@ public enum DaemonAPI {
         }
     }
 
-    /// The person ending whoever holds `name`.
+    /// The person ending a lease on `name`: the one `agentID` holds, or with none
+    /// named, every one (#116; before it there was only ever one).
     public struct PersonEndRequest: Codable, Sendable {
+        public var name: String
+        public var agentID: String?
+
+        public init(name: String, agentID: String? = nil) {
+            self.name = name
+            self.agentID = agentID
+        }
+    }
+
+    /// The person adding a declared resource, or changing one. `replacing` is the
+    /// name it had, when the change renames it.
+    public struct DeclareResourceRequest: Codable, Sendable {
+        public var resource: DeclaredResource
+        public var replacing: String?
+
+        public init(resource: DeclaredResource, replacing: String? = nil) {
+            self.resource = resource
+            self.replacing = replacing
+        }
+    }
+
+    /// The person taking a declared resource away. Anyone holding it keeps the lease.
+    public struct RemoveResourceRequest: Codable, Sendable {
         public var name: String
 
         public init(name: String) {
@@ -2207,21 +2236,79 @@ public enum DaemonAPI {
         public var displayName: String
         /// Leased, but no longer found on the Mac (spec, Edge Cases).
         public var isGone: Bool
-        public var lease: Lease?
+        /// Everyone holding it, in the order they got it (#116).
+        public var holds: [Lease]
+        /// How many may hold it at once.
+        public var places: Int
+        /// Set when the person declared it: its description and rules.
+        public var declared: DeclaredResource?
         public var line: [LineMember]
+        /// Whether any holder's lease is inside its warning window.
         public var endingSoon: Bool
+
+        /// The first holder. Still sent, so a client from before #116 draws the one.
+        public var lease: Lease? { holds.first }
 
         public var id: ResourceName { name }
 
         public init(name: ResourceName, kind: ResourceKind, displayName: String, isGone: Bool = false,
-                    lease: Lease? = nil, line: [LineMember] = [], endingSoon: Bool = false) {
+                    holds: [Lease] = [], places: Int = 1, declared: DeclaredResource? = nil,
+                    line: [LineMember] = [], endingSoon: Bool = false) {
             self.name = name
             self.kind = kind
             self.displayName = displayName
             self.isGone = isGone
-            self.lease = lease
+            self.holds = holds
+            self.places = places
+            self.declared = declared
             self.line = line
             self.endingSoon = endingSoon
+        }
+
+        public init(name: ResourceName, kind: ResourceKind, displayName: String, isGone: Bool = false,
+                    lease: Lease?, line: [LineMember] = [], endingSoon: Bool = false) {
+            self.init(name: name, kind: kind, displayName: displayName, isGone: isGone,
+                      holds: lease.map { [$0] } ?? [], line: line, endingSoon: endingSoon)
+        }
+
+        /// "2 of 3 held", for a resource more than one may hold; nil for one only one may.
+        public var heldCount: String? {
+            places > 1 ? "\(holds.count) of \(places) held" : nil
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case name, kind, displayName, isGone, holds, lease, places, declared, line, endingSoon
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try container.decode(ResourceName.self, forKey: .name)
+            kind = try container.decode(ResourceKind.self, forKey: .kind)
+            displayName = try container.decode(String.self, forKey: .displayName)
+            isGone = try container.decodeIfPresent(Bool.self, forKey: .isGone) ?? false
+            if let holds = try container.decodeIfPresent([Lease].self, forKey: .holds) {
+                self.holds = holds
+            } else {
+                holds = try container.decodeIfPresent(Lease.self, forKey: .lease).map { [$0] } ?? []
+            }
+            places = try container.decodeIfPresent(Int.self, forKey: .places) ?? 1
+            declared = try container.decodeIfPresent(DeclaredResource.self, forKey: .declared)
+            line = try container.decodeIfPresent([LineMember].self, forKey: .line) ?? []
+            endingSoon = try container.decodeIfPresent(Bool.self, forKey: .endingSoon) ?? false
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(name, forKey: .name)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(displayName, forKey: .displayName)
+            try container.encode(isGone, forKey: .isGone)
+            try container.encode(holds, forKey: .holds)
+            try container.encodeIfPresent(lease, forKey: .lease)
+            try container.encode(places, forKey: .places)
+            try container.encodeIfPresent(declared, forKey: .declared)
+            try container.encode(line, forKey: .line)
+            try container.encode(endingSoon, forKey: .endingSoon)
         }
     }
 

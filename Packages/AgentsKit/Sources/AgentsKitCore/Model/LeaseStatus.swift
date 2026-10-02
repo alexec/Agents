@@ -40,18 +40,20 @@ public struct LeaseStatus: Equatable, Sendable {
         var waiting: [Waiting] = []
         for state in snapshot.resources {
             let short = shortName(state.displayName, kind: state.kind)
-            if let lease = state.lease, lease.holder == agentID {
+            if let lease = state.holds.first(where: { $0.holder == agentID }) {
                 holding.append(Holding(
                     name: state.name, shortName: short, displayName: state.displayName,
                     expiresAt: lease.expiresAt,
                     minutesLeft: LeaseWords.minutesLeft(until: lease.expiresAt, now: snapshot.at),
-                    endingSoon: state.endingSoon))
+                    endingSoon: lease.isEndingSoon(at: snapshot.at)))
             }
             if let index = state.line.firstIndex(where: { $0.agentID == agentID }) {
+                // The place a waiter is waiting on is the lease that ends first.
+                let next = state.holds.min { $0.expiresAt < $1.expiresAt }
                 waiting.append(Waiting(
                     name: state.name, shortName: short, displayName: state.displayName,
-                    holderName: LeaseWords.agentName(state.lease.flatMap { titles[$0.holder] }),
-                    holder: state.lease?.holder, until: state.lease?.expiresAt, place: index + 1))
+                    holderName: LeaseWords.agentName(next.flatMap { titles[$0.holder] }),
+                    holder: next?.holder, until: next?.expiresAt, place: index + 1))
             }
         }
         guard !holding.isEmpty || !waiting.isEmpty else { return nil }

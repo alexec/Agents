@@ -40,9 +40,11 @@ extension DaemonCore {
             ? leaseBook.entry(resource.name)?.line.first { $0.agentID == caller.id }?.waitID
             : nil
         let events = leaseBook.request(resource.name, kind: resource.kind, displayName: resource.displayName,
+                                       rules: rules(for: resource.name),
                                        by: caller.id, minutes: request.minutes, wait: wait,
                                        waitID: waitID, now: now())
         let display = leaseBook.entry(resource.name)?.displayName ?? resource.displayName
+        let held = heldWords(resource.name, display: display)
 
         switch events.first {
         case .granted(let lease, _, let capped):
@@ -53,18 +55,17 @@ extension DaemonCore {
             leasesChanged()
             await settle(loaded + events)
             return told + LeaseWords.extended(lease, capped: capped)
-        case .refused(let holder, let until):
+        case .refused:
             await settle(loaded)
-            return told + LeaseWords.refused(display, holder: holderName(holder), until: until)
-        case .stillWaiting(let place, let holder, let until) where !wait:
+            return told + LeaseWords.refused(held: held)
+        case .stillWaiting(let place, _, _) where !wait:
             await settle(loaded)
-            return told + LeaseWords.stillInLine(display, holder: holderName(holder), until: until, place: place)
+            return told + LeaseWords.stillInLine(held: held, place: place)
         case .queued, .stillWaiting:
             guard let waitID else { return told }
             leasesChanged()
-            if let superseded, case .stillWaiting(let place, let holder, let until)? = events.first {
-                answer(superseded, .success(LeaseWords.stillInLine(display, holder: holderName(holder),
-                                                                   until: until, place: place)))
+            if let superseded, case .stillWaiting(let place, _, _)? = events.first {
+                answer(superseded, .success(LeaseWords.stillInLine(held: held, place: place)))
             }
             // Parked before anything is awaited, so a release arriving in the next
             // instant finds the call to answer rather than starting the agent again.
@@ -132,29 +133,48 @@ extension DaemonCore {
                 lines.append("- Holding \(lease.displayName) (\(lease.resource.key)) until \(LeaseWords.clock(lease.expiresAt)).")
             }
             for wait in waits {
-                guard let lease = wait.entry.lease else { continue }
-                lines.append("- Waiting for \(wait.entry.displayName) (\(wait.name.key)): held by "
-                             + "\(holderName(lease.holder)) until \(LeaseWords.clock(lease.expiresAt)), "
+                lines.append("- Waiting for \(wait.entry.displayName) (\(wait.name.key)): "
+                             + "\(heldWords(wait.name, display: wait.entry.displayName)); "
                              + "you are \(LeaseWords.ordinal(wait.place)).")
             }
             lines.append("")
         }
+        let states = buildLeaseSnapshot().resources
+        let declared = states.filter { $0.declared != nil }
+        if !declared.isEmpty {
+            lines.append("Declared by the person. Lease one whenever its description applies to what you "
+                         + "are about to do:")
+            for state in declared {
+                guard let declaration = state.declared else { continue }
+                lines.append("- \(state.name.key) (\(LeaseWords.placesWords(state.places))): "
+                             + "\(declaration.description) \u{2014} \(stateWords(state, caller: caller.id))")
+            }
+            lines.append("")
+        }
         lines.append("On this Mac:")
-        for state in buildLeaseSnapshot().resources {
+        for state in states where state.declared == nil {
             let label = state.kind == .named
                 ? "\(state.displayName) (named by an agent)"
                 : "\(state.name.key) \u{2014} \(state.displayName)"
-            var said = state.isGone ? " (gone from this Mac)" : ""
-            if let lease = state.lease {
-                let who = lease.holder == caller.id ? "you" : holderName(lease.holder)
-                said += ": held by \(who) until \(LeaseWords.clock(lease.expiresAt))"
-                said += state.line.isEmpty ? "." : "; \(state.line.count) waiting."
-            } else {
-                said += ": free."
-            }
-            lines.append("- \(label)\(said)")
+            let gone = state.isGone ? " (gone from this Mac)" : ""
+            lines.append("- \(label)\(gone): \(stateWords(state, caller: caller.id))")
         }
         return told + lines.joined(separator: "\n")
+    }
+
+    /// "free.", "held by you until 14:05.", "2 of 3 held: by you until 14:05 and
+    /// “Fix login” until 14:20; 1 waiting."
+    private func stateWords(_ state: DaemonAPI.ResourceState, caller: UUID) -> String {
+        guard !state.holds.isEmpty else {
+            return state.places > 1 ? "free (0 of \(state.places) held)." : "free."
+        }
+        let who = state.holds.map { lease in
+            (lease.holder == caller ? "you" : holderName(lease.holder)) + " until \(LeaseWords.clock(lease.expiresAt))"
+        }
+        let listed = who.count <= 2 ? who.joined(separator: " and ")
+            : who.dropLast().joined(separator: ", ") + " and " + who[who.count - 1]
+        let count = state.heldCount.map { "\($0): by " } ?? "held by "
+        return count + listed + (state.line.isEmpty ? "." : "; \(state.line.count) waiting.")
     }
 
     // MARK: The person's
@@ -175,10 +195,20 @@ extension DaemonCore {
         guard let name = ResourceName(request.name) else {
             throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused, message: "Say which resource to end.")
         }
-        let events = leaseBook.end(name, now: now())
+        var holder: UUID?
+        if let given = request.agentID?.trimmingCharacters(in: .whitespacesAndNewlines), !given.isEmpty {
+            guard let id = UUID(uuidString: given) else {
+                await settle(loaded)
+                throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused, message: "Say which agent's lease to end.")
+            }
+            holder = id
+        }
+        let events = leaseBook.end(name, holder: holder, now: now())
         guard !events.isEmpty else {
             await settle(loaded)
-            throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused, message: "Nobody holds \(request.name).")
+            throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused,
+                               message: holder == nil ? "Nobody holds \(request.name)."
+                                                      : "That agent does not hold \(request.name).")
         }
         leasesChanged()
         await settle(loaded + events)
@@ -204,6 +234,65 @@ extension DaemonCore {
         leasesChanged()
         if let openCall { answer(openCall, .success(LeaseWords.removedWhileWaiting(display))) }
         await settle(loaded + events)
+        return buildLeaseSnapshot()
+    }
+
+    // MARK: Declaring (#116)
+
+    /// The person adding a declared resource, or changing one. A changed count or
+    /// length applies to the book at once: more places let the line in, and fewer take
+    /// nothing from anyone holding it.
+    public func declareResource(_ request: DaemonAPI.DeclareResourceRequest) async throws -> DaemonAPI.LeaseSnapshot {
+        let loaded = loadLeasesIfNeeded()
+        var resource = request.resource
+        resource.displayName = resource.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        resource.description = resource.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let problem = resource.problem {
+            await settle(loaded)
+            throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused, message: problem)
+        }
+        let replacing = request.replacing.flatMap(ResourceName.init)
+        if resource.name != replacing, declaredResources.contains(where: { $0.name == resource.name }) {
+            await settle(loaded)
+            throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused,
+                               message: "\(resource.displayName) is declared already.")
+        }
+        var list = declaredResources.filter { $0.name != resource.name && $0.name != replacing }
+        list.append(resource)
+        list.sort { $0.name < $1.name }
+        do {
+            try declaredResourceStore.save(list)
+        } catch {
+            await settle(loaded)
+            throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused, message: "Could not save it: \(error.localizedDescription)")
+        }
+        declaredResources = list
+        DaemonLog.shared.write("resources: declared \(resource.name.key), \(resource.holders) at once")
+        let events = leaseBook.setRules(resource.rules, for: resource.name, now: now())
+        leasesChanged()
+        await settle(loaded + events)
+        return buildLeaseSnapshot()
+    }
+
+    /// The person taking a declaration away. Whoever holds it keeps the lease, under
+    /// the rules it had, and it is an ordinary named resource from then on.
+    public func removeDeclaredResource(_ request: DaemonAPI.RemoveResourceRequest) async throws -> DaemonAPI.LeaseSnapshot {
+        let loaded = loadLeasesIfNeeded()
+        guard let name = ResourceName(request.name), declaredResources.contains(where: { $0.name == name }) else {
+            await settle(loaded)
+            throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused, message: "\(request.name) is not declared.")
+        }
+        let list = declaredResources.filter { $0.name != name }
+        do {
+            try declaredResourceStore.save(list)
+        } catch {
+            await settle(loaded)
+            throw JSONRPCError(code: DaemonAPI.Failure.leaseRefused, message: "Could not save it: \(error.localizedDescription)")
+        }
+        declaredResources = list
+        DaemonLog.shared.write("resources: removed \(name.key)")
+        leasesChanged()
+        await settle(loaded)
         return buildLeaseSnapshot()
     }
 
@@ -263,8 +352,21 @@ extension DaemonCore {
         guard !leaseBookIsLoaded else { return [] }
         leaseBookIsLoaded = true
         leaseBook = leaseStore.load()
+        loadDeclaredIfNeeded()
         leaseBook.closeAllWaits()
-        return leaseBook.lapse(now: now())
+        // A count raised while the daemon was down lets the line in now.
+        var events: [LeaseEvent] = []
+        for declared in declaredResources {
+            events += leaseBook.setRules(declared.rules, for: declared.name, now: now())
+        }
+        return events + leaseBook.lapse(now: now())
+    }
+
+    /// What the person declared, the first time it is wanted.
+    func loadDeclaredIfNeeded() {
+        guard !declaredResourcesAreLoaded else { return }
+        declaredResourcesAreLoaded = true
+        declaredResources = declaredResourceStore.load()
     }
 
     /// Save, tell every window, and re-aim the timer. After every change.
@@ -282,7 +384,7 @@ extension DaemonCore {
     /// Once a minute while anything is held, the windows are told again, so the
     /// minutes left on a card count down without each window keeping its own clock.
     private func keepLeaseMinutesTicking() {
-        let anythingHeld = leaseBook.entries.values.contains { $0.lease != nil }
+        let anythingHeld = leaseBook.anythingHeld
         guard anythingHeld else {
             leaseMinuteTicker?.cancel()
             leaseMinuteTicker = nil
@@ -300,7 +402,7 @@ extension DaemonCore {
 
     /// One tick. False when there is nothing left to count down.
     private func tickLeaseMinutes() -> Bool {
-        guard leaseBook.entries.values.contains(where: { $0.lease != nil }) else {
+        guard leaseBook.anythingHeld else {
             leaseMinuteTicker = nil
             return false
         }
@@ -350,7 +452,7 @@ extension DaemonCore {
     /// its transcript says why.
     func wake(_ lease: Lease, askedAt: Date) async {
         let agentID = lease.holder
-        guard leaseBook.entry(lease.resource)?.lease?.holder == agentID else { return }
+        guard leaseBook.entry(lease.resource)?.lease(of: agentID) != nil else { return }
         await record(.runtimeNote(LeaseWords.noteLeased(lease)), for: agentID)
         let text = LeaseWords.wake(lease, askedAt: askedAt)
         var reason: String?
@@ -403,6 +505,10 @@ extension DaemonCore {
     private func resolveResource(_ given: String) async -> FoundResource? {
         let found = await resourceCatalog.found()
         foundResources = found
+        loadDeclaredIfNeeded()
+        if let name = ResourceName(given), let declared = declaredResources.first(where: { $0.name == name }) {
+            return FoundResource(name: name, kind: .named, displayName: declared.displayName)
+        }
         return await FixedCatalog(found).resolve(given)
     }
 
@@ -411,6 +517,19 @@ extension DaemonCore {
         let notices = leaseBook.takeNotices(for: agentID)
         guard !notices.isEmpty else { return "" }
         return notices.map(LeaseWords.notice).joined(separator: "\n") + "\n\n"
+    }
+
+    /// The rules a lease on `name` runs by: its declaration's, or the standard ones.
+    func rules(for name: ResourceName) -> LeaseRules {
+        declaredResources.first { $0.name == name }?.rules ?? .standard
+    }
+
+    /// Who holds `name`, as someone in its line is told it.
+    func heldWords(_ name: ResourceName, display: String) -> String {
+        let entry = leaseBook.entry(name)
+        let holders = (entry?.leases ?? []).sorted { $0.expiresAt < $1.expiresAt }
+            .map { (name: holderName($0.holder), until: $0.expiresAt) }
+        return LeaseWords.heldBy(display, holders: holders, places: entry?.rules.holders ?? 1)
     }
 
     func holderName(_ id: UUID) -> String {
@@ -429,16 +548,17 @@ extension DaemonCore {
     /// kept; the agent will be started when its turn comes.
     private func waitLimitReached(_ waitID: UUID) {
         guard openWaits[waitID] != nil else { return }
-        let display = leaseBook.names.lazy.compactMap { self.leaseBook.entry($0) }
-            .first { $0.line.contains { $0.waitID == waitID } }?.displayName ?? "It"
+        let name = leaseBook.names.first { name in
+            leaseBook.entry(name)?.line.contains { $0.waitID == waitID } == true
+        }
+        let display = name.flatMap { leaseBook.entry($0)?.displayName } ?? "It"
         let events = leaseBook.waitTimedOut(waitID)
         leasesChanged()
-        guard case .stillWaiting(let place, let holder, let until)? = events.first else {
+        guard case .stillWaiting(let place, _, _)? = events.first, let name else {
             answer(waitID, .success(LeaseWords.leftLine(display)))
             return
         }
-        answer(waitID, .success(LeaseWords.stillInLine(display, holder: holderName(holder),
-                                                       until: until, place: place)))
+        answer(waitID, .success(LeaseWords.stillInLine(held: heldWords(name, display: display), place: place)))
     }
 
     /// Answer a waiting call once. Taken out of the table first, so nothing can
@@ -453,16 +573,23 @@ extension DaemonCore {
         let at = now()
         var rows: [DaemonAPI.ResourceState] = []
         var drawn = Set<ResourceName>()
-        func row(_ name: ResourceName, kind: ResourceKind, display: String, gone: Bool) -> DaemonAPI.ResourceState {
+        func row(_ name: ResourceName, kind: ResourceKind, display: String, gone: Bool,
+                 declared: DeclaredResource? = nil) -> DaemonAPI.ResourceState {
             let entry = leaseBook.entry(name)
+            let holds = entry?.leases ?? []
             return DaemonAPI.ResourceState(
-                name: name, kind: kind, displayName: entry?.displayName ?? display, isGone: gone,
-                lease: entry?.lease,
+                name: name, kind: kind, displayName: declared?.displayName ?? entry?.displayName ?? display,
+                isGone: gone, holds: holds,
+                places: declared?.holders ?? entry?.rules.holders ?? 1, declared: declared,
                 line: entry?.line.map { DaemonAPI.LineMember(agentID: $0.agentID, askedAt: $0.askedAt,
                                                              isCallOpen: $0.isCallOpen && openWaits[$0.waitID!] != nil) } ?? [],
-                endingSoon: entry?.lease?.isEndingSoon(at: at) ?? false)
+                endingSoon: holds.contains { $0.isEndingSoon(at: at) })
         }
-        for found in foundResources ?? [] {
+        for declared in declaredResources {
+            rows.append(row(declared.name, kind: .named, display: declared.displayName, gone: false, declared: declared))
+            drawn.insert(declared.name)
+        }
+        for found in foundResources ?? [] where !drawn.contains(found.name) {
             rows.append(row(found.name, kind: found.kind, display: found.displayName, gone: false))
             drawn.insert(found.name)
         }
@@ -471,9 +598,11 @@ extension DaemonCore {
             let gone = entry.kind != .named && foundResources != nil
             rows.append(row(name, kind: entry.kind, display: entry.displayName, gone: gone))
         }
+        // Declared first, then by kind, then as Finder sorts names: "iPhone 9" before
+        // "iPhone 17".
         let order: [ResourceKind: Int] = [.screen: 0, .simulator: 1, .browser: 2, .named: 3]
-        // By kind, then as Finder sorts names: "iPhone 9" before "iPhone 17".
         rows.sort {
+            if ($0.declared == nil) != ($1.declared == nil) { return $0.declared != nil }
             let (a, b) = (order[$0.kind] ?? 9, order[$1.kind] ?? 9)
             if a != b { return a < b }
             switch $0.displayName.localizedStandardCompare($1.displayName) {

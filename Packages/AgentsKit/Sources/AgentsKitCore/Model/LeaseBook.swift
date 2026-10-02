@@ -4,8 +4,9 @@ import Foundation
 ///
 /// A value, not an actor. Each change is a mutating call that takes the time and says
 /// what happened, and nothing here awaits: that is what lets the daemon's actor be the
-/// whole of the lock, and what lets "never two holders" (SC-001) be tested as a
-/// property of one function rather than by racing a daemon.
+/// whole of the lock, and what lets "never more holders than allowed" (SC-001, and
+/// #116's counted ones) be tested as a property of one function rather than by
+/// racing a daemon.
 ///
 /// The daemon applies what comes back — saying it in transcripts, answering the calls
 /// that were waiting, starting the agents that were not — and nothing in here knows
@@ -14,16 +15,64 @@ public struct LeaseBook: Codable, Hashable, Sendable {
     public struct Entry: Codable, Hashable, Sendable {
         public var kind: ResourceKind
         public var displayName: String
-        public var lease: Lease?
-        /// In asking order. Empty whenever `lease` is nil: a free resource with a line
-        /// would be one somebody forgot to hand on.
+        /// Everyone holding it, in the order they got it. At most `rules.holders`, unless
+        /// the person lowered the count while more held it: those keep their leases, and
+        /// nobody new gets one until the count is under again (#116).
+        public var leases: [Lease]
+        /// In asking order. Empty whenever there is room: a resource with a free place
+        /// and a line would be one somebody forgot to hand on.
         public var line: [Waiter]
+        /// How many may hold it and for how long. The standard ones unless the person
+        /// declared it otherwise.
+        public var rules: LeaseRules
 
-        public init(kind: ResourceKind, displayName: String, lease: Lease? = nil, line: [Waiter] = []) {
+        public init(kind: ResourceKind, displayName: String, leases: [Lease] = [], line: [Waiter] = [],
+                    rules: LeaseRules = .standard) {
             self.kind = kind
             self.displayName = displayName
-            self.lease = lease
+            self.leases = leases
             self.line = line
+            self.rules = rules
+        }
+
+        public init(kind: ResourceKind, displayName: String, lease: Lease?, line: [Waiter] = []) {
+            self.init(kind: kind, displayName: displayName, leases: lease.map { [$0] } ?? [], line: line)
+        }
+
+        /// The first holder: the one holder of a resource only one may hold.
+        public var lease: Lease? { leases.first }
+
+        /// Every place taken.
+        public var isFull: Bool { leases.count >= rules.holders }
+
+        /// The lease that ends first: what someone in line is waiting on.
+        public var nextToEnd: Lease? { leases.min { $0.expiresAt < $1.expiresAt } }
+
+        public func lease(of agent: UUID) -> Lease? { leases.first { $0.holder == agent } }
+
+        private enum CodingKeys: String, CodingKey { case kind, displayName, leases, lease, line, rules }
+
+        /// A book written before #116 has one `lease` and no rules.
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try container.decode(ResourceKind.self, forKey: .kind)
+            displayName = try container.decode(String.self, forKey: .displayName)
+            if let leases = try container.decodeIfPresent([Lease].self, forKey: .leases) {
+                self.leases = leases
+            } else {
+                leases = try container.decodeIfPresent(Lease.self, forKey: .lease).map { [$0] } ?? []
+            }
+            line = try container.decodeIfPresent([Waiter].self, forKey: .line) ?? []
+            rules = try container.decodeIfPresent(LeaseRules.self, forKey: .rules) ?? .standard
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(displayName, forKey: .displayName)
+            try container.encode(leases, forKey: .leases)
+            try container.encode(line, forKey: .line)
+            try container.encode(rules, forKey: .rules)
         }
     }
 
@@ -46,54 +95,74 @@ public struct LeaseBook: Codable, Hashable, Sendable {
     /// only be let through by a daemon that is running (research R10).
     public var hasWaiters: Bool { entries.values.contains { !$0.line.isEmpty } }
 
+    /// Whether anyone holds anything.
+    public var anythingHeld: Bool { entries.values.contains { !$0.leases.isEmpty } }
+
     // MARK: Asking
 
     /// An agent asking for a resource.
     ///
-    /// Free: granted. Its own: extended, never a second lease and never a wait on
-    /// itself (US1-AS4). Someone else's: in line at the back, or refused with `wait`
-    /// false. Already in line: its place, unchanged, with the new call's id.
+    /// A place free: granted. Its own: extended, never a second lease and never a wait
+    /// on itself (US1-AS4). Every place taken: in line at the back, or refused with
+    /// `wait` false. Already in line: its place, unchanged, with the new call's id.
+    ///
+    /// `rules` are used for a resource the book does not have yet; one it has keeps
+    /// its own, which `setRules` changes.
     public mutating func request(_ name: ResourceName, kind: ResourceKind, displayName: String,
+                                 rules: LeaseRules = .standard,
                                  by agent: UUID, minutes: Int?, wait: Bool, waitID: UUID?,
                                  now: Date) -> [LeaseEvent] {
-        var entry = entries[name] ?? Entry(kind: kind, displayName: displayName)
+        var entry = entries[name] ?? Entry(kind: kind, displayName: displayName, rules: rules)
         defer { store(entry, at: name) }
-        let (length, capped) = Self.length(minutes)
+        let (length, capped) = entry.rules.length(minutes)
 
-        guard var lease = entry.lease else {
-            let lease = Lease(resource: name, displayName: entry.displayName, holder: agent,
-                              grantedAt: now, expiresAt: now.addingTimeInterval(length))
-            entry.lease = lease
-            return [.granted(lease, waiter: nil, capped: capped)]
-        }
-        if lease.holder == agent {
+        if let index = entry.leases.firstIndex(where: { $0.holder == agent }) {
+            var lease = entry.leases[index]
             // Forward only. An extension asking for less than is left is not a way to
             // shorten a lease, and must not be one by accident.
             let wanted = max(lease.expiresAt, now.addingTimeInterval(length))
-            let ceiling = now.addingTimeInterval(Self.maximum)
+            let ceiling = now.addingTimeInterval(TimeInterval(entry.rules.ceiling * 60))
             lease.expiresAt = min(wanted, ceiling)
             lease.warned = false
-            entry.lease = lease
+            entry.leases[index] = lease
             return [.extended(lease, capped: capped || wanted > ceiling)]
         }
+        if !entry.isFull && entry.line.isEmpty {
+            let lease = Lease(resource: name, displayName: entry.displayName, holder: agent,
+                              grantedAt: now, expiresAt: now.addingTimeInterval(length))
+            entry.leases.append(lease)
+            return [.granted(lease, waiter: nil, capped: capped)]
+        }
+        let next = entry.nextToEnd
+        let (holder, until) = (next?.holder ?? agent, next?.expiresAt ?? now)
         if let index = entry.line.firstIndex(where: { $0.agentID == agent }) {
             if wait { entry.line[index].waitID = waitID }
-            return [.stillWaiting(place: index + 1, holder: lease.holder, until: lease.expiresAt)]
+            return [.stillWaiting(place: index + 1, holder: holder, until: until)]
         }
         guard wait else {
-            return [.refused(holder: lease.holder, until: lease.expiresAt)]
+            return [.refused(holder: holder, until: until)]
         }
         entry.line.append(Waiter(agentID: agent, askedAt: now, minutes: minutes, waitID: waitID))
-        return [.queued(place: entry.line.count, holder: lease.holder, until: lease.expiresAt)]
+        return [.queued(place: entry.line.count, holder: holder, until: until)]
+    }
+
+    /// The person changing how many may hold a resource, or how long for (#116). More
+    /// places let the line in at once; fewer take nothing from those holding it.
+    public mutating func setRules(_ rules: LeaseRules, for name: ResourceName, now: Date) -> [LeaseEvent] {
+        guard var entry = entries[name], entry.rules != rules else { return [] }
+        entry.rules = rules
+        let events = handOn(&entry, name: name, now: now)
+        store(entry, at: name)
+        return events
     }
 
     // MARK: Letting go
 
-    /// The holder giving a lease back, or a waiter leaving the line.
+    /// A holder giving its lease back, or a waiter leaving the line.
     public mutating func release(_ name: ResourceName, by agent: UUID, now: Date) -> [LeaseEvent] {
         guard var entry = entries[name] else { return [.nothingHeld] }
-        if let lease = entry.lease, lease.holder == agent {
-            entry.lease = nil
+        if let index = entry.leases.firstIndex(where: { $0.holder == agent }) {
+            let lease = entry.leases.remove(at: index)
             var events: [LeaseEvent] = [.released(lease, .released)]
             events += handOn(&entry, name: name, now: now)
             store(entry, at: name)
@@ -107,14 +176,20 @@ public struct LeaseBook: Codable, Hashable, Sendable {
         return [.nothingHeld]
     }
 
-    /// The person ending whoever holds it. The holder is told at its next lease call,
-    /// never interrupted (US4-AS2). Nothing when nobody holds it.
-    public mutating func end(_ name: ResourceName, now: Date) -> [LeaseEvent] {
-        guard var entry = entries[name], let lease = entry.lease else { return [] }
-        entry.lease = nil
-        leave(LeaseNotice(resource: name, displayName: lease.displayName, kind: .endedByPerson, at: now),
-              for: lease.holder)
-        var events: [LeaseEvent] = [.released(lease, .endedByPerson)]
+    /// The person ending a lease: one holder's, or with no holder named, every one. The
+    /// holder is told at its next lease call, never interrupted (US4-AS2). Nothing when
+    /// nobody (or not that agent) holds it.
+    public mutating func end(_ name: ResourceName, holder: UUID? = nil, now: Date) -> [LeaseEvent] {
+        guard var entry = entries[name] else { return [] }
+        let ending = entry.leases.filter { holder == nil || $0.holder == holder }
+        guard !ending.isEmpty else { return [] }
+        entry.leases.removeAll { holder == nil || $0.holder == holder }
+        var events: [LeaseEvent] = []
+        for lease in ending {
+            leave(LeaseNotice(resource: name, displayName: lease.displayName, kind: .endedByPerson, at: now),
+                  for: lease.holder)
+            events.append(.released(lease, .endedByPerson))
+        }
         events += handOn(&entry, name: name, now: now)
         store(entry, at: name)
         return events
@@ -143,8 +218,9 @@ public struct LeaseBook: Codable, Hashable, Sendable {
             store(entry, at: name)
         }
         for name in names {
-            guard var entry = entries[name], let lease = entry.lease, lease.holder == agent else { continue }
-            entry.lease = nil
+            guard var entry = entries[name], let index = entry.leases.firstIndex(where: { $0.holder == agent })
+            else { continue }
+            let lease = entry.leases.remove(at: index)
             events.append(.released(lease, ending))
             events += handOn(&entry, name: name, now: now)
             store(entry, at: name)
@@ -156,8 +232,9 @@ public struct LeaseBook: Codable, Hashable, Sendable {
     /// A lease that reached an agent which could not be started to use it (research
     /// R4). Given up for it, and handed on.
     public mutating func giveUp(_ name: ResourceName, heldBy agent: UUID, now: Date) -> [LeaseEvent] {
-        guard var entry = entries[name], let lease = entry.lease, lease.holder == agent else { return [] }
-        entry.lease = nil
+        guard var entry = entries[name], let index = entry.leases.firstIndex(where: { $0.holder == agent })
+        else { return [] }
+        let lease = entry.leases.remove(at: index)
         var events: [LeaseEvent] = [.released(lease, .couldNotStart)]
         events += handOn(&entry, name: name, now: now)
         store(entry, at: name)
@@ -174,8 +251,8 @@ public struct LeaseBook: Codable, Hashable, Sendable {
                   let index = entry.line.firstIndex(where: { $0.waitID == waitID }) else { continue }
             entry.line[index].waitID = nil
             store(entry, at: name)
-            guard let lease = entry.lease else { return [] }
-            return [.stillWaiting(place: index + 1, holder: lease.holder, until: lease.expiresAt)]
+            guard let next = entry.nextToEnd else { return [] }
+            return [.stillWaiting(place: index + 1, holder: next.holder, until: next.expiresAt)]
         }
         return []
     }
@@ -196,21 +273,26 @@ public struct LeaseBook: Codable, Hashable, Sendable {
     public mutating func lapse(now: Date) -> [LeaseEvent] {
         var events: [LeaseEvent] = []
         for name in names {
-            guard var entry = entries[name], var lease = entry.lease else { continue }
-            if lease.expiresAt <= now {
-                entry.lease = nil
-                leave(LeaseNotice(resource: name, displayName: lease.displayName, kind: .expired, at: now),
-                      for: lease.holder)
-                events.append(.released(lease, .expired))
-                events += handOn(&entry, name: name, now: now)
-            } else if !lease.warned, lease.isEndingSoon(at: now) {
-                lease.warned = true
-                entry.lease = lease
-                leave(LeaseNotice(resource: name, displayName: lease.displayName,
-                                  kind: .endingSoon(expiresAt: lease.expiresAt), at: now),
-                      for: lease.holder)
-                events.append(.warned(lease))
+            guard var entry = entries[name], !entry.leases.isEmpty else { continue }
+            var kept: [Lease] = []
+            for var lease in entry.leases {
+                if lease.expiresAt <= now {
+                    leave(LeaseNotice(resource: name, displayName: lease.displayName, kind: .expired, at: now),
+                          for: lease.holder)
+                    events.append(.released(lease, .expired))
+                    continue
+                }
+                if !lease.warned, lease.isEndingSoon(at: now) {
+                    lease.warned = true
+                    leave(LeaseNotice(resource: name, displayName: lease.displayName,
+                                      kind: .endingSoon(expiresAt: lease.expiresAt), at: now),
+                          for: lease.holder)
+                    events.append(.warned(lease))
+                }
+                kept.append(lease)
             }
+            entry.leases = kept
+            events += handOn(&entry, name: name, now: now)
             store(entry, at: name)
         }
         return events
@@ -219,7 +301,7 @@ public struct LeaseBook: Codable, Hashable, Sendable {
     /// When `lapse` next has something to do: the earliest expiry or unwarned warning
     /// time. Nil when nothing is held.
     public var nextDeadline: Date? {
-        entries.values.compactMap(\.lease).flatMap { lease -> [Date] in
+        entries.values.flatMap(\.leases).flatMap { lease -> [Date] in
             lease.warned ? [lease.expiresAt]
                          : [lease.expiresAt, lease.expiresAt.addingTimeInterval(-LeaseLimits.warning)]
         }.min()
@@ -236,7 +318,7 @@ public struct LeaseBook: Codable, Hashable, Sendable {
 
     /// The leases an agent holds, by name.
     public func held(by agent: UUID) -> [Lease] {
-        names.compactMap { entries[$0]?.lease }.filter { $0.holder == agent }
+        names.compactMap { entries[$0]?.lease(of: agent) }
     }
 
     /// The lines an agent is in, with its place in each.
@@ -250,32 +332,31 @@ public struct LeaseBook: Codable, Hashable, Sendable {
 
     // MARK: Inside
 
-    private static let maximum = TimeInterval(LeaseLimits.maximumMinutes * 60)
-
-    /// The length asked for, in seconds, and whether it had to be cut to the longest
-    /// allowed. Nothing shorter than a minute.
+    /// The length asked for under the standard rules, in seconds, and whether it had
+    /// to be cut to the longest allowed.
     static func length(_ minutes: Int?) -> (TimeInterval, capped: Bool) {
-        let asked = max(1, minutes ?? LeaseLimits.defaultMinutes)
-        let given = min(asked, LeaseLimits.maximumMinutes)
-        return (TimeInterval(given * 60), asked > given)
+        LeaseRules.standard.length(minutes)
     }
 
-    /// The next in line, if there is one, gets it — for what it asked, from now.
+    /// The next in line, while there is a place, gets one — for what it asked, from now.
     private func handOn(_ entry: inout Entry, name: ResourceName, now: Date) -> [LeaseEvent] {
-        guard entry.lease == nil, !entry.line.isEmpty else { return [] }
-        let next = entry.line.removeFirst()
-        let (length, capped) = Self.length(next.minutes)
-        let lease = Lease(resource: name, displayName: entry.displayName, holder: next.agentID,
-                          grantedAt: now, expiresAt: now.addingTimeInterval(length))
-        entry.lease = lease
-        return [.granted(lease, waiter: next, capped: capped)]
+        var events: [LeaseEvent] = []
+        while !entry.isFull, !entry.line.isEmpty {
+            let next = entry.line.removeFirst()
+            let (length, capped) = entry.rules.length(next.minutes)
+            let lease = Lease(resource: name, displayName: entry.displayName, holder: next.agentID,
+                              grantedAt: now, expiresAt: now.addingTimeInterval(length))
+            entry.leases.append(lease)
+            events.append(.granted(lease, waiter: next, capped: capped))
+        }
+        return events
     }
 
     /// An entry with nobody holding it and nobody waiting is not kept: the page draws
-    /// found resources from the catalog, and a named one ends when nobody wants it
-    /// (US6-AS2).
+    /// found and declared resources from their own lists, and a named one ends when
+    /// nobody wants it (US6-AS2).
     private mutating func store(_ entry: Entry, at name: ResourceName) {
-        entries[name] = entry.lease == nil && entry.line.isEmpty ? nil : entry
+        entries[name] = entry.leases.isEmpty && entry.line.isEmpty ? nil : entry
     }
 
     private mutating func leave(_ notice: LeaseNotice, for agent: UUID) {
@@ -284,7 +365,8 @@ public struct LeaseBook: Codable, Hashable, Sendable {
 }
 
 /// What a change to the book did. The daemon turns each into words, an answer to a
-/// waiting call, or a start.
+/// waiting call, or a start. Where a line is said, `holder` and `until` are the lease
+/// that ends first: the place the waiter is waiting on.
 public enum LeaseEvent: Hashable, Sendable {
     /// `waiter` is set when it came from the line; its `waitID` says whether that call
     /// is still open to be answered, or the agent has to be started.

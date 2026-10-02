@@ -444,6 +444,15 @@ export interface CostState {
   day: string;
 }
 
+export interface DeclaredResource {
+  name: ResourceName;
+  displayName: string;
+  description: string;
+  holders: number;
+  defaultMinutes?: number;
+  maximumMinutes?: number;
+}
+
 export type DeviceKind = "iPhone" | "iPad" | "unknown";
 
 export interface DiffLine {
@@ -928,12 +937,21 @@ export type ResourceKind = "screen" | "simulator" | "browser" | "named";
 /** ResourceName (Model/Lease.swift): the name, trimmed and lower-cased, as a single string. */
 export type ResourceName = string & { readonly __brand: "ResourceName" };
 
+// uses: Lease, LineMember, DeclaredResource, ResourceKind, ResourceName
+/**
+ * ResourceState (Daemon/DaemonAPI.swift), as its encode(to:) writes it (#116): every holder in
+ * `holds`, and the first again as `lease` for a reader from before counted holders. A host from
+ * before #116 sends only `lease`, so `holds`, `places` and `declared` may be missing.
+ */
 export interface ResourceState {
   name: ResourceName;
   kind: ResourceKind;
   displayName: string;
   isGone: boolean;
+  holds?: Lease[];
   lease?: Lease;
+  places?: number;
+  declared?: DeclaredResource;
   line: LineMember[];
   endingSoon: boolean;
 }
@@ -1591,6 +1609,7 @@ export interface Notifications {
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
   "files/changed": FilesChangedNotification;
+  "leases/changed": LeaseSnapshot;
   "modes/changed": Record<string, JSONValue>;
   "project/changed": ProjectSummary;
   "storage/writeFailed": WriteFailure;
@@ -1636,6 +1655,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: [] },
+  DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
   DirectoryListing: { required: ["url", "entries", "omitted"], optional: [] },
@@ -1691,7 +1711,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface"] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
-  ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["lease"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: [] },

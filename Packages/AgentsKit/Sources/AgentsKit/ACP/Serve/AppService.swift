@@ -1406,7 +1406,10 @@ public actor AppService {
             yours after that, you keep your place in line. You can call this again to go \
             on waiting, or end your turn, and you will be started again when it is yours. \
             Take several resources in the same order every time. Use list_resources to \
-            see the names.
+            see the names. The person may have declared resources, such as "build", each \
+            with a description of when to take it and how many agents may hold it at \
+            once: lease a declared resource whenever its description applies to what you \
+            are about to do.
             """,
         "inputSchema": [
             "type": "object",
@@ -1420,7 +1423,7 @@ public actor AppService {
                 ],
                 "minutes": [
                     "type": "integer",
-                    "description": "How long. Default 30, at most 240.",
+                    "description": "How long. Default 30, at most 240, unless the resource was declared with its own.",
                 ],
                 "wait": [
                     "type": "boolean",
@@ -1455,7 +1458,9 @@ public actor AppService {
         "title": "List shared resources",
         "description": """
             List what can be leased on this Mac and who holds what, with your own leases \
-            and waits first.
+            and waits first. Resources the person declared come next, with a description \
+            of when to lease each: whenever one applies to what you are about to do, lease \
+            it with lease_resource first.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
     ]

@@ -72,6 +72,12 @@
 | Settings ▸ Control plane: "Couldn't join the control plane: … Trying again…" for this Mac's host (2026-10-02) | #113 | by design | by design | — | — | A Settings row; the page has no Settings. `control/status` carries `thisMacHost` and the page's types have it, unused. |
 | No chevron on a turn's margin lines (2026-10-02) | #112 | has the chevron (▸/▾ on every call line that opens, in a turn and out) | **has** | `before112-margin.png`, `after112-margin.png` | `window/112-before-steps.png`, `window/112-after-steps.png`, `window/112-after-details.png` | Walked at ec46210e on `/tmp/run-i112b` (one real Claude turn), in headless Chrome (the `margin` scene of `parity.mjs`: 6 chevrons before, 0 after; "Read file" still opens) and the window by window id over AX. A step is a plain line in the margin on both; an open call's detail sits under its line. "Hide steps" keeps its chevron. |
 
+## Since this walk
+
+| Change | Issue | Page | Notes |
+|---|---|---|---|
+| Declared resources with descriptions, counted holders ("2 of 3 held") | #116 | **has**, read-only | A **Resources** fold under each host lists the declared resources with their descriptions and "2 of 3 held", each holder, and anything else held or awaited; kept by `leases/changed` (added to `WebSignatures`). **web: by design** for declaring, editing and ending leases: they are the Mac's (Settings ▸ Resources, the Resources page), as on the Remote. |
+
 ## Left out by design
 
 - Settings, Project Settings and helper limits.
@@ -79,6 +85,7 @@
 - Dictation.
 - Approving a workflow, and changing a workflow's settings: the page says "approve it on the Mac", and shows the settings only in the workflow's one-line summary.
 - HTML as a live page.
+- Declaring, editing and removing resources, and ending leases (#116): the Mac's.
 
 ## Counts
 

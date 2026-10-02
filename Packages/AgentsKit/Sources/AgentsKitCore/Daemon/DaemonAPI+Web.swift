@@ -130,6 +130,8 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 // A write nobody was waiting on that the host could not keep (#88).
                 Row(Notification.writeFailed, params: WriteFailure.self, result: Empty.self, kind: .hostNotification),
+                // Who holds what, for the page's read-only Resources list (#116).
+                Row(Notification.leasesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
                 // An ad-hoc dictionary from ControlRouter.describe.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
             ]

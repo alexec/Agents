@@ -42,6 +42,20 @@ it runs out, you end it, or the agent is stopped or archived. That way an agent 
 simulator across a pause without losing its place. The lease also survives the app
 restarting, with the same end time.
 
+## Declared resources, and more than one holder
+
+Some things agents should take turns with are not on the screen at all. A Mac can only
+take so many builds at once, and a test database can only be reset by one agent at a
+time. You can declare a resource like that in **Settings ▸ Resources**, with a description
+of when to take it, for example **build**: "Lease before any xcodebuild, swift build,
+swift test, scripts/web.sh build or ship.sh; release as soon as it ends." Agents see
+declared resources in `list_resources` and in their briefing, even while nobody holds them,
+and are told to lease one whenever its description applies.
+
+A declared resource can allow more than one holder: "build: 2 at once" lets two agents
+compile while the rest wait in line. Up to that many agents hold it together; the next one
+waits, and gets the first place to come free. Any other resource has one holder.
+
 ## Waiting in line
 
 If another agent holds the resource, the asking agent joins a line and waits. When the
@@ -64,8 +78,9 @@ every resource, whether it is free, who holds it and since when, when the lease 
 and who is waiting, in order. Each agent's chat has a line saying what it holds and what
 it is waiting for, and its card on the project page says the same briefly.
 
-On iPhone and iPad, the chat and the card show the same leases and waits. The Resources
-page is on the Mac only.
+On iPhone and iPad, the chat and the card show the same leases and waits, and
+**Resources** under **Activity** lists the declared resources and anything held, read-only.
+The web page lists them under each host. Declaring, and ending leases, are on the Mac.
 
 ## What you can end
 

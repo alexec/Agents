@@ -33,3 +33,30 @@ public struct LeaseStore: Sendable {
         try data.write(to: locations.leases, options: .atomic)
     }
 }
+
+/// The resources the person declared (#116), kept on the same pattern: one small file,
+/// read and written whole. One that cannot be read is set aside, and nothing is
+/// declared until the person declares it again.
+public struct DeclaredResourceStore: Sendable {
+    private let locations: StoreLocations
+
+    public init(locations: StoreLocations) {
+        self.locations = locations
+    }
+
+    public func load() -> [DeclaredResource] {
+        guard let data = try? Data(contentsOf: locations.declaredResources) else { return [] }
+        guard let list = try? StoreCoding.decoder.decode([DeclaredResource].self, from: data) else {
+            StoreCoding.setAside(locations.declaredResources)
+            DaemonLog.shared.write("resources.json could not be read; set aside, nothing declared")
+            return []
+        }
+        return list
+    }
+
+    public func save(_ list: [DeclaredResource]) throws {
+        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        let data = try StoreCoding.encoder.encode(list)
+        try data.write(to: locations.declaredResources, options: .atomic)
+    }
+}

@@ -17,14 +17,17 @@ struct ResourcesView: View {
     /// Groups whose free rows are all showing. A Mac with Xcode has twenty-odd
     /// simulators, and a page that lists every free one pushes the browsers below the
     /// fold for no reason: what anyone comes here to see is what is held.
-    @State private var unfolded: Set<ResourceKind> = []
+    @State private var unfolded: Set<String> = []
     private static let freeShown = 4
 
     /// The page's groups, always in this order. A group with nothing in it is not
     /// drawn: a Mac without Xcode has no simulators, and names only exist while leased.
+    /// Declared ones come first, free or held, with what each is for (#116).
     private var groups: [(title: String, rows: [DaemonAPI.ResourceState])] {
-        [("Screen", .screen), ("Simulators", .simulator), ("Browsers", .browser), ("Named by agents", .named)]
-            .map { title, kind in (title, snapshot.resources.filter { $0.kind == kind }) }
+        [("Declared", snapshot.resources.filter { $0.declared != nil })]
+            + [("Screen", ResourceKind.screen), ("Simulators", .simulator), ("Browsers", .browser),
+               ("Named by agents", .named)]
+            .map { title, kind in (title, snapshot.resources.filter { $0.kind == kind && $0.declared == nil }) }
             .filter { !$0.rows.isEmpty }
     }
 
@@ -32,25 +35,31 @@ struct ResourcesView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Things on this Mac that one agent uses at a time. A lease is an agreement "
-                         + "between agents, not a lock.")
-                        .appText(.supporting)
-                        .foregroundStyle(.secondary)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Things on this Mac that agents take turns with. A lease is an agreement "
+                             + "between agents, not a lock.")
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        SettingsLink { Text("Declare in Settings\u{2026}") }
+                            .simultaneousGesture(TapGesture().onEnded { model.settingsPaneAsked = .resources })
+                            .appText(.fine)
+                    }
                     ForEach(groups, id: \.title) { group in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(group.title.uppercased())
                                 .appText(.fine).fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
-                            let (shown, folded) = fold(group.rows)
+                            let (shown, folded) = fold(group.rows, group: group.title)
                             VStack(spacing: 0) {
                                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, state in
                                     if index > 0 { Divider().padding(.leading, 32) }
                                     ResourceRow(state: state, at: snapshot.at)
                                         .id(state.name)
                                 }
-                                if folded > 0, let kind = group.rows.first?.kind {
+                                if folded > 0 {
                                     Divider().padding(.leading, 32)
-                                    Button("Show \(folded) more free") { unfolded.insert(kind) }
+                                    Button("Show \(folded) more free") { unfolded.insert(group.title) }
                                         .buttonStyle(.plain)
                                         .appText(.fine)
                                         .foregroundStyle(.secondary)
@@ -76,11 +85,12 @@ struct ResourcesView: View {
 
     /// Every held or awaited row, and the first few free ones unless the group has been
     /// unfolded. The rest are counted, not hidden without a word.
-    private func fold(_ rows: [DaemonAPI.ResourceState]) -> (shown: [DaemonAPI.ResourceState], folded: Int) {
-        guard let kind = rows.first?.kind, !unfolded.contains(kind) else { return (rows, 0) }
+    private func fold(_ rows: [DaemonAPI.ResourceState], group: String) -> (shown: [DaemonAPI.ResourceState], folded: Int) {
+        // Declared ones are few, and the person put each there: never folded.
+        guard group != "Declared", !unfolded.contains(group) else { return (rows, 0) }
         var freeSoFar = 0
         let shown = rows.filter { state in
-            if state.lease != nil || !state.line.isEmpty || state.name == model.resourcesFocus { return true }
+            if !state.holds.isEmpty || !state.line.isEmpty || state.name == model.resourcesFocus { return true }
             freeSoFar += 1
             return freeSoFar <= Self.freeShown
         }
@@ -111,6 +121,9 @@ private struct ResourceRow: View {
                     Text(state.displayName)
                         .appText(.reading).fontWeight(.semibold)
                         .foregroundStyle(state.isGone ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                    if let count = state.heldCount {
+                        Text(count).appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                    }
                     if state.endingSoon {
                         Text("ending soon")
                             .appText(.fine).fontWeight(.semibold)
@@ -119,27 +132,37 @@ private struct ResourceRow: View {
                             .paperRaised(in: Capsule())
                     }
                 }
+                if let declared = state.declared {
+                    Text(declared.description)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 held
                 if !state.line.isEmpty { line }
             }
             Spacer(minLength: 12)
-            if state.lease != nil {
-                // No confirmation: ending is recoverable, since the agent is told at its
-                // next lease call and can ask again; and one click matters most when an
-                // agent is holding the screen.
-                Button("End") { Task { await model.endLease(state.name) } }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .accessibilityLabel("End \(holderName)'s lease on \(state.displayName)")
+            if state.holds.count == 1, let lease = state.lease {
+                endButton(lease)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
 
+    /// No confirmation: ending is recoverable, since the agent is told at its next
+    /// lease call and can ask again; and one click matters most when an agent is
+    /// holding the screen.
+    private func endButton(_ lease: Lease) -> some View {
+        Button("End") { Task { await model.endLease(state.name, holder: lease.holder) } }
+            .buttonStyle(.paper)
+            .appText(.fine)
+            .accessibilityLabel("End \(name(lease.holder))'s lease on \(state.displayName)")
+    }
+
     @ViewBuilder
     private var dot: some View {
-        if state.lease == nil {
+        if state.holds.isEmpty {
             Circle().strokeBorder(.secondary, lineWidth: 1.5).frame(width: 10, height: 10)
         } else {
             Circle().fill(state.isGone ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
@@ -147,19 +170,28 @@ private struct ResourceRow: View {
         }
     }
 
+    /// One line per holder; with more than one, each has its own End.
     @ViewBuilder
     private var held: some View {
-        if let lease = state.lease {
-            HStack(spacing: 0) {
-                if state.isGone { Text("Gone from this Mac \u{00B7} still held by ") } else { Text("Held by ") }
-                agentLink(lease.holder)
-                Text(" since \(LeaseWords.clock(lease.grantedAt)) \u{00B7} until \(LeaseWords.clock(lease.expiresAt))"
-                     + " \u{00B7} \(minutesLeft(lease)) left")
-            }
-            .appText(.fine)
-            .foregroundStyle(.secondary)
-        } else {
+        if state.holds.isEmpty {
             Text("Free").appText(.fine).foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(state.holds, id: \.holder) { lease in
+                    HStack(spacing: 0) {
+                        if state.isGone { Text("Gone from this Mac \u{00B7} still held by ") } else { Text("Held by ") }
+                        agentLink(lease.holder)
+                        Text(" since \(LeaseWords.clock(lease.grantedAt)) \u{00B7} until \(LeaseWords.clock(lease.expiresAt))"
+                             + " \u{00B7} \(minutesLeft(lease)) left")
+                        if state.holds.count > 1 {
+                            Spacer(minLength: 8)
+                            endButton(lease)
+                        }
+                    }
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -203,8 +235,6 @@ private struct ResourceRow: View {
         LeaseWords.agentName(model.agents.first { $0.id == agentID }?.title)
     }
 
-    private var holderName: String { state.lease.map { name($0.holder) } ?? "" }
-
     private func minutesLeft(_ lease: Lease) -> String {
         let minutes = LeaseWords.minutesLeft(until: lease.expiresAt, now: at)
         return minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min"
@@ -220,7 +250,7 @@ struct ResourcesRow: View {
 
     private var counts: String? {
         guard let resources = model.leases?.resources else { return nil }
-        let held = resources.filter { $0.lease != nil }.count
+        let held = resources.reduce(0) { $0 + $1.holds.count }
         let waiting = resources.reduce(0) { $0 + $1.line.count }
         guard held + waiting > 0 else { return nil }
         return "\(held) held \u{00B7} \(waiting) waiting"
