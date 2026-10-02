@@ -21,6 +21,11 @@ struct PermissionView: View {
     @Environment(SidebarStates.self) private var states
     let request: PermissionRequest
 
+    /// Which option was clicked, while its answer is on the way. Every answer is held
+    /// meanwhile, so a double click or a repeated ⌘1 is not a second one, and the one
+    /// that went says so. Put back if it did not go (#86).
+    @State private var chosen: PermissionOption?
+
     /// How tall the question wants to be, measured, so a short one is not padded out
     /// to the cap and a long one scrolls rather than pushing the buttons off screen.
     @State private var questionHeight: CGFloat = 0
@@ -48,6 +53,7 @@ struct PermissionView: View {
                             .keyboardShortcut(.defaultAction)
                             .opacity(0)
                             .accessibilityHidden(true)
+                            .disabled(chosen != nil)
                     }
                 }
             }
@@ -106,12 +112,17 @@ struct PermissionView: View {
 
     /// Full width and wrapping rather than truncating.
     private func label(_ option: PermissionOption) -> some View {
-        Text(option.name)
-            .multilineTextAlignment(.leading)
-            // Wraps in the width it is given. Not `fixedSize`: measured at no width, a
-            // fixed-height sentence is one letter a line, and the card pushed the whole
-            // window's layout a thousand points past its bottom edge.
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 8) {
+            Text(option.name)
+                .multilineTextAlignment(.leading)
+                // Wraps in the width it is given. Not `fixedSize`: measured at no width, a
+                // fixed-height sentence is one letter a line, and the card pushed the whole
+                // window's layout a thousand points past its bottom edge.
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if chosen?.id == option.id {
+                Telling(host: model.answerRecipient(request.agentID))
+            }
+        }
     }
 
     @ViewBuilder
@@ -120,10 +131,12 @@ struct PermissionView: View {
             Button { answer(option) } label: { label(option) }
                 .buttonStyle(.paperProminent)
                 .modifier(NumberShortcut(index: index))
+                .modifier(Held(chosen: chosen, option: option))
         } else {
             Button { answer(option) } label: { label(option) }
                 .buttonStyle(.paper)
                 .modifier(NumberShortcut(index: index))
+                .modifier(Held(chosen: chosen, option: option))
         }
     }
 
@@ -138,7 +151,27 @@ struct PermissionView: View {
     }
 
     private func answer(_ option: PermissionOption) {
-        Task { await model.answer(request, optionID: option.optionID) }
+        // Two key presses can land before the disabled buttons are drawn.
+        guard chosen == nil else { return }
+        chosen = option
+        Task {
+            // Left showing what was sent: what becomes of it arrives as the daemon
+            // withdrawing the question, which takes this card away.
+            if !(await model.answer(request, optionID: option.optionID)) { chosen = nil }
+        }
+    }
+}
+
+/// While an answer is on its way: the others greyed, and the one sent left as it was
+/// drawn, so its pending mark reads, but taking no more clicks.
+private struct Held: ViewModifier {
+    let chosen: PermissionOption?
+    let option: PermissionOption
+
+    func body(content: Content) -> some View {
+        content
+            .disabled(chosen != nil && chosen?.id != option.id)
+            .allowsHitTesting(chosen == nil)
     }
 }
 

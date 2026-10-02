@@ -99,8 +99,14 @@ enum ControlTool {
             close(out[0]); close(err[0])
             throw ControlService.Failure("could not start agents-control (\(status))")
         }
+        // Both read at once: one read after the other leaves the child blocked on a full
+        // stderr while this waits for stdout to end (#92).
+        let errors = FileHandle(fileDescriptor: err[0], closeOnDealloc: true)
+        nonisolated(unsafe) var error = Data()
+        let drained = DispatchGroup()
+        DispatchQueue.global().async(group: drained) { error = errors.readDataToEndOfFile() }
         let output = FileHandle(fileDescriptor: out[0], closeOnDealloc: true).readDataToEndOfFile()
-        let error = FileHandle(fileDescriptor: err[0], closeOnDealloc: true).readDataToEndOfFile()
+        drained.wait()
         var exit: Int32 = 0
         waitpid(pid, &exit, 0)
         return Result(status: (exit >> 8) & 0xff, output: String(decoding: output, as: UTF8.self),

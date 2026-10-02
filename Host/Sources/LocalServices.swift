@@ -138,35 +138,24 @@ struct LocalServices {
         }
         // Loaded already is running already: nothing is started twice.
         if await Self.launchctl(["print", "gui/\(getuid())/\(label(job))"]) == 0 { return .enabled }
-        let status = await Self.launchctl(["bootstrap", "gui/\(getuid())", file.path])
-        return status == 0 ? .enabled : .failed("launchctl could not start \(label(job)) (\(status)).")
+        let outcome = await Self.run(["bootstrap", "gui/\(getuid())", file.path])
+        if outcome.timedOut { return .failed("launchctl did not finish starting \(label(job)) in 30 seconds and was stopped.") }
+        return outcome.status == 0 ? .enabled : .failed("launchctl could not start \(label(job)) (\(outcome.status)).")
     }
 
     // MARK: launchctl
 
-    /// Ended on its termination handler, never `waitUntilExit`, which hangs off the main
-    /// thread.
+    /// Read as it writes, so a `print` of a busy domain bigger than the pipe cannot stall
+    /// it, and stopped at a deadline (#92). See `ChildProcess`.
     private static func launchctl(_ arguments: [String]) async -> Int32 {
         await run(arguments).status
     }
 
     private static func launchctlOutput(_ arguments: [String]) async -> String {
-        await run(arguments).output
+        await run(arguments).text
     }
 
-    private static func run(_ arguments: [String]) async -> (status: Int32, output: String) {
-        await withCheckedContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            process.arguments = arguments
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            process.terminationHandler = { finished in
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                continuation.resume(returning: (finished.terminationStatus, String(decoding: data, as: UTF8.self)))
-            }
-            do { try process.run() } catch { continuation.resume(returning: (-1, "")) }
-        }
+    private static func run(_ arguments: [String]) async -> ChildProcess.Outcome {
+        await ChildProcess.run(URL(fileURLWithPath: "/bin/launchctl"), arguments)
     }
 }

@@ -40,6 +40,9 @@ struct FilesPane: View {
     /// The file `probe` was read from, so a file opened from elsewhere is loaded once
     /// and not once for every pass.
     @State private var loaded: URL?
+    /// Counted up on every file read, so a slow read of one file landing after the
+    /// person has opened another does not show under the other's name (#89).
+    @State private var fileRequest = 0
     /// Counted up on every folder event and handed to the page, which re-reads its
     /// pictures' stamps on each: a redrawn image changes no text (022 FR-020).
     @State private var folderEvents = 0
@@ -635,12 +638,15 @@ struct FilesPane: View {
 
     private func reloadFile(_ url: URL) {
         loaded = url
+        fileRequest += 1
+        let request = fileRequest
         let server = server
         let agentID = agent.id
         Task {
             do {
                 let reading = try await server.read(agentID: agentID, path: url.path(percentEncoded: false))
-                guard let fresh = Self.probe(reading) else { return }
+                // Only the latest read is shown, whichever file it was for.
+                guard request == fileRequest, let fresh = Self.probe(reading) else { return }
                 // The watch is on the whole folder, so a build writing beside this file
                 // lands here too. Unchanged bytes are not news.
                 if let probe, probe.prefix == fresh.prefix, probe.size == fresh.size { fileProblem = nil; fileGone = false; return }
@@ -648,6 +654,7 @@ struct FilesPane: View {
                 fileProblem = nil
                 fileGone = false
             } catch {
+                guard request == fileRequest else { return }
                 // A Markdown page keeps what it last had (022); source has nothing to
                 // keep that the listing does not say better.
                 fileGone = RemoteFiles.isGone(error)

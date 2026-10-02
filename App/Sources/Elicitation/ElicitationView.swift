@@ -16,6 +16,10 @@ struct ElicitationView: View {
     @State private var step = 0
     /// How tall the question on each page wants to be, measured rather than guessed.
     @State private var questionHeights: [Int: CGFloat] = [:]
+    /// Which answer was given, while it is on the way. The card is held meanwhile, so
+    /// a double click or a repeated ⌘1 is not a second answer, and the button that
+    /// sent it says so. Put back if it did not go (#86).
+    @State private var sending: String?
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
@@ -42,19 +46,19 @@ struct ElicitationView: View {
                         }
                         .buttonStyle(.paperProminent)
                         .keyboardShortcut(.defaultAction)
-                        Button("Done") {
-                            Task { await model.answerElicitation(request, action: .accept) }
-                        }
+                        .modifier(Held(sending: sending))
+                        Button { send("done", .accept) } label: { pending("Done", "done") }
                         .buttonStyle(.paper)
                         .keyboardShortcut("1")
-                        Button("Gave up") {
-                            Task { await model.answerElicitation(request, action: .decline) }
-                        }
+                        .modifier(Held(sending: sending, key: "done"))
+                        Button { send("gave up", .decline) } label: { pending("Gave up", "gave up") }
                         .buttonStyle(.paper)
                         .keyboardShortcut("2")
+                        .modifier(Held(sending: sending, key: "gave up"))
                     }
                 }
             }
+            .allowsHitTesting(sending == nil)
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .paperRaised(in: RoundedRectangle(cornerRadius: 16))
@@ -116,10 +120,9 @@ struct ElicitationView: View {
             // Saying no is an answer, and the paged form is the one shape that used
             // to have nowhere to say it: a form you cannot finish and cannot dismiss
             // is a card that sits there for ever.
-            Button("No thanks") {
-                Task { await model.answerElicitation(request, action: .decline) }
-            }
+            Button { send("decline", .decline) } label: { pending("No thanks", "decline") }
             .buttonStyle(.paper)
+            .modifier(Held(sending: sending, key: "decline"))
             // Always offered, on every page but the last. Clicking an option turns
             // the page by itself, so here Next is mostly the way past a question
             // that a click cannot answer: a boolean left alone, an optional box left
@@ -130,14 +133,14 @@ struct ElicitationView: View {
             if page < last {
                 Button("Next") { step = page + 1 }
                     .buttonStyle(.paper)
+                    .modifier(Held(sending: sending))
             }
             if page == last {
-                Button("Submit") {
-                    Task { await model.answerElicitation(request, action: .accept, content: values) }
-                }
+                Button { send("submit", .accept, content: values) } label: { pending("Submit", "submit") }
                 .buttonStyle(.paperProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!schema.problems(with: values).isEmpty)
+                .modifier(Held(sending: sending, key: "submit"))
             }
         }
     }
@@ -184,6 +187,7 @@ struct ElicitationView: View {
         Button { step = page } label: { Image(systemName: symbol) }
             .buttonStyle(.paper)
             .disabled(!enabled)
+            .modifier(Held(sending: sending))
             .accessibilityLabel(label)
     }
 
@@ -257,10 +261,12 @@ struct ElicitationView: View {
             Button(action: choose) { optionLabel(title, description) }
                 .buttonStyle(.paperProminent)
                 .modifier(ElicitationNumberShortcut(index: index))
+                .modifier(Held(sending: sending))
         } else {
             Button(action: choose) { optionLabel(title, description) }
                 .buttonStyle(.paper)
                 .modifier(ElicitationNumberShortcut(index: index))
+                .modifier(Held(sending: sending))
         }
     }
 
@@ -296,23 +302,23 @@ struct ElicitationView: View {
                 HStack(alignment: .top, spacing: 8) {
                     ForEach(Array(single.choices.enumerated()), id: \.element.id) { index, choice in
                         answerButton(title: choice.title, description: choice.description,
-                                     prominent: true, index: index) {
+                                     key: "choice:\(choice.value)", prominent: true, index: index) {
                             answer(single.property.name, with: .string(choice.value))
                         }
                     }
                     // Picking nothing is an answer too, where the agent said the
                     // question may go unanswered. Still one click (FR-040).
                     if !single.property.isRequired {
-                        answerButton(title: "No answer", description: nil, prominent: false,
+                        answerButton(title: "No answer", description: nil, key: "choice:", prominent: false,
                                      index: single.choices.count) {
                             answer(single.property.name, with: .string(""))
                         }
                     }
                     // Not the same thing as answering with nothing, and the daemon
                     // already tells the two apart.
-                    answerButton(title: "No thanks", description: nil, prominent: false,
+                    answerButton(title: "No thanks", description: nil, key: "decline", prominent: false,
                                  index: single.choices.count + (single.property.isRequired ? 0 : 1)) {
-                        Task { await model.answerElicitation(request, action: .decline) }
+                        send("decline", .decline)
                     }
                 }
                 .padding(.vertical, 1)
@@ -326,13 +332,14 @@ struct ElicitationView: View {
     /// same split `PermissionView` makes between an option that allows and one that
     /// does not. Return takes the first prominent answer; ⌘1…n pick by position.
     @ViewBuilder
-    private func answerButton(title: String, description: String?,
+    private func answerButton(title: String, description: String?, key: String,
                               prominent: Bool, index: Int = 0,
                               choose: @escaping () -> Void) -> some View {
         if prominent {
-            Button(action: choose) { answerLabel(title, description) }
+            Button(action: choose) { answerLabel(title, description, key: key) }
                 .buttonStyle(.paperProminent)
                 .modifier(ElicitationNumberShortcut(index: index))
+                .modifier(Held(sending: sending, key: key))
                 .background {
                     if index == 0 {
                         Button("") { choose() }
@@ -342,13 +349,14 @@ struct ElicitationView: View {
                     }
                 }
         } else {
-            Button(action: choose) { answerLabel(title, description) }
+            Button(action: choose) { answerLabel(title, description, key: key) }
                 .buttonStyle(.paper)
                 .modifier(ElicitationNumberShortcut(index: index))
+                .modifier(Held(sending: sending, key: key))
         }
     }
 
-    private func answerLabel(_ title: String, _ description: String?) -> some View {
+    private func answerLabel(_ title: String, _ description: String?, key: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title)
             if let description, !description.isEmpty {
@@ -356,13 +364,39 @@ struct ElicitationView: View {
                     .appText(.fine)
                     .foregroundStyle(.secondary)
             }
+            if sending == key {
+                Telling(host: model.answerRecipient(request.agentID))
+            }
         }
         .frame(maxWidth: 240, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
     }
 
     private func answer(_ name: String, with value: JSONValue) {
-        Task { await model.answerElicitation(request, action: .accept, content: [name: value]) }
+        send("choice:\(value.stringValue ?? "")", .accept, content: [name: value])
+    }
+
+    /// Sends the answer once, holding the card until it has gone.
+    private func send(_ key: String, _ action: DaemonAPI.AnswerElicitationRequest.Action,
+                      content: [String: JSONValue] = [:]) {
+        // Two key presses can land before the held card is drawn.
+        guard sending == nil else { return }
+        sending = key
+        Task {
+            // Left showing what was sent: the daemon withdrawing the question is what
+            // takes this card away.
+            if !(await model.answerElicitation(request, action: action, content: content)) { sending = nil }
+        }
+    }
+
+    /// A button's title, with the pending mark beside it while its answer is on the way.
+    private func pending(_ title: String, _ key: String) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+            if sending == key {
+                Telling(host: model.answerRecipient(request.agentID))
+            }
+        }
     }
 
     @ViewBuilder
@@ -473,6 +507,17 @@ struct ElicitationView: View {
         for property in schema.properties where values[property.name] == nil {
             if let value = property.defaultValue { values[property.name] = value }
         }
+    }
+}
+
+/// While an answer is on its way: every other button greyed, and the one that sent it
+/// left as it was drawn, so its pending mark reads. The card takes no clicks meanwhile.
+private struct Held: ViewModifier {
+    let sending: String?
+    var key: String?
+
+    func body(content: Content) -> some View {
+        content.disabled(sending != nil && sending != key)
     }
 }
 

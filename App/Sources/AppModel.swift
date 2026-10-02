@@ -2461,20 +2461,24 @@ final class AppModel {
         await attempt { try await self.client(forAgent: id).call(method, DaemonAPI.AgentRequest(agentID: id)) }
     }
 
-    func answer(_ request: PermissionRequest, optionID: String) async {
+    /// Whether the answer went, so the card can give its buttons back when it did not.
+    /// One `sendID` for every try, so the retry through a fresh connection is the same
+    /// answer and not a second one (#86).
+    @discardableResult
+    func answer(_ request: PermissionRequest, optionID: String) async -> Bool {
         let host = work.agent(request.agentID)?.host ?? .mac
+        let sendID = UUID()
         if host != .mac {
-            let sendID = UUID()
-            _ = await sendToServer(host) { client in
+            return await sendToServer(host) { client in
                 try await client.call(DaemonAPI.Method.permissionsAnswer,
                                       DaemonAPI.AnswerRequest(permissionID: request.id, optionID: optionID,
                                                               sendID: sendID))
             }
-            return
         }
-        await attempt {
+        return await attempt {
             try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.permissionsAnswer,
-                                       DaemonAPI.AnswerRequest(permissionID: request.id, optionID: optionID))
+                                       DaemonAPI.AnswerRequest(permissionID: request.id, optionID: optionID,
+                                                               sendID: sendID))
         }
     }
 
@@ -2698,16 +2702,21 @@ final class AppModel {
 
     // MARK: Forms
 
+    /// Whether the answer went, as `answer(_:optionID:)` (#86).
+    @discardableResult
     func answerElicitation(_ request: ElicitationRequest,
                            action: DaemonAPI.AnswerElicitationRequest.Action,
-                           content: [String: JSONValue] = [:]) async {
-        await attempt {
+                           content: [String: JSONValue] = [:]) async -> Bool {
+        let sendID = UUID()
+        let sent = await attempt {
             try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.elicitationsAnswer,
                                        DaemonAPI.AnswerElicitationRequest(requestID: request.id,
                                                                           action: action,
-                                                                          content: content))
+                                                                          content: content,
+                                                                          sendID: sendID))
         }
         await refreshElicitations()
+        return sent
     }
 
     func dismissProblem() { problem = nil }
