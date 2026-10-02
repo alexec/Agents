@@ -195,7 +195,16 @@ shown offline only for as long as that takes, and a request made in the gap is a
 afterwards or refused with a reason, never lost without a word.
 
 A host that loses its own network keeps its agents working in the same way, and reconnects
-when the network returns. A request for a host that is offline is refused at once with
+when the network returns.
+
+A host that has not joined yet tries the same way. Its host code is spent only by a join
+that worked, so a first try that fails, because the control plane isn't up yet or its
+address doesn't resolve yet, is tried again on the same backoff, and at once on a wake or
+a network change. Until it joins, Agents Host and **Settings ▸ Control plane** say
+**Couldn't join the control plane**, with the reason. The address in every code is this
+Mac's Bonjour name (System Settings ▸ General ▸ Sharing ▸ Local hostname), the one other
+machines on the network can resolve, not its Unix host name, which a managed Mac may set
+to something nothing answers for. A request for a host that is offline is refused at once with
 that reason, rather than left to time out.
 
 ## When the store is down

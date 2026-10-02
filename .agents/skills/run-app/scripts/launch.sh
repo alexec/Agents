@@ -15,6 +15,7 @@ FRONT=0
 WINDOW=1
 FIRST_RUN=0
 LAN=0
+HOST_FIRST=0
 EXTRA_ENV=()
 CONTROL_ENV=()
 
@@ -25,12 +26,13 @@ while [ $# -gt 0 ]; do
     --no-window) WINDOW=0 ;;         # the host and control plane only, for socket work
     --first-run) FIRST_RUN=1 ;;      # the window unpaired, on frame K; pair it by hand with PAIR_CODE
     --lan)       LAN=1 ;;            # the control plane at this Mac's LAN address, for a container
+    --host-first) HOST_FIRST=1 ;;    # the host starts while the control plane is down, then it comes up (#113)
     --slug)      SLUG="$2"; shift ;;
     --web-port)  WEB_PORT="$2"; shift ;;   # the web remote's port, e.g. one held already (071 R3)
     --seeded)    SEEDED=1 ;;         # the root exists, filled beforehand (scripts/seed-archived.swift), with no control/ yet
     --env)       EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the host, e.g. AGENTS_TEST_…=…
     --control-env) CONTROL_ENV+=("$2"); shift ;;  # KEY=VALUE for the control plane, e.g. AGENTS_SSH=…
-    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]…" >&2; exit 2 ;;
+    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]…" >&2; exit 2 ;;
   esac
   shift
 done
@@ -86,32 +88,55 @@ fi
 # The Linux hosts a server is given (scripts/build-linux-agentsd.sh), when built.
 SERVERS=()
 [ -d "$REPO/App/Resources/servers" ] && SERVERS=(AGENTS_CONTROL_SERVERS="$REPO/App/Resources/servers")
-"${CLEAN[@]}" ${SSH_AUTH_SOCK:+SSH_AUTH_SOCK="$SSH_AUTH_SOCK"} AGENTS_CONTROL_URL="$URL" AGENTS_CONTROL_NAME="run-$SLUG" \
-  ${SERVERS[@]+"${SERVERS[@]}"} ${CONTROL_ENV[@]+"${CONTROL_ENV[@]}"} \
-  nohup "$CONTROL" serve --home "$ROOT/control" --port "$PORT" --no-bonjour \
-    --web "$REPO/Web/dist" --web-port "$WEB_PORT" \
-  >"$ROOT/control/control.log" 2>&1 &
-echo $! >"$ROOT/control/control.pid"
-for _ in $(seq 1 100); do
-  curl -sk --max-time 1 "https://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && break
-  sleep 0.1
-done
-curl -sk --max-time 1 "https://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 \
-  || { echo "the control plane did not answer at $URL — see $ROOT/control/control.log" >&2; exit 1; }
+# --host-root: the host's join is in control/status, as on Agents Host's copy (#113).
+start_control() {
+  "${CLEAN[@]}" ${SSH_AUTH_SOCK:+SSH_AUTH_SOCK="$SSH_AUTH_SOCK"} AGENTS_CONTROL_URL="$URL" AGENTS_CONTROL_NAME="run-$SLUG" \
+    ${SERVERS[@]+"${SERVERS[@]}"} ${CONTROL_ENV[@]+"${CONTROL_ENV[@]}"} \
+    nohup "$CONTROL" serve --home "$ROOT/control" --port "$PORT" --no-bonjour \
+      --web "$REPO/Web/dist" --web-port "$WEB_PORT" --host-root "$ROOT" \
+    >>"$ROOT/control/control.log" 2>&1 &
+  echo $! >"$ROOT/control/control.pid"
+  for _ in $(seq 1 100); do
+    curl -sk --max-time 1 "https://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && break
+    sleep 0.1
+  done
+  curl -sk --max-time 1 "https://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 \
+    || { echo "the control plane did not answer at $URL — see $ROOT/control/control.log" >&2; exit 1; }
+}
+start_control
 
 code() { "${CLEAN[@]}" "$CONTROL" code "$@" --home "$ROOT/control" | head -1; }
+
+if [ "$HOST_FIRST" = 1 ]; then
+  # #113: the code is made, the control plane stops, and the host starts with the code
+  # left in its root, as Agents Host leaves it. It fails to join and keeps trying.
+  code --host >"$ROOT/control-join-code"
+  kill "$(cat "$ROOT/control/control.pid")"
+  for _ in $(seq 1 50); do curl -sk --max-time 1 "https://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 || break; sleep 0.1; done
+fi
 
 # This Mac's host, as Agents Host's launch agent runs it, on the root. Not `env -i`: a
 # runtime started without the person's environment cannot sign in. Only what would leak
 # this session into it goes: CLAUDE_* and the hosting app's AGENTS_*.
 STRIP=()
 for name in $(env | grep -oE '^(CLAUDE[A-Z_]*|AGENTS_[A-Z_]*)='); do STRIP+=(-u "${name%=}"); done
+if [ "$HOST_FIRST" = 1 ]; then HOST_ARGS=(--control-network); else HOST_ARGS=(--control-code "$(code --host)"); fi
 env ${STRIP[@]+"${STRIP[@]}"} AGENTS_ROOT="$ROOT" ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"} \
-  nohup "$AGENTSD" --control-code "$(code --host)" >"$ROOT/host.out" 2>&1 &
+  nohup "$AGENTSD" "${HOST_ARGS[@]}" >"$ROOT/host.out" 2>&1 &
+JOINED="uplink: connected to the control plane"
+[ "$HOST_FIRST" = 1 ] && JOINED="uplink: could not join the control plane yet"
 for _ in $(seq 1 200); do
-  [ -S "$ROOT/daemon.sock" ] && grep -q "uplink: a host of" "$ROOT/daemon.log" 2>/dev/null && break
+  [ -S "$ROOT/daemon.sock" ] && grep -q "$JOINED" "$ROOT/daemon.log" 2>/dev/null && break
   sleep 0.1
 done
+if [ "$HOST_FIRST" = 1 ]; then
+  grep -q "$JOINED" "$ROOT/daemon.log" || { echo "the host never tried to join — see $ROOT/daemon.log" >&2; exit 1; }
+  sleep "${HOST_FIRST_WAIT:-5}"
+  start_control
+  for _ in $(seq 1 300); do grep -q "uplink: connected to the control plane" "$ROOT/daemon.log" && break; sleep 0.1; done
+  grep -q "uplink: connected to the control plane" "$ROOT/daemon.log" \
+    || { echo "the host did not join once the control plane came up — see $ROOT/daemon.log" >&2; exit 1; }
+fi
 [ -S "$ROOT/daemon.sock" ] || { echo "no daemon.sock under $ROOT after 20s — see $ROOT/daemon.log and $ROOT/host.out" >&2; exit 1; }
 DAEMON_PID="$(tr -d '[:space:]' < "$ROOT/daemon.lock" 2>/dev/null || true)"
 
