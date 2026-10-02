@@ -868,10 +868,37 @@ final class AppModel {
                                    returning: [DaemonAPI.WaitingAgent].self)
     }
 
-    /// The person ending whoever holds a resource (036 US4). Never a way to take one.
-    func endLease(_ name: ResourceName) async {
+    /// The person ending a lease (036 US4): one holder's, or with none named, every
+    /// one. Never a way to take one.
+    func endLease(_ name: ResourceName, holder: UUID? = nil) async {
         guard let snapshot = try? await client.call(DaemonAPI.Method.leasesEnd,
-                                                    DaemonAPI.PersonEndRequest(name: name.key),
+                                                    DaemonAPI.PersonEndRequest(name: name.key,
+                                                                               agentID: holder?.uuidString),
+                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
+    }
+
+    /// The person adding or changing a declared resource (#116). The host's refusal,
+    /// in its words, when it will not keep it.
+    func declareResource(_ resource: DeclaredResource, replacing: ResourceName?) async -> String? {
+        do {
+            let snapshot = try await client.call(DaemonAPI.Method.resourcesDeclare,
+                                                 DaemonAPI.DeclareResourceRequest(resource: resource,
+                                                                                  replacing: replacing?.key),
+                                                 returning: DaemonAPI.LeaseSnapshot.self)
+            work.replaceLeases(snapshot)
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// The person taking a declaration away (#116). Whoever holds it keeps the lease.
+    func removeDeclaredResource(_ name: ResourceName) async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.resourcesRemove,
+                                                    DaemonAPI.RemoveResourceRequest(name: name.key),
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
     }
