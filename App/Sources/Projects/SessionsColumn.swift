@@ -215,10 +215,10 @@ struct SessionsColumn: View {
             // The list's own swipe, in place of the cards' hand-built one.
             .swipeActions(edge: .trailing) {
                 if agent.state == .archived {
-                    Button("Bring Back") { Task { await model.unarchive(agent.id) } }
+                    SwipeAction("Bring Back") { await model.unarchive(agent.id) }
                 } else {
-                    Button("Archive", systemImage: "archivebox") {
-                        Task { await model.archive(agent.id, andLeave: true) }
+                    SwipeAction("Archive", systemImage: "archivebox") {
+                        await model.archive(agent.id, andLeave: true)
                     }
                     .tint(.gray)
                 }

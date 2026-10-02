@@ -126,10 +126,10 @@ private struct WorkflowListRow: View {
         .accessibilityElement(children: .combine)
         .swipeActions(edge: .trailing) {
             if summary.isArchived {
-                Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
+                SwipeAction("Bring Back") { await model.setWorkflowArchived(summary, false) }
             } else {
-                Button("Archive", systemImage: "archivebox") {
-                    Task { await model.setWorkflowArchived(summary, true) }
+                SwipeAction("Archive", systemImage: "archivebox") {
+                    await model.setWorkflowArchived(summary, true)
                 }
                 .tint(.gray)
             }
