@@ -7,7 +7,7 @@ import { useEffect } from "preact/hooks";
 import type { ChangedFile, ChangedFileDetail, ChangesList, DiffLine } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
-import { lineDiff } from "../model/diff";
+import { lineDiff, wantsWhole } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
 
 const stateWords: Record<ChangedFile["state"], string> = {
@@ -66,16 +66,17 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
       (e) => { if (current) failed.value = describe(e); });
     return () => { current = false; };
   }, [host, session, changedAt, agentState]);
+  const whole = wantsWhole(list.value?.files.find((f) => f.path === open), list.value?.git);
   useEffect(() => {
     detail.value = null;
     let current = true;
     if (open) {
-      void store.changedFile(host, session, open).then(
+      void store.changedFile(host, session, open, whole).then(
         (d) => { if (current) detail.value = d; },
         (e) => { if (current) failed.value = describe(e); });
     }
     return () => { current = false; };
-  }, [host, session, open, changedAt]);
+  }, [host, session, open, changedAt, whole]);
 
   if (failed.value && !list.value) return <p class="hint">{failed.value}</p>;
   if (!list.value) return <p class="hint">Reading what changed…</p>;

@@ -1,0 +1,4 @@
+http://localhost:58707/
+http://localhost:58707/app.css
+http://localhost:58707/app.js
+http://localhost:58707/assets/favicon.png

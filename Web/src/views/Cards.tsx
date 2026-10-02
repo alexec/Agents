@@ -236,11 +236,23 @@ function problem(property: ElicitationSchemaProperty, value: JSONValue | undefin
 
 type Action = "accept" | "decline" | "cancel";
 
+/** A form's own defaults, as it is first shown. */
+function defaultsOf(request: ElicitationRequest): Record<string, JSONValue> {
+  const defaults: Record<string, JSONValue> = {};
+  if ("form" in request.mode) {
+    for (const p of request.mode.form._0.properties) if (p.defaultValue !== undefined) defaults[p.name] = p.defaultValue;
+  }
+  return defaults;
+}
+
 function ElicitationCard({ request, hold, answer }: {
   request: ElicitationRequest; hold: Hold; answer: (key: string, action: Action, content: Record<string, JSONValue>) => void;
 }) {
   const inert = hold.answered !== null;
-  const values = useSignal<Record<string, JSONValue>>({});
+  // Each card is its own request (keyed by its id above), so its defaults are where it starts.
+  // Filled in an effect instead, they landed after the first paint, and a choice made before
+  // then was wiped: the form went back empty (the closing walk, T071).
+  const values = useSignal<Record<string, JSONValue>>(defaultsOf(request));
   const step = useSignal(0);
   const title = elicitationTitle(request);
   const go = (key: string, action: Action, content: Record<string, JSONValue> = {}) => !inert && answer(key, action, content);
@@ -250,14 +262,6 @@ function ElicitationCard({ request, hold, answer }: {
     return { class: `${base} ${h.class}`.trim() || undefined, disabled: h.disabled, telling: h.telling };
   };
   const done = button("done"), gaveUp = button("gave-up"), none = button("none"), decline = button("decline");
-  useEffect(() => {
-    step.value = 0;
-    const defaults: Record<string, JSONValue> = {};
-    if ("form" in request.mode) {
-      for (const p of request.mode.form._0.properties) if (p.defaultValue !== undefined) defaults[p.name] = p.defaultValue;
-    }
-    values.value = defaults;
-  }, [request.id]);
 
   let body;
   if ("url" in request.mode) {

@@ -1,6 +1,6 @@
 // An edit as a line diff (LineDiff.rows, Packages/CodeText): the lines of the old text against
 // the new, each unchanged, removed or added. Without the window's per-word marks.
-import type { DiffLine } from "../protocol/generated";
+import type { ChangedFile, DiffLine, GitView } from "../protocol/generated";
 
 /** Beyond this many lines either side, the edit is shown as all removed then all added. */
 const largest = 3_000;
@@ -41,4 +41,13 @@ export function lineDiff(old: string | undefined, next: string): DiffLine[] {
     }
   }
   return rows;
+}
+
+/**
+ * The window's rule (ChangeFileView): the agent's edits, unless there are none, as for a file a
+ * command wrote; then the file as it stands, where git can say what changed in it.
+ */
+export function wantsWhole(file: ChangedFile | undefined, git: GitView | undefined): boolean {
+  const edits = (file?.editCount ?? 0) > 0 || file?.inProgress === true;
+  return !edits && git !== undefined && !("unavailable" in git) && file?.outsideFolder === false && file?.state !== "binary";
 }

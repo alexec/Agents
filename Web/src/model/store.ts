@@ -497,8 +497,8 @@ export class Store extends Work {
     return this.link.call("changes/list", { agentID: agentID as UUID }, host);
   }
 
-  changedFile(host: string, agentID: string, path: string) {
-    return this.link.call("changes/file", { agentID: agentID as UUID, path, whole: false }, host);
+  changedFile(host: string, agentID: string, path: string, whole = false) {
+    return this.link.call("changes/file", { agentID: agentID as UUID, path, whole }, host);
   }
 
   /** What the person typed on a live page, written to the file as the window writes it. */
