@@ -9,7 +9,9 @@ export function App({ session, store }: { session: Session; store: Store }) {
   switch (state.kind) {
     case "loading":
     case "connecting":
-      return <main class="pairing" aria-busy="true" />;
+      // Said rather than blank (#114): a page waiting on its connection looked like one that
+      // never loaded. The words wait a moment, so an ordinary connect doesn't flash them.
+      return <main class="pairing" aria-busy="true"><p class="connecting" role="status">Connecting…</p></main>;
     case "unpaired":
     case "pairing":
     case "forgotten":

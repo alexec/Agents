@@ -99,7 +99,12 @@ The control plane still lists the browser until you forget it there.
 - **This browser isn't supported.** The browser can't keep a key that can't be copied out of
   it. Use the current Safari or Chrome.
 - **The page doesn't load at all.** Check that **Serve Agents to browsers on this Mac** is on
-  in Agents Host, and that the address is `localhost`, not this Mac's network name.
+  in Agents Host, and that the address is `localhost`, not this Mac's network name. A page
+  that says only **Connecting…** has a key and is waiting for the control plane to answer.
+- **Chrome's console reports a Content Security Policy violation for
+  `/.well-known/appspecific/com.chrome.devtools.json`.** Chrome DevTools asks for that file by
+  itself while it is open, and the page's policy lets it talk only to its own WebSocket. The
+  page answers it with a 404. It is harmless and doesn't stop the page.
 - **Not serving: port 8792 is in use by another app.** Agents Host says this under the switch,
   and **Settings ▸ Control plane** says it too, when something else had the port first. Whatever
   answers at that address isn't Agents: don't paste a code into it. Quit what holds the port
