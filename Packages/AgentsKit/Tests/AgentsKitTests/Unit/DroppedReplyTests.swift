@@ -122,31 +122,104 @@ struct DroppedReplyTests {
 
     // MARK: The control plane
 
-    /// The phone's home connection is the bare wire. When the host behind it goes, a call
-    /// already on its way should be answered with a failure, as one the uplink refuses is
-    /// (`aRequestTheUplinkWillNotTakeIsRefusedNotLost`). Today it is dropped, and the
-    /// phone waits on it: the Remote's reconnect hang after a Mac restart (073, D2).
-    @Test func aCallInFlightWhenTheHostGoesIsAnswered() async throws {
-        let home = HostID(rawValue: "mac")
+    private let home = HostID(rawValue: "mac")
+
+    /// A home host that never answers, and a phone on the bare wire, as today's Remote is.
+    private func silentHomeAndPhone(_ grant: Grant = .device)
+        async -> (ControlRouter, PairedTransport, FakeControlClient, PairedTransport) {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let (ours, theirs) = PairedTransport.pair()
         await router.attachHost(home, transport: ours)
         let (phoneOurs, phoneTheirs) = PairedTransport.pair()
+        await router.attachClient(client(grant), transport: phoneOurs)
+        _ = await eventually { await router.channels(of: home).count == 1 }
+        return (router, theirs, FakeControlClient(transport: phoneTheirs), phoneTheirs)
+    }
+
+    /// The phone's home connection is the bare wire. When the host behind it goes, a call
+    /// already on its way is answered with a failure, as one the uplink refuses is
+    /// (`aRequestTheUplinkWillNotTakeIsRefusedNotLost`). It used to be dropped, and the
+    /// phone waited on it: the Remote's reconnect hang after a Mac restart (#77).
+    @Test func aCallInFlightWhenTheHostGoesIsAnswered() async throws {
+        let (router, host, phone, phoneEnd) = await silentHomeAndPhone()
+        try phone.send(#"{"jsonrpc":"2.0","id":3,"method":"agents/list"}"#)
+        _ = await eventually { await router.inFlight(of: home) == 1 }
+        host.close()
+
+        #expect(await eventually("an answer to the call in flight", within: .seconds(5)) {
+            phone.lines.contains { $0.contains(#""id":3"#) && $0.contains("\(DaemonAPI.Failure.hostOffline)") }
+        })
+        phoneEnd.close()
+    }
+
+    /// And the bare wire hears nothing else about hosts, so its session ends: the phone
+    /// reconnects, says who it is again, and reads everything afresh from the daemon that
+    /// came back, which knows nothing of it (#77).
+    @Test func aBareClientOfTheHomeHostIsLetGoWhenItGoes() async throws {
+        let (router, host, _, phoneEnd) = await silentHomeAndPhone()
+        #expect(await router.sessionCount == 1)
+        host.close()
+        #expect(await eventually("the phone's session ended") { await router.sessionCount == 0 })
+        phoneEnd.close()
+    }
+
+    /// A window speaks the wrapped wire and is told by `control/hostChanged`; its session
+    /// stays, and its call in flight is answered too.
+    @Test func aWrappedClientKeepsItsSessionAndHearsItsCallAnswered() async throws {
+        let router = ControlRouter(handler: StubControl(), homeHost: home)
+        let (ours, theirs) = PairedTransport.pair()
+        await router.attachHost(home, transport: ours)
+        let (windowOurs, windowTheirs) = PairedTransport.pair()
+        await router.attachClient(client(.operator), transport: windowOurs)
+        let window = FakeControlClient(transport: windowTheirs)
+        _ = await eventually { await router.channels(of: home).count == 1 }
+        try window.request(9, DaemonAPI.Method.agentsList, host: home)
+        _ = await eventually { await router.inFlight(of: home) == 1 }
+        theirs.close()
+        #expect(await eventually("an answer to the call in flight") {
+            window.lines.contains { $0.contains(#""id":9"#) && $0.contains("\(DaemonAPI.Failure.hostOffline)") }
+        })
+        #expect(await router.sessionCount == 1)
+        windowTheirs.close()
+    }
+
+    /// A call the host did answer is not answered a second time when it goes.
+    @Test func aCallAlreadyAnsweredIsNotAnsweredAgain() async throws {
+        let router = ControlRouter(handler: StubControl(), homeHost: home)
+        let (ours, theirs) = PairedTransport.pair()
+        await router.attachHost(home, transport: ours)
+        let host = FakeUplinkHost(transport: theirs)
+        let (phoneOurs, phoneTheirs) = PairedTransport.pair()
         await router.attachClient(client(.device), transport: phoneOurs)
         let phone = FakeControlClient(transport: phoneTheirs)
-        _ = await eventually { await router.channels(of: home).count == 1 }
-
-        // Sent, and never answered: the host is going.
-        try phone.send(#"{"jsonrpc":"2.0","id":3,"method":"agents/list"}"#)
-        try await Task.sleep(for: .milliseconds(100))
-        theirs.close()
-
-        await withKnownIssue("the router drops a call in flight when its host goes (073)") {
-            let answered = await eventually("an answer to the call in flight", within: .seconds(2)) {
-                phone.lines.contains { $0.contains(#""id":3"#) }
-            }
-            #expect(answered)
-        }
+        _ = await eventually { host.openChannels.count == 1 }
+        try phone.send(#"{"jsonrpc":"2.0","id":5,"method":"agents/list"}"#)
+        _ = await eventually { !phone.lines.isEmpty }
+        #expect(await router.inFlight(of: home) == 0)
+        host.stop()
+        _ = await eventually { await router.sessionCount == 0 }
+        #expect(phone.lines.filter { $0.contains(#""id":5"#) }.count == 1)
         phoneTheirs.close()
+    }
+
+    // MARK: Reading a reply's id without decoding it
+
+    @Test(arguments: [
+        #"{"jsonrpc":"2.0","id":7,"result":{"id":99,"method":"x"}}"#,
+        #"{"result":[{"id":1}],"jsonrpc":"2.0","id":12}"#,
+        #"{"error":{"code":-1,"message":"no \"id\": here"},"id":"abc","jsonrpc":"2.0"}"#,
+        #"{ "id" : -4 , "result" : "}{[" }"#,
+        #"{"jsonrpc":"2.0","method":"agent/changed","params":{"id":3}}"#,
+        #"{"jsonrpc":"2.0","id":4,"method":"credentials/want","params":{}}"#,
+        #"{"jsonrpc":"2.0","error":{"code":-32700,"message":"bad"},"id":null}"#,
+        #"not json"#,
+    ])
+    func theScannedIDIsTheDecodedOne(_ line: String) {
+        let decoded: JSONRPCID? = switch try? JSONRPCCodec.decode(line: line) {
+        case .success(let id, _)?: id
+        case .failure(let id?, _)?: id
+        default: nil
+        }
+        #expect(ControlRouter.answeredID(line) == decoded)
     }
 }
