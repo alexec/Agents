@@ -11,15 +11,19 @@ import SwiftUI
 /// been told a paragraph must not be cut off at a narrow width. This is both.
 ///
 /// Inline marks arrive as attributes on the text, from the same parse that found the
-/// blocks. Nothing here parses anything.
+/// blocks. Nothing here parses anything: the reading is remembered by its text.
 extension EnvironmentValues {
     /// Whether text takes the width it is offered or only the width it needs. The
     /// person's own message hugs its words, at the right of the chat.
     @Entry var textFillsWidth = true
+    /// Whether a long text may lay out only the blocks on screen. Set by the chat, whose
+    /// rows sit in one scroll view with nothing to keep a place by but the scroll (#90).
+    @Entry var textIsLazy = false
 }
 
 struct MarkdownText: View {
     @Environment(\.textFillsWidth) private var fillsWidth
+    @Environment(\.textIsLazy) private var isLazy
     let markdown: String
     /// The document's own location, when there is one, so a relative image can be
     /// found. Nil in the conversation, where there is no document to be relative to —
@@ -39,12 +43,26 @@ struct MarkdownText: View {
     }
 
     private var content: AnyView {
-        let parsed = MarkdownBlock.parse(markdown)
+        // Read once per text, not once per redraw (#90).
+        let parsed = MarkdownBlock.parsed(markdown)
         // A passage whose first characters have not arrived yet — nothing, or a `#` that
         // is not a heading until its text follows — is still somewhere the caret is.
         if parsed.isEmpty, let caret { return AnyView(caret.caret) }
+        // A long reply is one row of the chat, and a row lays out whole. Its blocks in a
+        // lazy stack lay out as they come on screen; the look is the same stack (#90).
+        if isLazy, fillsWidth, caret == nil, parsed.count > Self.lazyFrom {
+            return AnyView(LazyVStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(parsed.enumerated()), id: \.offset) { _, block in
+                    view(for: block, caret: nil)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading))
+        }
         return blocks(parsed, caret: caret)
     }
+
+    /// How many blocks make a text long enough to lay out lazily: about two screens.
+    private static let lazyFrom = 24
 
     /// Erased on purpose, and this is the only place it is.
     ///
@@ -112,7 +130,7 @@ struct MarkdownText: View {
                     Text(language).appText(.fine).foregroundStyle(.tertiary)
                 }
                 // Code keeps its own shape, so it scrolls rather than wraps.
-                ScrollView(.horizontal, showsIndicators: false) {
+                Sideways {
                     // Coloured by its tag, in the same inks as files and diffs (041 US4).
                     CodeBlockText(text: text, language: CodeLanguage.fence(tag: language),
                                   caret: caret)
@@ -129,7 +147,7 @@ struct MarkdownText: View {
         case .table(let table):
             // Columns keep their width, so a wide table scrolls rather than
             // squeezing its text into a stack of single words.
-            trailed(ScrollView(.horizontal, showsIndicators: false) {
+            trailed(Sideways {
                 Grid(alignment: .topLeading, horizontalSpacing: 18, verticalSpacing: 6) {
                     GridRow {
                         ForEach(Array(table.header.enumerated()), id: \.offset) { index, cell in
@@ -223,6 +241,23 @@ struct MarkdownText: View {
         case .leading: return .leading
         case .centre: return .center
         case .trailing: return .trailing
+        }
+    }
+}
+
+/// Content that scrolls sideways when it is wider than the column, and is simply drawn
+/// when it is not (#90).
+///
+/// The same to look at either way: a scroll view takes the whole width offered, so the
+/// narrow case is held to it too. Most code and tables an agent writes fit, and a
+/// scroll view each was a platform view every redraw of the chat had to visit.
+private struct Sideways<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            content.frame(maxWidth: .infinity, alignment: .leading)
+            ScrollView(.horizontal, showsIndicators: false) { content }
         }
     }
 }

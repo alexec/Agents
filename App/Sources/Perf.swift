@@ -33,6 +33,12 @@ enum Perf {
         }
     }
 
+    /// How long `interval` has run so far, for a line that splits it: the data in hand
+    /// against the drawing after it (#90).
+    static func elapsed(_ interval: Interval) -> Int {
+        milliseconds(ContinuousClock.now - interval.started)
+    }
+
     /// Logs, once per name, the time from this process starting to the moment what is
     /// asked for is on screen.
     static func sinceLaunch(_ name: StaticString) {

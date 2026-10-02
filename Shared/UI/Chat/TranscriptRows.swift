@@ -31,7 +31,11 @@ struct TranscriptRow: View {
 /// Its outcome — the ask, the answers, the reply and how it went — is drawn at every
 /// level. Between the ask and the outcome, one control opens the steps; it is the only
 /// thing in a turn that does, so the reply's text can be selected like any other.
-struct TurnView: View {
+///
+/// Equal when what it draws is: the closures are left out, because they are made again
+/// on every pass of the chat and do the same thing for the same turn. Without this,
+/// every streamed chunk drew every turn of the conversation again (#90).
+struct TurnView: View, Equatable {
     let turn: ChatTurn
     /// The app's default, or what the person chose for this turn.
     let detail: TurnDetail
@@ -42,6 +46,10 @@ struct TurnView: View {
     let toggle: () -> Void
     /// Fetch a stored turn's entries, for a turn drawn with its steps.
     let fetch: () async -> Void
+
+    nonisolated static func == (a: TurnView, b: TurnView) -> Bool {
+        a.turn == b.turn && a.detail == b.detail && a.fetched == b.fetched && a.isLive == b.isLive
+    }
 
     private var isWaitingForEntries: Bool { turn.isSummaryOnly && fetched == nil }
     private var items: [TranscriptItem] { turn.isSummaryOnly ? (fetched ?? []) : turn.items }

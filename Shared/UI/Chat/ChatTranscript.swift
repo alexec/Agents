@@ -96,6 +96,10 @@ struct ChatTranscript: View {
     private var rows: [ChatTurn] { stored.map(ChatTurn.init) + items.turns() }
 
     var body: some View {
+        // Once per pass. Read inside the row closure, `rows` was the whole conversation
+        // mapped again for every row it drew (#90).
+        let rows = self.rows
+        let liveID = isWorking ? rows.last?.id : nil
         ScrollViewReader { scroller in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
@@ -113,12 +117,14 @@ struct ChatTranscript: View {
                         TurnView(turn: turn,
                                  detail: turnViews[turn.id] ?? defaultDetail,
                                  fetched: fetchedTurns[turn.id],
-                                 isLive: turn.id == rows.last?.id && isWorking,
+                                 isLive: turn.id == liveID,
                                  toggle: { toggle(turn) },
                                  fetch: { await fetch(turn) })
+                            .equatable()
                             .id(turn.id)
                     }
                     .environment(\.backgroundWork, agent.background)
+                    .environment(\.textIsLazy, true)
                     ForEach(agent.queuedPrompts) { queued in
                         QueuedPromptRow(prompt: queued, agentID: agent.id,
                                         canSendNow: canSendNow)

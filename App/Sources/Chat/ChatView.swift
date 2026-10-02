@@ -58,7 +58,11 @@ struct ChatView: View {
                 }
             }
         }
-        .animation(.snappy(duration: 0.28), value: model.selection)
+        // The prompt bar moving between the middle of an empty pane and the foot of a
+        // chat. Not one chat changing for another: animating that faded the old rows out
+        // for a quarter of a second while the new ones were built, and every frame of it
+        // redrew the whole pane, which was most of the cost of opening a chat (#90).
+        .animation(.snappy(duration: 0.28), value: model.selection == nil)
         // Title stays on SessionsColumn: one owner for the window title.
         .environment(\.chatActions, chatActions)
     }
