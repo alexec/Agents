@@ -32,7 +32,8 @@ export function MissingFolderStrip({ store, host, agent }: { store: Store; host:
   return (
     <div class="missing-folder-strip" role="status">
       <span class="what" title={folderPath(agent)}>⚠ {missingFolderLabel} <span class="quiet">· {folderPath(agent)}</span></span>
-      <WaysOn store={store} host={host} agent={agent} />
+      {/* Once, not twice: a refused send's notice above has the same ways on. */}
+      {store.folderGone.value?.agentID !== agent.id && <WaysOn store={store} host={host} agent={agent} />}
     </div>
   );
 }

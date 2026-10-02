@@ -8,7 +8,7 @@ struct MissingFolderStrip: View {
     let agent: Agent
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Label {
                 Text("\(MissingFolderWords.label) \(Text("· " + MissingFolderWords.shortPath(agent.cwd)).foregroundStyle(.secondary))")
             } icon: {
@@ -19,33 +19,32 @@ struct MissingFolderStrip: View {
             .lineLimit(1)
             .truncationMode(.middle)
             .help(agent.folderGoneMessage)
-            Spacer(minLength: 0)
-            Button {
-                Task { await model.continueInProject(agent.id) }
-            } label: {
-                Label(MissingFolderWords.continueInProject, systemImage: "arrow.turn.down.right")
-            }
-            .buttonStyle(.paper)
-            .appText(.fine)
-            .help("Start a new session in the project folder that reads this one and carries on")
-            if agent.mayRecreateWorktree {
+            HStack(spacing: 8) {
                 Button {
-                    Task { await model.recreateWorktree(agent.id) }
+                    Task { await model.continueInProject(agent.id) }
                 } label: {
-                    Label(MissingFolderWords.recreateWorktree, systemImage: "arrow.triangle.branch")
+                    Label(MissingFolderWords.continueInProject, systemImage: "arrow.turn.down.right")
                 }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                .help("Make the worktree again from its branch\(agent.worktree?.branch.map { ", \($0)" } ?? "")")
-            }
-            Button {
-                Task { await model.archive(agent.id, andLeave: true) }
-            } label: {
-                Label(MissingFolderWords.archive, systemImage: "archivebox")
+                .help("Start a new session in the project folder that reads this one and carries on")
+                if agent.mayRecreateWorktree {
+                    Button {
+                        Task { await model.recreateWorktree(agent.id) }
+                    } label: {
+                        Label(MissingFolderWords.recreateWorktree, systemImage: "arrow.triangle.branch")
+                    }
+                    .help("Make the worktree again from its branch\(agent.worktree?.branch.map { ", \($0)" } ?? "")")
+                }
+                Button {
+                    Task { await model.archive(agent.id, andLeave: true) }
+                } label: {
+                    Label(MissingFolderWords.archive, systemImage: "archivebox")
+                }
+                .help("Archive this session")
+                Spacer(minLength: 0)
             }
             .buttonStyle(.paper)
             .appText(.fine)
-            .help("Archive this session")
+            .fixedSize(horizontal: false, vertical: true)
         }
         .chatColumn()
         .padding(.vertical, 8)

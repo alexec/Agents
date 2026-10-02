@@ -114,6 +114,13 @@ struct AgentRow: View {
                 if let acting = model.acting(agent.id) {
                     Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                         .frame(height: isCompact ? 14 : nil)
+                } else if agent.missingFolder != nil, agent.state != .archived {
+                    // Its folder gone (#119): said before anybody types, as a project's
+                    // row says it, in the report's place.
+                    Text(MissingFolderWords.label)
+                        .appText(isCompact ? .fine : .supporting)
+                        .foregroundStyle(.secondary)
+                        .help(agent.folderGoneMessage)
                 } else if let report = agent.report?.message {
                     Text(report)
                         .appText(isCompact ? .fine : .supporting)
@@ -126,15 +133,6 @@ struct AgentRow: View {
                     Color.clear
                         .frame(height: 14)
                         .accessibilityHidden(true)
-                }
-
-                // Its folder gone (#119): said before anybody types, as a project's row
-                // says it.
-                if agent.missingFolder != nil, agent.state != .archived {
-                    Label(MissingFolderWords.label, systemImage: "exclamationmark.triangle")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .help(agent.folderGoneMessage)
                 }
 
                 // Working in a worktree (030): named, because with two agents in one
