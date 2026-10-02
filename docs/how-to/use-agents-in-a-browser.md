@@ -9,7 +9,7 @@ description: Open Agents in Safari or Chrome on the Mac that runs Agents Host, p
 Agents Host serves Agents as a web page, for a browser on the same Mac. The page is another
 screen onto your agents, like the window and the phone. You can read and answer agents,
 start and steer them, open their files and run workflows from a browser tab, without the
-window open. Safari and Chrome are tested.
+window open, in the current Safari or Chrome.
 
 Only a browser on this Mac can reach the page. Using it from another computer waits on
 serving it at a public address (issue #61).

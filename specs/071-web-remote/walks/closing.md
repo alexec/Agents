@@ -69,7 +69,24 @@ There were three runs. The first two found the two bugs below. The notes and scr
 
 ## Safari
 
-Not walked yet. §2, §4 and §6 in Safari wait on Alex's answer on how they're walked. Firefox isn't installed, so it isn't walked.
+**Not walked yet.** Alex chose to have it driven under the screen lease while he was away, through `safaridriver` (`Web/test/walk/safari.mjs`, written and ready).
+
+**What happened:**
+1. Remote automation was off at first, so WebDriver refused: "You must enable 'Allow remote automation'". Alex turned it on.
+2. After that, every session timed out: "The session timed out while connecting to a Safari instance".
+3. A stale `safaridriver` of mine was holding port 4723. It was stopped, and a fresh one tried on 4790. The session still timed out.
+4. By then Alex's own window was in front. The Dock showed a second Safari with a badge, perhaps a prompt waiting in Safari's automation instance. Nothing was pressed behind his window, and his Safari wasn't quit.
+
+**To finish:** with Safari quit, or that prompt answered, run `safaridriver -p 4723` and then:
+
+```sh
+node Web/test/walk/safari.mjs "$WEB_URL" "$ROOT" "$(agents-control code --client device --browser --home $ROOT/control)" \
+  specs/071-web-remote/walks/closing .agents/skills/run-app/scripts/rpc.py <control script>
+```
+
+That walks §2, §4 and §6 in Safari's isolated automation window.
+
+Firefox isn't installed, so it isn't walked. The how-to says only "the current Safari or Chrome" and claims neither as tested.
 
 ## Screenshots (`walks/closing/`)
 
