@@ -104,7 +104,7 @@ struct WorkflowTriggerEventTests {
         #expect(workflow.triggers == [
             .event(EventPattern("agent.finished", filters: ["outcome": DetailFilter(anyOf: ["done", "nothing_to_do"])!])),
             .event(EventPattern("agent.failed", filters: [
-                "reason": DetailFilter(anyOf: ["allowance_spent", "allowance_spent", "rate_limited"])!])),
+                "reason": DetailFilter(anyOf: ["allowance_spent", "rate_limited"])!])),
             .event(EventPattern("agent.finished", filters: ["labels": "bug", "afterwards": "park"])),
         ])
     }

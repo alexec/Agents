@@ -92,13 +92,11 @@ public struct EventPattern: Hashable, Sendable {
             }
             var values: [String] = []
             for value in filter.values {
-                if valid.contains(value) {
-                    values.append(value)
-                } else if let code = detail.code(forOldWords: value) {
-                    values.append(code)
-                } else {
+                guard let code = valid.contains(value) ? value : detail.code(forOldWords: value) else {
                     return .failure(.badValue(name: name, key: key, valid: valid, given: value))
                 }
+                // A code and today's words for it are one value, not two.
+                if !values.contains(code) { values.append(code) }
             }
             result[key] = DetailFilter(anyOf: values) ?? filter
         }
@@ -111,7 +109,11 @@ public struct EventPattern: Hashable, Sendable {
         var copy = self
         for (key, filter) in filters {
             guard let detail = EventCatalogue.detail(key, in: name), let valid = detail.values else { continue }
-            let values = filter.values.map { valid.contains($0) ? $0 : detail.code(forOldWords: $0) ?? $0 }
+            var values: [String] = []
+            for value in filter.values {
+                let code = valid.contains(value) ? value : detail.code(forOldWords: value) ?? value
+                if !values.contains(code) { values.append(code) }
+            }
             copy.filters[key] = DetailFilter(anyOf: values) ?? filter
         }
         return copy
