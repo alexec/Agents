@@ -1,5 +1,5 @@
 // What didn't work, said once in a strip across the page until it is dismissed (071 T058).
-// A refusal by grant says the grant: never a silent failure.
+// A refusal says so: never a silent failure.
 import type { Store } from "../model/store";
 
 export function Problem({ store }: { store: Store }) {

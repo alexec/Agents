@@ -10,7 +10,7 @@ import { type KeyRecord, type KeyStore, UnsupportedBrowser } from "./keys";
 
 export type LinkState =
   | { kind: "connecting" }
-  | { kind: "open"; grant: "operator" | "device"; name: string }
+  | { kind: "open"; name: string }
   | { kind: "down"; since: number }
   | { kind: "unpaired" }
   | { kind: "forgotten" }
@@ -232,7 +232,7 @@ export class Link {
         authed = true;
         this.attempt = 0;
         log("link.open");
-        this.set({ kind: "open", grant: admitted.grant, name: admitted.name });
+        this.set({ kind: "open", name: admitted.name });
         this.startHeartbeat();
       } catch (error) {
         if (error instanceof Refused && (error.reason === "forgotten" || error.reason === "unknown")) {

@@ -32,11 +32,13 @@ function fakeServer(script) {
   };
 }
 
-const code = () => w.parseCode(`agents-control:2:c:device:${w.base64url(w.unhex(v.control.public))}:${v.code.secretBase64url}:http%3A%2F%2Flocalhost%3A8893:-:Alex%27s%20control%20plane`);
+const code = (slot = "operator") => w.parseCode(`agents-control:2:c:${slot}:${w.base64url(w.unhex(v.control.public))}:${v.code.secretBase64url}:http%3A%2F%2Flocalhost%3A8893:-:Alex%27s%20control%20plane`);
 
 test("a code parses, and only a client code of version 2", () => {
   const parsed = code();
-  assert.equal(parsed.grant, "device");
+  assert.equal("grant" in parsed, false);
+  // A code from an older Mac said a grant there; it reads the same (#111).
+  assert.deepEqual(code("device"), parsed);
   assert.equal(parsed.name, "Alex's control plane");
   assert.equal(w.codeIdentity(parsed), v.code.identity);
   assert.equal(w.parseCode("agents-control:2:h:-:" + "x".repeat(10)), null);
@@ -58,7 +60,7 @@ test("pairing proves the code as Swift does, and checks the control plane's proo
   assert.equal(announce.method, "clients/announce");
   assert.deepEqual(announce.params, { id: "6F1C2A3B-4D5E-4F60-8172-93A4B5C6D7E8", publicKey: w.base64(w.unhex(v.client.public)),
     name: "Chrome", kind: "browser" });
-  assert.equal(made.grant, "device");
+  assert.deepEqual(made, { name: "test", client: "6F1C2A3B-4D5E-4F60-8172-93A4B5C6D7E8" });
 });
 
 test("a code the control plane won't pair a browser with is refused in its own words (R2)", async () => {
@@ -75,12 +77,13 @@ test("a code the control plane won't pair a browser with is refused in its own w
 test("connecting proves the browser's key as Swift does", async () => {
   const privateKey = await crypto.subtle.importKey("jwk", v.client.jwk, curve, false, ["deriveBits"]);
   const record = { privateKey, publicKey: null, client: v.client.id, control: w.base64url(w.unhex(v.control.public)),
-    grant: "device", paired: "" };
-  const server = fakeServer(() => ({ ok: { mac: w.base64url(w.unhex(v.client.mac.server)), grant: "operator" } }));
+    paired: "" };
+  // An older control plane still says a grant in its `ok`; it isn't read (#111).
+  const server = fakeServer(() => ({ ok: { mac: w.base64url(w.unhex(v.client.mac.server)), grant: "device" } }));
   const admitted = await w.connect(server.socket, record, v.origin, w.unhex(v.peerNonce));
   assert.equal(server.heard[0].auth.id, v.client.identity);
   assert.equal(server.heard[0].auth.mac, w.base64url(w.unhex(v.client.mac.peer)));
-  assert.equal(admitted.grant, "operator");
+  assert.equal("grant" in admitted, false);
 });
 
 test("a code for another control plane sends nothing", async () => {

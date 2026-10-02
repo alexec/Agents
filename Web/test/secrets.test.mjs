@@ -24,10 +24,10 @@ test("the console hears event names and codes, never a secret or a message", asy
       async () => ({ client: "C", publicRaw: w.unhex(v.client.public) }), w.unhex(v.peerNonce)));
 
     const keys = new w.MemoryKeyStore();
-    keys.record = { privateKey: {}, publicKey: {}, client: "C", control: "K", grant: "device", paired: "" };
+    keys.record = { privateKey: {}, publicKey: {}, client: "C", control: "K", paired: "" };
     let open;
     const l = new w.Link({ url: "ws://x", origin: "http://x", keys, backoff: [60], heartbeat: { every: 60_000, within: 1 },
-      authenticate: async () => ({ grant: "device", name: "n" }),
+      authenticate: async () => ({ name: "n" }),
       open: () => (open = { send() {}, close() {}, onopen: null, onmessage: null, onclose: null, onerror: null }) });
     l.start();
     await new Promise((r) => setTimeout(r, 5));

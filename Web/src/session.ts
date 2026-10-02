@@ -116,7 +116,7 @@ export class Session {
         const client = newClientID();
         // Kept and read back before it is announced: a browser that can't keep it never pairs.
         await this.keys.save({ privateKey: keyPair.privateKey, publicKey: keyPair.publicKey, client,
-          control: base64url(code.controlKey), grant: code.grant, paired: new Date().toISOString() });
+          control: base64url(code.controlKey), paired: new Date().toISOString() });
         return { client, publicRaw };
       });
       socket.close(1000, "");

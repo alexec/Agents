@@ -1,4 +1,4 @@
-// A refusal by grant says so (071 spec edge case, T058).
+// A refusal says so (071 spec edge case, T058).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
@@ -6,9 +6,9 @@ import { load } from "./load.mjs";
 const e = await load("src/model/errors.ts");
 const w = e;
 
-test("a grant refusal, by either code, says the grant", () => {
-  assert.equal(e.describe(new w.CallFailed(-32045, "agents/x is not open to this client (device).")), e.notAllowedByGrant);
-  assert.equal(e.describe(new w.CallFailed(-32601, "method not found")), e.notAllowedByGrant);
+test("a refusal from an older control plane, or a method a host doesn't know, says so", () => {
+  assert.equal(e.describe(new w.CallFailed(-32045, "agents/x is not open to this client (device).")), e.notAllowed);
+  assert.equal(e.describe(new w.CallFailed(-32601, "method not found")), e.notKnown);
 });
 
 test("anything else the host says is shown as it said it", () => {

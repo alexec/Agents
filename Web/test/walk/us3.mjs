@@ -41,7 +41,7 @@ const chrome = await launch({ profile: `/tmp/071-us3-chrome-${process.pid}` });
 const page = await chrome.page(webURL, { width: 1440, height: 900 });
 await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
-await page.type((await op.call("clients/startPairing", { grant: "device", kind: "browser" })).text);
+await page.type((await op.call("clients/startPairing", { kind: "browser" })).text);
 await page.press("Connect");
 await page.waitFor(`document.querySelector(".projects .row")`);
 const clickText = (selector, text) => page.eval(`(() => {
