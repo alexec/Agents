@@ -1168,11 +1168,20 @@ public actor AppService {
                 ],
                 "runtime": [
                     "type": "string",
-                    "description": "Optional. The runtime to run it on, as a workflow's `runtime:`.",
+                    "description": """
+                        Optional. The runtime to run it on, by id, as a workflow's \
+                        `runtime:`; leave out for the default. list_my_agents ends with \
+                        the ones available here and each one's model. One that is not \
+                        available (not installed, not signed in, out of the pool) is \
+                        refused before anything starts, naming the ones that are.
+                        """,
                 ],
                 "model": [
                     "type": "string",
-                    "description": "Optional. The model, as a workflow's `model:`.",
+                    "description": """
+                        Optional. The model, as a workflow's `model:`. One the runtime \
+                        does not offer is refused, naming the ones it does.
+                        """,
                 ],
                 "permission_mode": [
                     "type": "string",
@@ -1249,7 +1258,9 @@ public actor AppService {
             The agents you started with start_agent that have not been archived: each \
             one's id, what it is doing, what it last said, and its labels with owners. Also \
             how many of this project's running and not-archived places are in use, out \
-            of the limits the person set.
+            of the limits the person set. And which runtimes start_agent can start one \
+            on here, as of now, with the model each starts on where known, and why the \
+            others cannot.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
     ]

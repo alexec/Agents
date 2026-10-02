@@ -771,8 +771,9 @@ struct HelperAgentTests {
         let core = try await makeCore(locations, FakeLauncher())
         let (_, token) = try await caller(core, in: work)
 
-        #expect(try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
-                == "You have not started any agents that are still here. This project has 0 of 3 running, 0 of 5 not archived.")
+        let list = try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
+        #expect(list.hasPrefix("You have not started any agents that are still here. "
+                               + "This project has 0 of 3 running, 0 of 5 not archived.\n"))
     }
 }
 

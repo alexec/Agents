@@ -57,7 +57,7 @@ extension DaemonCore {
         do {
             let worktree = try await helperWorktree(request.worktree, in: folder)
             var start = try await startRequest(settings: settings, folder: folder,
-                                               prompt: prompt, managesAgents: false)
+                                               prompt: prompt, managesAgents: false, checksDefault: true)
             start.worktree = worktree
             start.labels = request.labels
             agentID = try await self.start(start, startedBy: caller.id, chainDepth: depth)
@@ -172,13 +172,15 @@ extension DaemonCore {
         let places = "This project has \(helperPlaces(in: folder))."
         let mine = HelperLimit.helpers(in: folder, agents: agents.values)
             .filter { $0.startedByAgent == caller.id }
+        // Which runtimes it may name, last (#117): live, as a tool's description is not.
+        let runtimes = runtimeChoices(in: folder)
         guard !mine.isEmpty else {
-            return "You have not started any agents that are still here. \(places)"
+            return "You have not started any agents that are still here. \(places)\n\(runtimes)"
         }
         let lines = mine.map { agent in
             "- \(agent.id.uuidString): \u{201C}\(agent.title ?? "Untitled")\u{201D} — \(helperStatus(agent))\(SessionLookup.labels(of: agent))"
         }
-        return ([places] + lines).joined(separator: "\n")
+        return ([places] + lines + [runtimes]).joined(separator: "\n")
     }
 
     /// What one of an agent's own agents is doing, in a few words the agent can repeat.

@@ -595,8 +595,15 @@ extension DaemonCore {
     /// `managesAgents` is whether the agent this makes may start agents of its own; it
     /// has to be known here because a session with settings is made now, as a draft,
     /// and its MCP server is fixed when it is made.
+    ///
+    /// A runtime that is named and cannot take an agent here — not installed, not
+    /// signed in, out of the pool — is refused before anything starts, naming the ones
+    /// that can (#117). `checksDefault` asks the same of the default runtime when none
+    /// is named: an agent starting one is told; a workflow that names none is left as
+    /// it always was, because a refusal of a `runtime:` its file never wrote would send
+    /// the person to the wrong line.
     func startRequest(settings: WorkflowSettings, folder: URL, prompt: String,
-                      managesAgents: Bool) async throws -> DaemonAPI.StartRequest {
+                      managesAgents: Bool, checksDefault: Bool = false) async throws -> DaemonAPI.StartRequest {
         let runtimeID = settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             // A runtime this version has never heard of. Not rehomed onto the default
@@ -607,6 +614,9 @@ extension DaemonCore {
                 setting: WorkflowSettings.Setting.runtime,
                 detail: "There is no runtime called \"\(runtimeID)\" — this version knows "
                     + RuntimeCatalog.builtIn.map(\.id).joined(separator: ", "))
+        }
+        if settings.runtimeID != nil || checksDefault, let refusal = unavailableRuntimeRefusal(runtime) {
+            throw SettingRefused(setting: WorkflowSettings.Setting.runtime, detail: refusal)
         }
 
         if settings.isEmpty {
