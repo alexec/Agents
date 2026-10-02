@@ -7,7 +7,9 @@ import type { DirectoryEntry } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { replace, route } from "../route";
-import { Changes } from "./Changes";
+import { Changes, Counts, StatusSquare } from "./Changes";
+import { canonical, index } from "../model/changeTree";
+import type { ChangesList } from "../protocol/generated";
 import { FileView } from "./files/FileView";
 import { extensionOf, nameOf, paneOf, pathOf, setPane, type Tab } from "./files/paneState";
 import { LiveDocument } from "./LiveDocument";
@@ -22,6 +24,15 @@ function Browser({ store, host, session, root }: { store: Store; host: string; s
   const entries = useSignal<DirectoryEntry[]>([]);
   const failed = useSignal<string | null>(null);
   const changedAt = store.filesChanged.value?.agentID === session ? store.filesChanged.value.at : 0;
+  // What changed, for the same rows as Changes: a changed file in its status colour, a folder
+  // with the total under it (#63). Asked while the pane is shown, again on each change.
+  const changes = useSignal<ChangesList | null>(null);
+  useEffect(() => {
+    let current = true;
+    void store.changes(host, session).then((l) => { if (current) changes.value = l; }, () => {});
+    return () => { current = false; };
+  }, [host, session, changedAt]);
+  const marks = index(changes.value?.files ?? []);
   useEffect(() => {
     failed.value = null;
     // A slow listing of the last folder must not land under this one (the window's #89).
@@ -43,7 +54,8 @@ function Browser({ store, host, session, root }: { store: Store; host: string; s
     return (
       <div class="file">
         <div class="crumbs">
-          <button class="link" onClick={() => setPane(session, { file: undefined })}>‹ {nameOf(folder)}</button>
+          {/* Back finds the folder with this file marked (#66). */}
+          <button class="link" onClick={() => setPane(session, { file: undefined, last: file })}>‹ {nameOf(folder)}</button>
           <span class="title">{nameOf(file)}</span>
           {(extensionOf(file) === "md" || extensionOf(file) === "markdown") && (
             <button class="link" onClick={() => setPane(session, { tab: "page", page: file, line: undefined })}>Open as Page</button>
@@ -65,10 +77,17 @@ function Browser({ store, host, session, root }: { store: Store; host: string; s
       <ul class="entries" aria-label={`Files in ${nameOf(folder)}`}>
         {entries.value.map((entry) => {
           const path = pathOf(entry.url);
+          const changed = entry.isDirectory ? undefined : marks.files.get(canonical(path));
+          const total = entry.isDirectory ? marks.folders.get(canonical(path)) : undefined;
+          const last = pane.last === path;
           return (
             <li key={entry.url}>
-              <button class="row entry" onClick={() => setPane(session, entry.isDirectory ? { folder: path } : { file: path })}>
-                <span class="title">{entry.isDirectory ? "📁" : "📄"} {entry.name}</span>
+              <button class={`row entry${last ? " chosen" : ""}`} aria-current={last}
+                onClick={() => setPane(session, entry.isDirectory ? { folder: path } : { file: path, last: path })}>
+                <span class="title">
+                  {changed ? <StatusSquare file={changed} /> : <span aria-hidden="true">{entry.isDirectory ? "📁" : "📄"}</span>} {entry.name}
+                </span>
+                {changed ? <Counts added={changed.added} removed={changed.removed} /> : total ? <Counts added={total.added} removed={total.removed} /> : null}
               </button>
             </li>
           );

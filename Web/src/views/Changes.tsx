@@ -1,7 +1,8 @@
-// What the agent changed, file by file (071 US4 scenario 2; the window's Changes pane): each file
-// with its state and line counts, and opened, its diff: git's hunks where the folder is a
+// What the agent changed, file by file (071 US4 scenario 2; the window's Changes pane): as a tree,
+// folders first with their totals (#63), each file with a square in its status colour and its line
+// counts, and opened, its diff: git's hunks where the folder is a
 // repository, else the agent's own edits as line diffs (`changes/file`). Marked by sign, weight
-// and a faint neutral wash, never red and green: the app's one colour means something went wrong.
+// and a faint neutral wash; only a file's status square is coloured, as the window's is (#63).
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { ChangedFile, ChangedFileDetail, ChangesList, DiffLine } from "../protocol/generated";
@@ -9,10 +10,26 @@ import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { lineDiff, wantsWhole } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
+import { build, lines, statusGlyph, statusPhrase, type Totals } from "../model/changeTree";
 
-const stateWords: Record<ChangedFile["state"], string> = {
-  modified: "Modified", added: "Added", deleted: "Deleted", binary: "Binary", renamed: "Renamed", untracked: "Untracked",
-};
+/** A changed file's square, in its status colour, with the status in words for a reader (#63). */
+export function StatusSquare({ file }: { file: ChangedFile }) {
+  const words = statusPhrase(file);
+  return <span class={`change-mark state-${file.state}`} role="img" aria-label={words} title={words[0]!.toUpperCase() + words.slice(1)}>{statusGlyph(file.state)}</span>;
+}
+
+/** "+3 −1", for a file or a folder's total. */
+export function Counts({ added, removed }: { added?: number | undefined; removed?: number | undefined }) {
+  if (!added && !removed) return null;
+  return (
+    <span class="counts">
+      {added ? <span class="added">+{added}</span> : null}
+      {removed ? <span class="removed"> −{removed}</span> : null}
+    </span>
+  );
+}
+
+const folderCounts = (t: Totals) => <Counts added={t.added} removed={t.removed} />;
 
 function Lines({ lines }: { lines: DiffLine[] }) {
   return (
@@ -53,6 +70,7 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
   const list = useSignal<ChangesList | null>(null);
   const detail = useSignal<ChangedFileDetail | null>(null);
   const failed = useSignal<string | null>(null);
+  const collapsed = useSignal<ReadonlySet<string>>(new Set());
   const open = paneOf(session).changed;
   // Read again whenever the agent's folders change.
   const changedAt = store.filesChanged.value?.agentID === session ? store.filesChanged.value.at : 0;
@@ -81,22 +99,34 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
   if (failed.value && !list.value) return <p class="hint">{failed.value}</p>;
   if (!list.value) return <p class="hint">Reading what changed…</p>;
   if (!list.value.files.length) return <p class="hint">Nothing has changed yet.</p>;
+  const shown = lines(build(list.value.files), collapsed.value);
+  const toggle = (key: string) => {
+    const next = new Set(collapsed.value);
+    if (!next.delete(key)) next.add(key);
+    collapsed.value = next;
+  };
   return (
     <div class="changes">
-      <ul class="changed-files" aria-label="Changed files">
-        {list.value.files.map((file) => (
-          <li key={file.path}>
-            <button class={`row changed${open === file.path ? " chosen" : ""}`} aria-current={open === file.path}
-              onClick={() => setPane(session, { changed: open === file.path ? undefined : file.path })}>
-              <span class="title">{file.relativePath ?? nameOf(file.path)}</span>
-              <span class="subtitle">
-                {stateWords[file.state]}
-                {file.added !== undefined && <span class="added"> +{file.added}</span>}
-                {file.removed !== undefined && <span class="removed"> −{file.removed}</span>}
-                {file.inProgress && " · being edited"}
-              </span>
+      <ul class="changed-files tree" aria-label="Changed files">
+        {shown.map(({ node, depth }) => node.kind === "folder" ? (
+          <li key={`folder:${node.key}`}>
+            <button class="row tree-row folder" style={{ paddingLeft: `${8 + depth * 14}px` }} aria-expanded={!collapsed.value.has(node.key)}
+              onClick={() => toggle(node.key)}>
+              <span class="chevron" aria-hidden="true">{collapsed.value.has(node.key) ? "▸" : "▾"}</span>
+              <span class="title">{node.name}</span>
+              {folderCounts(node.totals)}
             </button>
-            {open === file.path && (detail.value ? <Detail detail={detail.value} /> : <p class="hint">Reading the diff…</p>)}
+          </li>
+        ) : (
+          <li key={node.file.path}>
+            <button class={`row tree-row changed${open === node.file.path ? " chosen" : ""}`} style={{ paddingLeft: `${22 + depth * 14}px` }}
+              aria-current={open === node.file.path}
+              onClick={() => setPane(session, { changed: open === node.file.path ? undefined : node.file.path })}>
+              <StatusSquare file={node.file} />
+              <span class="title">{nameOf(node.file.path)}{node.file.inProgress && <span class="faint"> · being edited</span>}</span>
+              <Counts added={node.file.added} removed={node.file.removed} />
+            </button>
+            {open === node.file.path && (detail.value ? <Detail detail={detail.value} /> : <p class="hint">Reading the diff…</p>)}
           </li>
         ))}
       </ul>

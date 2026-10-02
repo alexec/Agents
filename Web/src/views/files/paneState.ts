@@ -11,6 +11,8 @@ export interface PaneState {
   folder?: string | undefined;
   /** The file open under Files. */
   file?: string | undefined;
+  /** The file last open, marked in its folder when Back comes to it (#66). */
+  last?: string | undefined;
   /** The live page, and the line the agent named. */
   page?: string | undefined;
   line?: number | undefined;

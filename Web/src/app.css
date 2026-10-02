@@ -741,3 +741,17 @@ button.remove:hover { opacity: 1; }
 .bar > .telling { margin: 0 4px 6px; }
 .send .spinner { border-color: color-mix(in srgb, var(--paper-ground) 35%, transparent); border-top-color: var(--paper-ground); }
 .sessions.greyed .row.session, .sessions.greyed .row.workflow { opacity: 0.55; }
+
+/* Changes as a tree (#63): a changed file's square in its status colour; folders with their totals. */
+.tree-row { display: flex; align-items: center; gap: 6px; }
+.tree-row .title { flex: 1; min-width: 0; }
+.tree-row .chevron { width: 10px; opacity: 0.55; font-size: 10px; }
+.counts { font-size: 11.5px; font-variant-numeric: tabular-nums; opacity: 0.7; white-space: nowrap; }
+.change-mark { display: inline-block; width: 14px; text-align: center; font-weight: 600; }
+.state-added { color: var(--tint-vouched); }
+.state-modified, .state-binary { color: var(--tint-attention); }
+.state-deleted { color: var(--tint-failure); }
+.state-renamed { color: var(--tint-link, #2f6fd1); }
+.state-untracked { opacity: 0.6; }
+.row.entry { display: flex; align-items: center; gap: 6px; }
+.row.entry .title { flex: 1; min-width: 0; }
