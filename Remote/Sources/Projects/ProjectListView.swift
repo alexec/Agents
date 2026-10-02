@@ -130,7 +130,8 @@ struct ProjectRow: View {
                     .accessibilityHidden(true)
             }
         }
-        .padding(.vertical, 2)
+        // No padding of its own (#104): the list's insets are the air, and a row of one
+        // line stays at the list's least height, which is also the size of a fingertip.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
