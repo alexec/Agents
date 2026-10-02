@@ -62,13 +62,16 @@ This file records only what planning had to settle on top of that.
 
 ## R5. `afterwards`
 
-- **Decision**: `raiseAgentEnding` takes `parks: Bool` from `move`, computed as `parkedNow`. That
-  covers two cases:
+- **Decision**: `afterwards` is `park` when the agent is parked once the ending is through, and
+  `stay` otherwise. That covers:
   - the agent's own `afterwards: park` on an ending it asked about;
   - the person's park while the turn ran (`whenTurnEnds`).
-
-  Otherwise `afterwards` is `stay`.
-- An agent already parked before this ending is `stay`: this ending did not park it.
+- **Found while building**: the rule can't be "this ending parked it". When an agent ends
+  without a report, the app holds `agent.finished` back and asks it for an outcome. The person's
+  park then lands on the first ending, and the finish is raised on the second. By then the agent
+  is already parked.
+- An agent the app resumes while parked (a wait's resume, for example) stays parked. It finishes
+  `park` too: it is parked afterwards.
 
 ## R6. Which details are sets, and how they compare
 

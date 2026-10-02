@@ -60,20 +60,35 @@ extension DaemonCore {
     /// something choosing to stop it; failed is everything that ended it that nobody
     /// chose. The old `agent-stopped` trigger answers to both (FR-022).
     @discardableResult
-    func raiseAgentEnding(_ agentID: UUID, next: AgentState, reason: EndedReason?, depth: Int) -> EventPosition? {
+    ///
+    /// `parks` is whether the agent is parked once this ending is through, by its own
+    /// ask or the person's park while the turn ran (073 FR-003), which `move` has
+    /// decided by now. Read as "parked afterwards" rather than "parked by this ending":
+    /// a finish held back for the outcome question is raised on the second ending, by
+    /// when the park the first one made has already happened.
+    /// The details are codes (073 FR-007, FR-008); the sentence keeps today's words.
+    func raiseAgentEnding(_ agentID: UUID, next: AgentState, reason: EndedReason?, depth: Int,
+                          parks: Bool = false) -> EventPosition? {
         guard let agent = agents[agentID] else { return nil }
         if next == .finished {
             let outcome = agent.report?.outcome
+            var details = ["afterwards": parks ? "park" : "stay"]
+            if let outcome { details["outcome"] = outcome.rawValue }
             return raiseAgentEvent("agent.finished", agentID,
                                    sentence: outcome.map { "finished: \($0.heading.lowercased())." } ?? "finished.",
-                                   details: outcome.map { ["outcome": $0.rawValue] } ?? [:], depth: depth)
+                                   details: details, depth: depth)
         }
         let words = reason?.summary?.lowercased() ?? "stopped"
         if Self.isChosenStop(reason) {
-            return raiseAgentEvent("agent.stopped", agentID, sentence: "was stopped.", details: ["by": words], depth: depth)
+            let by = switch reason {
+            case .cancelled: "you"
+            case .costLimit: "cost_limit"
+            default: "unknown"
+            }
+            return raiseAgentEvent("agent.stopped", agentID, sentence: "was stopped.", details: ["by": by], depth: depth)
         }
         return raiseAgentEvent("agent.failed", agentID, sentence: "ended in an error: \(words).",
-                               details: ["reason": words], depth: depth)
+                               details: ["reason": reason?.code ?? EndedReason.unrecognised.code], depth: depth)
     }
 
     static func isChosenStop(_ reason: EndedReason?) -> Bool {

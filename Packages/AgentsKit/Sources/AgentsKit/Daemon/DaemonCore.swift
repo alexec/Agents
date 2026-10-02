@@ -954,7 +954,7 @@ public actor DaemonCore {
             // The event first (042): it is what a waiting agent hears, and what the
             // log keeps. Workflows still fire from the line below until US3 moves them.
             let cause = raiseAgentEnding(agentID, next: next, reason: reasonThisEventSet ?? agent.endedReason,
-                                         depth: depth)
+                                         depth: depth, parks: agent.parking?.isParked == true)
             workflowRunFinished(agentID: agentID)
             workflowsRespond(to: next == .finished ? .finished : .stopped,
                              agentID: agentID, depth: depth, causingEvent: cause, endingRun: endingRun)
@@ -965,14 +965,16 @@ public actor DaemonCore {
             break
         }
         // Put away (#96), after the ending it came with, so a wait hears the finish first.
+        // With the outcome of its last report, when it made one (073 FR-005).
+        let lastOutcome = agent.report.map { ["outcome": $0.outcome.rawValue] } ?? [:]
         if parkedNow {
-            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.", depth: putAwayDepth,
-                            endingRun: endingRun)
+            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.", details: lastOutcome,
+                            depth: putAwayDepth, endingRun: endingRun)
         }
         if archivedNow {
-            let by = agent.archivedReason == .byAgent ? "another agent" : "you"
+            let by = agent.archivedReason == .byAgent ? "agent" : "you"
             raiseAgentEvent("agent.archived", agentID, sentence: "was archived.",
-                            details: ["by": by], depth: putAwayDepth, endingRun: endingRun)
+                            details: lastOutcome.merging(["by": by]) { $1 }, depth: putAwayDepth, endingRun: endingRun)
         }
         // Anything blocked on this agent (039). Closing is one write per blocked agent;
         // the resume it may clear is queued in that same moment and sent behind this

@@ -84,4 +84,67 @@ struct WorkflowTriggerEventTests {
         #expect(WorkflowTrigger.event(EventPattern("custom.release_ready")).summary
                 == "When an agent here publishes custom.release_ready")
     }
+
+    // MARK: 073
+
+    @Test func aDetailTakesAListInlineOrAsABlock() {
+        let workflow = triggers("""
+              - agent.finished:
+                  outcome: [done, nothing_to_do]
+              - agent.failed:
+                  reason:
+                    - allowance_spent
+                    - its allowance ran out
+                    - rate_limited
+              - agent.finished:
+                  labels: bug
+                  afterwards: park
+            """)
+        #expect(workflow.problem == nil)
+        #expect(workflow.triggers == [
+            .event(EventPattern("agent.finished", filters: ["outcome": DetailFilter(anyOf: ["done", "nothing_to_do"])!])),
+            .event(EventPattern("agent.failed", filters: [
+                "reason": DetailFilter(anyOf: ["allowance_spent", "allowance_spent", "rate_limited"])!])),
+            .event(EventPattern("agent.finished", filters: ["labels": "bug", "afterwards": "park"])),
+        ])
+    }
+
+    @Test func aWrongValueIsTheFilesProblemNamingTheRightOnes() {
+        let workflow = triggers("""
+              - agent.finished:
+                  outcome: complete
+            """)
+        #expect(workflow.problem == .unreadable("outcome on agent.finished is one of done, nothing_to_do, "
+                                                + "needs_answer, partly_done, stuck, blocked; \"complete\" is not one of them."))
+        let mapping = triggers("""
+              - agent.finished:
+                  outcome:
+                    done: yes
+            """)
+        guard case .unreadable(let detail)? = mapping.problem else { Issue.record("not refused"); return }
+        #expect(detail.contains("should be one value or a list of values"))
+    }
+
+    @Test func theTriggerTextAPatternWritesReadsBackAsTheSamePattern() throws {
+        for pattern in [EventPattern("agent.finished", filters: ["outcome": DetailFilter(anyOf: ["done", "nothing_to_do"])!,
+                                                                 "labels": "needs review"]),
+                        EventPattern("lease.released", filters: ["resource": "simulator", "how": "expired"])] {
+            let lines = pattern.asTrigger.split(separator: "\n").dropFirst().joined(separator: "\n")
+            let workflow = triggers(lines)
+            #expect(workflow.triggers == [.event(pattern)], "\(pattern.asTrigger)")
+        }
+    }
+
+    @Test func aListTravelsAsAnArrayAndAnOlderReaderShowsItWider() throws {
+        let trigger = WorkflowTrigger.event(EventPattern("agent.finished", filters: [
+            "outcome": DetailFilter(anyOf: ["done", "nothing_to_do"])!, "labels": "bug"]))
+        let data = try JSONEncoder().encode(trigger)
+        let wire = try JSONDecoder().decode(JSONValue.self, from: data)
+        #expect(wire["unrecognised"]?["keys"]?["outcome"] == .array([.string("done"), .string("nothing_to_do")]))
+        #expect(wire["unrecognised"]?["keys"]?["labels"] == .string("bug"))
+        #expect(try JSONDecoder().decode(WorkflowTrigger.self, from: data) == trigger)
+        // An older reader kept scalars only, so it read the trigger without the list.
+        let keys = wire["unrecognised"]?["keys"]?.objectValue ?? [:]
+        #expect(keys.compactMapValues(WorkflowTrigger.scalar) == ["labels": "bug"])
+    }
 }

@@ -1323,7 +1323,8 @@ public actor AppService {
                     "type": "object",
                     "description": """
                         Narrow them by their details, e.g. {"workflow": "nightly"} or \
-                        {"agent": "Fix login"}.
+                        {"agent": "Fix login"}. A list means any of them, e.g. \
+                        {"labels": "deploy", "outcome": ["done", "nothing_to_do"]}.
                         """,
                 ],
                 "from": [

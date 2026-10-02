@@ -649,4 +649,26 @@ struct AppServiceTests {
         let description = AppService.workflowTool["description"]?.stringValue ?? ""
         #expect(description.hasSuffix(EventCatalogue.describe()))
     }
+
+    // MARK: 073: where takes a list, and drops nothing
+
+    @Test func aWaitsWhereTakesAListAndRefusesWhatIsNotAValue() throws {
+        let call = AppService.eventCall(named: AppService.waitForEventToolName, .object([
+            "events": .array([.string("agent.finished")]),
+            "where": .object(["labels": .string("deploy"),
+                              "outcome": .array([.string("done"), .string("nothing_to_do")]),
+                              "attempt": .int(2)]),
+        ]))
+        guard case .success(.wait(_, _, let filters?, _, _, _))? = call else { Issue.record("not read"); return }
+        #expect(filters == ["labels": "deploy", "outcome": DetailFilter(anyOf: ["done", "nothing_to_do"])!,
+                            "attempt": "2"])
+
+        let bad = AppService.eventCall(named: AppService.waitForEventToolName, .object([
+            "events": .array([.string("agent.finished")]),
+            "where": .object(["outcome": .object(["is": .string("done")])]),
+        ]))
+        guard case .failure(let problem)? = bad else { Issue.record("not refused"); return }
+        #expect(problem.message.contains("\"outcome\" in where is not a value"))
+        #expect(problem.message.contains("a list of those"))
+    }
 }

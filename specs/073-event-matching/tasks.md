@@ -74,13 +74,13 @@ scratch-root walk is last.
 **Independent test**: an integration test finishes three fake-runtime agents, and only the one
 labelled `bug` that parks fires T1.
 
-- [ ] T012 [US1] Change `agentDetails(_:)` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+EventWaits.swift` to add:
+- [X] T012 [US1] Change `agentDetails(_:)` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+EventWaits.swift` to add:
   - `labels`: sorted label keys, comma-joined;
   - `runtime`: `agent.runtimeID`;
   - `started_by`: `agent` if `startedByAgent`, `workflow` if `startedByWorkflow`, else `person` (research R4).
-- [ ] T013 [US1] Add `afterwards` (`park` or `stay`, from `parkedNow`) in `raiseAgentEnding`, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Events.swift`, and pass it from `move` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`. Add `outcome` to `agent.parked` and `agent.archived` when the agent has a report.
-- [ ] T014 [US1] Add `outcome` to `workflow.completed` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Workflows.swift`, from the run's agent's report.
-- [ ] T015 [US1] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/`, beside the existing event or workflow trigger tests. Cover:
+- [X] T013 [US1] Add `afterwards` (`park` or `stay`, from `parkedNow`) in `raiseAgentEnding`, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Events.swift`, and pass it from `move` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`. Add `outcome` to `agent.parked` and `agent.archived` when the agent has a report.
+- [X] T014 [US1] Add `outcome` to `workflow.completed` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Workflows.swift`, from the run's agent's report.
+- [X] T015 [US1] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/`, beside the existing event or workflow trigger tests. Cover:
   - the event carries labels, runtime, started_by and afterwards;
   - a label added after the event leaves the logged event unchanged;
   - T1 fires on a labelled agent that parks, and not otherwise.
@@ -89,11 +89,11 @@ labelled `bug` that parks fires T1.
 
 **Goal**: all three readers take lists and refuse what they can't take.
 
-- [ ] T016 [US2] In `Packages/AgentsKit/Sources/AgentsKit/Workflows/WorkflowFile.swift`, read a sequence of scalars under a detail as a list, inline or as a block. Refuse anything else with `should be one value or a list of values`. Throw `badValue` problems with `problem.message`.
-- [ ] T017 [US2] Change `DaemonAPI.EventWaitRequest.where` to `[String: DetailFilter]?` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Events.swift`.
+- [X] T016 [US2] In `Packages/AgentsKit/Sources/AgentsKit/Workflows/WorkflowFile.swift`, read a sequence of scalars under a detail as a list, inline or as a block. Refuse anything else with `should be one value or a list of values`. Throw `badValue` problems with `problem.message`.
+- [X] T017 [US2] Change `DaemonAPI.EventWaitRequest.where` to `[String: DetailFilter]?` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Events.swift`.
   - In `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/AppService.swift`, `eventCall` reads lists and refuses any other value with the FR-016 sentence.
   - In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+EventWaits.swift`, `waitForEvent` resolves `agent` titles in each value.
-- [ ] T018 [P] [US2] Tests:
+- [X] T018 [P] [US2] Tests:
   - `WorkflowFile` lists, and `outcome: complete` as the problem (`Packages/AgentsKit/Tests/AgentsKitTests/Unit/`);
   - an `AppServiceTests` `where` list, and the refusal;
   - an `EventWaitTests` wait with a list that a `stuck` finish doesn't wake;
@@ -101,18 +101,18 @@ labelled `bug` that parks fires T1.
 
 ## Phase 5: User Story 3 — codes, not sentences (P2)
 
-- [ ] T019 [US3] Raise codes in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Events.swift`, keeping each sentence's words:
+- [X] T019 [US3] Raise codes in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Events.swift`, keeping each sentence's words:
   - `agent.failed reason`: `EndedReason.code`;
   - `agent.stopped by`: `you`, `cost_limit` or `unknown`.
-- [ ] T020 [US3] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, `agent.archived by` becomes `you` or `agent`.
-- [ ] T021 [US3] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Workflows.swift`, `workflow.refused reason` becomes `WorkflowRefusal.code`.
-- [ ] T022 [US3] Update tests that asserted the old detail values (grep `"reason"`, `"by"` in `Packages/AgentsKit/Tests`), and add one asserting the sentence is unchanged.
+- [X] T020 [US3] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, `agent.archived by` becomes `you` or `agent`.
+- [X] T021 [US3] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Workflows.swift`, `workflow.refused reason` becomes `WorkflowRefusal.code`.
+- [X] T022 [US3] Update tests that asserted the old detail values (grep `"reason"`, `"by"` in `Packages/AgentsKit/Tests`), and add one asserting the sentence is unchanged.
 
 ## Phase 6: User Story 4 — wrong values named (P2)
 
 Built in T006. The tests are in T009 and T018. This phase only checks the gaps.
 
-- [ ] T023 [US4] Check that a wait with a wrong value is refused with the same sentence as the file's problem: add it to `Packages/AgentsKit/Tests/AgentsKitTests/Integration/EventWaitTests.swift`.
+- [X] T023 [US4] Check that a wait with a wrong value is refused with the same sentence as the file's problem: add it to `Packages/AgentsKit/Tests/AgentsKitTests/Integration/EventWaitTests.swift`.
 
 ## Phase 7: User Story 5 — words everywhere, and Copy as trigger (P3)
 

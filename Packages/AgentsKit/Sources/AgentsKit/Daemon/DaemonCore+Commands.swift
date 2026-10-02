@@ -1717,7 +1717,8 @@ extension DaemonCore {
         }
         changed(agent)
         if agent.parking?.isParked == true {
-            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.")
+            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.",
+                            details: agent.report.map { ["outcome": $0.outcome.rawValue] } ?? [:])
         }
         reconsider()
     }

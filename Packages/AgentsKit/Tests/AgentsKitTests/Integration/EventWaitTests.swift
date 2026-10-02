@@ -144,6 +144,34 @@ struct EventWaitTests {
         #expect(event?.consequences == [.woke(agentID: a, title: "Waiter")])
     }
 
+    /// Any of, in a wait (073 US2): a `stuck` finish does not wake a wait for done or
+    /// nothing to do, and the matching one does.
+    @Test func aListInWhereWaitsForAnyOfItsValues() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let (a, token) = try await agent(core, in: work, "Waiter")
+        let call = Task {
+            try await wait(core, token, ["agent.finished"],
+                           where: ["outcome": DetailFilter(anyOf: ["done", "nothing_to_do"])!])
+        }
+        try await eventually("held") { await isHeld(core, a) }
+        await core.raise(draft("agent.finished", in: work, ["agent": UUID().uuidString, "outcome": "stuck"]))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await isHeld(core, a), "a stuck finish does not wake it")
+        await core.raise(draft("agent.finished", in: work, ["agent": UUID().uuidString, "outcome": "nothing_to_do"]))
+        #expect(try await call.value.hasPrefix("agent.finished happened at "))
+    }
+
+    /// A wrong value is refused in a wait with the sentence a file's problem says (073 US4).
+    @Test func aWrongValueInAWaitIsRefusedNamingTheRightOnes() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let (_, token) = try await agent(core, in: work, "Waiter")
+        let refused = await refusal { _ = try await wait(core, token, ["agent.finished"], where: ["outcome": "complete"]) }
+        #expect(refused?.message == "outcome on agent.finished is one of done, nothing_to_do, needs_answer, "
+                + "partly_done, stuck, blocked; \"complete\" is not one of them.")
+    }
+
     /// `server.offline` and `server.online` come from the window, which holds the
     /// servers' connections: its word wakes a wait on the server it names, and no other.
     @Test func theWindowSayingAServerWentWakesAWaitOnIt() async throws {
