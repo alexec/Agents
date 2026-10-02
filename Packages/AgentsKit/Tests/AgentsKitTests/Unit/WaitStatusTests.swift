@@ -45,7 +45,7 @@ struct WaitStatusTests {
         blocked.report = WorkReport(outcome: .blocked, message: "waiting", at: since,
                                     block: Block(waits: [Wait(agentID: fixLogin, nameAtReport: "Fix login")]))
         var waiting = agent()
-        waiting.eventWait = EventWait(patterns: [EventPattern("agent.finished", filters: ["agent": fixLogin.uuidString])],
+        waiting.eventWait = EventWait(patterns: [EventPattern("agent.finished", filters: ["agent": DetailFilter(fixLogin.uuidString)])],
                                       from: 0, since: since)
 
         let block = WaitStatus.of(blocked, names: names)

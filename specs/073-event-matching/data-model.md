@@ -1,6 +1,6 @@
 # Data model: Finer event matching, step 1
 
-## EventFilter (new, AgentsKitCore)
+## DetailFilter (new, AgentsKitCore)
 
 One detail's wanted values.
 
@@ -13,7 +13,7 @@ One detail's wanted values.
   - On a set detail, the detail is split on `,` and each value is compared by
     `SessionLabelPolicy.key`.
   - Otherwise the comparison is exact string equality, as today.
-- A list of one is the single value (FR-014): `EventFilter(["done"]) == EventFilter("done")`.
+- A list of one is the single value (FR-014): `DetailFilter(["done"]) == DetailFilter("done")`.
 - It is `ExpressibleByStringLiteral`, so `["workflow": "nightly"]` still reads as a pattern's
   filters.
 - **Codable**: a single value is a string. A list is an array of strings. It decodes either.
@@ -48,7 +48,7 @@ One entry per detail a catalogue kind carries.
 | Field | Type | Was |
 |---|---|---|
 | `name` | `String` | same |
-| `filters` | `[String: EventFilter]` | `[String: String]` |
+| `filters` | `[String: DetailFilter]` | `[String: String]` |
 
 **Encoding** (research R1):
 

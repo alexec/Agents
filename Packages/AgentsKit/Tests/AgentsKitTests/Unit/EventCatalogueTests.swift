@@ -39,6 +39,27 @@ struct EventCatalogueTests {
         #expect(text.contains("agent.*"))
     }
 
+    @Test func everyAgentEventCarriesTheAgentsContext() {
+        for kind in EventCatalogue.kinds(in: .agent) + [EventCatalogue.kind(named: "cost.limit_reached")!] {
+            for key in ["labels", "runtime", "started_by"] { #expect(kind.details.contains(key), "\(kind.name) \(key)") }
+        }
+        #expect(EventCatalogue.kind(named: "agent.finished")!.details.contains("afterwards"))
+        for name in ["agent.parked", "agent.archived", "workflow.completed"] {
+            #expect(EventCatalogue.kind(named: name)!.details.contains("outcome"), "\(name)")
+        }
+        #expect(EventCatalogue.kind(named: "agent.finished")!.detail("labels")?.isSet == true)
+        #expect(EventCatalogue.kind(named: "lease.granted")!.details == ["resource", "agent"])
+    }
+
+    @Test func theDescriptionListsFixedValuesAndTheContextOnce() {
+        let text = EventCatalogue.describe()
+        #expect(text.contains("- agent.finished [agent, outcome=done|nothing_to_do|needs_answer|partly_done|stuck|blocked, "
+                              + "afterwards=park|stay, …]"))
+        #expect(text.contains("Every agent event also carries labels"))
+        #expect(text.contains("started_by=person|workflow|agent"))
+        #expect(text.contains("outcome: [done, nothing_to_do]"))
+    }
+
     @Test func customNamesAreLowercaseAndShort() {
         #expect(EventCatalogue.isCustom("custom.build_green"))
         #expect(EventCatalogue.isCustom("custom.v2"))

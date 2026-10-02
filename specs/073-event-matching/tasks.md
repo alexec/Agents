@@ -19,42 +19,42 @@ scratch-root walk is last.
 
 **⚠️ Every story depends on this phase.**
 
-- [ ] T002 Add `EventFilter` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EventFilter.swift`. Its rules:
+- [X] T002 Add `DetailFilter` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/DetailFilter.swift`. Its rules:
   - It holds `values: [String]`, never empty. A list of one equals the single value.
   - It is `ExpressibleByStringLiteral`.
   - `matches(_ detail: String?, isSet: Bool)`: a missing detail never matches. A set detail is split on `,` and compared by `SessionLabelPolicy.key`. Otherwise the match is exact.
   - Its words: `label` joins with `|`, `capsule` joins with ` | `, and `yaml` is `[a, b]` for a list, each value through `EventPattern.yamlScalar`.
   - Codable: a string, or an array of strings.
-- [ ] T003 Add `EventDetail` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EventDetail.swift`. Its fields:
+- [X] T003 Add `EventDetail` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EventDetail.swift`. Its fields:
   - `key`, `isSet`, `isContext`;
   - `values: [String]?`;
   - old words, each matched exactly or by a fixed prefix or suffix, mapping to a code;
   - `words(for values: [String]) -> String`, per contracts/catalogue.md.
-- [ ] T004 Add `code` to `EndedReason` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EndedReason.swift`, and to `WorkflowRefusal` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkflowOutcome.swift`. Both are snake_case of the case name; FR-007 and FR-010 list the values.
-- [ ] T005 Change `EventKind` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EventCatalogue.swift`:
+- [X] T004 Add `code` to `EndedReason` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EndedReason.swift`, and to `WorkflowRefusal` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkflowOutcome.swift`. Both are snake_case of the case name; FR-007 and FR-010 list the values.
+- [X] T005 Change `EventKind` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EventCatalogue.swift`:
   - It takes `[EventDetail]`, and `details: [String]` becomes a computed list of keys.
   - Every agent kind and `cost.limit_reached` carry the context details.
   - `agent.finished` adds `afterwards`; `agent.parked`, `agent.archived` and `workflow.completed` add `outcome`.
   - Every fixed set comes from contracts/catalogue.md.
   - Add `detail(_ key:, in name:)`, and union lookups for `subject.*`.
   - `describe()` lists the fixed values, and says once that agent events carry the context.
-- [ ] T006 Change `EventPattern` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EventPattern.swift`:
-  - `filters` becomes `[String: EventFilter]`.
+- [X] T006 Change `EventPattern` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/EventPattern.swift`:
+  - `filters` becomes `[String: DetailFilter]`.
   - `matches` asks the catalogue for `isSet`. A `custom.` event is never a set.
-  - `parse(_:filters: [String: EventFilter])` maps old words to codes and checks values. The new `badValue(name:key:valid:given:)` problem names the first wrong value.
+  - `parse(_:filters: [String: DetailFilter])` maps old words to codes and checks values. The new `badValue(name:key:valid:given:)` problem names the first wrong value.
   - The bad-key sentence is kept.
   - Codable follows research R1: `filters` holds singles and lists joined by `|`, plus `anyOf`. The decoder maps old words.
   - `matching(_:)` leaves out `agent` and the context details, except on `custom.` events.
   - `asTrigger` writes inline lists.
   - `summary` uses each detail's words, with "and …" phrases last; `label` joins a list with `|`.
-- [ ] T007 Update callers that build patterns from `[String: String]` to compile:
+- [X] T007 Update callers that build patterns from `[String: String]` to compile:
   - `Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkflowTrigger.swift`: the `patterns` filter and wire encode/decode, with lists as JSON arrays;
-  - `Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkflowTriggerWords.swift`: `filters` becomes `[String: EventFilter]`;
+  - `Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkflowTriggerWords.swift`: `filters` becomes `[String: DetailFilter]`;
   - `Packages/AgentsKit/Sources/AgentsKitCore/Model/WaitStatus.swift`: the agent filter.
-- [ ] T008 [P] Unit tests in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/EventFilterTests.swift`:
+- [X] T008 [P] Unit tests in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/DetailFilterTests.swift`:
   - any of, a list of one, set matching with case and spaces, an empty labels detail, a missing detail;
   - the Codable forms.
-- [ ] T009 [P] Extend `Packages/AgentsKit/Tests/AgentsKitTests/Unit/EventPatternTests.swift`. Cover:
+- [X] T009 [P] Extend `Packages/AgentsKit/Tests/AgentsKitTests/Unit/EventPatternTests.swift`. Cover:
   - SC-001: each of T1, T2, T4, T6, T9, T10, T12, T14-less-except and W1 matches its event and not a near miss;
   - US4: a bad value, a list with one bad value, and an open detail accepting anything;
   - `subject.*` checked against the union;
@@ -62,8 +62,8 @@ scratch-root walk is last.
   - the encoding: singles byte for byte as before (FR-028), and a list decoded by a stand-in for the old `[String: String]` decoder (FR-029);
   - `summary`, `label` and `asTrigger` for T1 and T4, including the asTrigger round trip (FR-024);
   - `matching` dropping `agent` and the context details (FR-025), with a `custom.` event kept whole.
-- [ ] T010 [P] Extend `Packages/AgentsKit/Tests/AgentsKitTests/Unit/EventCatalogueTests.swift`: `describe()` lists the values and the context line, and every agent kind carries the context details.
-- [ ] T011 Fix existing tests that build `EventPattern` from `[String: String]` variables. The literal forms keep compiling.
+- [X] T010 [P] Extend `Packages/AgentsKit/Tests/AgentsKitTests/Unit/EventCatalogueTests.swift`: `describe()` lists the values and the context line, and every agent kind carries the context details.
+- [X] T011 Fix existing tests that build `EventPattern` from `[String: String]` variables. The literal forms keep compiling.
 
 **Checkpoint**: the matcher and its words are done and tested. Commit.
 
@@ -90,7 +90,7 @@ labelled `bug` that parks fires T1.
 **Goal**: all three readers take lists and refuse what they can't take.
 
 - [ ] T016 [US2] In `Packages/AgentsKit/Sources/AgentsKit/Workflows/WorkflowFile.swift`, read a sequence of scalars under a detail as a list, inline or as a block. Refuse anything else with `should be one value or a list of values`. Throw `badValue` problems with `problem.message`.
-- [ ] T017 [US2] Change `DaemonAPI.EventWaitRequest.where` to `[String: EventFilter]?` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Events.swift`.
+- [ ] T017 [US2] Change `DaemonAPI.EventWaitRequest.where` to `[String: DetailFilter]?` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Events.swift`.
   - In `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/AppService.swift`, `eventCall` reads lists and refuses any other value with the FR-016 sentence.
   - In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+EventWaits.swift`, `waitForEvent` resolves `agent` titles in each value.
 - [ ] T018 [P] [US2] Tests:
@@ -116,9 +116,9 @@ Built in T006. The tests are in T009 and T018. This phase only checks the gaps.
 
 ## Phase 7: User Story 5 — words everywhere, and Copy as trigger (P3)
 
-- [ ] T024 [US5] Show each filter with `EventFilter.capsule` in the Mac Triggers capsules, in `App/Sources/Projects/WorkflowPage.swift`. Copy as trigger (`App/Sources/Events/EventDetailView.swift`) already reads `EventPattern.matching`, which T006 changed.
+- [ ] T024 [US5] Show each filter with `DetailFilter.capsule` in the Mac Triggers capsules, in `App/Sources/Projects/WorkflowPage.swift`. Copy as trigger (`App/Sources/Events/EventDetailView.swift`) already reads `EventPattern.matching`, which T006 changed.
 - [ ] T025 [US5] Check the Remote: `Remote/Sources/Projects/WorkflowPage.swift` and `WorkflowsSection.swift` show `workflow.summary` from AgentsKitCore, so they need no change. Build the Remote scheme for the generic simulator to confirm it compiles.
-- [ ] T026 [US5] Add `Packages/WebTypes/Overrides/EventPattern.ts` and `EventFilter.ts`, then run `scripts/web.sh types`.
+- [ ] T026 [US5] Add `Packages/WebTypes/Overrides/EventPattern.ts` and `DetailFilter.ts`, then run `scripts/web.sh types`.
 - [ ] T027 [US5] In `Web/src/model/workflows.ts`, `triggerSummary`, `triggerFilters` and `causePhrase` read lists. Filters are said in words as in contracts/catalogue.md: labels, runtime, outcome, afterwards, started_by, and the reason and `by` codes. Add web tests under `Web/test/`.
 - [ ] T028 [US5] Rebuild the page with `scripts/web.sh build`, then run `scripts/web.sh check`.
 - [ ] T029 [US5] Add the 073 row to `specs/071-web-remote/walks/parity.md`.

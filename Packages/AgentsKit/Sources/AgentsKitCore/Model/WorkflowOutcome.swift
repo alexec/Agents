@@ -131,6 +131,28 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         }
     }
 
+    /// The refusal as `workflow.refused` carries it, for a filter to name (073 FR-010).
+    /// The sentence the event says stays `message`.
+    public var code: String {
+        switch self {
+        case .chainTooDeep: return "chain_too_deep"
+        case .runInFlight: return "run_in_flight"
+        case .archived: return "archived"
+        case .disabled: return "disabled"
+        case .overLimit: return "over_limit"
+        case .unreadable: return "unreadable"
+        case .triggerNotSupported: return "trigger_not_supported"
+        case .agentUnavailable: return "agent_unavailable"
+        case .noTriggeringAgent: return "no_triggering_agent"
+        case .missedWhileClosed: return "missed_while_closed"
+        case .folderGone: return "folder_gone"
+        case .dayLimitReached: return "day_limit_reached"
+        case .settingRefused: return "setting_refused"
+        case .awaitingApproval: return "awaiting_approval"
+        case .coolingDown: return "cooling_down"
+        }
+    }
+
     /// Whether somebody has to do something, or whether this sorts itself out.
     ///
     /// Only the first kind earns colour on the project page. Colouring every refusal

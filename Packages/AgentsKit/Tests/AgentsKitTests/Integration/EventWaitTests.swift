@@ -73,7 +73,7 @@ struct EventWaitTests {
         }
     }
 
-    private func wait(_ core: DaemonCore, _ token: String, _ events: [String], where filters: [String: String]? = nil,
+    private func wait(_ core: DaemonCore, _ token: String, _ events: [String], where filters: [String: DetailFilter]? = nil,
                       from: EventPosition? = nil, until: Int? = nil) async throws -> String {
         try await calling(core, token) { t in
             try await core.waitForEvent(.init(token: t, events: events, where: filters, from: from, untilMinutes: until))

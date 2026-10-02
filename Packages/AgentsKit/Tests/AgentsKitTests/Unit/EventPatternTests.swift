@@ -12,7 +12,7 @@ struct EventPatternTests {
               scope: .project(folder: folder), sentence: "", details: details)
     }
 
-    private func pattern(_ name: String, _ filters: [String: String] = [:]) throws -> EventPattern {
+    private func pattern(_ name: String, _ filters: [String: DetailFilter] = [:]) throws -> EventPattern {
         try EventPattern.parse(name, filters: filters).get()
     }
 

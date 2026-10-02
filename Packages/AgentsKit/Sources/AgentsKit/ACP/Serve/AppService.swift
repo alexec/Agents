@@ -133,7 +133,7 @@ public actor AppService {
 
     /// One of the three event calls (042), as the agent made it.
     public enum EventCall: Sendable, Equatable {
-        case wait(action: String?, events: [String]?, where: [String: String]?, from: Int64?,
+        case wait(action: String?, events: [String]?, where: [String: DetailFilter]?, from: Int64?,
                   untilMinutes: Int?, limit: Int?)
         case cancel
         case publish(name: String, message: String?, details: [String: String]?)
@@ -477,6 +477,21 @@ public actor AppService {
             }
             return out
         }
+        /// Each key's value, one or a list (073 FR-016). The first key holding
+        /// anything else, which used to be dropped without a word.
+        func readFilters(_ value: JSONValue?) -> Result<[String: DetailFilter]?, AgentCallProblem> {
+            guard let object = value?.objectValue else { return .success(nil) }
+            var out: [String: DetailFilter] = [:]
+            for key in object.keys.sorted() {
+                guard let filter = object[key].flatMap(WorkflowTrigger.filter) else {
+                    return .failure(AgentCallProblem(stringLiteral:
+                        "Nothing is waited for: the \"\(key)\" in where is not a value. A value is text, "
+                        + "a number, true or false, or a list of those, e.g. {\"outcome\": [\"done\", \"nothing_to_do\"]}."))
+                }
+                out[key] = filter
+            }
+            return .success(out)
+        }
         func integer(_ value: JSONValue?) -> Int? {
             if let number = value?.intValue { return number }
             return value?.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
@@ -485,8 +500,13 @@ public actor AppService {
             var events = arguments?["events"]?.arrayValue?.compactMap(\.stringValue)
             // One name given as a string rather than a list of one.
             if events == nil, let one = arguments?["events"]?.stringValue { events = [one] }
+            let filters: [String: DetailFilter]?
+            switch readFilters(arguments?["where"]) {
+            case .success(let read): filters = read
+            case .failure(let problem): return .failure(problem)
+            }
             return .success(.wait(action: arguments?["action"]?.stringValue, events: events,
-                                  where: strings(arguments?["where"]),
+                                  where: filters,
                                   from: integer(arguments?["from"]).map(Int64.init),
                                   untilMinutes: integer(arguments?["until_minutes"]),
                                   limit: integer(arguments?["limit"])))

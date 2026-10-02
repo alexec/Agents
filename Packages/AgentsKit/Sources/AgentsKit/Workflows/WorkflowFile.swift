@@ -238,12 +238,22 @@ public enum WorkflowFile {
             // detail it does not carry is a mistake worth saying; a dotted name it does
             // not know is from a later version, and is kept whole like any other.
             if name.contains(".") {
-                var filters: [String: String] = [:]
+                // One value, or a list of them meaning any of (073 FR-015), inline or as
+                // a block, as `days:` already is.
+                var filters: [String: DetailFilter] = [:]
                 for (key, value) in keys {
-                    guard let text = value.scalar else {
-                        throw YAMLNode.Failure("The \"\(key)\" under \"\(name)\" should be one value")
+                    let filter: DetailFilter?
+                    switch value {
+                    case .scalar(let text): filter = DetailFilter(text)
+                    case .sequence(let items):
+                        let texts = items.compactMap(\.scalar)
+                        filter = texts.count == items.count ? DetailFilter(anyOf: texts) : nil
+                    case .mapping: filter = nil
                     }
-                    filters[key] = text
+                    guard let filter else {
+                        throw YAMLNode.Failure("The \"\(key)\" under \"\(name)\" should be one value or a list of values")
+                    }
+                    filters[key] = filter
                 }
                 switch EventPattern.parse(name, filters: filters) {
                 case .success(let pattern):
@@ -252,6 +262,8 @@ public enum WorkflowFile {
                     throw YAMLNode.Failure(valid.isEmpty
                         ? "\"\(kind)\" takes no settings, not \(key)"
                         : "\"\(kind)\" takes \(valid.joined(separator: ", ")), not \(key)")
+                case .failure(let problem) where problem.isBadValue:
+                    throw YAMLNode.Failure(problem.message)
                 case .failure:
                     break
                 }

@@ -8,7 +8,7 @@ with Alex's four decisions taken as recommended there.
 
 ## Summary
 
-A filter stops being one string and becomes `EventFilter`: one value or a list meaning "any of".
+A filter stops being one string and becomes `DetailFilter`: one value or a list meaning "any of".
 `EventPattern.matches` stays the one matcher for triggers and waits. It asks the catalogue
 whether a detail is a **set** (`labels`), and compares a set detail by label key.
 
@@ -86,7 +86,7 @@ specs/073-event-matching/
 ├── spec.md
 ├── plan.md          # this file
 ├── research.md      # decisions taken while planning (R1–R8)
-├── data-model.md    # EventFilter, EventDetail, EventPattern encoding
+├── data-model.md    # DetailFilter, EventDetail, EventPattern encoding
 ├── contracts/
 │   ├── patterns.md  # file, wait and wire forms; problem sentences
 │   └── catalogue.md # every detail's values, words and old-word mapping
@@ -98,15 +98,15 @@ specs/073-event-matching/
 
 ```text
 Packages/AgentsKit/Sources/AgentsKitCore/Model/
-├── EventFilter.swift           # new: one value or any of; matches(detail:set:)
+├── DetailFilter.swift           # new: one value or any of; matches(detail:set:)
 ├── EventDetail.swift           # new: a catalogue detail: key, set, values, old words, phrase
 ├── EventCatalogue.swift        # details become [EventDetail]; describe() lists values
-├── EventPattern.swift          # filters: [String: EventFilter]; parse checks values; words
+├── EventPattern.swift          # filters: [String: DetailFilter]; parse checks values; words
 ├── WorkflowTrigger.swift       # wire decode/encode keeps lists
 ├── WorkflowTriggerWords.swift  # filters for the capsules
 ├── EndedReason.swift           # `code`
 └── WorkflowOutcome.swift       # WorkflowRefusal.code
-Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Events.swift  # where: [String: EventFilter]
+Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Events.swift  # where: [String: DetailFilter]
 Packages/AgentsKit/Sources/AgentsKit/
 ├── Workflows/WorkflowFile.swift            # lists under a detail
 ├── ACP/Serve/AppService.swift              # where: lists, refuse anything else

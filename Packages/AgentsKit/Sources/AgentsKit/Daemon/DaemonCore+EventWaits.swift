@@ -41,7 +41,9 @@ extension DaemonCore {
             throw eventRefusal(EventWords.badDeadline())
         }
         var filters = request.where ?? [:]
-        if let named = filters["agent"] { filters["agent"] = try agentReference(named, for: caller) }
+        if let named = filters["agent"] {
+            filters["agent"] = DetailFilter(anyOf: try named.values.map { try agentReference($0, for: caller) }) ?? named
+        }
         var patterns: [EventPattern] = []
         for name in names {
             switch EventPattern.parse(name, filters: filters) {

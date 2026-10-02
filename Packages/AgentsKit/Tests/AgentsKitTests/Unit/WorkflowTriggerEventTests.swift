@@ -45,7 +45,7 @@ struct WorkflowTriggerEventTests {
                   branch: main
             """)
         guard case .unreadable(let detail)? = workflow.problem else { Issue.record("not refused"); return }
-        #expect(detail.contains("\"workflow.completed\" takes workflow, agent, not branch"))
+        #expect(detail.contains("\"workflow.completed\" takes workflow, agent, outcome, not branch"))
     }
 
     @Test func aDottedNameThisVersionDoesNotKnowStaysInert() {

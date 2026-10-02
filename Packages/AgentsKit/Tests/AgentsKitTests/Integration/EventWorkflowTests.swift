@@ -221,7 +221,7 @@ struct EventWorkflowTests {
         let token = UUID().uuidString
         await core.bindAppToken(token, to: waiter)
         let answer = try await core.waitForEvent(.init(token: token, events: ["agent.finished"],
-                                                       where: ["agent": own.id.uuidString], from: 0))
+                                                       where: ["agent": DetailFilter(own.id.uuidString)], from: 0))
         #expect(answer.hasPrefix("agent.finished happened at "))
         let finished = await core.eventLog.events.last { $0.name == "agent.finished" && $0.details["agent"] == own.id.uuidString }
         #expect(finished?.consequences.contains { if case .woke(waiter, _) = $0 { return true } else { return false } } == true)
