@@ -64,6 +64,7 @@ nav:
       - how-to/index.md
       - how-to/set-up-on-this-mac.md
       - how-to/connect-a-window-or-phone.md
+      - how-to/use-agents-in-a-browser.md
       - how-to/add-a-server.md
       - how-to/run-the-control-plane-in-the-cloud.md
       - how-to/run-several-copies.md
@@ -90,6 +91,7 @@ nav:
       - how-to/attach-files.md
       - how-to/read-an-agents-changes.md
       - how-to/follow-a-live-document.md
+      - how-to/look-at-an-html-page.md
       - how-to/wait-for-something.md
   - Reference:
       - reference/index.md

@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: Pair a window on another Mac, or an iPhone or iPad, with your control plane, change what it may do, and forget it.
+description: Pair a window on another Mac, an iPhone or iPad, or a browser on this Mac with your control plane, change what it may do, and forget it.
 ---
 
 # Connect a window or phone
@@ -62,6 +62,19 @@ An iPhone or iPad whose Agents predates the control plane can't read these codes
 **That isn't a pairing code from Agents on your Mac.** Install the current Agents on it
 first.
 
+### Connect a browser on this Mac
+
+1. In a paired window, open **Settings ▸ Control plane**, and click **Show** beside
+   **Clients**.
+2. Click **Pair a Browser…**. Under **It may**, **what a phone can (Device)** is chosen
+   first; leave it unless the browser needs to do everything. Click **Copy**.
+3. In Safari or Chrome on the Mac that runs Agents Host, open **http://localhost:8792**,
+   paste the code, and click **Connect**.
+
+In Agents Host, **Pair a Window or Phone…** with **A browser on this Mac** chosen gives the
+same code. Only a browser on that Mac can use it. See
+[Use Agents in a browser](use-agents-in-a-browser.md) for what the page can do.
+
 ### Change what a client may do
 
 1. Open **Settings ▸ Control plane**, and click **Show** beside **Clients**.
@@ -99,4 +112,5 @@ The app will not let you demote or forget the last operator, and says why.
 ## Related
 
 - [The control plane](../explanation/control-plane.md).
+- [Use Agents in a browser](use-agents-in-a-browser.md).
 - [Answer a question or a permission request](answer-a-question.md).

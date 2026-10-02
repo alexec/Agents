@@ -26,6 +26,10 @@ On a Mac, Agents is two apps:
   this Mac's agents, and optionally the control plane every window, phone and server
   connects to, kept running by macOS.
 
+Beside the window and the iPhone and iPad app, Agents Host serves Agents as a web page for
+a browser on this Mac, at `http://localhost:8792`, paired with a code like a phone. See
+[Use Agents in a browser](https://alexec.github.io/Agents/how-to/use-agents-in-a-browser/).
+
 The control plane is yours: on your Mac through Agents Host, or as several copies of
 `agents-control` in containers on hosting you rent, sharing an S3-compatible bucket. A
 Linux server becomes a host by running one command the window shows. See
@@ -48,6 +52,21 @@ The schemes:
 | `AgentsStore` | the App Store window: sandboxed, no helpers, reaches everything through a control plane |
 | `AgentsHost` | Agents Host, carrying `agentsd`, `agents-control` and `agents-relay` |
 | `Remote` | the iPhone and iPad app |
+
+The web page lives in `Web/`: Preact and TypeScript, bundled by esbuild. Its build,
+`Web/dist`, is checked in with a `MANIFEST` of hashes, and Agents Host carries it, so
+building Agents needs no Node. So are its protocol types, `Web/src/protocol/generated.ts`,
+generated from the Swift source. Only changing the web app, or a protocol type in Swift,
+needs anything more, and `scripts/web.sh` does it:
+
+```sh
+scripts/web.sh types   # regenerate the TypeScript types after changing a DaemonAPI type
+scripts/web.sh build   # rebuild Web/dist after changing Web/ (needs the Node in Web/.node-version)
+scripts/web.sh check   # what CI checks: types fresh, dist matching its manifest, and with Node, the tests
+```
+
+A test fails, in Swift as well as in Node, when `Web/dist` or `generated.ts` is out of
+date with its source.
 
 From the command line:
 

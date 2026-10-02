@@ -12,8 +12,10 @@ something particular done.
 
 - [Set up Agents on this Mac](set-up-on-this-mac.md): install Agents Host, run your
   agents and the control plane here, and pair the window.
-- [Connect a window or phone](connect-a-window-or-phone.md): pair another Mac, an iPhone
-  or an iPad, change what it may do, and forget it.
+- [Connect a window or phone](connect-a-window-or-phone.md): pair another Mac, an iPhone,
+  an iPad or a browser, change what it may do, and forget it.
+- [Use Agents in a browser](use-agents-in-a-browser.md): open Agents in Safari or Chrome on
+  the Mac that runs Agents Host, pair it once, and forget it.
 - [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
   control plane.
 - [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md): on a

@@ -17,8 +17,8 @@ A **host** is a machine that runs agents. Your Mac is one, once Agents Host is i
 it. A Linux server is another, and so is a second Mac. A host owns its agents: it starts
 their runtimes, holds their conversations and keeps their records on its own disk.
 
-A **client** is a screen: the Agents window on a Mac, or Agents on an iPhone or iPad. A
-client runs nothing. It shows what the hosts hold and passes on what you type and click.
+A **client** is a screen: the Agents window on a Mac, Agents on an iPhone or iPad, or a
+browser on the Mac that runs the control plane. A client runs nothing. It shows what the hosts hold and passes on what you type and click.
 
 The **control plane** sits between them. Every host and every client connects to it, and
 it sends each request to the host it concerns and each update to the clients that should
@@ -91,6 +91,38 @@ The control plane checks the grant before a request reaches a host, and the host
 again. You can change a grant, or forget a client, in **Settings ▸ Control plane ▸
 Clients**; forgetting cuts the client off at once. The app will not let you demote or
 forget the last operator, because nothing could then undo it.
+
+## A browser on this Mac
+
+Agents Host's copy of the control plane has a second, smaller listener: plain HTTP on the
+loopback address only, at **http://localhost:8792**. It serves the web page, which is
+built into Agents Host and checked against a list of its files' hashes, and takes the
+page's WebSocket. Nothing else on the network can reach it, and **Serve Agents to browsers
+on this Mac** in Agents Host turns it off.
+
+A browser that pairs there becomes a client of the **browser** kind, with a key of its own
+that script can use but not read. A browser key works only on that listener, and a window's
+or phone's key only on the HTTPS address, so neither can stand in for the other. Each proof
+of a key is bound to the address it was made for. The listener answers only a request
+addressed to `localhost` on its own port, and a WebSocket only from its own page. So a
+website you visit can't use it, by DNS trickery or otherwise. The page sets no cookies and
+relies on nothing the browser sends by itself.
+
+What someone holding a browser's session could do, in brief:
+
+- **Script running in the page**, such as a malicious extension, can do whatever the
+  browser's grant allows while the page is open. On a host that includes running commands.
+  The page draws nothing an agent wrote as HTML, and loads nothing from anywhere else.
+  Forgetting the browser stops it at once.
+- **A copy of the browser's profile on another computer** can do nothing: the listener is
+  on loopback only.
+- **Another account on this Mac** can reach the listener, but has no key, and a code works
+  once, for five minutes.
+- **A website** can do nothing: its requests are refused on their address and origin, and
+  it has no key.
+
+This is why a browser is paired as a device unless you choose otherwise. Serving the page
+at a public address, for a browser elsewhere, waits on issue #61.
 
 ## Copies and the store
 
@@ -196,3 +228,4 @@ special.
 - [Connect a window or phone](../how-to/connect-a-window-or-phone.md).
 - [The window and the host](window-and-daemon.md).
 - [How the phone and iPad reach your agents](phone-and-ipad.md).
+- [Use Agents in a browser](../how-to/use-agents-in-a-browser.md).

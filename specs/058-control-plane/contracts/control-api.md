@@ -33,6 +33,7 @@ Sent with no `h`. Grant column: which client grant may call it. Params and resul
 | `clients/announce` | pairing | `{id, publicKey, name, kind}` → `{client, controlKey, grant}` (was `devices/announce`) |
 | `clients/setGrant` | operator | `{client, grant}` → `{}`; refuses to leave no operator |
 | `clients/forget` | operator | `{client}` → `{}`; refuses the last operator; closes at once, home and relay |
+| `clients/forgetSelf` | any | `{}` → `{}`: the caller forgets itself (071 **Forget This Browser…**); refuses the last operator; the reply is sent, then every socket of the caller closes with 4403 `forgotten`, on every copy |
 | `presence/report` | any | as today; broadcast to peer copies, and folded for notices (R5, R10) |
 | `hosts/setRelay` | operator | `{host, relay: Bool}` → `{}`: switches a relay host (`agents-relay`) on or off. A host that runs agents cannot be made one: `invalidParams` (R10, T097) |
 

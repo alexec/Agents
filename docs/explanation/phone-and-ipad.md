@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: How the iPhone and iPad apps reach your agents on every host, what they can and cannot do, and how pairing and forgetting a device work.
+description: How the iPhone and iPad apps, and a browser on this Mac, reach your agents on every host, what they can and cannot do, and how pairing and forgetting a device work.
 devices: [mac, iphone, ipad]
 ---
 
@@ -121,6 +121,23 @@ once, directly and through the relay, and on every copy of the control plane. It
 attempt to connect is refused. To use it again, pair it again with a new code. The app
 will not let you forget or demote the last operator.
 
+## A browser on this Mac
+
+A browser is one more client. Agents Host serves Agents as a web page at
+**http://localhost:8792**, and a browser on the same Mac pairs with a code, as a phone
+does, from **Pair a Browser…**. It is a device unless you choose otherwise, and it does
+what the phone does, except that it has no terminal, no dictation and no notifications.
+
+The browser keeps a key that can't be copied out of it, made when it pairs and kept in
+that browser's storage for the page. Clearing the site's data loses it, and the browser
+pairs again.
+
+It works only on this Mac for now. The page is served on the loopback address, which
+nothing else on the network can reach, so a copy of the browser's profile on another
+computer can do nothing with the key. Serving the page at a public address, so a browser
+elsewhere can use it, waits on issue #61. See
+[Use Agents in a browser](../how-to/use-agents-in-a-browser.md).
+
 ## Devices paired before the control plane
 
 An iPhone or iPad paired with the earlier Agents app on your Mac keeps working after you
@@ -131,6 +148,7 @@ on, with the device grant. See [Move an existing set-up across](../how-to/move-a
 ## Related
 
 - [Connect a window or phone](../how-to/connect-a-window-or-phone.md), for pairing.
+- [Use Agents in a browser](../how-to/use-agents-in-a-browser.md), for the web page.
 - [Answer a question or a permission request](../how-to/answer-a-question.md), for the
   card on every device.
 - [See what needs you from your Home screen](../how-to/see-what-needs-you-from-your-home-screen.md),
