@@ -24,6 +24,7 @@ export const Failure = {
   catalogRefused: -32080,
   changedElsewhere: -32093,
   cloneFailed: -32026,
+  couldNotSave: -32095,
   credentialWanted: -32036,
   dayLimitReached: -32018,
   eventRefused: -32050,
