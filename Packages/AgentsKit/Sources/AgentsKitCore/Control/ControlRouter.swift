@@ -48,6 +48,9 @@ public actor ControlRouter {
         /// Set by the first wrapped line. Until then the client is today's Remote, which
         /// speaks bare JSON-RPC to one daemon: the home host (R7).
         var wrapped = false
+        /// Requests sent to each host and not answered yet, so a host that goes answers
+        /// them with `hostOffline` rather than leaving the client to wait for ever (#77).
+        var inFlight: [HostID: Set<JSONRPCID>] = [:]
     }
 
     /// Who a channel on a host's uplink is for: a client session here, or a stream a
@@ -119,6 +122,11 @@ public actor ControlRouter {
     public var hostStates: [HostID: HostState] { states }
 
     public var sessionCount: Int { clients.count }
+
+    /// How many calls to `host` are waiting on an answer, across every session.
+    public func inFlight(of host: HostID) -> Int {
+        clients.values.reduce(0) { $0 + ($1.inFlight[host]?.count ?? 0) }
+    }
 
     /// Every client's presence, folded the way a daemon folds its own: one record per
     /// surface, an active one beating a later quiet one (058, R6). An operator is the
@@ -331,9 +339,24 @@ public actor ControlRouter {
         guard let session = hosts[host], generation == nil || session.generation == generation else { return }
         hosts[host] = nil
         session.transport.close()
+        var bareGone: [UUID] = []
         for (channel, target) in session.channels {
             switch target {
-            case .session(let sessionID): clients[sessionID]?.channels[host] = nil
+            case .session(let sessionID):
+                clients[sessionID]?.channels[host] = nil
+                // What was asked of it is answered, not lost (#77).
+                let waiting = clients[sessionID]?.inFlight.removeValue(forKey: host) ?? []
+                let wrapped = clients[sessionID]?.wrapped ?? true
+                for id in waiting {
+                    reply(to: sessionID, host: host, id: id, wrapped: wrapped,
+                          error: JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                                              message: "That host went offline before it answered."))
+                }
+                // A bare-wire client (the Remote) talks to the home host's daemon and hears
+                // nothing else: no `control/hostChanged`, and the daemon that comes back
+                // knows nothing of it. Its connection ends, so it reconnects, says who it is
+                // again and reads everything afresh.
+                if !wrapped, host == homeHost { bareGone.append(sessionID) }
             // The peer's stream ends with the uplink; the peer finds the host again.
             case .peer(let peer, let theirs):
                 _ = channel
@@ -345,6 +368,78 @@ public actor ControlRouter {
             }
         }
         if let newState { setState(newState, of: host) }
+        for sessionID in bareGone { detachClient(sessionID) }
+    }
+
+    /// The id of a reply, or nil for anything else (a notification, or a request the host
+    /// makes of the client, whose ids are the host's own).
+    ///
+    /// Scanned, not decoded: every reply a host sends passes here, a page of transcript is
+    /// a hundred kilobytes, and all this needs is two keys at the top of the object.
+    static func answeredID(_ message: String) -> JSONRPCID? {
+        var id: JSONRPCID?
+        var isRequest = false
+        var depth = 0
+        var bytes = message.utf8[...]
+        while let byte = bytes.first {
+            switch byte {
+            case UInt8(ascii: "{"), UInt8(ascii: "["):
+                depth += 1
+                bytes = bytes.dropFirst()
+            case UInt8(ascii: "}"), UInt8(ascii: "]"):
+                depth -= 1
+                bytes = bytes.dropFirst()
+            case UInt8(ascii: "\""):
+                guard let (text, rest) = Self.string(bytes) else { return nil }
+                bytes = rest
+                // A key at the top: a string followed by a colon, one level in.
+                guard depth == 1, let colon = rest.firstIndex(where: { !Self.isSpace($0) }),
+                      rest[colon] == UInt8(ascii: ":") else { continue }
+                var value = rest[rest.index(after: colon)...].drop(while: Self.isSpace)
+                if text == "method" { isRequest = true }
+                guard text == "id", let first = value.first else { continue }
+                if first == UInt8(ascii: "\"") {
+                    guard let (string, after) = Self.string(value) else { return nil }
+                    id = .string(string)
+                    value = after
+                } else {
+                    let digits = value.prefix(while: { $0 == UInt8(ascii: "-") || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains($0) })
+                    id = Int(String(decoding: digits, as: UTF8.self)).map(JSONRPCID.number)
+                    value = value.dropFirst(digits.count)
+                }
+                bytes = value
+            default:
+                bytes = bytes.dropFirst()
+            }
+        }
+        return isRequest ? nil : id
+    }
+
+    private static func isSpace(_ byte: UInt8) -> Bool {
+        byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D
+    }
+
+    /// The JSON string `bytes` starts with, unescaped enough to compare a key or an id,
+    /// and what follows it.
+    private static func string(_ bytes: Substring.UTF8View.SubSequence) -> (String, Substring.UTF8View.SubSequence)? {
+        var index = bytes.index(after: bytes.startIndex)
+        var text: [UInt8] = []
+        while index < bytes.endIndex {
+            let byte = bytes[index]
+            if byte == UInt8(ascii: "\\") {
+                let next = bytes.index(after: index)
+                guard next < bytes.endIndex else { return nil }
+                text.append(bytes[next])
+                index = bytes.index(after: next)
+                continue
+            }
+            if byte == UInt8(ascii: "\"") {
+                return (String(decoding: text, as: UTF8.self), bytes[bytes.index(after: index)...])
+            }
+            text.append(byte)
+            index = bytes.index(after: index)
+        }
+        return nil
     }
 
     private func hostLine(_ line: String, from host: HostID) async {
@@ -365,6 +460,11 @@ public actor ControlRouter {
                 return
             }
             guard let session = clients[sessionID] else { return }
+            // Read only while something is waiting on this host, and only for its id: the
+            // line itself goes on as it came.
+            if session.inFlight[host]?.isEmpty == false, let id = Self.answeredID(message) {
+                clients[sessionID]?.inFlight[host]?.remove(id)
+            }
             if session.wrapped {
                 write(ControlWire.wrap(host: host, message: message), to: sessionID)
             } else if host == homeHost {
@@ -567,6 +667,7 @@ public actor ControlRouter {
             // An uplink that has ended but is not yet dropped takes nothing: said, not lost (#62).
             do {
                 try uplink.transport.write(line: ControlWire.channel(channel, message: message))
+                clients[sessionID]?.inFlight[host, default: []].insert(id)
             } catch {
                 reply(to: sessionID, host: host, id: id, wrapped: wrapped,
                       error: JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline."))

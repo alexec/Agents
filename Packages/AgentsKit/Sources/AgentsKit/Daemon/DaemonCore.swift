@@ -780,7 +780,12 @@ public actor DaemonCore {
         let previous = saveTail
         saveTail = Task { [store] in
             await previous?.value
-            try? await store.save(agent)
+            do {
+                try await store.save(agent)
+            } catch {
+                // Said in the log at least: a record not kept reverts on the next start (073).
+                DaemonLog.shared.write("store: could not save \(agent.id): \(error)")
+            }
         }
     }
 
@@ -789,7 +794,13 @@ public actor DaemonCore {
     func record(_ kind: TranscriptEntry.Kind, for agentID: UUID, subagentID: String? = nil) async {
         let entry = TranscriptEntry(kind: kind, subagentID: subagentID)
         if case .userMessage(_, _, .person) = kind { clearWaitingSandbox(agentID: agentID) }
-        try? await store.append(entry, for: agentID)
+        do {
+            try await store.append(entry, for: agentID)
+        } catch {
+            // The window still shows it; a restart would not. Logged, so a full disk is
+            // found in the log rather than as lines missing from a conversation (073).
+            DaemonLog.shared.write("store: could not append to \(agentID)'s transcript: \(error)")
+        }
         if var agent = agents[agentID] {
             agent.lastActivityAt = entry.at
             agents[agentID] = agent

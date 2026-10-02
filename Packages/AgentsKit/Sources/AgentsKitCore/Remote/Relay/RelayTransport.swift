@@ -139,6 +139,10 @@ public final class RelayTransport: LineTransport, @unchecked Sendable {
         /// When the phone last asked something. For a few seconds after, it looks for the
         /// answer four times a second rather than once (R7).
         var askedAt: Date = .distantPast
+        /// When the Mac last said anything in this session. It answers every keep-alive, so
+        /// silence for well over one keep-alive is a Mac that is gone: switched off,
+        /// asleep, or restarted with nobody there to say so (#79).
+        var lastHeard = Date()
 
         init(channel: any RelayChannel, device: UUID, session: UUID, key: any RelayKey, macKey: Data,
              lines: AsyncThrowingStream<String, any Error>.Continuation, patience: TimeInterval,
@@ -242,6 +246,10 @@ public final class RelayTransport: LineTransport, @unchecked Sendable {
 
         private func tick() async {
             guard !finished else { return }
+            if ready, Date().timeIntervalSince(lastHeard) > keepAlive * 2.5 {
+                finish(.macNotAnswering)
+                return
+            }
             if Date().timeIntervalSince(lastSent) > keepAlive {
                 lastSent = Date()
                 try? await post(Frame(session: session, direction: .toMac, seq: take()))
@@ -270,6 +278,13 @@ public final class RelayTransport: LineTransport, @unchecked Sendable {
                 delivered.append(record.name)
                 guard let frame = try? Frame.open(record.sealed, with: key, from: macKey, session: session,
                                                   direction: .toDevice, seq: record.seq) else { continue }
+                lastHeard = Date()
+                // The Mac does not know this session (it restarted): over at once, not held
+                // for a turn that will never come (#79).
+                if frame.end, frame.seq == Frame.notKnown {
+                    finish(.macNotAnswering)
+                    break
+                }
                 for frame in order.accept(frame) {
                     if frame.seq == 0 { becomeReady() }
                     for line in frame.lines { lines.yield(line) }

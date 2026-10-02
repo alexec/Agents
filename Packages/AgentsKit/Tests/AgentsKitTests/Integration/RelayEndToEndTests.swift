@@ -54,12 +54,13 @@ struct RelayEndToEndTests {
         }
 
         /// A paired phone with a client connected over the relay.
-        func phone(paired: Bool = true, key: DeviceKey = .ephemeral(), id: UUID = UUID(),
+        func phone(paired: Bool = true, key: DeviceKey = .ephemeral(), id: UUID = UUID(), keepAlive: TimeInterval = 30,
                    onTrouble: @escaping @Sendable (RelayTrouble) -> Void = { _ in }) async throws
             -> (client: DaemonClient, transport: RelayTransport, id: UUID) {
             if paired { await host.pair(id, key: key.publicKey) }
             let transport = RelayTransport(channel: FakeRelayChannel(cloud: cloud), device: id, key: key,
-                                           macKey: mac.publicKey, pollEvery: .milliseconds(20), onTrouble: onTrouble)
+                                           macKey: mac.publicKey, pollEvery: .milliseconds(20), keepAlive: keepAlive,
+                                           onTrouble: onTrouble)
             try await transport.open(timeout: paired ? max(.seconds(5), Eventually.timeout) : .seconds(1))
             let client = DaemonClient(link: GivenLink(transport: transport))
             try await client.connect(startIfNeeded: false)
@@ -170,6 +171,74 @@ struct RelayEndToEndTests {
         #expect(await rig.cloud.hasZone(id) == false)
         await eventually("the phone heard it was forgotten") { await troubles.all.contains(.forgotten) }
         await #expect(throws: (any Error).self) { try await client.call(DaemonAPI.Method.ping) }
+    }
+
+    // MARK: A Mac that is gone (#79)
+
+    /// The Mac's relay restarted while the phone was in a session: the new one does not know
+    /// it, and says so, and the phone starts again rather than waiting on nobody.
+    @Test func aPhoneTalkingToARestartedMacIsToldItsSessionIsOver() async throws {
+        let rig = try await Rig()
+        defer { rig.stop() }
+        let troubles = Troubles()
+        let key = DeviceKey.ephemeral()
+        let (client, _, id) = try await rig.phone(key: key, onTrouble: { trouble in Task { await troubles.add(trouble) } })
+        _ = try await client.call(DaemonAPI.Method.ping)
+
+        // The bridge goes, and a new one starts on the same iCloud with the same Mac key.
+        rig.running?.cancel()
+        let link = SocketLink(locations: rig.locations)
+        let restarted = RelayHostCore(channel: FakeRelayChannel(cloud: rig.cloud), key: rig.mac,
+                                      openDaemon: { try await link.transport() },
+                                      window: 0.05, livePoll: 0.02, idlePoll: 0.02)
+        await restarted.pair(id, key: key.publicKey)
+        let running = Task { await restarted.run() }
+        defer { running.cancel() }
+
+        // The phone's next word reaches the new bridge, which does not know the session.
+        let asking = Task { try await client.call(DaemonAPI.Method.ping) }
+        #expect(await eventually("the phone heard its session is over", within: .seconds(10)) {
+            await troubles.all.contains(.macNotAnswering)
+        })
+        await #expect(throws: (any Error).self) { _ = try await asking.value }
+        #expect(await !client.isConnected)
+
+        // A new session reaches the daemon through the new bridge.
+        let fresh = RelayTransport(channel: FakeRelayChannel(cloud: rig.cloud), device: id, key: key,
+                                   macKey: rig.mac.publicKey, pollEvery: .milliseconds(20))
+        try await fresh.open(timeout: .seconds(10))
+        let again = DaemonClient(link: GivenLink(transport: fresh))
+        try await again.connect(startIfNeeded: false)
+        _ = try await again.call(DaemonAPI.Method.ping)
+    }
+
+    /// The Mac went away without a word (off, asleep, no network): the phone lets the
+    /// session go once nothing has come back for well over a keep-alive.
+    @Test func aMacThatSaysNothingAtAllIsLetGo() async throws {
+        let rig = try await Rig()
+        defer { rig.stop() }
+        let troubles = Troubles()
+        let (client, _, _) = try await rig.phone(keepAlive: 0.2, onTrouble: { trouble in Task { await troubles.add(trouble) } })
+        _ = try await client.call(DaemonAPI.Method.ping)
+        rig.running?.cancel()
+        #expect(await eventually("the phone gave up on a silent Mac", within: .seconds(10)) {
+            await troubles.all.contains(.macNotAnswering)
+        })
+        #expect(await !client.isConnected)
+    }
+
+    /// A Mac that is there but has nothing to say answers each keep-alive, so a quiet
+    /// session is kept.
+    @Test func aQuietMacThatIsThereKeepsTheSession() async throws {
+        let rig = try await Rig()
+        defer { rig.stop() }
+        let troubles = Troubles()
+        let (client, _, _) = try await rig.phone(keepAlive: 0.2, onTrouble: { trouble in Task { await troubles.add(trouble) } })
+        _ = try await client.call(DaemonAPI.Method.ping)
+        // Five keep-alives' worth of quiet: twice the time after which a silent Mac is let go.
+        try await Task.sleep(for: .seconds(1))
+        #expect(await troubles.all.isEmpty)
+        _ = try await client.call(DaemonAPI.Method.ping)
     }
 
     private func answers(_ rig: Rig, _ agent: UUID) async throws -> Int {

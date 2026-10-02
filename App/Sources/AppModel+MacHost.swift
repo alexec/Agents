@@ -32,20 +32,33 @@ extension AppModel {
 
     /// Reveal in Finder. Only offered for this Mac's host.
     func reveal(_ url: URL, on host: HostID) {
-        Task { _ = try? await client(for: host).call(DaemonAPI.Method.macReveal,
-                                                     DaemonAPI.MacPathRequest(path: url.path(percentEncoded: false))) }
+        // What the host says when it cannot is shown, not dropped (073).
+        Task {
+            await attempt(on: host) {
+                try await self.client(for: host).call(DaemonAPI.Method.macReveal,
+                                                      DaemonAPI.MacPathRequest(path: url.path(percentEncoded: false)))
+            }
+        }
     }
 
     /// Open with the app macOS would choose, or `app`.
     func open(_ url: URL, on host: HostID, app: String? = nil) {
-        Task { _ = try? await client(for: host).call(DaemonAPI.Method.macOpen,
-                                                     DaemonAPI.MacPathRequest(path: url.path(percentEncoded: false), app: app)) }
+        Task {
+            await attempt(on: host) {
+                try await self.client(for: host).call(DaemonAPI.Method.macOpen,
+                                                      DaemonAPI.MacPathRequest(path: url.path(percentEncoded: false), app: app))
+            }
+        }
     }
 
     /// Terminal, on this Mac's host.
     func openTerminal(at url: URL? = nil, on host: HostID = .mac) {
-        Task { _ = try? await client(for: host).call(DaemonAPI.Method.macTerminal,
-                                                     DaemonAPI.MacTerminalRequest(path: url?.path(percentEncoded: false))) }
+        Task {
+            await attempt(on: host) {
+                try await self.client(for: host).call(DaemonAPI.Method.macTerminal,
+                                                      DaemonAPI.MacTerminalRequest(path: url?.path(percentEncoded: false)))
+            }
+        }
     }
 
     /// A text file by its full path on `host`: `files/readText`.

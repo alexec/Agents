@@ -33,6 +33,8 @@ public actor RelayHostCore {
     private var sessions: [UUID: Session] = [:]
     private var lastLive: Date = .distantPast
     private var lookedForNewSessionsAt: Date = .distantPast
+    /// Sessions already told they are not known here, so each is told once (#79).
+    private var toldNotKnown: Set<UUID> = []
     /// How soon an answer goes after the device asked: long enough to catch a reply and
     /// the notifications that come with it in one frame, short enough not to be felt.
     private let answerWindow: TimeInterval = 0.05
@@ -163,7 +165,15 @@ public actor RelayHostCore {
                 // Only a session's opening frame starts one, and only one sent since this
                 // bridge started: a zone read from the beginning after a restart holds old
                 // sessions' frames, which are nobody's now.
-                guard frame.seq == 0, record.sentAt >= startedAt.addingTimeInterval(-60) else { continue }
+                let recent = record.sentAt >= startedAt.addingTimeInterval(-60)
+                guard frame.seq == 0, recent else {
+                    // A frame sent lately in a session this bridge does not know: a phone
+                    // still talking to the bridge that was here before a restart. It is told
+                    // the session is over, so it starts a new one, rather than waiting for
+                    // ever on a session nobody holds (#79).
+                    if recent, frame.seq > 0 { await tellNotKnown(frame.session, device: device) }
+                    continue
+                }
                 if let old = sessions[device] { await end(old, telling: true) }
                 session = Session(id: frame.session, device: device, patience: patience, window: window, now: clock())
                 sessions[device] = session
@@ -172,6 +182,9 @@ public actor RelayHostCore {
             if !frame.lines.isEmpty { session.askedAt = clock() }
             for ready in session.order.accept(frame, now: clock()) {
                 if ready.seq == 0 { await open(session) }
+                // A keep-alive is answered, so a phone that hears nothing at all for long
+                // knows the Mac is gone, not merely quiet (#79).
+                if ready.seq > 0, ready.lines.isEmpty, !ready.end { await post([], in: session) }
                 for line in ready.lines { try? session.daemon?.write(line: line) }
                 if ready.end { await end(session, telling: false); break }
             }
@@ -245,6 +258,16 @@ public actor RelayHostCore {
                 return
             }
         }
+    }
+
+    /// An end for a session this bridge does not hold, numbered `Frame.notKnown`.
+    private func tellNotKnown(_ id: UUID, device: UUID) async {
+        guard let deviceKey = paired[device], toldNotKnown.insert(id).inserted else { return }
+        if toldNotKnown.count > 256 { toldNotKnown = [id] }
+        let frame = Frame(session: id, direction: .toDevice, seq: Frame.notKnown, end: true)
+        guard let sealed = try? frame.seal(to: deviceKey, from: key) else { return }
+        try? await channel.post(FrameRecord(session: id, direction: .toDevice, seq: frame.seq, sealed: sealed,
+                                            sentAt: clock()), device: device)
     }
 
     private func end(_ session: Session, telling: Bool) async {

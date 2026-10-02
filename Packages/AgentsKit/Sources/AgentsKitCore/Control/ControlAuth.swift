@@ -81,6 +81,10 @@ public enum ControlAuth {
     public enum Reason: String, Codable, Sendable {
         case unknown, forgotten, expired, spent, badProof = "bad-proof", wrongControlPlane = "wrong-control-plane"
         case badMessage = "bad-message"
+        /// The control plane could not tell, for now: its store could not be read, or it
+        /// is being filled by a handover. Try again; it says nothing about the member (#81).
+        /// A build from before this case cannot read it, and takes it as a failed dial.
+        case unavailable
     }
 
     /// One line of the exchange, as it goes on the wire.

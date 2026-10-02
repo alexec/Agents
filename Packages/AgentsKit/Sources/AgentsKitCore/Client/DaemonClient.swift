@@ -118,9 +118,54 @@ public actor DaemonClient {
         return connection
     }
 
+    /// How long a call made inside `DaemonClient.$patience.withValue(…)` waits for its
+    /// answer, for work that must not wait for ever: a reconnect's catching up, which
+    /// holds the reconnect loop while it runs, so one lost reply used to leave an app
+    /// that looked connected and never was again (073). Nil, the default, waits for the
+    /// answer however long it takes, as a clone or an install must.
+    @TaskLocal public static var patience: Duration?
+
+    /// A call that had no answer within `patience`.
+    public struct NoAnswer: Error, Sendable, CustomStringConvertible {
+        public let method: String
+        public var description: String { "No answer to \(method) in time." }
+    }
+
     @discardableResult
     public func call(_ method: String, _ params: (some Encodable)? = Optional<String>.none) async throws -> JSONValue {
         let value = try params.map { try JSONValue.encoding($0) }
+        guard let patience = Self.patience else { return try await unbounded(method, value) }
+        return try await answered(method, within: patience) { try await self.unbounded(method, value) }
+    }
+
+    /// `work`'s answer, or `NoAnswer` once `patience` is up. A connection that then does
+    /// not answer a ping either is closed, so whatever else waits on it fails too and the
+    /// listener reconnects; one that does is only slow with this call.
+    ///
+    /// Not a task group: a call waiting on a reply does not hear cancellation, and a group
+    /// waits for every child, so it would wait for the lost reply too (as `RemoteFiles`).
+    private func answered(_ method: String, within patience: Duration,
+                          _ work: @escaping @Sendable () async throws -> JSONValue) async throws -> JSONValue {
+        let settled = ManagedAtomicFlag()
+        return try await withCheckedThrowingContinuation { continuation in
+            let timer = Task {
+                try? await Task.sleep(for: patience)
+                guard !Task.isCancelled, !settled.isSet else { return }
+                _ = await self.answers(within: .seconds(4))
+                if settled.set() { continuation.resume(throwing: NoAnswer(method: method)) }
+            }
+            Task {
+                let result: Result<JSONValue, any Error>
+                do { result = .success(try await work()) } catch { result = .failure(error) }
+                if settled.set() {
+                    timer.cancel()
+                    continuation.resume(with: result)
+                }
+            }
+        }
+    }
+
+    private func unbounded(_ method: String, _ value: JSONValue?) async throws -> JSONValue {
         do {
             return try await connected().call(method, value)
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.credentialWanted {
