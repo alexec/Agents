@@ -67,3 +67,19 @@ test("a host down is noted from when the page first heard it, and forgotten once
   work.takeHosts([mac("online")], 9000);
   assert.deepEqual(work.downSince.value, {});
 });
+
+test("a lean list keeps the open session's menus; agent/changed replaces them (#107)", () => {
+  const work = new Work();
+  const [{ input }] = cases("reducer/streams.json");
+  const whole = { ...input.steps[0].notify.params,
+    advertisedOptions: [{ id: "model", name: "Model", type: "select" }],
+    availableCommands: [{ name: "review", description: "Review" }] };
+  work.addAgents([whole], host);
+  work.replaceAgents([{ ...whole, title: "Renamed", advertisedOptions: [], availableCommands: [] }], host);
+  const held = work.agents.value[host][0];
+  assert.equal(held.title, "Renamed");
+  assert.deepEqual(held.advertisedOptions.map((o) => o.id), ["model"]);
+  assert.deepEqual(held.availableCommands.map((c) => c.name), ["review"]);
+  work.apply("agent/changed", { ...whole, advertisedOptions: [{ id: "mode", name: "Mode", type: "select" }] }, host);
+  assert.deepEqual(work.agents.value[host][0].advertisedOptions.map((o) => o.id), ["mode"]);
+});
