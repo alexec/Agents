@@ -35,6 +35,8 @@ struct ProjectListView: View {
                         .paperListRow()
                     NavigationLink { TotalsView() } label: { SpendingRow() }
                         .paperListRow()
+                    NavigationLink { ResourcesListView() } label: { ResourcesRow() }
+                        .paperListRow()
                 }
             }
         }
