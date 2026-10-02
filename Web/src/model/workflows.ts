@@ -102,12 +102,26 @@ export function settingsSummary(s: WorkflowSettings, runtimeName: (id: string) =
   return clauses.length ? clauses.join(", ") : null;
 }
 
+/** WorkflowCooldown.words: "15 minutes", "1 hour 30 minutes", "1 day" (#103). */
+export function cooldownWords(seconds: number): string {
+  let left = Math.floor(seconds / 60);
+  const parts: string[] = [];
+  for (const [unit, minutes] of [["day", 24 * 60], ["hour", 60], ["minute", 1]] as const) {
+    if (left < minutes) continue;
+    const count = Math.floor(left / minutes);
+    parts.push(`${count} ${unit}${count === 1 ? "" : "s"}`);
+    left %= minutes;
+  }
+  return parts.join(" ");
+}
+
 /** Workflow.summary: what it is, in one line. */
 export function workflowSummary(w: Workflow, runtimeName: (id: string) => string | undefined = () => undefined): string {
   if (w.problem) return problemMessage(w.problem);
   const supported = w.triggers.filter(isSupported);
   if (!supported.length) return w.triggers[0] ? triggerSummary(w.triggers[0]) : "Nothing makes this run";
-  const base = `${supported.map(triggerSummary).join(", and ")}, ${modeWords[w.mode]}`;
+  let base = `${supported.map(triggerSummary).join(", and ")}, ${modeWords[w.mode]}`;
+  if (w.cooldown !== undefined) base += `, at most once every ${cooldownWords(w.cooldown)}`;
   if (w.mode === "triggering") return base;
   const settings = settingsSummary(w.settings, runtimeName);
   return settings ? `${base}, ${settings}` : base;
@@ -151,6 +165,8 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
   if (tinted) return { mark: "!", words: "Needs attention", tinted };
   if (s.isRunning) return { mark: "◌", words: "Running", tinted };
+  // A trigger held by its cooldown (#103): it runs once when the cooldown ends.
+  if (s.holdsAFire) return { mark: "⧗", words: "Cooling down, then it runs once", tinted };
   if (!canFire(s.workflow)) return { mark: "◌", words: "Not yet supported", tinted };
   return { mark: "◷", words: "Waiting for its trigger", tinted };
 }

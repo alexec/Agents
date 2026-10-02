@@ -1261,6 +1261,7 @@ export interface Workflow {
   problem?: WorkflowProblem;
   unknownFields: Record<string, JSONValue>;
   settings: WorkflowSettings;
+  cooldown?: number;
 }
 
 export interface WorkflowApproval {
@@ -1299,7 +1300,8 @@ export type WorkflowRefusal =
   | { folderGone: Record<string, never> }
   | { dayLimitReached: Record<string, never> }
   | { settingRefused: { setting: string; detail: string } }
-  | { awaitingApproval: Record<string, never> };
+  | { awaitingApproval: Record<string, never> }
+  | { coolingDown: { until?: WireDate } };
 
 export interface WorkflowRemovedNotification {
   folder: URLString;
@@ -1342,6 +1344,8 @@ export interface WorkflowSummary {
   awaitingApproval?: WorkflowApproval;
   lastFiredAt?: WireDate;
   lastFiredBy?: WorkflowCause;
+  cooldownEndsAt?: WireDate;
+  holdsAFire: boolean;
 }
 
 export type WorkflowTrigger = WorkflowTriggerStored;
@@ -1645,13 +1649,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: [] },
   WorkflowRemovedNotification: { required: ["folder", "workflowID"], optional: [] },
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy", "cooldownEndsAt"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },

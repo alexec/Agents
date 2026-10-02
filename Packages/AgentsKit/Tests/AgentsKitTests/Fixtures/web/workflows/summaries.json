@@ -6,6 +6,7 @@
       "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -66,6 +67,7 @@
       "summary" : "Every weekday on the hour and half hour between 9:30am and 5:30pm, in its own standing agent"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -125,6 +127,7 @@
       "summary" : "Mon on the half hour, in a new agent"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -179,6 +182,7 @@
       "summary" : "When an agent finishes, and When an agent stops without finishing, in a new agent, in plan mode, on Grok, using grok-4, at high effort, without beta, with fast, with voice calm"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -231,6 +235,7 @@
       "summary" : "When an agent asks for permission, and When an agent raises a form, in the agent that triggered it"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : true,
@@ -278,6 +283,7 @@
       "summary" : "When nightly finishes, and When any workflow finishes, in a new agent, on mystery"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -325,6 +331,7 @@
       "summary" : "Waits for \"on-push\", which this version does not know about yet"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -369,6 +376,7 @@
       "summary" : "Nothing makes this run"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -406,6 +414,7 @@
       "summary" : "Line 3: no closing ---"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -448,6 +457,7 @@
       "summary" : "Runs \"swarm\", which this version does not know about yet"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -494,6 +504,7 @@
       "summary" : "bad"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : true,
       "isEnabled" : true,
       "isRunning" : false,
@@ -536,6 +547,7 @@
       "summary" : "When an agent finishes, in a new agent"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -582,6 +594,7 @@
         "digest" : "abc",
         "isNew" : true
       },
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -623,6 +636,7 @@
       "summary" : "When an agent finishes, in a new agent"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -675,6 +689,7 @@
       "summary" : "When an agent finishes, in a new agent"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : true,
       "isRunning" : false,
@@ -727,6 +742,7 @@
       "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : false,
       "isRunning" : false,
@@ -787,6 +803,7 @@
       "summary" : "When an agent finishes, in a new agent"
     },
     "input" : {
+      "holdsAFire" : false,
       "isArchived" : false,
       "isEnabled" : false,
       "isRunning" : false,
@@ -831,5 +848,104 @@
       }
     },
     "name" : "turned off, a trigger refused"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When an agent finishes, in a new agent, at most once every 1 hour 30 minutes, in plan mode"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "workflow" : {
+        "cooldown" : 5400,
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Close landed",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          },
+          "permissionMode" : "plan"
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "close-landed"
+      }
+    },
+    "name" : "a cooldown, with settings"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When an agent finishes, in the agent that triggered it, at most once every 1 day"
+    },
+    "input" : {
+      "cooldownEndsAt" : 812500600,
+      "holdsAFire" : true,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "lastOutcome" : {
+        "refused" : {
+          "_0" : {
+            "coolingDown" : {
+              "until" : 812500600
+            }
+          },
+          "at" : 812500000,
+          "repeats" : 3
+        }
+      },
+      "nextFireAtByTrigger" : [
+
+      ],
+      "workflow" : {
+        "cooldown" : 86400,
+        "folder" : "file:///fixture/project",
+        "mode" : "triggering",
+        "name" : "Steady",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "steady"
+      }
+    },
+    "name" : "a cooldown, triggering, a trigger held"
   }
 ]
