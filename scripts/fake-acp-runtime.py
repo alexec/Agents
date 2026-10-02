@@ -10,6 +10,9 @@ every turn, from `<its folder>/<its name>.behaviour`:
           (limit, no actions): the pool moves the chat on.
   spent <epoch>
           the same, with the plan window's reset time first, so it is out until then.
+  stream <chunks> <ms>
+          a long Markdown reply, in that many chunks, that many milliseconds apart:
+          for watching a reply arrive in a long chat (#90).
   ok      (or no file) it answers, saying what it was handed.
 
 So a walk can make a runtime run out, and later come back, by rewriting one file.
@@ -17,6 +20,7 @@ So a walk can make a runtime run out, and later come back, by rewriting one file
 import json
 import os
 import sys
+import time
 import uuid
 
 NAME = os.path.basename(sys.argv[0])
@@ -71,6 +75,19 @@ def prompt(request_id, params):
                            "_meta": {"_claude/rateLimit": {"status": "rejected", "resetsAt": int(how[1]),
                                                            "rateLimitType": "five_hour", "isUsingOverage": False}}}}})
         reply(request_id, {"stopReason": "end_turn", "_meta": SPENT})
+        return
+    if how and how[0] == "stream":
+        chunks = int(how[1]) if len(how) > 1 else 200
+        pause = (int(how[2]) if len(how) > 2 else 50) / 1000
+        for i in range(chunks):
+            piece = f"Line {i + 1} of the reply, with *some* `marks` in it. "
+            if i % 10 == 9:
+                piece += "\n\n"
+            if i % 40 == 20:
+                piece += "\n\n- a point\n- another point\n\n"
+            say(session_id, piece)
+            time.sleep(pause)
+        reply(request_id, {"stopReason": "end_turn"})
         return
     handoff = next((b["resource"]["text"] for b in blocks
                     if b.get("type") == "resource" and "handoff" in b.get("resource", {}).get("uri", "")), None)
