@@ -812,6 +812,9 @@ final class RemoteModel {
                 // Lost again while this attempt was still settling in: `lostTouch` found
                 // this loop running and left it to go round once more.
                 if await self.tryOnce(), self.isConnected { break }
+                // Forgotten: nothing to dial until a new pairing starts a loop of its own.
+                // Ended here rather than cancelled, so `reconnecting` is cleared (#81).
+                if self.forgottenByControlPlane { break }
                 let nap = Task<Void, Never> { try? await Task.sleep(for: self.backOff) }
                 self.backingOff = nap
                 await withTaskCancellationHandler { await nap.value } onCancel: { nap.cancel() }
@@ -848,12 +851,16 @@ final class RemoteModel {
         }
     }
 
+    /// Whether a refusal is believed yet (#81).
+    @ObservationIgnored private var refusals = RefusalPatience()
+
     /// How long each call that catches up after connecting is given.
     static let catchUpPatience = Duration.seconds(20)
 
     private func tryOnce() async -> Bool {
         do {
             try await client.connect(startIfNeeded: false)
+            refusals.connected()
             isConnected = true
             lastHeardFrom = Date()
             problem = nil
@@ -876,12 +883,13 @@ final class RemoteModel {
             watchOtherHosts()
             return true
         } catch {
-            if let reason = ControlPlaneLink.refused.take(), reason == .forgotten || reason == .unknown {
-                // Forgotten from a window: this device asks for a new code, and stops dialling.
+            if let reason = ControlPlaneLink.refused.take(), refusals.forgets(after: reason) {
+                // Forgotten from a window, or unknown for minutes on end: this device asks
+                // for a new code, and stops dialling. One "unknown" alone is a control plane
+                // that could not tell yet, and is dialled again (#81).
                 RemoteControl.forget()
                 forgottenByControlPlane = true
                 isConnected = false
-                reconnecting?.cancel()
                 return false
             }
             isConnected = false

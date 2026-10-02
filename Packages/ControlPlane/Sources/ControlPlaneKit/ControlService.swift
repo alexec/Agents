@@ -369,7 +369,8 @@ public final class ControlService: @unchecked Sendable {
             // no code is used while records can't be written.
             switch (phase.now, identity) {
             case (.receiving, .copy): break
-            case (.receiving, _): throw ControlAuth.Refusal(.unknown)
+            // Being filled, so its records are not whole yet: not a verdict on anyone (#81).
+            case (.receiving, _): throw ControlAuth.Refusal(.unavailable)
             case (.frozen, .pairing), (.frozen, .enrolling), (.forwarding, .pairing), (.forwarding, .enrolling):
                 throw ControlAuth.Refusal(.unknown)
             case (.forwarding, .client), (.forwarding, .host):
@@ -444,13 +445,15 @@ public final class ControlService: @unchecked Sendable {
         let privateKey = configuration.privateKey
         switch identity {
         case .client(let id):
-            // Paired at another copy moments ago: this one reads the store again.
-            if await records.client(id) == nil { try? await methods.refresh() }
+            // Paired at another copy moments ago: this one reads the store again. A store
+            // that cannot be read says so; "unknown" would have the device forget its
+            // pairing over a hiccup (#81).
+            if await records.client(id) == nil { try await readAgain() }
             guard let client = await records.client(id), !client.publicKey.isEmpty else { throw ControlAuth.Refusal(.unknown) }
             return (try ControlAuth.clientKey(privateKey: privateKey, peer: client.publicKey, client: id),
                     Admitted(client: client))
         case .host(let id):
-            if await records.host(id) == nil { try? await methods.refresh() }
+            if await records.host(id) == nil { try await readAgain() }
             guard let host = await records.host(id), let key = host.publicKey else { throw ControlAuth.Refusal(.unknown) }
             return (try ControlAuth.hostKey(privateKey: privateKey, peer: key, host: id), Admitted(host: id))
         case .pairing(let id), .enrolling(let id):
@@ -462,6 +465,17 @@ public final class ControlService: @unchecked Sendable {
             return (ControlAuth.codeKey(secret: secret), Admitted(code: stored))
         case .copy:
             return (ControlAuth.copyKey(controlPrivateKey: privateKey), Admitted())
+        }
+    }
+
+    /// The store read again for a member not in the records, or `unavailable` when it
+    /// cannot be: not known yet is not the same as not a member.
+    private func readAgain() async throws {
+        do {
+            try await methods.refresh()
+        } catch {
+            log("store: could not read it to admit a member: \(error)")
+            throw ControlAuth.Refusal(.unavailable)
         }
     }
 
