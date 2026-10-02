@@ -35,3 +35,10 @@ test("the status mark follows WorkflowStatusIcon's order", () => {
   const { isEnabled, ...fromBefore100 } = input;
   assert.equal(w.workflowStatus(fromBefore100).words, "Waiting for its trigger", "a host from before #100 sends no isEnabled: on");
 });
+
+test("a held trigger says it is cooling down, grey (#103)", () => {
+  const held = cases("workflows/summaries.json").find((c) => c.name === "a cooldown, triggering, a trigger held");
+  assert.equal(w.workflowStatus(held.input).words, "Cooling down, then it runs once");
+  assert.equal(w.workflowStatus(held.input).tinted, false);
+  assert.equal(w.cooldownWords(90 * 60), "1 hour 30 minutes");
+});

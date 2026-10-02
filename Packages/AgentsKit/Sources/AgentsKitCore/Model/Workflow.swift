@@ -65,6 +65,10 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// put the app's bookkeeping into a history nobody wants to review. How much an
     /// agent is allowed to do while nobody is watching is not bookkeeping.
     public var settings: WorkflowSettings
+    /// The least time from the start of one run to the start of the next, from the
+    /// file's `cooldown:` (#103). A trigger inside it is held, and the latest held one
+    /// runs once when it ends; `nil` is no cooldown, as before.
+    public var cooldown: TimeInterval?
 
     /// Unique across projects, so one window showing two of them cannot collide.
     public var id: String { folder.path + "/" + workflowID }
@@ -73,7 +77,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
                 triggers: [WorkflowTrigger] = [], mode: WorkflowMode = .new,
                 prompt: String = "", problem: WorkflowProblem? = nil,
                 unknownFields: [String: JSONValue] = [:],
-                settings: WorkflowSettings = WorkflowSettings()) {
+                settings: WorkflowSettings = WorkflowSettings(),
+                cooldown: TimeInterval? = nil) {
+        self.cooldown = cooldown
         self.workflowID = workflowID
         self.folder = Project.standardize(folder)
         self.name = name ?? Self.defaultName(for: workflowID)
@@ -121,7 +127,8 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
             return triggers.first?.summary ?? "Nothing makes this run"
         }
         let triggerPart = supported.map(\.summary).joined(separator: ", and ")
-        let base = "\(triggerPart), \(mode.summary)"
+        var base = "\(triggerPart), \(mode.summary)"
+        if let cooldownPart { base += ", \(cooldownPart)" }
         // A `triggering` workflow never starts an agent — it resumes the one that set
         // it off — so it never applies a setting, and a row saying "in plan mode" about
         // one would be a false statement in the one place this feature exists to make
@@ -129,6 +136,19 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
         // says the longer version; what must not happen is the row asserting them.
         guard mode != .triggering, let settingsPart = settings.summary else { return base }
         return "\(base), \(settingsPart)"
+    }
+
+    /// The cooldown as the row says it: `at most once every 15 minutes`.
+    public var cooldownPart: String? {
+        cooldown.map { "at most once every \(WorkflowCooldown.words($0))" }
+    }
+
+    /// When a run started at `lastStarted` lets the next one start, if that is later
+    /// than `now`.
+    public func cooldownEnds(after lastStarted: Date?, now: Date) -> Date? {
+        guard let cooldown, let lastStarted else { return nil }
+        let end = lastStarted.addingTimeInterval(cooldown)
+        return end > now ? end : nil
     }
 
     /// The next time a clock makes this fire, across all of its schedules.
@@ -197,6 +217,12 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// a week of refusals on top of the last time it actually ran.
     public var lastFiredAt: Date?
     public var lastFiredBy: WorkflowCause?
+    /// When its cooldown lets the next run start, while that is still to come (#103).
+    /// By the host's clock, as the next times are.
+    public var cooldownEndsAt: Date?
+    /// Whether a trigger is being held for when the cooldown ends, or the run in flight
+    /// does: the one run the fires that arrived meanwhile collapse into.
+    public var holdsAFire: Bool
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
@@ -208,7 +234,10 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 causingEvent: EventPosition? = nil, causingEventName: String? = nil,
                 awaitingApproval: WorkflowApproval? = nil,
                 lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil,
-                nextFireAtByTrigger: [Date?] = []) {
+                nextFireAtByTrigger: [Date?] = [],
+                cooldownEndsAt: Date? = nil, holdsAFire: Bool = false) {
+        self.cooldownEndsAt = cooldownEndsAt
+        self.holdsAFire = holdsAFire
         self.nextFireAtByTrigger = nextFireAtByTrigger
         self.awaitingApproval = awaitingApproval
         self.isEnabled = isEnabled
@@ -268,6 +297,24 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         awaitingApproval = try? c.decodeIfPresent(WorkflowApproval.self, forKey: .awaitingApproval)
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
         lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
+        cooldownEndsAt = try c.decodeIfPresent(Date.self, forKey: .cooldownEndsAt)
+        holdsAFire = try c.decodeIfPresent(Bool.self, forKey: .holdsAFire) ?? false
+    }
+
+    /// What its cooldown is doing, in one sentence, for the pages that show triggers
+    /// (#103): how long it is, when it ends if it has not, and whether a fire is held
+    /// for then. `nil` without a cooldown.
+    public func cooldownSentence(formatting time: (Date) -> String) -> String? {
+        guard let cooldown = workflow.cooldown else { return nil }
+        var sentence = "Cooldown \(WorkflowCooldown.words(cooldown)): at most one run starts in any \(WorkflowCooldown.words(cooldown))"
+        if let end = cooldownEndsAt {
+            sentence += holdsAFire
+                ? ". Cooling down until \(time(end)), then it runs once for what came in meanwhile"
+                : ". Cooling down until \(time(end))"
+        } else if holdsAFire {
+            sentence += ". It runs once more for what came in while this run was going"
+        }
+        return sentence
     }
 }
 

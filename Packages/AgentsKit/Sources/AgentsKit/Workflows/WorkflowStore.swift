@@ -1,5 +1,23 @@
 import Foundation
 
+/// One trigger a cooldown is holding, with what `fire` needs to run it later.
+public struct HeldWorkflowFire: Codable, Hashable, Sendable {
+    public var trigger: WorkflowTrigger
+    public var triggeringAgentID: UUID?
+    public var depth: Int
+    public var causingEvent: EventPosition?
+    public var heldAt: Date
+
+    public init(trigger: WorkflowTrigger, triggeringAgentID: UUID?, depth: Int,
+                causingEvent: EventPosition?, heldAt: Date) {
+        self.trigger = trigger
+        self.triggeringAgentID = triggeringAgentID
+        self.depth = depth
+        self.causingEvent = causingEvent
+        self.heldAt = heldAt
+    }
+}
+
 /// What the app remembers about a workflow that its file cannot say.
 ///
 /// A few things, and the reason each is here rather than in the repository is the same:
@@ -34,6 +52,10 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// SHA-256 of the file as the person last approved it. Kept here, outside the
     /// project, because the file itself is something an agent can write.
     public var approvedDigest: String?
+    /// The trigger its cooldown is holding (#103): the latest to arrive while it was
+    /// cooling down or running, replaced by each one after it, and run once when the
+    /// cooldown ends. Kept here so a restart in between still runs it.
+    public var heldFire: HeldWorkflowFire?
 
     public var key: String { folder.path + "/" + workflowID }
 
@@ -55,6 +77,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         lastOutcome = (try? c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)) ?? nil
         lastCausingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .lastCausingEvent)
         approvedDigest = try c.decodeIfPresent(String.self, forKey: .approvedDigest)
+        heldFire = try? c.decodeIfPresent(HeldWorkflowFire.self, forKey: .heldFire)
     }
 
     public init(folder: URL, workflowID: String, isArchived: Bool = false,

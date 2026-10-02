@@ -450,6 +450,10 @@ struct WorkflowPage: View {
         } else if let next = summary.nextFireAt {
             parts.append("Next \(next.formatted(.relative(presentation: .named)))")
         }
+        // How often it may run, the Mac page's sentence (#103).
+        if let cooldown = summary.cooldownSentence(formatting: { $0.formatted(date: .omitted, time: .shortened) }) {
+            parts.append(cooldown)
+        }
         if let outcome = summary.lastOutcome {
             let when = outcome.at.formatted(.relative(presentation: .named))
             switch outcome {

@@ -1037,6 +1037,11 @@ public actor AppService {
             runs unattended, so this is the only chance to say so. A value the runtime \
             does not offer stops the workflow running rather than falling back.
 
+            `cooldown:` (e.g. `15m`, `2h`, `1d`) is the least time from the start of one \
+            run to the start of the next. Triggers that arrive sooner, or while a run is \
+            going, are held and run once, with the latest of them, when it ends. Set one \
+            for a workflow on a busy event such as `agent.finished`.
+
             Once its runtime has been used in this project, reading a workflow also \
             lists what that runtime offers for each of these, in the words the file \
             takes. To change how an existing workflow runs, \

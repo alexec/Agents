@@ -715,9 +715,10 @@ struct WebFixturesTests {
     /// the event catalogue, which the web remote does not carry.
     @Test func workflows() throws {
         func flow(_ id: String, _ triggers: [WorkflowTrigger], mode: WorkflowMode = .new,
-                  problem: WorkflowProblem? = nil, settings: WorkflowSettings = WorkflowSettings()) -> Workflow {
+                  problem: WorkflowProblem? = nil, settings: WorkflowSettings = WorkflowSettings(),
+                  cooldown: TimeInterval? = nil) -> Workflow {
             Workflow(workflowID: id, folder: Self.folderURL, triggers: triggers, mode: mode, prompt: "Do it.",
-                     problem: problem, settings: settings)
+                     problem: problem, settings: settings, cooldown: cooldown)
         }
         let nightly = WorkflowSchedule(minutes: [0], hours: 2...2, days: Weekday.everyDay)
         let office = WorkflowSchedule(minutes: [0, 30], hours: 9...17, startMinute: 30, endMinute: 30, days: Weekday.weekdays)
@@ -749,6 +750,13 @@ struct WebFixturesTests {
             ("turned off", WorkflowSummary(workflow: flow("quiet", [.schedule(nightly)]), isEnabled: false)),
             ("turned off, a trigger refused", WorkflowSummary(workflow: flow("hushed", [.agentFinished]), isEnabled: false,
                                                               lastOutcome: .refused(.disabled, at: Self.base, repeats: 1))),
+            // A cooldown (#103): said on the row, and a held trigger is grey.
+            ("a cooldown, with settings", WorkflowSummary(workflow: flow("close-landed", [.agentFinished],
+                settings: WorkflowSettings(permissionMode: "plan"), cooldown: 90 * 60))),
+            ("a cooldown, triggering, a trigger held", WorkflowSummary(workflow: flow("steady", [.agentFinished],
+                mode: .triggering, cooldown: 24 * 60 * 60),
+                lastOutcome: .refused(.coolingDown(until: Self.base.addingTimeInterval(600)), at: Self.base, repeats: 3),
+                cooldownEndsAt: Self.base.addingTimeInterval(600), holdsAFire: true)),
         ]
         let cases = try all.map { Case(name: $0.0, input: Self.sortingSets(try Self.encode($0.1))) }
         try pin("workflows/summaries.json", cases) { input in

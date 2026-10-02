@@ -47,6 +47,10 @@ public enum WorkflowFile {
                 if let named = mapping["agent"]?.scalar, let mode = WorkflowMode(rawValue: named) {
                     workflow.mode = mode
                 }
+                if let text = mapping[WorkflowCooldown.key]?.scalar,
+                   case .success(let length) = WorkflowCooldown.parse(text) {
+                    workflow.cooldown = length
+                }
             }
             return workflow
         }
@@ -148,6 +152,22 @@ public enum WorkflowFile {
                 throw YAMLNode.Failure("`labels:` \(error.localizedDescription)")
             }
         }
+        // How long from one run's start to the next (#103). Wrong, it is a file to fix
+        // rather than a cooldown to guess at: a workflow meant to run once an hour and
+        // running on every trigger is the thing the key was written to stop.
+        var cooldown: TimeInterval?
+        if let node = mapping[WorkflowCooldown.key] {
+            guard let text = node.scalar else {
+                return broken("`\(WorkflowCooldown.key):` must be a single value, like 15m")
+            }
+            if !text.isEmpty {
+                switch WorkflowCooldown.parse(text) {
+                case .success(let length): cooldown = length
+                case .failure(let failure): return broken(failure.message)
+                }
+            }
+        }
+
         let settings: WorkflowSettings
         do {
             settings = WorkflowSettings(permissionMode: try setting("permission-mode"),
@@ -167,14 +187,14 @@ public enum WorkflowFile {
         // is what a person would have to go and edit. See research.md §4.
 
         let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model", "labels",
-                                   "effort", "options"]
+                                   "effort", "options", WorkflowCooldown.key]
         let unknown = mapping.filter { !known.contains($0.key) }.mapValues(\.jsonValue)
 
         return Workflow(workflowID: workflowID, folder: project,
                         name: mapping["name"]?.scalar,
                         triggers: triggers, mode: mode,
                         prompt: body, problem: problem, unknownFields: unknown,
-                        settings: settings)
+                        settings: settings, cooldown: cooldown)
     }
 
     // MARK: Triggers

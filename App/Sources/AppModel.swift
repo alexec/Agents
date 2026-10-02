@@ -768,13 +768,16 @@ final class AppModel {
     /// This one is asking for somebody's own file to be changed, and a refusal — front
     /// matter it will not touch, a file it cannot write — has to reach them, or the
     /// app has silently kept a change it never made (FR-025).
-    func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings) async {
+    /// `cooldown` is the file's `cooldown:` to write (#103), empty to remove it; left
+    /// `nil`, the file's is left as it is.
+    func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
+                             cooldown: String? = nil) async {
         do {
             let updated: WorkflowSummary = try await client.call(
                 DaemonAPI.Method.workflowsSettings,
                 DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
                                                   workflowID: summary.workflowID,
-                                                  settings: settings),
+                                                  settings: settings, cooldown: cooldown),
                 returning: WorkflowSummary.self)
             work.upsert(updated)
         } catch {

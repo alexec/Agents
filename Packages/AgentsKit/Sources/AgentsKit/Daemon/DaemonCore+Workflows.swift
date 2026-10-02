@@ -206,7 +206,7 @@ extension DaemonCore {
         // A file waiting for the person has no next run: nothing fires until they approve.
         let waiting = archived ? nil : awaitingApproval(workflow, state: state, records: records)
         let runs = !archived && enabled && overLimit == nil && waiting == nil && workflow.problem == nil
-        let now = Date()
+        let now = self.now()
         return WorkflowSummary(
             workflow: workflow,
             isArchived: archived,
@@ -220,7 +220,9 @@ extension DaemonCore {
             awaitingApproval: waiting,
             lastFiredAt: state?.lastFiredAt,
             lastFiredBy: state?.lastFiredBy,
-            nextFireAtByTrigger: runs ? workflow.triggers.map { $0.schedule?.nextDue(after: now) } : [])
+            nextFireAtByTrigger: runs ? workflow.triggers.map { $0.schedule?.nextDue(after: now) } : [],
+            cooldownEndsAt: workflow.cooldownEnds(after: state?.lastFiredAt, now: now),
+            holdsAFire: state?.heldFire != nil)
     }
 
     /// Whether a run of it is in flight.
@@ -369,6 +371,10 @@ extension DaemonCore {
             }
         }
 
+        // Before the guard below, like the blocks above: a fire held across a restart is
+        // still owed its one run, and the first tick after starting is when to give it.
+        await releaseHeldWorkflowFires(now: now)
+
         var records = workflowStore.load()
         let since = records.lastTickAt
         records.lastTickAt = now
@@ -422,9 +428,10 @@ extension DaemonCore {
     @discardableResult
     func fire(_ workflow: Workflow, on trigger: WorkflowTrigger,
               triggeringAgentID: UUID? = nil, depth: Int = 0,
-              at now: Date = Date(),
+              at when: Date? = nil,
               causingEvent: EventPosition? = nil,
               byHand: Bool = false) async -> WorkflowRefusal? {
+        let now = when ?? self.now()
         let key = workflow.id
         let records = workflowStore.load()
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
@@ -455,7 +462,17 @@ extension DaemonCore {
             overLimit: limitReached(by: workflow, records: records),
             dayLimitReached: isDayLimitReached(),
             folderExists: Self.isDirectory(workflow.folder),
-            triggeringAgentIsUsable: triggeringAgentIsUsable) {
+            triggeringAgentIsUsable: triggeringAgentIsUsable,
+            lastStartedAt: state?.lastFiredAt,
+            now: now,
+            byHand: byHand) {
+            if case .coolingDown = refusal {
+                // Held rather than dropped (#103): this one replaces any held before it,
+                // so a burst comes to one run with the last of its triggers, which is
+                // usually the one that matters.
+                hold(HeldWorkflowFire(trigger: trigger, triggeringAgentID: triggeringAgentID, depth: depth,
+                                      causingEvent: causingEvent, heldAt: now), for: workflow)
+            }
             record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
             return refusal
         }
@@ -733,7 +750,10 @@ extension DaemonCore {
             // Not raised for a workflow turned off: it is the person's own decision, not
             // news, and a schedule turned off would put it on the log every half hour.
             // The row's count and the causing event's consequence still say it.
+            // Nor for a trigger held by a cooldown (#103): it has not been refused, only
+            // put off, and its run says so when it happens.
             guard refusal != .disabled else { return }
+            if case .coolingDown = refusal { return }
             raise(EventDraft(name: "workflow.refused", at: now(), scope: .project(folder: workflow.folder),
                              sentence: "Workflow \(workflow.name) did not run: \(refusal.message).",
                              details: ["workflow": workflow.workflowID, "reason": refusal.message],
@@ -881,6 +901,43 @@ extension DaemonCore {
         }
     }
 
+    // MARK: Cooldowns (#103)
+
+    /// Keep this trigger for when the cooldown ends, in place of any kept before it.
+    func hold(_ fire: HeldWorkflowFire, for workflow: Workflow) {
+        var records = workflowStore.load()
+        records.update(folder: workflow.folder, workflowID: workflow.workflowID) { $0.heldFire = fire }
+        keepQuietly("workflow history") { try workflowStore.save(records) }
+    }
+
+    /// Run each held trigger whose cooldown is over and whose last run has finished,
+    /// once. Held for a workflow since put away, turned off or removed, it is let go:
+    /// the trigger would not have run it then either.
+    func releaseHeldWorkflowFires(now: Date) async {
+        var records = workflowStore.load()
+        var due: [(Workflow, HeldWorkflowFire)] = []
+        var dropped = false
+        for state in records.states {
+            guard let held = state.heldFire else { continue }
+            guard let workflow = workflows[state.folder]?[state.workflowID],
+                  !state.isArchived, !state.isDisabled else {
+                records.update(folder: state.folder, workflowID: state.workflowID) { $0.heldFire = nil }
+                dropped = true
+                continue
+            }
+            guard !isRunning(workflow),
+                  workflow.cooldownEnds(after: state.lastFiredAt, now: now) == nil else { continue }
+            records.update(folder: state.folder, workflowID: state.workflowID) { $0.heldFire = nil }
+            due.append((workflow, held))
+        }
+        guard dropped || !due.isEmpty else { return }
+        keepQuietly("workflow history") { try workflowStore.save(records) }
+        for (workflow, held) in due {
+            await fire(workflow, on: held.trigger, triggeringAgentID: held.triggeringAgentID,
+                       depth: held.depth, at: now, causingEvent: held.causingEvent)
+        }
+    }
+
     // MARK: What the app asks for
 
     /// Run now.
@@ -915,6 +972,8 @@ extension DaemonCore {
         records.update(folder: request.folder, workflowID: request.workflowID) {
             $0.isDisabled = !request.enabled
             $0.disabledByAgent = !request.enabled && byAgent
+            // A held trigger was a trigger, and none run an off workflow.
+            if !request.enabled { $0.heldFire = nil }
         }
         try keep("this workflow's settings") { try workflowStore.save(records) }
         let summary = summary(for: workflow, records: records)
@@ -944,6 +1003,7 @@ extension DaemonCore {
             // What it last did belonged to the life it had before. Keeping it would
             // leave a restored workflow wearing a refusal from a fortnight ago.
             $0.lastOutcome = nil
+            $0.heldFire = nil
         }
         try keep("this workflow's settings") { try workflowStore.save(records) }
         let summary = summary(for: workflow, records: records)
@@ -986,6 +1046,20 @@ extension DaemonCore {
             for id in ids.sorted() where existing.settings.options[id] != request.settings.options[id] {
                 edited = try FrontMatterEdit.set(id, under: WorkflowSettings.Setting.options,
                                                  to: request.settings.options[id], in: edited)
+            }
+            if let text = request.cooldown {
+                var length: TimeInterval?
+                if !text.isEmpty {
+                    switch WorkflowCooldown.parse(text) {
+                    case .success(let parsed): length = parsed
+                    case .failure(let failure):
+                        throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable, message: failure.message)
+                    }
+                }
+                if length != existing.cooldown {
+                    edited = try FrontMatterEdit.set(WorkflowCooldown.key,
+                                                     to: length.map(WorkflowCooldown.fileText), in: edited)
+                }
             }
         } catch let refusal as FrontMatterEdit.Refusal {
             // The editor's own sentence, unchanged. It is the one that knows what it

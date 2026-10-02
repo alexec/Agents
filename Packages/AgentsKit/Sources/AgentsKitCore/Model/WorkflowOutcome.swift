@@ -101,6 +101,11 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     /// The file is new, or has changed since the person approved it, and nothing runs
     /// from a file nobody has looked at (security review, workflow approval).
     case awaitingApproval
+    /// Its cooldown has not ended, or a run is going and it has one (#103). Unlike every
+    /// other refusal this one is not the end of the fire: the latest held is run once
+    /// when the cooldown ends, so a burst of triggers is one run with the last of them.
+    /// `until` is when the cooldown ends, or `nil` while a run is going past it.
+    case coolingDown(until: Date?)
 
     /// Said the way the app says a refusal everywhere else: a sentence, because an
     /// agent may be reading it and a person certainly is.
@@ -120,6 +125,9 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .dayLimitReached: return "the day's spending limit has been reached"
         case .settingRefused(_, let detail): return detail
         case .awaitingApproval: return "it is waiting for your OK"
+        case .coolingDown(let until?):
+            return "it is cooling down until \(until.formatted(date: .omitted, time: .shortened)), and runs once then"
+        case .coolingDown(nil): return "a run is still going, and it runs once more when that ends"
         }
     }
 
@@ -143,7 +151,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         // Grey, not coloured: midnight resolves it with nobody doing anything, which
         // is the same shape as a fire missed while the app was closed.
         case .runInFlight, .archived, .disabled, .triggerNotSupported, .agentUnavailable,
-             .noTriggeringAgent, .missedWhileClosed, .dayLimitReached: return false
+             .noTriggeringAgent, .missedWhileClosed, .dayLimitReached, .coolingDown: return false
         }
     }
 
@@ -156,7 +164,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
              (.archived, .archived), (.disabled, .disabled), (.agentUnavailable, .agentUnavailable),
              (.noTriggeringAgent, .noTriggeringAgent), (.missedWhileClosed, .missedWhileClosed),
              (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached),
-             (.awaitingApproval, .awaitingApproval):
+             (.awaitingApproval, .awaitingApproval), (.coolingDown, .coolingDown):
             return true
         case (.overLimit(let a), .overLimit(let b)): return a == b
         case (.unreadable(let a), .unreadable(let b)): return a == b
@@ -202,6 +210,11 @@ public enum WorkflowOutcome: Codable, Hashable, Sendable {
         case .ran: return "Ran"
         case .refused(let refusal, _, let repeats):
             let many = repeats > 1
+            // Held, not dropped: it is going to run, and "did not run" would say otherwise.
+            if case .coolingDown = refusal {
+                return many ? "Waiting — \(repeats) triggers held into one run, as \(refusal.message)"
+                            : "Waiting — \(refusal.message)"
+            }
             if case .missedWhileClosed = refusal {
                 return many ? "Missed \(repeats) times — \(refusal.message)"
                             : "Missed — \(refusal.message)"
@@ -242,7 +255,10 @@ extension Workflow {
                                  overLimit: WorkflowLimit? = nil,
                                  dayLimitReached: Bool = false,
                                  folderExists: Bool = true,
-                                 triggeringAgentIsUsable: Bool? = nil) -> WorkflowRefusal? {
+                                 triggeringAgentIsUsable: Bool? = nil,
+                                 lastStartedAt: Date? = nil,
+                                 now: Date = Date(),
+                                 byHand: Bool = false) -> WorkflowRefusal? {
         // First, and ahead even of a file that cannot be read: somebody has already
         // said they do not want this one, and that answers every other question.
         if isArchived { return .archived }
@@ -260,6 +276,14 @@ extension Workflow {
         // does not pause the workflow or alter its schedule — it refused one fire
         // and will try again when it is next due.
         if dayLimitReached { return .dayLimitReached }
+        // A cooldown holds the fire rather than dropping it (#103), so what would refuse
+        // it for good is asked first: a chain too deep is not made any shallower by
+        // waiting. Run now is a person deciding to run it, and is not held.
+        if cooldown != nil, !byHand {
+            if depth > Self.chainDepthLimit { return .chainTooDeep(depth: Self.chainDepthLimit) }
+            if let end = cooldownEnds(after: lastStartedAt, now: now) { return .coolingDown(until: end) }
+            if isRunning { return .coolingDown(until: nil) }
+        }
         if isRunning { return .runInFlight }
         if depth > Self.chainDepthLimit { return .chainTooDeep(depth: Self.chainDepthLimit) }
         if let problem {

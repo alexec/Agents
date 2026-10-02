@@ -238,7 +238,44 @@ struct WorkflowPage: View {
                 }
                 .paperRaised(in: RoundedRectangle(cornerRadius: 18))
             }
+            cooldown(summary)
             lastRan(summary)
+        }
+    }
+
+    /// The lengths the cooldown menu offers. The file can say any other, and the menu
+    /// then offers that one too.
+    private static let cooldownChoices: [TimeInterval] = [5, 15, 30, 60, 4 * 60, 24 * 60].map { $0 * 60 }
+
+    /// How often it may run (#103): the cooldown, when it ends and whether a trigger is
+    /// held for then, with a menu that writes `cooldown:` into the file.
+    private func cooldown(_ summary: WorkflowSummary) -> some View {
+        let current = summary.workflow.cooldown
+        let choices = Self.cooldownChoices + (current.map { Self.cooldownChoices.contains($0) ? [] : [$0] } ?? [])
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "hourglass")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+            note(summary.cooldownSentence { $0.formatted(date: .omitted, time: .shortened) }
+                 ?? "No cooldown: every trigger runs it, one run at a time.")
+            Spacer(minLength: 12)
+            Picker("Cooldown", selection: Binding(
+                get: { current },
+                set: { chosen in
+                    guard chosen != current else { return }
+                    Task {
+                        await model.setWorkflowSettings(summary, summary.workflow.settings,
+                                                        cooldown: chosen.map(WorkflowCooldown.fileText) ?? "")
+                    }
+                })) {
+                Text("No cooldown").tag(TimeInterval?.none)
+                ForEach(choices.sorted(), id: \.self) { length in
+                    Text("Cooldown: \(WorkflowCooldown.words(length))").tag(TimeInterval?.some(length))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
         }
     }
 
