@@ -1,5 +1,5 @@
 // Frame E: with no key, the page shows this and nothing else (071 US1). A code is pasted,
-// never followed: nothing puts a code in a link.
+// or arrives in the address from Open in Browser (#109, pairLink.ts).
 import { useSignal } from "@preact/signals";
 import type { Session } from "../session";
 

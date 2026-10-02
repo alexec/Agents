@@ -56,6 +56,8 @@ export class Session {
   readonly link: Link;
   private readonly tabs: BroadcastChannel | null;
   private forgettingMyself = false;
+  /** A code the page was opened with (#109), used once if this browser turns out unpaired. */
+  private linked: string | null = null;
 
   constructor(
     readonly keys: KeyStore = new IndexedKeyStore(),
@@ -65,6 +67,15 @@ export class Session {
     const url = origin.replace(/^http/, "ws") + "/v1/connect";
     this.link = new Link({ url, origin, keys, open, ...loopbackTiming });
     this.link.onState((state) => {
+      // Opened with a code (#109): pair with it if there is no key, else leave it unused to
+      // expire. Either way only once, and only the first state the link reaches.
+      const linked = this.linked;
+      this.linked = null;
+      if (linked && state.kind === "unpaired") {
+        log("pair.fromLink");
+        void this.pair(linked);
+        return;
+      }
       if (state.kind === "forgotten") {
         this.wasForgotten.value = !this.forgettingMyself;
         this.forgettingMyself = false;
@@ -87,7 +98,9 @@ export class Session {
     }
   }
 
-  start(): void {
+  /** Connects with the stored key, or pairs with `code` from the page's address if there is none. */
+  start(code: string | null = null): void {
+    this.linked = code;
     this.link.start();
   }
 
