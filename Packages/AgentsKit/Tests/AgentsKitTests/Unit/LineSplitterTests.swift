@@ -58,7 +58,7 @@ struct LineSplitterTests {
     /// The phone's network link and the bridge hand it `Data`, in Wi‑Fi-sized pieces
     /// that are often slices of a bigger buffer. `agents/list` was 5.4 MB on
     /// 2026-09-25; read in 4 KB pieces the old search took seconds on a phone.
-    @Test func takesDataSlicesAndLooksAtEachByteOnce() {
+    @Test func takesDataSlicesAndLooksAtEachByteOnce() throws {
         let line = Data(repeating: UInt8(ascii: "y"), count: 5 * 1024 * 1024)
         var wire = Data("{\"a\":1}\n".utf8)
         wire.append(line)
@@ -72,7 +72,7 @@ struct LineSplitterTests {
             while let next = splitter.next() { lines.append(next) }
             offset = end
         }
-        #expect(lines.count == 3)
+        try #require(lines.count == 3)
         #expect(lines.first == "{\"a\":1}")
         #expect(lines[1].utf8.count == line.count)
         #expect(lines.last == "{\"b\":2}")

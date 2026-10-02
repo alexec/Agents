@@ -51,26 +51,23 @@ struct WorkflowScheduleTests {
         #expect(next == date("2026-09-21 09:00"))
     }
 
-    @Test func aSpringForwardDoesNotLoseTheFire() {
+    @Test func aSpringForwardDoesNotLoseTheFire() throws {
         // On 29 March 2026 the London clocks go forward at 1am: 01:30 does not exist.
         // A workflow set for 01:30 must still come round, on the following day, rather
         // than returning nil or spinning.
         let schedule = WorkflowSchedule(minutes: [30], hours: 1...1)
-        let next = schedule.nextDue(after: date("2026-03-28 12:00"), calendar: calendar("Europe/London"))
-        #expect(next != nil)
-        #expect(next! > date("2026-03-28 12:00"))
+        let next = try #require(schedule.nextDue(after: date("2026-03-28 12:00"), calendar: calendar("Europe/London")))
+        #expect(next > date("2026-03-28 12:00"))
     }
 
-    @Test func aFallBackDoesNotFireTwice() {
+    @Test func aFallBackDoesNotFireTwice() throws {
         // On 25 October 2026 the London clocks go back: 01:30 happens twice. Asking
         // again from the moment just returned must move forward, never stand still.
         let schedule = WorkflowSchedule(minutes: [30], hours: 1...1)
         let calendar = calendar("Europe/London")
-        let first = schedule.nextDue(after: date("2026-10-24 12:00"), calendar: calendar)
-        #expect(first != nil)
-        let second = schedule.nextDue(after: first!, calendar: calendar)
-        #expect(second != nil)
-        #expect(second! > first!)
+        let first = try #require(schedule.nextDue(after: date("2026-10-24 12:00"), calendar: calendar))
+        let second = try #require(schedule.nextDue(after: first, calendar: calendar))
+        #expect(second > first)
     }
 
     @Test func theAnswerFollowsTheTimeZone() {

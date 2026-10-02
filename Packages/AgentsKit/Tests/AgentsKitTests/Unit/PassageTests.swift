@@ -17,26 +17,28 @@ struct PassageTests {
 
     // MARK: Splitting
 
-    @Test func plainTextWithNoBlankLinesIsOnePassage() {
+    @Test func plainTextWithNoBlankLinesIsOnePassage() throws {
         let passages = Passage.split("One.\nTwo.\nThree.")
-        #expect(passages.count == 1)
+        try #require(passages.count == 1)
         #expect(passages[0].source == "One.\nTwo.\nThree.")
         #expect(passages[0].lines == 1...3)
         #expect(passages[0].separator == "")
     }
 
-    @Test func oneBlankLineMakesTwoPassages() {
+    @Test func oneBlankLineMakesTwoPassages() throws {
         let passages = Passage.split("First.\n\nSecond.")
         #expect(passages.map(\.source) == ["First.", "Second."])
+        try #require(passages.count > 1)
         #expect(passages[0].separator == "\n\n")
         #expect(passages[1].separator == "")
         #expect(passages[0].lines == 1...1)
         #expect(passages[1].lines == 3...3)
     }
 
-    @Test func aRunOfBlankLinesIsKeptExactly() {
+    @Test func aRunOfBlankLinesIsKeptExactly() throws {
         let passages = Passage.split("A\n\n\n\nB")
         #expect(passages.map(\.source) == ["A", "B"])
+        try #require(!passages.isEmpty)
         #expect(passages[0].separator == "\n\n\n\n")
     }
 
@@ -56,25 +58,28 @@ struct PassageTests {
         #expect(sources(text) == ["Before.", "```\nhalf\n\nof a\n\nthing"])
     }
 
-    @Test func aHeadingRunningStraightIntoAParagraphIsOnePassage() {
+    @Test func aHeadingRunningStraightIntoAParagraphIsOnePassage() throws {
         let passages = Passage.split("# Title\nThe first line.\n\nNext.")
         #expect(passages.map(\.source) == ["# Title\nThe first line.", "Next."])
+        try #require(passages.count > 1)
         #expect(passages[0].isHeading)
         #expect(!passages[1].isHeading)
     }
 
-    @Test func aSetextHeadingIsAHeading() {
+    @Test func aSetextHeadingIsAHeading() throws {
         let passages = Passage.split("Title\n=====\n\nBody.")
-        #expect(passages[0].isHeading)
-        #expect(Passage.split("Sub\n---")[0].isHeading)
+        #expect(try #require(passages.first).isHeading)
+        let dashed = try #require(Passage.split("Sub\n---").first)
+        #expect(dashed.isHeading)
     }
 
-    @Test func frontMatterIsOnePassage() {
+    @Test func frontMatterIsOnePassage() throws {
         let text = "---\ntitle: x\nkind: y\n---\n\nBody."
         let passages = Passage.split(text)
         #expect(passages.map(\.source) == ["---\ntitle: x\nkind: y\n---", "Body."])
         // `---` under `title: x` would be a setext rule if this were prose; front
         // matter is not prose, and the page has no business drawing it as a heading.
+        try #require(!passages.isEmpty)
         #expect(!passages[0].isHeading)
     }
 
@@ -84,16 +89,17 @@ struct PassageTests {
         #expect(Passage.split("  \n \n") == [])
     }
 
-    @Test func leadingBlankLinesBelongToTheFirstPassage() {
+    @Test func leadingBlankLinesBelongToTheFirstPassage() throws {
         let passages = Passage.split("\n\nA")
-        #expect(passages.count == 1)
+        try #require(passages.count == 1)
         #expect(passages[0].source == "\n\nA")
         #expect(passages[0].lines == 1...3)
     }
 
-    @Test func aTrailingNewlineIsKeptAsTheLastSeparator() {
+    @Test func aTrailingNewlineIsKeptAsTheLastSeparator() throws {
         let passages = Passage.split("A\n")
         #expect(passages.map(\.source) == ["A"])
+        try #require(!passages.isEmpty)
         #expect(passages[0].separator == "\n")
     }
 

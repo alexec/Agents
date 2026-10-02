@@ -72,12 +72,12 @@ struct AgentPickUpTests {
 
     /// A `starting` agent is picked back up like any other, which is FR-007: its
     /// process died with the last daemon exactly as a working one's did.
-    @Test func anAgentCutOffBeforeItsFirstTurnIsStillBroughtBack() {
-        let transition = AgentState.starting.applying(.foundDead)
-        #expect(transition?.next == .stopped)
+    @Test func anAgentCutOffBeforeItsFirstTurnIsStillBroughtBack() throws {
+        let transition = try #require(AgentState.starting.applying(.foundDead))
+        #expect(transition.next == .stopped)
         var agent = self.agent(.starting, nil, 0)
-        agent.state = transition!.next
-        if case .set(let reason) = transition!.endedReason { agent.endedReason = reason }
+        agent.state = transition.next
+        if case .set(let reason) = transition.endedReason { agent.endedReason = reason }
         #expect(agent.mayBePickedUpAfterRestart)
     }
 }

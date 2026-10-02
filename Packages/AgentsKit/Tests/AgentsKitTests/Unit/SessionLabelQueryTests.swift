@@ -10,7 +10,7 @@ struct SessionLabelQueryTests {
     }
 
     @Test func labelAndTextAreCombined() {
-        let all = [agent("Make parser fast", labels: ["perf"]),
+        let all = [agent("Make parser fast", labels: ["perf"]),  // index-ok: three, here
                    agent("Make build fast", labels: ["build"]),
                    agent("Inspect parser", labels: ["perf"])]
         let query = SessionLabelQuery("label:PERF parser")

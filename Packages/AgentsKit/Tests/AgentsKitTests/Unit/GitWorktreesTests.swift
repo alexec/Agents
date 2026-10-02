@@ -5,7 +5,7 @@ import Testing
 /// Reading `git worktree list --porcelain` (030).
 @Suite("What git says about a repository's worktrees")
 struct GitWorktreesTests {
-    @Test func everyKindOfEntryIsRead() {
+    @Test func everyKindOfEntryIsRead() throws {
         let porcelain = """
             worktree /repo
             HEAD 1111111111111111111111111111111111111111
@@ -34,14 +34,15 @@ struct GitWorktreesTests {
         #expect(entries.map(\.path.path) == ["/repo", "/repo/.agents/worktrees/fix-login", "/elsewhere/detached",
                                              "/repo/.agents/worktrees/held", "/repo/.agents/worktrees/gone"])
         #expect(entries.map(\.branch) == ["main", "agents/fix-login", nil, "agents/held", "agents/gone"])
+        try #require(!entries.isEmpty)
         #expect(entries[0].head == "1111111111111111111111111111111111111111")
         #expect(entries.map(\.isLocked) == [false, false, false, true, false])
         #expect(entries.map(\.isPrunable) == [false, false, false, false, true])
     }
 
-    @Test func aListWithoutATrailingBlankLineKeepsItsLastEntry() {
+    @Test func aListWithoutATrailingBlankLineKeepsItsLastEntry() throws {
         let entries = GitWorktrees.parse("worktree /repo\nHEAD abc\nbranch refs/heads/main")
-        #expect(entries.count == 1)
+        try #require(entries.count == 1)
         #expect(entries[0].branch == "main")
     }
 

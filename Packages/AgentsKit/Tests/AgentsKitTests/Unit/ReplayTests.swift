@@ -71,18 +71,20 @@ struct ReplayTests {
         }
     }
 
-    @Test func aStreamSplitInsideAnEscapeSequenceStillLands() {
+    @Test func aStreamSplitInsideAnEscapeSequenceStillLands() throws {
         // The narrow case, written out plainly: the CSI is cut in half.
         let bytes = Array("\u{1B}[2J\u{1B}[5;3Hplaced".utf8)
         #expect(feed(bytes, inChunksOf: 1) == feed(bytes, inChunksOf: nil))
         let screen = feed(bytes, inChunksOf: 1)
+        try #require(screen.count > 4)
         #expect(screen[4].hasSuffix("placed"))
     }
 
-    @Test func aStreamSplitInsideAUTF8CharacterStillLands() {
+    @Test func aStreamSplitInsideAUTF8CharacterStillLands() throws {
         let bytes = Array("costs £12 and €13".utf8)
         let single = feed(bytes, inChunksOf: 1)
         #expect(single == feed(bytes, inChunksOf: nil))
+        try #require(!single.isEmpty)
         #expect(single[0].contains("£12"))
         #expect(single[0].contains("€13"))
     }
