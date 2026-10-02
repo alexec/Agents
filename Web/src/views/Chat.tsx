@@ -1,6 +1,7 @@
 // The chosen session's chat (071 US2, FR-023): concise turns at the chosen level (069), tool
 // calls, plans and background tasks (057), live from agent/entry and agent/changed; the cards
-// above the prompt; the prompt pinned to the foot at every width (US6 scenario 4). Long
+// above the prompt; the prompt pinned to the foot at every width (US6 scenario 4), with where
+// the session works, its labels and its runtime over it, as in the window (#108). Long
 // conversations come a page at a time as the top is reached, and the pane follows the end
 // unless the person has scrolled up.
 import { useSignal } from "@preact/signals";
@@ -17,6 +18,7 @@ import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
 import { SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
+import { projectFolder } from "../model/groups";
 import { detailSummaries, detailTitles, TurnView, type TurnDetail } from "./chat/Rows";
 
 const detailKey = "agents.turnDetail";
@@ -162,7 +164,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             : "This host is offline. What's shown is from when it was last heard; nothing can be sent until it's back."}
         </p>
       )}
-      {agent && r.project && <Labels store={store} host={host} agent={agent} folder={r.project} disabled={down} />}
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, index) => (
@@ -181,7 +182,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <Cards store={store} host={host} session={session} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder="Reply…" disabled={down || !agent}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
-          send={(text, attachments) => store.prompt(host, session, text, attachments)}>
+          send={(text, attachments) => store.prompt(host, session, text, attachments)}
+          where={agent && (
+            <>
+              <Place store={store} host={host} agent={agent} />
+              {r.project && <Labels store={store} host={host} agent={agent} folder={r.project} disabled={down} />}
+            </>
+          )}
+          runtime={agent && <RuntimeLabel store={store} host={host} runtimeID={agent.runtimeID} />}>
           {agent && (
             <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down}
               value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
@@ -191,6 +199,31 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       </footer>
     </section>
   );
+}
+
+/**
+ * Where it works (PromptBar's placeTitle): its worktree, else the project folder's branch. Said,
+ * not offered: moving a session to another worktree is the window's.
+ */
+function Place({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
+  const branch = useSignal<string | undefined>(undefined);
+  const folder = projectFolder(agent);
+  useEffect(() => {
+    branch.value = undefined;
+    if (agent.worktree) return;
+    void store.worktrees(host, folder).then((list) => {
+      branch.value = list?.worktrees.find((w) => w.isProjectFolder)?.branch;
+    });
+  }, [host, folder, agent.worktree?.root]);
+  const title = agent.worktree?.name ?? branch.value ?? "Project folder";
+  const help = agent.worktree ? `Worktree ${agent.worktree.name}${agent.worktree.branch ? ` on ${agent.worktree.branch}` : ""}` : "The project folder";
+  return <span class="pill place" title={help} aria-label={`Works in: ${title}`}>{title}</span>;
+}
+
+/** The runtime the conversation is on (PromptBar's runtimeLabel): said, not offered. */
+function RuntimeLabel({ store, host, runtimeID }: { store: Store; host: string; runtimeID: string }) {
+  const name = (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === runtimeID)?.runtime.name ?? runtimeID;
+  return <span class="pill" title="Runtime" aria-label={`Runtime: ${name}`}>{name}</span>;
 }
 
 /**

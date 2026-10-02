@@ -56,7 +56,8 @@ export function PromptMenus({ options, value, onChange, disabled }: {
     <div class="menus" role="group" aria-label="Settings for this session">
       {permission.map(control)}
       <span class="spacer" />
-      {others.map(control)}
+      {/* Together on the right, wrapping there rather than under the mode at phone width. */}
+      {others.length > 0 && <span class="menus-right">{others.map(control)}</span>}
     </div>
   );
 }
