@@ -8,14 +8,16 @@ struct WordDiffTests {
         return ranges.map { String(decoding: utf16[$0], as: UTF16.self) }
     }
 
-    @Test func onlyTheChangedNumberIsMarked() {
+    @Test func onlyTheChangedNumberIsMarked() throws {
         let rows = LineDiff.rows(old: "let total = 10", new: "let total = 12")
+        try #require(rows.count == 2)
         #expect(Self.marked("let total = 10", rows[0].changed) == ["10"])
         #expect(Self.marked("let total = 12", rows[1].changed) == ["12"])
     }
 
-    @Test func anIndentationChangeMarksTheWhitespace() {
+    @Test func anIndentationChangeMarksTheWhitespace() throws {
         let rows = LineDiff.rows(old: "  return x", new: "    return x")
+        try #require(rows.count == 2)
         #expect(Self.marked("  return x", rows[0].changed) == ["  "])
         #expect(Self.marked("    return x", rows[1].changed) == ["    "])
     }
@@ -37,18 +39,20 @@ struct WordDiffTests {
         #expect(LineDiff.rows(old: old, new: new).allSatisfy { $0.changed.isEmpty })
     }
 
-    @Test func pairsAreRemovedIWithAddedIAndTheRestUnpaired() {
+    @Test func pairsAreRemovedIWithAddedIAndTheRestUnpaired() throws {
         let rows = LineDiff.rows(old: "a = 1\nb = 1", new: "a = 2\nb = 2\nc = 2")
         #expect(LineDiffTests.kinds(rows) == "--+++")
+        try #require(rows.count == 5)
         #expect(!rows[0].changed.isEmpty && !rows[2].changed.isEmpty)
         #expect(!rows[1].changed.isEmpty && !rows[3].changed.isEmpty)
         #expect(rows[4].changed.isEmpty)
     }
 
-    @Test func rangesAreUTF16AndLandOnWholeCharacters() {
+    @Test func rangesAreUTF16AndLandOnWholeCharacters() throws {
         let old = "let café = \"👩‍👩‍👧 one\""
         let new = "let café = \"👩‍👩‍👧 two\""
         let rows = LineDiff.rows(old: old, new: new)
+        try #require(rows.count == 2)
         #expect(Self.marked(old, rows[0].changed) == ["one"])
         #expect(Self.marked(new, rows[1].changed) == ["two"])
     }
