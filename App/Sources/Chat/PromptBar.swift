@@ -470,7 +470,7 @@ struct PromptBar: View {
                 .buttonBorderShape(.circle)
                 .disabled(!canSend)
                 .keyboardShortcut(.return, modifiers: .command)
-                .help(targetOffline ? "\(model.hosts.label(targetHost)) is offline"
+                .help(targetOffline ? model.hosts.offlineHelp(targetHost)
                                     : PromptWords.sendHelp(willQueue: willQueue))
                 .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
             }

@@ -60,10 +60,13 @@ struct ProjectListView: View {
                 // may have moved on, and the window is going back for it by itself.
                 // The control plane being away is the strip's sentence, and the projects
                 // stay listed under it (058, frame H).
-                Text(model.hasLoadedProjects ? "Not connected to the daemon. Trying again…"
-                                             : "Connecting…")
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
+                if model.hosts.isOffline(.mac) {
+                    MacHostDownNotice()
+                } else {
+                    Text("Connecting…")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                }
             } else if model.projects.isEmpty, model.clones.isEmpty, model.hasLoadedProjects {
                 EmptyProjectList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
             }
@@ -114,7 +117,10 @@ struct ProjectListView: View {
                     if model.hosts.isEmpty {
                         newProjectItems(on: .mac)
                     } else {
-                        Menu("This Mac") { newProjectItems(on: .mac) }
+                        Menu(model.hosts.isOffline(.mac) ? "This Mac — Not answering" : "This Mac") {
+                            newProjectItems(on: .mac)
+                        }
+                        .disabled(model.hosts.isOffline(.mac))
                         ForEach(model.hosts.servers, id: \.self) { host in
                             let offline = model.hostUnreachable(host)
                             let label = model.hosts.label(host)
@@ -431,5 +437,32 @@ private struct GoneProjectRows: View {
             }
             .help(path)
         }
+    }
+}
+
+/// In the projects list while this Mac's host does not answer (#83): said whole, in a
+/// person's words, with a way to try at once. The projects under it stay listed, greyed:
+/// what they show is what the window last heard.
+private struct MacHostDownNotice: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // A sidebar row is one line unless told otherwise, and cut off this said
+            // nothing (the walk on 2026-10-01 saw "Not connected to the daemon. Tr…").
+            Label("This Mac’s host isn’t answering", systemImage: "exclamationmark.triangle")
+                .appText(.supporting).fontWeight(.semibold)
+                .tinted(.attention)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("What’s listed is what it last said. The window is trying again by itself.")
+                .appText(.fine).foregroundStyle(.secondary)
+                .lineLimit(4)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Try Again") { model.tryMacHostAgain() }
+                .controlSize(.small)
+        }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
     }
 }

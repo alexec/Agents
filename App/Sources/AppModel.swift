@@ -515,6 +515,9 @@ final class AppModel {
         }
     }
 
+    /// This Mac's host strip's Try Again: the same as the control plane's (#83).
+    func tryMacHostAgain() { tryControlPlaneAgain() }
+
     /// The away strip's Try Again: one attempt now, then the usual backoff.
     func tryControlPlaneAgain() {
         reconnecting?.cancel()
@@ -1203,6 +1206,9 @@ final class AppModel {
     /// not an error worth showing.
     private func lostConnection() async {
         isConnected = false
+        // Said at once, everywhere this Mac's host is the target (#83), rather than
+        // when the next action has waited out a connect.
+        if hosts.macDownSince == nil { hosts.macDownSince = Date() }
         listening = nil
         await reconnect()
     }
@@ -1284,6 +1290,7 @@ final class AppModel {
         do {
             try await client.connect()
             isConnected = true
+            hosts.macDownSince = nil
             problem = nil
             await client.setCredentialLender { [weak self] wanted in
                 await self?.answerMacCredentialWanted(wanted) ?? false
@@ -1306,6 +1313,7 @@ final class AppModel {
             watchControlHosts()
         } catch {
             isConnected = false
+            if hosts.macDownSince == nil { hosts.macDownSince = Date() }
             // A control plane that cannot be reached is the strip, not an alert.
             if controlLink == nil { problem = describe(error) }
         }
@@ -2851,6 +2859,12 @@ final class AppModel {
 
     @discardableResult
     func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
+        // Already known to be down: said now, not after waiting out a connect that
+        // the reconnect loop is already making (#83). The strip has Try Again.
+        if host == .mac, hosts.isOffline(.mac), !controlPlaneAway {
+            problem = HostSet.macDownProblem
+            return false
+        }
         do {
             try await work()
             return true
@@ -2911,7 +2925,7 @@ final class AppModel {
         if let error = error as? DaemonClient.ConnectError {
             switch error {
             case .couldNotConnect:
-                return "Could not reach the helper that runs the agents."
+                return HostSet.macDownProblem
             case .socketPathTooLong(let path):
                 // Only ever seen by somebody who passed `--root`, and the fix is in
                 // their hands: a shorter path.
