@@ -66,6 +66,12 @@ agent: new
 Deploy the docs, then say what you deployed.
 ```
 
+A workflow never runs on an `agent.` event about its own agent: the agent doing its run,
+the agent a `new` or `standing` workflow started, or a helper either of those started. So a
+workflow on `agent.finished` runs once when another agent finishes, not again when its own
+agent does. A `triggering` workflow's agent is only its own for the run: when you next
+prompt that agent and it finishes, the workflow runs again. Waits still hear every event.
+
 The older hyphenated names still work, and each answers to the events listed under
 [Older trigger names](events.md#older-trigger-names). The pull-request triggers
 (`pull-request-checks-failed`, `pull-request-review-comments` and
