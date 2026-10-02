@@ -21,6 +21,10 @@ public final class ControlLink: @unchecked Sendable {
     private var dialling: Task<any LineTransport, any Error>?
     /// Keyed by host; nil is the control plane itself.
     private var routes: [HostID?: Virtual] = [:]
+    private var unreadableFrames = 0
+
+    /// Frames from the control plane that could not be read, each also logged (#93).
+    public var unreadableFrameCount: Int { lock.withLock { unreadableFrames } }
 
     public init(dial: @escaping Dial) {
         self.dial = dial
@@ -99,7 +103,16 @@ public final class ControlLink: @unchecked Sendable {
     }
 
     private func deliver(_ line: String) {
-        guard let frame = try? ControlWire.readClient(line) else { return }
+        let frame: ControlWire.ClientFrame
+        do {
+            frame = try ControlWire.readClient(line)
+        } catch {
+            // Which route it was for cannot be told, so nobody can be answered; said,
+            // at least, rather than vanishing (#93).
+            lock.withLock { unreadableFrames += 1 }
+            WireLog.write("control link: unreadable frame from the control plane (\(error)): \(WireLog.excerpt(line))")
+            return
+        }
         switch frame {
         case .toHost(let host, let message):
             route(host)?.yield(message)

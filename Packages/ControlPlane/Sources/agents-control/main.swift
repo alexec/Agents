@@ -101,6 +101,8 @@ func localHost() -> String {
 }
 
 func serve() async {
+    // Beside the rest of what it says, in control.log, rather than in the system log (#93).
+    WireLog.sink = { FileHandle.standardError.write(Data("agents-control: \($0)\n".utf8)) }
     let homePort = value("--port").flatMap(Int.init) ?? 8791
     let text = environment["AGENTS_CONTROL_URL"] ?? home.map { _ in "https://\(localHost()):\(homePort)" }
     guard let text, let url = URL(string: text) else {
