@@ -14,6 +14,8 @@ struct AgentsApp: App {
     @State private var frame = SidebarFrame()
 
     init() {
+        // Before anything can throw: the next layout crash names its view (#76).
+        CrashHook.install()
     }
 
     var body: some Scene {
