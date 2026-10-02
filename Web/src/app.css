@@ -46,6 +46,9 @@ button.prominent {
   box-sizing: border-box;
 }
 
+.connecting { margin: 0; opacity: 0; animation: connecting-shows 0.2s ease-in 0.6s forwards; }
+@keyframes connecting-shows { to { opacity: 0.55; } }
+
 .pairing-card {
   width: min(440px, 100%);
 }
@@ -766,3 +769,56 @@ button.remove:hover { opacity: 1; }
 .row.entry { display: flex; align-items: center; gap: 6px; }
 .row.entry .title { flex: 1; min-width: 0; }
 .changes-head { margin: 4px 8px 6px; }
+
+/* New project (#115): the + over the projects column, its menu, and the window's two sheets. */
+.menu-anchor.new-project { margin-right: 0; }
+.popover [role=menuitem]:disabled { background: none; }
+.popover hr { border: none; border-top: 1px solid var(--paper-rule); margin: 4px 0; }
+.new-project-host { display: flex; flex-direction: column; }
+.menu-head { margin: 6px 10px 2px; font-size: 11px; opacity: 0.55; }
+.empty-projects { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; }
+.empty-projects .quiet { line-height: 1.45; }
+.empty-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.row.cloning { cursor: default; opacity: 0.7; }
+.row.cloning .spinner { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+dialog.sheet {
+  width: min(520px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 20px;
+  color: inherit;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 40px var(--paper-shadow);
+}
+dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
+.sheet-body { display: flex; flex-direction: column; gap: 10px; }
+.sheet h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.sheet input[type="text"] {
+  font: inherit;
+  color: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-ground);
+}
+.sheet-note { margin: 10px 0 0; font-size: 12px; opacity: 0.65; min-height: 2.6em; }
+.sheet-body .sheet-note { margin: 0; }
+.sheet-note.failure { color: var(--tint-failure); opacity: 1; }
+.sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  height: 260px;
+  overflow-y: auto;
+  margin-top: 10px;
+  padding: 4px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-ground);
+}
+.folder-row { text-align: left; border: none; background: none; padding: 4px 8px; border-radius: var(--radius-control); }
+.folder-row:hover { background: var(--paper-wash); }
+.folder-row.chosen { background: var(--paper-selection); }
+.folder-row.up { opacity: 0.6; }
+.folder-row.file:disabled { opacity: 0.35; cursor: default; }
