@@ -42,6 +42,23 @@ Notes and the screenshot are in `walks/performance/`: `performance-notes.txt` (t
 
 The window pays the same 4 MB on its own socket, so this is the protocol's shape, not the browser's. The remedy is a list without each agent's command and option lists, which the sessions column never reads (the open session's menus come from `agents/options`). In the fixture record, `availableCommands` is 18.9 KB and `advertisedOptions` 1.9 KB of 21.5 KB, so without them a record is about 0.7 KB and the reply about thirty times smaller. It is a change to `DaemonAPI` for every client, so it's left as a follow-up rather than made here.
 
+## After #107: the lean list
+
+**Date:** 2026-10-02. **Root:** `/tmp/run-107`, seeded as above (`seed-archived.swift --live`, 10 in each of 20 project folders), the window and the page on one scratch set-up.
+
+`agents/list` now takes `lean`, which leaves out each record's `advertisedOptions`, `availableCommands` and `plans`. The window, Agents Host, the Remote and the page all ask for it. The open chat's own record comes whole with `agentID` (and `limit: 1`, for a host from before), and a listed record keeps the lists already held, so the menus the lean list leaves out are still there. Old clients ask without `lean` and get what they always got.
+
+| | Before | After |
+|---|---|---|
+| Reply to `agents/list`, 200 live agents | **4.17 MB** | **0.115 MB** (36× smaller) |
+| The host's answer on its socket (same run, median of 7) | 151 ms | 8 ms |
+| The window's `first-list`, after launch (median of 5) | 4188 ms (load ~40) | 389 ms (load ~8) |
+| The page painted, main's `Web/dist` against this branch's (same host, same minute, load ~5, median of 7) | 823 ms | **105 ms** |
+
+The window's before and after were taken at different machine loads, so the socket row is the fair comparison for it. The page's two sets were run back to back on one host, with only the control plane restarted to serve the other `Web/dist`. The old page got the full shape from the new host and painted as before, which is the check that old clients keep working.
+
+The open session's menus were checked in the page (Manual, the model, the effort and Fast mode under the prompt), after a lean list. `scripts/perf-budgets.py` has an `agents/list, lean` row with a 100 ms budget.
+
 ## The bundle
 
 | File | Size | Gzipped |
