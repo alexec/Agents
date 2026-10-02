@@ -14,6 +14,7 @@ import { browserName, type Session } from "../session";
 import { Banner } from "./Banner";
 import { Chat } from "./Chat";
 import { NewAgent } from "./NewAgent";
+import { CloningRows, EmptyProjects, NewProjectDialog, NewProjectItems, NewProjectMenu } from "./NewProject";
 import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { SessionRow } from "./SessionRow";
@@ -57,6 +58,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
           ) : <section class="chat empty" aria-label="Chat"><p>Choose a project.</p></section>}
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
       </div>
+      <NewProjectDialog store={store} />
     </div>
   );
 }
@@ -105,6 +107,7 @@ function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
                 </button>
               );
             })}
+            <CloningRows store={store} host={host.id} />
           </div>
         );
       })}
@@ -116,8 +119,12 @@ function ProjectsColumn({ session, store }: { session: Session; store: Store }) 
   const confirming = useSignal(false);
   return (
     <nav class="projects" aria-label="Projects">
-      <header class="column-head narrow-only"><h1>Agents</h1></header>
-      <div class="scroll"><ProjectList store={store} /></div>
+      {/* New project at the head of the column, where the window's + sits over its sidebar (#115). */}
+      <header class="column-head projects-head">
+        <h1><span class="narrow-only">Agents</span></h1>
+        <NewProjectMenu store={store} />
+      </header>
+      <div class="scroll"><ProjectList store={store} /><EmptyProjects store={store} /></div>
       <footer class="identity">
         <span>{browserName()} on this Mac</span>
         {confirming.value ? (
@@ -189,6 +196,8 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
           {menu.value && (
             <div class="popover" role="menu">
               <ProjectList store={store} onPick={() => (menu.value = false)} />
+              <hr />
+              <NewProjectItems store={store} onChoose={() => (menu.value = false)} />
             </div>
           )}
         </span>
