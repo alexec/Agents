@@ -49,6 +49,7 @@ Check the build and say whether it is green.
 | `effort:` | One of the runtime's levels, such as `low` or `high` | How hard the agent thinks. Without it, the runtime's own default. |
 | `labels:` | A list of up to five names, each 1–24 characters | Each newly started workflow session gets these agent-owned labels. A standing or triggering run reusing an existing session keeps that session’s labels. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
+| `cooldown:` | A length of time in minutes, hours or days, such as `15m`, `2h`, `1h30m` or `1d`; at least a minute | The least time from the start of one run to the start of the next. See [Cooldown](#cooldown). A value that is not a length of time stops the workflow running, and its page says what is wrong. |
 
 For example, to start a new agent whenever `main` moves, or another agent publishes
 `custom.build_green`:
@@ -103,6 +104,8 @@ A workflow does not run, and its page says why, when:
 - the project folder is not there;
 - its `agent:` is `triggering` and the agent it would have resumed is gone, or nothing
   set it off;
+- its cooldown has not ended, or a run is still going and it has one. This trigger is
+  held, not dropped, and runs once when the cooldown ends (see [Cooldown](#cooldown));
 - the file cannot be read, or names a trigger or `agent:` value this version does not
   know. The page says what is wrong with the file.
 
@@ -114,6 +117,41 @@ filters on it, whether it listens in this project or on the whole Mac or server,
 agent a `triggering` run resumes, when a schedule is next due, and a trigger this
 version does not know marked **Unknown**. Under them it says when the workflow last ran
 and what set it off. A file that cannot be read still lists the triggers it could read.
+
+## Cooldown
+
+A workflow on a busy trigger, such as `agent.finished`, can run many times a day. A
+`cooldown:` limits how often:
+
+```markdown
+---
+name: Close landed issues
+on:
+  - agent.finished
+cooldown: 15m
+---
+```
+
+- The cooldown counts from the **start** of the last run.
+- A trigger that comes inside the cooldown, or while a run is still going, is **held**,
+  not dropped. When the cooldown ends and no run is going, the workflow runs **once**,
+  for the latest held trigger. A burst of triggers gives one run, and that run is told
+  about the last of them.
+- Each held trigger is recorded: on its event, on the Events page, and on the workflow's
+  row as **Waiting — it is cooling down until 14:32, and runs once then**, counted on one
+  line. A held trigger is not put on the log as `workflow.refused`.
+- A schedule that comes due inside the cooldown is held the same way.
+- **Run now** is not held. It runs at once, even inside the cooldown, and starts the
+  cooldown again. It still waits for a run that is going.
+- A trigger set off by a chain already three deep is refused, not held.
+- Turning the workflow off or archiving it drops the held trigger. A held trigger survives
+  the app restarting.
+- Without `cooldown:`, every trigger runs it, one run at a time, as before.
+
+The **Triggers** section of the workflow's page says the cooldown, when it ends, and
+whether a trigger is held for then. Its menu changes the cooldown by rewriting
+`cooldown:` in the file. The project page's row, the phone and the web page say "at most
+once every 15 minutes" after the triggers.
 
 ## Off and archived
 
