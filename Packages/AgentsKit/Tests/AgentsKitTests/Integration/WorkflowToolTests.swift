@@ -479,4 +479,36 @@ struct WorkflowToolTests {
         #expect(summary.awaitingApproval?.isNew == true)
         #expect(summary.needsAPerson)
     }
+
+    // MARK: On and off (#100)
+
+    @Test func anAgentCanTurnOneOffAndBackOnAndTheListSaysSo() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        _ = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
+
+        let off = try await call(core, token, .disable, id: "advisories", keepingAlive: agentID)
+        #expect(off.contains("Turned off advisories"))
+        #expect(try await call(core, token, .list, keepingAlive: agentID).contains("[turned off]"))
+        #expect(await core.allWorkflows(in: work).first?.isEnabled == false)
+
+        let on = try await call(core, token, .enable, id: "advisories", keepingAlive: agentID)
+        #expect(on.contains("back on"))
+        #expect(await core.allWorkflows(in: work).first?.isEnabled == true)
+    }
+
+    @Test func anAgentCannotTurnBackOnWhatThePersonTurnedOff() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        _ = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
+        _ = try await core.setWorkflowEnabled(
+            DaemonAPI.WorkflowEnableRequest(folder: work, workflowID: "advisories", enabled: false))
+
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await call(core, token, .enable, id: "advisories", keepingAlive: agentID)
+        }
+        #expect(await core.allWorkflows(in: work).first?.isEnabled == false)
+    }
 }

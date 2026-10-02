@@ -166,6 +166,11 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// Put away by the person. Archived workflows are still listed — under their own
     /// heading, where they can be brought back — and never run.
     public var isArchived: Bool
+    /// Switched on or off by the person (#100), and on unless they said otherwise.
+    /// Unlike archiving, an off workflow stays where it is on the list and keeps its
+    /// place under the ceiling, so turning one off for an afternoon moves nothing else;
+    /// none of its triggers fire, and Run now still runs it.
+    public var isEnabled: Bool
     /// Which ceiling this one is past, if any: listed, and inert until something else
     /// is archived. Resolved by the daemon because it is a fact about every project at
     /// once rather than about this workflow, and two windows must not count differently.
@@ -183,17 +188,26 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// Set while the file is not the one the person approved: new since they last
     /// looked, or changed. Nothing fires until they approve it.
     public var awaitingApproval: WorkflowApproval?
+    /// When it last started an agent, and what set that run off (#98). Apart from
+    /// `lastOutcome`, which a refusal overwrites: a workflow turned off for a week has
+    /// a week of refusals on top of the last time it actually ran.
+    public var lastFiredAt: Date?
+    public var lastFiredBy: WorkflowCause?
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
     public var workflowID: String { workflow.workflowID }
 
-    public init(workflow: Workflow, isArchived: Bool = false,
+    public init(workflow: Workflow, isArchived: Bool = false, isEnabled: Bool = true,
                 overLimit: WorkflowLimit? = nil, nextFireAt: Date? = nil,
                 lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false,
                 causingEvent: EventPosition? = nil, causingEventName: String? = nil,
-                awaitingApproval: WorkflowApproval? = nil) {
+                awaitingApproval: WorkflowApproval? = nil,
+                lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil) {
         self.awaitingApproval = awaitingApproval
+        self.isEnabled = isEnabled
+        self.lastFiredAt = lastFiredAt
+        self.lastFiredBy = lastFiredBy
         self.causingEvent = causingEvent
         self.causingEventName = causingEventName
         self.workflow = workflow
@@ -222,6 +236,31 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         if case .refused(let refusal, _, _) = lastOutcome { return refusal.needsAPerson }
         return false
     }
+
+    /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome
+    /// this version does not know (a refusal added later) costs the outcome rather than
+    /// the whole project's list.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        workflow = try c.decode(Workflow.self, forKey: .workflow)
+        isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        overLimit = try? c.decodeIfPresent(WorkflowLimit.self, forKey: .overLimit)
+        nextFireAt = try c.decodeIfPresent(Date.self, forKey: .nextFireAt)
+        lastOutcome = (try? c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)) ?? nil
+        causingEvent = try? c.decodeIfPresent(EventPosition.self, forKey: .causingEvent)
+        causingEventName = try c.decodeIfPresent(String.self, forKey: .causingEventName)
+        isRunning = try c.decodeIfPresent(Bool.self, forKey: .isRunning) ?? false
+        awaitingApproval = try? c.decodeIfPresent(WorkflowApproval.self, forKey: .awaitingApproval)
+        lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
+        lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
+    }
+}
+
+/// What set a workflow's run off (#98): a person, with Run now, or one of its triggers.
+public enum WorkflowCause: Codable, Hashable, Sendable {
+    case byHand
+    case trigger(WorkflowTrigger)
 }
 
 /// What a workflow waiting for approval is waiting on (security review).

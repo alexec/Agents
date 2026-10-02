@@ -539,6 +539,9 @@ extension DaemonCore {
             return try writeWorkflowForAgent(request, in: project)
         case .remove:
             return try removeWorkflowForAgent(request.workflowID, in: project)
+        case .enable, .disable:
+            return try enableWorkflowForAgent(request.workflowID, enabled: request.action == .enable,
+                                              in: project)
         }
     }
 
@@ -555,6 +558,7 @@ extension DaemonCore {
         let lines = listed.map { summary -> String in
             var line = "- \(summary.workflowID): \(summary.workflow.summary)"
             if summary.isArchived { line += " [archived]" }
+            if !summary.isEnabled { line += " [turned off]" }
             if summary.overLimit != nil { line += " [over the limit, so it will not run]" }
             if let outcome = summary.lastOutcome { line += " — \(outcome.summary)" }
             return line
@@ -729,6 +733,47 @@ extension DaemonCore {
         try FileManager.default.removeItem(at: url)
         rescanWorkflows(in: project)
         return "\(workflow.workflowID) is gone. It will not run again."
+    }
+
+    // MARK: On and off (#100)
+
+    /// Turn one off, or back on. Off is always allowed: it is the safe direction, and
+    /// an agent that sees a workflow misbehaving should be able to stop it. On is
+    /// allowed only for one an agent turned off: what the person turned off stays off
+    /// until they turn it back on, as an archived workflow stays archived.
+    private func enableWorkflowForAgent(_ workflowID: String?, enabled: Bool,
+                                        in project: URL) throws -> String {
+        let url = try workflowURL(workflowID, in: project)
+        let id = url.deletingPathExtension().lastPathComponent
+        guard workflow(id, in: project) != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "There is no workflow called \(id) in this project.")
+        }
+        let state = workflowStore.load().state(folder: project, workflowID: id)
+        let isOff = state?.isDisabled ?? false
+        if enabled, !isOff { return "\(id) is already on." }
+        if !enabled, isOff { return "\(id) is already turned off." }
+        if enabled, state?.disabledByAgent != true {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowTurnedOffByPerson,
+                               message: """
+                                Nothing was changed: \(id) was turned off by the person, so \
+                                only they can turn it back on, from the project page. Ask \
+                                them to if it should run again.
+                                """)
+        }
+        let summary = try setWorkflowEnabled(
+            DaemonAPI.WorkflowEnableRequest(folder: project, workflowID: id, enabled: enabled),
+            byAgent: true)
+        guard enabled else {
+            return """
+                Turned off \(id). None of its triggers will run it until it is turned back \
+                on; it stays on the project page, marked off, where Run now still runs it. \
+                Tell them you turned it off and why.
+                """
+        }
+        let waiting = summary.awaitingApproval != nil
+            ? " It is still waiting for their OK, so it will not run until they approve it." : ""
+        return "Turned \(id) back on. Its triggers run it again." + waiting
     }
 
     // MARK: The boundary

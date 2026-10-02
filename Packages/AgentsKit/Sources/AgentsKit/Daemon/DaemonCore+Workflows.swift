@@ -200,19 +200,24 @@ extension DaemonCore {
         let records = records ?? workflowStore.load()
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
         let archived = state?.isArchived ?? false
+        let enabled = !(state?.isDisabled ?? false)
         let overLimit = archived ? nil : limitReached(by: workflow, records: records)
         // A file waiting for the person has no next run: nothing fires until they approve.
         let waiting = archived ? nil : awaitingApproval(workflow, state: state, records: records)
         return WorkflowSummary(
             workflow: workflow,
             isArchived: archived,
+            isEnabled: enabled,
             overLimit: overLimit,
-            nextFireAt: archived || overLimit != nil || waiting != nil ? nil : workflow.nextDue(after: Date()),
+            nextFireAt: archived || !enabled || overLimit != nil || waiting != nil
+                ? nil : workflow.nextDue(after: Date()),
             lastOutcome: state?.lastOutcome,
             isRunning: isRunning(workflow),
             causingEvent: state?.lastCausingEvent,
             causingEventName: state?.lastCausingEvent.flatMap { eventLog.event(at: $0) }.map(Self.eventLabel),
-            awaitingApproval: waiting)
+            awaitingApproval: waiting,
+            lastFiredAt: state?.lastFiredAt,
+            lastFiredBy: state?.lastFiredBy)
     }
 
     /// Whether a run of it is in flight.
@@ -381,12 +386,22 @@ extension DaemonCore {
                 // Nothing is recorded against an archived one, here or on a lifecycle
                 // event. A refusal is news, and "the thing you put away did not run"
                 // is not news every half hour for as long as the file exists.
-                guard records.state(folder: folder, workflowID: workflow.workflowID)?
-                    .isArchived != true else { continue }
-                if wasAway {
+                let state = records.state(folder: folder, workflowID: workflow.workflowID)
+                guard state?.isArchived != true else { continue }
+                // Turned off is recorded, unlike archived (#100): the workflow is still
+                // on the list, and its row saying how many times it did not run is how
+                // somebody notices it has been off since Tuesday. Repeats count up on
+                // one line, so this is one line however long it stays off.
+                if state?.isDisabled == true {
+                    record(.refused(.disabled, at: now, repeats: 1), for: workflow)
+                } else if wasAway {
                     record(.refused(.missedWhileClosed, at: now, repeats: 1), for: workflow)
                 } else {
-                    await fire(workflow, on: .schedule(WorkflowSchedule()), at: now)
+                    // The schedule that came due, so the page can say which one ran it.
+                    let schedule = workflow.schedules.first {
+                        $0.nextDue(after: since).map { $0 <= now } ?? false
+                    } ?? WorkflowSchedule()
+                    await fire(workflow, on: .schedule(schedule), at: now)
                 }
                 _ = folder
             }
@@ -405,7 +420,8 @@ extension DaemonCore {
     func fire(_ workflow: Workflow, on trigger: WorkflowTrigger,
               triggeringAgentID: UUID? = nil, depth: Int = 0,
               at now: Date = Date(),
-              causingEvent: EventPosition? = nil) async -> WorkflowRefusal? {
+              causingEvent: EventPosition? = nil,
+              byHand: Bool = false) async -> WorkflowRefusal? {
         let key = workflow.id
         let records = workflowStore.load()
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
@@ -418,7 +434,11 @@ extension DaemonCore {
 
         // Behind archiving, which is the person's own decision and says more; ahead of
         // everything else, because nothing else matters about a file nobody has seen.
-        if !(state?.isArchived ?? false), awaitingApproval(workflow, state: state, records: records) != nil {
+        // Turning off is the same kind of decision, and stops a trigger the same way; Run
+        // now is not a trigger, and runs an off workflow so it can be tried (#100).
+        let disabled = !byHand && (state?.isDisabled ?? false)
+        if !(state?.isArchived ?? false), !disabled,
+           awaitingApproval(workflow, state: state, records: records) != nil {
             let refusal = WorkflowRefusal.awaitingApproval
             record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
             return refusal
@@ -428,6 +448,7 @@ extension DaemonCore {
             isRunning: workflowRuns[key] != nil,
             depth: depth,
             isArchived: state?.isArchived ?? false,
+            isDisabled: disabled,
             overLimit: limitReached(by: workflow, records: records),
             dayLimitReached: isDayLimitReached(),
             folderExists: Self.isDirectory(workflow.folder),
@@ -455,7 +476,8 @@ extension DaemonCore {
             run.agentID = agentID
             workflowRuns[key] = run
             persistWorkflowRuns()
-            record(.ran(agentID: agentID, at: now), for: workflow, causingEvent: causingEvent, depth: depth)
+            record(.ran(agentID: agentID, at: now), for: workflow, causingEvent: causingEvent, depth: depth,
+                   cause: byHand ? .byHand : .trigger(trigger))
             return nil
         } catch let refused as SettingRefused {
             // Its own refusal, and not `.unreadable`: the file is perfectly readable,
@@ -681,10 +703,10 @@ extension DaemonCore {
     /// Write down what a fire produced, then tell the windows. That order is why a
     /// daemon killed mid-fire still leaves something true behind.
     func record(_ outcome: WorkflowOutcome, for workflow: Workflow,
-                causingEvent: EventPosition? = nil, depth: Int = 0) {
+                causingEvent: EventPosition? = nil, depth: Int = 0, cause: WorkflowCause? = nil) {
         var records = workflowStore.load()
         records.record(outcome, folder: workflow.folder, workflowID: workflow.workflowID,
-                       causingEvent: causingEvent)
+                       causingEvent: causingEvent, cause: cause)
         workflowStore.save(records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
         // On the log (042): what the fire came to, on the event that caused it, and as
@@ -705,6 +727,10 @@ extension DaemonCore {
                 addConsequence(.refused(workflowID: workflow.workflowID, folder: workflow.folder, reason: refusal),
                                to: causingEvent)
             }
+            // Not raised for a workflow turned off: it is the person's own decision, not
+            // news, and a schedule turned off would put it on the log every half hour.
+            // The row's count and the causing event's consequence still say it.
+            guard refusal != .disabled else { return }
             raise(EventDraft(name: "workflow.refused", at: now(), scope: .project(folder: workflow.folder),
                              sentence: "Workflow \(workflow.name) did not run: \(refusal.message).",
                              details: ["workflow": workflow.workflowID, "reason": refusal.message],
@@ -843,8 +869,31 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(request.workflowID) in this project.")
         }
-        await fire(workflow, on: .schedule(WorkflowSchedule()))
+        await fire(workflow, on: .schedule(WorkflowSchedule()), byHand: true)
         return summary(for: workflow)
+    }
+
+    /// Turn one on or off (#100).
+    ///
+    /// The app's own state, as archiving is, and never written into the file: a
+    /// workflow off for an afternoon is not a commit. Unlike archiving, the last
+    /// outcome is kept — turning a workflow off and on again should not forget that
+    /// it was failing.
+    public func setWorkflowEnabled(_ request: DaemonAPI.WorkflowEnableRequest,
+                                   byAgent: Bool = false) throws -> WorkflowSummary {
+        guard let workflow = workflow(request.workflowID, in: request.folder) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "There is no workflow called \(request.workflowID) in this project.")
+        }
+        var records = workflowStore.load()
+        records.update(folder: request.folder, workflowID: request.workflowID) {
+            $0.isDisabled = !request.enabled
+            $0.disabledByAgent = !request.enabled && byAgent
+        }
+        workflowStore.save(records)
+        let summary = summary(for: workflow, records: records)
+        broadcast(DaemonAPI.Notification.workflowChanged, summary)
+        return summary
     }
 
     /// Put one away, or bring it back.

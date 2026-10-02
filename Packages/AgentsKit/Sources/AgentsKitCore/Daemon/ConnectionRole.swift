@@ -115,6 +115,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.workflowsList,
         DaemonAPI.Method.workflowsRun,
         DaemonAPI.Method.workflowsArchive,
+        DaemonAPI.Method.workflowsEnable,
         DaemonAPI.Method.workflowsSettings,
         DaemonAPI.Method.filesMention,
         DaemonAPI.Method.filesList,
