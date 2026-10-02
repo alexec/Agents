@@ -154,7 +154,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <SessionMenu store={store} host={host} agent={agent} disabled={down} />
         </span>
       </header>
-      {hostDown && <p class="offline-strip" role="status">This host is offline. What's shown is from when it was last heard; nothing can be sent until it's back.</p>}
+      {hostDown && (
+        <p class="offline-strip" role="status">
+          {/* This Mac's host in the window's words (#83); a server's as before. */}
+          {host === "mac"
+            ? "This Mac's host isn't answering. What's shown is what it last said, and nothing here can change until it's back."
+            : "This host is offline. What's shown is from when it was last heard; nothing can be sent until it's back."}
+        </p>
+      )}
       {agent && r.project && <Labels store={store} host={host} agent={agent} folder={r.project} disabled={down} />}
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}

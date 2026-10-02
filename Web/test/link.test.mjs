@@ -69,6 +69,23 @@ test("a host's method carries h, the control plane's doesn't, and replies come b
   l.stop();
 });
 
+test("a failure with no id fails the calls waiting on its route, and only those (#93)", async () => {
+  const net = sockets();
+  const l = link(paired(), net);
+  await opened(l);
+  const socket = net.made[0];
+  const onHost = l.call("agents/list", {}, "k3v9");
+  const onOther = l.call("agents/list", {}, "mac");
+  const status = l.call("control/status", {});
+  socket.say({ h: "k3v9", m: { jsonrpc: "2.0", id: null, error: { code: -32700, message: "The control plane could not read that message." } } });
+  await assert.rejects(onHost, (error) => error instanceof w.CallFailed && error.code === -32700);
+  socket.say({ m: { jsonrpc: "2.0", id: 3, result: { name: "cp" } } });
+  socket.say({ h: "mac", m: { jsonrpc: "2.0", id: 2, result: [] } });
+  assert.deepEqual(await status, { name: "cp" });
+  assert.deepEqual(await onOther, []);
+  l.stop();
+});
+
 test("notifications reach listeners with their host", async () => {
   const net = sockets();
   const l = link(paired(), net);

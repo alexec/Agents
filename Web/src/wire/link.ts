@@ -60,7 +60,8 @@ export interface LinkOptions {
 /** Close code the control plane sends a forgotten client (contracts/browser-auth.md). */
 export const forgottenCode = 4403;
 
-type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
+/** A call waiting for its reply, and the route it went on: a host, or null for the control plane. */
+type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; route: string | null };
 
 /** Lines from a socket, as the exchange reads them. */
 export class Lines implements LineSocket {
@@ -176,11 +177,10 @@ export class Link {
     if (this.state.kind !== "open" || !this.socket) return Promise.reject(new LinkDown());
     const id = this.nextID++;
     const message = { jsonrpc: "2.0", id, method, params };
-    const line = targetOf(method) === "host"
-      ? JSON.stringify({ h: host ?? "mac", m: message })
-      : JSON.stringify({ m: message });
+    const route = targetOf(method) === "host" ? host ?? "mac" : null;
+    const line = route !== null ? JSON.stringify({ h: route, m: message }) : JSON.stringify({ m: message });
     return new Promise<Result<M>>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject, route });
       this.socket?.send(line);
     });
   }
@@ -254,7 +254,7 @@ export class Link {
   }
 
   private heard(line: string): void {
-    let frame: { h?: string; m?: { id?: number; result?: unknown; error?: { code: number; message: string }; method?: string; params?: unknown } };
+    let frame: { h?: string; m?: { id?: number | null; result?: unknown; error?: { code: number; message: string }; method?: string; params?: unknown } };
     try {
       frame = JSON.parse(line);
     } catch {
@@ -262,6 +262,19 @@ export class Link {
     }
     const message = frame.m;
     if (!message) return;
+    if (message.id === null && message.error) {
+      // A failure tied to no request: one of ours the far end couldn't read. Which one can't be
+      // known, so every call waiting on that route is told, rather than left waiting for good
+      // (#93, as JSONRPCConnection does).
+      log("call.failed", message.error.code);
+      const route = frame.h ?? null;
+      for (const [id, pending] of this.pending) {
+        if (pending.route !== route) continue;
+        this.pending.delete(id);
+        pending.reject(new CallFailed(message.error.code, message.error.message));
+      }
+      return;
+    }
     if (typeof message.id === "number" && (message.result !== undefined || message.error)) {
       const pending = this.pending.get(message.id);
       if (!pending) return;
