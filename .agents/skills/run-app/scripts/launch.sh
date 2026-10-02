@@ -26,9 +26,10 @@ while [ $# -gt 0 ]; do
     --first-run) FIRST_RUN=1 ;;      # the window unpaired, on frame K; pair it by hand with PAIR_CODE
     --lan)       LAN=1 ;;            # the control plane at this Mac's LAN address, for a container
     --slug)      SLUG="$2"; shift ;;
+    --seeded)    SEEDED=1 ;;         # the root exists, filled beforehand (scripts/seed-archived.swift), with no control/ yet
     --env)       EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the host, e.g. AGENTS_TEST_…=…
     --control-env) CONTROL_ENV+=("$2"); shift ;;  # KEY=VALUE for the control plane, e.g. AGENTS_SSH=…
-    *) echo "usage: launch.sh [--slug NAME] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--env KEY=VALUE]… [--control-env KEY=VALUE]…" >&2; exit 2 ;;
+    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--env KEY=VALUE]… [--control-env KEY=VALUE]…" >&2; exit 2 ;;
   esac
   shift
 done
@@ -40,7 +41,10 @@ case "$SLUG" in *[!A-Za-z0-9_-]*) echo "a slug is letters, digits, - and _" >&2;
 # live tests in AgentsKitTests take their own temporary roots from.
 ROOT="/tmp/run-$SLUG"
 
-if [ -e "$ROOT" ]; then
+if [ "${SEEDED:-0}" = 1 ]; then
+  [ -d "$ROOT" ] && [ ! -e "$ROOT/control" ] && [ ! -e "$ROOT/daemon.sock" ] \
+    || { echo "--seeded wants $ROOT made and filled, with nothing running on it" >&2; exit 1; }
+elif [ -e "$ROOT" ]; then
   echo "root $ROOT already exists — pick another slug or stop.sh it first" >&2
   exit 1
 fi

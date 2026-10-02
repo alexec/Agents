@@ -77,10 +77,12 @@ function makePage(send, sessionId, targetId, listen) {
   const console = [];
   const requests = [];
   const errors = [];
+  /** Every WebSocket frame, with CDP's monotonic time in seconds: `{ at, sent, data }`. */
+  const frames = [];
   const call = (method, params) => send(method, params, sessionId);
 
   const page = {
-    console, requests, errors, targetId,
+    console, requests, errors, frames, targetId,
 
     async start(width, height) {
       listen((message) => {
@@ -88,6 +90,8 @@ function makePage(send, sessionId, targetId, listen) {
           console.push(message.params.args.map((arg) => arg.value ?? arg.description ?? "").join(" "));
         } else if (message.method === "Network.requestWillBeSent") {
           requests.push(message.params.request.url);
+        } else if (message.method === "Network.webSocketFrameSent" || message.method === "Network.webSocketFrameReceived") {
+          frames.push({ at: message.params.timestamp, sent: message.method.endsWith("Sent"), data: message.params.response.payloadData });
         } else if (message.method === "Runtime.exceptionThrown") {
           errors.push(message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text);
         } else if (message.method === "Log.entryAdded") {
@@ -104,6 +108,19 @@ function makePage(send, sessionId, targetId, listen) {
 
     async viewport(width, height) {
       await call("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 2, mobile: width < 760 });
+    },
+
+    /** Any CDP method on this page's session, for what the helpers here don't cover. */
+    raw: call,
+
+    /** Calls `handle(params)` for every `method` event on this page's session. */
+    onEvent(method, handle) {
+      listen((message) => { if (message.method === method) void handle(message.params); });
+    },
+
+    /** Runs `source` in every document this page loads, before the page's own scripts. */
+    async onNewDocument(source) {
+      await call("Page.addScriptToEvaluateOnNewDocument", { source });
     },
 
     async goto(url) {

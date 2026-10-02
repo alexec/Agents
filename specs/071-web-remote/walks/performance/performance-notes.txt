@@ -1,0 +1,15 @@
+paired; the project is at /#/h/mac/p/file%3A%2F%2F%2Ftmp%2Frun-webperf%2Fprojects%2Fproject-07
+run 1: 20 projects, 10 sessions painted at 936 ms (DOMContentLoaded 58 ms)
+run 2: 20 projects, 10 sessions painted at 1158 ms (DOMContentLoaded 47 ms)
+run 3: 20 projects, 10 sessions painted at 1795 ms (DOMContentLoaded 84 ms)
+run 4: 20 projects, 10 sessions painted at 1235 ms (DOMContentLoaded 75 ms)
+run 5: 20 projects, 10 sessions painted at 1117 ms (DOMContentLoaded 63 ms)
+run 6: 20 projects, 10 sessions painted at 1106 ms (DOMContentLoaded 64 ms)
+run 7: 20 projects, 10 sessions painted at 1150 ms (DOMContentLoaded 61 ms)
+median 1150 ms, slowest 1795 ms, fastest 936 ms, over 7 runs
+app.css: 18.3 KB, 4.3 KB gzipped
+app.js: 228.1 KB, 83.5 KB gzipped
+assets/favicon.png: 1.8 KB, 1.8 KB gzipped
+index.html: 0.4 KB, 0.2 KB gzipped
+all: 248.5 KB, 89.8 KB gzipped
+page errors: []
