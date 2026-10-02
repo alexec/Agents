@@ -408,6 +408,7 @@ export interface ControlStatus {
   awayFromHome?: boolean;
   you?: UUID;
   relayKey?: Base64;
+  web?: WebRemoteStatus;
 }
 
 export interface Cost {
@@ -1240,6 +1241,13 @@ export interface WaitingAgent {
   status: WaitStatus;
 }
 
+export interface WebRemoteStatus {
+  port: number;
+  served: boolean;
+  reason?: string;
+  detail?: string;
+}
+
 export type Weekday = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
 export type WorkOutcome = "done" | "nothing_to_do" | "needs_answer" | "partly_done" | "stuck" | "blocked";
@@ -1550,7 +1558,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: [] },
@@ -1644,6 +1652,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitEnding: { required: ["at", "how"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
+  WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: [] },
