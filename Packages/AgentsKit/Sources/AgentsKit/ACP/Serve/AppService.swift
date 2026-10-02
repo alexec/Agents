@@ -336,8 +336,8 @@ public actor AppService {
                 guard let raw = arguments?["action"]?.stringValue,
                       let action = DaemonAPI.ManageWorkflowsRequest.Action(rawValue: raw) else {
                     return .success(Self.reply("""
-                        Nothing was done: `action` has to be one of list, read, write \
-                        or remove.
+                        Nothing was done: `action` has to be one of list, read, write, \
+                        remove, enable or disable.
                         """, isError: true))
                 }
                 return .success(Self.reply(await workflowSink(action,
@@ -1047,6 +1047,11 @@ public actor AppService {
             So write one only when they asked for it, and say in your reply what you set \
             up and that it is waiting for their OK.
 
+            `disable` turns a workflow off without touching its file: it stays listed, \
+            marked off, and none of its triggers run it; `list` says which are off. \
+            `enable` turns one back on, but only one an agent turned off: what the \
+            person turned off is theirs to turn back on.
+
             Under on:, besides schedule and today's hyphenated names (agent-finished and \
             the rest), any event name works, narrowed by its details written under it, \
             e.g. `- workflow.completed:` with `workflow: nightly` under it.
@@ -1056,14 +1061,15 @@ public actor AppService {
             "properties": [
                 "action": [
                     "type": "string",
-                    "enum": .array(["list", "read", "write", "remove"]),
+                    "enum": .array(["list", "read", "write", "remove", "enable", "disable"]),
                     "description": "What to do.",
                 ],
                 "id": [
                     "type": "string",
                     "description": """
                         The workflow's file name without its extension, e.g. \
-                        `morning-build-check`. Required for read, write and remove.
+                        `morning-build-check`. Required for read, write, remove, \
+                        enable and disable.
                         """,
                 ],
                 // The example carries `permission-mode:` so the shape an agent copies

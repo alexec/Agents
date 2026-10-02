@@ -78,6 +78,7 @@ struct WorkflowPage: View {
             if let problem = workflow.problem {
                 broken(problem, workflow: workflow)
             }
+            triggers(summary)
             form(summary)
             runs(workflow)
         }
@@ -164,6 +165,18 @@ struct WorkflowPage: View {
                     .buttonStyle(.paperProminent)
                     .disabled(summary.isRunning)
                 }
+                // Beside Run now, which still works with it off (#100): off stops the
+                // triggers, not the person.
+                Toggle("Enabled", isOn: Binding(
+                    get: { summary.isEnabled },
+                    set: { on in Task { await model.setWorkflowEnabled(summary, on) } }))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .appText(.fine)
+                    .help(summary.isEnabled
+                          ? "Turn this workflow off: its triggers stop, and it stays on the list"
+                          : "Turn this workflow back on")
+                    .accessibilityLabel("Enabled")
                 // One click, and back to the project: the same thing the archive
                 // button on a chat does, so putting a thing away is one gesture
                 // wherever it is.
@@ -198,6 +211,148 @@ struct WorkflowPage: View {
             }
         }
         .task(id: workflow) { rawText = await readRaw(workflow) }
+    }
+
+    // MARK: What sends it (#98)
+
+    /// What makes it run, a line a trigger, read-only like the rest of the file: what it
+    /// waits for, the filters on it, whose agents and events it listens to, when a
+    /// schedule is next due, and under them when it last ran and on what.
+    ///
+    /// Shown for a broken file too, as far as the file could be read: a file with a bad
+    /// `options:` still says what would have run it, and that is the half of it the
+    /// person is likeliest to remember writing.
+    @ViewBuilder
+    private func triggers(_ summary: WorkflowSummary) -> some View {
+        let triggers = summary.workflow.triggers
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Triggers")
+            if triggers.isEmpty {
+                note("None could be read from the file.")
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(triggers.enumerated()), id: \.offset) { index, trigger in
+                        if index > 0 { Divider().padding(.leading, 42) }
+                        triggerRow(trigger, at: index, summary)
+                    }
+                }
+                .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+            }
+            lastRan(summary)
+        }
+    }
+
+    private func triggerRow(_ trigger: WorkflowTrigger, at index: Int, _ summary: WorkflowSummary) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol(for: trigger))
+                .appText(.reading)
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(trigger.summary)
+                        .appText(.reading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !trigger.isSupported {
+                        Text("Unknown")
+                            .appText(.fine).fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .overlay(Capsule().strokeBorder(.secondary.opacity(0.5)))
+                            .help("This version does not know this trigger, so it never runs the workflow")
+                    }
+                }
+                if !trigger.filters.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(trigger.filters.sorted { $0.key < $1.key }, id: \.key) { key, value in
+                            Text("\(key): \(value)")
+                                .appText(.fine).monospaced()
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
+                        }
+                    }
+                }
+                if let scope = scopeLine(trigger) {
+                    note(scope)
+                }
+                if summary.workflow.mode == .triggering, trigger.isSupported {
+                    note(trigger.resumedAgent)
+                }
+            }
+            Spacer(minLength: 12)
+            if trigger.schedule != nil {
+                Text(nextLine(at: index, summary))
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+    }
+
+    private func symbol(for trigger: WorkflowTrigger) -> String {
+        switch trigger {
+        case .schedule: return "clock"
+        case .agentFinished, .agentAskedPermission, .agentAskedForm, .agentStopped: return "person.crop.circle"
+        case .workflowCompleted: return "arrow.triangle.2.circlepath"
+        case .event(let pattern):
+            switch EventSubject(name: pattern.name) {
+            case .agent: return "person.crop.circle"
+            case .workflow: return "arrow.triangle.2.circlepath"
+            case .branch: return "arrow.triangle.branch"
+            case .custom: return "sparkle"
+            default: return "desktopcomputer"
+            }
+        case .unrecognised: return "questionmark.circle"
+        }
+    }
+
+    /// Whose agents and events it listens to, by name: this project's, or the host's
+    /// as a whole. A schedule says whose clock, since a server's may not be this Mac's.
+    private func scopeLine(_ trigger: WorkflowTrigger) -> String? {
+        // "this Mac" mid-sentence, as the project page's own line writes it.
+        let host = model.isOnThisMac(model.selectedProjectHost)
+            ? "this Mac" : model.hosts.label(model.selectedProjectHost)
+        let project = model.selectedProject?.lastPathComponent ?? "this project"
+        if trigger.schedule != nil { return "By the clock on \(host)" }
+        switch trigger.listensIn {
+        case .project?: return "In \(project), on \(host)"
+        case .mac?: return "Anywhere on \(host), so it runs in every project"
+        case .either?: return "In \(project), or anywhere on \(host)"
+        case nil: return nil
+        }
+    }
+
+    /// When a schedule is next due, or why it is not. The time is the daemon's, which
+    /// knows the host's clock.
+    private func nextLine(at index: Int, _ summary: WorkflowSummary) -> String {
+        if summary.isArchived { return "Archived — no next time" }
+        if !summary.isEnabled { return "Off — no next time" }
+        if summary.workflow.problem != nil { return "Never, until the file is fixed" }
+        if summary.awaitingApproval != nil { return "No next time until you approve it" }
+        if summary.overLimit != nil { return "Over the limit — no next time" }
+        // A daemon from before #98 sends only the soonest, which is the one schedule's
+        // when there is only one.
+        let due = summary.nextFireAtByTrigger.indices.contains(index)
+            ? summary.nextFireAtByTrigger[index]
+            : (summary.workflow.schedules.count == 1 ? summary.nextFireAt : nil)
+        guard let due else { return "No next time" }
+        return "Next \(due.formatted(.relative(presentation: .named)))\n"
+            + due.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    /// When it last started an agent, and what set that off.
+    @ViewBuilder
+    private func lastRan(_ summary: WorkflowSummary) -> some View {
+        if let at = summary.lastFiredAt {
+            let when = at.formatted(.relative(presentation: .named))
+            note(["Last ran \(when)", summary.lastFiredBy?.phrase].compactMap { $0 }.joined(separator: ", "))
+        } else {
+            note("Has not run yet.")
+        }
     }
 
     // MARK: The form, shaped like the prompt bar
@@ -573,6 +728,8 @@ struct WorkflowPage: View {
             parts.append((waiting.isNew ? "New" : "Changed since you approved it")
                          + " — read it below, then Approve to let it run")
             return parts.joined()
+        } else if !summary.isEnabled {
+            parts.append(WorkflowSummary.turnedOffSentence)
         } else if let limit = summary.overLimit {
             parts.append("\(limit.sentence). \(limit.remedy)")
         } else if let next = summary.nextFireAt {

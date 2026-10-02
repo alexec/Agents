@@ -33,8 +33,22 @@ public enum WorkflowFile {
 
     /// The whole of the format, as a function of text, so a test needs no file.
     public static func parse(_ text: String, workflowID: String, in project: URL) -> Workflow {
+        // Set once the metadata block is found, so a file broken further down can still
+        // show what it says.
+        var frontMatter: [String]?
         func broken(_ why: String) -> Workflow {
-            Workflow(workflowID: workflowID, folder: project, problem: .unreadable(why))
+            var workflow = Workflow(workflowID: workflowID, folder: project, problem: .unreadable(why))
+            // What can still be read of it, for the page to show (#98): its name, its
+            // triggers and its mode. Shown and never acted on: the problem stops every
+            // fire, every next time and every match before the triggers are looked at.
+            if let frontMatter, let mapping = try? YAMLNode.mapping(from: frontMatter) {
+                if let name = mapping["name"]?.scalar, !name.isEmpty { workflow.name = name }
+                if let on = mapping["on"], let triggers = try? parseTriggers(on) { workflow.triggers = triggers }
+                if let named = mapping["agent"]?.scalar, let mode = WorkflowMode(rawValue: named) {
+                    workflow.mode = mode
+                }
+            }
+            return workflow
         }
 
         let lines = text.components(separatedBy: "\n")
@@ -47,7 +61,7 @@ public enum WorkflowFile {
             return broken("The metadata block is never closed")
         }
 
-        let frontMatter = Array(lines[1..<closing])
+        frontMatter = Array(lines[1..<closing])
         let body = FrontMatter.strip(text)
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return broken("There is no prompt under the metadata")
@@ -55,7 +69,7 @@ public enum WorkflowFile {
 
         let mapping: [String: YAMLNode]
         do {
-            mapping = try YAMLNode.mapping(from: frontMatter)
+            mapping = try YAMLNode.mapping(from: frontMatter ?? [])
         } catch let error as YAMLNode.Failure {
             return broken(error.message)
         } catch {

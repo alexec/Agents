@@ -12,11 +12,21 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// file left where it is. This is the answer to an agent writing a workflow
     /// nobody asked for, and the reason writing one no longer asks first.
     public var isArchived: Bool
+    /// Turned off (#100): kept on the list and under the ceiling, and none of its
+    /// triggers fire. Off rather than on as the stored sense, so a file from before
+    /// this reads as every workflow on.
+    public var isDisabled: Bool
+    /// Whether an agent turned it off, through `manage_workflows`. An agent may turn
+    /// back on what an agent turned off, and never what the person did: the same rule
+    /// that keeps an archived workflow archived when an agent writes it again.
+    public var disabledByAgent: Bool
     /// The agent a `standing` workflow keeps. Adopted on its first fire, and replaced
     /// when the one it had is gone.
     public var standingAgentID: UUID?
     /// What `nextDue` is measured against, so a fire that happened is not offered again.
     public var lastFiredAt: Date?
+    /// What set off the run at `lastFiredAt` (#98).
+    public var lastFiredBy: WorkflowCause?
     /// The only evidence a refused fire leaves.
     public var lastOutcome: WorkflowOutcome?
     /// The event that caused `lastOutcome`, when an event did (042 FR-030).
@@ -34,8 +44,11 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         folder = Project.standardize(try c.decode(URL.self, forKey: .folder))
         workflowID = try c.decode(String.self, forKey: .workflowID)
         isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        isDisabled = try c.decodeIfPresent(Bool.self, forKey: .isDisabled) ?? false
+        disabledByAgent = try c.decodeIfPresent(Bool.self, forKey: .disabledByAgent) ?? false
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
+        lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
         // An outcome this version no longer has — a pull-request refusal from before
         // GitHub support was removed (09-28, after the #58 cut-off) — is forgotten
         // rather than losing the whole state. Also how a newer build's outcome reads.
@@ -50,6 +63,8 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         self.folder = Project.standardize(folder)
         self.workflowID = workflowID
         self.isArchived = isArchived
+        self.isDisabled = false
+        self.disabledByAgent = false
         self.standingAgentID = standingAgentID
         self.lastFiredAt = lastFiredAt
         self.lastOutcome = lastOutcome
@@ -158,11 +173,14 @@ extension WorkflowRecords {
     /// Record what a fire produced, counting a repeat of the same refusal rather than
     /// listing it again. This is what keeps a fortnight away to one line.
     mutating func record(_ outcome: WorkflowOutcome, folder: URL, workflowID: String,
-                         causingEvent: EventPosition? = nil) {
+                         causingEvent: EventPosition? = nil, cause: WorkflowCause? = nil) {
         update(folder: folder, workflowID: workflowID) { state in
             state.lastOutcome = outcome.following(state.lastOutcome)
             state.lastCausingEvent = causingEvent
-            if case .ran = outcome { state.lastFiredAt = outcome.at }
+            if case .ran = outcome {
+                state.lastFiredAt = outcome.at
+                state.lastFiredBy = cause
+            }
         }
     }
 }

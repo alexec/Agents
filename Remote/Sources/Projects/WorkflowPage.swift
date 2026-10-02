@@ -129,10 +129,17 @@ struct WorkflowPage: View {
                     Text("Bring Back").frame(maxWidth: .infinity)
                 }
             } else {
-                Button { Task { await model.runWorkflow(summary) } } label: {
-                    Text(summary.isRunning ? "Running…" : "Run now").frame(maxWidth: .infinity)
+                VStack(spacing: 12) {
+                    Button { Task { await model.runWorkflow(summary) } } label: {
+                        Text(summary.isRunning ? "Running…" : "Run now").frame(maxWidth: .infinity)
+                    }
+                    .disabled(summary.isRunning)
+                    // Under Run now, which still works with it off (#100).
+                    Toggle("Enabled", isOn: Binding(
+                        get: { summary.isEnabled },
+                        set: { on in Task { await model.setWorkflowEnabled(summary, on) } }))
+                        .appText(.reading)
                 }
-                .disabled(summary.isRunning)
             }
         }
         .buttonStyle(.paperProminent)
@@ -436,6 +443,8 @@ struct WorkflowPage: View {
             parts.append("Archived — it will not run until it is restored")
         } else if summary.isRunning {
             parts.append("Running now")
+        } else if !summary.isEnabled {
+            parts.append(WorkflowSummary.turnedOffSentence)
         } else if let limit = summary.overLimit {
             parts.append("\(limit.sentence). \(limit.remedy)")
         } else if let next = summary.nextFireAt {

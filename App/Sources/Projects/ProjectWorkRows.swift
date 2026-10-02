@@ -119,7 +119,12 @@ private struct WorkflowListRow: View {
         } detail: {
             Text(summary.workflow.summary)
         } trailing: {
-            EmptyView()
+            // Marked where it stands, rather than moved (#100): off is not put away.
+            if !summary.isEnabled, !summary.isArchived {
+                Text("Off")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
         }
         .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
         .tag(ColumnPick.workflow(summary.id))
@@ -144,6 +149,9 @@ private struct WorkflowListRow: View {
                 Button("Run now") { Task { await model.runWorkflow(summary) } }
             }
             if !summary.isArchived {
+                Button(summary.isEnabled ? "Turn Off" : "Turn On") {
+                    Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
+                }
                 Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
             }
         }

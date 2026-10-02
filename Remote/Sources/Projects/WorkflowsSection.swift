@@ -75,6 +75,12 @@ private struct WorkflowRow: View {
                     .disabled(summary.isRunning)
                 }
                 Button {
+                    Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
+                } label: {
+                    Label(summary.isEnabled ? "Turn Off" : "Turn On",
+                          systemImage: summary.isEnabled ? "pause.circle" : "play.circle")
+                }
+                Button {
                     Task { await model.setWorkflowArchived(summary, true) }
                 } label: {
                     Label("Archive", systemImage: "archivebox")
@@ -132,6 +138,8 @@ private struct WorkflowRow: View {
         var parts: [String] = []
         if summary.isRunning {
             parts.append("Running now")
+        } else if !summary.isEnabled {
+            parts.append("Off")
         } else if let next = summary.nextFireAt {
             parts.append("Next \(next.formatted(.relative(presentation: .named)))")
         }
@@ -164,6 +172,7 @@ private struct StatusMark: View {
     private var symbol: String {
         if summary.isArchived { return "archivebox" }
         if summary.awaitingApproval != nil { return "hand.raised" }
+        if !summary.isEnabled { return "pause.circle" }
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
         if summary.nextFireAt != nil { return "clock" }
         return "circle.dotted"

@@ -68,6 +68,10 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     /// The person put it away. Unlike every other refusal here, this one is a decision
     /// rather than a circumstance, which is why it is checked before all of them.
     case archived
+    /// The person turned it off (#100). Like archiving, a decision rather than a
+    /// circumstance; unlike it, the workflow keeps its place on the list and under the
+    /// ceiling, and Run now still runs it.
+    case disabled
     /// A ceiling has been reached — this project's, or every project's together.
     case overLimit(WorkflowLimit)
     /// The file could not be read.
@@ -105,6 +109,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .chainTooDeep(let depth): return "this chain is already \(depth) deep"
         case .runInFlight: return "a run is still going"
         case .archived: return "it is archived"
+        case .disabled: return "it is turned off"
         case .overLimit(let limit): return limit.message
         case .unreadable(let detail): return detail
         case .triggerNotSupported(let name): return "\"\(name)\" is not something this version can watch for"
@@ -137,7 +142,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .awaitingApproval: return true
         // Grey, not coloured: midnight resolves it with nobody doing anything, which
         // is the same shape as a fire missed while the app was closed.
-        case .runInFlight, .archived, .triggerNotSupported, .agentUnavailable,
+        case .runInFlight, .archived, .disabled, .triggerNotSupported, .agentUnavailable,
              .noTriggeringAgent, .missedWhileClosed, .dayLimitReached: return false
         }
     }
@@ -148,7 +153,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     public func isSameReason(as other: WorkflowRefusal) -> Bool {
         switch (self, other) {
         case (.chainTooDeep, .chainTooDeep), (.runInFlight, .runInFlight),
-             (.archived, .archived), (.agentUnavailable, .agentUnavailable),
+             (.archived, .archived), (.disabled, .disabled), (.agentUnavailable, .agentUnavailable),
              (.noTriggeringAgent, .noTriggeringAgent), (.missedWhileClosed, .missedWhileClosed),
              (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached),
              (.awaitingApproval, .awaitingApproval):
@@ -233,6 +238,7 @@ extension Workflow {
     /// actually said what it offers.
     public func refusalIfBlocked(isRunning: Bool, depth: Int,
                                  isArchived: Bool = false,
+                                 isDisabled: Bool = false,
                                  overLimit: WorkflowLimit? = nil,
                                  dayLimitReached: Bool = false,
                                  folderExists: Bool = true,
@@ -240,6 +246,9 @@ extension Workflow {
         // First, and ahead even of a file that cannot be read: somebody has already
         // said they do not want this one, and that answers every other question.
         if isArchived { return .archived }
+        // Next, for the same reason. Run now passes `false`: trying a workflow you have
+        // turned off is what turning it off rather than archiving it is for.
+        if isDisabled { return .disabled }
         if case .unreadable(let detail) = problem { return .unreadable(detail) }
         if !folderExists { return .folderGone }
         // After the file's own problems, because "this one is broken" is the more

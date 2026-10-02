@@ -193,6 +193,8 @@ public enum DaemonAPI {
         /// Put one away, or bring it back. The user's one way of overruling a workflow
         /// an agent wrote, which is why it is here and not only in the file system.
         public static let workflowsArchive = "workflows/archive"
+        /// Turn one on or off, keeping its place on the list (#100).
+        public static let workflowsEnable = "workflows/enable"
         /// Approve a workflow file as the person was shown it (security review).
         public static let workflowsApprove = "workflows/approve"
         /// A project's plugins and which are waiting for the person's OK (security review, S2).
@@ -1771,6 +1773,9 @@ public enum DaemonAPI {
         public static let notInWorkflowFolder = -32016
         /// A new workflow in a project that already has all the live ones it may have.
         public static let workflowLimitReached = -32017
+        /// An agent turning back on a workflow the person turned off (#100). Only an
+        /// agent's own off can be undone by an agent.
+        public static let workflowTurnedOffByPerson = -32041
         /// A new agent asked for while the day's spending limit is reached. Raised by
         /// `agents/start` only: a prompt to an agent that already exists succeeds and
         /// waits on that agent's queue, because losing what somebody typed because a
@@ -1890,6 +1895,19 @@ public enum DaemonAPI {
         }
     }
 
+    /// Turn a workflow on or off (#100). The app's own state, like archiving, and never
+    /// written into the file.
+    public struct WorkflowEnableRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public var enabled: Bool
+        public init(folder: URL, workflowID: String, enabled: Bool) {
+            self.folder = folder
+            self.workflowID = workflowID
+            self.enabled = enabled
+        }
+    }
+
     /// A project's plugins.
     public struct PluginsListRequest: Codable, Sendable {
         public var folder: URL
@@ -1967,6 +1985,8 @@ public enum DaemonAPI {
     public struct ManageWorkflowsRequest: Codable, Sendable {
         public enum Action: String, Codable, Sendable {
             case list, read, write, remove
+            /// Turn one on or off (#100).
+            case enable, disable
         }
 
         public var token: String
