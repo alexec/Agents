@@ -174,7 +174,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {newBelow.value && <button class="jump" onClick={toEnd}>New messages ↓</button>}
       <footer class="foot">
         <BackgroundRows agent={agent} />
-        <Cards store={store} host={host} session={session} />
+        <Cards store={store} host={host} session={session} down={down} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder="Reply…" disabled={down || !agent}
           recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}

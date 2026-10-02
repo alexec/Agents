@@ -755,3 +755,4 @@ button.remove:hover { opacity: 1; }
 .state-untracked { opacity: 0.6; }
 .row.entry { display: flex; align-items: center; gap: 6px; }
 .row.entry .title { flex: 1; min-width: 0; }
+.changes-head { margin: 4px 8px 6px; }

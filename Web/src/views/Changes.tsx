@@ -10,7 +10,7 @@ import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { lineDiff, wantsWhole } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
-import { build, lines, statusGlyph, statusPhrase, type Totals } from "../model/changeTree";
+import { build, lines, statusGlyph, statusPhrase, totals, type Totals } from "../model/changeTree";
 
 /** A changed file's square, in its status colour, with the status in words for a reader (#63). */
 export function StatusSquare({ file }: { file: ChangedFile }) {
@@ -105,8 +105,11 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
     if (!next.delete(key)) next.add(key);
     collapsed.value = next;
   };
+  const all = totals(shown.length ? build(list.value.files) : []);
   return (
     <div class="changes">
+      {/* "4 files · +33 −0", as the window heads its list. */}
+      <p class="changes-head quiet small">{all.files === 1 ? "1 file" : `${all.files} files`} · +{all.added} −{all.removed}</p>
       <ul class="changed-files tree" aria-label="Changed files">
         {shown.map(({ node, depth }) => node.kind === "folder" ? (
           <li key={`folder:${node.key}`}>
