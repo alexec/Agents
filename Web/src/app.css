@@ -431,7 +431,9 @@ button.call-line:hover { opacity: 1; }
   text-decoration: none;
 }
 .card button.prominent, .card .button.prominent { background: var(--paper-ink); color: var(--paper-ground); border-color: var(--paper-ink); }
-.card.inert button, .card.inert .button { opacity: 0.45; cursor: default; }
+.card.inert button, .card.inert .button, .card button.held, .card .page.held button { opacity: 0.45; cursor: default; }
+.card [aria-disabled="true"] { cursor: default; }
+.card .telling { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 400; opacity: 0.75; }
 .card .answered { margin: 0; font-weight: 500; }
 .card .form-row { display: flex; align-items: center; gap: 8px; }
 .card .form-row .spacer { flex: 1; }

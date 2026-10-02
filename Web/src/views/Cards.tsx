@@ -5,7 +5,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type {
   ElicitationRequest, ElicitationSchema, ElicitationSchemaProperty, ElicitationSchemaPropertyChoice, JSONValue,
-  PermissionOption, PermissionRequest,
+  PermissionOption, PermissionRequest, UUID,
 } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { CallFailed } from "../wire/link";
@@ -14,9 +14,16 @@ import { Failure } from "../protocol/generated";
 import { isSafeLink } from "../render/markdown";
 import { elicitationTitle } from "./chat/Rows";
 
-type Held =
-  | { kind: "permission"; request: PermissionRequest; answered: Answered }
-  | { kind: "elicitation"; request: ElicitationRequest; answered: Answered };
+type Held = (
+  | { kind: "permission"; request: PermissionRequest }
+  | { kind: "elicitation"; request: ElicitationRequest }
+) & {
+  answered: Answered;
+  /** The answer on its way, by its button's key (#86). */
+  chosen?: string;
+  /** Made at the first send and kept, so a retry is the same answer. */
+  sendID?: UUID;
+};
 /**
  * null while it waits; "here" once this page answered; "elsewhere" when another client did;
  * "withdrawn" when the session stopped before anyone answered.
@@ -76,13 +83,18 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
   const mark = (id: string, answered: Answered) => {
     held.value = held.value.map((c) => (c.request.id === id ? { ...c, answered } : c));
   };
-  /** Sends an answer. A refusal means it was no longer waiting: answered somewhere else. */
-  const send = async (id: string, call: () => Promise<unknown>) => {
+  /**
+   * Sends an answer. A refusal means it was no longer waiting: answered somewhere else. While it
+   * is on its way the button that sent it says so and every other answer is held, so a second
+   * click is not a second answer; they come back if it fails (#86).
+   */
+  const send = async (id: string, chosen: string, call: (sendID: UUID) => Promise<unknown>) => {
     const card = held.value.find((c) => c.request.id === id);
     if (!card || card.answered !== null) return;
-    mark(id, "sending");
+    const sendID = card.sendID ?? (crypto.randomUUID().toUpperCase() as UUID);
+    held.value = held.value.map((c) => (c.request.id === id ? { ...c, answered: "sending", chosen, sendID } : c));
     try {
-      await call();
+      await call(sendID);
       mark(id, "here");
       held.value = held.value.filter((c) => c.request.id !== id);
     } catch (error) {
@@ -96,15 +108,18 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
 
   const cards = held.value.filter((c) => c.answered !== "here");
   if (!cards.length) return null;
+  const recipient = host === "mac" ? "your Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? "the host";
   return (
     <div class="cards" aria-label="Waiting for you">
       {cards.map((card) => card.kind === "permission"
-        ? <PermissionCard key={card.request.id} request={card.request} answered={card.answered}
-            answer={(option) => send(card.request.id, () => store.link.call("permissions/answer",
-              { permissionID: card.request.id, optionID: option.optionID }, host))} />
-        : <ElicitationCard key={card.request.id} request={card.request} answered={card.answered}
-            answer={(action, content) => send(card.request.id, () => store.link.call("elicitations/answer",
-              { requestID: card.request.id, action, content }, host))} />)}
+        ? <PermissionCard key={card.request.id} request={card.request}
+            hold={{ answered: card.answered, chosen: card.chosen, recipient }}
+            answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
+              { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
+        : <ElicitationCard key={card.request.id} request={card.request}
+            hold={{ answered: card.answered, chosen: card.chosen, recipient }}
+            answer={(key, action, content) => send(card.request.id, key, (sendID) => store.link.call("elicitations/answer",
+              { requestID: card.request.id, action, content, sendID }, host))} />)}
     </div>
   );
 }
@@ -112,30 +127,52 @@ export function Cards({ store, host, session }: { store: Store; host: string; se
 function AnsweredNote({ answered }: { answered: Answered }) {
   if (answered === "elsewhere") return <p class="answered" role="status">Answered on another device.</p>;
   if (answered === "withdrawn") return <p class="answered" role="status">The session stopped before this was answered.</p>;
-  if (answered === "sending") return <p class="answered" role="status">Sending…</p>;
   return null;
 }
 
+/** Where a card stands: its answer, and while one is on its way, which and to whom. */
+interface Hold { answered: Answered; chosen: string | undefined; recipient: string }
+
+/**
+ * A button's part in that: the one sent keeps its look and says where it is going; the others
+ * are held. Answered elsewhere or withdrawn, the whole card is inert instead.
+ */
+function holding(hold: Hold, key: string) {
+  const sending = hold.answered === "sending";
+  return {
+    class: sending && hold.chosen !== key ? "held" : "",
+    disabled: hold.answered !== null,
+    telling: sending && hold.chosen === key
+      ? <span class="telling" role="status"><span class="spinner" aria-hidden="true" />telling {hold.recipient}</span>
+      : null,
+  };
+}
+
+/** A card's own class: greyed whole only once it is settled somewhere else. */
+const cardClass = (hold: Hold) => `card${hold.answered === "elsewhere" || hold.answered === "withdrawn" ? " inert" : ""}`;
+
 const allows = (option: PermissionOption) => option.kind === "allow_once" || option.kind === "allow_always";
 
-function PermissionCard({ request, answered, answer }: {
-  request: PermissionRequest; answered: Answered; answer: (option: PermissionOption) => void;
+function PermissionCard({ request, hold, answer }: {
+  request: PermissionRequest; hold: Hold; answer: (option: PermissionOption) => void;
 }) {
-  const inert = answered !== null;
   return (
-    <section class={`card${inert ? " inert" : ""}`} aria-label="Permission request">
+    <section class={cardClass(hold)} aria-label="Permission request">
       <div class="question">
         {request.subagent && <p class="quiet small">Subagent “{request.subagent}” asks</p>}
         <p class="strong">{request.toolCall.title}</p>
         {request.toolCall.kind && <p class="quiet small">{request.toolCall.kind}</p>}
       </div>
       <div class="options">
-        {request.options.map((option) => (
-          <button key={option.optionID} class={allows(option) ? "prominent" : ""} aria-disabled={inert}
-            onClick={() => !inert && answer(option)}>{option.name}</button>
-        ))}
+        {request.options.map((option) => {
+          const h = holding(hold, option.optionID);
+          return (
+            <button key={option.optionID} class={`${allows(option) ? "prominent" : ""} ${h.class}`.trim()} aria-disabled={h.disabled}
+              onClick={() => !h.disabled && answer(option)}>{option.name}{h.telling}</button>
+          );
+        })}
       </div>
-      <AnsweredNote answered={answered} />
+      <AnsweredNote answered={hold.answered} />
     </section>
   );
 }
@@ -199,14 +236,20 @@ function problem(property: ElicitationSchemaProperty, value: JSONValue | undefin
 
 type Action = "accept" | "decline" | "cancel";
 
-function ElicitationCard({ request, answered, answer }: {
-  request: ElicitationRequest; answered: Answered; answer: (action: Action, content: Record<string, JSONValue>) => void;
+function ElicitationCard({ request, hold, answer }: {
+  request: ElicitationRequest; hold: Hold; answer: (key: string, action: Action, content: Record<string, JSONValue>) => void;
 }) {
-  const inert = answered !== null;
+  const inert = hold.answered !== null;
   const values = useSignal<Record<string, JSONValue>>({});
   const step = useSignal(0);
   const title = elicitationTitle(request);
-  const go = (action: Action, content: Record<string, JSONValue> = {}) => !inert && answer(action, content);
+  const go = (key: string, action: Action, content: Record<string, JSONValue> = {}) => !inert && answer(key, action, content);
+  /** One of the card's answers, by its key: its class beside `base`, held state and pending mark. */
+  const button = (key: string, base = "") => {
+    const h = holding(hold, key);
+    return { class: `${base} ${h.class}`.trim() || undefined, disabled: h.disabled, telling: h.telling };
+  };
+  const done = button("done"), gaveUp = button("gave-up"), none = button("none"), decline = button("decline");
   useEffect(() => {
     step.value = 0;
     const defaults: Record<string, JSONValue> = {};
@@ -222,8 +265,8 @@ function ElicitationCard({ request, answered, answer }: {
     body = (
       <div class="options row-options">
         {isSafeLink(url) && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer">Open</a>}
-        <button aria-disabled={inert} onClick={() => go("accept")}>Done</button>
-        <button aria-disabled={inert} onClick={() => go("decline")}>Gave up</button>
+        <button class={done.class} aria-disabled={done.disabled} onClick={() => go("done", "accept")}>Done{done.telling}</button>
+        <button class={gaveUp.class} aria-disabled={gaveUp.disabled} onClick={() => go("gave-up", "decline")}>Gave up{gaveUp.telling}</button>
       </div>
     );
   } else {
@@ -234,16 +277,20 @@ function ElicitationCard({ request, answered, answer }: {
         <>
           {schema.description && <p class="quiet">{schema.description}</p>}
           <div class="options row-options">
-            {single.choices.map((choice) => (
-              <button key={choice.value} class="prominent" aria-disabled={inert}
-                onClick={() => go("accept", { [single.property.name]: choice.value })}>
-                {choice.title}{choice.description && <span class="small quiet">{choice.description}</span>}
-              </button>
-            ))}
+            {single.choices.map((choice) => {
+              const b = button(`choice:${choice.value}`, "prominent");
+              return (
+                <button key={choice.value} class={b.class} aria-disabled={b.disabled}
+                  onClick={() => go(`choice:${choice.value}`, "accept", { [single.property.name]: choice.value })}>
+                  {choice.title}{choice.description && <span class="small quiet">{choice.description}</span>}{b.telling}
+                </button>
+              );
+            })}
             {!single.property.isRequired && (
-              <button aria-disabled={inert} onClick={() => go("accept", { [single.property.name]: "" })}>No answer</button>
+              <button class={none.class} aria-disabled={none.disabled}
+                onClick={() => go("none", "accept", { [single.property.name]: "" })}>No answer{none.telling}</button>
             )}
-            <button aria-disabled={inert} onClick={() => go("decline")}>No thanks</button>
+            <button class={decline.class} aria-disabled={decline.disabled} onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
           </div>
         </>
       );
@@ -256,7 +303,7 @@ function ElicitationCard({ request, answered, answer }: {
       body = (
         <>
           {schema.description && <p class="quiet">{schema.description}</p>}
-          <div class="page">
+          <div class={`page${hold.answered === "sending" ? " held" : ""}`}>
             {pages[page]!.map((property) => (
               <Field key={property.name} property={property} value={values.value[property.name]} inert={inert}
                 set={(value) => set(property.name, value)}
@@ -272,23 +319,26 @@ function ElicitationCard({ request, answered, answer }: {
             )}
             <span class="spacer" />
             {page === last && problems[0] && <span class="quiet small">{problems[0]}</span>}
-            <button aria-disabled={inert} onClick={() => go("decline")}>No thanks</button>
+            <button class={decline.class} aria-disabled={decline.disabled} onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
             {page < last && <button onClick={() => (step.value = page + 1)}>Next</button>}
-            {page === last && (
-              <button class="prominent" disabled={problems.length > 0} aria-disabled={inert}
-                onClick={() => go("accept", values.value)}>Submit</button>
-            )}
+            {page === last && (() => {
+              const submit = button("submit", "prominent");
+              return (
+                <button class={submit.class} disabled={problems.length > 0} aria-disabled={submit.disabled}
+                  onClick={() => go("submit", "accept", values.value)}>Submit{submit.telling}</button>
+              );
+            })()}
           </div>
         </>
       );
     }
   }
   return (
-    <section class={`card${inert ? " inert" : ""}`} aria-label="Question">
+    <section class={cardClass(hold)} aria-label="Question">
       <p class="strong">{title}</p>
       {request.message && request.message !== title && <p>{request.message}</p>}
       {body}
-      <AnsweredNote answered={answered} />
+      <AnsweredNote answered={hold.answered} />
     </section>
   );
 }

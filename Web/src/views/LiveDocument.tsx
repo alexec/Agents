@@ -44,11 +44,14 @@ export function LiveDocument({ store, host, agentID, path, line }: {
   const folder = path.slice(0, path.lastIndexOf("/")) || "/";
   const name = nameOf(path);
 
+  // Reads are counted, and any that lands after a later one started is dropped (the window's #89).
+  const reads = useRef(0);
   const read = async () => {
     const was = loaded.peek();
+    const n = ++reads.current;
     try {
       const r = await store.readFile(host, agentID, path, was.kind === "text" ? was.stamp : undefined);
-      if (r.kind === "unchanged") return;
+      if (n !== reads.current || r.kind === "unchanged") return;
       if (r.kind !== "text") {
         loaded.value = { kind: "refused", why: `${name} is not text, so it can't be read as a page.` };
         return;
@@ -64,6 +67,7 @@ export function LiveDocument({ store, host, agentID, path, line }: {
         if (!editing.peek()) go(changed[0]!);
       }
     } catch (error) {
+      if (n !== reads.current) return;
       const message = describe(error);
       if (/is gone/.test(message)) {
         loaded.value = was.kind === "text" ? { kind: "gone", last: was.text } : was.kind === "gone" ? was : { kind: "notYet" };

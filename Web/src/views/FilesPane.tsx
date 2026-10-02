@@ -24,9 +24,14 @@ function Browser({ store, host, session, root }: { store: Store; host: string; s
   const changedAt = store.filesChanged.value?.agentID === session ? store.filesChanged.value.at : 0;
   useEffect(() => {
     failed.value = null;
+    // A slow listing of the last folder must not land under this one (the window's #89).
+    let current = true;
     void store.listFiles(host, session, folder).then(
-      (listing) => (entries.value = [...listing.entries].sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || a.name.localeCompare(b.name))),
-      (e) => { entries.value = []; failed.value = describe(e); });
+      (listing) => {
+        if (current) entries.value = [...listing.entries].sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || a.name.localeCompare(b.name));
+      },
+      (e) => { if (current) { entries.value = []; failed.value = describe(e); } });
+    return () => { current = false; };
   }, [host, session, folder, changedAt]);
   useEffect(() => {
     store.watchFolder(host, session, folder);

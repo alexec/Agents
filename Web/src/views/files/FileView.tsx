@@ -39,7 +39,12 @@ export function FileView({ store, host, agentID, path }: { store: Store; host: s
   useEffect(() => {
     reading.value = null;
     failed.value = null;
-    void store.readFile(host, agentID, path).then((r) => (reading.value = r), (e) => (failed.value = describe(e)));
+    // A slow read of the last file must not land under this one (the window's #89).
+    let current = true;
+    void store.readFile(host, agentID, path).then(
+      (r) => { if (current) reading.value = r; },
+      (e) => { if (current) failed.value = describe(e); });
+    return () => { current = false; };
   }, [host, agentID, path]);
 
   const name = nameOf(path);

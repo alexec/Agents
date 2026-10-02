@@ -57,12 +57,24 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
   // Read again whenever the agent's folders change.
   const changedAt = store.filesChanged.value?.agentID === session ? store.filesChanged.value.at : 0;
   const agentState = store.agent(host, session)?.state;
+  // Each read is dropped if a later one has started: a slow answer for the last session or file
+  // must not land under this one (the window's #89).
   useEffect(() => {
-    void store.changes(host, session).then((l) => { list.value = l; failed.value = null; }, (e) => (failed.value = describe(e)));
+    let current = true;
+    void store.changes(host, session).then(
+      (l) => { if (current) { list.value = l; failed.value = null; } },
+      (e) => { if (current) failed.value = describe(e); });
+    return () => { current = false; };
   }, [host, session, changedAt, agentState]);
   useEffect(() => {
     detail.value = null;
-    if (open) void store.changedFile(host, session, open).then((d) => (detail.value = d), (e) => (failed.value = describe(e)));
+    let current = true;
+    if (open) {
+      void store.changedFile(host, session, open).then(
+        (d) => { if (current) detail.value = d; },
+        (e) => { if (current) failed.value = describe(e); });
+    }
+    return () => { current = false; };
   }, [host, session, open, changedAt]);
 
   if (failed.value && !list.value) return <p class="hint">{failed.value}</p>;
