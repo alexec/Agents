@@ -449,7 +449,8 @@ public actor DaemonCore {
     ///
     /// So `move` always emits. Whether the emission can be acted on now, or has to
     /// wait a moment, is the workflow layer's business and not the funnel's (FR-014).
-    var deferredLifecycleEvents: [(event: WorkflowAgentEvent, agentID: UUID, depth: Int, cause: EventPosition?)] = []
+    var deferredLifecycleEvents: [(event: WorkflowAgentEvent, agentID: UUID, depth: Int, cause: EventPosition?,
+                                   endingRun: String?)] = []
 
     /// Where notifications go, in a box rather than in a stored closure.
     ///
@@ -903,6 +904,8 @@ public actor DaemonCore {
         // Read before the ending below releases the run, as that ending's own depth is:
         // a workflow that parks its agent must not fire on that park from depth zero.
         let putAwayDepth = parkedNow || archivedNow ? workflowChainDepth(causedBy: agentID) : 0
+        // And whose run it is, so that workflow does not fire on its own agent's ending (#102).
+        let endingRun = runInFlight(for: agentID)?.key
         let wasStarting = agents[agentID]?.state == .starting
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
@@ -954,7 +957,7 @@ public actor DaemonCore {
                                          depth: depth)
             workflowRunFinished(agentID: agentID)
             workflowsRespond(to: next == .finished ? .finished : .stopped,
-                             agentID: agentID, depth: depth, causingEvent: cause)
+                             agentID: agentID, depth: depth, causingEvent: cause, endingRun: endingRun)
         // An agent that has started has neither finished nor stopped, so it fires
         // nothing. Named rather than folded in with `.running`, because it is not
         // running — it is about to be.
@@ -963,12 +966,13 @@ public actor DaemonCore {
         }
         // Put away (#96), after the ending it came with, so a wait hears the finish first.
         if parkedNow {
-            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.", depth: putAwayDepth)
+            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.", depth: putAwayDepth,
+                            endingRun: endingRun)
         }
         if archivedNow {
             let by = agent.archivedReason == .byAgent ? "another agent" : "you"
             raiseAgentEvent("agent.archived", agentID, sentence: "was archived.",
-                            details: ["by": by], depth: putAwayDepth)
+                            details: ["by": by], depth: putAwayDepth, endingRun: endingRun)
         }
         // Anything blocked on this agent (039). Closing is one write per blocked agent;
         // the resume it may clear is queued in that same moment and sent behind this

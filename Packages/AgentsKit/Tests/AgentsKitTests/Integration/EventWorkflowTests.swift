@@ -118,4 +118,113 @@ struct EventWorkflowTests {
         try await Task.sleep(for: .milliseconds(200))
         #expect(await started(core, by: "watcher").isEmpty)
     }
+
+    // MARK: #102 — never fired by news of its own agents
+
+    private func refusedForDepth(_ core: DaemonCore, _ workflowID: String) async -> Bool {
+        await core.eventLog.events.contains { $0.name == "workflow.refused" && $0.details["workflow"] == workflowID }
+    }
+
+    private func firedOn(_ core: DaemonCore, _ name: String, about agentID: UUID) async -> Int {
+        await core.eventLog.events
+            .filter { $0.name == name && $0.details["agent"] == agentID.uuidString }
+            .flatMap(\.consequences)
+            .filter { if case .fired = $0 { return true } else { return false } }
+            .count
+    }
+
+    @Test(arguments: ["  - agent.finished", "  - agent-finished"])
+    func anAgentFinishedWorkflowRunsOncePerRealFinish(_ on: String) async throws {
+        let (locations, work) = try temporary()
+        try write(on, as: "on-finish", in: work)
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        _ = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Do a thing"))
+        try await eventually("the workflow started an agent") { await started(core, by: "on-finish").count >= 1 }
+        let own = try #require(await started(core, by: "on-finish").first)
+        try await eventually("its agent finished") {
+            await core.eventLog.events.contains { $0.name == "agent.finished" && $0.details["agent"] == own.id.uuidString }
+        }
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(await started(core, by: "on-finish").count == 1, "once, not again on its own agent's finish")
+        #expect(!(await refusedForDepth(core, "on-finish")), "nothing for the chain limit to refuse")
+    }
+
+    @Test func anotherWorkflowsAgentStillFiresIt() async throws {
+        let (locations, work) = try temporary()
+        try write("  - mac.wake", as: "starter", in: work)
+        try write("  - agent.finished", as: "on-finish", in: work)
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        await core.raise(EventDraft(name: "mac.wake", scope: .mac, sentence: "This Mac woke up."))
+        try await eventually("the starter ran") { await started(core, by: "starter").count == 1 }
+        let theirs = try #require(await started(core, by: "starter").first)
+        try await eventually("its finish fired on-finish") { await firedOn(core, "agent.finished", about: theirs.id) == 1 }
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(await started(core, by: "on-finish").count == 1)
+        #expect(!(await refusedForDepth(core, "on-finish")))
+    }
+
+    @Test func aTriggeringWorkflowSkipsTheEndingOfItsOwnRunOnly() async throws {
+        let (locations, work) = try temporary()
+        try write("  - agent.finished", mode: "triggering", as: "review", in: work)
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let agent = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Build"))
+        try await eventually("adopted") { await core.agent(agent)?.startedByWorkflow == "review" }
+        try await eventually("the run is over") { await core.workflowRuns.isEmpty }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(await firedOn(core, "agent.finished", about: agent) == 1, "not on the finish of its own run")
+        #expect(!(await refusedForDepth(core, "review")))
+
+        // The person's own next turn is news again.
+        try await core.prompt(DaemonAPI.PromptRequest(agentID: agent, text: "And another"))
+        try await eventually("fired again on the person's turn") { await firedOn(core, "agent.finished", about: agent) == 2 }
+    }
+
+    @Test func aParkedWorkflowIsNotFiredByItsOwnAgentParking() async throws {
+        let (locations, work) = try temporary()
+        try write("  - agent.parked", as: "on-park", in: work)
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .milliseconds(400)
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: FakeLauncher(script: script))
+        await core.loadFromDisk()
+        await core.rescanWorkflows(in: work)
+        let person = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Go"))
+        try await eventually("settled") { await core.agent(person)?.state.hasTurnInFlight == false }
+        try await core.park(person)
+        try await eventually("the workflow ran") { await started(core, by: "on-park").count == 1 }
+        let own = try #require(await started(core, by: "on-park").first)
+
+        // Its agent parks as its run's turn ends, the way one asking to on finish_turn does.
+        try await eventually("its turn is going") { await core.agent(own.id)?.state.hasTurnInFlight == true }
+        try await core.park(own.id)
+        try await eventually("it parked") {
+            await core.eventLog.events.contains { $0.name == "agent.parked" && $0.details["agent"] == own.id.uuidString }
+        }
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(await started(core, by: "on-park").count == 1)
+        #expect(await firedOn(core, "agent.parked", about: own.id) == 0)
+        #expect(!(await refusedForDepth(core, "on-park")))
+    }
+
+    @Test func aWaitStillHearsTheWorkflowsOwnAgentFinish() async throws {
+        let (locations, work) = try temporary()
+        try write("  - agent.finished", as: "on-finish", in: work)
+        let core = try await core(locations)
+        await core.useForEvents(holdLimit: .seconds(5))
+        await core.rescanWorkflows(in: work)
+        let waiter = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Waiter"))
+        try await eventually("the workflow started an agent") { await started(core, by: "on-finish").count == 1 }
+        let own = try #require(await started(core, by: "on-finish").first)
+        let token = UUID().uuidString
+        await core.bindAppToken(token, to: waiter)
+        let answer = try await core.waitForEvent(.init(token: token, events: ["agent.finished"],
+                                                       where: ["agent": own.id.uuidString], from: 0))
+        #expect(answer.hasPrefix("agent.finished happened at "))
+        let finished = await core.eventLog.events.last { $0.name == "agent.finished" && $0.details["agent"] == own.id.uuidString }
+        #expect(finished?.consequences.contains { if case .woke(waiter, _) = $0 { return true } else { return false } } == true)
+        #expect(await firedOn(core, "agent.finished", about: own.id) == 0)
+    }
 }

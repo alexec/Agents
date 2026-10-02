@@ -37,7 +37,8 @@ extension DaemonCore {
         let waiting = deferredLifecycleEvents
         deferredLifecycleEvents.removeAll()
         for held in waiting {
-            workflowsRespond(to: held.event, agentID: held.agentID, depth: held.depth, causingEvent: held.cause)
+            workflowsRespond(to: held.event, agentID: held.agentID, depth: held.depth, causingEvent: held.cause,
+                             endingRun: held.endingRun)
         }
         // And the events whose new-style triggers could not be matched yet (042).
         let events = deferredEventsForWorkflows
@@ -790,9 +791,30 @@ extension DaemonCore {
         return workflowRuns.first { $0.value.agentID == agentID }.map { ($0.key, $0.value) }
     }
 
+    /// Whether this agent is one of the workflow's own, whose news must not fire it (#102).
+    ///
+    /// Its own is the agent doing the run's work right now — read before the run is
+    /// released, as the depth is, and handed in as `endingRun` once it has been — and,
+    /// for a workflow that starts or keeps its agent, that agent for good: the person
+    /// prompting it again later is still not news the workflow asked for. A triggering
+    /// workflow's agent is somebody else's, borrowed for one run, and is news again once
+    /// that run is over. An agent one of these started is the workflow's too.
+    ///
+    /// No opting in. A workflow that wants to go round again on its own agent's finish
+    /// would only reach the chain-depth limit; the agent itself can carry on instead.
+    func isOwnAgent(_ agentID: UUID, of workflow: Workflow, endingRun: String? = nil) -> Bool {
+        if endingRun == workflow.id || runInFlight(for: agentID)?.key == workflow.id { return true }
+        guard let agent = agents[agentID] else { return false }
+        if workflow.mode != .triggering, agent.startedByWorkflow == workflow.workflowID { return true }
+        // One step only, as `workflowChainDepth` goes: a helper cannot start one itself.
+        guard let starter = agent.startedByAgent, starter != agentID else { return false }
+        if runInFlight(for: starter)?.key == workflow.id { return true }
+        return workflow.mode != .triggering && agents[starter]?.startedByWorkflow == workflow.workflowID
+    }
+
     /// Called from the one funnel every agent state change goes through.
     func workflowsRespond(to event: WorkflowAgentEvent, agentID: UUID, depth: Int? = nil,
-                          causingEvent: EventPosition? = nil) {
+                          causingEvent: EventPosition? = nil, endingRun: String? = nil) {
         guard let agent = agents[agentID] else { return }
         // Before anything is read off `workflows`, because at this point that
         // dictionary is empty and the guard below would swallow the event without
@@ -801,7 +823,8 @@ extension DaemonCore {
         guard workflowsAreStarted else {
             deferredLifecycleEvents.append(
                 (event: event, agentID: agentID,
-                 depth: depth ?? workflowChainDepth(causedBy: agentID), cause: causingEvent))
+                 depth: depth ?? workflowChainDepth(causedBy: agentID), cause: causingEvent,
+                 endingRun: endingRun ?? runInFlight(for: agentID)?.key))
             return
         }
         let folder = agent.projectFolder
@@ -818,7 +841,8 @@ extension DaemonCore {
         }
 
         for workflow in byID.values where workflow.responds(to: event)
-            && records.state(folder: folder, workflowID: workflow.workflowID)?.isArchived != true {
+            && records.state(folder: folder, workflowID: workflow.workflowID)?.isArchived != true
+            && !isOwnAgent(agentID, of: workflow, endingRun: endingRun) {
             // Detached, because this is called from inside the actor by `move`, and
             // firing awaits things that can call back into it. The shape `beginTurn`
             // already uses for a turn.
