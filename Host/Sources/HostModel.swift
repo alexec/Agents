@@ -351,9 +351,13 @@ final class HostModel {
     /// it to `web.json`; nil until it has, or while it isn't running.
     private(set) var webRemote: DaemonAPI.WebRemoteStatus?
 
-    /// The toggle's line: what the control plane says, else the address it was asked for.
+    /// The toggle's line: what the control plane says, else the address it was asked for;
+    /// and while it's off, that it's off, never an address as if the page were there (R3).
     var webRemoteLine: String {
-        guard settings.servesWebRemote, controlRunning, let webRemote else {
+        guard settings.servesWebRemote else {
+            return "Off. Turn it on to use Agents at \(webRemoteAddress), in a browser on this Mac only."
+        }
+        guard controlRunning, let webRemote else {
             return "At \(webRemoteAddress), for a browser on this Mac only."
         }
         return webRemote.summary

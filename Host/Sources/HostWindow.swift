@@ -93,21 +93,25 @@ struct HostWindow: View {
                 Divider()
                 // The web remote (071 FR-002): on unless turned off, and only ever on loopback.
                 // Its line says what the control plane says: never the address of a page it
-                // isn't serving (071 R3).
+                // isn't serving (071 R3). The switch sits at the trailing edge, as Relay's does,
+                // named by its own title.
                 HStack(spacing: 12) {
-                    Toggle(isOn: Binding(get: { model.settings.servesWebRemote },
-                                         set: { on in Task { await model.setServeWebRemote(on) } })) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Serve Agents to browsers on this Mac")
-                            Text(model.webRemoteLine)
-                                .font(.callout)
-                                .foregroundStyle(model.webRemoteFailed ? AnyShapeStyle(Color.orange) : AnyShapeStyle(.secondary))
-                        }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Serve Agents to browsers on this Mac")
+                        Text(model.webRemoteLine)
+                            .font(.callout)
+                            .foregroundStyle(model.webRemoteFailed ? AnyShapeStyle(Color.orange) : AnyShapeStyle(.secondary))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .toggleStyle(.switch)
+                    Spacer()
                     if model.webRemoteFailed {
                         Button("Try Again") { Task { await model.retryWebRemote() } }
                     }
+                    Toggle("Serve Agents to browsers on this Mac",
+                           isOn: Binding(get: { model.settings.servesWebRemote },
+                                         set: { on in Task { await model.setServeWebRemote(on) } }))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
                 }
                 .disabled(model.busy != nil)
                 .padding(16)
@@ -464,11 +468,17 @@ struct PairingSheet: View {
                         .frame(maxWidth: .infinity)
                         .accessibilityLabel("Pairing code to scan")
                 }
+                // One element, labelled from outside: a label on the selectable Text itself sent
+                // the first accessibility query after the picker changed the code round until
+                // the stack ran out (#105, as #71).
                 Text(code.text)
                     .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
                     .padding(10).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                    .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Pairing code")
+                    .accessibilityValue(code.text)
+                    .accessibilityAddTraits(.isStaticText)
                 Text(instructions(for: code))
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
@@ -496,7 +506,17 @@ struct PairingSheet: View {
         case .phone:
             "In Agents on the iPhone or iPad, tap Scan the Code and point it at this, or copy the text and tap Paste there. It works once, for five minutes, and lets that device do everything."
         case .browser:
-            "Paste it into Agents in a browser on this Mac, at localhost. It works once, for five minutes, and lets that browser do everything."
+            "For a browser on this Mac only. \(browserWhere) It works once, for five minutes, and lets that browser do everything."
         }
+    }
+
+    /// Where to paste a browser's code: the page's address while it is served, else why it
+    /// isn't, as the switch's own line says (071 R3).
+    private var browserWhere: String {
+        guard model.settings.servesWebRemote else {
+            return "Turn on Serve Agents to browsers on this Mac first, then open \(model.webRemoteAddress) there and paste it in."
+        }
+        if model.webRemoteFailed { return "\(model.webRemoteLine) Free it, press Try Again beside Serve Agents to browsers on this Mac, then open \(model.webRemoteAddress) there and paste it in." }
+        return "Open \(model.webRemoteAddress) there and paste it in."
     }
 }

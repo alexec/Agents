@@ -20,11 +20,11 @@ export function Pairing({ session }: { session: Session }) {
         <p>
           Get a code from Agents on this Mac: in the window,{" "}
           <strong>Settings ▸ Control plane ▸ Clients ▸ Pair a Browser…</strong>, or in Agents Host,{" "}
-          <strong>Pair a Window or Phone…</strong>. Paste it here.
+          <strong>Pair a Window or Phone… ▸ A browser on this Mac</strong>. Paste it here.
         </p>
         <textarea
           aria-label="Code"
-          placeholder="agents-control:2:c:device:…"
+          placeholder="agents-control:2:c:…"
           spellcheck={false}
           autocomplete="off"
           autoFocus
