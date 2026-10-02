@@ -238,6 +238,7 @@ struct ServingTests {
         #expect(await core.agent(id)?.state == .waitingOnUser)
 
         let pending = await core.pendingPermissionRequests()
+        try #require(pending.count > 2)
         try await core.answerPermission(.init(permissionID: pending[0].id, optionID: "allow_once"))
         #expect(await core.pendingPermissionRequests().count == 2)
         #expect(await core.agent(id)?.state == .waitingOnUser,

@@ -70,15 +70,18 @@ struct ShellSizeTests {
         let core = try await core(locations: locations, heard: Heard())
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
         _ = try await core.attachShell(.init(agentID: id, rows: 24, cols: 80))
-        #expect(await size(core, id)! == (24, 80))
+        let atFirst = try #require(await size(core, id))
+        #expect(atFirst == (24, 80))
 
         // The phone types, at the phone's size.
         try await core.writeToShell(.init(agentID: id, bytes: Data(" ".utf8), rows: 40, cols: 50))
-        #expect(await size(core, id)! == (40, 50))
+        let phones = try #require(await size(core, id))
+        #expect(phones == (40, 50))
 
         // Then the Mac, at its own.
         try await core.writeToShell(.init(agentID: id, bytes: Data(" ".utf8), rows: 30, cols: 120))
-        #expect(await size(core, id)! == (30, 120))
+        let macs = try #require(await size(core, id))
+        #expect(macs == (30, 120))
     }
 
     @Test func keystrokesWithoutASizeResizeNothing() async throws {
@@ -88,7 +91,8 @@ struct ShellSizeTests {
         _ = try await core.attachShell(.init(agentID: id, rows: 24, cols: 80))
 
         try await core.writeToShell(.init(agentID: id, bytes: Data(" ".utf8)))
-        #expect(await size(core, id)! == (24, 80))
+        let after = try #require(await size(core, id))
+        #expect(after == (24, 80))
     }
 
     @Test func aPhoneHearsAShellOnlyWhileItHasItOpen() async throws {

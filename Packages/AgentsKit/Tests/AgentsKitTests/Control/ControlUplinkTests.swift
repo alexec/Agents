@@ -113,6 +113,7 @@ struct ControlUplinkTests {
         let (_, uplink) = host(heard: heard, dials: dials)
         defer { uplink.stop() }
         await eventually { !dials.all.isEmpty }
+        try #require(!dials.all.isEmpty)
         let control = dials.all[0]
         let phone = UUID()
         try control.open(1, .operator)
@@ -124,7 +125,7 @@ struct ControlUplinkTests {
         try control.ask(2, id: 2, DaemonAPI.Method.agentsList)
         await eventually { control.lines(on: 1).count == 1 && control.lines(on: 2).count == 2 }
 
-        #expect(control.lines(on: 1)[0].contains(#""ok":true"#))
+        #expect(control.lines(on: 1).first?.contains(#""ok":true"#) == true)
         #expect(control.lines(on: 2).contains { $0.contains("\(DaemonAPI.Failure.notPermitted)") })
         let lends = heard.all.filter { $0.method == DaemonAPI.Method.credentialsLend }
         #expect(lends.count == 1)
@@ -140,6 +141,7 @@ struct ControlUplinkTests {
         let (server, uplink) = host(heard: Heard(), dials: dials)
         defer { uplink.stop() }
         await eventually { !dials.all.isEmpty }
+        try #require(!dials.all.isEmpty)
         let control = dials.all[0]
         try control.open(1, .operator)
         try control.open(2, .device, device: UUID())
@@ -153,6 +155,7 @@ struct ControlUplinkTests {
         let (server, uplink) = host(heard: Heard(), dials: dials)
         defer { uplink.stop() }
         await eventually { !dials.all.isEmpty }
+        try #require(!dials.all.isEmpty)
         let control = dials.all[0]
         try control.open(1, .operator)
         try control.open(2, .operator)
@@ -167,11 +170,13 @@ struct ControlUplinkTests {
         let (server, uplink) = host(heard: Heard(), dials: dials)
         defer { uplink.stop() }
         await eventually { !dials.all.isEmpty }
+        try #require(!dials.all.isEmpty)
         try dials.all[0].open(1, .operator)
         await eventually { server.connectionCount == 1 }
         dials.all[0].transport.close()
         await eventually { server.connectionCount == 0 }
         await eventually { dials.all.count == 2 }
+        try #require(dials.all.count > 1)
         await eventually { dials.all[1].lines(on: 0).count == 1 }
     }
 

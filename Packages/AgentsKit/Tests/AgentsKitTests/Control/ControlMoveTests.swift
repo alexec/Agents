@@ -40,7 +40,7 @@ struct ControlMoveTests {
         try await prepare(control, from: locations)
 
         let clients = try await records(control).clients
-        #expect(clients.count == 1)
+        try #require(clients.count == 1)
         #expect(clients[0].id == phone.id)
         #expect(clients[0].publicKey == phone.publicKey)
         #expect(clients[0].grant == .device)

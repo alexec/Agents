@@ -73,6 +73,7 @@ struct SandboxRecoveryTests {
         await eventually("the turn ended") { await core.agent(id)?.state == .finished }
         #expect(await core.agent(id)?.sandboxOverride == .off)
         #expect(await core.agent(id)?.pendingSandboxFailure == nil)
+        try #require(launcher.allAgents.count > 1)
         let again = launcher.allAgents[1]
         let resent = await again.prompts.first
         #expect(resent.map { "\($0)".contains("Build it") } == true, "the person's words, not retyped")
@@ -111,6 +112,7 @@ struct SandboxRecoveryTests {
         _ = try await core.answerSandbox(.init(agentID: id, carryOn: true))
         await eventually("it ran again") { launcher.launchCount == 2 }
         await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        try #require(launcher.allAgents.count > 1)
         let sent = await launcher.allAgents[1].prompts.first.map { "\($0)" } ?? ""
         #expect(sent.contains("The command sandbox is now off"))
     }

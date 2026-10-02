@@ -79,6 +79,7 @@ struct PlanApprovalTests {
         }
 
         let waiting = await core.pendingPermissionRequests()
+        try #require(!waiting.isEmpty)
         try await core.answerPermission(.init(permissionID: waiting[0].id, optionID: "exit-plan-auto"))
         await eventually("the turn ran on") { await core.agent(id)?.state == .finished }
         #expect(await launcher.lastAgent?.permissionOutcome?["outcome"]?["optionId"]?.stringValue

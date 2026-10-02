@@ -287,7 +287,7 @@ struct DaemonTests {
         let agent = await core.agent(id)
         #expect(agent?.state == .waitingOnUser)
         let waiting = await core.pendingPermissionRequests()
-        #expect(waiting.count == 1)
+        try #require(waiting.count == 1)
         #expect(waiting.first?.toolCall.title == "Write hello.txt")
 
         // Nobody is connected, and the daemon must not go anywhere.
@@ -600,7 +600,7 @@ struct DaemonTests {
         let store = try AgentStore(locations: locations)
         var script = FakeACPAgent.Script()
         script.handshakeDelay = .milliseconds(300)
-        var saved: [Agent] = []
+        var saved: [Agent] = []  // index-ok: the loop saves three
         for index in 0..<3 {
             let agent = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s",
                               lastActivityAt: Date().addingTimeInterval(Double(-index)))

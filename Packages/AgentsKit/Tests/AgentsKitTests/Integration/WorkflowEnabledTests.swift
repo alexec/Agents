@@ -135,7 +135,7 @@ struct WorkflowEnabledTests {
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
         let on = try #require(await summary(core, work, "two-clocks"))
-        #expect(on.nextFireAtByTrigger.count == 3)
+        try #require(on.nextFireAtByTrigger.count == 3)
         #expect(on.nextFireAtByTrigger[0] == nil)
         let hour = try #require(on.nextFireAtByTrigger[1]), half = try #require(on.nextFireAtByTrigger[2])
         #expect(Calendar.current.component(.minute, from: hour) == 0)

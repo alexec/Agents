@@ -92,7 +92,7 @@ struct BackgroundWorkTests {
             if let item = result.announce { announced.append(item) }
         }
         #expect(announced.map(\.state) == [.running, .stopped])
-        #expect(items.count == 1)
+        try #require(items.count == 1)
         #expect(items[0].toolCallID == "toolu_01JBKqYEYTNwBecLVD7vX3q2")
         #expect(items[0].outputFilePath?.hasSuffix("bixt00wz6.output") == true)
         #expect(BackgroundWords.age(items[0]) == "0:37")
@@ -125,7 +125,7 @@ struct BackgroundWorkTests {
     }
 
     @Test func theMarkCountsWhatRuns() {
-        let items = [BackgroundItem(id: "a", kind: .task, name: "a", taskType: "shell"),
+        let items = [BackgroundItem(id: "a", kind: .task, name: "a", taskType: "shell"),  // index-ok: three, here
                      BackgroundItem(id: "b", kind: .subagent, name: "b"),
                      BackgroundItem(id: "c", kind: .task, name: "c", taskType: "shell", state: .completed)]
         #expect(BackgroundWords.mark(items) == "1 shell, 1 subagent in the background")

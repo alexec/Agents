@@ -125,7 +125,7 @@ struct ControlRecordsTests {
         try DeviceStore(locations: locations).save([device])
 
         let clients = ControlRecords.legacyDevices(at: locations.devices)
-        #expect(clients.count == 1)
+        try #require(clients.count == 1)
         #expect(clients[0].id == device.id)
         #expect(clients[0].publicKey == key)
         #expect(clients[0].grant == .device)

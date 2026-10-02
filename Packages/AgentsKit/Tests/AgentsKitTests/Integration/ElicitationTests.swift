@@ -112,7 +112,7 @@ struct ElicitationTests {
             Issue.record("expected a form")
             return
         }
-        #expect(schema.properties.count == 4)
+        try #require(schema.properties.count == 4)
         guard case .string(_, _, _, let picks) = schema.properties[0].kind,
               case .multiSelect(let alsoDo, _, _) = schema.properties[2].kind else {
             Issue.record("the choices were not read as choices")

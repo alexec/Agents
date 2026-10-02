@@ -123,6 +123,7 @@ struct ControlRouterTests {
         #expect(host.messages.first?.message == exact)
 
         await eventually { !window.lines.isEmpty }
+        try #require(!window.lines.isEmpty)
         guard case .toHost(let from, let reply)? = try? ControlWire.readClient(window.lines[0]) else {
             Issue.record("the reply came back untagged: \(window.lines)")
             return
@@ -145,7 +146,9 @@ struct ControlRouterTests {
         let note = #"{"jsonrpc":"2.0","method":"agent/changed","params":{"x":1}}"#
         for channel in host.openChannels { host.say(note, on: channel) }
         await eventually { a.lines.count == 2 && b.lines.count == 2 }
+        try #require(a.lines.count > 1)
         #expect(a.lines[1] == ControlWire.wrap(host: server, message: note))
+        try #require(b.lines.count > 1)
         #expect(b.lines[1] == ControlWire.wrap(host: server, message: note))
         try await Task.sleep(for: .milliseconds(50))
         #expect(a.lines.count == 2)
@@ -183,7 +186,7 @@ struct ControlRouterTests {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, home)
         let browser = client(.device)
-        var tabs: [(session: UUID, client: FakeControlClient)] = []
+        var tabs: [(session: UUID, client: FakeControlClient)] = []  // index-ok: the loop adds two
         for _ in 0..<2 {
             let (ours, theirs) = PairedTransport.pair()
             tabs.append((await router.attachClient(browser, transport: ours), FakeControlClient(transport: theirs)))
@@ -258,6 +261,7 @@ struct ControlRouterTests {
         try remote.send(bare)
         await eventually { !remote.lines.isEmpty }
         #expect(host.messages.first?.message == bare)
+        try #require(!remote.lines.isEmpty)
         #expect(!remote.lines[0].hasPrefix(#"{"h""#))
         host.stop()
     }
@@ -268,6 +272,7 @@ struct ControlRouterTests {
         let remote = await connectClient(router, client(.device))
         try remote.send(#"{"jsonrpc":"2.0","id":4,"method":"hosts/list"}"#)
         await eventually { !remote.lines.isEmpty }
+        try #require(!remote.lines.isEmpty)
         #expect(remote.lines[0].contains("control"))
         #expect(host.messages.isEmpty)
         host.stop()
@@ -347,14 +352,17 @@ struct ControlRouterTests {
         await eventually { host.openChannels.count == 1 }
         try remote.request(1, DaemonAPI.Method.credentialsLend, host: server)
         await eventually { remote.lines.count == 1 }
+        try #require(!remote.lines.isEmpty)
         #expect(remote.lines[0].contains("\(DaemonAPI.Failure.notPermitted)"))
 
         await router.setGrant(.operator, of: phone.id)
         await eventually { host.openChannels.count == 1 && host.closedChannels.count == 1 }
+        try #require(!host.openChannels.isEmpty)
         let reopened = host.openChannels[0]
         #expect(host.allOpened[reopened]?.grant == .operator)
         try remote.request(2, DaemonAPI.Method.credentialsLend, host: server)
         await eventually { remote.lines.count == 2 }
+        try #require(remote.lines.count > 1)
         #expect(remote.lines[1].contains(DaemonAPI.Method.credentialsLend))
         host.stop()
     }

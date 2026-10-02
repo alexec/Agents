@@ -93,7 +93,7 @@ struct WriteRefusalTests {
         await eventually("the first turn ended") { await core.agent(id)?.state == .finished }
 
         await readOnly(locations.agent(id)) {
-            var agent = await core.agent(id)!
+            guard var agent = await core.agent(id) else { Issue.record("the agent is gone"); return }
             agent.title = "Tidy the build"
             await core.changed(agent)
             await core.saveTail?.value

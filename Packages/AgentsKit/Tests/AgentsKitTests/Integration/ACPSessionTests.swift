@@ -94,7 +94,7 @@ struct ACPSessionTests {
         try await session.newSession(cwd: URL(fileURLWithPath: "/tmp"))
 
         let options = await session.options
-        #expect(options.count == 2)
+        try #require(options.count == 2)
         #expect(options[0].isRenderable)
         #expect(!options[1].isRenderable, "an option type we do not know is skipped, not guessed at")
 
