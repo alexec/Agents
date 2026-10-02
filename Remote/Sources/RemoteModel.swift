@@ -977,7 +977,8 @@ final class RemoteModel {
                                                     returning: [DaemonAPI.ProjectSummary].self) {
                 work.replaceProjects(projects, from: id)
             }
-            if let agents = try? await other.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(includeArchived: false),
+            if let agents = try? await other.call(DaemonAPI.Method.agentsList,
+                                                  DaemonAPI.ListRequest(includeArchived: false, lean: true),
                                                   returning: [Agent].self) {
                 work.replaceAgents(agents, from: id)
             }
@@ -1364,8 +1365,10 @@ final class RemoteModel {
     /// Archived agents already fetched are kept: an open archived chat stays open. One
     /// brought back while this phone was away is in the live list, and that copy wins.
     private func refreshAgents() async {
+        // Lean: no card or row reads the option and command lists, which were nearly all of
+        // each record (#107). The open chat's come with `loadWholeAgent`.
         guard let listed = try? await client.call(DaemonAPI.Method.agentsList,
-                                                  DaemonAPI.ListRequest(includeArchived: false),
+                                                  DaemonAPI.ListRequest(includeArchived: false, lean: true),
                                                   returning: [Agent].self) else { return }
         let live = Set(listed.map(\.id))
         // Only this host's: another host's agents come from that host (058, US4).
@@ -1388,28 +1391,28 @@ final class RemoteModel {
 
     func loadArchivedAgents(in folder: URL, limit: Int) async {
         let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
-                                            folder: folder, limit: limit)
+                                            folder: folder, limit: limit, lean: true)
         guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
                                                   returning: [Agent].self) else { return }
-        for agent in listed { work.upsert(agent) }
+        work.takeListed(listed)
     }
 
     func loadAllArchivedAgents(in folder: URL) async {
         let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
-                                            folder: folder)
+                                            folder: folder, lean: true)
         guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
                                                   returning: [Agent].self) else { return }
-        for agent in listed { work.upsert(agent) }
+        work.takeListed(listed)
     }
 
     /// A workflow's newest `limit` runs, archived ones included, for its page. Answers
     /// whether there are more than that.
     func loadRuns(of workflowID: String, in folder: URL, limit: Int) async -> Bool {
         let request = DaemonAPI.ListRequest(archivedCommands: false, folder: folder,
-                                            startedByWorkflow: workflowID, limit: limit + 1)
+                                            startedByWorkflow: workflowID, limit: limit + 1, lean: true)
         guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
                                                   returning: [Agent].self) else { return false }
-        for agent in listed.prefix(limit) { work.upsert(agent) }
+        work.takeListed(Array(listed.prefix(limit)))
         return listed.count > limit
     }
 
@@ -1661,8 +1664,21 @@ final class RemoteModel {
 
     // MARK: The conversation
 
+    /// The open chat's record whole, with the menus and plan a lean list leaves out (#107).
+    /// A Mac too old to know `agentID` lists its newest instead, which is not this one.
+    func loadWholeAgent(_ id: UUID) async {
+        let request = DaemonAPI.ListRequest.whole(id)
+        guard let listed = try? await client(for: request).call(DaemonAPI.Method.agentsList, request,
+                                                                returning: [Agent].self),
+              var whole = listed.first(where: { $0.id == id }) else { return }
+        whole.host = work.agent(id)?.host ?? whole.host
+        work.takeListed([whole])
+    }
+
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
+        // Beside the transcript rather than before it, and not cancelled by its returns.
+        Task { await loadWholeAgent(selection) }
         // The finished turns as summaries, then the turn in progress. A Mac too old to
         // keep turns gives the lot. Both from the chat's own host (058).
         let turnsRequest = DaemonAPI.TurnsRequest(agentID: selection)
