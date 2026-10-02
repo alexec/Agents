@@ -206,6 +206,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var effectiveSandbox: EffectiveSandbox?
     /// The sandbox card waiting for the person's answer, if one is (064, FR-007a).
     public var pendingSandboxFailure: SandboxFailureRecord?
+    /// Its `cwd` was not there when the daemon last looked (#119): a worktree removed
+    /// after a merge, a folder moved, a disk ejected. Written by the daemon, which looks
+    /// again on its heartbeat and before every send, so rows and the header say so
+    /// before anybody types. Nil while the folder is there.
+    public var missingFolder: MissingFolder?
     /// The three lists that are nearly all of a record — the options and commands the
     /// runtime advertised, and the plans — are empty here and still on disk (051). An
     /// archived agent nobody is reading is held this way: 1.4 KB rather than 24.
@@ -357,6 +362,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         sandboxOverride = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandboxOverride)
         effectiveSandbox = (try? c.decodeIfPresent(EffectiveSandbox.self, forKey: .effectiveSandbox)) ?? nil
         pendingSandboxFailure = (try? c.decodeIfPresent(SandboxFailureRecord.self, forKey: .pendingSandboxFailure)) ?? nil
+        missingFolder = (try? c.decodeIfPresent(MissingFolder.self, forKey: .missingFolder)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -426,6 +432,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(sandboxOverride, forKey: .sandboxOverride)
         try c.encodeIfPresent(effectiveSandbox, forKey: .effectiveSandbox)
         try c.encodeIfPresent(pendingSandboxFailure, forKey: .pendingSandboxFailure)
+        try c.encodeIfPresent(missingFolder, forKey: .missingFolder)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -454,6 +461,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case background
         case archivedAt, retirement
         case sandboxOverride, effectiveSandbox, pendingSandboxFailure
+        case missingFolder
     }
 
     struct AnyKey: CodingKey {

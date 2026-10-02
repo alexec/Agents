@@ -141,6 +141,7 @@ export interface Agent {
   sandboxOverride?: SandboxChoice;
   effectiveSandbox?: EffectiveSandbox;
   pendingSandboxFailure?: SandboxFailureRecord;
+  missingFolder?: MissingFolder;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -400,6 +401,13 @@ export type ContentBlock =
 export interface ContentBlockAnnotations {
   audience?: string[];
   priority?: number;
+}
+
+export interface ContinueInProjectRequest {
+  agentID: UUID;
+  text: string;
+  attachments: Attachment[];
+  requestID?: UUID;
 }
 
 export interface ControlHost {
@@ -762,6 +770,10 @@ export type MCPServerTransport =
   | { stdio: { command: string; args: string[]; env: Record<string, string> } }
   | { http: { url: string; headers: Record<string, string> } }
   | { sse: { url: string; headers: Record<string, string> } };
+
+export interface MissingFolder {
+  branchKept: boolean;
+}
 
 export type MoveAsker = "agent" | "person";
 
@@ -1484,12 +1496,14 @@ export type WriteFailureCause = "diskFull" | "notAllowed" | "readOnly";
 export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
+  "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
   "agents/park": { params: AgentRequest; result: Empty };
   "agents/prompt": { params: PromptRequest; result: Empty };
+  "agents/recreateWorktree": { params: AgentRequest; result: Agent };
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
   "agents/setLabels": { params: SetLabelsRequest; result: Agent };
   "agents/setOption": { params: SetOptionRequest; result: ConfigOption[] };
@@ -1542,12 +1556,14 @@ export interface Methods {
 export const MethodTarget = {
   "agents/answerSandbox": "host",
   "agents/archive": "host",
+  "agents/continueInProject": "host",
   "agents/discardDraft": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
   "agents/options": "host",
   "agents/park": "host",
   "agents/prompt": "host",
+  "agents/recreateWorktree": "host",
   "agents/sendNow": "host",
   "agents/setLabels": "host",
   "agents/setOption": "host",
@@ -1622,7 +1638,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
@@ -1650,6 +1666,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoice: { required: ["value", "name"], optional: ["description"] },
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
+  ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost"] },
   Cost: { required: ["amount", "currency"], optional: [] },
@@ -1693,6 +1710,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
+  MissingFolder: { required: ["branchKept"], optional: [] },
   Need: { required: ["id", "agentID", "folder", "kind", "raisedAt", "headline"], optional: [] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },

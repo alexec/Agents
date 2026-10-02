@@ -181,6 +181,18 @@ struct ContentView: View {
             case .problem:
                 Button("OK") {}
                     .keyboardShortcut(.defaultAction)
+            case .folderGone(let ask):
+                // The ways on (#119). What was typed goes with Continue; Cancel leaves it
+                // in the bar.
+                Button(MissingFolderWords.continueInProject) {
+                    Task { await model.continueInProject(ask.agentID, text: ask.text, attachments: ask.attachments) }
+                }
+                .keyboardShortcut(.defaultAction)
+                if model.agents.first(where: { $0.id == ask.agentID })?.mayRecreateWorktree == true {
+                    Button(MissingFolderWords.recreateWorktree) { Task { await model.recreateWorktree(ask.agentID) } }
+                }
+                Button(MissingFolderWords.archive) { Task { await model.archive(ask.agentID) } }
+                Button("Cancel", role: .cancel) {}
             }
         } message: { alert in
             Text(alert.message)
@@ -214,11 +226,13 @@ struct ContentView: View {
 enum WindowAlert: Identifiable {
     case lend(SignInLendAsk)
     case problem(AlertWords)
+    case folderGone(FolderGoneAsk)
 
     var id: String {
         switch self {
         case .lend(let ask): "lend-\(ask.id)"
         case .problem(let words): "problem-\(words.id)"
+        case .folderGone(let ask): "folder-gone-\(ask.id)"
         }
     }
 
@@ -226,6 +240,7 @@ enum WindowAlert: Identifiable {
         switch self {
         case .lend(let ask): "Let \(ask.label) use this Mac’s \(ask.runtimeName) sign-in?"
         case .problem: "Could not finish that"
+        case .folderGone: "This agent’s folder isn’t there"
         }
     }
 
@@ -234,12 +249,14 @@ enum WindowAlert: Identifiable {
         case .lend(let ask):
             "Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Control plane ▸ Hosts."
         case .problem(let words): words.text
+        case .folderGone(let ask): ask.message + " What you typed is still in the prompt."
         }
     }
 
     @MainActor
     static func wanted(by model: AppModel) -> WindowAlert? {
         if let ask = model.signInLendAsk { return .lend(ask) }
+        if let ask = model.folderGone { return .folderGone(ask) }
         return model.problem.map { .problem(AlertWords(text: $0)) }
     }
 
@@ -252,6 +269,7 @@ enum WindowAlert: Identifiable {
         // continuation, so nothing here answers it again.
         case .lend: break
         case .problem(let words): if model.problem == words.text { model.dismissProblem() }
+        case .folderGone(let ask): if model.folderGone == ask { model.folderGone = nil }
         }
     }
 }

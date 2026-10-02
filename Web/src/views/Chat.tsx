@@ -14,6 +14,7 @@ import type { Agent } from "../protocol/generated";
 import { go, replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
+import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
@@ -159,6 +160,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         </span>
       </header>
       {hostDown && <OfflineStrip store={store} host={host} />}
+      <FolderGoneNotice store={store} host={host} agent={agent} />
+      <MissingFolderStrip store={store} host={host} agent={agent} />
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, index) => (

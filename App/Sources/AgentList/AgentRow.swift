@@ -114,6 +114,13 @@ struct AgentRow: View {
                 if let acting = model.acting(agent.id) {
                     Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                         .frame(height: isCompact ? 14 : nil)
+                } else if agent.missingFolder != nil, agent.state != .archived {
+                    // Its folder gone (#119): said before anybody types, as a project's
+                    // row says it, in the report's place.
+                    Text(MissingFolderWords.label)
+                        .appText(isCompact ? .fine : .supporting)
+                        .foregroundStyle(.secondary)
+                        .help(agent.folderGoneMessage)
                 } else if let report = agent.report?.message {
                     Text(report)
                         .appText(isCompact ? .fine : .supporting)
@@ -135,7 +142,7 @@ struct AgentRow: View {
                 if agent.worktree != nil || !agent.labels.isEmpty {
                     WrappingHStack(spacing: 5) {
                         if let worktree = agent.worktree {
-                            WorktreeBadge(worktree: worktree, isGone: worktreeGone)
+                            WorktreeBadge(worktree: worktree, isGone: worktreeGone || agent.missingFolder != nil)
                         }
                         ForEach(agent.labels, id: \.normalizedValue) { LabelChip(label: $0) }
                     }
@@ -270,7 +277,8 @@ struct AgentRow: View {
     @State private var worktreeGone = false
 
     private var worktreeWatch: String {
-        "\(agent.host.rawValue)|\(agent.worktree?.root.path ?? "")|\(model.controlPlaneAway)"
+        // The host's mark too (#119), so a worktree made again is asked about again.
+        "\(agent.host.rawValue)|\(agent.worktree?.root.path ?? "")|\(model.controlPlaneAway)|\(agent.missingFolder != nil)"
     }
 
     private func refreshWorktree() async {

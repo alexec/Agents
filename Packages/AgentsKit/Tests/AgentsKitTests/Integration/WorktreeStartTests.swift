@@ -208,8 +208,9 @@ struct WorktreeStartTests {
         try FileManager.default.removeItem(at: root)
 
         let error = await failure { try await core.prompt(.init(agentID: id, text: "carry on")) }
-        #expect(error?.code == DaemonAPI.Failure.worktreeMissing)
-        #expect(error?.message == "The worktree fix-login-redirect-safari is gone, so this agent cannot be picked up where it was.")
+        #expect(error?.code == DaemonAPI.Failure.folderGone)
+        #expect(error?.message == (try #require(await core.agent(id))).folderGoneMessage)
+        #expect(await core.agent(id)?.queuedPrompts.isEmpty == true, "nothing kept to go later: the bar keeps it")
         #expect(launcher.launchCount == launchesBefore, "never started again, in the project folder or anywhere")
     }
 
@@ -228,6 +229,105 @@ struct WorktreeStartTests {
         #expect(copy.worktree == original.worktree)
         #expect(copy.projectFolder == repo.project)
         #expect(await core.allProjects().map(\.folder) == [repo.project])
+    }
+
+    // MARK: #119 — a folder that has gone
+
+    /// Started in a worktree, settled, and the worktree removed with git as a merge
+    /// agent removes one. The branch stays, as it does after `git worktree remove`.
+    private func goneAgent(_ core: DaemonCore, _ launcher: FakeLauncher,
+                           _ repo: Repo) async throws -> (UUID, AgentWorktree) {
+        let id = try await startNew(core, repo)
+        await settled(core, id, "the turn ended, and the question about it")
+        await eventually("its runtime was handed back") { await core.live[id] == nil }
+        let worktree = try #require(await core.agent(id)?.worktree)
+        _ = try await git(["worktree", "remove", "--force", worktree.root.path], in: repo.top)
+        return (id, worktree)
+    }
+
+    @Test func aSendToAGoneWorktreeSaysWhichFolderAndThatItWasAWorktree() async throws {
+        let repo = try await repository()
+        var resuming = FakeACPAgent.Script()
+        resuming.supportsResume = true
+        let launcher = FakeLauncher(script: resuming)
+        let core = try await makeCore(repo, launcher)
+        let (id, worktree) = try await goneAgent(core, launcher, repo)
+        let launchesBefore = launcher.launchCount
+
+        let error = await failure { try await core.prompt(.init(agentID: id, text: "carry on")) }
+        #expect(error?.code == DaemonAPI.Failure.folderGone)
+        let message = try #require(error?.message)
+        #expect(message.hasPrefix("This agent's folder isn't there any more ("))
+        #expect(message.contains(worktree.name))
+        #expect(message.contains("It was a worktree, and may have been removed after merging."))
+        #expect(launcher.launchCount == launchesBefore)
+        #expect(await core.agent(id)?.queuedPrompts.isEmpty == true)
+        #expect(await core.agent(id)?.missingFolder == MissingFolder(branchKept: true))
+        #expect(await core.agent(id)?.mayRecreateWorktree == true)
+    }
+
+    @Test func theHeartbeatMarksAGoneFolderBeforeAnybodySends() async throws {
+        let repo = try await repository()
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, _) = try await goneAgent(core, launcher, repo)
+        #expect(await core.agent(id)?.missingFolder == nil, "not looked at yet")
+
+        await core.noteMissingFolders()
+        #expect(await core.agent(id)?.missingFolder == MissingFolder(branchKept: true))
+    }
+
+    @Test func aDeletedBranchIsNotOfferedToRecreate() async throws {
+        let repo = try await repository()
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, worktree) = try await goneAgent(core, launcher, repo)
+        _ = try await git(["branch", "-D", try #require(worktree.branch)], in: repo.top)
+
+        await core.noteMissingFolders()
+        #expect(await core.agent(id)?.missingFolder == MissingFolder(branchKept: false))
+        #expect(await core.agent(id)?.mayRecreateWorktree == false)
+        let error = await failure { try await core.recreateWorktree(id) }
+        #expect(error?.code == DaemonAPI.Failure.folderGone)
+    }
+
+    @Test func continueInTheProjectFolderStartsASuccessorThatReadsThisSession() async throws {
+        let repo = try await repository()
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, _) = try await goneAgent(core, launcher, repo)
+        let title = await core.agent(id)?.title
+
+        let successor = try await core.continueInProject(.init(agentID: id, text: "and add a test"))
+        #expect(successor != id)
+        let made = try #require(await core.agent(successor))
+        #expect(made.cwd == repo.project)
+        #expect(made.worktree == nil)
+        #expect(made.runtimeID == "claude")
+        #expect(made.title == title)
+        let told = try #require(launcher.lastAgent)
+        await eventually("the successor was told") { await told.prompts.isEmpty == false }
+        let said = "\(await told.prompts)"
+        #expect(said.contains(id.uuidString))
+        #expect(said.contains("read_session"))
+        #expect(said.contains("and add a test"))
+        #expect(launcher.launches.last?.cwd == repo.project)
+    }
+
+    @Test func recreateTheWorktreeBringsTheFolderBackAndTheAgentTakesWordsAgain() async throws {
+        let repo = try await repository()
+        var resuming = FakeACPAgent.Script()
+        resuming.supportsResume = true
+        let launcher = FakeLauncher(script: resuming)
+        let core = try await makeCore(repo, launcher)
+        let (id, worktree) = try await goneAgent(core, launcher, repo)
+        await core.noteMissingFolders()
+
+        let agent = try await core.recreateWorktree(id)
+        #expect(agent.missingFolder == nil)
+        #expect(FileManager.default.fileExists(atPath: worktree.root.path))
+        #expect(try await git(["rev-parse", "--abbrev-ref", "HEAD"], in: worktree.root) == worktree.branch)
+        try await core.prompt(.init(agentID: id, text: "carry on"))
     }
 
     // MARK: US2 — worktrees already there

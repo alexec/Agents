@@ -30,6 +30,8 @@ final class RemoteModel {
     private(set) var relayTrouble: RelayTrouble?
     private(set) var lastHeardFrom: Date?
     private(set) var problem: String?
+    /// A send refused because the agent's folder has gone (#119), with the ways on.
+    var folderGone: FolderGoneAsk?
 
     /// Which project is being looked at. Not the daemon's business: it owns what is
     /// true about the work, and which of it somebody happens to be reading is not that.
@@ -1809,6 +1811,11 @@ final class RemoteModel {
             // It reached the Mac, which could not write it down (#88).
             problem = error.message + " What you typed is still there."
             return false
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
+            // Its folder has gone (#119): said with the ways on, carrying what was typed.
+            folderGone = FolderGoneAsk(agentID: agentID, message: error.message, text: what,
+                                       attachments: attachments)
+            return false
         } catch {
             problem = "That did not reach your Mac. What you typed is still there."
             return false
@@ -1932,6 +1939,49 @@ final class RemoteModel {
     func archive(_ agentID: UUID) async {
         await act(.archive, on: agentID, DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: agentID))
     }
+
+    /// Continue in the project folder (#119): a successor that reads this session and
+    /// carries on, with whatever was typed, opened once the Mac has started it.
+    @discardableResult
+    func continueInProject(_ agentID: UUID, text: String = "", attachments: [Attachment] = []) async -> Bool {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return false
+        }
+        let folder = work.agent(agentID)?.projectFolder
+        do {
+            let id = try await sendOnce(DaemonAPI.Method.agentsContinueInProject,
+                                        DaemonAPI.ContinueInProjectRequest(agentID: agentID, text: text,
+                                                                           attachments: attachments,
+                                                                           requestID: UUID())).decode(UUID.self)
+            await refreshAgents()
+            if let folder { selectedProject = folder }
+            selection = id
+            return true
+        } catch let error as JSONRPCError {
+            problem = error.message
+            return false
+        } catch {
+            problem = "That did not reach your Mac."
+            return false
+        }
+    }
+
+    /// Recreate the worktree from its branch (#119).
+    func recreateWorktree(_ agentID: UUID) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        do {
+            try await sendOnce(DaemonAPI.Method.agentsRecreateWorktree, DaemonAPI.AgentRequest(agentID: agentID))
+            await refreshAgents()
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
     /// Park or unpark, whichever `Agent.parkAction` offers (040). From the card's menu.
     func perform(_ action: ParkAction, on agentID: UUID) async {
@@ -1974,6 +2024,9 @@ final class RemoteModel {
             // To the agent's own host (073).
             try await client(for: request).call(method, request)
             return true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
+            problem = error.message
+            return false
         } catch {
             problem = "That did not reach your Mac."
             return false
@@ -2041,4 +2094,14 @@ final class RemoteModel {
         }
     }
 #endif
+}
+
+/// A send refused because the agent's folder has gone (#119): what the Mac said, and what
+/// was typed, for Continue in the project folder to carry on with.
+struct FolderGoneAsk: Identifiable, Equatable {
+    let id = UUID()
+    let agentID: UUID
+    let message: String
+    let text: String
+    let attachments: [Attachment]
 }

@@ -113,7 +113,9 @@ struct ChatView: View {
     /// What can be done to the chat as a whole, at the right-hand edge of its column.
     @ViewBuilder
     private func actions(for agent: Agent) -> some View {
-        if agent.state == .archived {
+        if agent.missingFolder != nil, agent.state != .archived {
+            MissingFolderStrip(agent: agent)
+        } else if agent.state == .archived {
             // Matching the phone: an archived chat's own page is where Bring Back lives,
             // not only on the row you left it from.
             HStack(spacing: 8) {

@@ -7,6 +7,7 @@ import { parkedAt, showsUnread } from "../model/groups";
 import { rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
+import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missingFolder";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "⧗", done: "✓", stopped: "■" };
 
@@ -74,9 +75,11 @@ export function SessionRow({ agent, chosen, onPick, going }: {
         {/* In the report's place, as the window's row has it (#87). */}
         {going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
           : agent.report && <span class="subtitle report">{agent.report.message}</span>}
+        {/* Its folder gone (#119), as a project's row says it. */}
+        {folderIsMissing(agent) && <span class="subtitle missing-folder" title={folderPath(agent)}>⚠ {missingFolderLabel}</span>}
         {(agent.worktree || labels.length > 0) && (
           <span class="chips">
-            {agent.worktree && <span class="chip worktree" title={agent.worktree.branch ?? "detached"}>⑂ {agent.worktree.name}</span>}
+            {agent.worktree && <span class={`chip worktree${folderIsMissing(agent) ? " gone" : ""}`} title={agent.worktree.branch ?? "detached"}>⑂ {agent.worktree.name}</span>}
             {labels.map((label) => <span key={label.value} class="chip label">{label.value}</span>)}
           </span>
         )}

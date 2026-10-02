@@ -52,6 +52,9 @@ final class AppModel {
     @ObservationIgnored private let wakeAndNetwork = WakeAndNetwork()
     @ObservationIgnored private var checkingAfterWake = false
     private(set) var problem: String?
+    /// A send refused because the agent's folder has gone (#119), with the ways on. Said
+    /// in the window's alert instead of `problem`, and the words stay in the bar.
+    var folderGone: FolderGoneAsk?
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
     var signInRuntimeID: String?
@@ -2496,10 +2499,50 @@ final class AppModel {
             }
         }
         return await attempt {
-            try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsPrompt,
-                                       DaemonAPI.PromptRequest(agentID: selection, text: text,
-                                                               attachments: attachments))
+            do {
+                try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsPrompt,
+                                           DaemonAPI.PromptRequest(agentID: selection, text: text,
+                                                                   attachments: attachments))
+            } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
+                // Its own alert, with the ways on, carrying what was typed (#119).
+                self.folderGone = FolderGoneAsk(agentID: selection, message: error.message,
+                                                text: text, attachments: attachments)
+                throw SaidAlready()
+            }
         }
+    }
+
+    // MARK: A folder that has gone (#119)
+
+    /// Start a successor in the project folder that reads this session and carries on,
+    /// with whatever was typed, and open it.
+    @discardableResult
+    func continueInProject(_ agentID: UUID, text: String = "", attachments: [Attachment] = []) async -> Bool {
+        var made: UUID?
+        let went = await attempt(on: host(ofAgent: agentID)) {
+            made = try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.agentsContinueInProject,
+                DaemonAPI.ContinueInProjectRequest(agentID: agentID, text: text, attachments: attachments,
+                                                   requestID: UUID()),
+                returning: UUID.self)
+        }
+        guard went, let made else { return false }
+        let host = host(ofAgent: agentID)
+        if host == .mac { await refreshAgents() } else { await refreshServer(host) }
+        selection = made
+        return true
+    }
+
+    /// Make the worktree again from its branch.
+    func recreateWorktree(_ agentID: UUID) async {
+        let host = host(ofAgent: agentID)
+        let made = await attempt(on: host) {
+            _ = try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.agentsRecreateWorktree, DaemonAPI.AgentRequest(agentID: agentID),
+                returning: Agent.self)
+        }
+        guard made else { return }
+        if host == .mac { await refreshAgents() } else { await refreshServer(host) }
     }
 
     /// End a block by hand (039): the prompt Carry on sends, as the person, to an agent
@@ -3005,6 +3048,7 @@ final class AppModel {
     /// in gets its sign-in sheet; everything else is said in words. A server's runtime
     /// is signed in on the server, which this sheet cannot do, so it stays words.
     private func fail(_ error: any Error, on host: HostID) {
+        if error is SaidAlready { return }
         if host == .mac, let error = error as? JSONRPCError, error.code == DaemonAPI.Failure.needsSignIn,
            let runtimeID = error.data?["runtimeID"]?.stringValue {
             signInRuntimeID = runtimeID
@@ -3057,4 +3101,17 @@ final class AppModel {
         if let failure = WriteFailure(error, keeping: "that") { return failure.message }
         return String(describing: error)
     }
+}
+
+/// A failure already put in front of the person in its own way, so `fail` says nothing more.
+struct SaidAlready: Error {}
+
+/// A send refused because the agent's folder has gone (#119): what the daemon said, and
+/// what was typed, for Continue in the project folder to carry on with.
+struct FolderGoneAsk: Identifiable, Equatable {
+    let id = UUID()
+    let agentID: UUID
+    let message: String
+    let text: String
+    let attachments: [Attachment]
 }

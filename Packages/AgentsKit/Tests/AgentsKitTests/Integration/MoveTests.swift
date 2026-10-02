@@ -628,7 +628,7 @@ struct MoveTests {
 
         let error = await failure { try await core.prompt(.init(agentID: id, text: "carry on")) }
 
-        #expect(error?.code == DaemonAPI.Failure.worktreeMissing)
+        #expect(error?.code == DaemonAPI.Failure.folderGone)
         #expect(launcher.launchCount == launchesBefore)
     }
 

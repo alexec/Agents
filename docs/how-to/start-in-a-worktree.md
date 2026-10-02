@@ -98,3 +98,17 @@ request, then send it when you are ready.
 - The terminal says *This shell is in … The agent now works in …*: the agent moved while
   your shell went on in the old folder. The shell is yours and is never stopped for you;
   click **Type cd there** to follow the agent.
+- The session's row says **Folder is missing**, and sending to it says *This agent's
+  folder isn't there any more (…). It was a worktree, and may have been removed after
+  merging.* Its worktree was removed outside the app, for example by `git worktree
+  remove` after a merge. What you typed stays in the prompt. Over the chat, and in the
+  message, choose one of these:
+  - **Continue in the project folder** starts a new session in the project folder on the
+    same runtime, with the same name. The new session reads this one and carries on, with
+    anything you had typed after that.
+  - **Recreate the worktree** makes the worktree again from its branch, in the same
+    place. It is offered only while the branch is still there. Send again afterwards.
+  - **Archive** puts the session away.
+
+  The same happens to any agent whose folder has been moved or deleted, or is on a disk
+  that isn't connected. Recreate the worktree is not offered for those.
