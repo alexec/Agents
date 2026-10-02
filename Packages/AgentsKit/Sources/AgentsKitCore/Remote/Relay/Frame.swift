@@ -38,6 +38,11 @@ public struct Frame: Sendable, Hashable {
         self.end = end
     }
 
+    /// The number of the end the Mac sends for a session it does not know: one from before
+    /// it restarted (#79). It cannot know where that session's numbering had got to, so the
+    /// device takes an end with this number at once rather than waiting its turn.
+    public static let notKnown = Int64.max
+
     static let suite = HPKE.Ciphersuite.P256_SHA256_AES_GCM_256
     static let info = Data("com.alexecollins.agents.relay.v1".utf8)
     /// A P256 encapsulated key, uncompressed: what the recipient needs first.
