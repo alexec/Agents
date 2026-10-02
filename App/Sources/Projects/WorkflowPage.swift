@@ -303,7 +303,7 @@ struct WorkflowPage: View {
                 if !trigger.filters.isEmpty {
                     HStack(spacing: 6) {
                         ForEach(trigger.filters.sorted { $0.key < $1.key }, id: \.key) { key, value in
-                            Text("\(key): \(value)")
+                            Text("\(key): \(value.capsule)")
                                 .appText(.fine).monospaced()
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 1)

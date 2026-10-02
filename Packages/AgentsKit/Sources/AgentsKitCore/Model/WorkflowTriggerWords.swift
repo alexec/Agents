@@ -10,10 +10,10 @@ import Foundation
 extension WorkflowTrigger {
     /// The details it is narrowed by, as the file writes them. `workflow-completed`
     /// with an `id:` is a `workflow` filter, which is what it is on the event log.
-    public var filters: [String: String] {
+    public var filters: [String: DetailFilter] {
         switch self {
         case .event(let pattern): return pattern.filters
-        case .workflowCompleted(let id): return id.map { ["workflow": $0] } ?? [:]
+        case .workflowCompleted(let id): return id.map { ["workflow": DetailFilter($0)] } ?? [:]
         default: return [:]
         }
     }

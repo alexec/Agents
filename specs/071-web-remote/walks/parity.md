@@ -67,6 +67,7 @@
 | One grant: no "It may" choice on the pairing sheets (2026-10-02) | #111 | lacks (footer said "· Device") | **has** | `after111-identity.png` | #111's walk | The footer reads "Chrome on this Mac", no grant. A browser may do what the window may; Settings, pairing and hosts still have no screens on the page (by design, below). Scene `identity` in `parity.mjs`. |
 | Pairing a browser: the sheets give the address, say this Mac only, and say when the page isn't served (2026-10-02) | #105 | n/a | **has** | `walks/105/web-pairing-after.png` | `walks/105/` | The page makes no codes; its pairing screen now names **Pair a Window or Phone… ▸ A browser on this Mac** and shows no grant in its placeholder. See `walks/105.md`. |
 | Open in Browser in View, atop Settings ▸ Control plane and in Agents Host (2026-10-02) | #109 | n/a | **has** (the page's side) | `109/first-open-pairs.png`, `109/paired-opens-directly.png` | `109/settings-control-plane.png` | These are the window's ways into the page; the page has nothing to open. Its side: it pairs from `#code=` in its address and takes the code out at once (`pairLink.ts`). See [109.md](109.md). |
+| Finer event matching: lists, labels, codes, filters in words (spec 073) | #99 | partly (a list was dropped, so a trigger read wider than written) | **has** | `after-filters-t1.png`, `after-filters-codes.png`, `after-filters-typo.png` | `window/filters-t1.png`, `window/filters-codes.png` | Walked 2026-10-02 at 496972b1 on `/tmp/run-r073`, in headless Chrome (the `filters` scene of `parity.mjs`) and the window by window id. The page says each filter in the window's words: *labelled bug, and parked*; *its allowance ran out or rate limited, and still limited after retrying, on Claude*; *by you, labelled bug or regression*. A list is a capsule joined by ` \| ` (`outcome: stuck \| partly_done`), and a run's cause joins it with `\|`. A wrong value is the workflow's problem, naming the right values. The page still names the event where the window says its meaning (below). |
 
 ## Left out by design
 
@@ -85,5 +86,5 @@ The window's shots found two more, both closed: answer cards held while their ho
 
 What is still different, and why:
 - **#83, "said at once":** neither the window nor the page hears a paused host for about a minute. Both learn of it from the control plane, which is #106's lane.
-- **Event trigger words:** the page says an event's name, not the window's catalogue meaning.
+- **Event trigger words:** the page says an event's name, not the window's catalogue meaning. Its filters read as the window's since 073.
 - **The window's Try Again for its host:** nothing on the page to redial.

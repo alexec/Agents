@@ -57,7 +57,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
         case .event(let pattern): return [pattern]
         case .schedule, .unrecognised: return []
         case .workflowCompleted(let id):
-            return [EventPattern("workflow.completed", filters: id.map { ["workflow": $0] } ?? [:])]
+            return [EventPattern("workflow.completed", filters: id.map { ["workflow": DetailFilter($0)] } ?? [:])]
         default:
             return EventCatalogue.kinds(forAlias: name).map { EventPattern($0.name) }
         }
@@ -125,6 +125,16 @@ extension WorkflowTrigger {
         if let flag = value.boolValue { return String(flag) }
         return nil
     }
+
+    /// One value or a list of them (073 FR-014), or `nil` for anything else: an
+    /// object, a list holding one, an empty list.
+    public static func filter(_ value: JSONValue) -> DetailFilter? {
+        if let one = scalar(value) { return DetailFilter(one) }
+        guard let items = value.arrayValue else { return nil }
+        let values = items.compactMap(scalar)
+        guard values.count == items.count else { return nil }
+        return DetailFilter(anyOf: values)
+    }
 }
 
 /// Written by hand so that event triggers go over the wire in the shape `.unrecognised`
@@ -152,8 +162,11 @@ extension WorkflowTrigger: Codable {
         case .agentStopped: self = .agentStopped
         case .workflowCompleted(let id): self = .workflowCompleted(id: id)
         case .unrecognised(let name, let keys):
-            if name.contains("."),
-                      case .success(let pattern) = EventPattern.parse(name, filters: keys.compactMapValues(Self.scalar)) {
+            // A key whose value is not one value or a list is not dropped: the trigger
+            // is then one this version cannot read, and says so (073 SC-002).
+            let filters = keys.compactMapValues(Self.filter)
+            if name.contains("."), filters.count == keys.count,
+                      case .success(let pattern) = EventPattern.parse(name, filters: filters) {
                 self = .event(pattern)
             } else {
                 self = .unrecognised(name: name, keys: keys)
@@ -173,7 +186,10 @@ extension WorkflowTrigger: Codable {
         // An older Mac or phone reads it as a trigger it does not know yet, and lists it
         // as inert (042 FR-025).
         case .event(let pattern):
-            stored = .unrecognised(name: pattern.name, keys: pattern.filters.mapValues(JSONValue.string))
+            // A list goes as an array, which an older reader drops (073 research R2).
+            stored = .unrecognised(name: pattern.name, keys: pattern.filters.mapValues { filter in
+                filter.single.map(JSONValue.string) ?? .array(filter.values.map(JSONValue.string))
+            })
         case .unrecognised(let name, let keys): stored = .unrecognised(name: name, keys: keys)
         }
         try stored.encode(to: encoder)

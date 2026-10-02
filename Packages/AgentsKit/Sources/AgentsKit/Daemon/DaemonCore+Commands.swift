@@ -198,9 +198,14 @@ extension DaemonCore {
     ///
     /// `chainDepth` is how deep a workflow fire this agent causes would be, read off
     /// the starter before any of the awaits here — see `Agent.chainDepth`.
+    ///
+    /// `workflow` is the workflow and run starting it, put on the record before its
+    /// first turn so that turn's `agent.started` already says `started_by: workflow`
+    /// (073).
     func start(_ request: DaemonAPI.StartRequest, startedBy starter: UUID?,
                chainDepth: Int? = nil,
-               labelOwner: SessionLabel.Owner? = nil) async throws -> UUID {
+               labelOwner: SessionLabel.Owner? = nil,
+               workflow: (id: String, run: UUID)? = nil) async throws -> UUID {
         let initialLabels: [SessionLabel]
         do {
             initialLabels = try SessionLabelPolicy.change(
@@ -310,6 +315,8 @@ extension DaemonCore {
                           startRequestID: request.requestID)
         agent.labels = initialLabels
         agent.sandboxOverride = request.sandbox
+        agent.startedByWorkflow = workflow?.id
+        agent.startedByRun = workflow?.run
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
         // so an agent stranded in it by a failed write would keep `isHoldingAgents`
@@ -1717,7 +1724,8 @@ extension DaemonCore {
         }
         changed(agent)
         if agent.parking?.isParked == true {
-            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.")
+            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.",
+                            details: agent.report.map { ["outcome": $0.outcome.rawValue] } ?? [:])
         }
         reconsider()
     }

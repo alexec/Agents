@@ -39,7 +39,7 @@ Check the build and say whether it is green.
 | `on:` `agent-asked-form` | No settings | Runs when an agent in this project asks you to fill in a form. |
 | `on:` `agent-stopped` | No settings | Runs when an agent in this project stops without finishing. |
 | `on:` `workflow-completed` | Optionally `id:`, a workflow's id | Runs when that workflow's run finishes, or when any workflow's run finishes if there is no `id:`. |
-| `on:` an event name, such as `branch.moved` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list details to narrow it, such as `branch: main`; a detail the event does not carry is an error in the file. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
+| `on:` an event name, such as `branch.moved` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list details to narrow it, such as `branch: main`. A detail can take a list, meaning any of them, such as `outcome: [done, nothing_to_do]`. A detail the event does not carry, or a value a detail cannot have, is an error in the file, naming the right ones. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
 | `agent:` `new` | The default | Each run starts a new agent. |
 | `agent:` `standing` | | Each run goes to the workflow's own agent, which keeps its conversation from run to run. |
 | `agent:` `triggering` | | Each run goes to the agent that set it off. For an event, it is the agent the event is about, or the agent that published a `custom.` event. A schedule, or an event with no agent, has no such agent, so it does not run. |
@@ -66,6 +66,30 @@ agent: new
 
 Deploy the docs, then say what you deployed.
 ```
+
+To narrow by more than one value, give a list. This one runs when an agent labelled `bug`
+finishes and is parked, and when the `nightly` workflow's agent ends `stuck` or
+`partly_done`:
+
+```markdown
+---
+name: Write up bug fixes
+on:
+  - agent.finished:
+      labels: bug
+      afterwards: park
+  - workflow.completed:
+      workflow: nightly
+      outcome: [stuck, partly_done]
+agent: new
+---
+
+Write up what the agent that set this off changed, for the release notes.
+```
+
+Every agent event carries the agent's `labels`, `runtime` and `started_by`, so
+`agent.failed` with `runtime: [gemini, grok]` runs on a Gemini or Grok agent's failure.
+The values each detail takes are on [Events](events.md).
 
 A workflow never runs on an `agent.` event about its own agent: the agent doing its run,
 the agent a `new` or `standing` workflow started, or a helper either of those started. So a

@@ -46,7 +46,7 @@ public struct WaitStatus: Codable, Hashable, Sendable {
     static func described(_ patterns: [EventPattern], names: (UUID) -> String?) -> String {
         let agents = patterns.compactMap { pattern -> String? in
             guard pattern.name == "agent.finished", pattern.filters.count == 1,
-                  let id = pattern.filters["agent"] else { return nil }
+                  let id = pattern.filters["agent"]?.single else { return nil }
             return UUID(uuidString: id).flatMap(names) ?? id
         }
         if agents.count == patterns.count, !agents.isEmpty { return finishing(agents) }

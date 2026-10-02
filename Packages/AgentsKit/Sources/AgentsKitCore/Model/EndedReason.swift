@@ -84,6 +84,14 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         }
     }
 
+    /// The reason as `agent.failed` carries it, for a filter to name (073 FR-007):
+    /// `allowance_spent`, `rate_limited`, …. The sentence the event says stays `summary`.
+    public var code: String {
+        rawValue.reduce(into: "") { code, character in
+            if character.isUppercase { code += "_" + character.lowercased() } else { code.append(character) }
+        }
+    }
+
     /// A reason written by a newer build reads as `unrecognised`, never as a failure
     /// to read the whole agent. Thrown from here, one new ending made every record
     /// carrying it vanish from an older app and every agent list fail on an older phone.

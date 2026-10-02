@@ -54,8 +54,9 @@ function scalar(value: JSONValue): string | null {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : null;
 }
 
-/** WorkflowTrigger.summary, with an event said by its name (see above). */
-export function triggerSummary(trigger: WorkflowTriggerStored): string {
+/** WorkflowTrigger.summary, with an event said by its name (see above) and its filters in words. */
+export function triggerSummary(trigger: WorkflowTriggerStored,
+  runtimeName: (id: string) => string | undefined = () => undefined): string {
   if ("schedule" in trigger) return scheduleSummary(trigger.schedule._0);
   if ("agentFinished" in trigger) return "When an agent finishes";
   if ("agentAskedPermission" in trigger) return "When an agent asks for permission";
@@ -65,10 +66,11 @@ export function triggerSummary(trigger: WorkflowTriggerStored): string {
     const id = trigger.workflowCompleted.id;
     return id ? `When ${id} finishes` : "When any workflow finishes";
   }
-  const { name, keys } = trigger.unrecognised;
+  const { name } = trigger.unrecognised;
   if (isEvent(trigger)) {
-    const filters = Object.entries(keys).map(([k, v]) => [k, scalar(v)] as const).filter(([, v]) => v !== null)
-      .sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k} ${v}`).join(", ");
+    const phrases = eventFilters(trigger).map(([k, values]) => filterWords(name, k, values, runtimeName));
+    let filters = [...phrases.filter((p) => !p.startsWith("and ")), ...phrases.filter((p) => p.startsWith("and "))].join(", ");
+    if (filters.startsWith("and ")) filters = filters.slice(4);
     return filters ? `When ${name} (${filters})` : `When ${name}`;
   }
   return `Waits for "${name}", which this version does not know about yet`;
@@ -121,7 +123,7 @@ export function workflowSummary(w: Workflow, runtimeName: (id: string) => string
   if (w.problem) return problemMessage(w.problem);
   const supported = w.triggers.filter(isSupported);
   if (!supported.length) return w.triggers[0] ? triggerSummary(w.triggers[0]) : "Nothing makes this run";
-  let base = `${supported.map(triggerSummary).join(", and ")}, ${modeWords[w.mode]}`;
+  let base = `${supported.map((t) => triggerSummary(t, runtimeName)).join(", and ")}, ${modeWords[w.mode]}`;
   if (w.cooldown !== undefined) base += `, at most once every ${cooldownWords(w.cooldown)}`;
   if (w.mode === "triggering") return base;
   const settings = settingsSummary(w.settings, runtimeName);
@@ -176,19 +178,22 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
 // window's WorkflowPage, ported by hand.
 
 /** Whose events a kind is: EventCatalogue's scope, and the details it carries (042). */
+/** What every agent event carries about its agent (EventCatalogue.context, 073). */
+const context = ["labels", "runtime", "started_by"];
+
 const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: string[] }> = {
-  "agent.started": { scope: "project", details: ["agent"] },
-  "agent.finished": { scope: "project", details: ["agent", "outcome"] },
-  "agent.asked_permission": { scope: "project", details: ["agent"] },
-  "agent.asked_form": { scope: "project", details: ["agent"] },
-  "agent.blocked": { scope: "project", details: ["agent", "waiting_on"] },
-  "agent.stopped": { scope: "project", details: ["agent", "by"] },
-  "agent.failed": { scope: "project", details: ["agent", "reason"] },
-  "agent.parked": { scope: "project", details: ["agent"] },
-  "agent.archived": { scope: "project", details: ["agent", "by"] },
-  "agent.retired": { scope: "project", details: ["agent", "because"] },
+  "agent.started": { scope: "project", details: ["agent", ...context] },
+  "agent.finished": { scope: "project", details: ["agent", "outcome", "afterwards", ...context] },
+  "agent.asked_permission": { scope: "project", details: ["agent", ...context] },
+  "agent.asked_form": { scope: "project", details: ["agent", ...context] },
+  "agent.blocked": { scope: "project", details: ["agent", "waiting_on", ...context] },
+  "agent.stopped": { scope: "project", details: ["agent", "by", ...context] },
+  "agent.failed": { scope: "project", details: ["agent", "reason", ...context] },
+  "agent.parked": { scope: "project", details: ["agent", "outcome", ...context] },
+  "agent.archived": { scope: "project", details: ["agent", "by", "outcome", ...context] },
+  "agent.retired": { scope: "project", details: ["agent", "because", ...context] },
   "workflow.ran": { scope: "project", details: ["workflow", "agent"] },
-  "workflow.completed": { scope: "project", details: ["workflow", "agent"] },
+  "workflow.completed": { scope: "project", details: ["workflow", "agent", "outcome"] },
   "workflow.refused": { scope: "project", details: ["workflow", "reason"] },
   "branch.moved": { scope: "project", details: ["branch", "from", "to"] },
   "lease.granted": { scope: "mac", details: ["resource", "agent"] },
@@ -197,7 +202,7 @@ const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: 
   "mac.wake": { scope: "mac", details: [] },
   "person.away": { scope: "mac", details: ["why"] },
   "person.back": { scope: "mac", details: ["why"] },
-  "cost.limit_reached": { scope: "either", details: ["limit", "agent"] },
+  "cost.limit_reached": { scope: "either", details: ["limit", "agent", ...context] },
   "cost.allowance_out": { scope: "mac", details: ["runtime", "until", "retry_after", "reason"] },
   "cost.allowance_back": { scope: "mac", details: ["runtime", "how"] },
   "server.offline": { scope: "mac", details: ["server"] },
@@ -222,18 +227,83 @@ export function isSupportedTrigger(trigger: WorkflowTriggerStored): boolean {
   return isSupported(trigger);
 }
 
-/** WorkflowTrigger.filters: what it is narrowed by, as the file writes it. */
-export function triggerFilters(trigger: WorkflowTriggerStored): [string, string][] {
-  let found: [string, string][] = [];
+/** One value, or a list of them meaning any of (073); null for anything else. */
+function filterValues(value: JSONValue): string[] | null {
+  const one = scalar(value);
+  if (one !== null) return [one];
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const all = value.map(scalar);
+  return all.every((v) => v !== null) ? (all as string[]) : null;
+}
+
+/** An event trigger's filters, each with its values, sorted by key. */
+function eventFilters(trigger: WorkflowTriggerStored): [string, string[]][] {
+  let found: [string, string[]][] = [];
   if (isEvent(trigger) && "unrecognised" in trigger) {
     found = Object.entries(trigger.unrecognised.keys).flatMap(([k, v]) => {
-      const text = scalar(v);
-      return text === null ? [] : [[k, text] as [string, string]];
+      const values = filterValues(v);
+      return values === null ? [] : [[k, values] as [string, string[]]];
     });
   } else if ("workflowCompleted" in trigger && trigger.workflowCompleted.id) {
-    found = [["workflow", trigger.workflowCompleted.id]];
+    found = [["workflow", [trigger.workflowCompleted.id]]];
   }
   return found.sort(([a], [b]) => (a < b ? -1 : 1));
+}
+
+/** WorkflowTrigger.filters as the Triggers section's capsules say them: "outcome: done | nothing_to_do". */
+export function triggerFilters(trigger: WorkflowTriggerStored): [string, string][] {
+  return eventFilters(trigger).map(([k, values]) => [k, values.join(" | ")]);
+}
+
+// The words a summary says a filter in (EventDetail.words, 073 FR-022).
+
+const failedWords: Record<string, string> = {
+  max_tokens: "ran out of room", max_turn_requests: "hit its limit", refusal: "refused",
+  process_died: "the runtime crashed", daemon_gone: "stopped with the daemon",
+  unrecognised: "stopped for a reason we do not know", stopped_by_agent: "stopped by the agent that started it",
+  sign_in_refused: "its sign-in was refused", runtime_error: "the runtime reported an error",
+  allowance_spent: "its allowance ran out", rate_limited: "rate limited, and still limited after retrying",
+  sandbox_failed: "its sandbox could not start",
+};
+const refusedWords: Record<string, string> = {
+  run_in_flight: "a run is still going", chain_too_deep: "its chain was too deep", archived: "it is archived",
+  over_limit: "too many workflows are running", unreadable: "its file could not be read",
+  trigger_not_supported: "it watches for something this version cannot",
+  agent_unavailable: "the agent it would have resumed is gone",
+  no_triggering_agent: "nothing triggered it, so there was no agent to resume",
+  missed_while_closed: "the app was closed", folder_gone: "the project folder is not there",
+  day_limit_reached: "the day's spending limit has been reached", setting_refused: "a setting it names cannot be had",
+  awaiting_approval: "it is waiting for your OK",
+};
+const codeWords: Record<string, Record<string, string>> = {
+  "agent.failed reason": failedWords,
+  "workflow.refused reason": refusedWords,
+  "agent.stopped by": { you: "stopped by you", cost_limit: "at its cost limit", unknown: "with no reason recorded" },
+  "agent.archived by": { you: "by you", agent: "by another agent" },
+};
+const startedByWords: Record<string, string> = { person: "you", workflow: "a workflow", agent: "another agent" };
+
+/** One filter in words, as the Mac's summary says it. */
+function filterWords(name: string, key: string, values: string[], runtimeName: (id: string) => string | undefined): string {
+  const or = (parts: string[]) => parts.join(" or ");
+  const subject = wholeSubject(name);
+  if (isCustom(name) || subject === "custom") return `${key} ${or(values)}`;
+  const kinds = subject ? kindsIn(subject).map(([n]) => n) : [name];
+  if (!kinds.some((n) => catalogue[n]?.details.includes(key))) return `${key} ${or(values)}`;
+  if (context.includes(key) || ["outcome", "afterwards"].includes(key)) {
+    switch (key) {
+      case "labels": return `labelled ${or(values)}`;
+      case "runtime": return `on ${or(values.map((id) => runtimeName(id) ?? id))}`;
+      case "started_by": return `started by ${or(values.map((v) => startedByWords[v] ?? v))}`;
+      case "outcome": return or(values.map((v) => v.replaceAll("_", " ")));
+      case "afterwards":
+        if (values.includes("park") && values.includes("stay")) return "and parked or not";
+        return values[0] === "stay" ? "and not parked" : "and parked";
+    }
+  }
+  const words = Object.assign({}, ...kinds.map((n) => codeWords[`${n} ${key}`] ?? {})) as Record<string, string>;
+  if (Object.keys(words).length) return or(values.map((v) => words[v] ?? v));
+  return `${key} ${or(values)}`;
 }
 
 /** WorkflowTrigger.listensIn. */
@@ -327,7 +397,7 @@ export function causePhrase(cause: WorkflowCause): string {
   const trigger = cause.trigger._0;
   if ("schedule" in trigger) return "on its schedule";
   if (isEvent(trigger) && "unrecognised" in trigger) {
-    return "on " + [trigger.unrecognised.name, ...triggerFilters(trigger).map(([k, v]) => `${k} ${v}`)].join(" ");
+    return "on " + [trigger.unrecognised.name, ...eventFilters(trigger).map(([k, v]) => `${k} ${v.join("|")}`)].join(" ");
   }
   const said = triggerSummary(trigger);
   return said.charAt(0).toLowerCase() + said.slice(1);

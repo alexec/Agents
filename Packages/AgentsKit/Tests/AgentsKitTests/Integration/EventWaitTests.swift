@@ -73,7 +73,7 @@ struct EventWaitTests {
         }
     }
 
-    private func wait(_ core: DaemonCore, _ token: String, _ events: [String], where filters: [String: String]? = nil,
+    private func wait(_ core: DaemonCore, _ token: String, _ events: [String], where filters: [String: DetailFilter]? = nil,
                       from: EventPosition? = nil, until: Int? = nil) async throws -> String {
         try await calling(core, token) { t in
             try await core.waitForEvent(.init(token: t, events: events, where: filters, from: from, untilMinutes: until))
@@ -142,6 +142,34 @@ struct EventWaitTests {
         #expect(!(await isWaiting(core, a)))
         let event = await core.eventLog.events.last { $0.name == "custom.ping" }
         #expect(event?.consequences == [.woke(agentID: a, title: "Waiter")])
+    }
+
+    /// Any of, in a wait (073 US2): a `stuck` finish does not wake a wait for done or
+    /// nothing to do, and the matching one does.
+    @Test func aListInWhereWaitsForAnyOfItsValues() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let (a, token) = try await agent(core, in: work, "Waiter")
+        let call = Task {
+            try await wait(core, token, ["agent.finished"],
+                           where: ["outcome": DetailFilter(anyOf: ["done", "nothing_to_do"])!])
+        }
+        try await eventually("held") { await isHeld(core, a) }
+        await core.raise(draft("agent.finished", in: work, ["agent": UUID().uuidString, "outcome": "stuck"]))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await isHeld(core, a), "a stuck finish does not wake it")
+        await core.raise(draft("agent.finished", in: work, ["agent": UUID().uuidString, "outcome": "nothing_to_do"]))
+        #expect(try await call.value.hasPrefix("agent.finished happened at "))
+    }
+
+    /// A wrong value is refused in a wait with the sentence a file's problem says (073 US4).
+    @Test func aWrongValueInAWaitIsRefusedNamingTheRightOnes() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let (_, token) = try await agent(core, in: work, "Waiter")
+        let refused = await refusal { _ = try await wait(core, token, ["agent.finished"], where: ["outcome": "complete"]) }
+        #expect(refused?.message == "outcome on agent.finished is one of done, nothing_to_do, needs_answer, "
+                + "partly_done, stuck, blocked; \"complete\" is not one of them.")
     }
 
     /// `server.offline` and `server.online` come from the window, which holds the

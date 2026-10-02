@@ -41,7 +41,9 @@ extension DaemonCore {
             throw eventRefusal(EventWords.badDeadline())
         }
         var filters = request.where ?? [:]
-        if let named = filters["agent"] { filters["agent"] = try agentReference(named, for: caller) }
+        if let named = filters["agent"] {
+            filters["agent"] = DetailFilter(anyOf: try named.values.map { try agentReference($0, for: caller) }) ?? named
+        }
         var patterns: [EventPattern] = []
         for name in names {
             switch EventPattern.parse(name, filters: filters) {
@@ -334,9 +336,15 @@ extension DaemonCore {
         event.scope == .mac || event.scope == .project(folder: agent.projectFolder)
     }
 
-    /// `agent` and `agent_title`, for an event about this agent.
+    /// `agent` and `agent_title`, for an event about this agent, and what it was at
+    /// that moment (073 FR-001): its labels (keys, sorted, comma-joined; labels cannot
+    /// hold a comma), its runtime, and who started it. A helper a workflow's agent
+    /// started is the agent's, not the workflow's.
     func agentDetails(_ agent: Agent) -> [String: String] {
-        ["agent": agent.id.uuidString, "agent_title": agent.title ?? "Untitled"]
+        let startedBy = agent.startedByAgent != nil ? "agent" : agent.startedByWorkflow != nil ? "workflow" : "person"
+        return ["agent": agent.id.uuidString, "agent_title": agent.title ?? "Untitled",
+                "labels": Set(agent.labels.map(\.normalizedValue)).sorted().joined(separator: ","),
+                "runtime": agent.runtimeID, "started_by": startedBy]
     }
 
     /// An agent named in `where.agent`, by id or by title in the caller's project.

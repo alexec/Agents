@@ -625,10 +625,9 @@ extension DaemonCore {
         var request = try await startRequest(settings: workflow.settings, folder: workflow.folder,
                                              prompt: prompt, managesAgents: true)
         request.labels = workflow.settings.labels
-        let agentID = try await start(request, startedBy: nil, labelOwner: .agent)
+        let agentID = try await start(request, startedBy: nil, labelOwner: .agent,
+                                      workflow: (workflow.workflowID, run.id))
         if var agent = agents[agentID] {
-            agent.startedByWorkflow = workflow.workflowID
-            agent.startedByRun = run.id
             agent.title = workflow.name
             changed(agent)
         }
@@ -756,7 +755,7 @@ extension DaemonCore {
             if case .coolingDown = refusal { return }
             raise(EventDraft(name: "workflow.refused", at: now(), scope: .project(folder: workflow.folder),
                              sentence: "Workflow \(workflow.name) did not run: \(refusal.message).",
-                             details: ["workflow": workflow.workflowID, "reason": refusal.message],
+                             details: ["workflow": workflow.workflowID, "reason": refusal.code],
                              chainDepth: depth + 1))
         }
     }
@@ -888,7 +887,10 @@ extension DaemonCore {
                          sentence: "Workflow \(workflow(run.workflowID, in: run.folder)?.name ?? run.workflowID) finished.",
                          details: ["workflow": run.workflowID]
                             .merging(run.agentID.map { ["agent": $0.uuidString,
-                                                         "agent_title": agents[$0]?.title ?? "Untitled"] } ?? [:]) { $1 },
+                                                         "agent_title": agents[$0]?.title ?? "Untitled"] } ?? [:]) { $1 }
+                            // What its agent's report said, when it made one (073 FR-004).
+                            .merging(run.agentID.flatMap { agents[$0]?.report }
+                                .map { ["outcome": $0.outcome.rawValue] } ?? [:]) { $1 },
                          chainDepth: run.depth + 1))
         guard let byID = workflows[folder] else { return }
         let records = workflowStore.load()

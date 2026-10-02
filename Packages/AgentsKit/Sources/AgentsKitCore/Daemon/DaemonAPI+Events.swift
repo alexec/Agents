@@ -42,13 +42,14 @@ public extension DaemonAPI {
         /// `wait` (the default), `recent` or `list`.
         public var action: String?
         public var events: [String]?
-        public var `where`: [String: String]?
+        /// Each key one value, or a list meaning any of (073).
+        public var `where`: [String: DetailFilter]?
         public var from: EventPosition?
         public var untilMinutes: Int?
         public var limit: Int?
 
         public init(token: String, action: String? = nil, events: [String]? = nil,
-                    where filters: [String: String]? = nil, from: EventPosition? = nil,
+                    where filters: [String: DetailFilter]? = nil, from: EventPosition? = nil,
                     untilMinutes: Int? = nil, limit: Int? = nil) {
             self.token = token
             self.action = action
