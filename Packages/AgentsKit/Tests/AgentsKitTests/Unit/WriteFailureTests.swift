@@ -22,7 +22,7 @@ struct WriteFailureTests {
     }
 
     @Test func aRefusedFolderIsNamedWithTheHomeAsATilde() throws {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
+        let home = NSHomeDirectory()
         let folder = (home.hasSuffix("/") ? home : home + "/") + "Code/app"
         let error = CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: folder])
         let failure = try #require(WriteFailure(error, keeping: "the workflow", machine: "Your Mac"))

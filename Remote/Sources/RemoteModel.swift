@@ -1051,6 +1051,11 @@ final class RemoteModel {
                 if notification.method == DaemonAPI.Notification.runtimeChanged {
                     await self.refreshRuntimes()
                 }
+                // The Mac could not keep something nobody was waiting on (#88).
+                if notification.method == DaemonAPI.Notification.writeFailed,
+                   let failure = try? notification.params?.decode(WriteFailure.self) {
+                    self.problem = failure.message
+                }
                 if notification.method == DaemonAPI.Notification.runtimeAccountChanged,
                    let account = try? notification.params?.decode(RuntimeAccount.self) {
                     self.accounts[account.runtimeID] = account
@@ -1777,6 +1782,10 @@ final class RemoteModel {
                                DaemonAPI.PromptRequest(agentID: agentID, text: what,
                                                        attachments: attachments, sendID: UUID()))
             return true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.couldNotSave {
+            // It reached the Mac, which could not write it down (#88).
+            problem = error.message + " What you typed is still there."
+            return false
         } catch {
             problem = "That did not reach your Mac. What you typed is still there."
             return false

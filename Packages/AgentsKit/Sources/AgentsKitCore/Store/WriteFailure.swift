@@ -74,7 +74,7 @@ public struct WriteFailure: Codable, Sendable, Equatable {
 
     /// The home folder as `~`, which is how the person knows it.
     static func shown(_ path: String) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
+        let home = NSHomeDirectory()
         let trimmed = home.hasSuffix("/") ? String(home.dropLast()) : home
         guard !trimmed.isEmpty, path == trimmed || path.hasPrefix(trimmed + "/") else { return path }
         return "~" + path.dropFirst(trimmed.count)
