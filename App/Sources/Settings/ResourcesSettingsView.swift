@@ -137,18 +137,27 @@ private struct DeclareResourceSheet: View {
             Text(original == nil ? "Declare a resource" : "Edit \(original!.displayName)")
                 .appText(.reading).fontWeight(.semibold)
             Form {
-                TextField("Name", text: $name, prompt: Text("build"))
-                VStack(alignment: .leading, spacing: 4) {
-                    TextField("Description", text: $description,
-                              prompt: Text("When an agent should lease it, and why"), axis: .vertical)
-                        .lineLimit(3...6)
-                    Text("Agents read this, and are told to lease the resource whenever it applies.")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
+                LabeledContent("Name") {
+                    TextField("Name", text: $name, prompt: Text("build"))
+                        .labelsHidden()
                 }
-                Stepper(value: $holders, in: 1...DeclaredResource.mostHolders) {
-                    LabeledContent("Held by") {
+                LabeledContent("Description") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Description", text: $description,
+                                  prompt: Text("When an agent should lease it, and why"), axis: .vertical)
+                            .labelsHidden()
+                            .lineLimit(3...6)
+                        Text("Agents read this, and are told to lease the resource whenever it applies.")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                LabeledContent("Held by") {
+                    HStack(spacing: 6) {
                         Text(holders == 1 ? "1 agent at a time" : "\(holders) agents at once").monospacedDigit()
+                        Stepper("Held by", value: $holders, in: 1...DeclaredResource.mostHolders)
+                            .labelsHidden()
                     }
                 }
                 LabeledContent("Usual length") {
