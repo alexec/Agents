@@ -67,12 +67,35 @@ there when it recovers. What it says under the name is the same line the page gi
 
 ## Resources
 
-**Resources** is not a Settings pane. It is a page of its own, opened from **View ▸
-Resources** (Option-Command-L) or the **Resources** row at the foot of the projects
-column. It lists every shared resource on this Mac — each simulator, each installed
-browser, and the screen — whether it is free, who holds it and since when, when the
-lease runs out, and who is waiting. You can end a lease or take an agent out of a line
+**Settings ▸ Resources** is where you declare resources: things agents should take turns
+with that the app can't find by itself, such as **build**. Each has:
+
+- a **name**, which agents lease it by;
+- a **description**, which agents read in `list_resources` and their briefing, and are
+  told to follow: they lease the resource whenever it applies to what they are about to do;
+- **Held by**: how many agents may hold it at once, 1 by default. With 2 or more, that many
+  hold it together and the rest wait in line, in order;
+- a **usual length** and a **longest** length for a lease on it, in minutes. Left blank,
+  they are the app's own: 30 and 240.
+
+**Add Resource…** declares one, **Edit…** changes it, and **Remove** stops declaring it.
+Anyone holding a resource you remove or shrink keeps the lease until they release it. The
+screen, simulators and browsers are listed under **Found on this Mac**, read-only: one
+agent at a time each. Declared resources belong to this Mac's host, kept in its folder
+beside its leases, because how many builds a machine can take is that machine's.
+
+The **Resources page** is not a Settings pane. It is a page of its own, opened from
+**View ▸ Resources** (Option-Command-L) or the **Resources** row at the foot of the
+projects column. It lists the declared resources first, free or held, with their
+descriptions, then every resource found on this Mac — each simulator, each installed
+browser, and the screen — whether it is free, who holds it and since when, when the lease
+runs out, and who is waiting. A declared resource more than one agent may hold says
+"2 of 3 held" and names each holder. You can end a lease or take an agent out of a line
 from here. See [Leases on shared resources](../explanation/leases.md).
+
+On iPhone and iPad, **Resources** under **Activity** shows the same list read-only, and so
+does **Resources** under each host on the web page. Declaring, editing and ending leases
+are on the Mac.
 
 When an agent reaches a spending limit, **Raise the limit** above the prompt opens the
 Settings window.

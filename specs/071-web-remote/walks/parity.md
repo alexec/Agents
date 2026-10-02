@@ -69,6 +69,12 @@
 | Open in Browser in View, atop Settings ▸ Control plane and in Agents Host (2026-10-02) | #109 | n/a | **has** (the page's side) | `109/first-open-pairs.png`, `109/paired-opens-directly.png` | `109/settings-control-plane.png` | These are the window's ways into the page; the page has nothing to open. Its side: it pairs from `#code=` in its address and takes the code out at once (`pairLink.ts`). See [109.md](109.md). |
 | Finer event matching: lists, labels, codes, filters in words (spec 073) | #99 | partly (a list was dropped, so a trigger read wider than written) | **has** | `after-filters-t1.png`, `after-filters-codes.png`, `after-filters-typo.png` | `window/filters-t1.png`, `window/filters-codes.png` | Walked 2026-10-02 at 496972b1 on `/tmp/run-r073`, in headless Chrome (the `filters` scene of `parity.mjs`) and the window by window id. The page says each filter in the window's words: *labelled bug, and parked*; *its allowance ran out or rate limited, and still limited after retrying, on Claude*; *by you, labelled bug or regression*. A list is a capsule joined by ` \| ` (`outcome: stuck \| partly_done`), and a run's cause joins it with `\|`. A wrong value is the workflow's problem, naming the right values. The page still names the event where the window says its meaning (below). |
 
+## Since this walk
+
+| Change | Issue | Page | Notes |
+|---|---|---|---|
+| Declared resources with descriptions, counted holders ("2 of 3 held") | #116 | **has**, read-only | A **Resources** fold under each host lists the declared resources with their descriptions and "2 of 3 held", each holder, and anything else held or awaited; kept by `leases/changed` (added to `WebSignatures`). **web: by design** for declaring, editing and ending leases: they are the Mac's (Settings ▸ Resources, the Resources page), as on the Remote. |
+
 ## Left out by design
 
 - Settings, Project Settings and helper limits.
@@ -76,6 +82,7 @@
 - Dictation.
 - Approving a workflow, and changing a workflow's settings: the page says "approve it on the Mac", and shows the settings only in the workflow's one-line summary.
 - HTML as a live page.
+- Declaring, editing and removing resources, and ending leases (#116): the Mac's.
 
 ## Counts
 

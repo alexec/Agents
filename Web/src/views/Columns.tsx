@@ -18,6 +18,7 @@ import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { SessionRow } from "./SessionRow";
 import { WorkflowRow } from "./WorkflowRow";
+import { Resources } from "./Resources";
 import { WorkflowPage } from "./WorkflowPage";
 import { workflowSummary } from "../model/workflows";
 
@@ -105,6 +106,7 @@ function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
                 </button>
               );
             })}
+            <Resources store={store} host={host.id} />
           </div>
         );
       })}

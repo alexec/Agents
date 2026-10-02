@@ -6,7 +6,7 @@ import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure,
+  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, LeaseSnapshot,
 } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { describe } from "./errors";
@@ -93,6 +93,8 @@ export class Work {
 
   /** The latest correction to a new agent's form, for the form holding that draft. */
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
+  /** Each host's resources and who holds them (036, #116): read-only on the page. */
+  readonly leases = signal<Record<string, LeaseSnapshot>>({});
   /** The mode last chosen for each runtime, by host (029). */
   readonly rememberedModes = signal<Record<string, Record<string, JSONValue>>>({});
 
@@ -178,6 +180,9 @@ export class Work {
         // Something nobody was waiting on was not kept: a full disk, or a folder refusing
         // writes. Said, as the window and the Remote say it (#88).
         this.say((params as WriteFailure).message);
+        return true;
+      case "leases/changed":
+        this.leases.value = { ...this.leases.value, [host]: params as LeaseSnapshot };
         return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
@@ -412,6 +417,9 @@ export class Store extends Work {
     const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
     void this.loadRuntimes(host);
+    void this.link.call("leases/snapshot", {}, host).then((snapshot) => {
+      this.leases.value = { ...this.leases.value, [host]: snapshot };
+    }).catch(failed("leases/snapshot"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
       this.link.call("elicitations/pending", {}, host).catch(failed("elicitations/pending")),
