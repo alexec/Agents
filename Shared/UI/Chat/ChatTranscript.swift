@@ -124,6 +124,7 @@ struct ChatTranscript: View {
                             .id(turn.id)
                     }
                     .environment(\.backgroundWork, agent.background)
+                    .environment(\.textIsLazy, true)
                     ForEach(agent.queuedPrompts) { queued in
                         QueuedPromptRow(prompt: queued, agentID: agent.id,
                                         canSendNow: canSendNow)

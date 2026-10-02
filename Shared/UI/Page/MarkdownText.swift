@@ -16,10 +16,14 @@ extension EnvironmentValues {
     /// Whether text takes the width it is offered or only the width it needs. The
     /// person's own message hugs its words, at the right of the chat.
     @Entry var textFillsWidth = true
+    /// Whether a long text may lay out only the blocks on screen. Set by the chat, whose
+    /// rows sit in one scroll view with nothing to keep a place by but the scroll (#90).
+    @Entry var textIsLazy = false
 }
 
 struct MarkdownText: View {
     @Environment(\.textFillsWidth) private var fillsWidth
+    @Environment(\.textIsLazy) private var isLazy
     let markdown: String
     /// The document's own location, when there is one, so a relative image can be
     /// found. Nil in the conversation, where there is no document to be relative to —
@@ -44,8 +48,21 @@ struct MarkdownText: View {
         // A passage whose first characters have not arrived yet — nothing, or a `#` that
         // is not a heading until its text follows — is still somewhere the caret is.
         if parsed.isEmpty, let caret { return AnyView(caret.caret) }
+        // A long reply is one row of the chat, and a row lays out whole. Its blocks in a
+        // lazy stack lay out as they come on screen; the look is the same stack (#90).
+        if isLazy, fillsWidth, caret == nil, parsed.count > Self.lazyFrom {
+            return AnyView(LazyVStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(parsed.enumerated()), id: \.offset) { _, block in
+                    view(for: block, caret: nil)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading))
+        }
         return blocks(parsed, caret: caret)
     }
+
+    /// How many blocks make a text long enough to lay out lazily: about two screens.
+    private static let lazyFrom = 24
 
     /// Erased on purpose, and this is the only place it is.
     ///
