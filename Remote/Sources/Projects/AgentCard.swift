@@ -112,7 +112,10 @@ struct AgentCard: View {
                     // The agent's own account of its last turn, and nothing else — the
                     // same two lines as the Mac's row. The state is the icon's; what it
                     // is doing is the title, which the agent keeps current.
-                    if let report = agent.report?.message {
+                    // Stop, park or archive on its way, as on the Mac's row (#87).
+                    if let acting = model.acting(agent.id) {
+                        Telling(host: "your Mac", doing: acting.doing)
+                    } else if let report = agent.report?.message {
                         Text(report)
                             .appText(.supporting)
                             .foregroundStyle(.secondary)
@@ -184,7 +187,7 @@ struct AgentCard: View {
                 } label: {
                     Label(ParkWords.label(action), systemImage: ParkWords.symbol(action))
                 }
-                .disabled(model.isStale)
+                .disabled(model.isStale || isActing)
                 .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
             }
             // Leave it to come back to, or clear it unopened (#70).
@@ -219,8 +222,11 @@ struct AgentCard: View {
         } label: {
             Label("Archive", systemImage: "archivebox")
         }
-        .disabled(model.isStale)
+        .disabled(model.isStale || isActing)
     }
+
+    /// Something is on its way to this agent; its menu and swipe hold until it is back (#87).
+    private var isActing: Bool { model.acting(agent.id) != nil }
 
     /// Whether the Mac is bringing this chat back by itself after a restart.
     private var isComingBack: Bool { model.isComingBack(agent) }

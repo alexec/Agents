@@ -221,6 +221,7 @@ struct RemoteChatView: View {
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
+            acting: { [model] agentID in model.acting(agentID) },
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },

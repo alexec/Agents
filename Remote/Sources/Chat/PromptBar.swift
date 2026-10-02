@@ -40,6 +40,10 @@ struct PromptBar: View {
     /// A draft came back without something it held by value — a picture too large to
     /// keep — and the bar says so until the next thing is sent (025 US5).
     @State private var draftLostSomething = false
+    /// Prompts this bar has sent that the Mac has not yet taken (#87). The send button
+    /// spins meanwhile; past a beat, the bar says so in words too, as the Mac's does.
+    @State private var sending = 0
+    @State private var sendingIsSlow = false
     /// How wide the options row has to fill. See `optionsRow`.
     @State private var optionsWidth: CGFloat = 0
     @FocusState private var focused: Bool
@@ -86,8 +90,17 @@ struct PromptBar: View {
                 SuggestionChip(prompt: suggestion, take: take)
                     .transition(.opacity)
             }
+            if sending > 0, sendingIsSlow {
+                Telling(host: "your Mac", doing: "Sending")
+            }
             field
             if isShowingEverything { options }
+        }
+        .task(id: sending > 0) {
+            sendingIsSlow = false
+            guard sending > 0 else { return }
+            try? await Task.sleep(for: .milliseconds(400))
+            if !Task.isCancelled { sendingIsSlow = true }
         }
         // The same column the transcript draws in, so the bar's edges track its edges
         // at every width, as on the Mac (FR-020, FR-021).
@@ -208,27 +221,48 @@ struct PromptBar: View {
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
-            if model.canStop(agent), !model.isStale, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if model.canStop(agent), !model.isStale, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               sending == 0 {
+                let acting = model.acting(agent.id)
                 Button {
                     Task { await model.stop(agent.id) }
                 } label: {
-                    Image(systemName: PromptWords.stopSymbol)
-                        .appText(.reading).fontWeight(.semibold)
-                        .frame(width: 22, height: 22)
+                    Group {
+                        if acting == .stop {
+                            ProgressView()
+                        } else {
+                            Image(systemName: PromptWords.stopSymbol)
+                                .appText(.reading).fontWeight(.semibold)
+                        }
+                    }
+                    .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.paperProminent)
                 .buttonBorderShape(.circle)
+                // Held while something else is on its way to this agent. Not while it is Stop: (#87).
+                // the one that went stays bright, as on the answer cards (#86), and the
+                // model refuses a second press.
+                .disabled(acting != nil && acting != .stop)
                 .help(PromptWords.stopHelp)
                 .accessibilityLabel("Stop")
+                .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: "your Mac") : "")
             } else {
                 Button(action: send) {
-                    Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                        .appText(.reading).fontWeight(.semibold)
-                        .frame(width: 22, height: 22)
+                    Group {
+                        if sending > 0 {
+                            ProgressView()
+                        } else {
+                            Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                                .appText(.reading).fontWeight(.semibold)
+                        }
+                    }
+                    .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.paperProminent)
                 .buttonBorderShape(.circle)
-                .disabled(!canSend)
+                // Bright while its own spinner turns, as the answer that went stays bright
+                // on the cards (#86); `send()` refuses the press meanwhile.
+                .disabled(!canSend && sending == 0)
                 .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
                 .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")
             }
@@ -261,7 +295,9 @@ struct PromptBar: View {
         model.scrollToEnd()
         let agentID = agent.id
         Task {
+            sending += 1
             let went = await model.send(outgoing, attachments: going, to: agentID)
+            sending -= 1
             if went {
                 StartDraftKeeper.shared.clear(.agent(agentID))
             } else if text.isEmpty, attachments.isEmpty {

@@ -83,6 +83,11 @@ struct StartAgentView: View {
                     .tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // In words as well as the spinner, as the Mac's bar says it (#87): a
+            // worktree and a runtime to start can take seconds.
+            if model.isStarting {
+                Telling(host: "your Mac", doing: "Starting")
+            }
             // The chat's prompt bar: one raised card holding the words, attach, and send
             // in ink, so starting an agent and talking to one look like the same act.
             HStack(alignment: .bottom, spacing: 8) {
@@ -92,6 +97,8 @@ struct StartAgentView: View {
                     .focused($focused)
                     .appText(.reading)
                     .accessibilityLabel("What the new agent should do")
+                    // Held, words and all, while they start an agent (#87).
+                    .disabled(model.isStarting)
 
                 AttachButton(attachments: $attachments, refusal: $attachNote)
 
@@ -110,7 +117,9 @@ struct StartAgentView: View {
                 }
                 .buttonStyle(.paperProminent)
                 .buttonBorderShape(.circle)
-                .disabled(!canSend)
+                // Bright while its own spinner turns, as the answer that went stays bright
+                // on the cards (#86); `send()` refuses the press meanwhile.
+                .disabled(!canSend && !model.isStarting)
                 .accessibilityLabel("Start agent")
                 .accessibilityValue(model.isStarting ? AgentState.startingLabel : "")
             }
@@ -131,6 +140,8 @@ struct StartAgentView: View {
     }
 
     private func send() {
+        // One agent at a time: a second tap while one starts is not a second (#87).
+        guard canSend else { return }
         let words = text
         let attached = attachments
         Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels) }

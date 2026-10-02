@@ -1900,29 +1900,33 @@ final class RemoteModel {
     }
 
     /// Send a queued prompt into the turn that is running, where the runtime takes one.
+    /// Once: the row shows it going, and a second tap is not a second send (#87).
     func sendNow(_ prompt: QueuedPrompt, to agentID: UUID) async {
-        guard !isStale else {
-            problem = "Your Mac is not answering, so that could not be sent."
-            return
-        }
-        do {
-            let request = DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id)
-            try await client(for: request).call(DaemonAPI.Method.agentsSendNow, request)
-        } catch {
-            problem = "That did not reach your Mac."
-        }
+        await act(.sendNow(prompt.id), on: agentID,
+                  DaemonAPI.Method.agentsSendNow,
+                  DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
     }
 
     /// What a command an agent ran has printed, as far as this phone heard it.
     func terminalOutput(_ terminalID: String) -> String { work.terminalOutput[terminalID] ?? "" }
 
-    func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
-    func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }
+    func stop(_ agentID: UUID) async {
+        await act(.stop, on: agentID, DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: agentID))
+    }
+    func archive(_ agentID: UUID) async {
+        await act(.archive, on: agentID, DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: agentID))
+    }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
     /// Park or unpark, whichever `Agent.parkAction` offers (040). From the card's menu.
     func perform(_ action: ParkAction, on agentID: UUID) async {
-        await act(action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark, agentID)
+        await act(AgentAct(action), on: agentID,
+                  action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark,
+                  DaemonAPI.AgentRequest(agentID: agentID))
     }
+
+    /// What is on its way to this agent, if anything: for the control that sent it to
+    /// show, and the others to hold (#87).
+    func acting(_ agentID: UUID) -> AgentAct? { work.acting[agentID] }
 
     /// Mark as Unread / Mark as Read, from the card's menu (#70).
     func setUnread(_ agentID: UUID, _ unread: Bool) async {
@@ -1935,6 +1939,28 @@ final class RemoteModel {
                                   DaemonAPI.SetUnreadRequest(agentID: agentID, unread: unread))
         } catch {
             problem = "That did not reach your Mac."
+        }
+    }
+
+    /// Something asked of a whole agent, sent once (#87): held in `work.acting` until the
+    /// Mac has answered, so the card, its menu, the swipe and the chat all show it going
+    /// and none sends a second. Given back, with the problem said, if it did not go.
+    @discardableResult
+    private func act(_ act: AgentAct, on agentID: UUID, _ method: String,
+                     _ request: some Encodable & Sendable) async -> Bool {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return false
+        }
+        guard work.begin(act, on: agentID) else { return false }
+        defer { work.end(act, on: agentID) }
+        do {
+            // To the agent's own host (073).
+            try await client(for: request).call(method, request)
+            return true
+        } catch {
+            problem = "That did not reach your Mac."
+            return false
         }
     }
 
