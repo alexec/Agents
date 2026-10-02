@@ -1963,10 +1963,15 @@ public enum DaemonAPI {
         public var folder: URL
         public var workflowID: String
         public var settings: WorkflowSettings
-        public init(folder: URL, workflowID: String, settings: WorkflowSettings) {
+        /// The `cooldown:` to write, as the file writes it (#103): `15m`, or empty to take
+        /// the line out. Unlike the settings, left out means left alone, so a phone or
+        /// page that does not show the cooldown cannot remove it by saving a mode.
+        public var cooldown: String?
+        public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil) {
             self.folder = folder
             self.workflowID = workflowID
             self.settings = settings
+            self.cooldown = cooldown
         }
     }
 

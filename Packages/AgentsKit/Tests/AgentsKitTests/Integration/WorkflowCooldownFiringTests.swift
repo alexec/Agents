@@ -189,4 +189,34 @@ struct WorkflowCooldownFiringTests {
         await core.tickWorkflows(now: clock.now())
         #expect(await core.allAgents().count == 1)
     }
+
+    // MARK: Changed from the page
+
+    @Test func thePageWritesItIntoTheFileAndLeavesItAloneWhenNotSent() async throws {
+        let clock = ManualClock()
+        let (locations, work) = try temporary()
+        try write(cooldown: "15m", in: work)
+        let core = try await core(locations, clock)
+        await core.rescanWorkflows(in: work)
+        let url = WorkflowFile.url(for: "catch-up", in: work)
+        func request(_ cooldown: String?) -> DaemonAPI.WorkflowSettingsRequest {
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "catch-up",
+                                              settings: WorkflowSettings(), cooldown: cooldown)
+        }
+
+        let longer = try await core.setWorkflowSettings(request("1h30m"))
+        #expect(longer.workflow.cooldown == TimeInterval(90 * 60))
+        #expect(try String(contentsOf: url, encoding: .utf8).contains("cooldown: 1h30m\n"))
+
+        // A phone from before #103 sends no cooldown, and must not remove it.
+        let untouched = try await core.setWorkflowSettings(request(nil))
+        #expect(untouched.workflow.cooldown == TimeInterval(90 * 60))
+
+        await #expect(throws: JSONRPCError.self) { try await core.setWorkflowSettings(request("soon")) }
+        #expect(try String(contentsOf: url, encoding: .utf8).contains("cooldown: 1h30m\n"), "a refusal writes nothing")
+
+        let none = try await core.setWorkflowSettings(request(""))
+        #expect(none.workflow.cooldown == nil)
+        #expect(!(try String(contentsOf: url, encoding: .utf8).contains("cooldown")))
+    }
 }

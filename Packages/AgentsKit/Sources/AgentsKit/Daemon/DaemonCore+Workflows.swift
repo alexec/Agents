@@ -1047,6 +1047,20 @@ extension DaemonCore {
                 edited = try FrontMatterEdit.set(id, under: WorkflowSettings.Setting.options,
                                                  to: request.settings.options[id], in: edited)
             }
+            if let text = request.cooldown {
+                var length: TimeInterval?
+                if !text.isEmpty {
+                    switch WorkflowCooldown.parse(text) {
+                    case .success(let parsed): length = parsed
+                    case .failure(let failure):
+                        throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable, message: failure.message)
+                    }
+                }
+                if length != existing.cooldown {
+                    edited = try FrontMatterEdit.set(WorkflowCooldown.key,
+                                                     to: length.map(WorkflowCooldown.fileText), in: edited)
+                }
+            }
         } catch let refusal as FrontMatterEdit.Refusal {
             // The editor's own sentence, unchanged. It is the one that knows what it
             // found, and nothing was written (FR-025).
