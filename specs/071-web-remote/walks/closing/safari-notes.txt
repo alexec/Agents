@@ -1,0 +1,12 @@
+Safari 27.0 on macOS
+secure context: true; title: "Agents"
+§2 paired: "Safari on this Mac · Device"
+after a reload: connected again with the stored key, nothing pasted
+started A6D55685-7D50-42F9-95B0-D04C5455568D on the host's socket
+answered the question in Safari: Howdy
+permission card: "echo Howdy > safari.txt"
+allowed it in Safari
+the turn ended: finished, done: Asked which greeting to use; you picked Howdy, and it was written to safari.txt.
+the chat says: "one sentence what you did.\n\n▸ 6 steps\n\nGreeting\n\nHowdy\n\nI asked which greeting you wanted, and since you chose Howdy, I wrote \"Howdy\" to safari.txt.\n\nComplete\n\nAsked which greeting to use; you picked Howdy, and it was written to safari.txt."
+away: the banner came after 0.1 s
+back: the banner went 2.1 s after the control plane started; not reloaded: true

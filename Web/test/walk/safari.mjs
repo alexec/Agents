@@ -59,8 +59,8 @@ try {
   say("after a reload: connected again with the stored key, nothing pasted");
 
   // §4. Read and answer: a real Claude turn, started on the host's socket, answered in Safari.
+  // An empty project draws no session headings; the chat is reached by its address below.
   await clickText(".projects .row", "work");
-  await waitFor(`document.querySelector(".sessions .section-head")`);
   const prompt = "This is a test of answering from Safari. Do exactly these steps, in order, and nothing else: "
     + "1. Use your AskUserQuestion tool to ask me which greeting to write, with the options Hello and Howdy. "
     + "2. Run this with your Bash tool: echo <the greeting I chose> > safari.txt "

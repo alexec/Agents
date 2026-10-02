@@ -65,30 +65,30 @@ There were three runs. The first two found the two bugs below. The notes and scr
 ## Found, not fixed here
 
 - **One file listed twice in the changes view** (host side). In the second run, `plan.md` was listed twice: as `Added +3` from the agent's own edit, at `/private/tmp/…`, and as `Untracked +5` from git, at `/tmp/…`. It is the same file through macOS's `/tmp` symlink. The host lists both, so the window would too. It appears only when the agent's path and the project's differ by a symlink, as on scratch roots under `/tmp`. The third run listed it once.
-- **The prompt's menus run under the send button** when the files pane is open at 1440: **Fast mode** is cut to "Fa" (`closing-2-page.png`). They should wrap or scroll.
+- **The prompt's menus were cut off** when the files pane was open at 1440: **Fast mode** showed as "Fa" (`closing-2-page.png`). They scrolled sideways with no scrollbar. Fixed after the walk: they wrap now.
 
-## Safari
+## Safari: §2, §4 and §6
 
-**Not walked yet.** Alex chose to have it driven under the screen lease while he was away, through `safaridriver` (`Web/test/walk/safari.mjs`, written and ready).
+**How it was run:**
+- Safari 27.0, through `safaridriver` (WebDriver), in its own automation window, apart from Alex's Safari. Both the screen and Safari were leased.
+- On the scratch root `/tmp/run-safari`, with no window, using `Web/test/walk/safari.mjs`.
+- The code was made with `agents-control code --client device --browser`.
 
-**What happened:**
+**Getting it to run:**
 1. Remote automation was off at first, so WebDriver refused: "You must enable 'Allow remote automation'". Alex turned it on.
-2. After that, every session timed out: "The session timed out while connecting to a Safari instance".
-3. A stale `safaridriver` of mine was holding port 4723. It was stopped, and a fresh one tried on 4790. The session still timed out.
-4. By then Alex's own window was in front. The Dock showed a second Safari with a badge, perhaps a prompt waiting in Safari's automation instance. Nothing was pressed behind his window, and his Safari wasn't quit.
+2. Sessions then timed out connecting to Safari. A stale `safaridriver` of mine was holding port 4723.
+3. Once Alex had quit Safari, a fresh `safaridriver` on 4723 got a session at once.
 
-**To finish:** with Safari quit, or that prompt answered, run `safaridriver -p 4723` and then:
+| Section | Result |
+|---|---|
+| §2 Pair | The page is a secure context at `http://localhost`. Pasting the code paired it: the footer reads **Safari on this Mac · Device**. After a reload, it connected again with the stored key, and nothing was pasted. |
+| §4 Read and answer | A real Claude turn, started on the host's socket. The question card showed in Safari, and **Howdy** then **Submit** were chosen there. The permission card (`echo Howdy > safari.txt`) was allowed there. The turn finished: "Asked which greeting to use; you picked Howdy, and it was written to safari.txt." `safari.txt` holds `Howdy`. The chat showed the answer, the reply and the outcome. |
+| §6 Away and back | The control plane was stopped. The banner came within 0.1 s. It was started again after 15 s. The banner went 2.1 s later, with no reload. |
 
-```sh
-node Web/test/walk/safari.mjs "$WEB_URL" "$ROOT" "$(agents-control code --client device --browser --home $ROOT/control)" \
-  specs/071-web-remote/walks/closing .agents/skills/run-app/scripts/rpc.py <control script>
-```
-
-That walks §2, §4 and §6 in Safari's isolated automation window.
-
-Firefox isn't installed, so it isn't walked. The how-to says only "the current Safari or Chrome" and claims neither as tested.
+Firefox isn't installed, so it isn't walked.
 
 ## Screenshots (`walks/closing/`)
 
 - `closing-1-started.png` to `closing-6-away.png`: the page at each step.
 - `closing-window-1-started.png` to `closing-window-7-workflow.png`: the scratch window on the same session after each step.
+- `safari-1-paired.png` to `safari-5-back.png`, with `safari-notes.txt`: the Safari walk.
