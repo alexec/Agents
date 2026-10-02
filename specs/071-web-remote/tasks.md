@@ -373,7 +373,7 @@ This comes before US4 and US5, because Agents Host restarts on every ship (plan.
 
   Run `scripts/docs.sh check`.
 - [x] T073 (R1 and R2 fixed; R3, not serving said only in a log, open) Write a security review in `specs/071-web-remote/walks/security-review.md`: the listener, the `browser` kind, the origin binding, the CSP and rendering, and the stolen-session table, with what #42 must add when #61 serves the page publicly.
-- [ ] T074 Compare six full suite runs against main on both commits (memory: the suite is flaky under load), and record the result in `walks/suite-compare.md`.
+- [x] T074 (six alternating runs each: no failure main lacks; two branch-only singles pass alone 6/6) Compare six full suite runs against main on both commits (memory: the suite is flaky under load), and record the result in `walks/suite-compare.md`.
 - [ ] T075 Final check:
   - `scripts/web.sh check`;
   - `swift test` in AgentsKit, ControlPlane and WebTypes;
