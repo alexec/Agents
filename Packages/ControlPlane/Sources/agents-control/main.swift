@@ -149,6 +149,15 @@ func serve() async {
             peerURL: environment["AGENTS_CONTROL_PEER_URL"].flatMap(URL.init(string:)),
             receive: arguments.contains("--receive") || environment["AGENTS_CONTROL_RECEIVE"] == "1")
         configuration.web = web()
+        // Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
+        if let file = home?.appendingPathComponent(WebRemoteFile.name) {
+            try? FileManager.default.removeItem(at: file)
+            configuration.webChanged = { status in
+                if let data = try? JSONEncoder().encode(WebRemoteFile(pid: getpid(), status: status)) {
+                    try? data.write(to: file, options: .atomic)
+                }
+            }
+        }
         let service = try ControlService(configuration)
         let listening = try await service.start()
         if let pin { print("pin \(pin)") }
@@ -171,6 +180,11 @@ func serve() async {
             }
         }
         stop.resume()
+        // SIGUSR1: try the web remote's listener again (Agents Host's Try Again, 071 R3).
+        let retry = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
+        signal(SIGUSR1, SIG_IGN)
+        retry.setEventHandler { Task { await service.retryWeb() } }
+        retry.resume()
         while true { try await Task.sleep(for: .seconds(3600)) }
     } catch {
         fail("\(error)")

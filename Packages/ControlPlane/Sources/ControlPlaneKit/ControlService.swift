@@ -40,6 +40,9 @@ public final class ControlService: @unchecked Sendable {
         /// Where each log line goes, already prefixed with this copy; standard error unless a
         /// test listens (071 FR-033: no line may hold a code, a key, a MAC or a message).
         public var log: (@Sendable (String) -> Void)?
+        /// Told whenever the web remote's listener starts or fails to (071 R3): `serve --home`
+        /// writes it beside the log for Agents Host.
+        public var webChanged: (@Sendable (DaemonAPI.WebRemoteStatus) -> Void)?
 
         public struct Web: Sendable {
             /// `Web/dist`, with its MANIFEST.
@@ -355,27 +358,46 @@ public final class ControlService: @unchecked Sendable {
     // MARK: The web remote's listener (071)
 
     /// Starts the loopback listener. A build that doesn't match its manifest, or a port
-    /// that's taken, leaves it off and says so; the TLS listener and hosts carry on.
+    /// that's taken, leaves it off and says so (071 R3): in the log, in `control/status`
+    /// and to `Configuration.webChanged`; the TLS listener and hosts carry on.
     func startWeb(_ web: Configuration.Web) async {
-        let files: WebFiles
+        let status: DaemonAPI.WebRemoteStatus
         do {
-            files = try WebFiles.load(from: web.folder)
+            let files = try WebFiles.load(from: web.folder)
+            do {
+                let port = try await loopback.start(port: web.port, files: files, log: { [weak self] in self?.log($0) }) {
+                    [weak self] socket, origin in
+                    guard let self else { return socket.close() }
+                    self.sockets.add(socket)
+                    Task { await self.accept(socket, arrival: .loopback(origin: origin)) }
+                }
+                log("web: serving the web remote at \(Loopback.origin(port: port))")
+                status = .init(port: port, served: true)
+            } catch {
+                log("web: port \(web.port) not bound (\(error)); not serving the web remote")
+                let inUse = (error as? IOError)?.errnoCode == EADDRINUSE
+                status = .init(port: web.port, served: false,
+                               reason: inUse ? DaemonAPI.WebRemoteStatus.portInUse : DaemonAPI.WebRemoteStatus.failed,
+                               detail: "\(error)")
+            }
         } catch {
             log("web: not serving, \(error)")
-            return
+            status = .init(port: web.port, served: false, reason: DaemonAPI.WebRemoteStatus.build, detail: "\(error)")
         }
-        do {
-            let port = try await loopback.start(port: web.port, files: files, log: { [weak self] in self?.log($0) }) {
-                [weak self] socket, origin in
-                guard let self else { return socket.close() }
-                self.sockets.add(socket)
-                Task { await self.accept(socket, arrival: .loopback(origin: origin)) }
-            }
-            log("web: serving the web remote at \(Loopback.origin(port: port))")
-        } catch {
-            log("web: port \(web.port) not bound (\(error)); not serving the web remote")
-        }
+        await methods.setWeb(status)
+        configuration.webChanged?(status)
+        await router.broadcastControl(DaemonAPI.Notification.controlWebChanged, (try? JSONValue.encoding(status)) ?? [:])
     }
+
+    /// Tries the loopback listener again when it isn't serving (071 R3): Agents Host's
+    /// *Try Again*, once whatever held the port has let it go. Nothing changes while it is.
+    public func retryWeb() async {
+        guard let web = configuration.web, await methods.web?.served != true else { return }
+        await startWeb(web)
+    }
+
+    /// The web remote's listener as it stands, or nil when this copy wasn't asked to serve it.
+    public var webStatus: DaemonAPI.WebRemoteStatus? { get async { await methods.web } }
 
     // MARK: A socket
 
