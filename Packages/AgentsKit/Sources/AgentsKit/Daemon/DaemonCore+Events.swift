@@ -11,8 +11,10 @@ import AgentsKitCore
 extension DaemonCore {
     // MARK: Raising
 
+    /// `endingRun` is the key of the workflow run this event ends, when the run has
+    /// already been released by the time it is raised (#102).
     @discardableResult
-    func raise(_ draft: EventDraft) -> Event {
+    func raise(_ draft: EventDraft, endingRun: String? = nil) -> Event {
         loadEventsIfNeeded()
         let appended = eventLog.append(draft, position: eventState.nextPosition, now: now())
         switch appended {
@@ -28,7 +30,7 @@ extension DaemonCore {
         let event = appended.event
         broadcastEvents(event)
         matchWaits(event)
-        fireWorkflows(for: event)
+        fireWorkflows(for: event, endingRun: endingRun)
         return eventLog.event(at: event.position) ?? event
     }
 
@@ -44,12 +46,14 @@ extension DaemonCore {
     /// An event about one agent, in its project, with its id and title.
     @discardableResult
     func raiseAgentEvent(_ name: String, _ agentID: UUID, sentence: String,
-                         details extra: [String: String] = [:], depth: Int? = nil) -> EventPosition? {
+                         details extra: [String: String] = [:], depth: Int? = nil,
+                         endingRun: String? = nil) -> EventPosition? {
         guard let agent = agents[agentID] else { return nil }
         return raise(EventDraft(name: name, at: now(), scope: .project(folder: agent.projectFolder),
                          sentence: "\(LeaseWords.agentName(agent.title)) \(sentence)",
                          details: agentDetails(agent).merging(extra) { $1 },
-                         chainDepth: depth ?? workflowChainDepth(causedBy: agentID))).position
+                         chainDepth: depth ?? workflowChainDepth(causedBy: agentID)),
+                     endingRun: endingRun).position
     }
 
     /// `agent.finished`, `agent.stopped` or `agent.failed`. Stopped is somebody or
@@ -88,8 +92,10 @@ extension DaemonCore {
     /// matched here, so nothing fires twice (research R7, as built). A project event
     /// reaches that project's workflows; a Mac event reaches every project's. A workflow
     /// is never fired by news of itself, which with the chain-depth limit is what stops
-    /// `workflow.refused` feeding on its own refusals.
-    func fireWorkflows(for event: Event) {
+    /// `workflow.refused` feeding on its own refusals — nor by news of its own agents
+    /// (#102), or every agent-finished workflow would run again on its own finish until
+    /// the limit refused it.
+    func fireWorkflows(for event: Event, endingRun: String? = nil) {
         guard workflowsAreStarted else {
             deferredEventsForWorkflows.append(event)
             return
@@ -107,6 +113,8 @@ extension DaemonCore {
                 guard workflow.problem == nil,
                       records.state(folder: folder, workflowID: workflow.workflowID)?.isArchived != true,
                       !(event.subject == .workflow && event.details["workflow"] == workflow.workflowID),
+                      !(event.subject == .agent && triggeringAgent.map {
+                          isOwnAgent($0, of: workflow, endingRun: endingRun) } == true),
                       let trigger = workflow.triggers.first(where: { $0.matches(event) }) else { continue }
                 // Detached, as `workflowsRespond` does: `raise` is called from inside
                 // the actor, and firing awaits things that call back into it.
