@@ -92,15 +92,23 @@ struct HostWindow: View {
             if model.settings.role == .runHere {
                 Divider()
                 // The web remote (071 FR-002): on unless turned off, and only ever on loopback.
-                Toggle(isOn: Binding(get: { model.settings.servesWebRemote },
-                                     set: { on in Task { await model.setServeWebRemote(on) } })) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Serve Agents to browsers on this Mac")
-                        Text("At \(model.webRemoteAddress), for a browser on this Mac only.")
-                            .font(.callout).foregroundStyle(.secondary)
+                // Its line says what the control plane says: never the address of a page it
+                // isn't serving (071 R3).
+                HStack(spacing: 12) {
+                    Toggle(isOn: Binding(get: { model.settings.servesWebRemote },
+                                         set: { on in Task { await model.setServeWebRemote(on) } })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Serve Agents to browsers on this Mac")
+                            Text(model.webRemoteLine)
+                                .font(.callout)
+                                .foregroundStyle(model.webRemoteFailed ? AnyShapeStyle(Color.orange) : AnyShapeStyle(.secondary))
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    if model.webRemoteFailed {
+                        Button("Try Again") { Task { await model.retryWebRemote() } }
                     }
                 }
-                .toggleStyle(.switch)
                 .disabled(model.busy != nil)
                 .padding(16)
             }

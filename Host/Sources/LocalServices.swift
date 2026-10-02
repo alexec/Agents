@@ -103,7 +103,7 @@ struct LocalServices {
             guard let program = Bundle.main.executableURL?.path else { return .failed("no program to launch") }
             arguments = [program, ControlLauncher.argument]
             variables = [StoreLocations.rootVariable: environment[StoreLocations.rootVariable] ?? "", "PATH": path]
-            for name in ["AGENTS_HOST_PORT", "AGENTS_HOST_BONJOUR"] { variables[name] = environment[name] }
+            for name in ["AGENTS_HOST_PORT", "AGENTS_HOST_WEB_PORT", "AGENTS_HOST_BONJOUR"] { variables[name] = environment[name] }
         case .daemon:
             arguments = [paths.agentsd.path, "--control-network"]
             variables = [StoreLocations.rootVariable: paths.hostRoot.path, "PATH": path]
