@@ -1339,16 +1339,34 @@ public enum DaemonAPI {
         public var startedByWorkflow: String?
         /// At most this many, newest activity first.
         public var limit: Int?
+        /// Every agent without its option and command lists and its plans (`Agent.leaned`),
+        /// which is what a sessions column needs. Those lists were 20 KB of a record's 21:
+        /// 4.2 MB for 200 agents (#107). The chat that is open asks for its own record
+        /// whole, with `agentID`. A client that does not ask gets the whole record, as before.
+        public var lean: Bool
+        /// Only this agent, whole: the record of the chat that is open, whose menus and
+        /// plan the lean list leaves out. An archived agent is read back from disk first.
+        /// A host from before #107 ignores it and lists everything, so ask with `limit: 1`
+        /// as well and look for the id in what comes back.
+        public var agentID: UUID?
 
         public init(includeArchived: Bool = true, archivedCommands: Bool = true,
                     archivedOnly: Bool = false, folder: URL? = nil,
-                    startedByWorkflow: String? = nil, limit: Int? = nil) {
+                    startedByWorkflow: String? = nil, limit: Int? = nil,
+                    lean: Bool = false, agentID: UUID? = nil) {
             self.includeArchived = includeArchived
             self.archivedCommands = archivedCommands
             self.archivedOnly = archivedOnly
             self.folder = folder
             self.startedByWorkflow = startedByWorkflow
             self.limit = limit
+            self.lean = lean
+            self.agentID = agentID
+        }
+
+        /// One agent's whole record, archived or not (#107).
+        public static func whole(_ agentID: UUID) -> ListRequest {
+            ListRequest(includeArchived: true, limit: 1, agentID: agentID)
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1359,6 +1377,8 @@ public enum DaemonAPI {
             folder = try c.decodeIfPresent(URL.self, forKey: .folder)
             startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)
             limit = try c.decodeIfPresent(Int.self, forKey: .limit)
+            lean = try c.decodeIfPresent(Bool.self, forKey: .lean) ?? false
+            agentID = try c.decodeIfPresent(UUID.self, forKey: .agentID)
         }
     }
 

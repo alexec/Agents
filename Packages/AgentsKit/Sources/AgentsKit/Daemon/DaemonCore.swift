@@ -1061,8 +1061,10 @@ public actor DaemonCore {
                 (!request.archivedOnly || agent.state == .archived)
                     && (folder == nil || agent.projectFolder == folder)
                     && (request.startedByWorkflow == nil || agent.startedByWorkflow == request.startedByWorkflow)
+                    && (request.agentID == nil || agent.id == request.agentID)
             }
         if let limit = request.limit { listed = Array(listed.prefix(max(0, limit))) }
+        if request.lean { return listed.map { $0.leaned() } }
         if !request.archivedCommands {
             for i in listed.indices where listed[i].state == .archived { listed[i].availableCommands = [] }
         }

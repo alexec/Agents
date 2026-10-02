@@ -25,6 +25,7 @@ struct AgentsListNarrowingTests {
         agent.startedByWorkflow = workflow
         if state == .archived { agent.archivedReason = .byUser }
         agent.availableCommands = [SlashCommand(name: "review", description: "Run code review")]
+        agent.advertisedOptions = [ConfigOption(id: "model", name: "Model", type: "select", currentValue: .string("a"))]
         return agent
     }
 
@@ -71,5 +72,40 @@ struct AgentsListNarrowingTests {
         #expect(request.folder == nil)
         #expect(request.startedByWorkflow == nil)
         #expect(request.limit == nil)
+        #expect(!request.lean)
+        #expect(request.agentID == nil)
+    }
+
+    /// The lean list (#107): every agent, none of its lists. The open chat asks for its own.
+    @Test func aLeanListLeavesTheListsOutAndOneAgentComesWhole() async throws {
+        let (locations, one, _) = try temporary()
+        let live = agent(one, .finished, minutesAgo: 1)
+        let other = agent(one, .finished, minutesAgo: 2)
+        let core = try await core(locations, seeded: [live, other])
+
+        let lean = await core.listAgents(.init(includeArchived: false, lean: true))
+        #expect(Set(lean.map(\.id)) == [live.id, other.id])
+        #expect(lean.allSatisfy { $0.availableCommands.isEmpty && $0.advertisedOptions.isEmpty && $0.plans.isEmpty })
+        #expect(lean.allSatisfy { $0.title == "seed" && $0.state == .finished }, "the rest of the record is all there")
+        #expect(await core.agent(live.id)?.availableCommands.count == 1, "only the reply is lean")
+
+        let whole = await core.listAgents(.whole(other.id))
+        #expect(whole.map(\.id) == [other.id])
+        #expect(whole.first?.availableCommands.map(\.name) == ["review"])
+        #expect(whole.first?.advertisedOptions.map(\.id) == ["model"])
+    }
+
+    /// An archived agent is held slim (051); asked for by id, it is read back from disk.
+    @Test func anArchivedAgentAskedForByIDIsReadBackWhole() async throws {
+        let (locations, one, _) = try temporary()
+        let archived = agent(one, .archived, minutesAgo: 5)
+        let core = try await core(locations, seeded: [archived])
+        #expect(await core.agent(archived.id)?.isSlim == true)
+
+        let answer = await core.handle(method: DaemonAPI.Method.agentsList,
+                                       params: try JSONValue.encoding(DaemonAPI.ListRequest.whole(archived.id)))
+        let listed = try answer.get().decode([Agent].self)
+        #expect(listed.map(\.id) == [archived.id])
+        #expect(listed.first?.availableCommands.map(\.name) == ["review"])
     }
 }

@@ -505,7 +505,15 @@ public final class AgentsModel {
     }
 
     public func replaceAgents(_ listed: [Agent]) {
-        agents = listed.sorted { $0.lastActivityAt > $1.lastActivityAt }
+        let held = Dictionary(agents.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        agents = listed.map { $0.keepingLists(of: held[$0.id]) }.sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
+    /// Agents from a list that is not all of them (a project's archived ones, a workflow's
+    /// runs, the open chat's record), filed beside the rest. A lean one keeps the lists
+    /// held for it (#107); `agent/changed` is always whole and goes through `upsert`.
+    public func takeListed(_ listed: [Agent]) {
+        for agent in listed { upsert(agent.keepingLists(of: self.agent(agent.id))) }
     }
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
@@ -515,7 +523,10 @@ public final class AgentsModel {
     /// One host's agents, as it just listed them. Every other host's are left alone:
     /// a server re-listing after a reconnect must not take the Mac's away (037).
     public func replaceAgents(_ listed: [Agent], from host: HostID) {
-        let stamped = listed.map { var agent = $0; agent.host = host; return agent }
+        // A lean list (#107) keeps the lists already held for an agent: the open chat's menus.
+        let held = Dictionary(agents.filter { $0.host == host }.map { ($0.id, $0) },
+                              uniquingKeysWith: { first, _ in first })
+        let stamped = listed.map { var agent = $0.keepingLists(of: held[$0.id]); agent.host = host; return agent }
         agents = (agents.filter { $0.host != host } + stamped).sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
