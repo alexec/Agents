@@ -415,6 +415,8 @@ extension DaemonCore {
                 // ask to be parked or archived when its turn ends: the person has moved
                 // the work on.
                 return .success(try await once(request.sendID) {
+                    // Before the unpark below: a refused send leaves the chat as it was.
+                    try await self.requireFolder(request.agentID)
                     if request.from == .person {
                         await self.unparkQuietly(request.agentID)
                         await self.dropAfterTurnAsk(request.agentID)
@@ -481,8 +483,17 @@ extension DaemonCore {
 
             case DaemonAPI.Method.agentsUnpark:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                try await requireFolder(request.agentID)
                 try unpark(request.agentID)
                 return .success([:])
+
+            case DaemonAPI.Method.agentsContinueInProject:
+                let request = try require(params, as: DaemonAPI.ContinueInProjectRequest.self)
+                return .success(try JSONValue.encoding(try await continueInProject(request)))
+
+            case DaemonAPI.Method.agentsRecreateWorktree:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                return .success(try JSONValue.encoding(try await recreateWorktree(request.agentID)))
 
             case DaemonAPI.Method.agentsSetUnread:
                 let request = try require(params, as: DaemonAPI.SetUnreadRequest.self)

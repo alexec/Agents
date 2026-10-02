@@ -541,6 +541,9 @@ extension DaemonCore {
     /// runtime's, because a `session/prompt` sent mid-turn means something different
     /// to each of the three and none of that belongs in the window.
     public func prompt(_ request: DaemonAPI.PromptRequest) async throws {
+        // Before the words are kept: queued for a folder that is not there, they would
+        // wait for ever, and the bar that sent them would have let them go (#119).
+        try await requireFolder(request.agentID)
         try await keepPrompt(request)
         // New words go first: a chat waiting for an allowance waits no more (052, FR-017).
         dropAllowanceWait(request.agentID)
@@ -637,6 +640,8 @@ extension DaemonCore {
         }
         // Gone already: it went out as the turn ended, or was taken back.
         guard let index = agent.queuedPrompts.firstIndex(where: { $0.id == request.promptID }) else { return }
+        // A folder gone since it was queued: said, and the words stay where they are.
+        if live[agent.id] == nil { try await requireFolder(agent.id) }
         let queued = agent.queuedPrompts.remove(at: index)
         guard turnTasks[agent.id] != nil, let session = live[agent.id] else {
             agent.queuedPrompts.insert(queued, at: 0)
@@ -937,12 +942,10 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: notYetInstalled(runtime) ?? "\(runtime.name) is not installed any more.")
         }
-        // Its worktree gone is said, not worked around: starting it in the project
-        // folder instead would put its work somewhere nobody asked for (FR-017).
-        if let worktree = agent.worktree, !Self.isDirectory(agent.cwd) {
-            throw JSONRPCError(code: DaemonAPI.Failure.worktreeMissing,
-                               message: "The worktree \(worktree.name) is gone, so this agent cannot be picked up where it was.")
-        }
+        // Its folder gone is said, not worked around: starting it in the project
+        // folder instead would put its work somewhere nobody asked for (030 FR-017).
+        // The person can choose that, as Continue in the project folder (#119).
+        try await requireFolder(agent.id)
         // Before anything is said or started: wanting a credential leaves the agent as it
         // was, and the window lends one and asks again (043).
         let lent = try launchEnvironment(for: runtime.id)

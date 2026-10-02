@@ -138,6 +138,11 @@ public enum DaemonAPI {
         /// word about their own attention: no agent tool reaches either.
         public static let agentsPark = "agents/park"
         public static let agentsUnpark = "agents/unpark"
+        /// The ways on from an agent whose folder has gone (#119): a successor in the
+        /// project folder that reads this session, or the worktree made again from its
+        /// branch. The person's, from the error and the chat header.
+        public static let agentsContinueInProject = "agents/continueInProject"
+        public static let agentsRecreateWorktree = "agents/recreateWorktree"
         /// Mark a finished chat unread, or read, from its row (#70). The person's word
         /// about their own attention, as parking is: no agent tool reaches it.
         public static let agentsSetUnread = "agents/setUnread"
@@ -741,6 +746,33 @@ public enum DaemonAPI {
     public struct AgentRequest: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    /// `agents/continueInProject` (#119): start a successor of an agent whose folder has
+    /// gone, in its project folder, on the same runtime and choices, told to read this
+    /// session and carry on. `text` is whatever was in the prompt bar, said after that.
+    /// Answered with the new agent's id.
+    public struct ContinueInProjectRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var text: String
+        public var attachments: [Attachment]
+        /// As `StartRequest.requestID`: a retry answers with the first try's agent.
+        public var requestID: UUID?
+
+        public init(agentID: UUID, text: String = "", attachments: [Attachment] = [], requestID: UUID? = nil) {
+            self.agentID = agentID
+            self.text = text
+            self.attachments = attachments
+            self.requestID = requestID
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
+            attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
+            requestID = try c.decodeIfPresent(UUID.self, forKey: .requestID)
+        }
     }
 
     /// `agents/setUnread`: put the unread mark on a finished chat, or take it off.

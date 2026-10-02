@@ -28,6 +28,8 @@ extension DaemonCore {
         // And the projects' plugins, on the same terms (security review, S2).
         beginPluginApprovalsIfNeeded()
         beginMCPApprovalsIfNeeded()
+        // Folders that went while the daemon was away, marked before the first tick (#119).
+        await noteMissingFolders()
         startWorkflowTicker()
         workflowsAreStarted = true
         // Whatever happened while this layer could not act, now, and in the order it
@@ -349,6 +351,10 @@ extension DaemonCore {
         // guard below, for the same reason as the battery: the first tick after a start
         // is exactly when a Mac that slept through the time should catch up.
         await resumeDueBlocks(now: now)
+
+        // Folders gone since the last look: a worktree removed after a merge shows on
+        // its row before anybody types into it (#119).
+        await noteMissingFolders()
 
         // Allowances whose time to come back has come, and grants past their date (052).
         settleAllowanceClocks(now: now)
