@@ -64,15 +64,7 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
             // A server asked for a credential there is none of (043).
             .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
-            .alert(model.signInLendAsk.map { "Let \($0.label) use this Mac’s \($0.runtimeName) sign-in?" } ?? "",
-                   isPresented: Binding(get: { model.signInLendAsk != nil },
-                                        set: { if !$0 { model.finishSignInLendAsk(allowed: false) } }),
-                   presenting: model.signInLendAsk) { _ in
-                Button("Allow") { model.finishSignInLendAsk(allowed: true) }
-                Button("Don’t Allow", role: .cancel) { model.finishSignInLendAsk(allowed: false) }
-            } message: { ask in
-                Text("Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Control plane ▸ Hosts.")
-            }
+            // A server asking to borrow a sign-in (T091) is the window's one alert, below.
             // A known server with a new key: rebuilt, or not what it says (043).
             // Agents missing at start-up, offered once each (048). Closed any way at
             // all, what was missing counts as offered.
@@ -179,13 +171,19 @@ struct ContentView: View {
         // and shut means gone: there would be nothing listening.
         .onChange(of: model.filesToShow) { showWhatWasAskedFor() }
         .onChange(of: model.selection) { showWhatWasAskedFor() }
-        .alert("Could not finish that",
-               isPresented: Binding(get: { model.problem != nil },
-                                    set: { if !$0 { model.dismissProblem() } })) {
-            Button("OK") { model.dismissProblem() }
-                .keyboardShortcut(.defaultAction)
-        } message: {
-            Text(model.problem ?? "")
+        // The window's one alert, held while it is open (#101): a reconnect clearing the
+        // problem, or a second arriving, waits for its button rather than closing it.
+        .heldAlert(\.title, item: { WindowAlert.wanted(by: model) }, dismiss: { $0.closed(in: model) }) { alert in
+            switch alert {
+            case .lend(let ask):
+                Button("Allow") { model.finishSignInLendAsk(ask, allowed: true) }
+                Button("Don’t Allow", role: .cancel) { model.finishSignInLendAsk(ask, allowed: false) }
+            case .problem:
+                Button("OK") {}
+                    .keyboardShortcut(.defaultAction)
+            }
+        } message: { alert in
+            Text(alert.message)
         }
         // One project's settings, over whatever the window is showing (066).
         .sheet(isPresented: Binding(get: { requests.projectSettings != nil },
@@ -206,6 +204,54 @@ struct ContentView: View {
         // How many sessions need a person, on the Dock — Needs attention and Blocked.
         .onChange(of: model.needsPersonCount, initial: true) { _, count in
             NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
+        }
+    }
+}
+
+/// What the window's one alert is about (#101): a server asking to borrow a sign-in, or
+/// something that could not be finished. One at a time, the ask first, since a server is
+/// waiting on it.
+enum WindowAlert: Identifiable {
+    case lend(SignInLendAsk)
+    case problem(AlertWords)
+
+    var id: String {
+        switch self {
+        case .lend(let ask): "lend-\(ask.id)"
+        case .problem(let words): "problem-\(words.id)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .lend(let ask): "Let \(ask.label) use this Mac’s \(ask.runtimeName) sign-in?"
+        case .problem: "Could not finish that"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .lend(let ask):
+            "Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Control plane ▸ Hosts."
+        case .problem(let words): words.text
+        }
+    }
+
+    @MainActor
+    static func wanted(by model: AppModel) -> WindowAlert? {
+        if let ask = model.signInLendAsk { return .lend(ask) }
+        return model.problem.map { .problem(AlertWords(text: $0)) }
+    }
+
+    /// Closed, by its button or by Escape (its cancel button). A problem the model has
+    /// moved on from is not the model's to forget again.
+    @MainActor
+    func closed(in model: AppModel) {
+        switch self {
+        // Its buttons answer it, Escape as Don’t Allow, and only once: its answer is a
+        // continuation, so nothing here answers it again.
+        case .lend: break
+        case .problem(let words): if model.problem == words.text { model.dismissProblem() }
         }
     }
 }

@@ -56,10 +56,11 @@ extension AppModel {
         }
     }
 
-    /// The person answered the lend ask.
-    func finishSignInLendAsk(allowed: Bool) {
-        guard let ask = signInLendAsk else { return }
-        signInLendAsk = nil
+    /// The person answered the lend ask: the one the window showed, which a second ask
+    /// may since have replaced (#101). The second is still asked. Once per ask: its
+    /// answer is a continuation.
+    func finishSignInLendAsk(_ ask: SignInLendAsk, allowed: Bool) {
+        if signInLendAsk?.id == ask.id { signInLendAsk = nil }
         ask.answer.resume(returning: allowed)
     }
 
