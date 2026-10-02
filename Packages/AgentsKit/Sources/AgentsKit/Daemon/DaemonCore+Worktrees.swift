@@ -86,7 +86,7 @@ extension DaemonCore {
         do {
             try GitWorktrees.ensureExcluded(commonDir: repository.commonDir)
         } catch let failure as GitWorktrees.Failure {
-            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed, message: failure.message)
+            throw Self.worktreeRefusal(failure.message, saying: failure.message)
         }
 
         let folder = repository.worktreesFolder
@@ -100,8 +100,8 @@ extension DaemonCore {
         do {
             try await GitWorktrees.add(existing: branch, path: root, in: project)
         } catch let failure as GitWorktrees.Failure {
-            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
-                               message: "Could not make a worktree on \(wanted): \(failure.message)")
+            throw Self.worktreeRefusal(failure.message,
+                                       saying: "Could not make a worktree on \(wanted): \(failure.message)")
         }
         let made = Project.standardize(root)
         let worktree = AgentWorktree(name: name, root: made, branch: wanted, project: project,
@@ -136,7 +136,7 @@ extension DaemonCore {
         do {
             try GitWorktrees.ensureExcluded(commonDir: repository.commonDir)
         } catch let failure as GitWorktrees.Failure {
-            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed, message: failure.message)
+            throw Self.worktreeRefusal(failure.message, saying: failure.message)
         }
 
         // A branch of that name made some other way is only seen by git. Asked first,
@@ -157,8 +157,8 @@ extension DaemonCore {
                 } catch let failure as GitWorktrees.Failure {
                     let clash = failure.message.contains("already exists")
                     guard clash, attempts < 20 else {
-                        throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
-                                           message: "Could not make a worktree: \(failure.message)")
+                        throw Self.worktreeRefusal(failure.message,
+                                                   saying: "Could not make a worktree: \(failure.message)")
                     }
                 }
             }

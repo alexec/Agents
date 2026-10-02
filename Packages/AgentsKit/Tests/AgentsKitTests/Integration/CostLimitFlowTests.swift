@@ -219,7 +219,7 @@ struct CostLimitIntegrationTests {
         try await Task.sleep(for: .milliseconds(200))
         #expect(await core.agent(id)?.queuedPrompts.count == 1)
 
-        let state = await core.setLimits(.init(daily: .some(Cost(amount: 100, currency: "USD"))))
+        let state = try await core.setLimits(.init(daily: .some(Cost(amount: 100, currency: "USD"))))
         #expect(!state.dayLimitReached)
         await eventually("what was holding went, with no restart and no second act") {
             await core.agent(id)?.queuedPrompts.isEmpty == true

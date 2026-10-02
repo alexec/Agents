@@ -1402,6 +1402,12 @@ final class AppModel {
             guard let settings = try? params?.decode(SandboxSettings.self) else { return }
             sandboxSettings = settings
 
+        case DaemonAPI.Notification.writeFailed:
+            // Something nobody was waiting on was not kept: a full disk, or a folder
+            // refusing writes. Said, so it is not found out at the next restart (#88).
+            guard let failure = try? params?.decode(WriteFailure.self) else { return }
+            problem = failure.message
+
         default:
             break
         }
@@ -1601,7 +1607,7 @@ final class AppModel {
             guard let change = try? params?.decode(DaemonAPI.FilesChangedNotification.self) else { return }
             serverFiles(host).apply(change)
         case DaemonAPI.Notification.shellOutput, DaemonAPI.Notification.shellStateChanged,
-             DaemonAPI.Notification.draftOptions:
+             DaemonAPI.Notification.draftOptions, DaemonAPI.Notification.writeFailed:
             await received(method, params, nil)
         default:
             break
@@ -2932,6 +2938,8 @@ final class AppModel {
                 return "That folder is too deep to run a daemon in: \(path) is past the 104 bytes a socket may be named with."
             }
         }
+        // This window's own writes: a full disk or a refused folder, in words (#88).
+        if let failure = WriteFailure(error, keeping: "that") { return failure.message }
         return String(describing: error)
     }
 }

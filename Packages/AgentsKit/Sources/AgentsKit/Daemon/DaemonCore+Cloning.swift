@@ -81,11 +81,17 @@ extension DaemonCore {
         } catch GitProcess.LaunchError.notInstalled {
             throw JSONRPCError(code: DaemonAPI.Failure.cloneFailed, message: CloneFailure.notInstalled)
         } catch {
+            if let failure = WriteFailure(error, keeping: "the clone") { throw Self.refusal(failure) }
             throw JSONRPCError(code: DaemonAPI.Failure.cloneFailed,
                                message: "Could not start git: \(error.localizedDescription)")
         }
         guard outcome.succeeded else {
             DaemonLog.shared.write("clone of \(remote.url) failed (\(outcome.status)): \(outcome.errors)")
+            // Only a full disk is read from git's words here: "Permission denied" from a
+            // clone is as often the server refusing a key as a folder refusing a write.
+            if let failure = WriteFailure(gitMessage: outcome.errors, keeping: "the clone"), failure.cause == .diskFull {
+                throw Self.refusal(failure)
+            }
             throw JSONRPCError(code: DaemonAPI.Failure.cloneFailed,
                                message: CloneFailure.explain(outcome.errors, remote: remote))
         }
@@ -98,6 +104,7 @@ extension DaemonCore {
                 throw JSONRPCError(code: DaemonAPI.Failure.folderInTheWay,
                                    message: "\(shown) appeared while the clone ran. Nothing in it was changed.")
             }
+            if let failure = WriteFailure(error, keeping: "the clone") { throw Self.refusal(failure) }
             throw JSONRPCError(code: DaemonAPI.Failure.cloneFailed,
                                message: "Cloned, but could not move it to \(shown): \(error.localizedDescription)")
         }

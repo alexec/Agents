@@ -43,7 +43,7 @@ extension DaemonCore {
             }
         }
         records.approvalsBegan = Date()
-        workflowStore.save(records)
+        keepQuietly("workflow history") { try workflowStore.save(records) }
     }
 
     /// Record `digest` as approved for the workflow, in the records given.
@@ -69,7 +69,7 @@ extension DaemonCore {
         }
         var records = workflowStore.load()
         approve(workflow, digest: request.digest, in: &records)
-        workflowStore.save(records)
+        try keep("this workflow's settings") { try workflowStore.save(records) }
         let summary = summary(for: workflow, records: records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
         return summary

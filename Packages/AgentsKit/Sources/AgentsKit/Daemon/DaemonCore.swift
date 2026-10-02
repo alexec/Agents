@@ -99,6 +99,9 @@ public actor DaemonCore {
     var mailboxTail: Task<Void, Never>?
     /// The last write of an agent's record, so the next one goes after it.
     var saveTail: Task<Void, Never>?
+    /// When each kind of refused write was last told to the windows (#88), so a full
+    /// disk under a streaming agent is one alert and not one per token.
+    var writeFailuresTold: [WriteFailure.Cause: Date] = [:]
     /// What the machine says about its own power, and the claim on its idle sleep.
     /// Injected together so a test can cross the battery floor without a laptop and
     /// assert on holds without touching the real one (024).
@@ -778,13 +781,13 @@ public actor DaemonCore {
     /// of which the next daemon acts on.
     func saveQuietly(_ agent: Agent) {
         let previous = saveTail
-        saveTail = Task { [store] in
+        saveTail = Task { [store, self] in
             await previous?.value
             do {
                 try await store.save(agent)
             } catch {
-                // Said in the log at least: a record not kept reverts on the next start (073).
-                DaemonLog.shared.write("store: could not save \(agent.id): \(error)")
+                // A record not kept reverts on the next start (073), so the person is told (#88).
+                self.lost(error, keeping: "the latest state of \(agent.title ?? "a session")")
             }
         }
     }
@@ -797,9 +800,9 @@ public actor DaemonCore {
         do {
             try await store.append(entry, for: agentID)
         } catch {
-            // The window still shows it; a restart would not. Logged, so a full disk is
-            // found in the log rather than as lines missing from a conversation (073).
-            DaemonLog.shared.write("store: could not append to \(agentID)'s transcript: \(error)")
+            // The window still shows it; a restart would not. Said, so a full disk is
+            // found out rather than as lines missing from a conversation (073, #88).
+            lost(error, keeping: "a line of \(agents[agentID]?.title ?? "a session")'s chat")
         }
         if var agent = agents[agentID] {
             agent.lastActivityAt = entry.at

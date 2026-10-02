@@ -18,9 +18,9 @@ struct PluginApprovalStore: Sendable {
         return records
     }
 
-    func save(_ records: PluginApprovals) {
-        guard let data = try? StoreCoding.encoder.encode(records) else { return }
-        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: file, options: .atomic)
+    func save(_ records: PluginApprovals) throws {
+        let data = try StoreCoding.encoder.encode(records)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: file, options: .atomic)
     }
 }

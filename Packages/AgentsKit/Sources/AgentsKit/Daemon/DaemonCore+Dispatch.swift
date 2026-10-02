@@ -583,7 +583,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.costSetLimits:
                 let request = try require(params, as: DaemonAPI.SetLimitsRequest.self)
-                return .success(try JSONValue.encoding(await setLimits(request)))
+                return .success(try JSONValue.encoding(try await setLimits(request)))
 
             case DaemonAPI.Method.agentsSuggestPrompts:
                 let request = try require(params, as: DaemonAPI.SuggestPromptsRequest.self)
@@ -764,6 +764,9 @@ extension DaemonCore {
         } catch let error as JSONRPCError {
             return .failure(error)
         } catch {
+            // A full disk or a refused folder reads as words, not `NSCocoaErrorDomain
+            // Code=640` (#88). The paths that know what they were keeping say so first.
+            if let failure = WriteFailure(error, keeping: "that") { return .failure(Self.refusal(failure)) }
             return .failure(.internalError(String(describing: error)))
         }
     }

@@ -371,7 +371,7 @@ extension DaemonCore {
         var records = workflowStore.load()
         let since = records.lastTickAt
         records.lastTickAt = now
-        workflowStore.save(records)
+        keepQuietly("workflow history") { try workflowStore.save(records) }
 
         // The first tick after starting has no window to look at. Everything before the
         // daemon existed is somebody else's business.
@@ -530,7 +530,7 @@ extension DaemonCore {
             records.update(folder: workflow.folder, workflowID: workflow.workflowID) {
                 $0.standingAgentID = agentID
             }
-            workflowStore.save(records)
+            keepQuietly("this workflow's settings") { try workflowStore.save(records) }
             return agentID
 
         case .new:
@@ -709,7 +709,7 @@ extension DaemonCore {
         var records = workflowStore.load()
         records.record(outcome, folder: workflow.folder, workflowID: workflow.workflowID,
                        causingEvent: causingEvent, cause: cause)
-        workflowStore.save(records)
+        keepQuietly("workflow history") { try workflowStore.save(records) }
         broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
         // On the log (042): what the fire came to, on the event that caused it, and as
         // an event of its own, one step deeper in the chain.
@@ -892,7 +892,7 @@ extension DaemonCore {
             $0.isDisabled = !request.enabled
             $0.disabledByAgent = !request.enabled && byAgent
         }
-        workflowStore.save(records)
+        try keep("this workflow's settings") { try workflowStore.save(records) }
         let summary = summary(for: workflow, records: records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
         return summary
@@ -921,7 +921,7 @@ extension DaemonCore {
             // leave a restored workflow wearing a refusal from a fortnight ago.
             $0.lastOutcome = nil
         }
-        workflowStore.save(records)
+        try keep("this workflow's settings") { try workflowStore.save(records) }
         let summary = summary(for: workflow, records: records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
         return summary
@@ -981,13 +981,14 @@ extension DaemonCore {
         do {
             try Data(edited.utf8).write(to: url, options: .atomic)
         } catch {
+            if let failure = WriteFailure(error, keeping: url.lastPathComponent) { throw Self.refusal(failure) }
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
                                message: "\(url.lastPathComponent) could not be written: \(error.localizedDescription)")
         }
         if wasApproved, RequestConnection.role == .control {
             var records = workflowStore.load()
             approve(existing, digest: ContentDigest.sha256(Data(edited.utf8)), in: &records)
-            workflowStore.save(records)
+            try keep("this workflow's settings") { try workflowStore.save(records) }
         }
 
         // Synchronously, and not through the watcher. The watcher is debounced by
@@ -1038,7 +1039,7 @@ extension DaemonCore {
         records.runs = workflowRuns.values.sorted {
             ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString)
         }
-        workflowStore.save(records)
+        keepQuietly("workflow history") { try workflowStore.save(records) }
     }
 
     /// Let go of every restored run that cannot complete, and fire nothing for it.
