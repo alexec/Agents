@@ -809,45 +809,50 @@ final class RemoteModel {
     /// the meantime rather than looking broken.
     func connect() async {
         guard reconnecting == nil else { return }
+        networkChanges.start()
+        let backoff = backoff
         reconnecting = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
+                backoff.trying()
                 // Lost again while this attempt was still settling in: `lostTouch` found
                 // this loop running and left it to go round once more.
                 if await self.tryOnce(), self.isConnected { break }
                 // Forgotten: nothing to dial until a new pairing starts a loop of its own.
                 // Ended here rather than cancelled, so `reconnecting` is cleared (#81).
                 if self.forgottenByControlPlane { break }
-                let nap = Task<Void, Never> { try? await Task.sleep(for: self.backOff) }
-                self.backingOff = nap
-                await withTaskCancellationHandler { await nap.value } onCancel: { nap.cancel() }
-                self.backingOff = nil
                 // Backing off to half a minute, so a phone in a pocket with no Mac to
                 // find is not holding the radio open every second all afternoon.
-                self.backOff = min(self.backOff * 2, .seconds(30))
+                await backoff.wait()
             }
             // Cancelled by a pairing, which has already started the loop that replaces
             // this one; that one's handle is not this one's to clear.
-            if !Task.isCancelled { self?.finishedReconnecting() }
+            if !Task.isCancelled {
+                backoff.settle()
+                self?.finishedReconnecting()
+            }
         }
         await reconnecting?.value
     }
 
-    /// How long the loop waits before the next attempt, and the wait itself, so coming
-    /// back to the app can cut it short.
-    @ObservationIgnored private var backOff = Duration.seconds(1)
-    @ObservationIgnored private var backingOff: Task<Void, Never>?
+    /// How long the loop waits before the next attempt, and the wait itself, which coming
+    /// back to the app or a network change cuts short (#82); and the other hosts' watch's.
+    @ObservationIgnored private let backoff = Backoff()
+    @ObservationIgnored private let otherHostsBackoff = Backoff(first: .seconds(5), longest: .seconds(5))
+    @ObservationIgnored private var checkingConnection = false
+    @ObservationIgnored private lazy var networkChanges = ReconnectTriggers { [weak self] reason in
+        Task { @MainActor in await self?.goBackNow(reason) }
+    }
 
-    /// The app came to the front. A phone that was in a pocket may have been half a
-    /// minute into a back-off, or holding a connection that died while it was
-    /// suspended; either way the person is looking now, so look now.
-    private func cameToTheFront() async {
-        backOff = .seconds(1)
-        if let backingOff {
-            backingOff.cancel()
-            return
-        }
-        guard isConnected, reconnecting == nil else { return }
+    /// The app came to the front, or the network changed (#82). A phone that was in a
+    /// pocket may have been half a minute into a back-off, or holding a connection that
+    /// died while it was suspended; either way, look now. A try already in flight is
+    /// left alone.
+    private func goBackNow(_ reason: ReconnectTriggers.Reason) async {
+        otherHostsBackoff.nudge()
+        guard backoff.nudge() == .idle, isConnected, reconnecting == nil, !checkingConnection else { return }
+        checkingConnection = true
+        defer { checkingConnection = false }
         if await !client.answers(within: .seconds(4)) {
             // The listener hears the connection close and reconnects.
             await client.disconnect()
@@ -867,7 +872,6 @@ final class RemoteModel {
             isConnected = true
             lastHeardFrom = Date()
             problem = nil
-            backOff = .seconds(1)
             listen()
             // Each call here with a deadline: this runs inside the reconnect loop, and a
             // reply lost to a Mac restarting left the loop, and so the app, waiting for
@@ -937,14 +941,17 @@ final class RemoteModel {
             let base: any DaemonLink = (self.baseLink as? ControlPlaneLink)?.addressOnly ?? self.baseLink
             let link = ControlLink { try await base.transport() }
             let control = DaemonClient(link: link.controlLink)
+            let backoff = self.otherHostsBackoff
             while !Task.isCancelled {
+                backoff.trying()
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(5))) != nil {
+                    backoff.settle()
                     await self.syncOtherHosts(control, link: link)
                     for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
                         await self.syncOtherHosts(control, link: link)
                     }
                 }
-                try? await Task.sleep(for: .seconds(5))
+                await backoff.wait()
             }
         }
     }
@@ -1128,7 +1135,7 @@ final class RemoteModel {
         presence?.scenePhase(phase)
         if phase == .active {
             Task {
-                await cameToTheFront()
+                await goBackNow(.wake)
                 await refreshAttention()
                 // A silent push is best effort, so a need that moved while the app was
                 // shut may have been missed; the model is now as true as it can be.

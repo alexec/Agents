@@ -19,6 +19,8 @@ public final class Daemon: @unchecked Sendable {
     /// The control plane this daemon is a host of, if any (058).
     private let control: Control?
     private var uplink: ControlUplink?
+    /// What tells the uplink to dial now on a network change (#82).
+    private var uplinkTriggers: ReconnectTriggers?
 
     /// How this host joins its control plane: over a WebSocket, as the control plane
     /// names it, with a host code the first time.
@@ -261,6 +263,12 @@ public final class Daemon: @unchecked Sendable {
             await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
             await lendAndBorrowSignIns(through: uplink)
             uplink.start()
+            let triggers = ReconnectTriggers(queue: DispatchQueue(label: "uplink.triggers")) { [uplink] reason in
+                let nudged = uplink.goBackNow()
+                if nudged != .idle { DaemonLog.shared.write("uplink: \(reason.rawValue): dialling now (\(nudged))") }
+            }
+            uplinkTriggers = triggers
+            triggers.start()
             DaemonLog.shared.write("uplink: a host of \(membership.name) at \(membership.url ?? "?"), as \(membership.host?.rawValue ?? "?")")
         } catch {
             DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
@@ -275,6 +283,7 @@ public final class Daemon: @unchecked Sendable {
 
     public func shutDown() async {
         DaemonLog.shared.write("shutting down")
+        uplinkTriggers?.stop()
         uplink?.stop()
         server?.stop()
         await core.shutDown()

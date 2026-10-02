@@ -45,6 +45,12 @@ final class AppModel {
     private var presence: PresenceReporter?
     /// The loop going back for a lost daemon, while there is one.
     private var reconnecting: Task<Void, Never>?
+    /// Its wait, and the control plane watch's, both cut short by a wake or a network
+    /// change (#82).
+    @ObservationIgnored private let backoff = Backoff()
+    @ObservationIgnored private let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(2))
+    @ObservationIgnored private let wakeAndNetwork = WakeAndNetwork()
+    @ObservationIgnored private var checkingAfterWake = false
     private(set) var problem: String?
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
@@ -522,6 +528,7 @@ final class AppModel {
     func tryControlPlaneAgain() {
         reconnecting?.cancel()
         reconnecting = nil
+        backoff.settle()
         controlWatch?.cancel()
         controlWatch = nil
         Task {
@@ -1219,8 +1226,26 @@ final class AppModel {
         routeSharedFiles()
         // Nothing to connect to, and nothing to start: the first run says where.
         guard !needsFirstRun else { return }
+        wakeAndNetwork.start { [weak self] reason in self?.goBackNow(reason) }
         await connect()
         if !isConnected { await reconnect() }
+    }
+
+    /// The Mac woke or the network changed (#82): a wait in progress ends now, and a
+    /// connection the window still believes in is asked whether it is alive, since a
+    /// sleep can leave one dead without a word. A try already in flight is left alone.
+    private func goBackNow(_ reason: ReconnectTriggers.Reason) {
+        let host = backoff.nudge()
+        let control = controlBackoff.nudge()
+        WakeAndNetwork.log.info("reconnect: \(reason.rawValue, privacy: .public): host \(String(describing: host), privacy: .public), control plane \(String(describing: control), privacy: .public)")
+        guard host == .idle, isConnected, !checkingAfterWake else { return }
+        checkingAfterWake = true
+        Task {
+            // One that does not answer is closed; with a control plane, the connection
+            // under every host's goes too, so nothing dials back over the dead one.
+            if await !client.answers(within: .seconds(4)) { controlLink?.disconnect() }
+            checkingAfterWake = false
+        }
     }
 
     /// The move across (058, US6) is letting the old daemon go: the window does not go
@@ -1265,16 +1290,21 @@ final class AppModel {
     /// backing off to half a minute, and only one of it at a time.
     private func reconnect() async {
         guard reconnecting == nil else { return }
+        let backoff = backoff
+        backoff.trying()
         reconnecting = Task { [weak self] in
-            var wait = Duration.seconds(1)
             while !Task.isCancelled {
-                try? await Task.sleep(for: wait)
+                await backoff.wait()
                 guard let self else { return }
                 if self.isConnected { break }
+                WakeAndNetwork.log.info("reconnect: trying")
                 await self.connect()
-                if self.isConnected { break }
-                wait = min(wait * 2, .seconds(30))
+                if self.isConnected {
+                    WakeAndNetwork.log.info("reconnect: connected")
+                    break
+                }
             }
+            if !Task.isCancelled { backoff.settle() }
             self?.reconnecting = nil
         }
         await reconnecting?.value
@@ -1480,10 +1510,13 @@ final class AppModel {
     /// listed now and kept as hosts come and go (058, US3).
     private func watchControlHosts() {
         guard let controlLink, controlWatch == nil else { return }
+        let backoff = controlBackoff
         controlWatch = Task { [weak self] in
             let control = DaemonClient(link: controlLink.controlLink)
             while !Task.isCancelled {
+                backoff.trying()
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(3))) != nil {
+                    backoff.settle()
                     self?.controlPlaneDidAnswer()
                     await self?.syncControlHosts(control)
                     for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
@@ -1493,7 +1526,7 @@ final class AppModel {
                 } else if !Task.isCancelled {
                     self?.controlPlaneWent()
                 }
-                try? await Task.sleep(for: .seconds(2))
+                await backoff.wait()
             }
         }
     }
