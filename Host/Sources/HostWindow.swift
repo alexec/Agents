@@ -464,11 +464,17 @@ struct PairingSheet: View {
                         .frame(maxWidth: .infinity)
                         .accessibilityLabel("Pairing code to scan")
                 }
+                // One element, labelled from outside: a label on the selectable Text itself sent
+                // the first accessibility query after the picker changed the code round until
+                // the stack ran out (#105, as #71).
                 Text(code.text)
                     .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
                     .padding(10).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                    .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Pairing code")
+                    .accessibilityValue(code.text)
+                    .accessibilityAddTraits(.isStaticText)
                 Text(instructions(for: code))
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
