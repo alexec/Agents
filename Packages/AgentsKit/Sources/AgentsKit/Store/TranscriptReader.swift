@@ -68,6 +68,64 @@ struct TranscriptReader {
         index.scanned = index.lineEnds.last ?? 0
     }
 
+    /// The lines from `from` on whose bytes hold `needle`, found without decoding any
+    /// of them (#91). A line is read whole or not at all, so a needle with no newline in
+    /// it is never cut in two.
+    func lines(containing needle: String, _ index: Index, from: Int) throws -> [Int] {
+        guard from < index.count else { return [] }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let pattern = Array(needle.utf8)
+        var found: [Int] = []
+        var line = from
+        while line < index.count {
+            // About 4 MB at a time, ended at a line's end.
+            let start = index.start(of: line)
+            var last = line
+            while last + 1 < index.count, index.lineEnds[last] - start < 4 << 20 { last += 1 }
+            try handle.seek(toOffset: start)
+            let data = try handle.read(upToCount: Int(index.lineEnds[last] - start)) ?? Data()
+            data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+                guard let base = bytes.baseAddress else { return }
+                var cursor = base
+                let end = base + bytes.count
+                var current = line
+                while cursor < end, let hit = memmem(cursor, end - cursor, pattern, pattern.count) {
+                    let at = start + UInt64(UnsafeRawPointer(hit) - base)
+                    // The line it is on: the first whose end is past it.
+                    while index.lineEnds[current] <= at { current += 1 }
+                    found.append(current)
+                    // On to the next line; one hit is enough to look at a line.
+                    cursor = base + Int(index.lineEnds[current] - start)
+                    current += 1
+                }
+            }
+            line = last + 1
+        }
+        return found
+    }
+
+    /// The entries on lines `range`, one for each line, nil where a line will not
+    /// decode, so a caller can count by the line rather than by what decoded.
+    func entries(_ index: Index, lines range: Range<Int>) throws -> [TranscriptEntry?] {
+        let range = range.clamped(to: 0..<index.count)
+        guard !range.isEmpty else { return [] }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let from = index.start(of: range.lowerBound)
+        try handle.seek(toOffset: from)
+        let data = try handle.read(upToCount: Int(index.lineEnds[range.upperBound - 1] - from)) ?? Data()
+        var entries: [TranscriptEntry?] = []
+        entries.reserveCapacity(range.count)
+        var cursor = data.startIndex
+        for line in range {
+            let end = data.startIndex + Int(index.lineEnds[line] - from) - 1
+            entries.append(try? StoreCoding.decoder.decode(TranscriptEntry.self, from: data[cursor..<end]))
+            cursor = end + 1
+        }
+        return entries
+    }
+
     /// A page out of an index that is already up to date.
     func page(_ index: Index, before: Int?, limit: Int) throws -> TranscriptPage {
         let total = index.count
