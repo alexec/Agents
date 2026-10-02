@@ -185,6 +185,10 @@ for (const scene of scenes) {
       }
       await page.waitFor(`document.querySelector(".chat .transcript")`, 60_000).catch(() => {});
       say(`after: opened ${JSON.stringify(await visible(".chat .column-head h1"))}`);
+    } else if (scene === "identity") {
+      // #111: the footer names the browser, and no grant.
+      say(`footer: ${JSON.stringify(await page.text(".identity"))}`);
+      await shot("identity");
     } else if (scene === "hostdown") {
       // #83: the host down is plain and said at once.
       await openProject();
