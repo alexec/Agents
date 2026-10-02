@@ -64,7 +64,7 @@ struct PairDeviceSheet: View {
         .frame(width: 380)
         .task {
             before = Set(control.clients.map(\.id))
-            shown = await control.startCode(forHost: false, grant: .device)
+            shown = await control.startCode(forHost: false)
             if shown == nil { problem = control.problem ?? "Couldn't make a pairing code." }
         }
         .onDisappear { Task { await control.stopCodes() } }
