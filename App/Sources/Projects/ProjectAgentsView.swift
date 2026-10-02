@@ -7,8 +7,8 @@ import SwiftUI
 /// session and carrying one on happen in the same place, and sending turns this pane
 /// into the session without the bar moving. Above the prompt, the project's name and
 /// where it is, where a chat's transcript would be. The project's sessions and workflows
-/// are the middle column's (`SessionsColumn`); its settings are a sheet
-/// (`ProjectSettingsSheet`). Anything in it waiting for somebody's OK — a plugin, a
+/// are the middle column's (`SessionsColumn`), and so is the button to its settings, a
+/// sheet (`ProjectSettingsSheet`). Anything in it waiting for somebody's OK — a plugin, a
 /// workflow — is one banner across the top, since no agent gets it until somebody looks.
 ///
 /// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
@@ -16,7 +16,6 @@ import SwiftUI
 /// in for a new chat, with the folder already set to this project.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
-    @Environment(WindowRequests.self) private var requests
     @Binding var selection: UUID?
 
     private var folder: URL? { model.selectedProject }
@@ -48,14 +47,6 @@ struct ProjectAgentsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(summary?.name ?? "Project")
-        .toolbar {
-            ToolbarItem {
-                Button { requests.projectSettings = .general } label: {
-                    Label("Project Settings", systemImage: "slider.horizontal.3")
-                }
-                .help("Project Settings (⌥⌘,)")
-            }
-        }
         .onAppear { adopt(folder) }
         .onChange(of: folder) { _, folder in
             adopt(folder)
