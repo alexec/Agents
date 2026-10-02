@@ -113,7 +113,7 @@ struct MarkdownText: View {
                     Text(language).appText(.fine).foregroundStyle(.tertiary)
                 }
                 // Code keeps its own shape, so it scrolls rather than wraps.
-                ScrollView(.horizontal, showsIndicators: false) {
+                Sideways {
                     // Coloured by its tag, in the same inks as files and diffs (041 US4).
                     CodeBlockText(text: text, language: CodeLanguage.fence(tag: language),
                                   caret: caret)
@@ -130,7 +130,7 @@ struct MarkdownText: View {
         case .table(let table):
             // Columns keep their width, so a wide table scrolls rather than
             // squeezing its text into a stack of single words.
-            trailed(ScrollView(.horizontal, showsIndicators: false) {
+            trailed(Sideways {
                 Grid(alignment: .topLeading, horizontalSpacing: 18, verticalSpacing: 6) {
                     GridRow {
                         ForEach(Array(table.header.enumerated()), id: \.offset) { index, cell in
@@ -224,6 +224,23 @@ struct MarkdownText: View {
         case .leading: return .leading
         case .centre: return .center
         case .trailing: return .trailing
+        }
+    }
+}
+
+/// Content that scrolls sideways when it is wider than the column, and is simply drawn
+/// when it is not (#90).
+///
+/// The same to look at either way: a scroll view takes the whole width offered, so the
+/// narrow case is held to it too. Most code and tables an agent writes fit, and a
+/// scroll view each was a platform view every redraw of the chat had to visit.
+private struct Sideways<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            content.frame(maxWidth: .infinity, alignment: .leading)
+            ScrollView(.horizontal, showsIndicators: false) { content }
         }
     }
 }
