@@ -160,7 +160,7 @@ struct LatencyLiveTests {
     }
 
     @Test func throughEveryPath() async throws {
-        var results: [Result] = []
+        var results: [Result] = []  // index-ok: the first two paths each add one, or throw
 
         // Today: the window on daemon.sock.
         do {
@@ -190,7 +190,7 @@ struct LatencyLiveTests {
         // Two copies over one store: the host at A, the window at B.
         do {
             let store = MemoryStore()
-            var copies: [(ControlService, URL)] = []
+            var copies: [(ControlService, URL)] = []  // index-ok: the loop adds two, or throws
             for _ in 0..<2 {
                 let port = try await freePort()
                 let url = URL(string: "http://127.0.0.1:\(port)")!
