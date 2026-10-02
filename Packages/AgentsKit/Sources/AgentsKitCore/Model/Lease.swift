@@ -69,6 +69,106 @@ public enum ResourceKind: String, Codable, Hashable, Sendable, CaseIterable {
     case named
 }
 
+/// A resource the person declared ahead of time, with what it is for (#116).
+///
+/// Kept by each host, beside its book: a lease is a turn with something on one
+/// machine, and "build" on this Mac and "build" on a Linux server are two machines'
+/// worth of compiling. It exists whether or not anyone holds it, so `list_resources`
+/// and the Resources page can say it, with its description, while it is free.
+public struct DeclaredResource: Codable, Hashable, Sendable, Identifiable {
+    public var name: ResourceName
+    /// As the person typed it: "build", "Staging DB".
+    public var displayName: String
+    /// What it is for and when to take it. Agents read this, and are told to lease the
+    /// resource whenever it applies.
+    public var description: String
+    /// How many agents may hold it at once. One is a lock; more is a counted line.
+    public var holders: Int
+    /// What a lease lasts when the agent does not say. Nil is `LeaseLimits.defaultMinutes`.
+    public var defaultMinutes: Int?
+    /// The longest one may run. Nil is `LeaseLimits.maximumMinutes`, which no
+    /// declaration can go past.
+    public var maximumMinutes: Int?
+
+    public var id: ResourceName { name }
+
+    public init(name: ResourceName, displayName: String? = nil, description: String, holders: Int = 1,
+                defaultMinutes: Int? = nil, maximumMinutes: Int? = nil) {
+        self.name = name
+        self.displayName = displayName ?? name.key
+        self.description = description
+        self.holders = holders
+        self.defaultMinutes = defaultMinutes
+        self.maximumMinutes = maximumMinutes
+    }
+
+    /// The rules a lease on it runs by.
+    public var rules: LeaseRules {
+        LeaseRules(holders: holders, defaultMinutes: defaultMinutes, maximumMinutes: maximumMinutes)
+    }
+
+    /// The most holders one declaration may allow. A counted line of more than this
+    /// is not taking turns any more.
+    public static let mostHolders = 20
+
+    /// Why it cannot be kept as it stands, in a sentence for the person; nil when it can.
+    public var problem: String? {
+        if displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Give it a name." }
+        if ResourceKind.isFoundName(name) {
+            return "\(displayName) is found on the Mac by itself; choose another name."
+        }
+        if description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Say what it is for, so agents know when to take it."
+        }
+        if !(1...Self.mostHolders).contains(holders) {
+            return "Between 1 and \(Self.mostHolders) agents may hold it at once."
+        }
+        let ceiling = maximumMinutes ?? LeaseLimits.maximumMinutes
+        if !(1...LeaseLimits.maximumMinutes).contains(ceiling) {
+            return "The longest a lease can run is between 1 and \(LeaseLimits.maximumMinutes) minutes."
+        }
+        if let given = defaultMinutes, !(1...ceiling).contains(given) {
+            return "The usual length is between 1 minute and the longest, \(ceiling)."
+        }
+        return nil
+    }
+}
+
+/// How many may hold a resource at once, and how long a lease on it runs. Every
+/// resource has the standard ones unless the person declared it otherwise.
+public struct LeaseRules: Codable, Hashable, Sendable {
+    public var holders: Int
+    public var defaultMinutes: Int?
+    public var maximumMinutes: Int?
+
+    public init(holders: Int = 1, defaultMinutes: Int? = nil, maximumMinutes: Int? = nil) {
+        self.holders = max(1, holders)
+        self.defaultMinutes = defaultMinutes
+        self.maximumMinutes = maximumMinutes
+    }
+
+    public static let standard = LeaseRules()
+
+    /// The longest a lease may run, in minutes: the declaration's, never past the app's.
+    public var ceiling: Int { min(maximumMinutes ?? LeaseLimits.maximumMinutes, LeaseLimits.maximumMinutes) }
+
+    /// The length asked for, in seconds, and whether it had to be cut to the longest
+    /// allowed. Nothing shorter than a minute.
+    public func length(_ minutes: Int?) -> (TimeInterval, capped: Bool) {
+        let asked = max(1, minutes ?? min(defaultMinutes ?? LeaseLimits.defaultMinutes, ceiling))
+        let given = min(asked, ceiling)
+        return (TimeInterval(given * 60), asked > given)
+    }
+}
+
+extension ResourceKind {
+    /// Whether a name is one the Mac finds by itself — the screen, a simulator or a
+    /// browser — and so cannot be declared.
+    public static func isFoundName(_ name: ResourceName) -> Bool {
+        name == .screen || name.key.hasPrefix("simulator:") || name.key.hasPrefix("browser:")
+    }
+}
+
 /// One agent's right to one resource, until a time.
 ///
 /// Only an agent ever holds one. The person can end a lease and take an agent out of

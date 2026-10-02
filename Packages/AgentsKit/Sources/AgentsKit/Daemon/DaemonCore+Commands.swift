@@ -1138,8 +1138,11 @@ extension DaemonCore {
             // An agent another agent started hears nothing about starting agents: it
             // was not given the tools (028).
             let managesAgents = agents[agentID]?.startedByAgent == nil
-            outgoing.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID),
-                                                managesAgents: managesAgents)))
+            // With what the person declared on this machine, and what each is for (#116).
+            loadDeclaredIfNeeded()
+            let briefing = [Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID), managesAgents: managesAgents),
+                            LeaseWords.declaredBriefing(declaredResources)].compactMap { $0 }
+            outgoing.append(.text(briefing.joined(separator: "\n\n")))
         }
         // What the person changed on a live page since this agent last took a turn
         // (022 FR-016). Told once, here, after their words and in the briefing's

@@ -252,6 +252,79 @@ struct LeaseTests {
                 "answered in its call, not started again")
     }
 
+    // MARK: #116: declared, counted resources
+
+    private static let buildDescription = "Lease before any xcodebuild, swift build, swift test, "
+        + "scripts/web.sh build or ship.sh; release as soon as it ends. This Mac can take one build at a time."
+
+    @Test func aDeclaredResourceIsListedFreeWithItsDescription() async throws {
+        let (locations, work) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let build = ResourceName("build")!
+        let snapshot = try await core.declareResource(.init(resource: DeclaredResource(
+            name: build, description: Self.buildDescription)))
+        #expect(snapshot.resources.first?.declared?.description == Self.buildDescription)
+        #expect(snapshot.resources.first?.holds.isEmpty == true)
+
+        let (_, token) = try await agent(core, in: work, "Lister")
+        let listed = try await list(core, token)
+        #expect(listed.contains("Declared by the person. Lease one whenever its description applies"))
+        #expect(listed.contains("- build (one at a time): \(Self.buildDescription) \u{2014} free."))
+        #expect(!listed.contains("named by an agent"))
+
+        // Kept by the host across a restart.
+        let again = try await makeCore(locations, clock: Clock())
+        #expect(await again.leaseSnapshot().resources.first?.declared?.name == build)
+
+        let removed = try await again.removeDeclaredResource(.init(name: "build"))
+        #expect(removed.resources.allSatisfy { $0.declared == nil })
+    }
+
+    @Test func aBadDeclarationIsRefusedInWords() async throws {
+        let (locations, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let error = await refusal {
+            _ = try await core.declareResource(.init(resource: DeclaredResource(name: .screen, description: "x")))
+        }
+        #expect(error?.message.contains("found on the Mac") == true)
+    }
+
+    @Test func twoHoldACountedResourceTheThirdWaitsAndOneReleaseLetsItIn() async throws {
+        let (locations, work) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let build = ResourceName("build")!
+        _ = try await core.declareResource(.init(resource: DeclaredResource(
+            name: build, description: "Two builds at once.", holders: 2)))
+        let (a, first) = try await agent(core, in: work, "First")
+        let (b, second) = try await agent(core, in: work, "Second")
+        let (c, third) = try await agent(core, in: work, "Third")
+
+        #expect(try await lease(core, first, "build").hasPrefix("You hold build until "))
+        #expect(try await lease(core, second, "build").hasPrefix("You hold build until "))
+        let refused = try await lease(core, third, "build", wait: false)
+        #expect(refused.hasPrefix("All 2 places on build are held: by \u{201C}First\u{201D} until "))
+        #expect(refused.hasSuffix("You are not in line."))
+
+        let waiting = Task { try await lease(core, third, "build", minutes: 10) }
+        try await eventually("c in line") { await line(core, build) == [c] }
+        let state = await core.buildLeaseSnapshot().resources.first { $0.name == build }
+        #expect(state?.heldCount == "2 of 2 held")
+        #expect(state?.holds.map(\.holder) == [a, b])
+        let listed = try await list(core, first)
+        #expect(listed.contains("2 of 2 held: by you until "))
+        #expect(listed.contains("; 1 waiting."))
+
+        let released = try await release(core, second, "build")
+        #expect(released == "Released build. It has gone to \u{201C}Third\u{201D}.")
+        let answer = try await waiting.value
+        #expect(answer.hasPrefix("build is yours now, until "))
+        #expect(await core.leaseBook.entry(build)?.leases.map(\.holder) == [a, c])
+
+        // The person ends one holder's lease and leaves the other's.
+        _ = try await core.endLease(.init(name: "build", agentID: c.uuidString))
+        #expect(await core.leaseBook.entry(build)?.leases.map(\.holder) == [a])
+    }
+
     @Test func aCallThatWaitsTooLongKeepsItsPlaceAndTheAgentIsStartedWhenItComes() async throws {
         let (locations, work) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), waitLimit: .milliseconds(200))

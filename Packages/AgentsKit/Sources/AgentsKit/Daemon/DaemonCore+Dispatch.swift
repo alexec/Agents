@@ -659,6 +659,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.PersonRemoveRequest.self)
                 return .success(try JSONValue.encoding(try await removeWaiter(request)))
 
+            case DaemonAPI.Method.resourcesDeclare:
+                let request = try require(params, as: DaemonAPI.DeclareResourceRequest.self)
+                return .success(try JSONValue.encoding(try await declareResource(request)))
+
+            case DaemonAPI.Method.resourcesRemove:
+                let request = try require(params, as: DaemonAPI.RemoveResourceRequest.self)
+                return .success(try JSONValue.encoding(try await removeDeclaredResource(request)))
+
             case DaemonAPI.Method.agentsStartHelper:
                 let request = try require(params, as: DaemonAPI.StartHelperRequest.self)
                 let started = try await startHelper(request)

@@ -182,6 +182,9 @@ public struct StoreLocations: Sendable {
     /// Every resource lease on the Mac and every line waiting for one (036). One file
     /// for the root, like the limits: a lease is the Mac's, not a project's.
     public var leases: URL { root.appendingPathComponent("leases.json") }
+    /// The resources the person declared, with what each is for (#116). The host's,
+    /// beside its leases: how many builds a machine can take is that machine's.
+    public var declaredResources: URL { root.appendingPathComponent("resources.json") }
     /// What happened (042): one event, consequence or repeat per line, appended, and
     /// rewritten only when the oldest are dropped.
     public var events: URL { root.appendingPathComponent("events.jsonl") }

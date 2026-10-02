@@ -230,6 +230,10 @@ public actor DaemonCore {
 
     /// Where the lease book is kept between runs.
     lazy var leaseStore = LeaseStore(locations: locations)
+    lazy var declaredResourceStore = DeclaredResourceStore(locations: locations)
+    /// What the person declared (#116), read with the book.
+    var declaredResources: [DeclaredResource] = []
+    var declaredResourcesAreLoaded = false
     /// Every lease on the Mac and everyone waiting. Read from disk on first use, and
     /// written back after every change, so a restart finds it as it was (FR-008).
     var leaseBook = LeaseBook()
