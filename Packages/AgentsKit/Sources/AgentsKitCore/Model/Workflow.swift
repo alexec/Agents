@@ -237,6 +237,13 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         return false
     }
 
+    /// What a page says about a workflow turned off (#100), on the Mac and the phone
+    /// alike: that nothing fires it, that it still holds its place under the ceiling,
+    /// and that Run now still works, the three things that set it apart from archived.
+    public static let turnedOffSentence = "Turned off — none of its triggers run it. "
+        + "It keeps its place among this project's \(WorkflowLimit.project.allowed) workflows, "
+        + "and Run now still runs it"
+
     /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome
     /// this version does not know (a refusal added later) costs the outcome rather than
     /// the whole project's list.

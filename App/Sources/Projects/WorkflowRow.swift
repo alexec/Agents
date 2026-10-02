@@ -251,6 +251,7 @@ struct WorkflowStatusIcon: View {
     private var name: String {
         if summary.isArchived { return "archivebox" }
         if summary.awaitingApproval != nil { return "hand.raised" }
+        if !summary.isEnabled { return "pause.circle" }
         if summary.needsAPerson { return "exclamationmark.triangle" }
         if summary.isRunning { return "circle.dotted" }
         if !summary.workflow.canFire { return "circle.dashed" }
@@ -260,6 +261,7 @@ struct WorkflowStatusIcon: View {
     private var label: String {
         if summary.isArchived { return "Archived" }
         if summary.awaitingApproval != nil { return "Waiting for your OK" }
+        if !summary.isEnabled { return "Turned off" }
         if summary.overLimit != nil { return "Over the limit" }
         if summary.needsAPerson { return "Needs attention" }
         if summary.isRunning { return "Running" }

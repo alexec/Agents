@@ -1521,6 +1521,18 @@ final class RemoteModel {
         }
     }
 
+    /// Turn one on or off, keeping its place on the list (#100).
+    func setWorkflowEnabled(_ summary: WorkflowSummary, _ enabled: Bool) async {
+        do {
+            try await client.call(DaemonAPI.Method.workflowsEnable,
+                                  DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
+                                                                  workflowID: summary.workflowID,
+                                                                  enabled: enabled))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Change what a workflow is allowed to do. The Mac's daemon writes the file and
     /// answers with what it now says; a refusal has to reach the person, and the list
     /// is asked again so the menu goes back to what the file still holds (FR-025).

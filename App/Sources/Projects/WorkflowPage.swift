@@ -164,6 +164,17 @@ struct WorkflowPage: View {
                     .buttonStyle(.paperProminent)
                     .disabled(summary.isRunning)
                 }
+                // Beside Run now, which still works with it off (#100): off stops the
+                // triggers, not the person.
+                Toggle("Enabled", isOn: Binding(
+                    get: { summary.isEnabled },
+                    set: { on in Task { await model.setWorkflowEnabled(summary, on) } }))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .appText(.fine)
+                    .help(summary.isEnabled
+                          ? "Turn this workflow off: its triggers stop, and it stays on the list"
+                          : "Turn this workflow back on")
                 // One click, and back to the project: the same thing the archive
                 // button on a chat does, so putting a thing away is one gesture
                 // wherever it is.
@@ -573,6 +584,8 @@ struct WorkflowPage: View {
             parts.append((waiting.isNew ? "New" : "Changed since you approved it")
                          + " — read it below, then Approve to let it run")
             return parts.joined()
+        } else if !summary.isEnabled {
+            parts.append(WorkflowSummary.turnedOffSentence)
         } else if let limit = summary.overLimit {
             parts.append("\(limit.sentence). \(limit.remedy)")
         } else if let next = summary.nextFireAt {

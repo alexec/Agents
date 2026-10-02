@@ -683,6 +683,14 @@ final class AppModel {
                                                                 archived: archived))
     }
 
+    /// Turn one on or off, keeping its place on the list (#100).
+    func setWorkflowEnabled(_ summary: WorkflowSummary, _ enabled: Bool) async {
+        _ = try? await client.call(DaemonAPI.Method.workflowsEnable,
+                                   DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
+                                                                   workflowID: summary.workflowID,
+                                                                   enabled: enabled))
+    }
+
     /// A project's plugins, asked for when its page opens; kept current after that by
     /// `plugins/changed`.
     func plugins(in folder: URL?) -> [ProjectPlugin] { work.plugins(in: folder) }
