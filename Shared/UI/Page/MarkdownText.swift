@@ -11,7 +11,7 @@ import SwiftUI
 /// been told a paragraph must not be cut off at a narrow width. This is both.
 ///
 /// Inline marks arrive as attributes on the text, from the same parse that found the
-/// blocks. Nothing here parses anything.
+/// blocks. Nothing here parses anything: the reading is remembered by its text.
 extension EnvironmentValues {
     /// Whether text takes the width it is offered or only the width it needs. The
     /// person's own message hugs its words, at the right of the chat.
@@ -39,7 +39,8 @@ struct MarkdownText: View {
     }
 
     private var content: AnyView {
-        let parsed = MarkdownBlock.parse(markdown)
+        // Read once per text, not once per redraw (#90).
+        let parsed = MarkdownBlock.parsed(markdown)
         // A passage whose first characters have not arrived yet — nothing, or a `#` that
         // is not a heading until its text follows — is still somewhere the caret is.
         if parsed.isEmpty, let caret { return AnyView(caret.caret) }

@@ -96,6 +96,17 @@ public enum MarkdownBlock: Hashable, Sendable {
         return build(pieces[...], depth: 0)
     }
 
+    /// The blocks of `markdown`, read once and then remembered (#90).
+    ///
+    /// What a view should call. A view's body runs on every redraw, and in the chat
+    /// that is several times a second while a reply streams: reading the whole message
+    /// again each time was a tenth of the cost of opening a chat. The text is the key,
+    /// so a message is read again only when its words change, and two copies of the
+    /// same words share one reading.
+    public static func parsed(_ markdown: String) -> [MarkdownBlock] {
+        MarkdownCache.shared.blocks(for: markdown)
+    }
+
     /// The inline marks worth carrying, and nothing else.
     ///
     /// A whitelist rather than a few deletions, because the parser leaves working notes
@@ -349,5 +360,39 @@ private extension Array where Element == AttributedString {
         if self.count > count { return Array(prefix(count)) }
         return self + Array(repeating: AttributedString(), count: count - self.count)
     }
+}
+
+/// Readings of markdown, by their text (#90).
+///
+/// Bounded by characters as well as by count: a streamed reply leaves one reading per
+/// chunk behind it, and the oldest go first. Safe from any thread, which is `NSCache`'s.
+public final class MarkdownCache: @unchecked Sendable {
+    public static let shared = MarkdownCache()
+
+    private final class Reading {
+        let blocks: [MarkdownBlock]
+        init(_ blocks: [MarkdownBlock]) { self.blocks = blocks }
+    }
+
+    private let readings = NSCache<NSString, Reading>()
+    private let lock = NSLock()
+    private var reads = 0
+
+    public init(countLimit: Int = 2_000, characterLimit: Int = 8_000_000) {
+        readings.countLimit = countLimit
+        readings.totalCostLimit = characterLimit
+    }
+
+    public func blocks(for markdown: String) -> [MarkdownBlock] {
+        let key = markdown as NSString
+        if let reading = readings.object(forKey: key) { return reading.blocks }
+        let blocks = MarkdownBlock.parse(markdown)
+        readings.setObject(Reading(blocks), forKey: key, cost: key.length)
+        lock.withLock { reads += 1 }
+        return blocks
+    }
+
+    /// How many times the text was actually read, for tests.
+    public var readCount: Int { lock.withLock { reads } }
 }
 #endif

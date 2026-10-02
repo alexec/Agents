@@ -16,6 +16,18 @@ struct MarkdownBlockTests {
         #expect(MarkdownBlock.parse("Just a line.") == [.paragraph("Just a line.")])
     }
 
+    @Test func aReadingIsRememberedByItsText() {
+        let cache = MarkdownCache()
+        let text = "# Title\n\nSome *words* and a list:\n\n- one\n- two"
+        let first = cache.blocks(for: text)
+        #expect(first == MarkdownBlock.parse(text))
+        #expect(cache.blocks(for: text) == first)
+        #expect(cache.readCount == 1)
+        // A streamed reply grows, and the longer text is read once more.
+        #expect(cache.blocks(for: text + "\n- three").count == 3)
+        #expect(cache.readCount == 2)
+    }
+
     @Test func blankLinesSeparateParagraphs() {
         let blocks = MarkdownBlock.parse("First.\n\nSecond.")
         #expect(blocks == [.paragraph("First."), .paragraph("Second.")])
