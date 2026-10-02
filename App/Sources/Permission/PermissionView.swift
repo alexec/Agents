@@ -53,9 +53,9 @@ struct PermissionView: View {
                             .keyboardShortcut(.defaultAction)
                             .opacity(0)
                             .accessibilityHidden(true)
+                            .disabled(chosen != nil)
                     }
                 }
-                .disabled(chosen != nil)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -131,10 +131,12 @@ struct PermissionView: View {
             Button { answer(option) } label: { label(option) }
                 .buttonStyle(.paperProminent)
                 .modifier(NumberShortcut(index: index))
+                .modifier(Held(chosen: chosen, option: option))
         } else {
             Button { answer(option) } label: { label(option) }
                 .buttonStyle(.paper)
                 .modifier(NumberShortcut(index: index))
+                .modifier(Held(chosen: chosen, option: option))
         }
     }
 
@@ -157,6 +159,19 @@ struct PermissionView: View {
             // withdrawing the question, which takes this card away.
             if !(await model.answer(request, optionID: option.optionID)) { chosen = nil }
         }
+    }
+}
+
+/// While an answer is on its way: the others greyed, and the one sent left as it was
+/// drawn, so its pending mark reads, but taking no more clicks.
+private struct Held: ViewModifier {
+    let chosen: PermissionOption?
+    let option: PermissionOption
+
+    func body(content: Content) -> some View {
+        content
+            .disabled(chosen != nil && chosen?.id != option.id)
+            .allowsHitTesting(chosen == nil)
     }
 }
 
