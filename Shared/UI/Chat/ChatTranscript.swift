@@ -120,6 +120,7 @@ struct ChatTranscript: View {
                                  isLive: turn.id == liveID,
                                  toggle: { toggle(turn) },
                                  fetch: { await fetch(turn) })
+                            .equatable()
                             .id(turn.id)
                     }
                     .environment(\.backgroundWork, agent.background)
