@@ -331,10 +331,16 @@ def runtime_tests(tree):
 
 def failure_lines(out, names):
     """What the output says about these failed tests, and nothing about the rest."""
-    lines = [line for line in out.splitlines()
-             if any(name in line for name in names) and re.search(r"✘|error:|failed", line)]
-    detail = [line for line in out.splitlines() if line.startswith("↳")]
-    return "\n".join(lines[:40] + detail[:40]) if lines else tail(out)
+    lines, ours = [], False
+    for line in out.splitlines():
+        if line.startswith("↳"):
+            if ours:
+                lines.append(line)
+            continue
+        ours = any(name in line for name in names) and bool(re.search(r"✘|error:|failed", line))
+        if ours:
+            lines.append(line)
+    return "\n".join(lines[:120]) if lines else tail(out)
 
 
 def build(args):
