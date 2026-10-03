@@ -41,6 +41,10 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// Whether anybody has moved the switch (#42). Until then a file saying
     /// `enabled: false` keeps it off; after, `isDisabled` alone decides.
     public var enabledChosen: Bool
+    /// Set off when an agent created it through `manage_workflows` (#124), so the
+    /// person turns it on knowingly; cleared once anybody moves the switch. Only the
+    /// reason the page gives: `isDisabled` is what keeps it off.
+    public var writtenOffByAgent: Bool
     /// The agent a `standing` workflow keeps. Adopted on its first fire, and replaced
     /// when the one it had is gone.
     public var standingAgentID: UUID?
@@ -69,6 +73,14 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         return state?.isDisabled == true || workflow.enabled == false
     }
 
+    /// Why it is off, for its page (#124), or `nil` while it is on.
+    public static func offReason(_ workflow: Workflow, _ state: WorkflowState?) -> WorkflowOffReason? {
+        guard isOff(workflow, state) else { return nil }
+        if state?.writtenOffByAgent == true { return .writtenByAgent }
+        if state?.enabledChosen != true, workflow.enabled == false { return .file }
+        return state?.disabledByAgent == true ? .agent : .person
+    }
+
     /// Read leniently, because a file written before archiving existed has no such key
     /// and losing every pause to a new field would be a poor trade.
     public init(from decoder: any Decoder) throws {
@@ -79,6 +91,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         isDisabled = try c.decodeIfPresent(Bool.self, forKey: .isDisabled) ?? false
         disabledByAgent = try c.decodeIfPresent(Bool.self, forKey: .disabledByAgent) ?? false
         enabledChosen = try c.decodeIfPresent(Bool.self, forKey: .enabledChosen) ?? false
+        writtenOffByAgent = try c.decodeIfPresent(Bool.self, forKey: .writtenOffByAgent) ?? false
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
         lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
@@ -100,6 +113,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         self.isDisabled = false
         self.disabledByAgent = false
         self.enabledChosen = false
+        self.writtenOffByAgent = false
         self.standingAgentID = standingAgentID
         self.lastFiredAt = lastFiredAt
         self.lastOutcome = lastOutcome

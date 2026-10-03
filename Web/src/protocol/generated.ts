@@ -1485,6 +1485,8 @@ export type WorkflowLimit = "project" | "total";
 
 export type WorkflowMode = "new" | "standing" | "triggering";
 
+export type WorkflowOffReason = "file" | "writtenByAgent" | "agent" | "person";
+
 export type WorkflowOutcome =
   | { ran: { agentID: UUID; at: WireDate } }
   | { refused: { _0: WorkflowRefusal; at: WireDate; repeats: number } };
@@ -1554,6 +1556,7 @@ export interface WorkflowSummary {
   lastFiredBy?: WorkflowCause;
   cooldownEndsAt?: WireDate;
   holdsAFire: boolean;
+  offReason?: WorkflowOffReason;
 }
 
 export type WorkflowTrigger = WorkflowTriggerStored;
@@ -1926,7 +1929,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy", "cooldownEndsAt"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },

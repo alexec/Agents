@@ -1089,13 +1089,17 @@ public actor AppService {
 
             Nothing here asks the person, but a workflow you write or change does not run \
             until they approve it on the project page; removing one takes effect at once. \
-            So write one only when they asked for it, and say in your reply what you set \
-            up and that it is waiting for their OK.
+            A new workflow you write also starts turned off, whatever its file says: \
+            after approving it, the person turns it on from its page when they are \
+            ready. Changing one that exists leaves it on or off as it was. So write one \
+            only when they asked for it, and say in your reply what you set up, that it \
+            is waiting for their OK, and that they turn it on once approved.
 
             `disable` turns a workflow off without touching its file: it stays listed, \
-            marked off, and none of its triggers run it; `list` says which are off. \
-            `enable` turns one back on, but only one an agent turned off: what the \
-            person turned off is theirs to turn back on.
+            marked off, and none of its triggers run it; `list` says which are off and \
+            why. `enable` turns one back on, but only one an agent turned off: one the \
+            person turned off, one an agent wrote and nobody has turned on yet, and one \
+            whose file says `enabled: false` are theirs to turn on.
 
             Under on:, besides schedule and today's hyphenated names (agent-finished and \
             the rest), any event name works, narrowed by its details written under it, \

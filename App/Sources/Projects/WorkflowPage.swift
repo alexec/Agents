@@ -764,9 +764,12 @@ struct WorkflowPage: View {
             // What waits on the person is the file, and it is on this page to be read.
             parts.append((waiting.isNew ? "New" : "Changed since you approved it")
                          + " — read it below, then Approve to let it run")
-            return parts.joined()
+            // Approving one that starts off does not start it (#124): say so now, not
+            // after they have approved it and wondered why nothing ran.
+            if let why = summary.offReason?.sentence { parts.append(why) }
+            return parts.joined(separator: " · ")
         } else if !summary.isEnabled {
-            parts.append(WorkflowSummary.turnedOffSentence)
+            parts.append(summary.turnedOffSentence)
         } else if let limit = summary.overLimit {
             parts.append("\(limit.sentence). \(limit.remedy)")
         } else if let next = summary.nextFireAt {

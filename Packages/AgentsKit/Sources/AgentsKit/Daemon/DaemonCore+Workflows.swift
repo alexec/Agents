@@ -228,7 +228,8 @@ extension DaemonCore {
             lastFiredBy: state?.lastFiredBy,
             nextFireAtByTrigger: runs ? workflow.triggers.map { $0.schedule?.nextDue(after: now) } : [],
             cooldownEndsAt: workflow.cooldownEnds(after: state?.lastFiredAt, now: now),
-            holdsAFire: state?.heldFire != nil)
+            holdsAFire: state?.heldFire != nil,
+            offReason: WorkflowState.offReason(workflow, state))
     }
 
     /// Whether a run of it is in flight.
@@ -995,6 +996,7 @@ extension DaemonCore {
             $0.isDisabled = !request.enabled
             $0.disabledByAgent = !request.enabled && byAgent
             $0.enabledChosen = true
+            $0.writtenOffByAgent = false
             // A held trigger was a trigger, and none run an off workflow.
             if !request.enabled { $0.heldFire = nil }
         }

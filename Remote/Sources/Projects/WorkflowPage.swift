@@ -444,7 +444,7 @@ struct WorkflowPage: View {
         } else if summary.isRunning {
             parts.append("Running now")
         } else if !summary.isEnabled {
-            parts.append(WorkflowSummary.turnedOffSentence)
+            parts.append(summary.turnedOffSentence)
         } else if let limit = summary.overLimit {
             parts.append("\(limit.sentence). \(limit.remedy)")
         } else if let next = summary.nextFireAt {
