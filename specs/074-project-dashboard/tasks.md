@@ -60,7 +60,7 @@ compaction, downsampling.
 - [X] T024 Briefing paragraph in `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/Briefing.swift`; `BriefingTests`
 - [X] T025 Docs: `docs/reference/agent-tools.md`, `docs/how-to/keep-a-project-dashboard.md`, `docs/reference/dashboard-tiles.md`, `docs/explanation/projects-hosts-worktrees.md`, `specs/071-web-remote/walks/parity.md`, `mkdocs.yml`
 - [X] T026 `scripts/perf-budgets.py` row for `dashboard/get`
-- [ ] T027 The walk (quickstart.md): agent posts a big number and a time series; Mac, web, Remote build; Remove holds until the next post; screenshots in `specs/074-project-dashboard/walks/`
+- [X] T027 The walk (quickstart.md): a Claude agent posted `open_bugs` 4 and `tests_passing` 1180 → 1191 → 1203 (a minute apart, three points) through set_tile; shown on the Mac and the web page; Remove from the web page held (dashboard/get without it) until the agent set it again, whose answer said who removed it and when; Remote builds for the generic simulator (its look is Alex's). Shots in `specs/074-project-dashboard/walks/`
 
 ## Dependencies
 
