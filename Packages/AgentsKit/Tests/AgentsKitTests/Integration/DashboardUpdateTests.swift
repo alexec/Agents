@@ -223,11 +223,11 @@ struct DashboardUpdateWordsTests {
         #expect(state.line(now: now.addingTimeInterval(60), calendar: calendar)?.hasSuffix("did not finish") == true)
     }
 
-    @Test func anOldRunIsDated() {
+    @Test func timesAre24HourAndAnOldRunIsDated() {
+        // 1_800_000_000 is 15 Jan 2027, 08:00 UTC.
         let state = DashboardUpdate(lastStartedAt: now)
-        let line = state.line(now: now.addingTimeInterval(3 * 86_400), calendar: calendar)
-        #expect(line?.hasPrefix("Last update ") == true)
-        #expect(line?.contains(";") == false, "no cooldown left to mention")
+        #expect(state.line(now: now.addingTimeInterval(60), calendar: calendar) == "Last update 08:00; again from 08:05")
+        #expect(state.line(now: now.addingTimeInterval(3 * 86_400), calendar: calendar) == "Last update 15 Jan 08:00")
     }
 
     @Test func aSnapshotFromAnOlderHostDecodesWithNoButton() throws {

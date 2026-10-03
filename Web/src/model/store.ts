@@ -728,6 +728,12 @@ export class Store extends Work {
     await this.loadDashboard(host, folder);
   }
 
+  /** Update now (#146): the dashboard workflow, or a one-off agent; a refusal is said. */
+  async updateDashboard(host: string, folder: string): Promise<void> {
+    await this.act("dashboard/update", { folder: folder as never }, host);
+    await this.loadDashboard(host, folder);
+  }
+
   /** Run now (US5). The session it starts arrives as any other does, by agent/changed. */
   async runWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
     const ran = await this.act("workflows/run", { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID }, host);

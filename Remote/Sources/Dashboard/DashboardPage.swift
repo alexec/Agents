@@ -59,6 +59,7 @@ struct DashboardPage: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
                 if let snapshot {
+                    if let update = snapshot.update { updateLine(update) }
                     let sections = DashboardModel.sections(snapshot)
                     if sections.isEmpty {
                         Text("No tiles yet. Agents keep tiles here with set_tile.")
@@ -92,6 +93,26 @@ struct DashboardPage: View {
         }
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let update = snapshot?.update, let folder {
+                ToolbarItem(placement: .primaryAction) {
+                    // Ticks so the cooldown's end turns the button back on.
+                    TimelineView(.periodic(from: .now, by: 15)) { context in
+                        Button {
+                            Task { await model.updateDashboard(folder) }
+                        } label: {
+                            if update.isRunning {
+                                ProgressView()
+                            } else {
+                                Label("Update now", systemImage: "arrow.clockwise")
+                            }
+                        }
+                        .disabled(!update.canPress(now: context.date))
+                        .accessibilityLabel(update.isRunning ? "Updating…" : "Update now")
+                    }
+                }
+            }
+        }
         .task(id: model.work.dashboardRevision(in: folder)) {
             if let folder { await model.refreshDashboard(folder) }
         }
@@ -106,6 +127,26 @@ struct DashboardPage: View {
                 .toolbar { Button("Done") { wholeTable = nil } }
             }
             .paperSheet()
+        }
+    }
+
+    /// Update now's line (#146): what is going, why it can't, how the last one went.
+    @ViewBuilder
+    private func updateLine(_ update: DashboardUpdate) -> some View {
+        if let line = update.line(now: .now) {
+            HStack(spacing: 6) {
+                if update.isRunning { ProgressView().controlSize(.small) }
+                Text(line)
+                    .foregroundStyle(update.lastFailed && !update.isRunning ? AnyShapeStyle(StateTint.failure.style(or: .secondary))
+                                                                             : AnyShapeStyle(.secondary))
+                if update.blocked != nil, let workflow = update.workflowID, let folder {
+                    Button("Open Workflow") { model.openWorkflow = Project.standardize(folder).path + "/" + workflow }
+                } else if let agent = update.agentID, update.isRunning || update.lastFailed {
+                    Button("Open Session") { model.selection = agent }
+                }
+            }
+            .appText(.fine)
+            .padding(.top, 4)
         }
     }
 

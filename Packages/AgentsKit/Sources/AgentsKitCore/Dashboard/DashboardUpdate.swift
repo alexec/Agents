@@ -62,19 +62,30 @@ public struct DashboardUpdate: Codable, Sendable, Hashable {
         if isRunning { return "\(name) is running" }
         if let blocked { return "Update now can't start: \(blocked)" }
         guard let lastStartedAt else { return nil }
-        let when = Self.time(lastStartedAt, now: now, calendar: calendar)
+        let when = Self.when(lastStartedAt, now: now, calendar: calendar)
         if lastFailed { return "The last update, \(when), did not finish" }
         if let ready = readyAt(now: now) {
-            return "Last update \(when); again from \(ready.formatted(date: .omitted, time: .shortened))"
+            return "Last update \(when); again from \(Self.clock(ready, calendar: calendar))"
         }
         return "Last update \(when)"
     }
 
-    /// "14:02" today, "2 Oct 14:02" before.
-    static func time(_ date: Date, now: Date, calendar: Calendar) -> String {
-        calendar.isDate(date, inSameDayAs: now)
-            ? date.formatted(date: .omitted, time: .shortened)
-            : date.formatted(.dateTime.day().month(.abbreviated).hour().minute())
+    /// "14:02" today, "2 Oct 14:02" before: 24-hour, as the rest of the app's times are.
+    static func when(_ date: Date, now: Date, calendar: Calendar) -> String {
+        guard !calendar.isDate(date, inSameDayAs: now) else { return clock(date, calendar: calendar) }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_GB")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date) + " " + clock(date, calendar: calendar)
+    }
+
+    static func clock(_ date: Date, calendar: Calendar) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 
     /// The one-off agent's prompt, for a project with no dashboard workflow (Alex, #146).

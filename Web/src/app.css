@@ -838,6 +838,10 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .dashboard-row .glyph { opacity: 0.6; }
 .dashboard-row .dot.failure { position: static; display: inline-block; background: var(--tint-failure); }
 .dashboard-page .column-head .show-hidden { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+/* Update now (#146), beside the title line's other control. */
+.dashboard-page .column-head .update-now { margin-left: 12px; white-space: nowrap; }
+.dashboard-page .update-line { margin-top: -6px; }
+.dashboard-page .update-line.failure { color: var(--tint-failure); margin-top: -6px; }
 .dashboard-page .dashboard-body { padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 6px; }
 .dashboard-page .dashboard-body > p { margin: 0 0 6px; }
 .dashboard-page .section-head { margin: 14px 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.65; }
@@ -859,7 +863,7 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .tile .number .delta.bad { color: var(--tint-failure); opacity: 1; }
 .tile .spark { display: block; width: 100%; height: 26px; margin-top: 6px; }
 .tile .spark polyline { stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; opacity: 0.55; }
-.tile .status { margin: 0; }
+.tile .tile-status { margin: 0; }
 .tile .light { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, currentColor 30%, transparent); }
 .tile .light.ok { background: var(--tint-vouched); }
 .tile .light.warn { background: var(--tint-attention); }

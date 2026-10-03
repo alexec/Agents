@@ -1572,6 +1572,17 @@ final class RemoteModel {
         await refreshDashboard(folder)
     }
 
+    /// Update now (#146): the Mac runs the dashboard workflow, or a one-off agent, and
+    /// says why when it won't.
+    func updateDashboard(_ folder: URL) async {
+        do {
+            try await client.call(DaemonAPI.Method.dashboardUpdate, DaemonAPI.DashboardRequest(folder: folder))
+        } catch {
+            problem = sentence(for: error)
+        }
+        await refreshDashboard(folder)
+    }
+
     /// A tile's keeper: its conversation, or its workflow's page (FR-030).
     func openKeeper(_ keeper: KeeperView, folder: URL) {
         switch keeper.kind {

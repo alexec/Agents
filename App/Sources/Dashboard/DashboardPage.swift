@@ -49,12 +49,21 @@ struct DashboardPage: View {
     }
 
     private func heading(_ snapshot: DashboardSnapshot?) -> some View {
+        // Ticks so the cooldown's end re-enables the button without a change from the host.
+        TimelineView(.periodic(from: .now, by: 15)) { context in
+            headingRow(snapshot, now: context.date)
+        }
+    }
+
+    private func headingRow(_ snapshot: DashboardSnapshot?, now: Date) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Dashboard").appText(.title).fontWeight(.semibold)
                 Text(subtitle(snapshot)).appText(.supporting).foregroundStyle(.secondary)
+                if let update = snapshot?.update { updateLine(update, now: now) }
             }
             Spacer(minLength: 0)
+            if let update = snapshot?.update { updateButton(update, now: now) }
             Menu {
                 Toggle("Show Hidden Tiles", isOn: $showsHidden)
             } label: {
@@ -64,6 +73,46 @@ struct DashboardPage: View {
             .fixedSize()
             .help("Show Hidden Tiles")
             .accessibilityLabel("Dashboard options")
+        }
+    }
+
+    /// Update now (#146): Updating… while a run is going, off while it can't start.
+    private func updateButton(_ update: DashboardUpdate, now: Date) -> some View {
+        Button {
+            Task { await model.updateDashboard(folder) }
+        } label: {
+            if update.isRunning {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Updating…")
+                }
+            } else {
+                Label("Update now", systemImage: "arrow.clockwise")
+            }
+        }
+        .disabled(!update.canPress(now: now))
+        .help(update.workflowID == nil
+              ? "Start an agent to set every tile again from its source"
+              : "Run \u{201C}\(update.name)\u{201D} now, as Run now would")
+    }
+
+    /// What is going, why it can't, or how the last one went, with the way to its session.
+    @ViewBuilder
+    private func updateLine(_ update: DashboardUpdate, now: Date) -> some View {
+        if let line = update.line(now: now) {
+            HStack(spacing: 6) {
+                Text(line)
+                    .foregroundStyle(update.lastFailed && !update.isRunning ? AnyShapeStyle(StateTint.failure.style(or: .secondary))
+                                                                             : AnyShapeStyle(.secondary))
+                if update.blocked != nil, let workflow = update.workflowID {
+                    Button("Open Workflow") { model.showWorkflow(folder: folder, workflowID: workflow) }
+                        .buttonStyle(.link)
+                } else if let agent = update.agentID, update.isRunning || update.lastFailed {
+                    Button("Open Session") { model.openAgent(agent) }
+                        .buttonStyle(.link)
+                }
+            }
+            .appText(.fine)
         }
     }
 
