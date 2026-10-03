@@ -116,8 +116,42 @@ public enum RuntimeCatalog {
         installPage: URL(string: "https://opencode.ai/docs/")!,
         usesAppCopyOnly: true)
 
-    /// `builtIn[0]` is the default runtime, so a new one is appended.
-    public static var builtIn: [Runtime] { [claude, grok, copilot, cursor, codex, gemini, antigravity, opencode] + extra }
+    /// Every runtime, alphabetical by the name shown (#154), so every list of them, on
+    /// the Mac, the Remote, the web page and in the daemon's replies, reads the same way.
+    /// The default is `defaultRuntime`, not whichever comes first.
+    public static var builtIn: [Runtime] { sortedByName([claude, grok, copilot, cursor, codex, gemini, antigravity, opencode] + extra) }
+
+    /// The runtime an agent or workflow gets when it names none.
+    public static var defaultRuntime: Runtime { claude }
+
+    /// Runtimes or anything standing for one, alphabetical by the name shown: compared
+    /// case-insensitively and as the person's language would (#154), with the id breaking
+    /// a tie so the order is fixed. Within a runtime, models and modes keep their order.
+    public static func sortedByName<T>(_ items: [T], name: (T) -> String, id: (T) -> String) -> [T] {
+        items.sorted { a, b in
+            switch name(a).localizedStandardCompare(name(b)) {
+            case .orderedAscending: true
+            case .orderedDescending: false
+            case .orderedSame: id(a) < id(b)
+            }
+        }
+    }
+
+    public static func sortedByName(_ runtimes: [Runtime]) -> [Runtime] {
+        sortedByName(runtimes, name: \.name, id: \.id)
+    }
+
+    /// A daemon's runtime list, put in this order on arrival: a server on an older build
+    /// still answers in its catalog's order.
+    public static func sortedByName(_ statuses: [RuntimeStatus]) -> [RuntimeStatus] {
+        sortedByName(statuses, name: \.runtime.name, id: \.id)
+    }
+
+    /// Runtime ids in the order their names sort; an id the catalog does not know sorts by
+    /// itself.
+    public static func sortedByName(ids: [String]) -> [String] {
+        sortedByName(ids, name: { runtime(id: $0)?.name ?? $0 }, id: { $0 })
+    }
 
     /// Runtimes a host adds for itself at start-up, before anything reads the catalog: the
     /// demo runtime of a review control plane (058, T092). Empty everywhere else.

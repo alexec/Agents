@@ -11,6 +11,7 @@ import type { Attachment, ConfigOption, JSONValue, StartRequest, UUID, WorktreeS
 import type { Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn, choices, same } from "../model/options";
 import { folderKey } from "../model/groups";
+import { firstChoice } from "../model/runtimes";
 import { go } from "../route";
 import { LabelField } from "./Labels";
 import { Reach } from "./Reach";
@@ -42,11 +43,12 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   store: Store; host: string; folder: string; projectName: string; down: boolean;
 }) {
   const runtimes = (store.runtimes.value[host] ?? []).filter((r) => "available" in r.availability);
-  // Whatever the last session here used, if it can still start; else the first that can (029).
+  // Whatever the last session here used, if it can still start; else the default, or the
+  // first that can (029). The list is alphabetical (#154), so its first is not the default.
   const recent = (store.agents.value[host] ?? []).filter((a) => runtimes.some((r) => r.runtime.id === a.runtimeID))
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0]?.runtimeID;
   const runtimeID = useSignal<string | undefined>(undefined);
-  const chosenRuntime = runtimeID.value ?? recent ?? runtimes[0]?.runtime.id;
+  const chosenRuntime = runtimeID.value ?? recent ?? firstChoice(runtimes);
   const where = useSignal<Where>({ kind: "project" });
   const worktrees = useSignal<WorktreeSummary[]>([]);
   const canMakeNew = useSignal(false);

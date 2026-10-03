@@ -597,7 +597,7 @@ extension DaemonCore {
     /// From the daemon's memory, and said to be: nothing is started to ask, and a
     /// runtime can change its menu. The fire is still what checks.
     private func offeredSettings(for workflow: Workflow) -> String? {
-        let runtimeID = workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+        let runtimeID = workflow.settings.runtimeID ?? RuntimeCatalog.defaultRuntime.id
         let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
         let advertised = rememberedOptions(DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID,
                                                                               cwd: workflow.folder))
@@ -631,7 +631,7 @@ extension DaemonCore {
     /// them is still there to fix them. Not a refusal: the memory can be stale, and the
     /// fire is what decides.
     private func unofferedWarning(for workflow: Workflow) -> String? {
-        let runtimeID = workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+        let runtimeID = workflow.settings.runtimeID ?? RuntimeCatalog.defaultRuntime.id
         guard !workflow.settings.isEmpty, RuntimeCatalog.runtime(id: runtimeID) != nil else { return nil }
         let advertised = rememberedOptions(DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID,
                                                                               cwd: workflow.folder))

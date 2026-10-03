@@ -469,6 +469,6 @@ public enum ToolPolicyCatalog {
         ])),
         preferredAuthMethods: ["opencode-login"])
 
-    /// In the same order as `RuntimeCatalog.builtIn`, so the two read side by side.
+    /// In the order `RuntimeCatalog` declares its runtimes, so the two read side by side.
     public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini, antigravity, opencode]
 }

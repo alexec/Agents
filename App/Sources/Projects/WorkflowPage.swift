@@ -506,7 +506,7 @@ struct WorkflowPage: View {
 
     /// The runtime the file names, or the one a workflow runs on when it names none.
     private func runtimeID(_ workflow: Workflow) -> String {
-        workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+        workflow.settings.runtimeID ?? RuntimeCatalog.defaultRuntime.id
     }
 
     /// The runtime, from the catalog rather than from anything remembered: which
@@ -514,7 +514,7 @@ struct WorkflowPage: View {
     /// and marked, because that workflow is refusing every fire on it (FR-009).
     private func runtimeControl(_ summary: WorkflowSummary) -> some View {
         let named = summary.workflow.settings.runtimeID
-        let fallback = RuntimeCatalog.builtIn[0]
+        let fallback = RuntimeCatalog.defaultRuntime
         let choices = [ConfigChoice(value: .null, name: "Default (\(fallback.name))")]
             + RuntimeCatalog.builtIn.map { ConfigChoice(value: .string($0.id), name: $0.name) }
         let option = ConfigOption(id: WorkflowSettings.Setting.runtime, name: "Runtime",

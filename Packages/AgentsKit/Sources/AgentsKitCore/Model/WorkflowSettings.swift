@@ -80,7 +80,7 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
         guard !isEmpty else { return nil }
         var clauses: [String] = []
         if let permissionMode { clauses.append("in \(permissionMode) mode") }
-        if let runtimeID, runtimeID != RuntimeCatalog.builtIn[0].id {
+        if let runtimeID, runtimeID != RuntimeCatalog.defaultRuntime.id {
             clauses.append("on \(RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID)")
         }
         if let model { clauses.append("using \(model)") }

@@ -74,7 +74,7 @@ extension DaemonCore {
         }
         var lines = [available.isEmpty
             ? "No runtime can take a new agent \(Self.here) right now."
-            : "Runtimes you can start agents on (\(RuntimeCatalog.builtIn[0].id) if you name none): "
+            : "Runtimes you can start agents on (\(RuntimeCatalog.defaultRuntime.id) if you name none): "
                 + available.joined(separator: ", ") + "."]
         if !not.isEmpty { lines.append("Not available \(Self.here): " + not.joined(separator: ", ") + ".") }
         return lines.joined(separator: "\n")

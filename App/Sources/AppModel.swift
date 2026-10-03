@@ -705,7 +705,7 @@ final class AppModel {
     func refreshServerRuntimes(_ host: HostID) async {
         if let listed = try? await client(for: host).call(DaemonAPI.Method.runtimesList, Optional<String>.none,
                                                           returning: [RuntimeStatus].self) {
-            serverRuntimes[host] = listed
+            serverRuntimes[host] = RuntimeCatalog.sortedByName(listed)
         }
     }
 
@@ -2198,9 +2198,9 @@ final class AppModel {
 
     func refreshRuntimes() async {
         let listed = await attempt {
-            self.runtimes = try await self.client.call(DaemonAPI.Method.runtimesList,
-                                                       Optional<String>.none,
-                                                       returning: [RuntimeStatus].self)
+            self.runtimes = RuntimeCatalog.sortedByName(try await self.client.call(DaemonAPI.Method.runtimesList,
+                                                                                   Optional<String>.none,
+                                                                                   returning: [RuntimeStatus].self))
         }
         if listed { weighInstallOffer() }
     }

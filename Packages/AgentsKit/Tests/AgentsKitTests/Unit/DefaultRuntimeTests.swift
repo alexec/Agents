@@ -13,9 +13,10 @@ struct DefaultRuntimeTests {
         return agent
     }
 
-    @Test func withNoAgentsItIsTheFirstAvailableInOrder() {
+    @Test func withNoAgentsItIsTheCatalogDefaultThenTheFirstAvailableInOrder() {
         let model = AgentsModel()
-        #expect(model.defaultRuntimeID(available: ["codex", "claude"]) == "codex")
+        #expect(model.defaultRuntimeID(available: ["antigravity", "claude"]) == "claude")
+        #expect(model.defaultRuntimeID(available: ["gemini", "codex"]) == "gemini")
         #expect(model.defaultRuntimeID(available: []) == nil)
     }
 
