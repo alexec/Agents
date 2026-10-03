@@ -638,7 +638,7 @@ extension DaemonCore {
     /// the person to the wrong line.
     func startRequest(settings: WorkflowSettings, folder: URL, prompt: String,
                       managesAgents: Bool, checksDefault: Bool = false) async throws -> DaemonAPI.StartRequest {
-        let runtimeID = settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+        let runtimeID = settings.runtimeID ?? RuntimeCatalog.defaultRuntime.id
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             // A runtime this version has never heard of. Not rehomed onto the default
             // one: a workflow that says `runtime: grok` and quietly runs on Claude is

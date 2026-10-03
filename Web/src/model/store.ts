@@ -16,6 +16,7 @@ import { describe } from "./errors";
 import { log } from "../log";
 import { folderKey } from "./groups";
 import { DisplayBuilder, type Item } from "./turns";
+import { sortedRuntimes } from "./runtimes";
 
 export { folderKey } from "./groups";
 
@@ -603,7 +604,7 @@ export class Store extends Work {
       this.link.call("modes/remembered", {}, host).catch(() => null),
     ]);
     batch(() => {
-      if (runtimes) this.runtimes.value = { ...this.runtimes.value, [host]: runtimes };
+      if (runtimes) this.runtimes.value = { ...this.runtimes.value, [host]: sortedRuntimes(runtimes) };
       if (accounts) this.accounts.value = { ...this.accounts.value, [host]: accounts };
       if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
     });

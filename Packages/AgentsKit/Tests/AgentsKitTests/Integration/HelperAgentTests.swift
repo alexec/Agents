@@ -193,7 +193,7 @@ struct HelperAgentTests {
         #expect(message.hasPrefix("Nothing was started: "))
         #expect(message.contains("abacus"))
         try #require(!RuntimeCatalog.builtIn.isEmpty)
-        #expect(message.contains(RuntimeCatalog.builtIn[0].id))
+        #expect(message.contains(RuntimeCatalog.defaultRuntime.id))
         #expect(await core.allAgents().count == 1, "no agent left behind")
         #expect(await core.reservedStarts.values.allSatisfy { $0 == 0 }, "and its place given back")
     }

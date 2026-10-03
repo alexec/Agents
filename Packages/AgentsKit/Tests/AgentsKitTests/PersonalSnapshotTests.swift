@@ -66,7 +66,7 @@ struct PersonalSnapshotTests {
 
     @Test func reachHasAKeyForEachInstalledRuntimeOnly() throws {
         let shot = snapshot(try fullHome())
-        #expect(shot.runtimes.map(\.id) == ["claude", "codex", "cursor", "copilot"])
+        #expect(shot.runtimes.map(\.id) == ["claude", "codex", "copilot", "cursor"], "alphabetical by name (#154)")
         #expect(Set(shot.instructions?.reach.keys ?? [:].keys) == ["claude", "codex", "cursor", "copilot"])
         for skill in shot.skills { #expect(Set(skill.reach.keys) == ["claude", "codex", "cursor", "copilot"]) }
         for server in shot.mcp.servers { #expect(!server.reach.keys.contains("grok")) }

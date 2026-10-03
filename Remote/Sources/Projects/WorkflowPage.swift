@@ -252,7 +252,7 @@ struct WorkflowPage: View {
     }
 
     private func runtimeID(_ workflow: Workflow) -> String {
-        workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+        workflow.settings.runtimeID ?? RuntimeCatalog.defaultRuntime.id
     }
 
     /// The runtime, from the catalog: which runtimes exist is the app's to know. A
@@ -260,7 +260,7 @@ struct WorkflowPage: View {
     /// refusing every fire on it (FR-009).
     private func runtimeRow(_ summary: WorkflowSummary) -> some View {
         let named = summary.workflow.settings.runtimeID
-        let fallback = RuntimeCatalog.builtIn[0]
+        let fallback = RuntimeCatalog.defaultRuntime
         let choices = [ConfigChoice(value: .null, name: "Default (\(fallback.name))")]
             + RuntimeCatalog.builtIn.map { ConfigChoice(value: .string($0.id), name: $0.name) }
         let option = ConfigOption(id: WorkflowSettings.Setting.runtime, name: "Runtime",

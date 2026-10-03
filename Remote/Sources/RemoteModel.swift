@@ -1702,7 +1702,7 @@ final class RemoteModel {
         if let listed = try? await client.call(DaemonAPI.Method.runtimesList,
                                                Optional<String>.none,
                                                returning: [RuntimeStatus].self) {
-            runtimes = listed
+            runtimes = RuntimeCatalog.sortedByName(listed)
         }
         if let listed = try? await client.call(DaemonAPI.Method.runtimesAccounts,
                                                Optional<Int>.none,

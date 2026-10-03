@@ -348,15 +348,18 @@ extension DaemonCore {
 
     /// Every runtime's state (065, US4): a row for each runtime this Mac
     /// finds, and one for any other credential with a state. A runtime nothing has
-    /// happened to is available.
+    /// happened to is available. Alphabetical by runtime name (#154), each runtime's own
+    /// sign-in before its other credentials.
     public func runtimeAllowances() -> RuntimeAllowances {
         let at = now()
-        var keys: [String] = []
+        var own: [String] = []
         for runtime in RuntimeCatalog.builtIn {
             if case .missing = discovery.locate(runtime) { continue }
-            keys.append(AllowanceState.credentialKey(for: Self.ownEntry(runtimeID: runtime.id)))
+            own.append(AllowanceState.credentialKey(for: Self.ownEntry(runtimeID: runtime.id)))
         }
-        for key in allowances.keys.sorted() where !keys.contains(key) { keys.append(key) }
+        let others = allowances.keys.sorted().filter { !own.contains($0) }
+        let byRuntime = Dictionary(grouping: own + others) { entry(forKey: $0).runtimeID }
+        let keys = RuntimeCatalog.sortedByName(ids: Array(byRuntime.keys)).flatMap { byRuntime[$0] ?? [] }
         let rows = keys.map { key -> RuntimeAllowances.Row in
             let entry = entry(forKey: key)
             var state = allowances[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)

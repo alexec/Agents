@@ -71,7 +71,7 @@ struct RuntimeChoiceTests {
 
         let message = try #require(error?.message)
         #expect(message.hasPrefix("Nothing was started: Grok isn't available on this Mac (out of the pool: "))
-        #expect(message.hasSuffix("Available: claude, copilot, codex, gemini, antigravity, opencode."))
+        #expect(message.hasSuffix("Available: antigravity, claude, codex, copilot, gemini, opencode."))
         #expect(await core.allAgents().count == before)
     }
 
@@ -84,7 +84,7 @@ struct RuntimeChoiceTests {
 
         #expect(error?.message
                 == "Nothing was started: Cursor isn't available on this Mac (not installed). "
-                + "Available: claude, grok, copilot, codex, gemini, antigravity, opencode.")
+                + "Available: antigravity, claude, codex, copilot, gemini, grok, opencode.")
     }
 
     @Test func theDefaultRuntimeIsCheckedWhenNoneIsNamed() async throws {
@@ -142,8 +142,8 @@ struct RuntimeChoiceTests {
 
         #expect(list.contains("Runtimes you can start agents on (claude if you name none): "))
         #expect(list.contains("codex"))
-        #expect(list.contains("Not available on this Mac: grok (out of the pool: "))
-        #expect(list.contains("cursor (not installed)"))
+        #expect(list.contains("Not available on this Mac: cursor (not installed), grok (out of the pool: "),
+                "alphabetical by name (#154)")
     }
 
     // MARK: A workflow's runtime:
@@ -177,6 +177,6 @@ struct RuntimeChoiceTests {
         }
         #expect(setting == WorkflowSettings.Setting.runtime)
         #expect(detail == "Cursor isn't available on this Mac (not installed). "
-                + "Available: claude, grok, copilot, codex, gemini, antigravity, opencode")
+                + "Available: antigravity, claude, codex, copilot, gemini, grok, opencode")
     }
 }

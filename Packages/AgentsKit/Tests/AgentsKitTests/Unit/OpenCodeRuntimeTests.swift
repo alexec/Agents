@@ -13,8 +13,8 @@ struct OpenCodeRuntimeTests {
         #expect(runtime.arguments == ["acp"])
         #expect(runtime.usesAppCopyOnly)
         #expect(runtime.install == .toolset(runtimeID: "opencode"))
-        #expect(RuntimeCatalog.builtIn.last == runtime, "appended: builtIn[0] is the default runtime")
-        #expect(RuntimeCatalog.builtIn.first == RuntimeCatalog.claude)
+        #expect(RuntimeCatalog.builtIn.contains(runtime))
+        #expect(RuntimeCatalog.defaultRuntime == RuntimeCatalog.claude)
         #expect(!RuntimeCatalog.canMoveFolders(runtimeID: "opencode"), "it keeps working in the old folder (R9)")
     }
 

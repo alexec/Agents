@@ -304,6 +304,16 @@ for (const scene of scenes) {
       }
       await page.waitFor(`document.querySelector(".chat .transcript")`, 60_000).catch(() => {});
       say(`after: opened ${JSON.stringify(await visible(".chat .column-head h1"))}`);
+    } else if (scene === "runtimes") {
+      // #154: the new session's runtime menu, alphabetical by name. Drawn open (size = its
+      // options) for the shot, since a closed select shows only the chosen one.
+      await clickRow(".projects", "work");
+      await page.waitFor(`document.querySelector(".sessions [aria-label='New session']")`, 30_000);
+      await page.eval(`document.querySelector(".sessions [aria-label='New session']").click()`);
+      await page.waitFor(`document.querySelector(".new-agent select[aria-label='Runtime'] option")`, 60_000);
+      say(`runtimes: ${JSON.stringify(await page.eval(`(() => { const s = document.querySelector(".new-agent select[aria-label='Runtime']");
+        s.size = s.options.length; return { options: [...s.options].map((o) => o.textContent), chosen: s.value }; })()`))}`);
+      await shot("runtimes");
     } else if (scene === "identity") {
       // #111: the footer names the browser, and no grant.
       say(`footer: ${JSON.stringify(await page.text(".identity"))}`);

@@ -28,9 +28,9 @@ extension PersonalDotAgents {
         let shared = home.appending(path: folder, directoryHint: .isDirectory)
         let present = rules.filter { installed.contains($0.runtimeID) }
         var snapshot = Snapshot(home: shared.path, laidOut: true)
-        snapshot.runtimes = present.map {
+        snapshot.runtimes = RuntimeCatalog.sortedByName(present.map {
             DaemonAPI.RuntimeName(id: $0.runtimeID, name: RuntimeCatalog.runtime(id: $0.runtimeID)?.name ?? $0.runtimeID)
-        }
+        }, name: \.name, id: \.id)
         var looks: [DaemonAPI.Look] = []
         snapshot.instructions = instructions(home: home, present: present, record: record, looks: &looks)
         let plugins = personalPluginFolders(home: home)

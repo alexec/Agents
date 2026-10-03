@@ -90,7 +90,7 @@ extension DaemonCore {
     /// word on another runtime is not known to be the same promise (see
     /// `WorkflowSettings`). There the helper starts as the named runtime starts.
     func inheritedMode(from caller: Agent, runtime: String?) -> String? {
-        let runtimeID = runtime ?? RuntimeCatalog.builtIn[0].id
+        let runtimeID = runtime ?? RuntimeCatalog.defaultRuntime.id
         guard runtimeID == caller.runtimeID,
               let option = ModeMemory.modeOption(in: caller.advertisedOptions),
               let value = caller.startOptions.values[option.id] ?? option.currentValue else {
