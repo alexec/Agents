@@ -66,7 +66,7 @@ an event already on the log.
 | `agent.stopped` | agent, by | An agent was stopped before finishing. `by` is `you`, `cost_limit` or `unknown`. |
 | `agent.failed` | agent, reason | An agent ended in an error. `reason` is `allowance_spent`, `rate_limited`, `process_died`, `sign_in_refused`, `runtime_error`, `sandbox_failed`, `max_tokens`, `max_turn_requests`, `refusal`, `daemon_gone`, `stopped_by_agent` or `unrecognised`. |
 | `agent.parked` | agent, outcome | An agent was parked: put down to come back to. `outcome` is its last report's, when it made one. |
-| `agent.archived` | agent, by, outcome | An agent was archived. `by` is `you` or `agent`. `outcome` is its last report's, when it made one. |
+| `agent.archived` | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_agent`. `outcome` is its last report's, when it made one. |
 | `agent.retired` | agent, because | An archived agent was retired and its conversation deleted. `because` is `age`, `cap` or `person`. |
 
 ## Workflows
