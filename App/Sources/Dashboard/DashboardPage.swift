@@ -1,8 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A project's Dashboard, in the chat's place (FR-031): tiles in sections, in the order
-/// they were made, small ones in a grid of 180 pt cells and tables and notes across.
+/// A project's Dashboard, in the chat's place (FR-031): tiles in sections, small ones in a
+/// grid of 180 pt cells and tables and notes across, in the order a person or an agent
+/// put them (#147), or else the order they were made. Tiles drag within and between
+/// sections, and a section drags by its heading; their menus move them without a pointer.
 struct DashboardPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
@@ -21,8 +23,16 @@ struct DashboardPage: View {
                     if sections.isEmpty {
                         empty(hiddenCount: snapshot.tiles.filter { $0.tile?.isHidden == true }.count)
                     }
-                    ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
-                        sectionView(section.title, section.tiles, now: snapshot.now)
+                    VStack(alignment: .leading, spacing: 22) {
+                        ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
+                            sectionView(section.title, section.tiles, now: snapshot.now,
+                                        place: (index, sections.count, sections.map(\.title)))
+                        }
+                    }
+                    // One container for every section's grids, so a tile drags from one
+                    // section into another; a drop is sent once, as the whole order.
+                    .reorderContainer(for: TileView.self, in: TileRun.self) { difference in
+                        apply(difference)
                     }
                     // The tiles are the project's files (#127).
                     Text(DashboardModel.filesSentence + ".")
@@ -140,23 +150,82 @@ struct DashboardPage: View {
         .padding(.top, 12)
     }
 
-    private func sectionView(_ title: String?, _ tiles: [TileView], now: Date) -> some View {
+    private func sectionView(_ title: String?, _ tiles: [TileView], now: Date,
+                             place: (index: Int, count: Int, titles: [String?])) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let title {
                 Text(title.uppercased())
                     .appText(.fine).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
                     .tracking(0.6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+                    // A section moves by its heading: dragged onto another heading it goes
+                    // before that section (#147).
+                    .draggable(Self.sectionDragPrefix + title)
+                    .dropDestination(for: String.self) { items, _ in
+                        guard let dragged = items.first, dragged.hasPrefix(Self.sectionDragPrefix) else { return false }
+                        let moving = String(dragged.dropFirst(Self.sectionDragPrefix.count))
+                        guard moving != title else { return false }
+                        arrange { $0.movingSection(moving, before: .some(title)) }
+                        return true
+                    }
+                    .contextMenu {
+                        Button("Move Section Up") {
+                            arrange { $0.movingSection(title, before: .some(place.titles[place.index - 1])) }
+                        }
+                        .disabled(place.index == 0)
+                        Button("Move Section Down") {
+                            let after = place.index + 2
+                            arrange { $0.movingSection(title, before: after < place.count ? .some(place.titles[after]) : nil) }
+                        }
+                        .disabled(place.index + 1 >= place.count)
+                    }
             }
-            ForEach(Array(runs(tiles).enumerated()), id: \.offset) { _, run in
+            ForEach(Array(runs(tiles).enumerated()), id: \.offset) { index, run in
+                let id = TileRun(section: title, index: index)
                 if run.count == 1, let only = run.first, TileCard.isWide(only) {
-                    card(only, now: now)
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(run) { tile in card(tile, now: now) }
+                            .reorderable(collectionID: id)
+                    }
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 360), spacing: 10, alignment: .top)],
                               alignment: .leading, spacing: 10) {
                         ForEach(run) { tile in card(tile, now: now) }
+                            .reorderable(collectionID: id)
                     }
                 }
+            }
+        }
+    }
+
+    private static let sectionDragPrefix = "agents-dashboard-section:"
+
+    /// The order as shown, changed by `change`, kept at once and sent once.
+    private func arrange(_ change: (DashboardOrder) -> DashboardOrder?) {
+        guard let snapshot = model.dashboard(in: folder),
+              let order = change(DashboardModel.arrangement(snapshot)) else { return }
+        Task { await model.arrangeDashboard(order, folder: folder) }
+    }
+
+    /// A drop: the tiles go before the one they were dropped on, or after the last of the
+    /// grid they were dropped at the end of.
+    private func apply(_ difference: ReorderDifference<TileView.ID, TileRun>) {
+        let target = difference.destination.collectionID
+        let sources = difference.sources
+        switch difference.destination.position {
+        case .before(let id):
+            arrange { $0.moving(sources, to: target.section, before: id) }
+        case .end:
+            guard let snapshot = model.dashboard(in: folder) else { return }
+            let shown = DashboardModel.sections(snapshot, includeHidden: showsHidden)
+            let run = shown.first { $0.title == target.section }.map { runs($0.tiles) } ?? []
+            let rest = run.indices.contains(target.index) ? run[target.index].map(\.id).filter { !sources.contains($0) } : []
+            if let last = rest.last {
+                arrange { $0.moving(sources, after: last) }
+            } else {
+                arrange { $0.moving(sources, to: target.section) }
             }
         }
     }
@@ -189,7 +258,7 @@ struct DashboardPage: View {
                     .menuIndicator(.hidden)
                     .fixedSize()
                     .padding(8)
-                    .help("Hide, remove or open its keeper")
+                    .help("Move, hide, remove or open its keeper")
                     .accessibilityLabel("Tile options")
             }
     }
@@ -199,6 +268,7 @@ struct DashboardPage: View {
         Button("Details…") { detail = tile }
         Button("Open Keeper") { model.openKeeper(tile.keeper, folder: folder) }
             .disabled(tile.keeper.id.isEmpty)
+        moveItems(tile)
         Divider()
         if tile.tile?.isHidden == true {
             Button("Show") { Task { await model.actOnTile(DaemonAPI.Method.dashboardShow, folder: folder, id: tile.id) } }
@@ -207,6 +277,32 @@ struct DashboardPage: View {
                 .disabled(tile.tile == nil)
         }
         Button("Remove") { Task { await model.actOnTile(DaemonAPI.Method.dashboardRemove, folder: folder, id: tile.id) } }
+    }
+
+    /// Move Up, Move Down and Move to Section ▸: the order without a drag (#147).
+    @ViewBuilder
+    private func moveItems(_ tile: TileView) -> some View {
+        if let snapshot = model.dashboard(in: folder) {
+            let shown = DashboardModel.sections(snapshot, includeHidden: showsHidden)
+            let current = shown.first { $0.tiles.contains { $0.id == tile.id } }?.title
+            Divider()
+            Button("Move Up") {
+                arrange { _ in DashboardModel.stepping(tile.id, by: -1, in: snapshot, includeHidden: showsHidden) }
+            }
+            .disabled(DashboardModel.neighbour(of: tile.id, in: shown, step: -1) == nil)
+            Button("Move Down") {
+                arrange { _ in DashboardModel.stepping(tile.id, by: 1, in: snapshot, includeHidden: showsHidden) }
+            }
+            .disabled(DashboardModel.neighbour(of: tile.id, in: shown, step: 1) == nil)
+            let others = shown.map(\.title).filter { $0 != current }
+            if !others.isEmpty {
+                Menu("Move to Section") {
+                    ForEach(Array(others.enumerated()), id: \.offset) { _, title in
+                        Button(title ?? "No Section") { arrange { $0.moving([tile.id], to: title) } }
+                    }
+                }
+            }
+        }
     }
 
     private func open(_ link: TileLink) {
@@ -218,6 +314,13 @@ struct DashboardPage: View {
             model.showWorkflow(folder: folder, workflowID: workflow)
         }
     }
+}
+
+/// One grid of a section's tiles (#147): a section's small tiles run together in a grid
+/// and each wide one stands alone, so a drop lands in a section and a place in it.
+struct TileRun: Hashable, Sendable {
+    var section: String?
+    var index: Int
 }
 
 /// A tile's detail (FR-035): its source, keeper and keeper changes, whether it was

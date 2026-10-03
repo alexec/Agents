@@ -26,6 +26,7 @@ from the project folder.
 - **Read only, apart from `set_tile`.** No builds, no tests, no file edits, no `git fetch`,
   checkout, push or merge, no issue or PR edits. Never write `.agents/dashboard/` by hand.
 - Leave tiles you are not told to keep below alone, and remove none.
+- Never move a tile (`move_tile`) unless the person asks: where tiles sit is theirs (#147).
 - Give every tile the `source` written here, word for word, so its file changes only when
   its value does.
 

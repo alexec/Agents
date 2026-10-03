@@ -89,6 +89,35 @@ final class DashboardStore: @unchecked Sendable {
         try? FileManager.default.removeItem(at: Self.tileFile(project, id))
     }
 
+    // MARK: The order (#147)
+
+    static func orderFile(_ project: URL) -> URL {
+        tilesFolder(project).appendingPathComponent(DashboardOrder.fileName)
+    }
+
+    /// Nil when nobody has moved a tile, or the file does not read.
+    func readOrder(_ project: URL) -> DashboardOrder? {
+        guard let data = try? Data(contentsOf: Self.orderFile(project)) else { return nil }
+        return try? JSONDecoder().decode(DashboardOrder.self, from: data)
+    }
+
+    /// Write the order whole, or remove the file when it lists nothing. Unchanged bytes
+    /// are left alone, as a tile's are.
+    func writeOrder(_ order: DashboardOrder, in project: URL) throws {
+        let url = Self.orderFile(project)
+        guard !order.isEmpty else {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        var data = try encoder.encode(order)
+        data.append(0x0A)
+        if let old = try? Data(contentsOf: url), old == data { return }
+        try FileManager.default.createDirectory(at: Self.tilesFolder(project), withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
+    }
+
     // MARK: The host's state
 
     func folder(for project: URL) -> URL {

@@ -82,19 +82,36 @@ public enum DashboardModel {
         return (change > 0 ? "▲" : "▼") + numberWords(abs(change))
     }
 
-    /// The tiles grouped by section, sections in the order their first tile was made and
-    /// tiles in the order they were made (spec, Assumptions). Hidden tiles left out
-    /// unless asked for.
+    /// The tiles grouped by section, as the order puts them (#147); then the tiles it
+    /// does not list, in their files' sections, sections in the order their first tile was
+    /// made and tiles in the order they were made (spec, Assumptions). Hidden tiles left
+    /// out unless asked for.
     public static func sections(_ snapshot: DashboardSnapshot, includeHidden: Bool = false)
         -> [(title: String?, tiles: [TileView])] {
+        let shown = ordered(snapshot.tiles).filter { includeHidden || $0.tile?.isHidden != true }
+        let byID = Dictionary(shown.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var order: [String?] = []
         var grouped: [String?: [TileView]] = [:]
-        for tile in ordered(snapshot.tiles) where includeHidden || tile.tile?.isHidden != true {
-            let section = tile.tile?.section
+        var placed = Set<String>()
+        func add(_ tile: TileView, to section: String?) {
             if grouped[section] == nil { order.append(section) }
             grouped[section, default: []].append(tile)
         }
+        for section in snapshot.order?.cleaned().sections ?? [] {
+            for id in section.tiles {
+                guard let tile = byID[id], placed.insert(id).inserted else { continue }
+                add(tile, to: section.title)
+            }
+        }
+        for tile in shown where !placed.contains(tile.id) {
+            add(tile, to: tile.tile?.section)
+        }
         return order.map { ($0, grouped[$0] ?? []) }
+    }
+
+    /// The tiles as shown, flat: the order `read_dashboard` lists them in.
+    public static func shownOrder(_ snapshot: DashboardSnapshot) -> [TileView] {
+        sections(snapshot, includeHidden: true).flatMap(\.tiles)
     }
 
     /// Made order, then id; a tile only a file knows of goes after those the host made.
@@ -111,7 +128,7 @@ public enum DashboardModel {
 
     /// The row's summary (FR-031, FR-032), ignoring stale and hidden tiles (FR-026).
     public static func summary(_ snapshot: DashboardSnapshot) -> DashboardSummary {
-        let shown = ordered(snapshot.tiles).filter { $0.tile?.isHidden != true }
+        let shown = shownOrder(snapshot).filter { $0.tile?.isHidden != true }
         let live = shown.filter { !isStale($0, now: snapshot.now) }
         let bad = live.filter { $0.tile?.status?.level == .bad }.count
         let warn = live.filter { $0.tile?.status?.level == .warn }.count

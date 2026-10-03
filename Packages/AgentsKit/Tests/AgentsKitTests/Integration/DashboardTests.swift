@@ -239,7 +239,7 @@ struct DashboardTests {
         s.clock.advance(minutes: 60)
         _ = try await set(s, "Lead", number("open_bugs", 4))
         let read = try await s.core.readDashboard(.init(token: s.tokens["Helper"]!))
-        #expect(read.contains("open_bugs — Open bugs [number] in Quality"))
+        #expect(read.contains("## Quality\n\n1. open_bugs — Open bugs [number]"))
         #expect(read.contains("keeper: Lead"))
         #expect(read.contains("last points: 6 at"))
     }
@@ -427,6 +427,122 @@ struct DashboardTests {
         #expect(summary.bad == 1)
         #expect(summary.line == "1 needs a look · Open bugs 4")
         #expect(DashboardModel.sections(snapshot).first?.tiles.map(\.id) == ["old", "live", "bugs"])
+    }
+
+    // MARK: Order (#147)
+
+    private func status(_ id: String, section: String? = nil) -> JSONValue {
+        var arguments: [String: JSONValue] = ["id": .string(id), "title": .string(id), "type": "status",
+                                              "level": "ok", "line": "fine"]
+        if let section { arguments["section"] = .string(section) }
+        return .object(arguments)
+    }
+
+    private func shown(_ s: Setup) async -> [String] {
+        await DashboardModel.sections(s.core.dashboardSnapshot(s.project), includeHidden: true)
+            .map { "\($0.title ?? "-"): " + $0.tiles.map(\.id).joined(separator: " ") }
+    }
+
+    private func move(_ s: Setup, _ who: String, _ arguments: JSONValue) async throws -> String {
+        try await s.core.moveTile(DaemonAPI.MoveTileRequest(token: s.tokens[who]!, arguments: arguments))
+    }
+
+    @Test func aPersonsArrangeIsKeptInTheProjectAndSurvivesAReset() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        for id in ["a", "b", "c"] { _ = try await set(s, "Lead", status(id)) }
+        _ = try await set(s, "Lead", status("d", section: "Ship"))
+        #expect(await shown(s) == ["-: a b c", "Ship: d"])
+
+        try await s.core.arrangeDashboard(.init(folder: s.project, order: DashboardOrder(sections: [
+            .init(title: "Ship", tiles: ["d", "c"]), .init(title: nil, tiles: ["b", "a", "gone"]),
+        ])))
+        #expect(await shown(s) == ["Ship: d c", "-: b a"])
+        let order = try JSONDecoder().decode(DashboardOrder.self, from: Data(contentsOf:
+            s.project.appendingPathComponent(".agents/dashboard/_order.json")))
+        #expect(order.tiles == ["d", "c", "b", "a"])
+
+        // Setting a value again keeps a tile where it was put, and a new one goes last in
+        // its own section; the order file is never read as a tile.
+        _ = try await set(s, "Lead", status("c"))
+        _ = try await set(s, "Lead", status("e"))
+        #expect(await shown(s) == ["Ship: d c", "-: b a e"])
+        #expect(await s.core.dashboardSnapshot(s.project).tiles.count == 5)
+
+        // A new host (a relaunch) reads the same order from the project.
+        let again = DaemonCore(store: try AgentStore(locations: s.locations), locations: s.locations,
+                               discovery: .findsEverything, launcher: FakeLauncher(), now: { s.clock.now })
+        await again.loadFromDisk()
+        #expect(await DashboardModel.sections(again.dashboardSnapshot(s.project), includeHidden: true)
+            .map(\.title) == ["Ship", nil])
+    }
+
+    @Test func changingASectionMovesATileAndRemovingOneTakesItOut() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        for id in ["a", "b"] { _ = try await set(s, "Lead", status(id)) }
+        _ = try await set(s, "Lead", status("c", section: "Ship"))
+        try await s.core.arrangeDashboard(.init(folder: s.project, order: DashboardOrder(sections: [
+            .init(title: nil, tiles: ["b", "a"]), .init(title: "Ship", tiles: ["c"]),
+        ])))
+        _ = try await set(s, "Lead", status("b", section: "Ship"))
+        #expect(await shown(s) == ["-: a", "Ship: c b"])
+        _ = try await s.core.removeTile(.init(token: s.tokens["Lead"]!, id: "c"))
+        #expect(await s.core.dashboardSnapshot(s.project).order?.tiles == ["a"])
+    }
+
+    @Test func anyAgentMovesATileAndReadDashboardShowsTheOrder() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished), ("Helper", false, nil, .finished)])
+        for id in ["a", "b", "c"] { _ = try await set(s, "Lead", status(id)) }
+        let answer = try await move(s, "Helper", ["id": "c", "position": "first"])
+        #expect(answer.contains("Moved \"c\""))
+        #expect(await shown(s) == ["-: c a b"])
+        _ = try await move(s, "Helper", ["id": "c", "after": "a"])
+        #expect(await shown(s) == ["-: a c b"])
+        _ = try await move(s, "Helper", ["id": "b", "before": "a"])
+        #expect(await shown(s) == ["-: b a c"])
+        _ = try await move(s, "Helper", ["id": "a", "section": "Later"])
+        #expect(await shown(s) == ["-: b c", "Later: a"])
+        _ = try await move(s, "Helper", ["id": "a", "section": ""])
+        #expect(await shown(s) == ["-: b c a"])
+        let read = try await s.core.readDashboard(.init(token: s.tokens["Helper"]!))
+        #expect(read.contains("1. b — b"))
+        #expect(read.contains("3. a — a"))
+    }
+
+    @Test func aMoveIsRefusedInWords() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        _ = try await set(s, "Lead", status("a"))
+        for (arguments, words) in [
+            (["id": "zz", "position": "first"] as JSONValue, "no tile \"zz\""),
+            (["id": "a"], "say where"),
+            (["id": "a", "before": "a"], "next to itself"),
+            (["id": "a", "position": "middle"], "first or last"),
+            (["id": "a", "before": "a", "position": "first"], "not more"),
+        ] {
+            await #expect {
+                _ = try await move(s, "Lead", arguments)
+            } throws: { error in
+                (error as? JSONRPCError)?.message.contains(words) == true
+            }
+        }
+    }
+
+    @Test func tileIDsMayNotStartWithAnUnderscore() {
+        #expect(!TileLimits.isValidID("_order"))
+        #expect(TileLimits.isValidID("open_bugs"))
+        #expect(TileLimits.isValidID("x_"))
+    }
+
+    @Test func theOrderMovesTilesAndSections() {
+        let order = DashboardOrder(sections: [.init(title: nil, tiles: ["a", "b"]), .init(title: "S", tiles: ["c"])])
+        #expect(order.moving(["a"], to: "S", before: "c").sections
+            == [.init(title: nil, tiles: ["b"]), .init(title: "S", tiles: ["a", "c"])])
+        #expect(order.moving(["b"], to: "S").moving(["a"], to: "S").sections == [.init(title: "S", tiles: ["c", "b", "a"])])
+        #expect(order.moving(["a"], after: "b").tiles == ["b", "a", "c"])
+        #expect(order.movingSection("S", before: .some(nil)).sections.map(\.title) == ["S", nil])
+        #expect(order.movingSection(nil, before: nil).sections.map(\.title) == ["S", nil])
+        let messy = DashboardOrder(sections: [.init(title: "", tiles: ["a", "a"]), .init(title: nil, tiles: ["b", "x"]),
+                                              .init(title: "E", tiles: [])])
+        #expect(messy.cleaned(known: ["a", "b"]).sections == [.init(title: nil, tiles: ["a", "b"])])
     }
 }
 

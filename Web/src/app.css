@@ -852,6 +852,10 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .dashboard-page .dashboard-body { padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 6px; }
 .dashboard-page .dashboard-body > p { margin: 0 0 6px; }
 .dashboard-page .section-head { margin: 14px 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.65; }
+/* A section drags by its heading, and its ··· moves it without a pointer (#147). */
+.dashboard-page .section-head[draggable="true"] { cursor: grab; display: flex; align-items: center; gap: 6px; }
+.dashboard-page .section-head .menu-anchor { text-transform: none; letter-spacing: normal; }
+.dashboard-page .tile[draggable="true"] { cursor: grab; }
 .tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; align-items: stretch; }
 .tile { position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 112px; padding: 12px;
   background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }

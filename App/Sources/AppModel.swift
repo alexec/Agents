@@ -830,6 +830,20 @@ final class AppModel {
         await refreshDashboard(folder)
     }
 
+    /// A drop or a Move menu item (#147): shown at once, then the whole order sent once.
+    func arrangeDashboard(_ order: DashboardOrder, folder: URL) async {
+        if var snapshot = dashboard(in: folder) {
+            snapshot.order = order
+            work.store(snapshot)
+        }
+        let host = selectedProjectHost
+        await attempt(on: host) {
+            try await self.client(for: host).call(DaemonAPI.Method.dashboardArrange,
+                                                  DaemonAPI.ArrangeRequest(folder: folder, order: order))
+        }
+        await refreshDashboard(folder)
+    }
+
     /// A tile's keeper: its session, or its workflow's page (FR-030).
     func openKeeper(_ keeper: KeeperView, folder: URL) {
         switch keeper.kind {

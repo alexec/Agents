@@ -673,6 +673,15 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.RemoveTileRequest.self)
                 return .success(["note": .string(try removeTile(request))])
 
+            case DaemonAPI.Method.dashboardMoveTile:
+                let request = try require(params, as: DaemonAPI.MoveTileRequest.self)
+                return .success(["note": .string(try moveTile(request))])
+
+            case DaemonAPI.Method.dashboardArrange:
+                let request = try require(params, as: DaemonAPI.ArrangeRequest.self)
+                try arrangeDashboard(request)
+                return .success([:])
+
             case DaemonAPI.Method.dashboardRead:
                 let request = try require(params, as: DaemonAPI.DashboardTokenRequest.self)
                 return .success(["note": .string(try readDashboard(request))])

@@ -193,7 +193,9 @@ public struct TileLink: Codable, Hashable, Sendable {
 
 /// The limits in spec 074 (FR-002, FR-009, FR-021, FR-023), said once.
 public enum TileLimits {
-    public static let idPattern = "[a-z0-9_-]{1,40}"
+    /// No leading `_`: names that start with one are the Dashboard's own files, such as
+    /// `_order.json` (#147).
+    public static let idPattern = "[a-z0-9-][a-z0-9_-]{0,39}"
     public static let titleLength = 80
     public static let sectionLength = 40
     public static let sourceLength = 200
@@ -217,6 +219,6 @@ public enum TileLimits {
     public static let removalKept: TimeInterval = 30 * 86_400
 
     public static func isValidID(_ id: String) -> Bool {
-        (1...40).contains(id.count) && id.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "_" || $0 == "-" }
+        (1...40).contains(id.count) && id.first != "_" && id.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "_" || $0 == "-" }
     }
 }

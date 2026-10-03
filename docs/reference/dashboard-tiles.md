@@ -14,10 +14,10 @@ A project's Dashboard is made of tiles that agents keep with `set_tile` (see
 
 | Field | Rule |
 | --- | --- |
-| `id` | 1 to 40 lowercase letters, digits, `_` and `-`, unique in the project. It is the file's name. |
+| `id` | 1 to 40 lowercase letters, digits, `_` and `-`, not starting with `_`, unique in the project. It is the file's name. |
 | `title` | Up to 80 characters. |
 | `type` | `number`, `status`, `table`, `note` or `link`. |
-| `section` | Optional, up to 40 characters. Tiles are grouped under it. |
+| `section` | Optional, up to 40 characters. Tiles are grouped under it, unless the tile has been moved to another (see [Order](#order)). |
 | `source` | Where the value came from, in one line, up to 200 characters. Required for `number` and `table`. |
 | `stale_after_hours` | 1 to 168. Past it without a set, the tile is greyed. 24 if not given. |
 
@@ -33,6 +33,24 @@ A project's Dashboard is made of tiles that agents keep with `set_tile` (see
 
 A tile's file is at most 8 KB. A project holds at most 60 tiles, hidden ones included. An agent
 may set at most 120 tiles an hour. A refused call says which limit, and nothing is written.
+
+## Order
+
+Tiles stay where a person or an agent put them (#147). A person drags a tile, or uses
+Move Up, Move Down and Move to Section in its menu, on the Mac, the iPhone, the iPad
+and the web page. An agent uses `move_tile`. The order is one file in the project,
+`.agents/dashboard/_order.json`, written only by the app:
+
+```json
+{ "sections": [ { "tiles": ["open_bugs", "ci_status"] },
+                { "title": "Delivery", "tiles": ["open_prs", "not_shipped"] } ] }
+```
+
+- A tile listed there is shown where it is listed, whatever its own `section` says.
+- A tile it doesn't list goes after the listed ones, in its own section, in the order it
+  was made. A section it doesn't list goes after the listed ones. So a new tile lands at the end.
+- Setting a tile again never moves it. Changing its `section` moves it to the end of that section.
+- The latest move wins. Removing a tile takes it out of the order.
 
 ## Keepers
 

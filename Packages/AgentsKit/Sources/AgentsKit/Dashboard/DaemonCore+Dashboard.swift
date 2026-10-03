@@ -72,6 +72,15 @@ extension DaemonCore {
             throw dashboardRefusal(TileCheck.lead + "the file could not be written in \(project.path)/.agents/dashboard: "
                 + "\(error.localizedDescription)")
         }
+        // Re-setting a tile never moves it; changing its section does, to the end of that
+        // section, where an unlisted tile goes (#147).
+        if let before = existing?.tile, before.section != tile.section,
+           let order = dashboardStore.readOrder(project), order.tiles.contains(check.id) {
+            let left = DashboardOrder(sections: order.sections.map {
+                DashboardOrder.Section(title: $0.title, tiles: $0.tiles.filter { $0 != check.id })
+            }).cleaned()
+            try? dashboardStore.writeOrder(left, in: project)
+        }
         if existing == nil { record.made = state.tiles[check.id]?.made ?? at }
         record.set = at
         record.hash = written.hash
@@ -127,27 +136,94 @@ extension DaemonCore {
         }
         let mine = tileKeeper(for: caller)
         var blocks: [String] = []
-        for view in DashboardModel.ordered(snapshot.tiles) {
-            var lines: [String] = []
-            guard let tile = view.tile else {
-                blocks.append("\(view.id): broken — \(view.problem ?? "unreadable").")
-                continue
+        var position = 0
+        // In the order the person sees them, under their headings and numbered (#147).
+        for section in DashboardModel.sections(snapshot, includeHidden: true) {
+            blocks.append("## " + (section.title ?? "(no section)"))
+            for view in section.tiles {
+                position += 1
+                var lines: [String] = []
+                guard let tile = view.tile else {
+                    blocks.append("\(position). \(view.id): broken — \(view.problem ?? "unreadable").")
+                    continue
+                }
+                let keeperLine = tile.keeper == mine ? "you" : "\(view.keeper.name) (\(view.keeper.kind.rawValue), \(view.keeper.state.rawValue))"
+                lines.append("\(position). \(view.id) — \(tile.title) [\(tile.type.rawValue)]")
+                lines.append("  value: \(DashboardWords.value(tile))")
+                lines.append("  keeper: \(keeperLine); \(DashboardModel.ageWords(view, now: snapshot.now))"
+                    + (DashboardModel.isStale(view, now: snapshot.now) ? " (stale)" : "")
+                    + (tile.isHidden ? "; hidden by the person" : "")
+                    + (view.changedOutside ? "; changed outside Agents" : ""))
+                if let source = tile.source { lines.append("  source: \(source)") }
+                if !view.recent.isEmpty {
+                    lines.append("  last points: " + view.recent.map {
+                        "\(DashboardModel.numberWords($0.value)) at \(DashboardWords.dayAndTime($0.at))" }.joined(separator: ", "))
+                }
+                blocks.append(lines.joined(separator: "\n"))
             }
-            let keeperLine = tile.keeper == mine ? "you" : "\(view.keeper.name) (\(view.keeper.kind.rawValue), \(view.keeper.state.rawValue))"
-            lines.append("\(view.id) — \(tile.title) [\(tile.type.rawValue)]\(tile.section.map { " in \($0)" } ?? "")")
-            lines.append("  value: \(DashboardWords.value(tile))")
-            lines.append("  keeper: \(keeperLine); \(DashboardModel.ageWords(view, now: snapshot.now))"
-                + (DashboardModel.isStale(view, now: snapshot.now) ? " (stale)" : "")
-                + (tile.isHidden ? "; hidden by the person" : "")
-                + (view.changedOutside ? "; changed outside Agents" : ""))
-            if let source = tile.source { lines.append("  source: \(source)") }
-            if !view.recent.isEmpty {
-                lines.append("  last points: " + view.recent.map {
-                    "\(DashboardModel.numberWords($0.value)) at \(DashboardWords.dayAndTime($0.at))" }.joined(separator: ", "))
-            }
-            blocks.append(lines.joined(separator: "\n"))
         }
         return blocks.joined(separator: "\n\n")
+    }
+
+    /// `move_tile`: put a tile somewhere else on the Dashboard (#147). Any agent in the
+    /// project may, as a person may: moving a tile is not keeping it.
+    public func moveTile(_ request: DaemonAPI.MoveTileRequest) throws -> String {
+        let caller = try dashboardCaller(request.token)
+        let project = caller.projectFolder
+        let arguments = request.arguments
+        func text(_ key: String) -> String? {
+            let value = arguments[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return value.isEmpty ? nil : value
+        }
+        let lead = "Nothing was moved: "
+        guard let id = text("id") else { throw dashboardRefusal(lead + "say which tile, in `id`.") }
+        let snapshot = dashboardSnapshot(project, withUpdate: false)
+        let known = Set(snapshot.tiles.map(\.id))
+        guard known.contains(id) else {
+            throw dashboardRefusal(lead + "this project's Dashboard has no tile \"\(id)\".")
+        }
+        let before = text("before"), after = text("after"), position = text("position")
+        guard [before, after, position].compactMap({ $0 }).count <= 1 else {
+            throw dashboardRefusal(lead + "give one of `before`, `after` or `position`, not more.")
+        }
+        for other in [before, after].compactMap({ $0 }) {
+            guard known.contains(other) else {
+                throw dashboardRefusal(lead + "this project's Dashboard has no tile \"\(other)\".")
+            }
+            guard other != id else { throw dashboardRefusal(lead + "a tile can't go next to itself.") }
+        }
+        if let position, position != "first", position != "last" {
+            throw dashboardRefusal(lead + "`position` is first or last.")
+        }
+        let sectionGiven = arguments["section"] != nil
+        let section = text("section")
+        if let section, section.count > TileLimits.sectionLength {
+            throw dashboardRefusal(lead + "`section` is at most \(TileLimits.sectionLength) characters.")
+        }
+        guard before != nil || after != nil || position != nil || sectionGiven else {
+            throw dashboardRefusal(lead + "say where: `before` or `after` another tile, `position` first or last, or a `section`.")
+        }
+
+        let order = DashboardModel.arrangement(snapshot)
+        let current = order.sections.first { $0.tiles.contains(id) }?.title
+        let moved: DashboardOrder
+        if let before {
+            moved = order.moving([id], to: order.sections.first { $0.tiles.contains(before) }?.title, before: before)
+        } else if let after {
+            moved = order.moving([id], after: after)
+        } else {
+            let target = sectionGiven ? section : current
+            let first = position == "first"
+                ? order.sections.first { $0.title == target }?.tiles.first { $0 != id } : nil
+            moved = order.moving([id], to: target, before: first)
+        }
+        try writeOrder(moved.cleaned(known: known), in: project)
+
+        let placed = DashboardModel.sections(dashboardSnapshot(project, withUpdate: false), includeHidden: true)
+        let home = placed.first { $0.tiles.contains { $0.id == id } }
+        let neighbours = home?.tiles.map(\.id) ?? []
+        return "Moved \"\(id)\" to " + (home?.title.map { "\"\($0)\"" } ?? "the tiles under no section")
+            + ": " + neighbours.joined(separator: ", ") + ". The order is kept in .agents/dashboard/\(DashboardOrder.fileName)."
     }
 
     // MARK: The person's
@@ -171,7 +247,8 @@ extension DaemonCore {
                             keeperChanges: record?.keeperChanges ?? [])
         }
         return DashboardSnapshot(folder: project, tiles: DashboardModel.ordered(tiles), now: at,
-                                 update: withUpdate ? dashboardUpdate(project) : nil)
+                                 update: withUpdate ? dashboardUpdate(project) : nil,
+                                 order: dashboardStore.readOrder(project))
     }
 
     public func dashboardSummaries() -> [DashboardSummary] {
@@ -196,6 +273,24 @@ extension DaemonCore {
         if state.tiles[request.id]?.hash == found.hash {
             state.tiles[request.id]?.hash = written.hash
             dashboardStore.save(state, for: project)
+        }
+        dashboardChanged(project)
+    }
+
+    /// A person's drop or Move menu item: the whole order, as they left it (#147). Tiles
+    /// that are no longer there are dropped from it; the latest arrange wins.
+    public func arrangeDashboard(_ request: DaemonAPI.ArrangeRequest) throws {
+        let project = Project.standardize(request.folder)
+        let known = Set(dashboardStore.readTiles(project).map(\.id))
+        try writeOrder(request.order.cleaned(known: known), in: project)
+    }
+
+    private func writeOrder(_ order: DashboardOrder, in project: URL) throws {
+        do {
+            try dashboardStore.writeOrder(order, in: project)
+        } catch {
+            throw dashboardRefusal("The order could not be written in \(project.path)/.agents/dashboard: "
+                + "\(error.localizedDescription)")
         }
         dashboardChanged(project)
     }
@@ -268,6 +363,11 @@ extension DaemonCore {
     private func forgetTile(_ id: String, in project: URL) {
         dashboardStore.deleteFile(id, in: project)
         dashboardStore.deletePoints(id, in: project)
+        if let order = dashboardStore.readOrder(project), order.tiles.contains(id) {
+            try? dashboardStore.writeOrder(DashboardOrder(sections: order.sections.map {
+                DashboardOrder.Section(title: $0.title, tiles: $0.tiles.filter { $0 != id })
+            }).cleaned(), in: project)
+        }
         var state = dashboardStore.state(project)
         state.tiles.removeValue(forKey: id)
         dashboardStore.save(state, for: project)
