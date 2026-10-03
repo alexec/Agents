@@ -21,6 +21,9 @@ struct ProjectListView: View {
     @State private var picked: Set<SidebarItem> = []
     @State private var query = ""
     @FocusState private var searchFocused: Bool
+    /// Whether the list itself has the keyboard: only then is a picked row filled with
+    /// the accent rather than a grey wash (see `SidebarInk`).
+    @FocusState private var listFocused: Bool
     @State private var isChoosingFolder = false
     @State private var isCloning = false
     /// Which machine the New project menu was pointed at (037).
@@ -44,10 +47,10 @@ struct ProjectListView: View {
             // titles, no icons (#155): a sidebar list draws a `Label`'s title in its own
             // style, so with icons they did not match the project names below.
             Section("Activity") {
-                EventsRow().font(.body).tag(SidebarItem.events)
-                ResourcesRow().font(.body).tag(SidebarItem.resources)
-                RuntimesRow().font(.body).tag(SidebarItem.runtimes)
-                SpendingRow(selection: $selection).font(.body).tag(SidebarItem.spending)
+                EventsRow().font(.body).sidebarInk(.events).tag(SidebarItem.events)
+                ResourcesRow().font(.body).sidebarInk(.resources).tag(SidebarItem.resources)
+                RuntimesRow().font(.body).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
+                SpendingRow(selection: $selection).font(.body).sidebarInk(.spending).tag(SidebarItem.spending)
             }
 
             Section("Projects") {
@@ -78,6 +81,8 @@ struct ProjectListView: View {
             }
         }
         .listStyle(.sidebar)
+        .focused($listFocused)
+        .environment(\.sidebarPicks, SidebarPicks(items: picked, listFocused: listFocused))
         // Rows as tall as their lines (#104). Small also makes the sidebar's own text
         // small, so each row says `.font(.body)` to keep the size it was read at.
         .environment(\.sidebarRowSize, .small)
@@ -284,6 +289,7 @@ private struct ProjectFold: View {
                     // Last known, not current: the server is not answering (037).
                     .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
                     .contextMenu { ProjectMenu(summary: summary) }
+                    .sidebarInk(.project(key))
                     // On the row, not the group: a group's tag goes to every untagged
                     // row under it, and the subheadings would light with the project.
                     .tag(SidebarItem.project(key))
@@ -364,6 +370,7 @@ private struct SessionSidebarRow: View {
         AgentRow(agent: agent, isCompact: true)
             .padding(.vertical, 2)
             .listRowInsets(.vertical, 2)
+            .sidebarInk(.session(agent.id))
             .tag(SidebarItem.session(agent.id))
             // The list's own swipe, in place of the cards' hand-built one.
             .swipeActions(edge: .trailing) {
@@ -717,5 +724,41 @@ private struct MacHostDownNotice: View {
         }
         .padding(.vertical, 8)
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// What the sidebar has picked, and whether it has the keyboard, for `SidebarInk`.
+struct SidebarPicks {
+    var items: Set<SidebarItem> = []
+    var listFocused = false
+}
+
+extension EnvironmentValues {
+    @Entry var sidebarPicks = SidebarPicks()
+}
+
+/// A picked row in the focused sidebar of the key window is filled with the accent, and
+/// macOS draws its text white: 2.5:1 on the dark violet. The ground is 6.6:1 there, and
+/// 6.3:1 on the light one, as on the prominent button (#156). The list tells no row it
+/// is drawn so (`backgroundProminence` stays standard in a macOS sidebar), so the row
+/// works it out from what is picked, the list's focus and the window's.
+private struct SidebarInk: ViewModifier {
+    let item: SidebarItem
+    @Environment(\.sidebarPicks) private var picks
+    @Environment(\.controlActiveState) private var windowState
+
+    func body(content: Content) -> some View {
+        if picks.listFocused, windowState == .key, picks.items.contains(item) {
+            content.foregroundStyle(Paper.ground)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// On a sidebar row, outside its own foreground, with the tag the row carries.
+    func sidebarInk(_ item: SidebarItem) -> some View {
+        modifier(SidebarInk(item: item))
     }
 }

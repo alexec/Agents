@@ -63,7 +63,7 @@
 
 /* A row the keys or the list landed on. */
 .with-sidebar .sidebar :is(.row.session, .row.activity-row, summary):focus-visible,
-.with-sidebar .sidebar .row:has(> .pick:focus-visible) { outline: 2px solid var(--tint-link, #2f6fd1); outline-offset: -2px; }
+.with-sidebar .sidebar .row:has(> .pick:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 .with-sidebar .sidebar .pick:focus-visible { outline: none; }
 
 .with-sidebar .sidebar-foot { border-top: 1px solid var(--paper-rule); }

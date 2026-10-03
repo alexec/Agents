@@ -46,7 +46,7 @@ struct FirstRunView: View {
                      body: "Install Agents Host, a free app from us. It runs your agents and the control plane on this Mac, and keeps them running with this window closed. It isn’t in the App Store because it runs programs for your agents.",
                      usual: true) {
                     Button("Get Agents Host…") { getAgentsHost() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                         .keyboardShortcut(.defaultAction)
                 }
                 card(title: "Connect to a control plane",
@@ -75,7 +75,7 @@ struct FirstRunView: View {
                 }
                 Spacer()
                 Button("Pair") { pair() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.paperProminent)
                     .keyboardShortcut(.defaultAction)
             }
             .padding(14)

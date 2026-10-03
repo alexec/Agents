@@ -24,7 +24,9 @@ import UIKit
 ///     well      #F1EDE4   #2A2825   what is set into the page: code, your own message
 ///     wash      #ECE7DB   #2F2C28   a row under the pointer, a picked item
 ///     rule      #E2DCCF   #3A3733   hairlines between rows and round raised things
-///     ink       #1F1D1A   #ECE7DC   the prominent button's fill
+///     ink       #1F1D1A   #ECE7DC   text drawn as ink
+///     accent    #5B3BE0   #AB8EFF   the icon's violet (#156): links, focus, the prominent
+///                                   button's fill; `Color.accentColor`, from the asset
 enum Paper {
     static let ground = Color(light: 0xFBF9F4, dark: 0x1C1B19)
     static let sidebar = Color(light: 0xF3F0E8, dark: 0x161513)
@@ -217,8 +219,9 @@ extension ButtonStyle where Self == PaperButtonStyle {
     static var paper: PaperButtonStyle { PaperButtonStyle() }
 }
 
-/// The one control on a card that is the answer: ink on paper turned over, so the
-/// ground becomes the text. Replaces `.buttonStyle(.glassProminent)`.
+/// The one control on a card that is the answer: the accent, with the ground as its text
+/// (6.3:1 light, 6.6:1 dark; white on the dark violet would be 2.6:1). Replaces
+/// `.buttonStyle(.glassProminent)`.
 struct PaperProminentButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
@@ -232,7 +235,7 @@ struct PaperProminentButtonStyle: ButtonStyle {
             // Inside `.paper`'s hairline rather than out to where it is drawn. The same
             // outer size filled edge to edge reads a size larger than a button whose
             // edge is a line, and send sat beside two of those looking wider than them.
-            .background(Paper.ink.opacity(configuration.isPressed ? 0.8 : 1),
+            .background(Color.accentColor.opacity(configuration.isPressed ? 0.8 : 1),
                         in: Capsule().inset(by: 1))
             .overlay(Capsule().strokeBorder(Paper.rule, lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.4)

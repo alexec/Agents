@@ -194,6 +194,9 @@ struct ContentView: View {
         .environment(requests)
         .environment(sidebarStates)
         .environment(webHolders)
+        // A link in Markdown text is drawn in the tint, and with none set macOS draws it in
+        // the system's link blue rather than the app's accent (#156).
+        .tint(.accentColor)
         // A file a chat links to is on its host: that host opens it (058, US1). Links to
         // the web are the window's own.
         .environment(\.openURL, OpenURLAction { url in

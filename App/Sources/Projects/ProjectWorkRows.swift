@@ -134,6 +134,7 @@ private struct WorkflowListRow: View {
             }
         }
         .listRowInsets(.vertical, 2)
+        .sidebarInk(.workflow(summary.id, in: project))
         .tag(SidebarItem.workflow(summary.id, in: project))
         .accessibilityElement(children: .combine)
         .swipeActions(edge: .trailing) {

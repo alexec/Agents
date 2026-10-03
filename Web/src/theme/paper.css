@@ -1,5 +1,5 @@
 /* The Paper palette (071 FR-020): the Mac window's own, from Shared/UI/Paper.swift and
-   Shared/UI/StateTint.swift. Light and dark follow the system, as the window does. Keep the
+   Shared/UI/StateTint.swift, and the accent from the AccentColor asset. Light and dark follow the system, as the window does. Keep the
    values in step with those files; nothing else in the web remote names a colour. */
 
 :root {
@@ -22,6 +22,11 @@
   --paper-selection: #e4dcc8;
   /* Soft and short: paper lifted a little off the desk. */
   --paper-shadow: rgb(59 47 30 / 10%);
+  /* The app icon's violet (#156): links, focus, controls and the prominent button's fill,
+     as the window's AccentColor. Deep enough for text on every paper (4.9:1 on the
+     selection, 6.3:1 on the ground), and the ground reads on it at 6.3:1. */
+  --accent: #5b3be0;
+  accent-color: var(--accent);
 
   /* The three tints, and only Needs you is drawn in colour in a list (FR-018). */
   --tint-attention: #c2410c;
@@ -51,6 +56,9 @@
     --paper-ink: #ece7dc;
     --paper-selection: #3a3630;
     --paper-shadow: rgb(0 0 0 / 10%);
+    /* Light enough for text on dark paper (4.6:1 on the selection, 6.6:1 on the ground);
+       white can't read on it, so what is drawn on it is the ground, at 6.6:1. */
+    --accent: #ab8eff;
 
     --tint-attention: #f08a4b;
     --tint-failure: #f07b6e;

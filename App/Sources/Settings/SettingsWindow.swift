@@ -62,6 +62,8 @@ struct SettingsWindow: View {
                minHeight: Self.size.height, idealHeight: Self.size.height,
                maxHeight: .infinity)
         .background(Paper.ground)
+        // Links in the accent, not macOS's link blue, as in the main window (#156).
+        .tint(.accentColor)
         // The Settings scene draws a window with no grow box, and ignores
         // windowResizability, so the mask is set on the window itself.
         .background(SettingsGrowBox())
@@ -396,7 +398,7 @@ struct RailButton<Content: View>: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(lit ? Paper.ink : .clear, in: RoundedRectangle(cornerRadius: Paper.Radius.control))
+                .background(lit ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: Paper.Radius.control))
                 .contentShape(RoundedRectangle(cornerRadius: Paper.Radius.control))
         }
         .buttonStyle(.plain)

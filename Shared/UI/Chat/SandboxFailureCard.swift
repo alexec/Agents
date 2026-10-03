@@ -61,7 +61,7 @@ struct SandboxFailureCard: View {
                     isSending = true
                     Task { await go(); isSending = false }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.paperProminent)
                 .disabled(isSending)
             }
         }
