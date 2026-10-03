@@ -221,7 +221,9 @@ it in a tree of its own, builds Agents Host, runs the AgentsKit runtime tests, t
 handshake and the tools check, and has one real turn through a scratch `agentsd` on the
 cheapest model the runtime offers. A pinned runtime that passes becomes a pull request on
 `nightly/runtime-<id>`; one that fails becomes an issue naming the step. A runtime with
-nothing new, or out of the pool, costs nothing. To try it without opening anything:
+nothing new, or out of the pool, costs nothing. It arrives waiting for your OK: turn it
+off first (**Turn Off** on its row), then **Approve**, and turn it on when you want it.
+To try it without opening anything:
 
 ```sh
 ./scripts/nightly-runtimes.py plan --home /tmp/nightly --runtimes claude

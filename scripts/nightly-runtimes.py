@@ -379,16 +379,22 @@ def real_turn(client, root, rid, model, timeout=300):
             break
     else:
         return False, f"no end to the turn after {timeout}s: {json.dumps(record)[:2000]}"
-    reply = ""
+    # The agent's own words only: the transcript also holds the prompt, which says OK too.
+    replies = []
     try:
-        reply = json.dumps(client.call("agents/transcript", {"agentID": agent}))
-    except Exception as e:
-        reply = f"(transcript not read: {e})"
+        with open(os.path.join(root, "agents", agent, "transcript.jsonl")) as f:
+            for line in f:
+                message = (json.loads(line).get("kind") or {}).get("agentMessage")
+                if message:
+                    replies.append(message.get("text", ""))
+    except (OSError, ValueError) as e:
+        replies.append(f"(transcript not read: {e})")
+    reply = "".join(replies)
     said_ok = "OK" in reply
     what = (f"agent {agent} on {model or 'the default model'}: {record.get('state')}"
             f"{'' if said_ok else ', and the reply had no OK in it'}")
     if record.get("state") != "finished" or not said_ok:
-        return False, what + "\n" + json.dumps(record)[:2000] + "\n" + reply[-2000:]
+        return False, what + "\n" + json.dumps(record)[:2000] + "\nreplied: " + reply[-2000:]
     return True, what
 
 
