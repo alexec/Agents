@@ -1,0 +1,4 @@
+— call
+call: {"path":"notes.txt","diffLines":[],"struckBlocks":2,"showInChanges":false,"locations":[{"text":"README.md:1","links":0,"font":"ui-monospace"},{"text":"notes.txt:1","links":0,"font":"ui-monospace"},{"text":"notes.txt:1","links":0,"font":"ui-monospace"}]}
+shot before-call-details.png
+errors: []

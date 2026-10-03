@@ -342,8 +342,17 @@ button.call-line:hover { opacity: 1; }
 .call-detail { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; }
 /* In a turn, code at the window's code step (13, mono) beside the reading text. */
 .turn .call-detail pre { font-size: 13px; }
-.diff .removed { opacity: 0.6; text-decoration: line-through; }
-.locations { font: 12px var(--font-mono); opacity: 0.65; margin: 0; }
+/* An edit in an open call (DiffView): its path at the fine step, the lines in a well capped as
+   the window's are, and Show in Changes under it at the right. */
+.call-detail .edit { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.call-diff { align-self: stretch; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.call-diff .path { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.call-diff .diff-lines { max-height: 280px; overflow: auto; }
+button.link.reading { font: inherit; cursor: pointer; }
+button.link.reading:hover { text-decoration: underline; }
+/* Where a call did its work, each a link that opens the file, wrapped. */
+.locations { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0; }
+.locations > * { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note { display: flex; flex-direction: column; gap: 3px; }
 .note.switch {
   padding: 10px 12px;

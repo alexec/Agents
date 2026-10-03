@@ -3,7 +3,7 @@
 // (which a browser draws with scripts off and nothing loaded), and HTML as its source. Nothing a
 // file holds can run or reach anywhere: no HTML sink, and the page's CSP besides.
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { FileReading } from "../../protocol/generated";
 import type { Store } from "../../model/store";
 import { describe } from "../../model/errors";
@@ -33,7 +33,23 @@ function Picture({ bytes, type, name }: { bytes: Uint8Array | string; type: stri
   return url.value ? <img class="picture" src={url.value} alt={name} /> : null;
 }
 
-export function FileView({ store, host, agentID, path }: { store: Store; host: string; agentID: string; path: string }) {
+/** Text at a line: its pane scrolled so the line a tool call named is at the top. */
+function TextAt({ text, line }: { text: string; line: number | undefined }) {
+  const pre = useRef<HTMLPreElement>(null);
+  useLayoutEffect(() => {
+    const el = pre.current;
+    const scroller = el?.closest(".scroll");
+    if (!el || !scroller || !line || line < 2) return;
+    const height = parseFloat(getComputedStyle(el).lineHeight) || 18;
+    const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = top + parseFloat(getComputedStyle(el).paddingTop || "0") + (line - 1) * height;
+  }, [text, line]);
+  return <pre class="file-text" ref={pre}>{text}</pre>;
+}
+
+export function FileView({ store, host, agentID, path, line }: {
+  store: Store; host: string; agentID: string; path: string; line?: number | undefined;
+}) {
   const reading = useSignal<FileReading | null>(null);
   const failed = useSignal<string | null>(null);
   useEffect(() => {
@@ -69,11 +85,11 @@ export function FileView({ store, host, agentID, path }: { store: Store; host: s
           <>
             <p class="quiet small">HTML is shown as its source here, so nothing in it runs.</p>
             {note}
-            <pre class="file-text">{r.text}</pre>
+            <TextAt text={r.text} line={line} />
           </>
         );
       }
-      return <>{note}<pre class="file-text">{r.text}</pre></>;
+      return <>{note}<TextAt text={r.text} line={line} /></>;
     }
   }
 }

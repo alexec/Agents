@@ -26,18 +26,20 @@ const narrow = signal(narrowQuery?.matches ?? false);
 narrowQuery?.addEventListener("change", (e) => { narrow.value = e.matches; });
 
 /** A file open under Files, with Back to where it was opened from. */
-function OpenFile({ store, host, session, file, back }: { store: Store; host: string; session: string; file: string; back: string }) {
+function OpenFile({ store, host, session, file, line, back }: {
+  store: Store; host: string; session: string; file: string; line: number | undefined; back: string;
+}) {
   return (
     <div class="file">
       <div class="crumbs">
         {/* Back finds the folder with this file marked (#66). */}
-        <button class="link" onClick={() => setPane(session, { file: undefined, last: file })}>‹ {nameOf(back)}</button>
+        <button class="link" onClick={() => setPane(session, { file: undefined, fileLine: undefined, last: file })}>‹ {nameOf(back)}</button>
         <span class="title">{nameOf(file)}</span>
         {(extensionOf(file) === "md" || extensionOf(file) === "markdown") && (
           <button class="link" onClick={() => setPane(session, { tab: "page", page: file, line: undefined })}>Open as Page</button>
         )}
       </div>
-      <FileView store={store} host={host} agentID={session} path={file} />
+      <FileView store={store} host={host} agentID={session} path={file} line={line} />
     </div>
   );
 }
@@ -58,7 +60,7 @@ function Browser({ store, host, session, root }: { store: Store; host: string; s
   // The tree stays under an open file rather than going, so Back finds it as it was left (#66).
   return (
     <>
-      {pane.file && <OpenFile store={store} host={host} session={session} file={pane.file} back={root} />}
+      {pane.file && <OpenFile store={store} host={host} session={session} file={pane.file} line={pane.fileLine} back={root} />}
       {!pane.file && <div class="crumbs"><span class="title">{nameOf(root)}</span></div>}
       <Tree store={store} host={host} session={session} root={root} marks={marks} changedAt={changedAt} hidden={!!pane.file} />
     </>
@@ -87,7 +89,7 @@ function FolderList({ store, host, session, root, marks, changedAt }: {
     return () => store.unwatchFolder(host, session, folder);
   }, [host, session, folder]);
 
-  if (pane.file) return <OpenFile store={store} host={host} session={session} file={pane.file} back={folder} />;
+  if (pane.file) return <OpenFile store={store} host={host} session={session} file={pane.file} line={pane.fileLine} back={folder} />;
   // Up to the session's own folder and no further: the host refuses anything outside it.
   const parent = folder !== root && folder.startsWith(root) ? folder.slice(0, folder.lastIndexOf("/")) || "/" : null;
   return (
@@ -106,7 +108,7 @@ function FolderList({ store, host, session, root, marks, changedAt }: {
           return (
             <li key={entry.url}>
               <button class={`row entry${last ? " chosen" : ""}`} aria-current={last}
-                onClick={() => setPane(session, entry.isDirectory ? { folder: path } : { file: path, last: path })}>
+                onClick={() => setPane(session, entry.isDirectory ? { folder: path } : { file: path, fileLine: undefined, last: path })}>
                 <span class="title">
                   {changed ? <StatusSquare file={changed} /> : <span aria-hidden="true">{entry.isDirectory ? "📁" : "📄"}</span>} {entry.name}
                 </span>

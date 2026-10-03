@@ -136,7 +136,7 @@ export function Tree({ store, host, session, root, marks, changedAt, hidden }: {
   };
   const open = (line: TreeLine & { kind: "entry" }) => {
     if (line.entry.isDirectory) toggle(line.path);
-    else setPane(session, { file: line.path, last: line.path, cursor: line.path });
+    else setPane(session, { file: line.path, fileLine: undefined, last: line.path, cursor: line.path });
   };
   const cursor = pane.cursor ?? pane.last;
   const onKey = (e: KeyboardEvent) => {

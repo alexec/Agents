@@ -2,10 +2,14 @@
 // shared TranscriptRows.swift draws them for the Mac and the phone (071 FR-023). Words come from
 // the ported rules; agent text goes through the Markdown renderer and nowhere else.
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { createContext } from "preact";
+import { useContext, useEffect } from "preact/hooks";
 import type {
-  AgentState, BackgroundItem, ContentBlock, EndedReason, JSONValue, Plan, ToolCall, TranscriptEntry, WorkReport,
+  AgentState, BackgroundItem, ContentBlock, EndedReason, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
+  TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
+import { lineDiff } from "../../model/diff";
+import { Lines } from "../Changes";
 import { backgroundEnding } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, startingLabel } from "../../model/status";
@@ -99,11 +103,32 @@ function ReportLine({ report }: { report: WorkReport }) {
   );
 }
 
+/**
+ * What a call's detail needs from the page (the window's ChatActions): open a file it touched in
+ * the Files pane, and show an edit among the agent's changes. Nothing is offered without them.
+ */
+export interface CallActions {
+  open: (location: ToolCallLocation) => void;
+  showEdit: (diff: Extract<ToolCallContent, { type: "diff" }>, toolCallID: string | undefined) => void;
+}
+export const CallActionsContext = createContext<CallActions | null>(null);
+
+/** An edit (DiffView): its path at the fine step, then its lines marked + and −, in a well. */
+function EditDiff({ diff }: { diff: Extract<ToolCallContent, { type: "diff" }> }) {
+  return (
+    <div class="call-diff">
+      <p class="path faint small" title={diff.path}><bdi>{diff.path}</bdi></p>
+      <Lines lines={lineDiff(diff.oldText, diff.newText)} />
+    </div>
+  );
+}
+
 /** One tool call: its line, and what it did once asked (ToolCallLine). */
 export function ToolCallLine({ call, text, open = false, background, onClick }: {
   call: ToolCall; text?: string; open?: boolean; background: readonly BackgroundItem[]; onClick?: () => void;
 }) {
   const expanded = useSignal(false);
+  const actions = useContext(CallActionsContext);
   const runsOn = call.toolCallID !== undefined
     && background.some((item) => item.toolCallID === call.toolCallID && (item.state === "running" || item.state === "paused"))
     ? " · running in the background" : "";
@@ -124,11 +149,15 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
         <div class="call-detail">
           {(call.content ?? []).map((piece, index) => {
             if (piece.type === "diff") {
+              // A link under the edit rather than the edit as a button: the lines stay
+              // selectable, and the way in is said in words.
               return (
-                <div key={index} class="diff">
-                  <p class="quiet">{piece.path.split("/").pop()}</p>
-                  {piece.oldText !== undefined && <pre class="removed">{piece.oldText}</pre>}
-                  <pre class="added">{piece.newText}</pre>
+                <div key={index} class="edit">
+                  <EditDiff diff={piece} />
+                  {actions && (
+                    <button class="link reading" title="See this edit among everything the agent changed"
+                      onClick={() => actions.showEdit(piece, call.toolCallID)}>Show in Changes</button>
+                  )}
                 </div>
               );
             }
@@ -136,8 +165,17 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
             if (piece.type === "terminal") return <p key={index} class="quiet">Terminal output is shown in the Mac window.</p>;
             return null;
           })}
+          {/* Where it did its work, each a way in, wrapped: file names are long. */}
           {(call.locations ?? []).length > 0 && (
-            <p class="locations">{(call.locations ?? []).map((l) => `${l.path.split("/").pop()}${l.line ? `:${l.line}` : ""}`).join("  ")}</p>
+            <p class="locations">
+              {(call.locations ?? []).map((l, i) => {
+                const words = `${l.path.split("/").pop()}${l.line ? `:${l.line}` : ""}`;
+                return actions
+                  ? <button key={i} class="link reading" aria-label={`Open ${l.path.split("/").pop()}`} title={l.path}
+                    onClick={() => actions.open(l)}>{words}</button>
+                  : <span key={i}>{words}</span>;
+              })}
+            </p>
           )}
           {call.rawInput !== undefined && <div><p class="faint">Argument</p><pre>{pretty(call.rawInput)}</pre></div>}
           {call.rawOutput !== undefined && <div><p class="faint">Return</p><pre>{pretty(call.rawOutput)}</pre></div>}
