@@ -978,6 +978,9 @@ public enum DaemonAPI {
         /// Only with `blocked` (039). See `ReportOutcomeRequest`.
         public var waitingOn: [String]?
         public var checkAgainInMinutes: Int?
+        /// `any` or `all` (#152): whether the first of `waitingOn` to finish resumes it.
+        /// A string, checked at the daemon; left out is `all`.
+        public var wakeOn: String?
         /// `park` or `archive`: where the agent asked to be put once the turn is over.
         /// A string, checked at the daemon, and optional for the reason `title` is.
         public var afterwards: String?
@@ -991,7 +994,7 @@ public enum DaemonAPI {
         public init(token: String, outcome: String, message: String,
                     prompts: [SuggestedPrompt], title: String? = nil,
                     waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
-                    afterwards: String? = nil,
+                    wakeOn: String? = nil, afterwards: String? = nil,
                     addLabels: [String] = [], removeLabels: [String] = [],
                     move: MoveAsk? = nil) {
             self.token = token
@@ -1001,6 +1004,7 @@ public enum DaemonAPI {
             self.title = title
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
+            self.wakeOn = wakeOn
             self.afterwards = afterwards
             self.addLabels = addLabels
             self.removeLabels = removeLabels
@@ -1016,6 +1020,7 @@ public enum DaemonAPI {
             title = try c.decodeIfPresent(String.self, forKey: .title)
             waitingOn = try c.decodeIfPresent([String].self, forKey: .waitingOn)
             checkAgainInMinutes = try c.decodeIfPresent(Int.self, forKey: .checkAgainInMinutes)
+            wakeOn = try c.decodeIfPresent(String.self, forKey: .wakeOn)
             afterwards = try c.decodeIfPresent(String.self, forKey: .afterwards)
             addLabels = try c.decodeIfPresent([String].self, forKey: .addLabels) ?? []
             removeLabels = try c.decodeIfPresent([String].self, forKey: .removeLabels) ?? []

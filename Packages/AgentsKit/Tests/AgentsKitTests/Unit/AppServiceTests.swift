@@ -332,7 +332,22 @@ struct AppServiceTests {
         #expect(properties?["outcome"]?["enum"]?.arrayValue?.contains("blocked") == true)
         #expect(properties?["waiting_on"]?["type"]?.stringValue == "array")
         #expect(properties?["check_again_in_minutes"]?["maximum"]?.intValue == 1440)
+        #expect(properties?["wake_on"]?["enum"]?.arrayValue == ["any", "all"])
         #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("blocked") == true)
+        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("wake_on any") == true)
+    }
+
+    /// #152: wake_on rides to the sink as read; left out, it is nil, which is all.
+    @Test func wakeOnIsCarriedToTheSink() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(finishTurn: finishing(box))
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "blocked", "message": "Waiting on any lane.",
+                          "title": "Lanes", "waiting_on": ["A", "B", "C"], "wake_on": "any"],
+        ])
+        #expect(await box.words == AppService.BlockWords(waitingOn: ["A", "B", "C"], wakeOn: .any))
+        await service.close()
     }
 
     @Test func aBlockedCallCarriesItsWaitsAndTimeToTheSink() async throws {
@@ -360,6 +375,8 @@ struct AppServiceTests {
             ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 0],
             ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 1441],
             ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 2.5],
+            ["outcome": "done", "message": "m", "title": "t", "wake_on": "any"],
+            ["outcome": "blocked", "message": "m", "title": "t", "waiting_on": ["A"], "wake_on": "first"],
         ]
         for arguments in cases {
             let result = try await client.call("tools/call", [

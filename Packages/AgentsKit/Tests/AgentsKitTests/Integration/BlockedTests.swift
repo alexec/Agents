@@ -78,11 +78,12 @@ struct BlockedTests {
 
     @discardableResult
     private func finish(_ core: DaemonCore, _ token: String, _ outcome: String, _ message: String,
-                        waitingOn: [String]? = nil, minutes: Int? = nil) async throws -> String {
+                        waitingOn: [String]? = nil, minutes: Int? = nil,
+                        wakeOn: String? = nil) async throws -> String {
         if let id = callers[token] { await core.bindAppToken(token, to: id) }
         return try await core.finishTurn(.init(token: token, outcome: outcome, message: message,
                                                prompts: [], title: nil, waitingOn: waitingOn,
-                                               checkAgainInMinutes: minutes))
+                                               checkAgainInMinutes: minutes, wakeOn: wakeOn))
     }
 
     private func refusal(_ body: () async throws -> Void) async -> String? {
@@ -162,6 +163,101 @@ struct BlockedTests {
         leadGate.open()
         await eventually("the lead was resumed") { (try? await self.resumes(core, lead).count) == 1 }
         await settled(core, lead)
+        try await quiet()
+        #expect(try await resumes(core, lead).count == 1)
+    }
+
+    // MARK: #152 — waking on any
+
+    /// Three lanes, wake_on any: the first to finish resumes the lead once, told which
+    /// finished and which are still running. The second finishing sends nothing, until
+    /// the lead waits on the rest again.
+    @Test func wakingOnAnyResumesOnceWhenTheFirstFinishes() async throws {
+        let (locations, work) = try temporary()
+        let gates = [TurnGate(), TurnGate(), TurnGate()]
+        let launcher = FakeLauncher(script: .init(), then: gates.map(Self.held))
+        let core = try await makeCore(locations, launcher)
+        let (a, aToken) = try await agent(core, in: work, "Lane A")
+        let (b, bToken) = try await agent(core, in: work, "Lane B")
+        let (c, cToken) = try await agent(core, in: work, "Lane C")
+        let (lead, leadToken) = try await agent(core, in: work, "Lead")
+        await settled(core, lead)
+
+        let note = try await finish(core, leadToken, "blocked", "Waiting on the lanes.",
+                                    waitingOn: [a.uuidString, b.uuidString, c.uuidString], wakeOn: "any")
+        #expect(note.contains("resumed once, when the first of"))
+        #expect(await core.agent(lead)?.report?.block?.wakeOn == .any)
+
+        try await finish(core, bToken, "done", "Lane B merged.")
+        gates[1].open()
+        await settled(core, b, "lane B finished")
+        await eventually("the lead was resumed") { (try? await self.resumes(core, lead).count) == 1 }
+        await settled(core, lead, "the lead's resumed turn ended")
+        let sent = try #require(try await resumes(core, lead).first)
+        #expect(sent.contains("Finished:\n- \u{201C}Lane B\u{201D} (id \(b.uuidString)): finished: complete — Lane B merged."))
+        #expect(sent.contains("Still running:\n- \u{201C}Lane A\u{201D} (id \(a.uuidString)): still working\n"
+                              + "- \u{201C}Lane C\u{201D} (id \(c.uuidString)): still working"))
+        #expect(sent.contains("You said you were waiting on: Waiting on the lanes."))
+
+        // A second lane finishing: the block has cleared, so nothing more is sent.
+        try await finish(core, aToken, "done", "Lane A merged.")
+        gates[0].open()
+        await settled(core, a, "lane A finished")
+        try await quiet()
+        #expect(try await resumes(core, lead).count == 1, "one block, one resume")
+
+        // Waiting again on the one still running resumes it once more.
+        try await finish(core, leadToken, "blocked", "Waiting on lane C.", waitingOn: ["Lane C"], wakeOn: "any")
+        try await finish(core, cToken, "done", "Lane C merged.")
+        gates[2].open()
+        await settled(core, c, "lane C finished")
+        await eventually("the lead was resumed again") { (try? await self.resumes(core, lead).count) == 2 }
+        await settled(core, lead)
+        try await quiet()
+        #expect(try await resumes(core, lead).count == 2)
+    }
+
+    /// wake_on all, said out loud, is the block there was before: the default.
+    @Test func wakingOnAllIsTheDefault() async throws {
+        let (locations, work) = try temporary()
+        let a = Agent(runtimeID: "claude", cwd: work, title: "A", state: .running)
+        let b = Agent(runtimeID: "claude", cwd: work, title: "B", state: .running)
+        let lead = Self.finished("Lead", in: work)
+        let core = try await seeded(locations, [a, b, lead])
+        let leadToken = await token(core, for: lead.id)
+        let said = try await finish(core, leadToken, "blocked", "On both.", waitingOn: ["A", "B"], wakeOn: "all")
+        #expect(said.contains("have all finished"))
+        #expect(await core.agent(lead.id)?.report?.block?.wakeOn == nil)
+        let unknown = await refusal {
+            try await self.finish(core, leadToken, "blocked", "On both.", waitingOn: ["A"], wakeOn: "first")
+        }
+        #expect(unknown?.contains("wake_on has to be any or all") == true)
+        let wrongOutcome = await refusal { try await self.finish(core, leadToken, "done", "Done.", wakeOn: "any") }
+        #expect(wrongOutcome?.contains("only go with blocked") == true)
+    }
+
+    /// waiting_on with check_again_in_minutes: the time, coming first, resumes it, and
+    /// the helper finishing later sends nothing more.
+    @Test func theTimeComingFirstResumesAWaitOnAnAgentOnce() async throws {
+        let (locations, work) = try temporary()
+        let helperGate = TurnGate()
+        let launcher = FakeLauncher(script: .init(), then: [Self.held(helperGate)])
+        let core = try await makeCore(locations, launcher)
+        let (helper, helperToken) = try await agent(core, in: work, "Helper")
+        let (lead, leadToken) = try await agent(core, in: work, "Lead")
+        await settled(core, lead)
+        let note = try await finish(core, leadToken, "blocked", "On the helper, or CI.",
+                                    waitingOn: [helper.uuidString], minutes: 10)
+        #expect(note.contains("whichever comes first"))
+        let at = try #require(await core.agent(lead)?.report?.block?.checkAgainAt)
+        await core.tickWorkflows(now: at.addingTimeInterval(1))
+        await eventually("the lead was resumed") { (try? await self.resumes(core, lead).count) == 1 }
+        await settled(core, lead)
+        #expect(try await resumes(core, lead).first?.hasPrefix("The time you asked to check again has come.") == true)
+
+        try await finish(core, helperToken, "done", "Done.")
+        helperGate.open()
+        await settled(core, helper)
         try await quiet()
         #expect(try await resumes(core, lead).count == 1)
     }

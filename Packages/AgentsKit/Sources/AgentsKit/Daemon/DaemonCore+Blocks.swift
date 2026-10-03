@@ -18,7 +18,8 @@ extension DaemonCore {
     /// lists the names it could have meant, and an agent that has already ended says how,
     /// so the one waiting can use what it said instead of waiting on nothing (SC-004).
     func checkedBlock(for caller: Agent, waitingOn written: [String],
-                      checkAgainInMinutes minutes: Int?, at: Date) throws -> Block {
+                      checkAgainInMinutes minutes: Int?, wakeOn: Block.WakeOn? = nil,
+                      at: Date) throws -> Block {
         if let minutes, !Block.checkAgainMinutes.contains(minutes) {
             throw refusal("check_again_in_minutes has to be from \(Block.checkAgainMinutes.lowerBound) "
                           + "to \(Block.checkAgainMinutes.upperBound).")
@@ -34,8 +35,10 @@ extension DaemonCore {
             throw refusal("waiting on \(names[0]) would close a circle: "
                           + names.joined(separator: " waits on ") + " waits on you.")
         }
+        // Kept only where it changes something: `all` is what a block with no word does.
         return Block(waits: waits,
-                     checkAgainAt: minutes.map { at.addingTimeInterval(TimeInterval($0) * 60) })
+                     checkAgainAt: minutes.map { at.addingTimeInterval(TimeInterval($0) * 60) },
+                     wakeOn: wakeOn == .any && !waits.isEmpty ? .any : nil)
     }
 
     /// One name an agent wrote, as an agent it may wait on.
@@ -134,6 +137,9 @@ extension DaemonCore {
         switch named.count {
         case 0: break
         case 1: note += " You will be resumed when \(named[0]) has finished"
+        case _ where block.wakeOn == .any:
+            note += " You will be resumed once, when the first of \(named.dropLast().joined(separator: ", ")) "
+                + "or \(named.last!) has finished"
         default:
             note += " You will be resumed when \(named.dropLast().joined(separator: ", ")) and \(named.last!) "
                 + "have all finished"
@@ -218,7 +224,7 @@ extension DaemonCore {
               var block = report.block, block.shouldResume(now: now),
               agent.queuedPrompts.isEmpty, turnTasks[agentID] == nil, !sending.contains(agentID)
         else { return nil }
-        let why: Block.Clearing = (!block.waits.isEmpty && block.allWaitsClosed) ? .waits : .time
+        let why: Block.Clearing = block.waitsCleared ? .waits : .time
         let text = block.resumePrompt(message: report.message, name: { self.waitName($0) }, why: why)
         block.clearedAt = now
         block.clearedBy = why

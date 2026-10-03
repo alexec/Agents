@@ -64,6 +64,7 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                                 message: message, prompts: prompts,
                                                 title: title, waitingOn: words.waitingOn,
                                                 checkAgainInMinutes: words.checkAgainInMinutes,
+                                                wakeOn: words.wakeOn?.rawValue,
                                                 afterwards: words.afterwards?.rawValue,
                                                 addLabels: words.addLabels,
                                                 removeLabels: words.removeLabels,

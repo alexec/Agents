@@ -142,7 +142,8 @@ extension DaemonCore {
     public func finishTurn(_ request: DaemonAPI.FinishTurnRequest) async throws -> String {
         let checked = try checkedReport(token: request.token, outcome: request.outcome,
                                         message: request.message, waitingOn: request.waitingOn,
-                                        checkAgainInMinutes: request.checkAgainInMinutes)
+                                        checkAgainInMinutes: request.checkAgainInMinutes,
+                                        wakeOn: request.wakeOn)
         // Checked after the report's own refusals, so an agent that got the outcome
         // wrong hears about that first; and before either write, so a refused ask
         // leaves nothing behind (the whole call is refused).
@@ -218,7 +219,8 @@ extension DaemonCore {
     /// app is holding a form or a permission for the person would tell them the
     /// opposite of the truth, so the agent is sent back to its own question first.
     private func checkedReport(token: String, outcome rawOutcome: String, message: String,
-                               waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil)
+                               waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
+                               wakeOn rawWakeOn: String? = nil)
         throws -> (agentID: UUID, agent: Agent, report: WorkReport) {
         guard let agentID = appTokens[token], let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
@@ -253,12 +255,19 @@ extension DaemonCore {
         }
         // Last, because it is the only check that reads other agents (039): everything
         // about this call alone has passed by now.
+        var wakeOn: Block.WakeOn?
+        if let rawWakeOn {
+            guard let known = Block.WakeOn(rawValue: rawWakeOn) else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: Block.unknownWakeOn)
+            }
+            wakeOn = known
+        }
         if outcome == .blocked {
             report.block = try checkedBlock(for: agent, waitingOn: waitingOn ?? [],
-                                            checkAgainInMinutes: checkAgainInMinutes, at: report.at)
-        } else if waitingOn?.isEmpty == false || checkAgainInMinutes != nil {
-            throw JSONRPCError(code: JSONRPCError.invalidParams,
-                               message: "Nothing was recorded: waiting_on and check_again_in_minutes only go with blocked.")
+                                            checkAgainInMinutes: checkAgainInMinutes,
+                                            wakeOn: wakeOn, at: report.at)
+        } else if waitingOn?.isEmpty == false || checkAgainInMinutes != nil || wakeOn != nil {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: Block.onlyWithBlocked)
         }
         return (agentID, agent, report)
     }
@@ -303,8 +312,10 @@ extension DaemonCore {
             let waitingOn = report.block.map { block in
                 block.waits.map { "\u{201C}\(self.waitName($0))\u{201D}" }.joined(separator: ", ")
             } ?? ""
+            let anyOf = report.block?.wakeOn == .any && (report.block?.waits.count ?? 0) > 1
             raiseAgentEvent("agent.blocked", agentID,
-                            sentence: waitingOn.isEmpty ? "is blocked." : "is waiting for \(waitingOn) to finish.",
+                            sentence: waitingOn.isEmpty ? "is blocked."
+                                : "is waiting for \(anyOf ? "any of " : "")\(waitingOn) to finish.",
                             details: waitingOn.isEmpty ? [:] : ["waiting_on": waitingOn])
             // Reported after its turn had already ended, with everything it named
             // already over by then: nothing else will pass through `move` for it.

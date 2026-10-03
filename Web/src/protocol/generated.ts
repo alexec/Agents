@@ -249,11 +249,14 @@ export type BackgroundItemState = "running" | "paused" | "completed" | "failed" 
 export interface Block {
   waits: Wait[];
   checkAgainAt?: WireDate;
+  wakeOn?: BlockWakeOn;
   clearedAt?: WireDate;
   clearedBy?: BlockClearing;
 }
 
 export type BlockClearing = "waits" | "time" | "dropped";
+
+export type BlockWakeOn = "any" | "all";
 
 export interface BranchSummary {
   name: string;
@@ -1805,7 +1808,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AttentionPending: { required: ["needs", "deliveries"], optional: [] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
-  Block: { required: ["waits"], optional: ["checkAgainAt", "clearedAt", "clearedBy"] },
+  Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },

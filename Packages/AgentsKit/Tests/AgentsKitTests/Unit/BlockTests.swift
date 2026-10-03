@@ -23,6 +23,47 @@ struct BlockTests {
         #expect(!Block(waits: [Self.wait(ended: true), Self.wait(ended: false)]).shouldResume(now: Self.now))
     }
 
+    /// #152: waking on any, the first wait to close clears it; all is as before.
+    @Test func wakingOnAnyResumesWhenTheFirstWaitHasClosed() {
+        let some = [Self.wait(ended: true), Self.wait(ended: false), Self.wait(ended: false)]
+        #expect(Block(waits: some, wakeOn: .any).shouldResume(now: Self.now))
+        #expect(!Block(waits: some, wakeOn: .all).shouldResume(now: Self.now))
+        #expect(!Block(waits: some).shouldResume(now: Self.now))
+        #expect(!Block(waits: [Self.wait(ended: false)], wakeOn: .any).shouldResume(now: Self.now))
+        #expect(!Block(wakeOn: .any).shouldResume(now: Self.now), "any of nobody is still nobody")
+    }
+
+    /// A block written before #152 has no wake_on, and reads as all.
+    @Test func aBlockWithoutWakeOnDecodesAsAll() throws {
+        let old = #"{"waits":[]}"#.data(using: .utf8)!
+        let block = try JSONDecoder().decode(Block.self, from: old)
+        #expect(block.wakeOn == nil)
+        #expect(Block(wakeOn: .any) != Block())
+    }
+
+    /// The row and the card say which, once there is more than one to choose from.
+    @Test func theWakeLineSaysAnyOrAll() {
+        let two = [Self.wait(ended: false), Self.wait(ended: false)]
+        #expect(Block(waits: two, wakeOn: .any).wakeLine() == "Carries on when any of these finishes")
+        #expect(Block(waits: two).wakeLine() == "Carries on when all of these have finished")
+        #expect(Block(waits: [Self.wait(ended: false)], wakeOn: .any).wakeLine() == nil)
+    }
+
+    /// Waking on any, the prompt lists what finished and what is still running, and
+    /// says how to wait on the rest.
+    @Test func theAnyPromptListsFinishedAndStillRunning() {
+        let done = Wait(agentID: UUID(), nameAtReport: "Lane A",
+                        ending: WaitEnding(at: Self.now, how: .finished(outcome: .done, message: "Merged.")))
+        let b = Wait(agentID: UUID(), nameAtReport: "Lane B")
+        let c = Wait(agentID: UUID(), nameAtReport: "Lane C")
+        let text = Block(waits: [b, done, c], wakeOn: .any)
+            .resumePrompt(message: "the lanes", name: \.nameAtReport, why: .waits)
+        #expect(text.hasPrefix("The block you reported has cleared: you asked to carry on when any of"))
+        #expect(text.contains("Finished:\n- \u{201C}Lane A\u{201D} (id \(done.agentID.uuidString)): finished: complete — Merged."))
+        #expect(text.contains("Still running:\n- \u{201C}Lane B\u{201D} (id \(b.agentID.uuidString)): still working\n- \u{201C}Lane C\u{201D}"))
+        #expect(text.contains("To wait on the rest, end your turn blocked again"))
+    }
+
     /// Whichever comes first: the time, even with waits still open.
     @Test func theTimeResumesItWithWaitsStillOpen() {
         let block = Block(waits: [Self.wait(ended: false)], checkAgainAt: Self.now)

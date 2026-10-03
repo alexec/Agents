@@ -16,21 +16,33 @@ public struct Block: Codable, Hashable, Sendable {
     public var waits: [Wait]
     /// When to resume it anyway, to look at something the app cannot see.
     public var checkAgainAt: Date?
+    /// Whether the first of `waits` to end clears it, or only the last (#152). Nil is
+    /// `all`, which is what every block before this was.
+    public var wakeOn: WakeOn?
     public var clearedAt: Date?
     public var clearedBy: Clearing?
 
-    public init(waits: [Wait] = [], checkAgainAt: Date? = nil,
+    public init(waits: [Wait] = [], checkAgainAt: Date? = nil, wakeOn: WakeOn? = nil,
                 clearedAt: Date? = nil, clearedBy: Clearing? = nil) {
         self.waits = waits
         self.checkAgainAt = checkAgainAt
+        self.wakeOn = wakeOn
         self.clearedAt = clearedAt
         self.clearedBy = clearedBy
+    }
+
+    /// Which of the agents waited on have to end before it clears.
+    public enum WakeOn: String, Codable, Hashable, Sendable, CaseIterable {
+        /// The first one to end.
+        case any
+        /// Every one.
+        case all
     }
 
     /// How a block came to clear. A person's prompt is not here: it takes the whole
     /// report away, block and all.
     public enum Clearing: String, Codable, Hashable, Sendable {
-        /// Every agent it waited on has finished.
+        /// Every agent it waited on has finished — or, waking on any, the first has.
         case waits
         /// The time it asked to be checked on came.
         case time
@@ -42,11 +54,23 @@ public struct Block: Codable, Hashable, Sendable {
     /// not wake every few seconds, and short enough to cover an overnight CI run.
     public static let checkAgainMinutes = 1...1440
 
+    /// The two refusals about a block's words, said once for the helper and the daemon.
+    public static let onlyWithBlocked =
+        "Nothing was recorded: waiting_on, wake_on and check_again_in_minutes only go with blocked."
+    public static let unknownWakeOn = "Nothing was recorded: wake_on has to be any or all."
+
     public var isOpen: Bool { clearedAt == nil }
 
     /// Every agent it waited on has ended. True of no waits at all, which is why
     /// `shouldResume` asks for at least one.
     public var allWaitsClosed: Bool { waits.allSatisfy { $0.ending != nil } }
+
+    /// The agents it waited on have ended as far as it asked: the first of them, when it
+    /// wakes on any, and every one otherwise. False of no waits at all.
+    public var waitsCleared: Bool {
+        guard !waits.isEmpty else { return false }
+        return wakeOn == .any ? waits.contains { $0.ending != nil } : allWaitsClosed
+    }
 
     public func isDue(now: Date) -> Bool {
         checkAgainAt.map { $0 <= now } ?? false
@@ -55,7 +79,7 @@ public struct Block: Codable, Hashable, Sendable {
     /// The whole rule for resuming. A block that named nobody and gave no time is
     /// never resumed by the app: it waits for the person.
     public func shouldResume(now: Date) -> Bool {
-        isOpen && ((!waits.isEmpty && allWaitsClosed) || isDue(now: now))
+        isOpen && (waitsCleared || isDue(now: now))
     }
 }
 
@@ -128,6 +152,13 @@ public extension Block {
         return "\(name) — \(ending.summary)"
     }
 
+    /// Above the wait lines, when there is more than one: which of them it waits for.
+    func wakeLine() -> String? {
+        guard isOpen, waits.count > 1 else { return nil }
+        return wakeOn == .any ? "Carries on when any of these finishes"
+                              : "Carries on when all of these have finished"
+    }
+
     /// When it will check again, if it asked to.
     func checkAgainLine() -> String? {
         guard isOpen, let checkAgainAt else { return nil }
@@ -145,7 +176,11 @@ public extension Block {
     /// back into what it was doing.
     func resumePrompt(message: String, name: (Wait) -> String, why: Clearing) -> String {
         var lines: [String] = []
+        let anyOf = wakeOn == .any && waits.count > 1
         switch why {
+        case .waits where anyOf:
+            lines.append("The block you reported has cleared: you asked to carry on when any of "
+                         + "the agents you were waiting on finished, and one has.")
         case .waits:
             lines.append(waits.count == 1
                 ? "The block you reported has cleared: the agent you were waiting on has finished."
@@ -153,23 +188,43 @@ public extension Block {
         case .time, .dropped:
             lines.append("The time you asked to check again has come.")
         }
-        if !waits.isEmpty {
-            lines.append("")
-            for wait in waits {
-                var line = "- \u{201C}\(name(wait))\u{201D} (id \(wait.agentID.uuidString)): "
-                if let ending = wait.ending {
-                    line += ending.summary
-                    if let said = ending.message { line += " — \(said)" }
-                } else {
-                    line += "still working"
-                }
-                lines.append(line)
+        func line(_ wait: Wait) -> String {
+            var line = "- \u{201C}\(name(wait))\u{201D} (id \(wait.agentID.uuidString)): "
+            if let ending = wait.ending {
+                line += ending.summary
+                if let said = ending.message { line += " — \(said)" }
+            } else {
+                line += "still working"
             }
+            return line
+        }
+        let ended = waits.filter { $0.ending != nil }
+        let going = waits.filter { $0.ending == nil }
+        if anyOf {
+            // Two lists, so the agent can see at a glance what is left to wait on.
+            if !ended.isEmpty {
+                lines.append("")
+                lines.append("Finished:")
+                lines.append(contentsOf: ended.map(line))
+            }
+            if !going.isEmpty {
+                lines.append("")
+                lines.append("Still running:")
+                lines.append(contentsOf: going.map(line))
+            }
+        } else if !waits.isEmpty {
+            lines.append("")
+            lines.append(contentsOf: waits.map(line))
         }
         lines.append("")
         lines.append("You said you were waiting on: \(message)")
-        lines.append(why == .waits ? "Carry on from here."
-                                   : "Check on it, and carry on or end your turn blocked again.")
+        if why == .waits {
+            lines.append(going.isEmpty ? "Carry on from here."
+                                       : "Carry on from here. To wait on the rest, end your turn blocked "
+                                         + "again, naming them in waiting_on.")
+        } else {
+            lines.append("Check on it, and carry on or end your turn blocked again.")
+        }
         return lines.joined(separator: "\n")
     }
 }

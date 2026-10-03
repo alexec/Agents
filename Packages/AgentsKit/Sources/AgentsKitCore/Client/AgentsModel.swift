@@ -946,11 +946,12 @@ public final class AgentsModel {
         return title.flatMap { $0.isEmpty ? nil : $0 } ?? wait.nameAtReport
     }
 
-    /// The lines under a blocked agent's message: one per agent it waits on, and when it
-    /// will check again. The same on the Mac's row and the phone's card (FR-011).
+    /// The lines under a blocked agent's message: whether it waits on any or all of
+    /// several (#152), one per agent it waits on, and when it will check again. The same on the Mac's row and the phone's card (FR-011).
     public func blockLines(_ agent: Agent) -> [String] {
         guard let (_, block) = openBlock(agent) else { return [] }
-        return block.waits.map { Block.waitLine(name: waitName($0), ending: $0.ending) }
+        return [block.wakeLine()].compactMap { $0 }
+            + block.waits.map { Block.waitLine(name: waitName($0), ending: $0.ending) }
             + [block.checkAgainLine()].compactMap { $0 }
     }
 

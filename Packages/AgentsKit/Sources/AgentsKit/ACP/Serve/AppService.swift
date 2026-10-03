@@ -88,17 +88,20 @@ public actor AppService {
     public struct BlockWords: Sendable, Equatable {
         public var waitingOn: [String]?
         public var checkAgainInMinutes: Int?
+        /// Whether the first of `waitingOn` to finish resumes it (#152). Nil is `all`.
+        public var wakeOn: Block.WakeOn?
         public var afterwards: AfterTurn?
         public var addLabels: [String]
         public var removeLabels: [String]
         public var move: MoveCall?
 
         public init(waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
-                    afterwards: AfterTurn? = nil,
+                    wakeOn: Block.WakeOn? = nil, afterwards: AfterTurn? = nil,
                     addLabels: [String] = [], removeLabels: [String] = [],
                     move: MoveCall? = nil) {
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
+            self.wakeOn = wakeOn
             self.afterwards = afterwards
             self.addLabels = addLabels
             self.removeLabels = removeLabels
@@ -657,11 +660,18 @@ public actor AppService {
         -> Result<BlockWords, AgentCallProblem> {
         let names = arguments?["waiting_on"]?.arrayValue?.compactMap(\.stringValue)
         let minutesValue = arguments?["check_again_in_minutes"]
+        let wakeValue = arguments?["wake_on"]
         let written = (names?.isEmpty == false) || (minutesValue != nil && minutesValue != .null)
+            || (wakeValue != nil && wakeValue != .null)
         guard outcome == WorkOutcome.blocked.rawValue else {
-            return written
-                ? .failure("Nothing was recorded: waiting_on and check_again_in_minutes only go with blocked.")
-                : .success(.none)
+            return written ? .failure(AgentCallProblem(stringLiteral: Block.onlyWithBlocked)) : .success(.none)
+        }
+        var wakeOn: Block.WakeOn?
+        if let wakeValue, wakeValue != .null {
+            guard let known = wakeValue.stringValue.flatMap(Block.WakeOn.init(rawValue:)) else {
+                return .failure(AgentCallProblem(stringLiteral: Block.unknownWakeOn))
+            }
+            wakeOn = known
         }
         var minutes: Int?
         if let minutesValue, minutesValue != .null {
@@ -680,7 +690,7 @@ public actor AppService {
             }
             minutes = number
         }
-        return .success(BlockWords(waitingOn: names, checkAgainInMinutes: minutes))
+        return .success(BlockWords(waitingOn: names, checkAgainInMinutes: minutes, wakeOn: wakeOn))
     }
     /// Where the agent asked to be put once the turn is over, read and checked against
     /// the outcome — here and again at the daemon, as the block's words are. Left out,
@@ -783,8 +793,10 @@ public actor AppService {
                               agents you started, another agent's change, a CI run.
 
             For blocked, name the agents in waiting_on and you will be resumed, with \
-            how each one ended, once they have all finished; for something the app \
-            can't see, say what it is and give check_again_in_minutes. Either way the \
+            how each one ended, once they have all finished; with wake_on any, once, \
+            when the first has, told which are still running. For something the app \
+            can't see, say what it is and give check_again_in_minutes; with waiting_on \
+            too, whichever comes first resumes you. Either way the \
             person sees you under Waiting, knowing you will carry on by yourself; name \
             nothing and give no time and you sit under Blocked until they carry you on. \
             It is not for a \
@@ -878,7 +890,16 @@ public actor AppService {
                     "description": """
                         Only with blocked. The agents in this project you are waiting on, \
                         by id (as start_agent or list_my_agents gave it) or by exact \
-                        title. You will be resumed once every one has finished.
+                        title. You will be resumed once every one has finished, or \
+                        the first has with wake_on any.
+                        """,
+                ],
+                "wake_on": [
+                    "type": "string",
+                    "enum": .array(["any", "all"]),
+                    "description": """
+                        Only with waiting_on. any to be resumed once, when the first \
+                        agent named finishes; all, the default, when every one has.
                         """,
                 ],
                 "check_again_in_minutes": [
