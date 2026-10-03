@@ -148,8 +148,14 @@ means the control plane posts to APNs itself, which adds a secret and a surface:
   plaintext headlines.
 - **Device tokens** become records (one per device client), written only by that client
   over its own R6 session.
-- This needs Alex's APNs key and a choice of approach, so it waits on him (#61's open
-  item).
+- **Decided (Alex, 2026-10-02): APNs from the control plane.** It waits on Alex's key
+  (`.p8`, Key ID and Team ID), made by him in the developer account and copied to the
+  machine as a compose secret. Never put it in a code, the store or the repo.
+
+**Alex's other answers, 2026-10-02:** the machine is a **DigitalOcean** droplet, at a
+**subdomain of alexecollins.com** (an A record Alex makes), with records in a **folder on
+the machine** (back up the volume), not a bucket. Claude creates no account, droplet or
+DNS record. Alex does, and T131 starts from there.
 
 ## 6. What #60's webhooks add
 
