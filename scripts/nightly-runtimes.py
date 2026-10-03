@@ -24,7 +24,8 @@ build    xcodegen + xcodebuild -scheme AgentsHost into <home>/tree/build/DD, the
          AgentsKit runtime tests, all with every new pin in place. Both run on the base as it
          was too: what already fails there is "already failing on main", and no runtime's
          fault. A test that fails only with the new pins is put down to the pin that fails it
-         alone; one no single pin fails is put down to all of them together.
+         alone; one no single pin fails is put down to all of them together. A new failure
+         that a second run does not repeat is called flaky, and is no runtime's fault either.
 check    Starts a scratch host on that build (the run-app skill's launch.sh --no-window),
          installs each app-copy runtime from its new pin, then per runtime:
          scripts/acp-handshake.sh, scripts/runtime-tools.sh (a NEW tool fails), and one real
@@ -400,6 +401,15 @@ def test_all(run, record, tree, rids, pins):
     with open(os.path.join(run, "tests.log"), "w") as f:
         f.write(out)
     new = failed - base_failed
+    if new:
+        # The suite is flaky under load: a new failure counts only if a second run fails it too.
+        _, again_out, again = runtime_tests(tree)
+        with open(os.path.join(run, "tests-again.log"), "w") as f:
+            f.write(again_out)
+        record["flaky"] = sorted(new - again)
+        new &= again
+        if record["flaky"]:
+            print(f"runtime tests: flaky, failed once and passed again: {', '.join(record['flaky'])}")
     own = {rid: set() for rid in rids}
     outputs = {}
     if new and len(pins) == 1:
@@ -715,6 +725,9 @@ def report(args):
         lines.append(f"- Already failing on main ({base_name(record)}), filed for no runtime: {what}")
         print(f"Already failing on main ({base_name(record)}): {what}\n  "
               + (baseline.get("build") or baseline.get("tests_output") or "")[-2000:].replace("\n", "\n  "))
+    if record.get("flaky"):
+        lines.append(f"- Flaky, failed once and passed on a second run, filed for no runtime: "
+                     f"{', '.join(record['flaky'])}")
     failed = {}
     for rid, entry in record["runtimes"].items():
         spec = RUNTIMES[rid]
