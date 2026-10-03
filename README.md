@@ -232,6 +232,23 @@ To try it without opening anything:
 ./scripts/nightly-runtimes.py report --home /tmp/nightly --dry-run
 ```
 
+Two weekly reviews (#42) look for new problems in what changed on `main` since their last
+run, plus one area in rotation, and have the critical and high findings fixed by helper
+agents on branches of their own (failing test first, proven, left unmerged for you):
+
+- **Security review** (`.agents/workflows/security-review.md`), Sundays at 03:00: the
+  `security-review` skill's method, rotating through tokens, daemon.sock roles, servers,
+  files from someone else, git hooks, the Keychain and logs. At most two helpers a run.
+- **Performance review** (`.agents/workflows/performance-review.md`), Wednesdays at 03:00:
+  main-thread work, unbounded growth, file descriptors, polling, transcript size,
+  start-up and reconnects. At most one helper a run, whose proof is six runs of the
+  measurement on `main` and six on its branch.
+
+Each keeps its findings, and the commit of `main` it reviewed through, in its own folder,
+`.agents/reviews/security/` or `.agents/reviews/performance/`, on a local branch that is
+never pushed (`agents/reviews-security`, `agents/reviews-performance`): a security
+finding is not published before it is fixed. Both arrive turned off; **Run now** tries one.
+
 ## Scoping an agent's tools
 
 Every runtime arrives holding its own version of nearly everything this app owns: a way to
