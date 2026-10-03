@@ -137,6 +137,17 @@ What happened, from the record:
   list. Codex offers that tool only in some collaboration modes, yet `ToolPolicy` names it
   as Codex's question tool. Either the policy should give Codex nil here, or the app should
   start Codex in a mode that has the tool.
+  **Rechecked for #141 (2026-10-03), and the tool is there.** On a fresh scratch root with
+  the same adapter (1.13.1), Codex 0.156.1, model `gpt-6-luna` and the app's `agent` mode:
+  `codex features list` knows `default_mode_request_user_input`; the adapter merges
+  `CODEX_CONFIG` into every `thread/start`; asked for its tools, Codex listed
+  `request_user_input`, called it, and the form's answer came back to it. A rerun of the
+  assessment scored `own_ask` **passed** ("1 question reached the app through
+  `request_user_input`"). The run above only said the tool was missing and never called
+  it, so the policy keeps `request_user_input`. The brief now says it is one of the
+  runtime's own tools and asks the agent to call it rather than judge from a list. That
+  rerun's later steps failed on the turn not ending at `finish_turn blocked` (#139, fixed
+  separately), and its tile again had no `level`.
 - **`dashboard`:** the model sent a status tile without a `level`. The daemon refused it
   rightly, and the model went on to `remove_tile` a tile that was never set. That is the
   model's slip, not the integration's.

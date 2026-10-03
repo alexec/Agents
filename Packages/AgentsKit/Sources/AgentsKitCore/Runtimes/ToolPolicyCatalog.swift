@@ -255,6 +255,11 @@ public enum ToolPolicyCatalog {
     /// wants, and saying so is what the check script reads.
     /// `default_mode_request_user_input` is the opposite of the rest: it lets Codex's
     /// question tool, which the adapter raises as a form elicitation, ask outside plan mode.
+    /// Measured again for #141 on 2026-10-03 (Codex 0.156.1, `codex-acp` 1.13.1, a scratch
+    /// root's own toolset): `codex features list` knows the key ("under development");
+    /// the adapter merges `CODEX_CONFIG` into every `thread/start`; and in the app's `agent`
+    /// mode the model lists `request_user_input` and its question reaches the app as a
+    /// form, answer and all. The #47 run that found it "not exposed" never called it.
     ///
     /// ChatGPT is offered before an API key when signing in (D1).
     public static let codex = ToolPolicy(
