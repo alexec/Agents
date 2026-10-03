@@ -713,6 +713,7 @@ export interface Headline {
 export interface HelperLimits {
   running?: number;
   notArchived?: number;
+  agentsMayArchive?: boolean;
 }
 
 export type Hold = "firstDay" | "worktreeHasWork" | "workflowRunning" | "openInWindow";
@@ -1702,7 +1703,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
-  HelperLimits: { required: [], optional: ["running", "notArchived"] },
+  HelperLimits: { required: [], optional: ["running", "notArchived", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },

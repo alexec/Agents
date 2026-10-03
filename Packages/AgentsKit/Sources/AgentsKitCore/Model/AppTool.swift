@@ -29,9 +29,9 @@ public enum AppTool {
     /// `ask_question` so it does not collide with Antigravity's own tool.
     public static let askForm = "ask_form"
 
-    // Four that act on other agents (028): start one in this project, and stop, park
-    // or list the ones this agent started. Only the person archives. Never offered to
-    // an agent another agent started.
+    // Five that act on other agents (028): start one in this project, and stop, park,
+    // archive (#120) or list the ones this agent started. An agent never archives itself
+    // or the person's sessions. Never offered to an agent another agent started.
 
     /// Start an agent in the caller's own project.
     public static let startAgent = "start_agent"
@@ -41,6 +41,9 @@ public enum AppTool {
 
     /// Park an agent the caller started, to come back to later.
     public static let parkAgent = "park_agent"
+
+    /// Archive an agent the caller started, once it has stopped working (#120).
+    public static let archiveAgent = "archive_agent"
 
     /// The agents the caller started that are still here, and the places in use.
     public static let listMyAgents = "list_my_agents"
@@ -93,7 +96,7 @@ public enum AppTool {
     public static let all: [String] = [
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
         listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
-        cancelWait, publishEvent, listSessions, readSession,
+        cancelWait, publishEvent, listSessions, readSession, archiveAgent,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

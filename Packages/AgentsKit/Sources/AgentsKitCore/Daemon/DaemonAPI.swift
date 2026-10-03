@@ -218,6 +218,8 @@ public enum DaemonAPI {
         public static let agentsStartHelper = "agents/startHelper"
         public static let agentsStopHelper = "agents/stopHelper"
         public static let agentsParkHelper = "agents/parkHelper"
+        /// `archive_agent` (#120).
+        public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
         /// `list_sessions` and `read_session` (065): the caller's project, read only.
         public static let agentsListSessions = "agents/listSessions"

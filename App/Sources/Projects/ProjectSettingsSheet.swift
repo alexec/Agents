@@ -219,6 +219,16 @@ private struct ProjectGeneralPane: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    row("Helpers archived") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            mayArchive(in: summary)
+                            Text("An agent may archive only agents it started, once they've stopped working, "
+                                 + "and never itself or your own sessions. You can bring any of them back.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
                 .appText(.supporting)
                 Divider().padding(.vertical, 20)
@@ -258,6 +268,20 @@ private struct ProjectGeneralPane: View {
         }
         .labelsHidden()
         .fixedSize()
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
+    /// Whether agents may archive the helpers they started (#120), beside the limits
+    /// those places count against. Back to nil when it is the default again.
+    private func mayArchive(in summary: DaemonAPI.ProjectSummary) -> some View {
+        let kept = summary.project.helperLimits ?? HelperLimits()
+        return Toggle("Agents may archive the helpers they started", isOn: Binding(get: { kept.mayArchive }, set: { on in
+            var limits = kept
+            limits.agentsMayArchive = on == HelperLimit.defaultAgentsMayArchive ? nil : on
+            Task { await model.setHelperLimits(limits, for: summary.key) }
+        }))
+        .toggleStyle(.switch)
+        .controlSize(.small)
         .disabled(model.hosts.isOffline(summary.host))
     }
 

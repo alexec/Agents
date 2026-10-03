@@ -306,6 +306,12 @@ extension DaemonCore {
         (projectRecords()[Project.standardize(folder)]?.helperLimits ?? HelperLimits()).effective
     }
 
+    /// Whether agents may archive the helpers they started in a project (#120): the
+    /// person's choice, or the default.
+    func agentsMayArchive(in folder: URL) -> Bool {
+        (projectRecords()[Project.standardize(folder)]?.helperLimits ?? HelperLimits()).mayArchive
+    }
+
     /// Bring one back. Succeeds whether or not the folder is still there: the agents
     /// and their transcripts are the point, and `exists` says the rest.
     public func unarchiveProject(_ folder: URL) async throws -> DaemonAPI.ProjectSummary {

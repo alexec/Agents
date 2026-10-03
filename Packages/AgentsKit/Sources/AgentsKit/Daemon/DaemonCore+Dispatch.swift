@@ -700,6 +700,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try parkHelper(request))])
 
+            case DaemonAPI.Method.agentsArchiveHelper:
+                let request = try require(params, as: DaemonAPI.HelperRequest.self)
+                return .success(["note": .string(try await archiveHelper(request))])
+
             case DaemonAPI.Method.worktreesList:
                 let request = try require(params, as: DaemonAPI.WorktreesListRequest.self)
                 return .success(try JSONValue.encoding(await listWorktrees(for: request.folder)))

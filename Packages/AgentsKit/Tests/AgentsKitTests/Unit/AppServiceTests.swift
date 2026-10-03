@@ -58,7 +58,8 @@ struct AppServiceTests {
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
-                AppService.parkAgentToolName, AppService.listMyAgentsToolName,
+                AppService.parkAgentToolName, AppService.archiveAgentToolName,
+                AppService.listMyAgentsToolName,
                 AppService.listSessionsToolName, AppService.readSessionToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
@@ -632,7 +633,7 @@ struct AppServiceTests {
     /// once ended with lease_resource, and every release became an extension.
     @Test func noToolNameEndsWithAnother() {
         let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
-                     AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent,
+                     AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent,
                      AppTool.listMyAgents,
                      AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
                      AppTool.listResources]
