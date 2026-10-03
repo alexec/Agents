@@ -69,6 +69,11 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// file's `cooldown:` (#103). A trigger inside it is held, and the latest held one
     /// runs once when it ends; `nil` is no cooldown, as before.
     public var cooldown: TimeInterval?
+    /// Where the Enabled switch starts, from the file's `enabled:` (#42): `false` is a
+    /// workflow checked in for somebody to turn on when they are ready. `nil` is a file
+    /// that does not say, which starts on. Once anybody moves the switch, their choice
+    /// is kept by the app and this no longer decides.
+    public var enabled: Bool?
 
     /// Unique across projects, so one window showing two of them cannot collide.
     public var id: String { folder.path + "/" + workflowID }
@@ -78,8 +83,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
                 prompt: String = "", problem: WorkflowProblem? = nil,
                 unknownFields: [String: JSONValue] = [:],
                 settings: WorkflowSettings = WorkflowSettings(),
-                cooldown: TimeInterval? = nil) {
+                cooldown: TimeInterval? = nil, enabled: Bool? = nil) {
         self.cooldown = cooldown
+        self.enabled = enabled
         self.workflowID = workflowID
         self.folder = Project.standardize(folder)
         self.name = name ?? Self.defaultName(for: workflowID)

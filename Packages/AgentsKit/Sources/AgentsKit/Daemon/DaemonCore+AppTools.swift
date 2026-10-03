@@ -745,14 +745,24 @@ extension DaemonCore {
                                         in project: URL) throws -> String {
         let url = try workflowURL(workflowID, in: project)
         let id = url.deletingPathExtension().lastPathComponent
-        guard workflow(id, in: project) != nil else {
+        guard let found = workflow(id, in: project) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(id) in this project.")
         }
         let state = workflowStore.load().state(folder: project, workflowID: id)
-        let isOff = state?.isDisabled ?? false
+        let isOff = WorkflowState.isOff(found, state)
         if enabled, !isOff { return "\(id) is already on." }
         if !enabled, isOff { return "\(id) is already turned off." }
+        // Its file starts it off (#42) and nobody has turned it on: that is waiting for
+        // the person as much as a switch they moved themselves.
+        if enabled, state?.enabledChosen != true, found.enabled == false {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowTurnedOffByPerson,
+                               message: """
+                                Nothing was changed: \(id)'s file says `enabled: false`, so it \
+                                starts off until the person turns it on from the project page. \
+                                Ask them to if it should run.
+                                """)
+        }
         if enabled, state?.disabledByAgent != true {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowTurnedOffByPerson,
                                message: """

@@ -203,7 +203,7 @@ extension DaemonCore {
         let records = records ?? workflowStore.load()
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
         let archived = state?.isArchived ?? false
-        let enabled = !(state?.isDisabled ?? false)
+        let enabled = !WorkflowState.isOff(workflow, state)
         let overLimit = archived ? nil : limitReached(by: workflow, records: records)
         // A file waiting for the person has no next run: nothing fires until they approve.
         let waiting = archived ? nil : awaitingApproval(workflow, state: state, records: records)
@@ -407,7 +407,7 @@ extension DaemonCore {
                 // on the list, and its row saying how many times it did not run is how
                 // somebody notices it has been off since Tuesday. Repeats count up on
                 // one line, so this is one line however long it stays off.
-                if state?.isDisabled == true {
+                if WorkflowState.isOff(workflow, state) {
                     record(.refused(.disabled, at: now, repeats: 1), for: workflow)
                 } else if wasAway {
                     record(.refused(.missedWhileClosed, at: now, repeats: 1), for: workflow)
@@ -452,7 +452,7 @@ extension DaemonCore {
         // everything else, because nothing else matters about a file nobody has seen.
         // Turning off is the same kind of decision, and stops a trigger the same way; Run
         // now is not a trigger, and runs an off workflow so it can be tried (#100).
-        let disabled = !byHand && (state?.isDisabled ?? false)
+        let disabled = !byHand && WorkflowState.isOff(workflow, state)
         if !(state?.isArchived ?? false), !disabled,
            awaitingApproval(workflow, state: state, records: records) != nil {
             let refusal = WorkflowRefusal.awaitingApproval
@@ -938,7 +938,7 @@ extension DaemonCore {
         for state in records.states {
             guard let held = state.heldFire else { continue }
             guard let workflow = workflows[state.folder]?[state.workflowID],
-                  !state.isArchived, !state.isDisabled else {
+                  !state.isArchived, !WorkflowState.isOff(workflow, state) else {
                 records.update(folder: state.folder, workflowID: state.workflowID) { $0.heldFire = nil }
                 dropped = true
                 continue
@@ -990,6 +990,7 @@ extension DaemonCore {
         records.update(folder: request.folder, workflowID: request.workflowID) {
             $0.isDisabled = !request.enabled
             $0.disabledByAgent = !request.enabled && byAgent
+            $0.enabledChosen = true
             // A held trigger was a trigger, and none run an off workflow.
             if !request.enabled { $0.heldFire = nil }
         }
