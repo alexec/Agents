@@ -1122,6 +1122,7 @@ extension DaemonCore {
         // events rather than one because that is what lets the table refuse
         // `(.starting, .promptSent)` — a prompt arriving mid-start has to queue.
         await move(agentID, on: agents[agentID]?.state == .starting ? .turnBegun : .promptSent)
+        endWatch(agentID)
         turnTasks[agentID]?.cancel()
         // The words of ours, sent with the first prompt of a conversation and not
         // again. They stay in the runtime's own history from there, and that history is
@@ -1169,8 +1170,11 @@ extension DaemonCore {
             guard let self else { return }
             do {
                 let result = try await session.prompt(outgoing)
+                // Already ended by the app after finish_turn (#139): nothing more to end.
+                guard await !self.turnAlreadyEnded(for: session) else { return }
                 await self.finishTurn(agentID: agentID, result: result)
             } catch {
+                guard await !self.turnAlreadyEnded(for: session) else { return }
                 await self.turnFailed(agentID: agentID, error: error)
             }
         }
@@ -1185,8 +1189,10 @@ extension DaemonCore {
                                + "\(failure.reason ?? "") \(failure.details ?? "")")
     }
 
-    private func finishTurn(agentID: UUID, result: TurnResult) async {
+    func finishTurn(agentID: UUID, result: TurnResult) async {
         turnTasks.removeValue(forKey: agentID)
+        // Whether the app cancelled this turn because the agent had ended it (#139).
+        let endedByTheAgent = endWatch(agentID)
         // Read before anything is awaited, so a stop in any of the waits below is seen.
         let stopsBefore = stops[agentID, default: 0]
         // Whether this turn was the one that crossed the per-agent ceiling. Decided
@@ -1250,6 +1256,9 @@ extension DaemonCore {
                          for: agentID)
             reason = .unrecognised
         }
+        // Cancelled by the app because the agent had already said how it ended: the
+        // ordinary ending, as it is on a runtime that lets go by itself (#139).
+        if endedByTheAgent, reason == .cancelled { reason = .endTurn }
         // What the ending says about the runtime's allowance (052): spent, rate limited,
         // paid overage begun, or nothing. A turn that worked counts against credit.
         let recognition = recognise(agentID: agentID, failure: result.failure,
@@ -1412,6 +1421,14 @@ extension DaemonCore {
         """
 
     private func turnFailed(agentID: UUID, error: any Error) async {
+        // A runtime that fell over on the cancel the app sent after finish_turn (#139):
+        // the agent had already ended the turn, so it ends as one that worked.
+        if finishedTurns[agentID]?.cancelled == true {
+            DaemonLog.shared.write("agent \(agentID): the runtime failed after its cancel: \(error)")
+            await finishTurn(agentID: agentID, result: TurnResult(reason: .endTurn, rawStopReason: nil))
+            return
+        }
+        endWatch(agentID)
         turnTasks.removeValue(forKey: agentID)
         // Before anything else is said, so the record reads: the question, that nobody
         // answered it, why the agent stopped, and that it did. And at all, which it was
@@ -1590,6 +1607,7 @@ extension DaemonCore {
             broadcast(DaemonAPI.Notification.agentElicitation,
                       DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
         }
+        endWatch(agentID)
         if let session = live[agentID] { await session.cancel() }
         turnTasks.removeValue(forKey: agentID)?.cancel()
         // Re-read, rather than trusting the `agent` captured at the top of this

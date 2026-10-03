@@ -337,6 +337,15 @@ public actor DaemonCore {
     /// draining. In memory and not on the record: it exists only to keep an agent at
     /// its limit from filling its own transcript saying so on every drain attempt.
     var held: Set<UUID> = []
+    /// Turns the agent has ended with `finish_turn` while its runtime is still in them
+    /// (#139), watched until the runtime lets go or the app ends them. See
+    /// `DaemonCore+TurnEnds`. In memory only: a restart ends every turn anyway.
+    var finishedTurns: [UUID: FinishedTurn] = [:]
+    /// Sessions whose turn the app ended itself after `finish_turn`, so the prompt's
+    /// own late answer, when it comes, ends nothing a second time.
+    var endedForTheRuntime: Set<ObjectIdentifier> = []
+    /// How long a runtime is given to end a turn after `finish_turn`. A test shortens it.
+    var finishGrace = FinishGrace()
 
     // MARK: Client permission mode (061)
 
@@ -1138,6 +1147,7 @@ public actor DaemonCore {
             }
             await record(kind, for: agentID)
             notePlanning(kind, agentID: agentID)
+            heardAfterTheEnd(kind, agentID: agentID)
 
         case .optionsChanged(let options):
             guard var agent = agents[agentID] else { return }
