@@ -14,10 +14,10 @@ echo "$SVG$BODY<rect width=\"1024\" height=\"1024\" fill=\"url(#g)\"/>$FACE</svg
 # mac: the macOS grid, an 824 tile in 1024 with a soft shadow beneath
 echo "$SVG$BODY<defs><filter id=\"s\" x=\"-10%\" y=\"-10%\" width=\"120%\" height=\"130%\"><feDropShadow dx=\"0\" dy=\"10\" stdDeviation=\"12\" flood-color=\"#000\" flood-opacity=\".28\"/></filter></defs><g transform=\"translate(100 100) scale(.8046875)\"><rect width=\"1024\" height=\"1024\" rx=\"230\" fill=\"url(#g)\" filter=\"url(#s)\"/>$FACE</g></svg>" > mac.svg
 
+# Quick Look fills transparency white, so render with AppKit instead
+swiftc -O -o /tmp/blob-render render.swift
 render() { # svg size out
-  rm -rf /tmp/blob-r && mkdir -p /tmp/blob-r
-  qlmanage -t -s "$2" -o /tmp/blob-r "$1" >/dev/null 2>&1
-  sips -z "$2" "$2" "/tmp/blob-r/$1.png" --out "$3" >/dev/null
+  /tmp/blob-render "$1" "$2" "$3"
 }
 
 MAC="$ROOT/App/Resources/Assets.xcassets/AppIcon.appiconset"
