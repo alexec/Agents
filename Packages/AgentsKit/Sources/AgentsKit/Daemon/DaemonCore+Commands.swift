@@ -1106,6 +1106,20 @@ extension DaemonCore {
         }
         lastPrompts[agentID] = SentPrompt(text: text, blocks: blocks, from: from, preface: preface,
                                           costBefore: agents[agentID]?.costToDate ?? [:])
+        // The app carrying the agent on by itself (#149) starts a turn the person did
+        // not, so nothing of theirs cleared the last turn's report. It stays where the
+        // person sees it until this turn gives its own; what is noted here is that it
+        // is not this turn's, and that this turn's silence has not been asked about.
+        // The question itself is the one app turn that is not a fresh piece of work.
+        if from == .app, text != Self.askForOutcome, var agent = agents[agentID] {
+            reportBeforeTurn[agentID] = agent.report
+            if agent.outcomeAsked {
+                agent.outcomeAsked = false
+                changed(agent)
+            }
+        } else if text != Self.askForOutcome {
+            reportBeforeTurn[agentID] = nil
+        }
         // Stopped or archived while that was written. The move below would otherwise
         // take an archived agent straight back out of the archive — the app's own
         // question to a silent agent did, and started it in a worktree the archive had
@@ -1367,6 +1381,10 @@ extension DaemonCore {
         guard willAskForOutcome(agentID: agentID, reason: reason),
               var agent = agents[agentID] else { return }
         agent.outcomeAsked = true
+        // A turn the app started that ended under the last turn's report (#149): that
+        // report gives way now, so the question reads as the question and an agent that
+        // will not answer it is an ending nobody accounted for, not the old one.
+        if reportBeforeTurn.removeValue(forKey: agentID) != nil { agent.report = nil }
         changed(agent)
         // Through the ordinary path, so it starts the runtime, is recorded, and has
         // what it costs counted against the agent like any other turn (FR-024).
@@ -1390,8 +1408,10 @@ extension DaemonCore {
         guard reason == .endTurn, let agent = agents[agentID] else { return false }
         // The review demo's echo (T092) has no tools to report with.
         if agent.runtimeID == "demo" { return false }
+        // A report this turn began under is the last turn's, not this one's (#149).
+        let reported = agent.report != nil && agent.report != reportBeforeTurn[agentID]
         return agent.state == .finished
-            && agent.report == nil
+            && !reported
             && !agent.outcomeAsked
             && agent.queuedPrompts.isEmpty
     }
