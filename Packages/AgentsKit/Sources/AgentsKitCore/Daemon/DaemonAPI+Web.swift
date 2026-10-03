@@ -104,6 +104,11 @@ public extension DaemonAPI {
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
+                // Approve, and Archive or Bring Back, on the workflow page (#142), as the window's has them.
+                Row(Method.workflowsApprove, params: WorkflowApproveRequest.self, result: WorkflowSummary.self,
+                    kind: .hostRequest),
+                Row(Method.workflowsArchive, params: WorkflowArchiveRequest.self, result: WorkflowSummary.self,
+                    kind: .hostRequest),
                 // New project (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
                 // as the window's projects column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),

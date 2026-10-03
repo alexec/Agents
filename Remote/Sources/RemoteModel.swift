@@ -1634,6 +1634,23 @@ final class RemoteModel {
         }
     }
 
+    /// Let a waiting one run as its file now reads (#142): the digest is what the page
+    /// was showing, so a file changed since is still waiting afterwards.
+    func approveWorkflow(_ summary: WorkflowSummary) async {
+        guard let waiting = summary.awaitingApproval else { return }
+        do {
+            let updated: WorkflowSummary = try await client.call(
+                DaemonAPI.Method.workflowsApprove,
+                DaemonAPI.WorkflowApproveRequest(folder: summary.folder, workflowID: summary.workflowID,
+                                                 digest: waiting.digest),
+                returning: WorkflowSummary.self)
+            work.upsert(updated)
+        } catch {
+            problem = sentence(for: error)
+            await refreshWorkflows()
+        }
+    }
+
     /// Turn one on or off, keeping its place on the list (#100).
     func setWorkflowEnabled(_ summary: WorkflowSummary, _ enabled: Bool) async {
         do {
@@ -1649,13 +1666,14 @@ final class RemoteModel {
     /// Change what a workflow is allowed to do. The Mac's daemon writes the file and
     /// answers with what it now says; a refusal has to reach the person, and the list
     /// is asked again so the menu goes back to what the file still holds (FR-025).
-    func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings) async {
+    func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
+                             labels: [String]? = nil) async {
         do {
             let updated: WorkflowSummary = try await client.call(
                 DaemonAPI.Method.workflowsSettings,
                 DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
                                                   workflowID: summary.workflowID,
-                                                  settings: settings),
+                                                  settings: settings, labels: labels),
                 returning: WorkflowSummary.self)
             work.upsert(updated)
         } catch {

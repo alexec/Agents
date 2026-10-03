@@ -111,6 +111,8 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
         /// The block the rest go under. A refusal of one of them is grouped by the
         /// option's own id, which is what the file says under this.
         public static let options = "options"
+        /// The labels each run's agent is given (#142).
+        public static let labels = "labels"
     }
 
     /// What to start with, or why nothing may start.

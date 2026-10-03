@@ -2038,11 +2038,17 @@ public enum DaemonAPI {
         /// the line out. Unlike the settings, left out means left alone, so a phone or
         /// page that does not show the cooldown cannot remove it by saving a mode.
         public var cooldown: String?
-        public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil) {
+        /// The `labels:` to write (#142), or empty to take the line out. Left out means
+        /// left alone, as the cooldown is, so a phone or page from before the labels
+        /// field cannot remove them by saving a mode.
+        public var labels: [String]?
+        public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil,
+                    labels: [String]? = nil) {
             self.folder = folder
             self.workflowID = workflowID
             self.settings = settings
             self.cooldown = cooldown
+            self.labels = labels
         }
     }
 

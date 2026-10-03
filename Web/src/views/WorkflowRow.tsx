@@ -1,8 +1,8 @@
 // One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark, its
 // name, what it is in one line, and Run Now. Chosen, it opens its page in the chat's place, as the
 // window's list does (#98); its ··· menu turns it off or on (#100). A workflow waiting for its OK
-// is approved on the Mac, which shows what it would run; the page says so instead of offering to
-// run it. One turned off still runs now, as the window's does.
+// is approved on its page, which shows what it would run (#142); the row says so instead of
+// offering to run it. One turned off still runs now, as the window's does.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { WorkflowSummary } from "../protocol/generated";
@@ -24,7 +24,7 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick }: 
             {/* Marked where it stands, rather than moved (#100): off is not put away. */}
             {!isOn(summary) && !summary.isArchived && <span class="faint"> · Off</span>}
           </span>
-          <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK on the Mac" : workflowSummary(summary.workflow, name)}</span>
+          <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK" : workflowSummary(summary.workflow, name)}</span>
         </span>
       </button>
       <RunNow store={store} host={host} summary={summary} disabled={disabled} />

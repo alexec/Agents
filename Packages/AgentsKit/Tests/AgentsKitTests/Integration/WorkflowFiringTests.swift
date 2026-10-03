@@ -245,6 +245,38 @@ struct WorkflowFiringTests {
         #expect(agents.contains { $0.id != first && $0.startedByWorkflow == "standup" })
     }
 
+    @Test func theSummaryNamesTheStandingAgentWhileItIsHere() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write("""
+            ---
+            on:
+              - schedule:
+                  at: [":00"]
+            agent: standing
+            ---
+
+            Carry on.
+            """, as: "standup", in: work)
+
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        // None yet: the page says the next run starts it.
+        #expect(await core.allWorkflows(in: work).first?.standingAgentID == nil)
+
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "standup"))
+        guard let kept = await core.allAgents().first?.id else {
+            Issue.record("expected an agent")
+            return
+        }
+        // The exact agent the store keeps (#142), not the newest the workflow started.
+        #expect(await core.allWorkflows(in: work).first?.standingAgentID == kept)
+
+        // Gone is the same as none: the next run replaces it.
+        try await core.archive(kept)
+        #expect(await core.allWorkflows(in: work).first?.standingAgentID == nil)
+    }
+
     // MARK: An ending the daemon discovered when it came back (020, US2)
 
     /// A workflow file that watches for an agent stopping.
