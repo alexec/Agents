@@ -1,0 +1,26 @@
+shot tree-top.png
+top: [".agents, folder",".claude, folder",".git, folder","Docs, folder, 1 changed file, 1 line added","Many, folder","Sources, folder, 1 changed file, 1 line added","AGENTS.md","CLAUDE.md","README.md"]
+PASS three levels open
+open: ["1:.agents, folder","1:.claude, folder","1:.git, folder","1:Docs, folder, 1 changed file, 1 line added","2:guide.md, changed, 1 line added","1:Many, folder","1:Sources, folder, 1 changed file, 1 line added","2:App, folder, 1 changed file, 1 line added","3:Core, folder, 1 changed file, 1 line added","4:Engine.swift, changed, 1 line added","4:Parser.swift","3:main.swift","2:Kit, folder","1:AGENTS.md","1:CLAUDE.md","1:README.md"]
+shot tree-three-levels.png
+shot tree-file-open.png
+PASS Back: Engine.swift marked
+PASS Back: Core still open
+shot tree-back.png
+PASS Docs shut
+PASS Back again: Sources/App/Core open, Docs shut
+PASS Back again: README.md marked
+PASS Engine.swift marked again
+shot tree-sibling-shut-back.png
+PASS up from Engine.swift is Core
+PASS left shuts the open folder the cursor is on
+PASS left again steps out to App
+PASS right opens Core again
+PASS right again steps into it
+PASS Return opens Parser.swift
+shot tree-keys.png
+PASS a folder of 3000: 40 rows drawn, the list 78390px tall
+scrolled: ["file-1525.txt","file-1526.txt","file-1527.txt"]
+shot tree-many-scrolled.png
+PASS at 390 Files is the one-folder list
+shot phone-folder-list.png
