@@ -169,6 +169,7 @@ public actor AppService {
     private let leasesSink: LeasesSink
     private let eventsSink: EventsSink
     private let sessionsSink: SessionsSink
+    private let dashboardSink: DashboardSink
     /// Whether the agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
@@ -202,6 +203,9 @@ public actor AppService {
                 },
                 sessions: @escaping SessionsSink = { _ in
                     .refused("This app cannot read other sessions.")
+                },
+                dashboard: @escaping DashboardSink = { _ in
+                    .refused("This app has no Dashboard.")
                 }) {
         let box = self.box
         self.finishSink = finishTurn
@@ -212,6 +216,7 @@ public actor AppService {
         self.leasesSink = leases
         self.eventsSink = events
         self.sessionsSink = sessions
+        self.dashboardSink = dashboard
         self.managesAgents = managesAgents
         self.movesItself = movesItself
         self.connection = JSONRPCConnection(transport: transport) { method, params in
@@ -358,6 +363,13 @@ public actor AppService {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await leasesSink(call)))
+                }
+            }
+
+            if let call = Self.dashboardCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await dashboardSink(call)))
                 }
             }
 
@@ -546,13 +558,15 @@ public actor AppService {
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
         // The two for reading another session in this project, for every agent (065).
         let sessionTools = [Self.listSessionsTool, Self.readSessionTool]
+        // The three for the project's Dashboard, for every agent (074).
+        let dashboardTools = [Self.setTileTool, Self.removeTileTool, Self.readDashboardTool]
         // Moving itself rides on the call that ends the turn, since that is when a move
         // happens (053); not offered on a runtime that would forget the conversation on
         // the way.
         return [Self.finishTurnTool(movesItself: movesItself), Self.showFileTool, Self.workflowTool,
                 Self.askFormTool]
             + agentTools + sessionTools + leaseTools
-            + eventTools
+            + eventTools + dashboardTools
     }
 
     /// The questions an `ask_form` call carried, or why it cannot be asked.

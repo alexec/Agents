@@ -650,6 +650,35 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.EventPublishRequest.self)
                 return .success(["note": .string(try publishEvent(request))])
 
+            case DaemonAPI.Method.dashboardSetTile:
+                let request = try require(params, as: DaemonAPI.SetTileRequest.self)
+                return .success(["note": .string(try setTile(request))])
+
+            case DaemonAPI.Method.dashboardRemoveTile:
+                let request = try require(params, as: DaemonAPI.RemoveTileRequest.self)
+                return .success(["note": .string(try removeTile(request))])
+
+            case DaemonAPI.Method.dashboardRead:
+                let request = try require(params, as: DaemonAPI.DashboardTokenRequest.self)
+                return .success(["note": .string(try readDashboard(request))])
+
+            case DaemonAPI.Method.dashboardGet:
+                let request = try require(params, as: DaemonAPI.DashboardRequest.self)
+                return .success(try JSONValue.encoding(dashboardSnapshot(request.folder)))
+
+            case DaemonAPI.Method.dashboardSummaries:
+                return .success(try JSONValue.encoding(dashboardSummaries()))
+
+            case DaemonAPI.Method.dashboardHide, DaemonAPI.Method.dashboardShow:
+                let request = try require(params, as: DaemonAPI.TileRequest.self)
+                try setTileHidden(request, hidden: method == DaemonAPI.Method.dashboardHide)
+                return .success([:])
+
+            case DaemonAPI.Method.dashboardRemove:
+                let request = try require(params, as: DaemonAPI.TileRequest.self)
+                try removeTileByPerson(request, from: surface)
+                return .success([:])
+
             case DaemonAPI.Method.eventsCancelWait:
                 let request = try require(params, as: DaemonAPI.CancelWaitRequest.self)
                 return .success(try JSONValue.encoding(try cancelWaitByPerson(request)))

@@ -292,6 +292,16 @@ public actor DaemonCore {
     /// notes writes the index once.
     var indexSave: Task<Void, Never>?
 
+    // MARK: Dashboard (074)
+
+    /// The projects' tile files and the host's history of them.
+    lazy var dashboardStore = DashboardStore(locations: locations)
+    /// A `dashboard/changed` waiting to go, per project: at most one a second.
+    var dashboardBroadcasts: [URL: Task<Void, Never>] = [:]
+    /// Whose sessions each agent has read with `read_session`, in memory only: what lets
+    /// a successor take its predecessor's tiles over (074 research R1).
+    var sessionReads: [UUID: Set<UUID>] = [:]
+
     // MARK: Events (042)
 
     /// Where the log and the event sources' memory are kept between runs.

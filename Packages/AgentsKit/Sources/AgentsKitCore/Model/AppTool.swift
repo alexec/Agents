@@ -84,6 +84,18 @@ public enum AppTool {
     /// Say that something happened, as a `custom.` event.
     public static let publishEvent = "publish_event"
 
+    // Three for the project's Dashboard (074). Offered to every agent, helpers included:
+    // a helper is often the one that measured the thing.
+
+    /// Create or replace a tile the caller keeps.
+    public static let setTile = "set_tile"
+
+    /// Remove a tile the caller keeps.
+    public static let removeTile = "remove_tile"
+
+    /// Every tile in the caller's project.
+    public static let readDashboard = "read_dashboard"
+
     /// The older names for the two halves of `finishTurn`, served from 2026-09-23 (023)
     /// until 2026-09-29. No longer offered or answered; kept only so a conversation that
     /// called them still draws without them, the way it did.
@@ -97,6 +109,7 @@ public enum AppTool {
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
         listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, publishEvent, listSessions, readSession, archiveAgent,
+        setTile, removeTile, readDashboard,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's
