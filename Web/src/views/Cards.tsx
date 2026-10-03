@@ -13,6 +13,7 @@ import { describe } from "../model/errors";
 import { Failure } from "../protocol/generated";
 import { isSafeLink } from "../render/markdown";
 import { elicitationTitle } from "./chat/Rows";
+import { askerFor } from "../model/asker";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -113,14 +114,18 @@ export function Cards({ store, host, session, down = false }: {
   const cards = held.value.filter((c) => c.answered !== "here");
   if (!cards.length) return null;
   const recipient = host === "mac" ? "your Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? "the host";
+  // Who is asking, by title and runtime (#121).
+  const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === id)?.runtime.name;
+  const asker = (agentID: string, subagent?: string) =>
+    askerFor(store.agents.value[host] ?? [], agentID, runtimeName, subagent);
   return (
     <div class="cards" aria-label="Waiting for you">
       {cards.map((card) => card.kind === "permission"
-        ? <PermissionCard key={card.request.id} request={card.request}
+        ? <PermissionCard key={card.request.id} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
             hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
             answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
               { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
-        : <ElicitationCard key={card.request.id} request={card.request}
+        : <ElicitationCard key={card.request.id} request={card.request} asker={asker(card.request.agentID)}
             hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
             answer={(key, action, content) => send(card.request.id, key, (sendID) => store.link.call("elicitations/answer",
               { requestID: card.request.id, action, content, sendID }, host))} />)}
@@ -158,13 +163,13 @@ const cardClass = (hold: Hold) => `card${hold.answered === "elsewhere" || hold.a
 
 const allows = (option: PermissionOption) => option.kind === "allow_once" || option.kind === "allow_always";
 
-function PermissionCard({ request, hold, answer }: {
-  request: PermissionRequest; hold: Hold; answer: (option: PermissionOption) => void;
+function PermissionCard({ request, asker, hold, answer }: {
+  request: PermissionRequest; asker: string | null; hold: Hold; answer: (option: PermissionOption) => void;
 }) {
   return (
     <section class={cardClass(hold)} aria-label="Permission request">
       <div class="question">
-        {request.subagent && <p class="quiet small">Subagent “{request.subagent}” asks</p>}
+        {asker && <p class="quiet small asker">{asker}</p>}
         <p class="strong">{request.toolCall.title}</p>
         {request.toolCall.kind && <p class="quiet small">{request.toolCall.kind}</p>}
       </div>
@@ -250,8 +255,8 @@ function defaultsOf(request: ElicitationRequest): Record<string, JSONValue> {
   return defaults;
 }
 
-function ElicitationCard({ request, hold, answer }: {
-  request: ElicitationRequest; hold: Hold; answer: (key: string, action: Action, content: Record<string, JSONValue>) => void;
+function ElicitationCard({ request, asker, hold, answer }: {
+  request: ElicitationRequest; asker: string | null; hold: Hold; answer: (key: string, action: Action, content: Record<string, JSONValue>) => void;
 }) {
   const inert = hold.answered !== null || hold.down;
   // Each card is its own request (keyed by its id above), so its defaults are where it starts.
@@ -344,6 +349,7 @@ function ElicitationCard({ request, hold, answer }: {
   }
   return (
     <section class={cardClass(hold)} aria-label="Question">
+      {asker && <p class="quiet small asker">{asker}</p>}
       <p class="strong">{title}</p>
       {request.message && request.message !== title && <p>{request.message}</p>}
       {body}

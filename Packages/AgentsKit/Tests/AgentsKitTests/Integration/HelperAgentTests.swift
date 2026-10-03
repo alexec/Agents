@@ -99,6 +99,32 @@ struct HelperAgentTests {
 
     // MARK: Starting (US1)
 
+    /// A helper is told who started it, by title, so it names that agent the same way
+    /// (#121), and the person by the same name its lead was given.
+    @Test func aHelpersBriefingNamesWhoStartedIt() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let launcher = FakeLauncher()
+        let core = try await makeCore(locations, launcher)
+        _ = try await core.setPerson(PersonSettings(name: "Sam"))
+        let (lead, token) = try await caller(core, in: work)
+
+        let helper = try await start(core, token)
+        @Sendable func briefings() async -> [String] {
+            var texts: [String] = []
+            for agent in launcher.allAgents {
+                if let text = await agent.promptContent?.arrayValue?.last?["text"]?.stringValue { texts.append(text) }
+            }
+            return texts
+        }
+        await eventually("the helper was briefed") { await briefings().contains { $0.contains(", started by") } }
+        let told = try #require(await briefings().first { $0.contains(", started by") })
+        // By the lead's title as it stands, or "another agent" while it has none.
+        let starter = LeaseWords.agentName(await core.agent(lead)?.title)
+        #expect(told.contains("You are Claude, started by \(starter), and I am Sam"))
+        #expect(await core.agent(helper)?.startedByAgent == lead)
+    }
+
     @Test func aStartedAgentLandsInTheCallersProjectMarkedAsTheirs() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
@@ -277,7 +303,8 @@ struct HelperAgentTests {
         let message = error?.message ?? ""
         #expect(error?.code == DaemonAPI.Failure.notYours)
         #expect(message.hasPrefix("Nothing was started: this project already has 5 of 5 agents started by agents not yet archived"))
-        #expect(message.contains("Only the person can archive one to free that place."))
+        #expect(message.contains("Archive one of yours with archive_agent once its work is merged or abandoned, "
+                                 + "or ask the person to archive one, to free that place."))
         #expect(message.hasSuffix("The person sets these limits in Project Settings."))
         for name in ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"] { #expect(message.contains(name), "names \(name)") }
         #expect(await core.allAgents().count == 7)
@@ -724,9 +751,12 @@ struct HelperAgentTests {
 
         let cases: [(String, String)] = [
             (lead.uuidString, "Nothing changed: an agent cannot stop itself."),
-            (persons.uuidString, "Nothing changed: you can only stop or park agents you started."),
-            (workflows.uuidString, "Nothing changed: you can only stop or park agents you started."),
-            (othersHelper.uuidString, "Nothing changed: you can only stop or park agents you started."),
+            (persons.uuidString, "Nothing changed: that is one of the person's own sessions. "
+                + "You can only stop, park or archive agents you started."),
+            (workflows.uuidString, "Nothing changed: a workflow started that one. "
+                + "You can only stop, park or archive agents you started."),
+            (othersHelper.uuidString, "Nothing changed: another agent started that one. "
+                + "You can only stop, park or archive agents you started."),
             ("not-an-id", "Nothing changed: there is no agent with that id."),
             (UUID().uuidString, "Nothing changed: there is no agent with that id."),
         ]
@@ -738,10 +768,111 @@ struct HelperAgentTests {
                 : expected
             let parked = await refusal { _ = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: target)) } }
             #expect(parked?.message == parkExpected, "park \(target)")
+            let archiveExpected = target == lead.uuidString ? DaemonCore.cannotArchiveItself : expected
+            let archived = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: target)) } }
+            #expect(archived?.message == archiveExpected, "archive \(target)")
         }
 
         let after = await core.allAgents().map { "\($0.id) \($0.state) \(String(describing: $0.endedReason))" }.sorted()
         #expect(before == after)
+    }
+
+    // MARK: Archiving (#120)
+
+    /// A helper of its own, finished and let go, so an archive is not undone by the
+    /// outcome ask picking it back up.
+    private func settledHelper(_ core: DaemonCore, _ token: String, _ name: String) async throws -> UUID {
+        let id = try await start(core, token, name)
+        _ = await eventually("\(name) settled") {
+            let agent = await core.agent(id)
+            let released = await core.live[id] == nil
+            return agent?.outcomeAsked == true && agent?.state.holdsRuntime == false && released
+        }
+        return id
+    }
+
+    @Test func archivingOneItStartedFreesItsPlaceSaysWhoAndThePersonCanBringItBack() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher())
+        let (_, token) = try await caller(core, in: work, title: "Lead")
+        let alpha = try await settledHelper(core, token, "Alpha")
+        _ = try await start(core, token, "Beta")
+
+        let note = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: alpha.uuidString)) }
+
+        let archived = try #require(await core.agent(alpha))
+        #expect(archived.state == .archived)
+        #expect(archived.archivedReason == .byAgent)
+        #expect(note.hasPrefix("Archived \u{201C}Alpha\u{201D}, freeing its place; the person can bring it back."))
+        #expect(note.hasSuffix(" 1 of 5 not archived."))
+        #expect(try await notes(core, alpha).contains("\u{201C}Lead\u{201D} archived this agent."))
+        // The only archive here, so the only `agent.archived`: by another agent.
+        let raised = await eventually("agent.archived raised") {
+            await core.eventLog.events.contains { $0.name == "agent.archived" }
+        }
+        #expect(raised)
+        #expect(await core.eventLog.events.filter { $0.name == "agent.archived" }.map { $0.details["by"] } == ["agent"])
+        let list = try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
+        #expect(!list.contains(alpha.uuidString))
+
+        try await core.unarchive(alpha)   // by the person
+        #expect(await core.agent(alpha)?.state != .archived)
+    }
+
+    @Test func anAgentCannotArchiveItself() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher())
+        let (lead, token) = try await caller(core, in: work)
+        let helper = try await settledHelper(core, token, "Alpha")
+        let helperToken = UUID().uuidString
+        callers[helperToken] = helper
+
+        let leadError = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: lead.uuidString)) } }
+        #expect(leadError?.message == "Nothing changed: you can't archive yourself. Park when your turn ends "
+                + "with finish_turn's afterwards: park, and the person or the agent that started you can archive you.")
+        // A helper hears the same, rather than that it may not use the tools at all.
+        let helperError = await refusal { _ = try await calling(core, helperToken) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) } }
+        #expect(helperError?.message == DaemonCore.cannotArchiveItself)
+        #expect(await core.agent(lead)?.state != .archived)
+        #expect(await core.agent(helper)?.state != .archived)
+    }
+
+    @Test func aHelperStillWorkingIsNotArchived() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, longTurns())
+        let (_, token) = try await caller(core, in: work)
+        let helper = try await start(core, token, "Alpha")
+        _ = await eventually("the helper is working") { await core.agent(helper)?.state == .running }
+
+        let error = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) } }
+
+        #expect(error?.message == "Nothing changed: \u{201C}Alpha\u{201D} is still working. Wait for it to finish, "
+                + "or stop it with stop_agent if its work is no longer wanted, then archive it.")
+        #expect(await core.agent(helper)?.state == .running)
+    }
+
+    @Test func withTheSwitchOffOnlyThePersonArchives() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher())
+        let (_, token) = try await caller(core, in: work)
+        let helper = try await settledHelper(core, token, "Alpha")
+        let summary = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(agentsMayArchive: false)))
+        #expect(summary.project.helperLimits?.mayArchive == false)
+
+        let error = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) } }
+
+        #expect(error?.message == "Nothing changed: in this project only the person archives; they can let agents "
+                + "archive the helpers they started in Project Settings. Park \u{201C}Alpha\u{201D} with park_agent instead.")
+        #expect(await core.agent(helper)?.state != .archived)
+        // Back on, which is the default and so keeps no record.
+        let reset = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(agentsMayArchive: true)))
+        #expect(reset.project.helperLimits == nil)
+        _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) }
+        #expect(await core.agent(helper)?.state == .archived)
     }
 
     // MARK: Listing (US4)

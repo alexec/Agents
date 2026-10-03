@@ -35,7 +35,8 @@ struct AgentToolsServiceTests {
     }
 
     private let agentTools = [AppService.startAgentToolName, AppService.stopAgentToolName,
-                              AppService.parkAgentToolName, AppService.listMyAgentsToolName]
+                              AppService.parkAgentToolName, AppService.archiveAgentToolName,
+                              AppService.listMyAgentsToolName]
 
     @Test func anAgentThePersonStartedIsOfferedThem() async throws {
         let (client, service) = await pair()
@@ -89,8 +90,11 @@ struct AgentToolsServiceTests {
         _ = try await client.call("tools/call", [
             "name": .string(AppService.parkAgentToolName), "arguments": ["id": "abc"],
         ])
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.archiveAgentToolName), "arguments": ["id": "abc"],
+        ])
         _ = try await client.call("tools/call", ["name": .string(AppService.listMyAgentsToolName)])
-        #expect(await calls.seen == [.stop(agentID: "abc"), .park(agentID: "abc"), .list])
+        #expect(await calls.seen == [.stop(agentID: "abc"), .park(agentID: "abc"), .archive(agentID: "abc"), .list])
         await service.close()
     }
 
@@ -129,7 +133,7 @@ struct AgentToolsServiceTests {
     /// No helper tool says how many: the project's limits are in each result (#64).
     @Test func noHelperToolHardCodesANumber() {
         for tool in [AppService.startAgentTool, AppService.stopAgentTool, AppService.parkAgentTool,
-                     AppService.listMyAgentsTool] {
+                     AppService.archiveAgentTool, AppService.listMyAgentsTool] {
             let description = tool["description"]?.stringValue ?? ""
             for number in ["three", "five", " 3 ", " 5 "] {
                 #expect(!description.contains(number), "\(tool["name"]?.stringValue ?? "?") says \(number)")

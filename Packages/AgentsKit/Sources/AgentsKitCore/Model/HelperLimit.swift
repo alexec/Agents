@@ -18,6 +18,10 @@ public enum HelperLimit {
     /// The most either can ever be set to, by anybody.
     public static let maximumRunning = 10
     public static let maximumNotArchived = 20
+    /// Whether an agent may archive the agents it started (#120) in a project with no
+    /// setting. On: a lead that archives its finished helpers frees their places
+    /// without waiting on the person, who can still bring any of them back.
+    public static let defaultAgentsMayArchive = true
 
     /// The places in use in a project: every agent another agent started there that
     /// has not been archived, plus starts that have taken a place and not yet made
@@ -76,7 +80,8 @@ public enum HelperLimit {
     }
 }
 
-/// One project's two helper limits, as the person set them (#64). Kept on `Project`.
+/// One project's two helper limits, as the person set them (#64), and whether agents
+/// may archive the helpers they started (#120). Kept on `Project`.
 ///
 /// Each is nil until the person sets it, which is the default; `effective` is what is
 /// enforced, clamped to the hard maximums whatever the file says, so a hand-edited
@@ -84,11 +89,19 @@ public enum HelperLimit {
 public struct HelperLimits: Codable, Hashable, Sendable {
     public var running: Int?
     public var notArchived: Int?
+    /// Whether `archive_agent` is answered in this project (#120). Nil is the default,
+    /// `HelperLimit.defaultAgentsMayArchive`.
+    public var agentsMayArchive: Bool?
 
-    public init(running: Int? = nil, notArchived: Int? = nil) {
+    public init(running: Int? = nil, notArchived: Int? = nil, agentsMayArchive: Bool? = nil) {
         self.running = running
         self.notArchived = notArchived
+        self.agentsMayArchive = agentsMayArchive
     }
+
+    /// Whether agents may archive the helpers they started here: the person's
+    /// choice, or the default.
+    public var mayArchive: Bool { agentsMayArchive ?? HelperLimit.defaultAgentsMayArchive }
 
     /// What is enforced: each limit, or its default, between 1 and its maximum.
     /// Running is never more than not archived, since every running helper is one not
@@ -119,9 +132,11 @@ public struct HelperLimits: Codable, Hashable, Sendable {
         return nil
     }
 
-    /// Nil when both are the defaults, so a project that never changed them keeps no
-    /// record of it.
+    /// Nil when all three are the defaults, so a project that never changed them keeps
+    /// no record of it. The switch set to its default is kept as no choice at all.
     public var orNilIfDefault: HelperLimits? {
-        running == nil && notArchived == nil ? nil : self
+        var kept = self
+        if kept.agentsMayArchive == HelperLimit.defaultAgentsMayArchive { kept.agentsMayArchive = nil }
+        return kept.running == nil && kept.notArchived == nil && kept.agentsMayArchive == nil ? nil : kept
     }
 }

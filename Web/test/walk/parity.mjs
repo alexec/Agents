@@ -66,6 +66,15 @@ for (const scene of scenes) {
       say(`project row: ${JSON.stringify(await visible(".projects .row.project"))}`);
       say(`project row height: ${await page.eval(`document.querySelector(".projects .row.project").getBoundingClientRect().height`)}`);
       await shot("sessions");
+    } else if (scene === "asker") {
+      // #121: a question or permission card names who asks, by title and runtime. Takes the
+      // first session waiting on a card, so a root with one agent asking is enough.
+      await openProject();
+      await page.eval(`document.querySelector(".sessions .row.session .pick, .sessions .row.session")?.click()`);
+      await page.waitFor(`document.querySelector(".cards .card")`, 30_000);
+      say(`asker: ${JSON.stringify(await visible(".cards .card .asker"))}`);
+      say(`card: ${JSON.stringify(await visible(".cards .card .strong"))}`);
+      await shot("asker");
     } else if (scene === "chat") {
       // 069 turn detail, concise turns, trailing reply; #108 bar.
       await openProject();

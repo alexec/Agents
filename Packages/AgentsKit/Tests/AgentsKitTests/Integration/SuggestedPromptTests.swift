@@ -245,7 +245,7 @@ struct SuggestedPromptTests {
         let sent = await launcher.allAgents.first?.promptContent?.arrayValue ?? []
         #expect(sent.count == 2)
         #expect(sent.first?["text"]?.stringValue == "do the thing")
-        #expect(sent.last?["text"]?.stringValue == Briefing.text(for: ToolPolicyCatalog.cursor))
+        #expect(sent.last?["text"]?.stringValue == Briefing.asSent(to: "cursor"))
     }
 
     /// Asked once. The runtime keeps it in its own history and replays that history
@@ -262,7 +262,7 @@ struct SuggestedPromptTests {
         try await settle(core, id)
 
         let sent = await prompts(launcher)
-        #expect(sent == [["do the thing", Briefing.text(for: ToolPolicyCatalog.cursor)],
+        #expect(sent == [["do the thing", Briefing.asSent(to: "cursor")],
                          ["and the next thing"]])
     }
 
@@ -321,8 +321,8 @@ struct SuggestedPromptTests {
         // Two prompts, and the ask on both: the second runtime is a conversation
         // starting again, however much of it the app still has on its own record.
         let sent = await prompts(launcher)
-        #expect(sent == [["do the thing", Briefing.text(for: ToolPolicyCatalog.cursor)],
-                         ["carry on", Briefing.text(for: ToolPolicyCatalog.cursor)]])
+        #expect(sent == [["do the thing", Briefing.asSent(to: "cursor")],
+                         ["carry on", Briefing.asSent(to: "cursor")]])
     }
 
     /// The other way a conversation comes back, and the one the two tests above leave
@@ -336,7 +336,7 @@ struct SuggestedPromptTests {
 
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "do the thing"))
         try await settle(core, id)
-        #expect(await prompts(first) == [["do the thing", Briefing.text(for: ToolPolicyCatalog.cursor)]])
+        #expect(await prompts(first) == [["do the thing", Briefing.asSent(to: "cursor")]])
 
         // Wait for the record on disk, not the one in memory. `settle` watches the
         // daemon's own copy, and the file is written a moment behind it — the same gap
@@ -415,7 +415,7 @@ struct SuggestedPromptTests {
         #expect(started.startedByWorkflow == "check-build")
         let sent = await prompts(launcher)
         #expect(sent == [["Check the build.",
-                          Briefing.text(for: ToolPolicyCatalog.policy(for: started.runtimeID))]])
+                          Briefing.asSent(to: started.runtimeID)]])
     }
 
     /// Ours is a block of its own and not part of what was said. The transcript is a

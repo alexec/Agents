@@ -57,10 +57,11 @@ struct PermissionSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    // Its subagent asking, not the agent itself (057). Still the agent's
-                    // question to answer, so it is asked here and not somewhere else.
-                    if let subagent = request.subagent {
-                        Text("Subagent “\(subagent)” asks").appText(.fine).foregroundStyle(.secondary)
+                    // Who is asking, by title and runtime (#121) — its subagent, when it
+                    // is one (057). Still the agent's question to answer, so it is here.
+                    if let asker = model.work.askerLine(request.agentID, subagent: request.subagent) {
+                        Text(asker).appText(.fine).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Text(request.toolCall.title)
                         .appText(.reading).fontWeight(.semibold)

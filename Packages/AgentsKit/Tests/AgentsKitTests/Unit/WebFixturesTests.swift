@@ -127,6 +127,40 @@ struct WebFixturesTests {
         ]
     }
 
+    // MARK: asker/ (#121)
+
+    /// Who is asking at the head of a card: titled, untitled, a helper whose starter is
+    /// here or gone, and a subagent.
+    @Test func asker() throws {
+        let lead = Self.agent(50, .running, title: "Project lead")
+        var helper = Self.agent(51, .waitingOnUser, title: "#116 helper")
+        helper.startedByAgent = lead.id
+        helper.runtimeID = "grok"
+        var orphan = Self.agent(52, .waitingOnUser, title: "Orphan")
+        orphan.startedByAgent = Self.id(999)
+        var untitled = Self.agent(53, .waitingOnUser)
+        untitled.title = "  "
+        let everyone = [lead, helper, orphan, untitled]
+        let runtimes: JSONValue = .object(Dictionary(uniqueKeysWithValues: [RuntimeCatalog.claude, RuntimeCatalog.grok].map {
+            ($0.id, JSONValue.string($0.name))
+        }))
+        let asked: [(String, Agent, String?)] = [
+            ("titled", lead, nil), ("a helper", helper, nil), ("a helper whose starter has gone", orphan, nil),
+            ("untitled", untitled, nil), ("a subagent", lead, "Explore"),
+        ]
+        let cases = try asked.map { name, agent, subagent in
+            Case(name: name, input: .object([
+                "agents": .array(try everyone.map(Self.encode)), "runtimes": runtimes,
+                "agentID": .string(agent.id.uuidString), "subagent": subagent.map(JSONValue.string) ?? .null]))
+        }
+        try pin("asker/line.json", cases) { input in
+            let model = AgentsModel()
+            model.replaceAgents(try input["agents"]!.decode([Agent].self))
+            let id = UUID(uuidString: input["agentID"]!.stringValue!)!
+            return .string(model.askerLine(id, subagent: input["subagent"]?.stringValue)!)
+        }
+    }
+
     // MARK: groups/ and status/
 
     @Test func groups() throws {
