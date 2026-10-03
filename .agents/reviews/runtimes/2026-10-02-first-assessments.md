@@ -76,3 +76,26 @@ The daemon's score was never taken from the agents' reports. Each agent's report
 "all passed" both times, including the runs where the daemon (rightly or wrongly) said
 otherwise. Every disagreement above was settled from `app-tools.jsonl`, the transcript and
 the event log.
+
+## The rest of the issue's steps: Claude 15 of 15
+
+Later the same evening, after the steps the issue asked for and the branch lacked were added
+(`worktree`, `sessions`, `scope`, `permissions`, the throwaway workflow and `cancel_wait`).
+Three Claude Haiku runs, on a git scratch project, rebased onto main `3a6a5b0b`:
+
+1. **14 of 15** (`ask_form` failed). This was the driver's fault: it rejected every card that
+   quoted the scope file's path, including the agent's own edits to its report. It now
+   matches by where a write lands, and so does the verifier (`8c81d8d9`).
+2. **12 of 15.** One was a real finding and two were ours:
+   - `leases`, the finding: Haiku called `lease_resource "screen"` where the brief said
+     `list_resources`. The model didn't follow the brief, and the record caught it.
+   - `ending`, ours: a permission card after `finish_turn` was counted as a new turn
+     starting, so three accounted turns read as silent.
+   - `show_file`, ours: the first run's report was already there. A second assessment the
+     same day now gets `-2.md` (`1b002d34`).
+3. **15 of 15**, on the rebuilt host, with a same-day report put there first. It got
+   `claude-2026-10-02-2.md`, opened empty. The app's note names the adapter and host:
+   *claude (@agentclientprotocol/claude-agent-acp 0.81.2, model haiku, on this Mac (…))*.
+   Afterwards the project had no worktree, no `assess-…` branch, no workflow file, and no
+   scope file outside the project. The driver rejected the scope card, and nothing was
+   written.
