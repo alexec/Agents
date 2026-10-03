@@ -13,21 +13,28 @@ Each phase takes the run that `plan` made (the latest, without RUN). Every phase
 --home DIR, where the state between nights is kept (default ~/Library/Application Support/
 Agents Nightly Runtimes, or $AGENTS_NIGHTLY_HOME).
 
-plan     Fetches origin/main into a worktree of its own (<home>/tree, never the project's
-         checkout) and asks each runtime's source for its latest release. A runtime is
+plan     Checks out --base (default main, this Mac's own: origin/main can be days behind it)
+         into a worktree of its own (<home>/tree, never the project's checkout) and asks each runtime's source for its latest release. A runtime is
          tested when that release is new: not the one pinned, and not the one tested on an
          earlier night. A runtime not in --available (the app's pool, #117) is skipped and
-         said so. A pinned runtime is re-pinned in the tree with scripts/update-toolset.sh.
+         said so. A pinned runtime is re-pinned in the tree with scripts/update-toolset.sh,
+         and each new pin is kept in the run, so later phases can test pins one at a time.
          Prints "Nothing changed." and nothing else when nothing is to be tested.
 build    xcodegen + xcodebuild -scheme AgentsHost into <home>/tree/build/DD, then the
-         AgentsKit runtime tests, all with every new pin in place.
+         AgentsKit runtime tests, all with every new pin in place. Both run on the base as it
+         was too: what already fails there is "already failing on main", and no runtime's
+         fault. A test that fails only with the new pins is put down to the pin that fails it
+         alone; one no single pin fails is put down to all of them together. A new failure
+         that a second run does not repeat is called flaky, and is no runtime's fault either.
 check    Starts a scratch host on that build (the run-app skill's launch.sh --no-window),
          installs each app-copy runtime from its new pin, then per runtime:
          scripts/acp-handshake.sh, scripts/runtime-tools.sh (a NEW tool fails), and one real
          turn through agentsd on the cheapest model the runtime offers. Stops the host.
 report   A pinned runtime that passed every step: one PR per runtime, on the branch
-         nightly/runtime-<id>, opened or updated. A runtime that failed a step: one issue
-         per runtime, opened or commented on, with the version, the step and its output.
+         nightly/runtime-<id> off origin/main (only its toolset folder changes), opened or
+         updated. A runtime that failed a step: one issue per runtime, opened or commented
+         on, with the version, the step and its output; runtimes that failed the same step for
+         the same cause share one issue. What already fails on main is listed, never filed.
          --dry-run prints what it would do and opens, pushes and records nothing.
 
 Runtimes the person installs (Grok, Copilot, Cursor) are never updated here: the app runs
@@ -157,7 +164,12 @@ def latest_version(rid, env):
                          env=env, timeout=60)
         return out.strip().removeprefix("v") if status == 0 else None
     status, out = sh(spec["version"], env=env, timeout=60)
-    return out.strip().splitlines()[0] if status == 0 and out.strip() else None
+    if status != 0 or not out.strip():
+        return None
+    # "GitHub Copilot CLI 1.0.89-5." is version 1.0.89-5.
+    line = out.strip().splitlines()[0]
+    found = re.search(r"\d+(?:\.\d+)+(?:-[\w.]*\w)?", line)
+    return found.group(0) if found else line
 
 
 def repin(tree, rid, version, env):
@@ -210,7 +222,7 @@ def plan(args):
     run = os.path.join(args.home, "runs", stamp)
     os.makedirs(run)
     record = {"started": stamp, "tree": tree, "base": sh(["git", "-C", tree, "rev-parse", "HEAD"])[1].strip(),
-              "runtimes": {}}
+              "base_ref": args.base, "runtimes": {}}
     for rid in wanted:
         if rid not in RUNTIMES:
             sys.exit(f"no runtime called {rid}; try {', '.join(RUNTIMES)}")
@@ -241,6 +253,8 @@ def plan(args):
             entry["steps"]["update"] = {"ok": ok, "output": tail(out)}
             if not ok:
                 entry["status"] = "failed"
+            else:
+                shutil.copytree(os.path.join(tree, TOOLSETS, rid), os.path.join(run, "pins", rid))
     save(os.path.join(run, "run.json"), record)
     latest_link = os.path.join(args.home, "runs", "latest")
     if os.path.lexists(latest_link):
@@ -262,6 +276,25 @@ def plan(args):
             print(f"  {rid}: {entry['to']}, unchanged")
 
 
+TOOLSETS = "App/Resources/toolsets"
+
+
+def use_pins(tree, run, rids):
+    """Put the tree's toolsets back to the base, then lay in the new pins of these runtimes."""
+    sh(["git", "-C", tree, "checkout", "-q", "HEAD", "--", TOOLSETS], check=True)
+    sh(["git", "-C", tree, "clean", "-qfd", "--", TOOLSETS], check=True)
+    for rid in rids:
+        pin = os.path.join(run, "pins", rid)
+        if os.path.isdir(pin):
+            target = os.path.join(tree, TOOLSETS, rid)
+            shutil.rmtree(target, ignore_errors=True)
+            shutil.copytree(pin, target)
+
+
+def pinned(run, rids):
+    return [rid for rid in rids if os.path.isdir(os.path.join(run, "pins", rid))]
+
+
 def testing(record):
     return [rid for rid, e in record["runtimes"].items() if e["status"] == "testing"]
 
@@ -276,6 +309,41 @@ def fail_all(record, rids, step, ok, output):
 
 # ---- build ------------------------------------------------------------------------------
 
+def xcodebuild(tree):
+    return sh(["/bin/zsh", "-c",
+               "xcodegen generate >/dev/null && xcodebuild -scheme AgentsHost -destination 'platform=macOS' "
+               "-configuration Debug -derivedDataPath build/DD -skipPackagePluginValidation build"],
+              cwd=tree, timeout=3600)
+
+
+NOT_RUN = "(the runtime tests did not build or run)"
+
+
+def runtime_tests(tree):
+    """(exit status, output, the names of the tests that failed)."""
+    status, out = sh(["swift", "test", "--package-path", "Packages/AgentsKit", "--filter", RUNTIME_TESTS],
+                     cwd=tree, timeout=3600)
+    failed = set(re.findall(r"✘ Test (\S+?)\(.*?\) failed", out))
+    failed |= set(re.findall(r"Test Case '-\[\S+ (\S+)\]' failed", out))
+    if status != 0 and not failed:
+        failed = {NOT_RUN}
+    return status, out, failed
+
+
+def failure_lines(out, names):
+    """What the output says about these failed tests, and nothing about the rest."""
+    lines, ours = [], False
+    for line in out.splitlines():
+        if line.startswith("↳"):
+            if ours:
+                lines.append(line)
+            continue
+        ours = any(name in line for name in names) and bool(re.search(r"✘|error:|failed", line))
+        if ours:
+            lines.append(line)
+    return "\n".join(lines[:120]) if lines else tail(out)
+
+
 def build(args):
     run = run_dir(args.home, args.run)
     record = load(os.path.join(run, "run.json"), {})
@@ -284,25 +352,94 @@ def build(args):
         print("nothing to build")
         return
     tree = record["tree"]
-    together = f" (built and tested with {', '.join(rids)} re-pinned together)" if len(rids) > 1 else ""
-    status, out = sh(["/bin/zsh", "-c",
-                      "xcodegen generate >/dev/null && xcodebuild -scheme AgentsHost -destination 'platform=macOS' "
-                      "-configuration Debug -derivedDataPath build/DD -skipPackagePluginValidation build"],
-                     cwd=tree, timeout=3600)
+    pins = pinned(run, rids)
+    baseline = record.setdefault("baseline", {})
+    use_pins(tree, run, pins)
+    status, out = xcodebuild(tree)
     with open(os.path.join(run, "build.log"), "w") as f:
         f.write(out)
-    fail_all(record, rids, "build", status == 0, out + together)
+    if status != 0 and pins:
+        # Is it the pins, or does the base not build either?
+        use_pins(tree, run, [])
+        base_status, base_out = xcodebuild(tree)
+        with open(os.path.join(run, "build-baseline.log"), "w") as f:
+            f.write(base_out)
+        if base_status != 0:
+            baseline["build"] = tail(base_out)
+            for rid in rids:
+                record["runtimes"][rid]["status"] = "blocked"
+            save(os.path.join(run, "run.json"), record)
+            print(f"build: FAILED on the base too, already failing on main ({run}/build-baseline.log)")
+            return
+        use_pins(tree, run, pins)
+    together = f" (built with {', '.join(pins)} re-pinned together)" if len(pins) > 1 else ""
+    for rid in rids:
+        record["runtimes"][rid]["steps"]["build"] = {
+            "ok": status == 0, "output": tail(out + together), "cause": "build" if status else None}
+        if status != 0:
+            record["runtimes"][rid]["status"] = "failed"
     print(f"build: {'ok' if status == 0 else 'FAILED'} ({run}/build.log)")
     if status == 0:
-        status, out = sh(["swift", "test", "--package-path", "Packages/AgentsKit", "--filter", RUNTIME_TESTS],
-                         cwd=tree, timeout=3600)
-        with open(os.path.join(run, "tests.log"), "w") as f:
-            f.write(out)
-        summary = "\n".join(line for line in out.splitlines()
-                            if re.search(r"✘|error:|failed|passed after|Executed", line))
-        fail_all(record, rids, "tests", status == 0, (summary or out) + together)
-        print(f"runtime tests: {'ok' if status == 0 else 'FAILED'} ({run}/tests.log)")
+        test_all(run, record, tree, rids, pins)
     save(os.path.join(run, "run.json"), record)
+
+
+def test_all(run, record, tree, rids, pins):
+    """The runtime tests on the base, with every new pin, and with each pin alone when that
+    is needed to say which pin a new failure comes from."""
+    use_pins(tree, run, [])
+    _, base_out, base_failed = runtime_tests(tree)
+    with open(os.path.join(run, "tests-baseline.log"), "w") as f:
+        f.write(base_out)
+    record["baseline"]["tests"] = sorted(base_failed)
+    record["baseline"]["tests_output"] = failure_lines(base_out, base_failed) if base_failed else ""
+    if pins:
+        use_pins(tree, run, pins)
+        _, out, failed = runtime_tests(tree)
+    else:
+        out, failed = base_out, base_failed
+    with open(os.path.join(run, "tests.log"), "w") as f:
+        f.write(out)
+    new = failed - base_failed
+    if new:
+        # The suite is flaky under load: a new failure counts only if a second run fails it too.
+        _, again_out, again = runtime_tests(tree)
+        with open(os.path.join(run, "tests-again.log"), "w") as f:
+            f.write(again_out)
+        record["flaky"] = sorted(new - again)
+        new &= again
+        if record["flaky"]:
+            print(f"runtime tests: flaky, failed once and passed again: {', '.join(record['flaky'])}")
+    own = {rid: set() for rid in rids}
+    outputs = {}
+    if new and len(pins) == 1:
+        own[pins[0]], outputs[pins[0]] = new, out
+    elif new:
+        for rid in pins:
+            use_pins(tree, run, [rid])
+            _, alone_out, alone_failed = runtime_tests(tree)
+            with open(os.path.join(run, f"tests-{rid}.log"), "w") as f:
+                f.write(alone_out)
+            own[rid], outputs[rid] = (alone_failed - base_failed) & new, alone_out
+        use_pins(tree, run, pins)
+    shared = new - set().union(*own.values())
+    already = f"\n\nAlready failing on main, and not counted: {', '.join(sorted(base_failed))}" if base_failed else ""
+    for rid in rids:
+        entry = record["runtimes"][rid]
+        if own[rid]:
+            entry["steps"]["tests"] = {"ok": False, "cause": "tests: " + ", ".join(sorted(own[rid])),
+                                       "output": tail(failure_lines(outputs[rid], own[rid]) + f"\n\n(with only the "
+                                                      f"{RUNTIMES[rid]['name']} pin new){already}")}
+        elif shared and rid in pins:
+            entry["steps"]["tests"] = {"ok": False, "cause": "tests together: " + ", ".join(sorted(shared)),
+                                       "output": tail(failure_lines(out, shared) + f"\n\n(only with {', '.join(pins)} "
+                                                      f"re-pinned together; no one pin fails it alone){already}")}
+        else:
+            entry["steps"]["tests"] = {"ok": True, "output": "passed" + already}
+        if not entry["steps"]["tests"]["ok"]:
+            entry["status"] = "failed"
+    print(f"runtime tests: {'ok' if not new else 'FAILED: ' + ', '.join(sorted(new))} ({run}/tests.log)"
+          + (f"; already failing on main: {', '.join(sorted(base_failed))}" if base_failed else ""))
 
 
 # ---- check ------------------------------------------------------------------------------
@@ -411,6 +548,8 @@ def check(args):
     status, out = sh([f"{scripts}/launch.sh", "--no-build", "--no-window", "--slug", slug], cwd=tree, timeout=300)
     if status != 0:
         fail_all(record, rids, "start", False, out)
+        for rid in rids:
+            record["runtimes"][rid]["steps"]["start"]["cause"] = "start"
         save(os.path.join(run, "run.json"), record)
         print("the scratch host would not start:\n" + out)
         return
@@ -442,6 +581,13 @@ def check(args):
             model = cheapest_model(load(os.path.join(sessions, f"{rid}.json"), None))
             try:
                 ok, out = real_turn(client, root, rid, model)
+                if not ok and model:
+                    # The cheapest model can be a free one whose provider is down; the runtime
+                    # is not at fault if its own default model answers.
+                    ok, again = real_turn(client, root, rid, None)
+                    out = (f"{again}, after {out}" if ok else f"{out}\n\nthen on the default model: {again}")
+                    out = out.splitlines()[0] if ok else out
+                    model = model if not ok else f"default; {model} failed"
             except Exception as e:
                 ok, out = False, f"{type(e).__name__}: {e}"
             steps["turn"] = {"ok": ok, "output": tail(out), "model": model}
@@ -483,22 +629,24 @@ def do(command, dry_run, cwd=None):
     return status, out
 
 
-def open_pr(record, rid, entry, dry_run):
+def open_pr(run, record, rid, entry, dry_run):
     spec = RUNTIMES[rid]
     branch = f"nightly/runtime-{rid}"
     title = f"Pin {spec['name']} to {entry['to']}"
     body = (f"The nightly runtime check (#39) re-pinned {spec['name']} from {entry['from']} to "
-            f"{entry['to']} and every step passed, on origin/main {record['base'][:10]}.\n\n"
+            f"{entry['to']} and every step passed, tested on {base_name(record)}.\n\n"
             f"{steps_table(entry)}\n\nRe-pinned with `scripts/update-toolset.sh`; only "
             f"`App/Resources/toolsets/{rid}/` changes. Notes in specs and comments that name the "
             f"old version are left as they were.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)")
     work = tempfile.mkdtemp(prefix=f"nightly-{rid}-")
     os.rmdir(work)
-    sh(["git", "-C", REPO, "worktree", "add", "-q", "--detach", work, record["base"]], check=True)
+    # The branch starts from origin/main whatever was tested, so it never carries unpushed work:
+    # only the toolset folder changes, and it lays on either.
+    sh(["git", "-C", REPO, "worktree", "add", "-q", "--detach", work, "origin/main"], check=True)
     try:
         target = os.path.join(work, "App/Resources/toolsets", rid)
         shutil.rmtree(target, ignore_errors=True)
-        shutil.copytree(os.path.join(record["tree"], "App/Resources/toolsets", rid), target)
+        shutil.copytree(os.path.join(run, "pins", rid), target)
         sh(["git", "-C", work, "add", "-A", target], check=True)
         message = (f"{title} (nightly runtime check, #39)\n\n"
                    f"{entry['from']} → {entry['to']}: update, build, runtime tests, handshake, tools and "
@@ -520,16 +668,17 @@ def open_pr(record, rid, entry, dry_run):
         sh(["git", "-C", REPO, "worktree", "remove", "--force", work])
 
 
-def open_issue(record, rid, entry, dry_run):
-    spec = RUNTIMES[rid]
+def base_name(record):
+    return f"{record.get('base_ref', 'origin/main')} {record['base'][:10]}"
+
+
+def cause(entry):
     step = first_failure(entry)
-    prefix = f"Nightly runtime check: {spec['name']}"
-    title = f"{prefix} {entry.get('to', '?')} fails at {step}"
-    outputs = "\n\n".join(f"### {s}\n\n```\n{entry['steps'][s]['output']}\n```"
-                          for s in STEP_ORDER if s in entry["steps"] and not entry["steps"][s]["ok"])
-    body = (f"{spec['name']} {entry.get('from') or '(untested)'} → {entry.get('to')}, on origin/main "
-            f"{record['base'][:10]}, run {record['started']}.\n\n{steps_table(entry)}\n\n{outputs}\n\n"
-            f"Found by the nightly runtime check (#39).")
+    result = entry["steps"][step]
+    return step, result.get("cause") or result["output"]
+
+
+def file_issue(prefix, title, body, dry_run):
     existing = sh(["gh", "issue", "list", "--state", "open", "--search", f'in:title "{prefix}"',
                    "--json", "number,title", "--jq", f'[.[] | select(.title | startswith("{prefix} "))][0].number'],
                   cwd=REPO)[1].strip()
@@ -539,8 +688,36 @@ def open_issue(record, rid, entry, dry_run):
     else:
         status, _ = do(["gh", "issue", "create", "--title", title, "--body", body], dry_run, cwd=REPO)
     if dry_run:
-        print("  ---- issue body ----\n  " + body[:3000].replace("\n", "\n  "))
+        print(f"  ---- issue: {title} ----\n  " + body[:3000].replace("\n", "\n  "))
     return status == 0
+
+
+def outputs_of(entry):
+    return "\n\n".join(f"### {s}\n\n```\n{entry['steps'][s]['output']}\n```"
+                        for s in STEP_ORDER if s in entry["steps"] and not entry["steps"][s]["ok"])
+
+
+def open_issue(record, rid, entry, dry_run):
+    spec = RUNTIMES[rid]
+    prefix = f"Nightly runtime check: {spec['name']}"
+    title = f"{prefix} {entry.get('to', '?')} fails at {first_failure(entry)}"
+    body = (f"{spec['name']} {entry.get('from') or '(untested)'} → {entry.get('to')}, on {base_name(record)}, "
+            f"run {record['started']}.\n\n{steps_table(entry)}\n\n{outputs_of(entry)}\n\n"
+            f"Found by the nightly runtime check (#39).")
+    return file_issue(prefix, title, body, dry_run)
+
+
+def open_shared_issue(record, rids, dry_run):
+    """Runtimes that failed the same step for the same cause: one issue for all of them."""
+    names = ", ".join(RUNTIMES[rid]["name"] for rid in rids)
+    first = record["runtimes"][rids[0]]
+    prefix = "Nightly runtime check: one cause"
+    title = f"{prefix} fails {names} at {first_failure(first)}"
+    each = "\n\n".join(f"**{RUNTIMES[rid]['name']}** {record['runtimes'][rid].get('from') or '(untested)'} → "
+                        f"{record['runtimes'][rid].get('to')}\n\n{steps_table(record['runtimes'][rid])}" for rid in rids)
+    body = (f"{names} failed at {first_failure(first)} for one cause, on {base_name(record)}, run "
+            f"{record['started']}.\n\n{each}\n\n{outputs_of(first)}\n\nFound by the nightly runtime check (#39).")
+    return file_issue(prefix, title, body, dry_run)
 
 
 def report(args):
@@ -549,6 +726,16 @@ def report(args):
     state_path = os.path.join(args.home, "state.json")
     state = load(state_path, {})
     lines = []
+    baseline = record.get("baseline") or {}
+    if baseline.get("build") or baseline.get("tests"):
+        what = "Agents Host does not build" if baseline.get("build") else ", ".join(baseline["tests"])
+        lines.append(f"- Already failing on main ({base_name(record)}), filed for no runtime: {what}")
+        print(f"Already failing on main ({base_name(record)}): {what}\n  "
+              + (baseline.get("build") or baseline.get("tests_output") or "")[-2000:].replace("\n", "\n  "))
+    if record.get("flaky"):
+        lines.append(f"- Flaky, failed once and passed on a second run, filed for no runtime: "
+                     f"{', '.join(record['flaky'])}")
+    failed = {}
     for rid, entry in record["runtimes"].items():
         spec = RUNTIMES[rid]
         if entry["status"] == "skipped":
@@ -556,24 +743,32 @@ def report(args):
             continue
         if entry["status"] == "unchanged":
             continue
+        if entry["status"] == "blocked":
+            lines.append(f"- {spec['name']}: {entry['to']} not tested; main does not build")
+            continue
         if entry["status"] == "testing" and not entry["steps"].get("turn"):
             lines.append(f"- {spec['name']}: {entry['to']} not tested; build or check did not run")
             continue
         passed = entry["status"] == "testing"
         print(f"{spec['name']} {entry.get('from')} → {entry['to']}: {'passed' if passed else 'failed at ' + first_failure(entry)}")
         if passed and spec["kind"] != "installed":
-            sent = open_pr(record, rid, entry, args.dry_run)
+            sent = open_pr(run, record, rid, entry, args.dry_run)
             lines.append(f"- {spec['name']} {entry['to']}: passed; PR {'would be ' if args.dry_run else ''}"
                          f"{'opened or updated' if sent else 'NOT opened (see above)'} on nightly/runtime-{rid}")
         elif passed:
             lines.append(f"- {spec['name']} {entry['to']} (installed by the person): passed")
         else:
-            sent = open_issue(record, rid, entry, args.dry_run)
-            lines.append(f"- {spec['name']} {entry['to']}: failed at {first_failure(entry)}; issue "
-                         f"{'would be ' if args.dry_run else ''}{'opened or updated' if sent else 'NOT opened'}")
+            failed.setdefault(cause(entry), []).append(rid)
         if not args.dry_run:
             state[rid] = {"version": entry["to"], "result": "passed" if passed else "failed",
                           "run": record["started"]}
+    for (step, _), rids in failed.items():
+        shared = len(rids) > 1
+        sent = (open_shared_issue if shared else lambda r, ids, d: open_issue(r, ids[0], r["runtimes"][ids[0]], d))(
+            record, rids, args.dry_run)
+        names = ", ".join(f"{RUNTIMES[rid]['name']} {record['runtimes'][rid]['to']}" for rid in rids)
+        lines.append(f"- {names}: failed at {step}; {'one issue for all, ' if shared else 'issue '}"
+                     f"{'would be ' if args.dry_run else ''}{'opened or updated' if sent else 'NOT opened'}")
     if not args.dry_run:
         save(state_path, state)
     text = "\n".join(lines)
@@ -589,8 +784,9 @@ def main():
     parser.add_argument("--home", default=DEFAULT_HOME)
     parser.add_argument("--runtimes", help="only these, comma-separated")
     parser.add_argument("--available", help="the runtimes the app can start tonight, comma-separated")
-    parser.add_argument("--base", default="origin/main",
-                        help="plan: what the tree and the PRs start from (default origin/main)")
+    parser.add_argument("--base", default="main",
+                        help="plan: what the tree is tested on (default main, this Mac's own; PR branches "
+                             "always start from origin/main)")
     parser.add_argument("--force", action="store_true", help="test even what has not changed")
     parser.add_argument("--dry-run", action="store_true", help="report: open, push and record nothing")
     parser.add_argument("--keep", action="store_true", help="check: leave the scratch root on disk")
