@@ -5,8 +5,10 @@ import Observation
 /// Which projects in the sidebar are unfolded, and which of their Archived folds are
 /// open (#145), kept across launches.
 ///
-/// In defaults, scoped by root: every copy of the app shares one defaults domain, and a
-/// scratch root's folds are not the real window's.
+/// In defaults, scoped by walk and by root: every copy of the app shares one defaults
+/// domain, and a scratch window's folds are not the real window's. A walk's window (run-app,
+/// `--walk`) is a client of a scratch control plane on the standard root, so the root alone
+/// does not tell it apart.
 @MainActor
 @Observable
 final class SidebarFolds {
@@ -14,9 +16,11 @@ final class SidebarFolds {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let key: String
 
-    init(defaults: UserDefaults = .standard, locations: StoreLocations = .default) {
+    init(defaults: UserDefaults = .standard, locations: StoreLocations = .default,
+         walk: String? = ControlConfig.walk) {
         self.defaults = defaults
-        key = locations.isStandard ? "sidebar.folds" : "sidebar.folds.root:\(locations.name)"
+        key = walk.map { "sidebar.folds.walk:\($0)" }
+            ?? (locations.isStandard ? "sidebar.folds" : "sidebar.folds.root:\(locations.name)")
         open = Set(defaults.stringArray(forKey: key) ?? [])
     }
 
