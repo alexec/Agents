@@ -372,6 +372,11 @@ public actor DaemonCore {
     var lastPrompts: [UUID: SentPrompt] = [:]
     /// Rate-limit retries so far for each agent's current prompt (R7).
     var rateLimitAttempts: [UUID: Int] = [:]
+    /// The report an agent's current turn began under, when the app started that turn
+    /// itself (#149): a block cleared, a wait over, a time come. It is the last turn's
+    /// account, kept on the row until this one gives its own, so a turn that ends still
+    /// holding it has said nothing about itself.
+    var reportBeforeTurn: [UUID: WorkReport] = [:]
     /// The latest plan window each agent's runtime reported (R2).
     var latestRateLimit: [UUID: RateLimitInfo] = [:]
     /// Credentials whose allowance is being asked for now, so opening Agent Runtimes
