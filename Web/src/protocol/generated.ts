@@ -1567,6 +1567,7 @@ export interface Workflow {
 export interface WorkflowApproval {
   digest: string;
   isNew: boolean;
+  note?: string;
 }
 
 export interface WorkflowApproveRequest {
@@ -2081,7 +2082,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived"] },
-  WorkflowApproval: { required: ["digest", "isNew"], optional: [] },
+  WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },

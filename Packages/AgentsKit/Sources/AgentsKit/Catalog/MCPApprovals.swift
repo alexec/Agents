@@ -10,10 +10,16 @@ import Foundation
 struct MCPApprovals: Codable, Equatable, Sendable {
     var approvalsBegan: Date?
     var approved: [String: String]
+    /// Read from a file that is there and could not be read (#169): approval has begun
+    /// and nothing is approved. Not written.
+    var unreadable = false
 
-    init(approvalsBegan: Date? = nil, approved: [String: String] = [:]) {
+    enum CodingKeys: String, CodingKey { case approvalsBegan, approved }
+
+    init(approvalsBegan: Date? = nil, approved: [String: String] = [:], unreadable: Bool = false) {
         self.approvalsBegan = approvalsBegan
         self.approved = approved
+        self.unreadable = unreadable
     }
 
     static let relativeFile = ".agents/mcp.json"
@@ -70,18 +76,20 @@ struct MCPApprovals: Codable, Equatable, Sendable {
 struct MCPApprovalStore: Sendable {
     let file: URL
 
+    /// A file that cannot be read approves nothing, and is left as it is (`ApprovalFile`).
     func load() -> MCPApprovals {
-        guard let data = try? Data(contentsOf: file),
-              let records = try? StoreCoding.decoder.decode(MCPApprovals.self, from: data) else {
-            return MCPApprovals()
+        switch ApprovalFile.read(MCPApprovals.self, at: file) {
+        case .missing: return MCPApprovals()
+        case .read(let records): return records
+        case .unreadable: return MCPApprovals(approvalsBegan: Date(), unreadable: true)
         }
-        return records
     }
 
-    func save(_ records: MCPApprovals) throws {
+    /// `replacing` is the person's own act, the only write that replaces a file that
+    /// could not be read.
+    func save(_ records: MCPApprovals, replacing: Bool = false) throws {
         let data = try StoreCoding.encoder.encode(records)
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: file, options: .atomic)
+        try ApprovalFile.write(data, to: file, overUnreadable: records.unreadable, replacing: replacing)
     }
 }
 

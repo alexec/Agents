@@ -13,6 +13,7 @@ public struct SandboxSettingsStore: Sendable {
         guard let data = try? Data(contentsOf: file) else { return .init() }
         guard let settings = try? StoreCoding.decoder.decode(SandboxSettings.self, from: data) else {
             StoreCoding.setAside(file)
+            DaemonLog.shared.write("sandbox-settings.json could not be read; set aside, every runtime as configured")
             return .init()
         }
         return settings

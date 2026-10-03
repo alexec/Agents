@@ -292,6 +292,9 @@ struct WorkflowPage: View {
         let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow))
         return VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Settings")
+            if workflow.settingsLocked {
+                note(Workflow.settingsLockedNote)
+            }
             switch workflow.mode {
             case .triggering:
                 note("This workflow resumes the agent that triggered it, so these do not apply.")
@@ -326,7 +329,7 @@ struct WorkflowPage: View {
             }
             .padding(14)
             .paperRaised(in: RoundedRectangle(cornerRadius: 18))
-            .disabled(workflow.mode == .triggering || model.isStale)
+            .disabled(workflow.mode == .triggering || workflow.settingsLocked || model.isStale)
         }
         // Asked again when the runtime or the folder changes, and not otherwise: the
         // answer is the daemon's memory, and it starts nothing to give it.
@@ -503,7 +506,7 @@ struct WorkflowPage: View {
             }
             .padding(14)
             .paperRaised(in: RoundedRectangle(cornerRadius: 18))
-            .disabled(model.isStale)
+            .disabled(summary.workflow.settingsLocked || model.isStale)
         }
     }
 

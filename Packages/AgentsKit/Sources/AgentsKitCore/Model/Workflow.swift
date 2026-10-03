@@ -409,9 +409,13 @@ public struct WorkflowApproval: Codable, Hashable, Sendable {
     public var digest: String
     /// Never approved before, as opposed to changed since it was.
     public var isNew: Bool
+    /// Why it waits when the reason is not the file itself: the approvals file could
+    /// not be read, so nothing is approved (#169). Said where the approval shows.
+    public var note: String?
 
-    public init(digest: String, isNew: Bool) {
+    public init(digest: String, isNew: Bool, note: String? = nil) {
         self.digest = digest
         self.isNew = isNew
+        self.note = note
     }
 }

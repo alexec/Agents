@@ -137,6 +137,7 @@ private struct WorkflowRow: View {
             return "\(limit.sentence). \(limit.remedy)"
         }
         if let waiting = summary.awaitingApproval {
+            if let note = waiting.note { return "Waiting for your OK on the Mac — \(note)" }
             return (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK on the Mac"
         }
         var parts: [String] = []

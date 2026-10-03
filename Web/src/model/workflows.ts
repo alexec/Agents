@@ -491,7 +491,9 @@ export function happening(summary: WorkflowSummary, now = new Date()): string | 
   else if (waitsItsTurn(summary) && summary.overLimit) {
     return `${limitSentence(summary.overLimit)}. ${limitRemedy(summary.overLimit)}`;
   } else if (summary.awaitingApproval) {
-    const waiting = (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on its page to let it run";
+    const waiting = summary.awaitingApproval.note !== undefined
+      ? `Waiting for your OK — ${summary.awaitingApproval.note}`
+      : (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on its page to let it run";
     const why = offReasonSentence(summary);
     return why ? `${waiting} · ${why}` : waiting;
   } else if (!isOn(summary)) parts.push(turnedOffSentenceFor(summary));
@@ -536,7 +538,9 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
   if (waitsItsTurn(s) && s.overLimit) {
     lines.push({ glyph: "⧗", text: `Waiting its turn: ${limitSentence(s.overLimit)}`, detail: limitRemedy(s.overLimit), tint: "attention" });
   } else if (s.awaitingApproval) {
-    lines.push({ glyph: "✋", text: s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
+    const note = s.awaitingApproval.note;
+    lines.push({ glyph: "✋", text: note !== undefined ? `Waiting for your OK — ${note}`
+      : s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
       detail: "Read the prompt and settings below, then Approve to let it run", tint: "attention" });
   }
   if (!s.isArchived) lines.push(enabledLine(s));

@@ -89,7 +89,7 @@ struct MCPInstaller: Sendable {
         if case .project(let path) = destination {
             var records = MCPApprovalStore(file: approvalsURL).load()
             records.recordAdded(folder: URL(filePath: path), name: staged.preview.nameHere, entry: entry)
-            try MCPApprovalStore(file: approvalsURL).save(records)
+            try MCPApprovalStore(file: approvalsURL).save(records, replacing: true)
         }
 
         return DaemonAPI.ManagedMCPServer(name: staged.preview.nameHere, registryName: staged.registryName,
@@ -133,7 +133,7 @@ struct MCPInstaller: Sendable {
         if case .project(let path) = destination {
             var records = MCPApprovalStore(file: approvalsURL).load()
             records.drop(folder: URL(filePath: path), name: name)
-            try MCPApprovalStore(file: approvalsURL).save(records)
+            try MCPApprovalStore(file: approvalsURL).save(records, replacing: true)
         }
         if let secret = forgetSecret, !secret.isEmpty {
             var env = SecretsEnv.load(from: SecretsEnv.url(home: home))

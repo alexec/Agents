@@ -227,6 +227,7 @@ struct WorkflowRow: View {
         }
         if let waiting = summary.awaitingApproval {
             // The mode it would run in is on the line above, where every row says it.
+            if let note = waiting.note { return "Waiting for your OK — \(note)" }
             return (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK"
         }
         // Ahead of the pause, because unpausing it would change nothing: what has to
