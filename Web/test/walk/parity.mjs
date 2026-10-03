@@ -100,6 +100,54 @@ for (const scene of scenes) {
       say(`opened: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".turn button.call-line[aria-expanded=true]")].map((b) => b.textContent)`))}`);
       await shot("margin");
       await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "outcome"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    } else if (scene === "call") {
+      // #153: an open call's detail as the window's: an edit's diff with + and − lines, Show in
+      // Changes under it, and each location a link that opens the file. Takes the first session,
+      // so a root with one turn that read a file and edited another is enough.
+      await openProject();
+      await page.eval(`document.querySelector(".sessions .row.session .pick, .sessions .row.session")?.click()`);
+      await page.waitFor(`document.querySelector(".chat .turn")`, 30_000);
+      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "details"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+      await page.waitFor(`document.querySelector(".call-detail")`, 30_000);
+      await page.eval(`document.querySelector(".call-detail .edit, .call-detail .diff")?.scrollIntoView({ block: "center" })`);
+      say(`call: ${JSON.stringify(await page.eval(`(() => {
+        const edit = document.querySelector(".call-detail .edit, .call-detail .diff");
+        return {
+          path: edit?.querySelector(".path, .quiet")?.textContent ?? null,
+          diffLines: [...(edit?.querySelectorAll(".diff-line") ?? [])].map((l) => l.textContent),
+          struckBlocks: edit?.querySelectorAll("pre.removed, pre.added").length ?? 0,
+          showInChanges: [...document.querySelectorAll(".call-detail button")].some((b) => b.textContent === "Show in Changes"),
+          locations: [...document.querySelectorAll(".call-detail .locations")].map((p) => ({
+            text: p.innerText, links: p.querySelectorAll("button").length, font: getComputedStyle(p).fontFamily.split(",")[0],
+          })),
+        };
+      })()`))}`);
+      await shot("call-details");
+      const showed = await page.eval(`(() => {
+        const b = [...document.querySelectorAll(".call-detail button")].find((b) => b.textContent === "Show in Changes");
+        b?.click(); return !!b;
+      })()`);
+      if (showed) {
+        await page.waitFor(`document.querySelector(".files .changes .row.changed.chosen") && document.querySelector(".files .diff-line")`, 30_000);
+        say(`show in changes: ${JSON.stringify(await page.eval(`({
+          tab: document.querySelector(".files .tab.chosen")?.textContent,
+          chosen: document.querySelector(".files .row.changed.chosen .title")?.textContent,
+          lines: [...document.querySelectorAll(".files .diff-line")].map((l) => l.textContent),
+        })`))}`);
+        await shot("call-show-in-changes");
+      }
+      const opened = await page.eval(`(() => {
+        const b = document.querySelector(".call-detail .locations button"); b?.click(); return b?.textContent ?? null;
+      })()`);
+      if (opened) {
+        await page.waitFor(`document.querySelector(".files .file pre.file-text, .files .file .file-page")`, 30_000);
+        say(`location ${opened}: ${JSON.stringify(await page.eval(`({
+          tab: document.querySelector(".files .tab.chosen")?.textContent,
+          file: document.querySelector(".files .file .crumbs .title")?.textContent,
+        })`))}`);
+        await shot("call-location");
+      }
+      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "outcome"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
     } else if (scene === "workflow") {
       // #98 triggers, next run, last fired; #100 Enabled switch and Turn Off/On.
       await openProject();

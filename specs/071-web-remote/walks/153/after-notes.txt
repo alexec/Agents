@@ -1,0 +1,8 @@
+— call
+call: {"path":"/private/tmp/run-i153/work/notes.txt","diffLines":["−colour: red\n","+colour: blue\n"],"struckBlocks":0,"showInChanges":true,"locations":[{"text":"README.md:1","links":1,"font":"-apple-system"},{"text":"notes.txt:1","links":1,"font":"-apple-system"},{"text":"notes.txt:1","links":1,"font":"-apple-system"}]}
+shot after-call-details.png
+show in changes: {"tab":"Changes","chosen":"notes.txt","lines":[" name: walk\n","−colour: red\n","+colour: blue\n"," size: 3\n"," shape: round\n"]}
+shot after-call-show-in-changes.png
+location README.md:1: {"tab":"Files","file":"README.md"}
+shot after-call-location.png
+errors: []
