@@ -79,18 +79,21 @@ try {
   await page.focus("aside.files [role=tree]");
   const cursor = async () => (await rows()).find((r) => r.cursor)?.label;
   await key("ArrowUp");
-  say(`up from Engine.swift: ${await cursor()}`);
+  ok("up from Engine.swift is Core", (await cursor())?.startsWith("Core,"));
   await key("ArrowLeft");
-  say(`left: ${await cursor()}`);
+  ok("left shuts the open folder the cursor is on", !(await expanded("Core")));
   await key("ArrowLeft");
-  ok("left shuts the folder the cursor is on", !(await expanded("Core")));
+  ok("left again steps out to App", (await cursor())?.startsWith("App,"));
+  await key("ArrowDown");
   await key("ArrowRight");
-  ok("right opens it again", await expanded("Core"));
-  await key("ArrowDown"); await key("ArrowDown");
+  ok("right opens Core again", await expanded("Core"));
+  await key("ArrowRight");
+  ok("right again steps into it", (await cursor())?.startsWith("Engine.swift"));
+  await key("ArrowDown");
   const onto = await cursor();
   await key("Enter");
   await sleep(500);
-  ok(`Return opens ${onto}`, await page.eval(`!!document.querySelector("aside.files .file .crumbs")`));
+  ok(`Return opens ${onto}`, (await page.eval(`document.querySelector("aside.files .file .crumbs .title")?.textContent`)) === "Parser.swift");
   await back();
   await shot("tree-keys");
 
@@ -105,6 +108,7 @@ try {
   say(`scrolled: ${JSON.stringify((await rows()).slice(0, 3).map((r) => r.label))}`);
   await shot("tree-many-scrolled");
   await page.eval(`document.querySelector("aside.files .scroll").scrollTop = 0`);
+  await sleep(400);
   await click("Many");
 
   // The phone keeps the one-folder list.

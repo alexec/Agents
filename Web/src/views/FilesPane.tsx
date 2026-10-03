@@ -59,6 +59,7 @@ function Browser({ store, host, session, root }: { store: Store; host: string; s
   return (
     <>
       {pane.file && <OpenFile store={store} host={host} session={session} file={pane.file} back={root} />}
+      {!pane.file && <div class="crumbs"><span class="title">{nameOf(root)}</span></div>}
       <Tree store={store} host={host} session={session} root={root} marks={marks} changedAt={changedAt} hidden={!!pane.file} />
     </>
   );
