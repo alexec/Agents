@@ -549,8 +549,22 @@ public final class AgentsModel {
     /// Agents from a list that is not all of them (a project's archived ones, a workflow's
     /// runs, the open chat's record), filed beside the rest. A lean one keeps the lists
     /// held for it (#107); `agent/changed` is always whole and goes through `upsert`.
+    ///
+    /// Merged in one go and sorted once, as `replaceAgents` does: filed one at a time it
+    /// was a search and a sort of everything held for each one listed (#136).
     public func takeListed(_ listed: [Agent]) {
-        for agent in listed { upsert(agent.keepingLists(of: self.agent(agent.id))) }
+        guard !listed.isEmpty else { return }
+        var merged = agents
+        var at = Dictionary(merged.indices.map { (merged[$0].id, $0) }, uniquingKeysWith: { first, _ in first })
+        for agent in listed {
+            if let index = at[agent.id] {
+                merged[index] = agent.keepingLists(of: merged[index])
+            } else {
+                at[agent.id] = merged.count
+                merged.append(agent)
+            }
+        }
+        agents = merged.sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
