@@ -13,6 +13,10 @@ export interface PaneState {
   file?: string | undefined;
   /** The file last open, marked in its folder when Back comes to it (#66). */
   last?: string | undefined;
+  /** The tree's open folders, by path (#133): kept while files are opened and closed. */
+  expanded?: ReadonlySet<string> | undefined;
+  /** The tree's row the keys are on. */
+  cursor?: string | undefined;
   /** The live page, and the line the agent named. */
   page?: string | undefined;
   line?: number | undefined;
