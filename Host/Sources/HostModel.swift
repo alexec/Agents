@@ -96,7 +96,39 @@ final class HostModel {
 
     // MARK: Looking
 
+    private var looking = HostRefreshPolicy()
+
+    /// One tick of the window's loop (#134): nothing while it can't be seen, else a cheap
+    /// look, or a full one when the policy says.
+    func tick(visible: Bool, key: Bool) async {
+        let lost = [controlPID, daemonPID].contains { pid in pid.map { kill($0, 0) != 0 && errno == ESRCH } ?? false }
+        switch looking.look(at: Date(), visible: visible, key: key, lost: lost, missing: jobMissing) {
+        case .none: return
+        case .cheap: await glance()
+        case .full: await refresh()
+        }
+    }
+
+    /// A job the role wants running that launchd didn't have running at the last look.
+    private var jobMissing: Bool {
+        switch settings.role {
+        case .none: false
+        case .runHere: controlPID == nil || daemonPID == nil
+        case .joinElsewhere: daemonPID == nil
+        }
+    }
+
+    /// What can be read without starting a process: the files the running jobs write, and
+    /// the host's counts over the kept socket.
+    private func glance() async {
+        hostJoin = daemonPID.flatMap { HostJoinFile.read(paths.hostLocations.controlJoinStatus, pid: $0) }
+        webRemote = controlPID.flatMap { WebRemoteFile.read(in: paths.controlHome, pid: $0) }
+        await countWork()
+    }
+
+    /// The full look: launchd for both jobs, and `agents-control` for clients and hosts.
     func refresh() async {
+        looking.lookedFully(at: Date())
         let services = self.services
         let control = await services.running(.control)
         controlRunning = control != nil

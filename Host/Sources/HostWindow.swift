@@ -15,6 +15,7 @@ struct HostWindow: View {
     @State private var confirmingStop = false
     @State private var returning = false
     @State private var confirmingReturnStop = false
+    @State private var window: NSWindow?
 
     var body: some View {
         @Bindable var model = model
@@ -59,10 +60,14 @@ struct HostWindow: View {
         } message: {
             Text(stopMessage)
         }
+        .background(WindowReader(window: $window))
         .task {
+            // Out of sight it looks at nothing; in sight, mostly without starting a process (#134).
             while !Task.isCancelled {
-                await model.refresh()
-                try? await Task.sleep(for: .seconds(5))
+                // Before the window is known, as if seen and key: the first look is a full one.
+                let visible = !NSApp.isHidden && (window?.occlusionState.contains(.visible) ?? true)
+                await model.tick(visible: visible, key: window?.isKeyWindow ?? true)
+                try? await Task.sleep(for: HostRefreshPolicy.tick)
             }
         }
         .confirmationDialog("Switch where the control plane keeps its store?", isPresented: $confirmingSwitch) {
@@ -534,5 +539,20 @@ struct PairingSheet: View {
         }
         if model.webRemoteFailed { return "\(model.webRemoteLine) Free it, press Try Again beside Serve Agents to browsers on this Mac, then open \(model.webRemoteAddress) there and paste it in." }
         return "Open \(model.webRemoteAddress) there and paste it in."
+    }
+}
+
+/// The window a view is in, for whether it can be seen and is key.
+private struct WindowReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { window = view.window }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        if view.window !== window { DispatchQueue.main.async { window = view.window } }
     }
 }
