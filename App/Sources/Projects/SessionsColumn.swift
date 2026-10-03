@@ -6,6 +6,8 @@ import SwiftUI
 enum ColumnPick: Hashable {
     case session(UUID)
     case workflow(Workflow.ID)
+    /// The selected project's Dashboard (074), at the top of the column.
+    case dashboard
 }
 
 /// The middle column: the selected project's sessions, as a list you move through.
@@ -33,8 +35,15 @@ struct SessionsColumn: View {
 
     var body: some View {
         List(selection: $picked) {
-            // Two groups: the sessions, archived ones folded at their foot, then the
-            // workflows. A search narrows both.
+            // The Dashboard, then two groups: the sessions, archived ones folded at their
+            // foot, then the workflows. A search narrows both.
+            // The Dashboard first, above Needs you (074 FR-031): somewhere to come back to,
+            // not a session. Left out of a search, which is about sessions and workflows.
+            if let folder = model.selectedProject, model.selectedProjectSummary != nil, query.isEmpty {
+                Section {
+                    DashboardRow(folder: folder)
+                }
+            }
             if model.selectedProjectSummary != nil {
                 Section {
                     // The same headings the project page draws, one step down.
@@ -118,7 +127,7 @@ struct SessionsColumn: View {
                         .help("Archive the highlighted sessions and workflows")
                 }
             }
-            if model.selection != nil, model.openWorkflow == nil {
+            if model.selection != nil, model.openWorkflow == nil, !model.openDashboard {
                 ToolbarSpacer(.fixed)
                 ToolbarItem {
                     SidebarToggle(windowWidth: frame.windowWidth)
@@ -129,10 +138,12 @@ struct SessionsColumn: View {
         // A workflow opened is what the right-hand side reads now, so it is the row lit
         // and no session names the window.
         .onChange(of: model.openWorkflow) { _, id in applyOpenWorkflow(id) }
+        .onChange(of: model.openDashboard) { _, open in applyOpenDashboard(open) }
         .onChange(of: selection) { _, id in applySelection(id) }
         .onAppear {
             applySelection(selection)
             applyOpenWorkflow(model.openWorkflow)
+            applyOpenDashboard(model.openDashboard)
         }
     }
 
@@ -140,6 +151,7 @@ struct SessionsColumn: View {
         picked = []
         selection = nil
         model.openWorkflow = nil
+        model.openDashboard = false
         requests.focusPrompt()
     }
 
@@ -155,12 +167,24 @@ struct SessionsColumn: View {
                 if selection != id { selection = id }
             case .workflow(let id):
                 if model.openWorkflow != id { model.openWorkflow = id }
+            case .dashboard:
+                if !model.openDashboard { model.openDashboard = true }
             case nil:
                 break
             }
         default:
             if let current = selection, !picks.contains(.session(current)) { selection = nil }
             if let open = model.openWorkflow, !picks.contains(.workflow(open)) { model.openWorkflow = nil }
+            if model.openDashboard, !picks.contains(.dashboard) { model.openDashboard = false }
+        }
+    }
+
+    /// The Dashboard opened from anywhere lights its row.
+    private func applyOpenDashboard(_ open: Bool) {
+        if open {
+            if picked != [.dashboard] { picked = [.dashboard] }
+        } else if picked == [.dashboard] {
+            picked = []
         }
     }
 
@@ -198,6 +222,8 @@ struct SessionsColumn: View {
                 if model.agents.first(where: { $0.id == id })?.state != .archived { sessions.append(id) }
             case .workflow(let id):
                 if let summary = workflows.first(where: { $0.id == id }), !summary.isArchived { flows.append(summary) }
+            case .dashboard:
+                break
             }
         }
         guard !sessions.isEmpty || !flows.isEmpty else { return }

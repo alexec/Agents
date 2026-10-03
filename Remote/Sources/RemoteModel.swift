@@ -40,6 +40,7 @@ final class RemoteModel {
             guard selectedProject != oldValue else { return }
             selection = nil
             openWorkflow = nil
+            openDashboard = false
         }
     }
 
@@ -244,6 +245,8 @@ final class RemoteModel {
     /// Mac page's reason: the file is the truth, and a copy would show what it used to
     /// say. Pushed under the conversation, so a run opened from its page comes back to it.
     var openWorkflow: Workflow.ID?
+    /// Whether the project's Dashboard (074) is pushed over the project page.
+    var openDashboard = false
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
@@ -1119,6 +1122,7 @@ final class RemoteModel {
         await refreshLeases()
         await refreshEvents()
         await refreshWorkflows()
+        await refreshDashboardSummaries()
         await refreshRuntimes()
         await refreshModes()
         await refreshSandboxSettings()
@@ -1528,6 +1532,41 @@ final class RemoteModel {
                                                   DaemonAPI.WorkflowsListRequest(),
                                                   returning: [WorkflowSummary].self) else { return }
         work.replaceWorkflows(listed)
+    }
+
+    // MARK: The Dashboard (074)
+
+    func refreshDashboardSummaries() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.dashboardSummaries, DaemonAPI.Empty(),
+                                                  returning: [DashboardSummary].self) else { return }
+        work.replaceDashboardSummaries(listed)
+    }
+
+    func refreshDashboard(_ folder: URL) async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.dashboardGet,
+                                                    DaemonAPI.DashboardRequest(folder: folder),
+                                                    returning: DashboardSnapshot.self) else { return }
+        work.store(snapshot)
+    }
+
+    /// Hide, Show or Remove: every client may (FR-029).
+    func actOnTile(_ method: String, folder: URL, id: String) async {
+        do {
+            try await client.call(method, DaemonAPI.TileRequest(folder: folder, id: id))
+        } catch {
+            problem = sentence(for: error)
+        }
+        await refreshDashboard(folder)
+    }
+
+    /// A tile's keeper: its conversation, or its workflow's page (FR-030).
+    func openKeeper(_ keeper: KeeperView, folder: URL) {
+        switch keeper.kind {
+        case .agent:
+            if let id = UUID(uuidString: keeper.id) { selection = id }
+        case .workflow:
+            openWorkflow = Project.standardize(folder).path + "/" + keeper.id
+        }
     }
 
     // MARK: Driving a workflow

@@ -21,13 +21,14 @@ import { SessionRow } from "./SessionRow";
 import { WorkflowRow } from "./WorkflowRow";
 import { Resources } from "./Resources";
 import { WorkflowPage } from "./WorkflowPage";
+import { DashboardPage, DashboardRow } from "./Dashboard";
 import { workflowSummary } from "../model/workflows";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
   const down = session.state.value.kind === "down";
   // Which single column a narrow window shows: the deepest one the route names.
-  const depth = r.session || r.workflow || r.compose ? "chat" : r.project ? "sessions" : "projects";
+  const depth = r.session || r.workflow || r.dashboard || r.compose ? "chat" : r.project ? "sessions" : "projects";
   const project = r.host && r.project
     ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
     : undefined;
@@ -54,6 +55,9 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
           : r.host && r.project && project && r.workflow ? (
             <WorkflowPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
+          ) : r.host && r.project && project && r.dashboard ? (
+            <DashboardPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
+              down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.project && project ? (
             <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
           ) : <section class="chat empty" aria-label="Chat"><p>Choose a project.</p></section>}
@@ -215,6 +219,11 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
       </header>
       <div class="scroll">
         {!project && <p class="hint">Choose a project.</p>}
+        {/* The Dashboard first, above Needs you, as the window has it (074); left out of a search. */}
+        {project && host && folder && !search.value && (
+          <DashboardRow store={store} host={host} folder={folder} chosen={!!r.dashboard}
+            onPick={() => go({ host, project: folder, dashboard: true })} />
+        )}
         {project && (
           <section class="group-list" aria-label="Sessions">
             <h2 class="section-head">Sessions <span class="count">{liveCount}</span></h2>

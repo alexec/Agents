@@ -41,6 +41,8 @@ BUDGETS = {
     "files/list, big repo root": 250,
     "files/list, big repo deep folder": 100,
     "changes/list, big repo": 1000,
+    # The project with the most Dashboard tiles, up to 60, with 30 days of points (074 SC-002).
+    "dashboard/get, fullest project": 100,
 }
 
 
@@ -131,6 +133,12 @@ def main(argv):
         row("files/list, big repo deep folder",
             lambda: host.call("files/list", {"agentID": big["id"], "folder": cwd + "/src/mod07/pkg0712"})[1])
         row("changes/list, big repo", lambda: host.call("changes/list", {"agentID": big["id"]}, timeout=120)[1])
+
+    summaries, _ = host.call("dashboard/summaries", {})
+    if summaries:
+        fullest = max(summaries, key=lambda s: s["tiles"])
+        row("dashboard/get, fullest project",
+            lambda: host.call("dashboard/get", {"folder": fullest["folder"]})[1], f"{fullest['tiles']} tiles")
 
     over = [r for r in rows if r[1] is not None and r[3] is not None and r[1] > r[3]]
     failed = [r for r in rows if r[1] is None]

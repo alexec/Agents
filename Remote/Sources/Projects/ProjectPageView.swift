@@ -73,6 +73,11 @@ struct ProjectPageView: View {
                     ProjectTotal(summary: summary)
                 }
 
+                // Above Sessions, worth a glance without opening (074 FR-032).
+                if query.isEmpty, let folder = model.selectedProject {
+                    DashboardRow(folder: folder)
+                }
+
                 if !isEmpty {
                     SectionHeading(title: "Sessions")
                 }

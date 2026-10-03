@@ -68,6 +68,9 @@ public extension DaemonAPI {
                 Row(Method.costState, params: Empty.self, result: CostState.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
                 Row(Method.leasesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
+                // The Dashboard (074), as the window's row and page have it.
+                Row(Method.dashboardGet, params: DashboardRequest.self, result: DashboardSnapshot.self, kind: .hostRequest),
+                Row(Method.dashboardSummaries, params: Empty.self, result: [DashboardSummary].self, kind: .hostRequest),
                 // Acting
                 Row(Method.agentsStart, params: StartRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),
@@ -90,6 +93,10 @@ public extension DaemonAPI {
                 Row(Method.elicitationsAnswer, params: AnswerElicitationRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsAnswerSandbox, params: AnswerSandboxRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.workflowsRun, params: WorkflowRequest.self, result: WorkflowSummary.self, kind: .hostRequest),
+                // Hide, Show and Remove (074), from every client alike.
+                Row(Method.dashboardHide, params: TileRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.dashboardShow, params: TileRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.dashboardRemove, params: TileRequest.self, result: Empty.self, kind: .hostRequest),
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
@@ -136,6 +143,8 @@ public extension DaemonAPI {
                 Row(Notification.writeFailed, params: WriteFailure.self, result: Empty.self, kind: .hostNotification),
                 // Who holds what, for the page's read-only Resources list (#116).
                 Row(Notification.leasesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.dashboardChanged, params: DashboardChangedNotification.self, result: Empty.self,
+                    kind: .hostNotification),
                 // An ad-hoc dictionary from ControlRouter.describe.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
             ]

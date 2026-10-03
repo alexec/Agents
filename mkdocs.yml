@@ -80,6 +80,7 @@ nav:
       - how-to/watch-background-work.md
       - how-to/use-a-shell.md
       - how-to/set-up-a-workflow.md
+      - how-to/keep-a-project-dashboard.md
       - how-to/sign-a-runtime-in.md
       - how-to/share-skills-across-agents.md
       - how-to/add-a-skill-from-a-catalogue.md
@@ -100,6 +101,7 @@ nav:
       - reference/agent-tools.md
       - reference/settings.md
       - reference/workflows.md
+      - reference/dashboard-tiles.md
       - reference/events.md
       - reference/keyboard-shortcuts.md
   - Explanation:

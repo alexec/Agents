@@ -90,6 +90,9 @@ struct ContentView: View {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
             WorkflowPage(workflowID: id).paperGround()
+        } else if model.openDashboard, let folder = model.selectedProject {
+            // The project's Dashboard (074), in the chat's place as a workflow's page is.
+            DashboardPage(folder: folder).paperGround()
         } else if let id = model.selection, model.selectedAgent == nil, let gone = model.retiredTombstone(id) {
             // Retired (051): nothing left to chat with, only who it was.
             RetiredAgentPage(tombstone: gone, startedBy: model.retiredStarterLabel(gone)).paperGround()

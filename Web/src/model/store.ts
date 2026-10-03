@@ -7,6 +7,7 @@ import type {
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot,
+  DashboardChangedNotification, DashboardSnapshot, DashboardSummary,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -85,6 +86,12 @@ export class Work {
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
   /** The last folders said to have changed, for a pane watching them (`files/changed`). */
   readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; at: number } | null>(null);
+
+  /** Each project's Dashboard row by `host|folder` (074), kept by dashboard/changed. */
+  readonly dashboardSummaries = signal<Record<string, DashboardSummary>>({});
+  /** The Dashboards opened, by `host|folder`; asked again when `dashboardRevisions` moves. */
+  readonly dashboards = signal<Record<string, DashboardSnapshot>>({});
+  readonly dashboardRevisions = signal<Record<string, number>>({});
 
   /** Each project's workflows by `host|folder`, listed when the project is chosen. */
   readonly workflows = signal<Record<string, WorkflowSummary[]>>({});
@@ -166,6 +173,15 @@ export class Work {
       case "workflow/changed":
         this.upsertWorkflow(params as WorkflowSummary, host);
         return true;
+      case "dashboard/changed": {
+        const note = params as DashboardChangedNotification;
+        const key = `${host}|${folderKey(note.folder)}`;
+        batch(() => {
+          this.dashboardSummaries.value = { ...this.dashboardSummaries.value, [key]: note.summary };
+          this.dashboardRevisions.value = { ...this.dashboardRevisions.value, [key]: (this.dashboardRevisions.value[key] ?? 0) + 1 };
+        });
+        return true;
+      }
       case "workflow/removed": {
         const note = params as WorkflowRemovedNotification;
         const key = `${host}|${folderKey(note.folder)}`;
@@ -432,6 +448,11 @@ export class Store extends Work {
     const clones = await this.link.call("projects/clones", {}, host).catch(failed("projects/clones"));
     if (clones) this.clones.value = { ...this.clones.value, [host]: clones };
     void this.loadRuntimes(host);
+    void this.link.call("dashboard/summaries", {}, host).then((listed) => {
+      const held = Object.fromEntries(Object.entries(this.dashboardSummaries.value).filter(([key]) => !key.startsWith(`${host}|`)));
+      for (const summary of listed) held[`${host}|${folderKey(summary.folder)}`] = summary;
+      this.dashboardSummaries.value = held;
+    }).catch(failed("dashboard/summaries"));
     void this.link.call("leases/snapshot", {}, host).then((snapshot) => {
       this.leases.value = { ...this.leases.value, [host]: snapshot };
     }).catch(failed("leases/snapshot"));
@@ -691,6 +712,20 @@ export class Store extends Work {
   /** What the person typed on a live page, written to the file as the window writes it. */
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
+  }
+
+  /** One project's Dashboard (074), asked for when it opens and on each dashboard/changed for it. */
+  async loadDashboard(host: string, folder: string): Promise<void> {
+    const snapshot = await this.link.call("dashboard/get", { folder: folder as never }, host).catch(() => null);
+    if (!snapshot) return;
+    const key = `${host}|${folderKey(folder)}`;
+    this.dashboards.value = { ...this.dashboards.value, [key]: snapshot };
+  }
+
+  /** Hide, Show or Remove: the person's, from any client (FR-027 to FR-029). */
+  async actOnTile(host: string, folder: string, method: "dashboard/hide" | "dashboard/show" | "dashboard/remove", id: string): Promise<void> {
+    await this.act(method, { folder: folder as never, id }, host);
+    await this.loadDashboard(host, folder);
   }
 
   /** Run now (US5). The session it starts arrives as any other does, by agent/changed. */

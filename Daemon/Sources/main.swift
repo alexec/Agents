@@ -163,6 +163,22 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
                                DaemonAPI.ReadSessionRequest(token: token, session: session),
                                fallback: SessionLookup.unavailable)
         }
+    } dashboard: { call in
+        // Always the caller's own project folder: the daemon takes it from the token (074).
+        switch call {
+        case .set(let arguments):
+            return await relay(DaemonAPI.Method.dashboardSetTile,
+                               DaemonAPI.SetTileRequest(token: token, arguments: arguments),
+                               fallback: "Set.")
+        case .remove(let id):
+            return await relay(DaemonAPI.Method.dashboardRemoveTile,
+                               DaemonAPI.RemoveTileRequest(token: token, id: id),
+                               fallback: "Removed.")
+        case .read:
+            return await relay(DaemonAPI.Method.dashboardRead,
+                               DaemonAPI.DashboardTokenRequest(token: token),
+                               fallback: "The Dashboard has no tiles yet.")
+        }
     }
     let task = Task {
         await service.run()

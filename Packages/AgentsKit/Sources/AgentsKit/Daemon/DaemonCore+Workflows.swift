@@ -91,7 +91,11 @@ extension DaemonCore {
         guard workflowWatchers[standardized] == nil, Self.isDirectory(standardized) else { return }
         workflowWatchers[standardized] = FolderWatch(root: standardized) { [weak self] changed in
             guard changed.contains(where: { $0.path.contains("/.agents") }) else { return }
-            Task { await self?.scheduleWorkflowRescan(in: standardized) }
+            Task {
+                await self?.scheduleWorkflowRescan(in: standardized)
+                // The same watch sees the Dashboard's tile files change by hand or by a pull (074).
+                await self?.dashboardFilesChanged(changed, in: standardized)
+            }
         }
     }
 

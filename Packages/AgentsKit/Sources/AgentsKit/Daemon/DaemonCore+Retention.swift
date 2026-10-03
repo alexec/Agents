@@ -290,6 +290,8 @@ extension DaemonCore {
         saveArchiveIndex()
         let after = retentionState()
         if after != before { broadcast(DaemonAPI.Notification.retentionChanged, after) }
+        // The Dashboards' points fold on the same hourly tick (074 FR-020).
+        compactDashboards()
     }
 
     /// A heavy archiving day can cross the cap well before the hourly check, so an
