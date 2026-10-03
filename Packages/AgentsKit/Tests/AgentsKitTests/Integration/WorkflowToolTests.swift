@@ -459,7 +459,7 @@ struct WorkflowToolTests {
 
         let answer = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
         #expect(FileManager.default.fileExists(atPath: WorkflowFile.url(for: "advisories", in: work).path))
-        #expect(answer.contains("It is live now"))
+        #expect(answer.contains("It is turned off, so none of its triggers run it until they turn it on"))
         #expect(!answer.contains("pause"))
         #expect(description.contains("does not run until they approve it"))
     }
@@ -487,10 +487,15 @@ struct WorkflowToolTests {
         let work = try project(root)
         let (core, token, agentID) = try await core(locations, in: work)
         _ = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
+        // It arrives off (#124); the person turns it on, and from there it is the
+        // agent's to turn off and back on.
+        _ = try await core.setWorkflowEnabled(
+            DaemonAPI.WorkflowEnableRequest(folder: work, workflowID: "advisories", enabled: true))
 
         let off = try await call(core, token, .disable, id: "advisories", keepingAlive: agentID)
         #expect(off.contains("Turned off advisories"))
-        #expect(try await call(core, token, .list, keepingAlive: agentID).contains("[turned off]"))
+        #expect(try await call(core, token, .list, keepingAlive: agentID).contains("[turned off by an agent]"))
+        #expect(await core.allWorkflows(in: work).first?.offReason == .agent)
         #expect(await core.allWorkflows(in: work).first?.isEnabled == false)
 
         let on = try await call(core, token, .enable, id: "advisories", keepingAlive: agentID)

@@ -229,6 +229,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// Whether a trigger is being held for when the cooldown ends, or the run in flight
     /// does: the one run the fires that arrived meanwhile collapse into.
     public var holdsAFire: Bool
+    /// Why it is off, while it is (#124): what the page says beside the switch, so a
+    /// workflow that started off reads as waiting for somebody rather than as broken.
+    public var offReason: WorkflowOffReason?
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
@@ -241,7 +244,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 awaitingApproval: WorkflowApproval? = nil,
                 lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil,
                 nextFireAtByTrigger: [Date?] = [],
-                cooldownEndsAt: Date? = nil, holdsAFire: Bool = false) {
+                cooldownEndsAt: Date? = nil, holdsAFire: Bool = false,
+                offReason: WorkflowOffReason? = nil) {
+        self.offReason = offReason
         self.cooldownEndsAt = cooldownEndsAt
         self.holdsAFire = holdsAFire
         self.nextFireAtByTrigger = nextFireAtByTrigger
@@ -285,6 +290,15 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         + "It keeps its place among this project's \(WorkflowLimit.project.allowed) workflows, "
         + "and Run now still runs it"
 
+    /// The same, led by why it is off when that is something the person is waiting on
+    /// (#124). The Remote and the web page say the same words.
+    public var turnedOffSentence: String {
+        guard let why = offReason?.sentence else { return Self.turnedOffSentence }
+        return why + ". None of its triggers run it until it is turned on. "
+            + "It keeps its place among this project's \(WorkflowLimit.project.allowed) workflows, "
+            + "and Run now still runs it"
+    }
+
     /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome
     /// this version does not know (a refusal added later) costs the outcome rather than
     /// the whole project's list.
@@ -305,6 +319,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
         cooldownEndsAt = try c.decodeIfPresent(Date.self, forKey: .cooldownEndsAt)
         holdsAFire = try c.decodeIfPresent(Bool.self, forKey: .holdsAFire) ?? false
+        offReason = (try? c.decodeIfPresent(WorkflowOffReason.self, forKey: .offReason)) ?? nil
     }
 
     /// What its cooldown is doing, in one sentence, for the pages that show triggers
@@ -321,6 +336,30 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
             sentence += ". It runs once more for what came in while this run was going"
         }
         return sentence
+    }
+}
+
+/// Why a workflow is off (#124). The page leads with it, so one that started off is
+/// read as waiting for somebody to turn it on rather than as something gone wrong.
+public enum WorkflowOffReason: String, Codable, Hashable, Sendable {
+    /// Its file says `enabled: false` and nobody has turned it on yet (#42).
+    case file
+    /// An agent wrote it through manage_workflows, and new ones start off so the
+    /// person turns them on knowingly.
+    case writtenByAgent
+    /// An agent turned it off, and may turn it back on.
+    case agent
+    /// The person turned it off.
+    case person
+
+    /// What the page says first. `nil` for the person's own switch: they know.
+    public var sentence: String? {
+        switch self {
+        case .file: "Off: its file asks to start off. Turn it on when you are ready"
+        case .writtenByAgent: "Off: written by an agent. Turn it on when you are ready"
+        case .agent: "Off: an agent turned it off"
+        case .person: nil
+        }
     }
 }
 

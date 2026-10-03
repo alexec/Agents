@@ -136,4 +136,107 @@ struct WorkflowStartsOffTests {
         }
         #expect(await summary(core, work, "weekly")?.isEnabled == false)
     }
+
+    // MARK: Written by an agent (#124)
+
+    private func agentCore(_ locations: StoreLocations, in work: URL) async throws -> (DaemonCore, String, UUID) {
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything,
+                              launcher: FakeLauncher(script: FakeACPAgent.Script(gate: TurnGate())))
+        await core.loadFromDisk()
+        let agentID = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Do"))
+        return (core, UUID().uuidString, agentID)
+    }
+
+    private func call(_ core: DaemonCore, _ token: String, _ agentID: UUID,
+                      _ action: DaemonAPI.ManageWorkflowsRequest.Action, content: String? = nil) async throws -> String {
+        await core.bindAppToken(token, to: agentID)
+        return try await core.manageWorkflows(DaemonAPI.ManageWorkflowsRequest(
+            token: token, action: action, workflowID: action == .list ? nil : "nightly", content: content))
+    }
+
+    @Test func aNewOneAnAgentWritesArrivesOffWhateverTheFileSays() async throws {
+        let (locations, work) = try temporary()
+        let (core, token, agentID) = try await agentCore(locations, in: work)
+
+        let answer = try await call(core, token, agentID, .write, content: text(enabled: "true"))
+        #expect(answer.contains("It is turned off"))
+        let off = try #require(await summary(core, work, "nightly"))
+        #expect(off.isEnabled == false)
+        #expect(off.offReason == .writtenByAgent)
+        #expect(off.nextFireAt == nil)
+        #expect(off.turnedOffSentence.hasPrefix("Off: written by an agent. Turn it on when you are ready."))
+        #expect(try await call(core, token, agentID, .list).contains("written by an agent"))
+        // The file is exactly what the agent handed over: the daemon keeps the switch.
+        let onDisk = try String(contentsOf: WorkflowFile.url(for: "nightly", in: work), encoding: .utf8)
+        #expect(onDisk == text(enabled: "true"))
+
+        await core.tickWorkflows(now: nineOClock)
+        await core.tickWorkflows(now: nineOClock.addingTimeInterval(60))
+        #expect(await core.allAgents().count == 1, "only the writer: the clock started nothing")
+    }
+
+    @Test func theAgentCannotTurnOnWhatItWrote() async throws {
+        let (locations, work) = try temporary()
+        let (core, token, agentID) = try await agentCore(locations, in: work)
+        _ = try await call(core, token, agentID, .write, content: text(enabled: nil))
+
+        do {
+            _ = try await call(core, token, agentID, .enable)
+            Issue.record("an agent turned on the workflow it wrote")
+        } catch let error as JSONRPCError {
+            #expect(error.message.contains("written by an agent"))
+        }
+        #expect(await summary(core, work, "nightly")?.isEnabled == false)
+        #expect(await summary(core, work, "nightly")?.offReason == .writtenByAgent)
+    }
+
+    @Test func thePersonsSwitchSurvivesTheAgentEditingTheFile() async throws {
+        let (locations, work) = try temporary()
+        let (core, token, agentID) = try await agentCore(locations, in: work)
+        _ = try await call(core, token, agentID, .write, content: text(enabled: nil))
+
+        _ = try await core.setWorkflowEnabled(
+            DaemonAPI.WorkflowEnableRequest(folder: work, workflowID: "nightly", enabled: true))
+        #expect(await summary(core, work, "nightly")?.offReason == nil)
+
+        // A change to one that exists leaves the switch where the person put it, even a
+        // change that adds `enabled: false`.
+        let changed = try await call(core, token, agentID, .write, content: text(enabled: "false"))
+        #expect(!changed.contains("It is turned off"))
+        #expect(await summary(core, work, "nightly")?.isEnabled == true)
+
+        // And by hand, then a restart.
+        try write(enabled: nil, as: "nightly", in: work)
+        let again = try await self.core(locations)
+        await again.rescanWorkflows(in: work)
+        #expect(await summary(again, work, "nightly")?.isEnabled == true)
+    }
+
+    @Test func eachReasonIsSaid() async throws {
+        let (locations, work) = try temporary()
+        try write(enabled: "false", as: "weekly", in: work)
+        let core = try await self.core(locations)
+        await core.rescanWorkflows(in: work)
+        let fromFile = try #require(await summary(core, work, "weekly"))
+        #expect(fromFile.offReason == .file)
+        #expect(fromFile.turnedOffSentence.hasPrefix("Off: its file asks to start off."))
+
+        _ = try await core.setWorkflowEnabled(
+            DaemonAPI.WorkflowEnableRequest(folder: work, workflowID: "weekly", enabled: false))
+        let byPerson = try #require(await summary(core, work, "weekly"))
+        #expect(byPerson.offReason == .person)
+        #expect(byPerson.turnedOffSentence == WorkflowSummary.turnedOffSentence)
+    }
+
+    @Test func aReasonFromANewerHostIsDroppedNotTheList() throws {
+        let summary = WorkflowSummary(workflow: Workflow(workflowID: "w", folder: URL(fileURLWithPath: "/tmp/x")),
+                                      isEnabled: false, offReason: .file)
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(summary)) as! [String: Any]
+        json["offReason"] = "somethingNew"
+        let read = try JSONDecoder().decode(WorkflowSummary.self,
+                                            from: JSONSerialization.data(withJSONObject: json))
+        #expect(read.offReason == nil)
+        #expect(read.turnedOffSentence == WorkflowSummary.turnedOffSentence)
+    }
 }

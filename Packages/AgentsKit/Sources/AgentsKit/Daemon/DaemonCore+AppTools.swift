@@ -558,7 +558,12 @@ extension DaemonCore {
         let lines = listed.map { summary -> String in
             var line = "- \(summary.workflowID): \(summary.workflow.summary)"
             if summary.isArchived { line += " [archived]" }
-            if !summary.isEnabled { line += " [turned off]" }
+            switch summary.offReason {
+            case .file: line += " [turned off: its file says enabled: false]"
+            case .writtenByAgent: line += " [turned off: written by an agent, waiting for the person]"
+            case .agent: line += " [turned off by an agent]"
+            case .person, nil: if !summary.isEnabled { line += " [turned off]" }
+            }
             if summary.overLimit != nil { line += " [over the limit, so it will not run]" }
             if let outcome = summary.lastOutcome { line += " — \(outcome.summary)" }
             return line
@@ -690,14 +695,30 @@ extension DaemonCore {
         // Written whole, exactly as it was handed over. Nothing is re-serialised from
         // the parsed form, which is what makes a key this version does not know survive
         // being written by an agent running against a later one.
+        // A new one starts off (#124), so the person turns it on knowingly rather than
+        // finding it ran the moment they approved it. Recorded here, by the daemon, and
+        // not written into the file: the file stays exactly what the agent handed over,
+        // and no front matter the agent chooses can opt it out. Only a new file: a
+        // change to one that exists leaves its switch where somebody put it.
+        var records = workflowStore.load()
+        if !exists {
+            records.update(folder: project, workflowID: workflowID) {
+                $0.isDisabled = true
+                $0.disabledByAgent = false
+                $0.enabledChosen = true
+                $0.writtenOffByAgent = true
+                $0.heldFire = nil
+            }
+            try keep("this workflow's settings") { try workflowStore.save(records) }
+        }
         try Data(content.utf8).write(to: url, options: .atomic)
         // An archived id written to again stays archived. The one thing the person can
         // say about a workflow they did not ask for should not be undone by the agent
         // that wrote it.
-        let archived = workflowStore.load()
-            .state(folder: project, workflowID: workflowID)?.isArchived ?? false
+        let archived = records.state(folder: project, workflowID: workflowID)?.isArchived ?? false
         rescanWorkflows(in: project)
         let warning = unofferedWarning(for: parsed).map { " " + $0 } ?? ""
+        let startsOff = exists ? "" : " It starts turned off: once they have approved it, they turn it on from its page when they are ready, and you cannot."
         if archived {
             return """
                 \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
@@ -707,7 +728,7 @@ extension DaemonCore {
         }
         // Waiting for the person, which is the usual case for a file an agent wrote:
         // said plainly, so the agent tells them rather than believing it will run.
-        let records = workflowStore.load()
+        records = workflowStore.load()
         if let written = workflow(workflowID, in: project),
            awaitingApproval(written, state: records.state(folder: project, workflowID: workflowID),
                             records: records) != nil {
@@ -715,6 +736,14 @@ extension DaemonCore {
                 \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
                 It will not run until they approve it on the project page, so tell them \
                 it is waiting for their OK and what it does.
+                """ + startsOff + warning
+        }
+        if !exists {
+            return """
+                Created \(workflowID). \(parsed.summary). \
+                It is turned off, so none of its triggers run it until they turn it on \
+                from the project page, where they can also run it, or archive it if it \
+                is not what they wanted. Tell them it is there and what it does.
                 """ + warning
         }
         return """
@@ -761,6 +790,14 @@ extension DaemonCore {
                                 Nothing was changed: \(id)'s file says `enabled: false`, so it \
                                 starts off until the person turns it on from the project page. \
                                 Ask them to if it should run.
+                                """)
+        }
+        if enabled, state?.writtenOffByAgent == true {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowTurnedOffByPerson,
+                               message: """
+                                Nothing was changed: \(id) was written by an agent, so it \
+                                starts off until the person turns it on from its page. Ask \
+                                them to if it should run.
                                 """)
         }
         if enabled, state?.disabledByAgent != true {
