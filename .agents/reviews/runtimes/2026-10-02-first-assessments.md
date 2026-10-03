@@ -194,3 +194,10 @@ Copilot's helper kept working, Codex sat in its own `wait`, and OpenCode kept go
 ended without one. Only Claude stops where it says it does. The app could end the ACP turn
 itself once `finish_turn` is recorded: cancel the prompt still in flight, so the turn is
 over when the agent says it is.
+
+**Filed (2026-10-03):**
+- #139: runtimes don't end their turn at `finish_turn`. It was Copilot's issue; it now covers
+  Codex and OpenCode too, with their evidence and the cancel-on-finish fix.
+- #140: one failed model takes the whole runtime out of the pool.
+- #141: Codex's `request_user_input` isn't available, though the app names it as Codex's
+  question tool.
