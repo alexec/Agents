@@ -134,6 +134,16 @@ public enum RuntimeAssessment {
     /// carries, in this order. The nightly runtime check (#39) uses the same list.
     public static let cheapWords = ["haiku", "nano", "flash-lite", "lite", "mini", "flash", "small"]
 
+    /// The model to start on: the one asked for, the runtime's own default for `default`,
+    /// or else the cheapest it offers. Nil means the runtime's default.
+    public static func model(asked: String?, in options: [ConfigOption]) -> String? {
+        switch asked?.trimmingCharacters(in: .whitespaces) {
+        case nil, "": cheapestModel(in: options)
+        case "default": nil
+        case let value?: value
+        }
+    }
+
     /// The value to start the model option with, or nil for the runtime's own default.
     public static func cheapestModel(in options: [ConfigOption]) -> String? {
         guard let option = WorkflowSettings.modelOption(in: options) else { return nil }
