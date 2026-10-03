@@ -1,67 +1,73 @@
 import AgentsKitCore
 import SwiftUI
 
-/// What the project is working on besides its sessions, under them in the middle column:
-/// its workflows. Rows the size of a session's, tagged into the same list selection, so
-/// the column is one list: the arrow keys, ⌘-click, ⌫ and the highlight go through
-/// both, and a workflow opens its page on the right as a session opens its chat.
+/// What a project is working on besides its sessions, under them in its fold of the
+/// sidebar (#145): its workflows. Rows the size of a session's, tagged into the same
+/// list selection, so the sidebar is one list: the arrow keys, ⌘-click, ⌫ and the
+/// highlight go through both, and a workflow opens its page on the right as a session
+/// opens its chat.
 ///
-/// Always there for a project, even with none, so the place to find workflows is always
-/// the same place: an empty one says None. Archived workflows fold away at its foot,
-/// where their pages (and Bring Back) are. A search narrows it with the sessions, and
-/// leaves it out when nothing in it matches.
-struct ProjectWorkSections: View {
+/// Left out for a project with none, so a fold is as long as its work. Archived
+/// workflows fold away at its foot, where their pages (and Bring Back) are. A search
+/// narrows it with the sessions, and leaves it out when nothing in it matches.
+struct ProjectWorkflowRows: View {
     @Environment(AppModel.self) private var model
-    let folder: URL?
+    let project: ProjectKey
     let query: String
-
-    @AppStorage("showsArchivedWorkflows") private var showsArchived = false
+    let folds: SidebarFolds
 
     private var matching: [WorkflowSummary] {
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let all = model.workflows(in: folder)
+        let all = model.workflows(in: project.folder)
         guard !words.isEmpty else { return all }
         return all.filter(SessionLabelQuery(words).matches)
     }
-    private var workflows: [WorkflowSummary] { matching.filter { !$0.isArchived } }
-    private var archived: [WorkflowSummary] { matching.filter(\.isArchived) }
 
     var body: some View {
-        if folder != nil, query.isEmpty || !matching.isEmpty {
-            Section {
-                ForEach(workflows) { summary in
-                    WorkflowListRow(summary: summary)
-                }
-                if workflows.isEmpty, query.isEmpty {
-                    Text("None")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
-                }
-                if !archived.isEmpty {
-                    DisclosureGroup(isExpanded: $showsArchived) {
-                        ForEach(archived) { summary in
-                            WorkflowListRow(summary: summary)
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("Archived workflows")
-                            Text("\(archived.count)").monospacedDigit().foregroundStyle(.tertiary)
-                        }
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                HStack(spacing: 6) {
-                    Text("Workflows")
-                    Text("\(workflows.count)").monospacedDigit().foregroundStyle(.tertiary)
-                }
+        let matching = matching
+        let workflows = matching.filter { !$0.isArchived }
+        let archived = matching.filter(\.isArchived)
+        if !matching.isEmpty {
+            SidebarSubheading(title: "Workflows", count: workflows.count)
+            ForEach(workflows) { summary in
+                WorkflowListRow(summary: summary, project: project)
             }
-            .onChange(of: query) {
-                if !query.isEmpty { showsArchived = true }
+            if !archived.isEmpty {
+                DisclosureGroup(isExpanded: Binding(
+                    get: { !query.isEmpty || folds.isOpen(project, .archivedWorkflows) },
+                    set: { folds.set(project, .archivedWorkflows, open: $0) })) {
+                    ForEach(archived) { summary in
+                        WorkflowListRow(summary: summary, project: project)
+                    }
+                } label: {
+                    SidebarSubheading(title: "Archived workflows", count: archived.count)
+                }
             }
         }
+    }
+}
+
+/// A group within a project's fold: Needs you, Working, Workflows, Archived. With how
+/// many under it are unread (#70), so finished work is not missed now it sits in Done.
+/// One accessibility element, so VoiceOver reads it as one line.
+struct SidebarSubheading: View {
+    let title: String
+    let count: Int
+    var unread: Int = 0
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+            Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+            if unread > 0 {
+                Text("· \(unread) unread").monospacedDigit()
+            }
+        }
+        .appText(.fine)
+        .foregroundStyle(.secondary)
+        .padding(.top, 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(unread > 0 ? "\(title), \(count), \(unread) unread" : "\(title), \(count)")
     }
 }
 
@@ -100,7 +106,7 @@ private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
             .contentShape(.rect)
             trailing
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 2)
     }
 }
 
@@ -111,6 +117,7 @@ private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
 private struct WorkflowListRow: View {
     @Environment(AppModel.self) private var model
     let summary: WorkflowSummary
+    let project: ProjectKey
 
     var body: some View {
         WorkRow(summary.workflow.name) {
@@ -126,8 +133,8 @@ private struct WorkflowListRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-        .tag(ColumnPick.workflow(summary.id))
+        .listRowInsets(.vertical, 2)
+        .tag(SidebarItem.workflow(summary.id, in: project))
         .accessibilityElement(children: .combine)
         .swipeActions(edge: .trailing) {
             if summary.isArchived {
@@ -140,7 +147,7 @@ private struct WorkflowListRow: View {
             }
         }
         .contextMenu {
-            Button("Open") { model.openWorkflow = summary.id }
+            Button("Open") { model.sidebarItem = .workflow(summary.id, in: project) }
             if summary.isArchived {
                 Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
             } else if summary.awaitingApproval != nil {

@@ -23,7 +23,7 @@ final class WindowRequests {
     /// asks before the project page — and its prompt — exists.
     var wantsPromptFocus = false
 
-    /// Set to put the keyboard in the sessions column's search field.
+    /// Set to put the keyboard in the sidebar's search field.
     var wantsSessionSearchFocus = false
 
     /// The Project Settings pane showing, or nil while the sheet is shut (066). Set by
@@ -193,8 +193,8 @@ struct AgentsCommands: Commands {
 
     /// The project's page with the keyboard in its prompt, which is where a session starts.
     private func newSession(inWorktree: Bool = false) {
-        guard let key = model.selectedProjectKey else { return }
-        model.showProject(key)
+        guard model.selectedProjectKey != nil else { return }
+        model.composing = true
         // Either way, so a plain New Session after a worktree one is back in the folder.
         model.draftWorktree = inWorktree ? .new : nil
         requests.focusPrompt()

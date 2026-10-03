@@ -50,18 +50,15 @@ struct ContentView: View {
         .paperGround()
         // What the chat does not need is how wide the sidebar opens (`SidebarFrame.open`).
         .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.paneWidth = $0 }
-        // Its toggle is in the sessions column's toolbar, after the search field.
+        // Its toggle is in the detail's toolbar.
     }
 
-    private var isShowingActivity: Bool {
-        model.showsEvents || model.showsResources || model.showsRuntimes || model.showsSpending
-    }
-
-    /// The projects column, the same in both layouts.
+    /// The one sidebar (#145): Activity, the projects folded open on their sessions, and
+    /// at its foot what this Mac and its hosts are doing.
     private var projects: some View {
         @Bindable var model = model
         return ProjectListView(selection: $model.sidebarItem)
-            .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+            .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
             // A server asked for a credential there is none of (043).
             .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
             // A server asking to borrow a sign-in (T091) is the window's one alert, below.
@@ -74,8 +71,8 @@ struct ContentView: View {
             }
     }
 
-    /// What the right-hand column shows: a page about all the work, a workflow, the
-    /// chat picked in the middle column, or — with nothing picked — the project itself.
+    /// What the right-hand column shows: a page about all the work, a workflow, a
+    /// project's Dashboard, a chat, a new session, or — with nothing picked — what to do.
     @ViewBuilder
     private func detail(inPaneOf width: CGFloat) -> some View {
         if model.showsEvents {
@@ -90,9 +87,15 @@ struct ContentView: View {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
             WorkflowPage(workflowID: id).paperGround()
-        } else if model.openDashboard, let folder = model.selectedProject {
-            // The project's Dashboard (074), in the chat's place as a workflow's page is.
-            DashboardPage(folder: folder).paperGround()
+        } else if model.openDashboard, let folder = model.selectedProject, let summary = model.selectedProjectSummary {
+            // The project's own page (#145): its Dashboard (074), with anything waiting for
+            // somebody's OK across the top, as over a new session.
+            VStack(spacing: 0) {
+                WaitingForOKBanner(folder: folder)
+                OfflineStrip(host: summary.host)
+                DashboardPage(folder: folder)
+            }
+            .paperGround()
         } else if let id = model.selection, model.selectedAgent == nil, let gone = model.retiredTombstone(id) {
             // Retired (051): nothing left to chat with, only who it was.
             RetiredAgentPage(tombstone: gone, startedBy: model.retiredStarterLabel(gone)).paperGround()
@@ -104,21 +107,60 @@ struct ContentView: View {
                 .task(id: model.selection) {
                     if let id = model.selection, model.selectedAgent == nil { _ = await model.tombstone(for: id) }
                 }
-        } else {
-            // The project on its own: a new session. Its sessions and workflows are the
-            // middle column's, and its settings a sheet.
+        } else if model.composing {
+            // A new session in the project: the empty chat with its prompt (066).
             ProjectAgentsView(selection: Binding(get: { model.selection },
                                                  set: { model.selection = $0 }))
                 .paperGround()
+        } else {
+            NothingPickedPage().paperGround()
         }
+    }
+
+    /// The detail's toolbar: what a project and its sessions are done with, in reach
+    /// whichever of its pages is open (#97).
+    @ToolbarContentBuilder
+    private var detailToolbar: some ToolbarContent {
+        // Compose, where Mail and Notes have it (066): a new session in the project.
+        ToolbarItem {
+            Button { newSession() } label: {
+                Label("New Session", systemImage: "square.and.pencil")
+            }
+            .help("Start a new session in this project (⌘N)")
+            .disabled(model.selectedProjectSummary == nil)
+        }
+        ToolbarItem {
+            Button { requests.projectSettings = .general } label: {
+                Label("Project Settings", systemImage: "slider.horizontal.3")
+            }
+            .help("Project Settings (⌥⌘,)")
+            .disabled(model.selectedProjectSummary == nil)
+        }
+        if model.selection != nil {
+            ToolbarSpacer(.fixed)
+            ToolbarItem {
+                SidebarToggle(windowWidth: frame.windowWidth)
+            }
+        }
+    }
+
+    private func newSession() {
+        model.composing = true
+        model.draftWorktree = nil
+        requests.focusPrompt()
+    }
+
+    /// The window's title: the worktree this build came from, then whatever the detail
+    /// is reading. The primary checkout is "main".
+    private var title: String {
+        AppCheckout.windowTitle(model.selectedAgent?.title ?? (model.composing ? model.selectedProjectSummary?.name : nil))
     }
 
     var body: some View {
         @Bindable var model = model
-        // Three columns, the way Mail and Notes are laid out: the projects, the
-        // sessions in the one picked, and what is being read. Picking a session shows
-        // its chat beside the list rather than pushing it over the project, so moving
-        // between two chats is one click, and the list stays in sight.
+        // A sidebar and what is being read (#145). Picking a session shows its chat
+        // beside the list rather than pushing it over the project, so moving between
+        // two chats is one click, and the list stays in sight.
         // Today's set-up, offered the move to a control plane, never moved on its own
         // (058, frame I). Above the columns, not an inset: a split view's columns run
         // under an inset and hide their first rows behind it.
@@ -129,27 +171,21 @@ struct ContentView: View {
                 // No control plane and nothing of the old way: one question, and no
                 // sidebar or toolbar until it is answered (058, frame A).
                 FirstRunView()
-            } else if isShowingActivity {
-                // Events, Resources and Spending are about all of the work, so the
-                // sessions of one project have no place beside them: two columns.
-                NavigationSplitView(columnVisibility: $columns) {
-                    projects
-                } detail: {
-                    detail(inPaneOf: 0)
-                }
             } else {
+                // Two columns (#145): the one sidebar, then what is being read, with the
+                // inspector beside a chat.
                 NavigationSplitView(columnVisibility: $columns) {
                     projects
-                } content: {
-                    SessionsColumn(selection: $model.selection)
-                        .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
                 } detail: {
                     GeometryReader { pane in
                         detail(inPaneOf: pane.size.width)
                     }
-                    // The chat and the inspector share this column now, not the window,
-                    // so this is the width the inspector measures itself against.
+                    // The chat and the inspector share this column, not the window, so
+                    // this is the width the inspector measures itself against.
                     .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
+                    .toolbar { detailToolbar }
+                    .navigationTitle(title)
+                    .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
                 }
             }
         }
@@ -220,6 +256,24 @@ struct ContentView: View {
         .onChange(of: model.needsPersonCount, initial: true) { _, count in
             NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
         }
+    }
+}
+
+/// The detail with nothing picked (#145): what the sidebar is, and the keys through it.
+private struct NothingPickedPage: View {
+    var body: some View {
+        ContentUnavailableView {
+            Label("Nothing selected", systemImage: "sidebar.left")
+        } description: {
+            Text("""
+            Pick a session on the left to read it, or a project to see its Dashboard. \
+            New Session (⌘N) starts one in the selected project.
+
+            ↑ and ↓ move through the list, → and ← unfold and fold a project, \
+            and ⌘F finds a session.
+            """)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

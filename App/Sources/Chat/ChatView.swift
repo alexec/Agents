@@ -63,7 +63,7 @@ struct ChatView: View {
         // for a quarter of a second while the new ones were built, and every frame of it
         // redrew the whole pane, which was most of the cost of opening a chat (#90).
         .animation(.snappy(duration: 0.28), value: model.selection == nil)
-        // Title stays on SessionsColumn: one owner for the window title.
+        // Title stays on ContentView's detail: one owner for the window title.
         .environment(\.chatActions, chatActions)
     }
 
