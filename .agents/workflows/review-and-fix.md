@@ -157,7 +157,8 @@ When the helpers are done (or if none were started):
    <branch> (<commits>)`, `needs a decision: <the choice>`, `won't fix: <why>`, or
    `recorded` (medium and low). Commit on `agents/reviews`.
 3. Archive each helper you started with `archive_agent`. Never delete its worktree or
-   branch: the work is there for Alex.
+   branch yourself: the work is there for Alex. (Archiving lets the app tidy away a
+   worktree it made once everything in it is committed; the unmerged branch stays.)
 4. End with one line per finding:
    `<id> <severity> <title> — fixed on <branch> | needs a decision: … | won't fix: … | recorded`,
    then finish_turn: `done` if every critical and high finding is fixed or there were
