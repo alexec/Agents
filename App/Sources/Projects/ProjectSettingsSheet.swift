@@ -217,6 +217,12 @@ private struct ProjectGeneralPane: View {
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
+                            // They go with the project (#126), so say where.
+                            Text("These and Helpers archived are saved in .agents/project.json, a file in "
+                                 + "this project you may commit.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     row("Helpers archived") {

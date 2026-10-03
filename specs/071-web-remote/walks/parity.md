@@ -61,6 +61,7 @@
 | A chat opens with its last 12 turns | #90 | lacks (50) | **has** | — | — | Earlier turns come as the top is reached, as before. |
 | HTML opens as a live page | #67 | by design | by design | — | — | 071 FR-031: the page shows HTML as source and runs nothing. |
 | Helper limits per project | #64 | by design | by design | — | — | A setting. |
+| Helper limits kept in the project's `.agents/project.json`, and Project Settings says so | #126 | by design | by design | — | — | Still a setting, the Mac's alone (Project Settings ▸ General), as on the Remote. Nothing the page shows changed: it never showed the limits. |
 | Swipe to archive waits for the swipe | #74 | n/a | n/a | — | — | The page has no swipe. |
 | Dictation keeps every word through a pause | #69 | by design | by design | — | — | Dictation is the window's. |
 | Archive stays on the chat when it did not archive (073) | 073 | has | has | — | — | Archive never leaves the chat on the page; a failure says why. |

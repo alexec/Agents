@@ -198,6 +198,10 @@ public actor DaemonCore {
     /// only writer, and `allProjects` — which runs each time any agent changes —
     /// used to read the file every time.
     var projectRecordsCache: [URL: Project]?
+    /// Each project's `.agents/project.json` helper limits as last read (#126), nil
+    /// inside for a project whose file sets none. Let go when the folder's `.agents`
+    /// changes and when the daemon writes the file.
+    var projectConfigCache: [URL: HelperLimits?] = [:]
     /// Clones under way, by id (027). Memory only: a clone the daemon did not live to
     /// finish is not resumed, and its staging folder is removed on the next start.
     var clones: [UUID: RunningClone] = [:]

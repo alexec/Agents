@@ -16,6 +16,8 @@ extension DaemonCore {
 
     /// Read every project's workflows, watch their folders, and start the clock.
     public func startWorkflows() async {
+        // Helper limits kept in projects.json before #126, into each project's file once.
+        migrateHelperLimitsToProjectFiles()
         for project in allProjects(includeArchived: false) where project.exists {
             adoptWorkflows(in: project.folder)
         }
@@ -101,6 +103,8 @@ extension DaemonCore {
                 await self?.scheduleWorkflowRescan(in: standardized)
                 // The same watch sees the Dashboard's tile files change by hand or by a pull (074).
                 await self?.dashboardFilesChanged(changed, in: standardized)
+                // And the project's own settings file (#126).
+                await self?.projectConfigFilesChanged(changed, in: standardized)
             }
         }
     }

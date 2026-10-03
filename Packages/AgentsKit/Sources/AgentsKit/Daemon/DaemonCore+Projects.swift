@@ -70,6 +70,9 @@ extension DaemonCore {
             }
             let newest = inFolder.map(\.lastActivityAt).max()
                 ?? gone.map(\.lastActivityAt).max() ?? project.addedAt
+            // The limits are the project's own file's (#126), not the record's.
+            var project = project
+            project.helperLimits = configuredHelperLimits(in: project.folder)
             var summary = DaemonAPI.ProjectSummary(
                 project: project,
                 name: names[project.folder] ?? project.folder.lastPathComponent,
@@ -274,25 +277,32 @@ extension DaemonCore {
     /// The person setting a project's two helper limits (#64), from any window or paired
     /// client (#111): `ConnectionRole` keeps it from agents.
     ///
+    /// Written to the project's own `.agents/project.json` (#126), so the limits go
+    /// wherever the project goes; nothing about them is kept in `projects.json` any more.
     /// Refused outside the hard maximums rather than clamped, so the person reads what
     /// was kept rather than finding out later. Lowering a limit below what is in use
     /// stops nothing: it refuses the next start until enough have finished or been
     /// archived.
     public func setHelperLimits(_ request: DaemonAPI.SetHelperLimitsRequest) throws -> DaemonAPI.ProjectSummary {
         let standardized = Project.standardize(request.folder)
-        // The derived record when none was kept, so its `addedAt` stays its oldest agent's.
-        guard let derived = projectSummary(for: standardized)?.project else {
+        guard projectSummary(for: standardized) != nil else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) is not a project.")
         }
         if let problem = request.limits.problem {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: problem)
         }
+        guard Self.isDirectory(standardized) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
+                               message: "\(standardized.path) is not there, so its settings cannot be written.")
+        }
+        try writeHelperLimits(request.limits, in: standardized)
+        // A record from before #126 says nothing now: the file does.
         var records = projectRecords()
-        var record = records[standardized] ?? derived
-        record.helperLimits = request.limits.orNilIfDefault
-        records[standardized] = record
-        try saveProjectRecords(records)
+        if records[standardized]?.helperLimits != nil {
+            records[standardized]?.helperLimits = nil
+            try saveProjectRecords(records)
+        }
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) is not a project.")
@@ -301,15 +311,82 @@ extension DaemonCore {
         return summary
     }
 
-    /// The helper limits enforced in a project: the person's, or the defaults.
+    /// Write the limits into the project's file, in the person's words when it can't be.
+    private func writeHelperLimits(_ limits: HelperLimits?, in folder: URL) throws {
+        do {
+            try ProjectConfig.setHelperLimits(limits, in: folder)
+        } catch let unreadable as ProjectConfig.Unreadable {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: unreadable.message)
+        } catch {
+            let name = "\(DotAgents.folder)/\(ProjectConfig.fileName)"
+            if let failure = WriteFailure(error, keeping: name) { throw Self.refusal(failure) }
+            throw JSONRPCError(code: JSONRPCError.internalError,
+                               message: "\(name) could not be written: \(error.localizedDescription)")
+        }
+        projectConfigCache[folder] = nil
+    }
+
+    /// What the project's file sets, read once until it changes; before a project's
+    /// limits have been moved into its file, what `projects.json` kept.
+    func configuredHelperLimits(in folder: URL) -> HelperLimits? {
+        let standardized = Project.standardize(folder)
+        let fromFile: HelperLimits?
+        if let known = projectConfigCache[standardized] {
+            fromFile = known
+        } else {
+            fromFile = ProjectConfig.helperLimits(in: standardized)
+            projectConfigCache[standardized] = .some(fromFile)
+        }
+        return fromFile ?? projectRecords()[standardized]?.helperLimits
+    }
+
+    /// The helper limits enforced in a project: the person's, or the defaults, never
+    /// past the hard maximums whatever the file says.
     func helperLimits(in folder: URL) -> (running: Int, notArchived: Int) {
-        (projectRecords()[Project.standardize(folder)]?.helperLimits ?? HelperLimits()).effective
+        (configuredHelperLimits(in: folder) ?? HelperLimits()).effective
     }
 
     /// Whether agents may archive the helpers they started in a project (#120): the
     /// person's choice, or the default.
     func agentsMayArchive(in folder: URL) -> Bool {
-        (projectRecords()[Project.standardize(folder)]?.helperLimits ?? HelperLimits()).mayArchive
+        (configuredHelperLimits(in: folder) ?? HelperLimits()).mayArchive
+    }
+
+    /// The project's `.agents` changed on disk, by hand or by a pull: its limits are
+    /// read again, and the windows told if they moved.
+    func projectConfigFilesChanged(_ changed: [URL], in folder: URL) {
+        let file = ProjectConfig.url(in: folder).path
+        guard changed.contains(where: { $0.path == file || file.hasPrefix($0.path + "/") || $0.path == file + "/" })
+        else { return }
+        let before = projectConfigCache[folder] ?? nil
+        projectConfigCache[folder] = nil
+        guard configuredHelperLimits(in: folder) != before, let summary = projectSummary(for: folder) else { return }
+        broadcast(DaemonAPI.Notification.projectChanged, summary)
+    }
+
+    /// Helper limits kept in `projects.json` before #126, written into each project's
+    /// own file once and then forgotten there. A folder that is not here keeps its
+    /// record, which still counts, for a later start; a file that already sets limits
+    /// wins over the record.
+    func migrateHelperLimitsToProjectFiles() {
+        var records = projectRecords()
+        var changed = false
+        for (folder, record) in records {
+            guard let limits = record.helperLimits, Self.isDirectory(folder) else { continue }
+            do {
+                if ProjectConfig.helperLimits(in: folder) == nil {
+                    try ProjectConfig.setHelperLimits(limits, in: folder)
+                    DaemonLog.shared.write("wrote \(folder.lastPathComponent)'s helper limits into its project file")
+                }
+                records[folder]?.helperLimits = nil
+                projectConfigCache[folder] = nil
+                changed = true
+            } catch {
+                DaemonLog.shared.write("could not write \(folder.lastPathComponent)'s helper limits into its project file yet: \(error)")
+            }
+        }
+        guard changed else { return }
+        keepQuietly("the project list") { try saveProjectRecords(records) }
     }
 
     /// Bring one back. Succeeds whether or not the folder is still there: the agents

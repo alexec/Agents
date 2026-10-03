@@ -57,7 +57,8 @@ So a lead that stops or parks a helper whose part is done frees a running place 
 helper's not-archived place stays taken until it is archived. A lead should archive a
 helper once its work is merged or abandoned, rather than remove the helper's worktree under
 it; archiving removes a worktree the app made for it once everything in it is committed. Both limits are yours alone to
-change: the tools only read them. `list_sessions` and `read_session` are
+change: the tools only read them. They are kept in the project's `.agents/project.json`;
+a value written there by hand is held to the maximums. `list_sessions` and `read_session` are
 given to every agent, including one another agent started.
 
 ## See also

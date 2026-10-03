@@ -23,8 +23,10 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// purpose: reading it as anything else would either lay out step 1 again, putting
     /// back what the person deleted, or fail `projects.json`, which holds every project.
     public var layoutVersion: Int?
-    /// The person's own helper limits (#64). Nil is the defaults. Written only by
-    /// `projects/setHelperLimits`, which only an operator may call.
+    /// The person's own helper limits (#64). Nil is the defaults. In a summary, what the
+    /// project's own `.agents/project.json` says (#126); in `projects.json`, only a record
+    /// from before then, moved into that file once. Set only by
+    /// `projects/setHelperLimits`, which agents cannot call.
     public var helperLimits: HelperLimits?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
