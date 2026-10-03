@@ -55,8 +55,10 @@ export function shortAgo(date: Date, now = new Date()): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-export function SessionRow({ agent, chosen, onPick, going }: {
+export function SessionRow({ agent, chosen, onPick, going, waits = [] }: {
   agent: Agent; chosen: boolean; onPick: () => void;
+  /** A blocked agent's wait lines (039, #157): blockLines over its host's agents. */
+  waits?: string[];
   /** Stop, park or archive on its way (#87): what it is doing, and to whom. */
   going?: { doing: string; recipient: string } | undefined;
 }) {
@@ -83,6 +85,8 @@ export function SessionRow({ agent, chosen, onPick, going }: {
             {labels.map((label) => <span key={label.value} class="chip label">{label.value}</span>)}
           </span>
         )}
+        {/* What it waits on, one line an agent, as the window's row (039, #152). */}
+        {waits.map((line) => <span key={line} class="subtitle wait-line">{line}</span>)}
         {running && <span class="subtitle">{running}</span>}
         {park && <span class="subtitle quiet">{park}</span>}
       </span>

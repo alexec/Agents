@@ -12,6 +12,7 @@ import {
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { SessionRow } from "./SessionRow";
+import { blockLines } from "../model/block";
 
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
   store: Store; host: string; folder: string; projectName: string; workflowID: string; down: boolean;
@@ -93,7 +94,8 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           <h2 class="section-head">Recent runs</h2>
           {runs.length === 0 && <p class="hint">Nothing has run yet.</p>}
           {runs.slice(0, 6).map((agent) => (
-            <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })} />
+            <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
+              waits={blockLines(agent, store.agents.value[host] ?? [])} />
           ))}
         </div>
       </div>

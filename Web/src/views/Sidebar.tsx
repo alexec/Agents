@@ -20,6 +20,7 @@ import { ActivityRows } from "./Activity";
 import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { SessionRow } from "./SessionRow";
+import { blockLines } from "../model/block";
 import { sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
 
@@ -168,7 +169,8 @@ function ProjectFold({ store, host, project, query, linkDown }: {
   const row = (agent: Agent) => (
     <div class="nav-item" key={agent.id} onContextMenu={(e) => openContextMenu(e, sessionMenu(agent))}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, sessionMenu(agent)); }}>
-      <SessionRow agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)} />
+      <SessionRow agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)}
+        waits={blockLines(agent, store.agents.value[host.id] ?? [])} />
     </div>
   );
   return (

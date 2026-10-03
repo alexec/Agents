@@ -15,6 +15,7 @@ import { go, replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
+import { BlockStrip } from "./BlockStrip";
 import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
@@ -179,6 +180,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {hostDown && <OfflineStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
+      <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       <CallActionsContext.Provider value={callActions}>
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}

@@ -20,6 +20,7 @@ import { CloningRows, EmptyProjects, NewProjectDialog, NewProjectItems, NewProje
 import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { SessionRow } from "./SessionRow";
+import { blockLines } from "../model/block";
 import { WorkflowRow } from "./WorkflowRow";
 import { Resources } from "./Resources";
 import { WorkflowPage } from "./WorkflowPage";
@@ -261,7 +262,8 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
                   {group.agents.some(showsUnread) && <span> · {group.agents.filter(showsUnread).length} unread</span>}
                 </h3>
                 {group.agents.map((agent) => (
-                  <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)} />
+                  <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)}
+                  waits={blockLines(agent, agents)} />
                 ))}
               </div>
             ))}
@@ -275,7 +277,8 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
               onToggle={(e) => openArchived((e.currentTarget as HTMLDetailsElement).open)}>
               <summary class="subhead">Archived sessions{showsArchived.value && <span class="count"> {archived.length}</span>}</summary>
               {(search.value ? archived : archived.slice(0, archivedShown)).map((agent) => (
-                <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)} />
+                <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)}
+                  waits={blockLines(agent, agents)} />
               ))}
               {showsArchived.value && project.retiredCount > 0 && !search.value && (
                 <p class="hint">{project.retiredCount === 1 ? "1 older agent has been retired."

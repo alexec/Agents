@@ -161,6 +161,60 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: block/ (#157)
+
+    /// The wait lines under a blocked agent (039, #152), as `AgentsModel.blockLines` says
+    /// them: any of or all of several, one, each way a wait can end, a waited-on agent
+    /// renamed since or gone, a cleared block, and one waiting only on a time. When it checks
+    /// again is said in the reader's own time, so the case says only whether there is one.
+    @Test func block() throws {
+        let running = Self.agent(60, .running, title: "Haiku one, renamed")
+        let done = Self.agent(61, .finished, title: "Haiku two", report: Self.report(.done))
+        func ended(_ how: WaitEnding.How) -> WaitEnding { WaitEnding(at: Self.at(3), how: how) }
+        let one = Wait(agentID: running.id, nameAtReport: "Haiku one")
+        let two = Wait(agentID: done.id, nameAtReport: "Haiku two",
+                       ending: ended(.finished(outcome: .done, message: "Said hello.")))
+        let blocks: [(String, Block)] = [
+            ("all of two, one finished", Block(waits: [one, two])),
+            ("all of two, written out", Block(waits: [one, two], wakeOn: .all)),
+            ("any of two", Block(waits: [one, two], wakeOn: .any)),
+            ("one, with a time to check again", Block(waits: [one], checkAgainAt: Self.at(90), wakeOn: .any)),
+            ("only a time", Block(checkAgainAt: Self.at(90))),
+            ("every way to end", Block(waits: [
+                Wait(agentID: Self.id(70), nameAtReport: "No outcome", ending: ended(.finished(outcome: nil, message: nil))),
+                Wait(agentID: Self.id(71), nameAtReport: "Stuck", ending: ended(.finished(outcome: .stuck, message: nil))),
+                Wait(agentID: Self.id(72), nameAtReport: "Stopped", ending: ended(.stopped(.rateLimited))),
+                Wait(agentID: Self.id(73), nameAtReport: "Stopped, no reason", ending: ended(.stopped(nil))),
+                Wait(agentID: Self.id(74), nameAtReport: "Stopped, ended its turn", ending: ended(.stopped(.endTurn))),
+                Wait(agentID: Self.id(75), nameAtReport: "Archived", ending: ended(.archived)),
+                Wait(agentID: Self.id(76), nameAtReport: "Gone", ending: ended(.gone)),
+            ], wakeOn: .any)),
+            ("cleared", Block(waits: [one, two], clearedAt: Self.at(4), clearedBy: .waits)),
+        ]
+        var blocked = blocks.map { name, block in
+            (name, Self.agent(62, .finished, title: "Lead", report: Self.report(.blocked, "Waiting on the haikus.", block: block)))
+        }
+        blocked.append(("blocked on nothing named", Self.agent(62, .finished, title: "Lead", report: Self.report(.blocked))))
+        blocked.append(("blocked, still running", Self.agent(62, .running, title: "Lead",
+                                                             report: Self.report(.blocked, block: Block(waits: [one])))))
+        let cases = try blocked.map { name, agent in
+            Case(name: name, input: .object([
+                "agents": .array(try [running, done, agent].map(Self.encode)), "agentID": .string(agent.id.uuidString)]))
+        }
+        try pin("block/lines.json", cases) { input in
+            let model = AgentsModel()
+            let agents = try input["agents"]!.decode([Agent].self)
+            model.replaceAgents(agents)
+            let agent = agents.first { $0.id.uuidString == input["agentID"]!.stringValue! }!
+            var lines = model.blockLines(agent)
+            let checksAgain = model.openBlock(agent)?.block.checkAgainLine() != nil
+            if checksAgain { lines.removeLast() }
+            return .object(["isBlocked": .bool(model.openBlock(agent) != nil),
+                            "lines": .array(lines.map(JSONValue.string)), "checksAgain": .bool(checksAgain),
+                            "carryOnHelp": .string(AgentsModel.carryOnHelp(for: agent))])
+        }
+    }
+
     // MARK: groups/ and status/
 
     @Test func groups() throws {

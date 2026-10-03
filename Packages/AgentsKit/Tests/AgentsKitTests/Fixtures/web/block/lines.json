@@ -1,0 +1,1071 @@
+[
+  {
+    "expected" : {
+      "carryOnHelp" : "Stop waiting and carry on now",
+      "checksAgain" : false,
+      "isBlocked" : true,
+      "lines" : [
+        "Carries on when all of these have finished",
+        "Haiku one, renamed — still working",
+        "Haiku two — finished: complete"
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "block" : {
+              "waits" : [
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000060",
+                  "nameAtReport" : "Haiku one"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000061",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "finished" : {
+                        "message" : "Said hello.",
+                        "outcome" : "done"
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Haiku two"
+                }
+              ]
+            },
+            "message" : "Waiting on the haikus.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "all of two, one finished"
+  },
+  {
+    "expected" : {
+      "carryOnHelp" : "Stop waiting and carry on now",
+      "checksAgain" : false,
+      "isBlocked" : true,
+      "lines" : [
+        "Carries on when all of these have finished",
+        "Haiku one, renamed — still working",
+        "Haiku two — finished: complete"
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "block" : {
+              "waits" : [
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000060",
+                  "nameAtReport" : "Haiku one"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000061",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "finished" : {
+                        "message" : "Said hello.",
+                        "outcome" : "done"
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Haiku two"
+                }
+              ],
+              "wakeOn" : "all"
+            },
+            "message" : "Waiting on the haikus.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "all of two, written out"
+  },
+  {
+    "expected" : {
+      "carryOnHelp" : "Stop waiting and carry on now",
+      "checksAgain" : false,
+      "isBlocked" : true,
+      "lines" : [
+        "Carries on when any of these finishes",
+        "Haiku one, renamed — still working",
+        "Haiku two — finished: complete"
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "block" : {
+              "waits" : [
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000060",
+                  "nameAtReport" : "Haiku one"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000061",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "finished" : {
+                        "message" : "Said hello.",
+                        "outcome" : "done"
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Haiku two"
+                }
+              ],
+              "wakeOn" : "any"
+            },
+            "message" : "Waiting on the haikus.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "any of two"
+  },
+  {
+    "expected" : {
+      "carryOnHelp" : "Stop waiting and carry on now",
+      "checksAgain" : true,
+      "isBlocked" : true,
+      "lines" : [
+        "Haiku one, renamed — still working"
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "block" : {
+              "checkAgainAt" : 812505400,
+              "waits" : [
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000060",
+                  "nameAtReport" : "Haiku one"
+                }
+              ],
+              "wakeOn" : "any"
+            },
+            "message" : "Waiting on the haikus.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "one, with a time to check again"
+  },
+  {
+    "expected" : {
+      "carryOnHelp" : "Stop waiting and carry on now",
+      "checksAgain" : true,
+      "isBlocked" : true,
+      "lines" : [
+
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "block" : {
+              "checkAgainAt" : 812505400,
+              "waits" : [
+
+              ]
+            },
+            "message" : "Waiting on the haikus.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "only a time"
+  },
+  {
+    "expected" : {
+      "carryOnHelp" : "Stop waiting and carry on now",
+      "checksAgain" : false,
+      "isBlocked" : true,
+      "lines" : [
+        "Carries on when any of these finishes",
+        "No outcome — finished without saying how it went",
+        "Stuck — finished: stuck",
+        "Stopped — rate limited, and still limited after retrying",
+        "Stopped, no reason — stopped",
+        "Stopped, ended its turn — stopped",
+        "Archived — archived",
+        "Gone — gone"
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "block" : {
+              "waits" : [
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000070",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "finished" : {
+
+                      }
+                    }
+                  },
+                  "nameAtReport" : "No outcome"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000071",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "finished" : {
+                        "outcome" : "stuck"
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Stuck"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000072",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "stopped" : {
+                        "_0" : "rateLimited"
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Stopped"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000073",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "stopped" : {
+
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Stopped, no reason"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000074",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "stopped" : {
+                        "_0" : "endTurn"
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Stopped, ended its turn"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000075",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "archived" : {
+
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Archived"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000076",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "gone" : {
+
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Gone"
+                }
+              ],
+              "wakeOn" : "any"
+            },
+            "message" : "Waiting on the haikus.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "every way to end"
+  },
+  {
+    "expected" : {
+      "carryOnHelp" : "Tell it the block has cleared, and let it carry on",
+      "checksAgain" : false,
+      "isBlocked" : false,
+      "lines" : [
+
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "block" : {
+              "clearedAt" : 812500240,
+              "clearedBy" : "waits",
+              "waits" : [
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000060",
+                  "nameAtReport" : "Haiku one"
+                },
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000061",
+                  "ending" : {
+                    "at" : 812500180,
+                    "how" : {
+                      "finished" : {
+                        "message" : "Said hello.",
+                        "outcome" : "done"
+                      }
+                    }
+                  },
+                  "nameAtReport" : "Haiku two"
+                }
+              ]
+            },
+            "message" : "Waiting on the haikus.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "cleared"
+  },
+  {
+    "expected" : {
+      "carryOnHelp" : "Tell it the block has cleared, and let it carry on",
+      "checksAgain" : false,
+      "isBlocked" : true,
+      "lines" : [
+
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "blocked on nothing named"
+  },
+  {
+    "expected" : {
+      "carryOnHelp" : "Stop waiting and carry on now",
+      "checksAgain" : false,
+      "isBlocked" : false,
+      "lines" : [
+
+      ]
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "block" : {
+              "waits" : [
+                {
+                  "agentID" : "00000000-0000-0000-0000-000000000060",
+                  "nameAtReport" : "Haiku one"
+                }
+              ]
+            },
+            "message" : "It went.",
+            "outcome" : "blocked"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "blocked, still running"
+  }
+]
