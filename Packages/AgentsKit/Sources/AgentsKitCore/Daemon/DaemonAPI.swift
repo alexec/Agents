@@ -320,6 +320,10 @@ public enum DaemonAPI {
         /// Cursor and Grok permission mode (061). Control only.
         public static let clientPermissionsState = "clientPermissions/state"
         public static let clientPermissionsSet = "clientPermissions/set"
+        /// What agents call the person, and their pronouns (#121). Kept as given; a
+        /// blank name follows the account of the machine that says it.
+        public static let personState = "person/state"
+        public static let personSet = "person/set"
         /// Each runtime's command sandbox default (064). Reading is also the phone's, for
         /// "Use runtime default (Off)"; setting is the Mac's alone.
         public static let sandboxState = "sandbox/state"
@@ -429,6 +433,8 @@ public enum DaemonAPI {
         public static let costChanged = "cost/changed"
         /// Cursor and Grok permission mode changed (061).
         public static let clientPermissionsChanged = "clientPermissions/changed"
+        /// What agents call the person changed (#121).
+        public static let personChanged = "person/changed"
         /// A runtime's sandbox default changed (064).
         public static let sandboxChanged = "sandbox/changed"
         /// `RuntimeAllowances`, whenever a runtime's state changes (065). Debounced to

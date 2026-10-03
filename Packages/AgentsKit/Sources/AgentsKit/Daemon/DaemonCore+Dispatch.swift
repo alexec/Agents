@@ -574,6 +574,13 @@ extension DaemonCore {
                 let settings = try require(params, as: ClientPermissionSettings.self)
                 return .success(try JSONValue.encoding(try setClientPermissions(settings)))
 
+            case DaemonAPI.Method.personState:
+                return .success(try JSONValue.encoding(personState()))
+
+            case DaemonAPI.Method.personSet:
+                let settings = try require(params, as: PersonSettings.self)
+                return .success(try JSONValue.encoding(try setPerson(settings)))
+
             case DaemonAPI.Method.sandboxState:
                 return .success(try JSONValue.encoding(sandboxSettings))
 

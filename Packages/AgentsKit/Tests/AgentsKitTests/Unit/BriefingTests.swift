@@ -63,6 +63,67 @@ struct BriefingTests {
         }
     }
 
+    // MARK: Who is who (#121)
+
+    static let alex = Briefing.Naming(runtime: "Claude", person: "Alex")
+
+    /// One sentence, second, naming the runtime by its display name and the person by
+    /// theirs, with the rule for questions: no bare "I" or "you".
+    @Test func theNamingSentenceNamesTheRuntimeAndThePerson() {
+        let line = Briefing.naming(Self.alex)
+        #expect(line.hasPrefix("You are Claude and I am Alex:"))
+        #expect(line.contains("in questions and messages to me"))
+        #expect(line.contains("never write a bare \"I\" or \"you\""))
+        #expect(line.contains("\"Claude (this agent) will…\""))
+        #expect(line.contains("\"Alex, do you want…?\""))
+        #expect(line.contains("name any other agent by its title"))
+        // One sentence, said once.
+        #expect(line.split(separator: ". ").count == 1)
+        for policy in ToolPolicyCatalog.builtIn {
+            let lines = Briefing.lines(for: policy, naming: Self.alex)
+            #expect(lines.first == Briefing.finish)
+            #expect(lines.dropFirst().first == line)
+            #expect(Briefing.text(for: policy, naming: Self.alex).components(separatedBy: "You are Claude").count == 2)
+        }
+    }
+
+    /// Pronouns are the person's to give: without them, the name or "they".
+    @Test func withoutPronounsItIsTheNameOrThey() {
+        #expect(Briefing.naming(Self.alex).hasSuffix("refer to me by name or as \"they\"."))
+        let given = Briefing.naming(.init(runtime: "Grok", person: "Sam", pronouns: "she/her"))
+        #expect(given.hasSuffix("refer to me by name or as she/her."))
+        #expect(!given.contains("\"they\""))
+    }
+
+    /// A helper names the agent that started it by title, as the person sees it.
+    @Test func aHelperIsToldWhoStartedIt() {
+        let helper = Briefing.naming(.init(runtime: "Claude", person: "Alex", startedBy: "Project lead"))
+        #expect(helper.hasPrefix("You are Claude, started by \u{201C}Project lead\u{201D}, and I am Alex:"))
+        let untitled = Briefing.naming(.init(runtime: "Claude", person: "Alex", startedBy: ""))
+        #expect(untitled.hasPrefix("You are Claude, started by another agent, and I am Alex:"))
+    }
+
+    /// The person's name: the one set, else the account's first name, else something
+    /// that still reads.
+    @Test func theNameFallsBackToTheAccountsFirstName() {
+        #expect(PersonSettings(name: "Sam").effectiveName(accountName: "Alex Collins") == "Sam")
+        #expect(PersonSettings(name: "  ").effectiveName(accountName: "Alex Collins") == "Alex")
+        #expect(PersonSettings().effectiveName(accountName: "Alex Collins") == "Alex")
+        #expect(PersonSettings().effectiveName(accountName: "") == "the person")
+        #expect(PersonSettings(pronouns: " ").givenPronouns == nil)
+        #expect(PersonSettings().resolved(accountName: "Alex Collins") == PersonSettings(name: "Alex"))
+        // And what the daemon says with nothing set is this account's first name.
+        let said = Briefing.naming(.init(runtime: "Claude", person: PersonSettings().effectiveName()))
+        #expect(said.contains("I am \(PersonSettings.firstName(of: NSFullUserName()) ?? "the person"):"))
+    }
+
+    /// Without a naming, nothing is said: a caller that does not know says nothing.
+    @Test func noNamingSaysNothing() {
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(!Briefing.text(for: policy).contains("You are "))
+        }
+    }
+
     /// The escalation line asks for the act first, whatever the runtime, because the act
     /// is the part that is true everywhere and a runtime may know its tool by a name we
     /// have not written down.
@@ -162,12 +223,17 @@ struct BriefingTests {
     ///
     /// Raised with reading another session (065), to 2,800 and 2,600 and nine lines: one
     /// line, told to every agent, helpers included (about 150 characters with its break).
+    ///
+    /// Raised with who is who (#121), to 3,150 and 2,950 and ten lines: one sentence,
+    /// told to every agent, about 300 characters with a long name and a helper's starter.
     @Test func itStaysShortEnoughToBeRead() {
+        let naming = Briefing.Naming(runtime: "Antigravity", person: "Alexandra", pronouns: "they/them",
+                                     startedBy: "#121 agent names and questions")
         for policy in ToolPolicyCatalog.builtIn {
-            let text = Briefing.text(for: policy)
-            #expect(text.count < 2_800, "\(policy.runtimeID): \(text.count)")
-            #expect(Briefing.lines(for: policy).count <= 9, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false).count < 2_600,
+            let text = Briefing.text(for: policy, naming: naming)
+            #expect(text.count < 3_150, "\(policy.runtimeID): \(text.count)")
+            #expect(Briefing.lines(for: policy, naming: naming).count <= 10, "\(policy.runtimeID)")
+            #expect(Briefing.text(for: policy, managesAgents: false, naming: naming).count < 2_950,
                     "\(policy.runtimeID), for an agent another agent started")
         }
     }

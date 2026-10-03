@@ -121,6 +121,45 @@ public enum Briefing {
         by id or exact title; \(AppTool.listSessions) lists them. Reading leaves it as it was.
         """
 
+    /// Who is who, for the sentence below (#121).
+    public struct Naming: Hashable, Sendable {
+        /// The runtime's display name ("Claude"), not its model.
+        public var runtime: String
+        /// What the person is called: the setting, or the account's first name.
+        public var person: String
+        /// As the person gave them; nil where they gave none.
+        public var pronouns: String?
+        /// The title of the agent that started this one, for a helper; nil otherwise.
+        public var startedBy: String?
+
+        public init(runtime: String, person: String, pronouns: String? = nil, startedBy: String? = nil) {
+            self.runtime = runtime
+            self.person = person
+            self.pronouns = pronouns
+            self.startedBy = startedBy
+        }
+    }
+
+    /// Names instead of "I" and "you" (#121).
+    ///
+    /// A question card read on a phone, beside other agents' cards, cannot say who "I"
+    /// is or which "you" is meant: the agent asking, the agent it is asking about, or
+    /// the person. So the agent is told its own name and the person's once, and told to
+    /// use them in questions above all. Pronouns are the person's to give; where they
+    /// gave none, the name or "they", never a guess. A helper is told who started it,
+    /// by title, so it can name that agent the same way.
+    public static func naming(_ naming: Naming) -> String {
+        let you = naming.startedBy.map { "\(naming.runtime), started by \(LeaseWords.agentName($0))," }
+            ?? naming.runtime
+        let refer = naming.pronouns.map { "as \($0)" } ?? "as \"they\""
+        return """
+            You are \(you) and I am \(naming.person): in questions and messages to me, \
+            never write a bare "I" or "you" — say "\(naming.runtime) (this agent) will…" \
+            and "\(naming.person), do you want…?" — name any other agent by its title, \
+            and refer to me by name or \(refer).
+            """
+    }
+
     /// Ask, rather than guess or stop.
     ///
     /// The act, and then the reason it is worth doing: the question is held by the
@@ -239,10 +278,15 @@ public enum Briefing {
     /// `managesAgents` is false for an agent another agent started, which gets no line
     /// about starting agents because it has no tools for it (028).
     ///
-    public static func lines(for policy: ToolPolicy, managesAgents: Bool = true) -> [String] {
+    /// `naming` is who is who (#121), second because the lines after it say "I" and
+    /// "me" and that is the person it names. Nil says nothing, for a caller that does
+    /// not know.
+    public static func lines(for policy: ToolPolicy, managesAgents: Bool = true,
+                             naming: Naming? = nil) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
-        return [finish,
-                liveDocument,
+        return [finish]
+            + [naming.map(Self.naming)].compactMap { $0 }
+            + [liveDocument,
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]
             + (managesAgents ? [helpers] : [])
@@ -251,8 +295,9 @@ public enum Briefing {
     }
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
-    public static func text(for policy: ToolPolicy, managesAgents: Bool = true) -> String {
-        var blocks = lines(for: policy, managesAgents: managesAgents)
+    public static func text(for policy: ToolPolicy, managesAgents: Bool = true,
+                            naming: Naming? = nil) -> String {
+        var blocks = lines(for: policy, managesAgents: managesAgents, naming: naming)
         if policy.appToolSchemaDelivery == .firstPrompt {
             blocks.append(AppToolPreface.firstPrompt)
         }

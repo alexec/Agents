@@ -99,6 +99,32 @@ struct HelperAgentTests {
 
     // MARK: Starting (US1)
 
+    /// A helper is told who started it, by title, so it names that agent the same way
+    /// (#121), and the person by the same name its lead was given.
+    @Test func aHelpersBriefingNamesWhoStartedIt() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let launcher = FakeLauncher()
+        let core = try await makeCore(locations, launcher)
+        _ = try await core.setPerson(PersonSettings(name: "Sam"))
+        let (lead, token) = try await caller(core, in: work)
+
+        let helper = try await start(core, token)
+        @Sendable func briefings() async -> [String] {
+            var texts: [String] = []
+            for agent in launcher.allAgents {
+                if let text = await agent.promptContent?.arrayValue?.last?["text"]?.stringValue { texts.append(text) }
+            }
+            return texts
+        }
+        await eventually("the helper was briefed") { await briefings().contains { $0.contains(", started by") } }
+        let told = try #require(await briefings().first { $0.contains(", started by") })
+        // By the lead's title as it stands, or "another agent" while it has none.
+        let starter = LeaseWords.agentName(await core.agent(lead)?.title)
+        #expect(told.contains("You are Claude, started by \(starter), and I am Sam"))
+        #expect(await core.agent(helper)?.startedByAgent == lead)
+    }
+
     @Test func aStartedAgentLandsInTheCallersProjectMarkedAsTheirs() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
