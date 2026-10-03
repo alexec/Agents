@@ -49,6 +49,7 @@ Check the build and say whether it is green.
 | `effort:` | One of the runtime's levels, such as `low` or `high` | How hard the agent thinks. Without it, the runtime's own default. |
 | `labels:` | A list of up to five names, each 1–24 characters | Each newly started workflow session gets these agent-owned labels. A standing or triggering run reusing an existing session keeps that session’s labels. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
+| `enabled:` | `true` or `false` | Where its **Enabled** switch starts. `false` is a workflow checked in to be turned on when you are ready: it arrives turned off, and **Run now** still runs it. Once anybody moves the switch, that choice is kept and this no longer decides. An agent cannot turn on a workflow whose file says `false`; only you can. Anything else stops the workflow running, and its page says what is wrong. |
 | `cooldown:` | A length of time in minutes, hours or days, such as `15m`, `2h`, `1h30m` or `1d`; at least a minute | The least time from the start of one run to the start of the next. See [Cooldown](#cooldown). A value that is not a length of time stops the workflow running, and its page says what is wrong. |
 
 For example, to start a new agent whenever `main` moves, or another agent publishes

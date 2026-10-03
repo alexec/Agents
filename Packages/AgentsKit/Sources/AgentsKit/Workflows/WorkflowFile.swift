@@ -168,6 +168,18 @@ public enum WorkflowFile {
             }
         }
 
+        // Where the Enabled switch starts (#42). Anything but true or false is a file to
+        // fix: a workflow meant to arrive off and arriving on is what the key prevents.
+        var enabled: Bool?
+        if let node = mapping["enabled"] {
+            switch node.scalar {
+            case "true": enabled = true
+            case "false": enabled = false
+            case "": break
+            default: return broken("`enabled:` must be true or false")
+            }
+        }
+
         let settings: WorkflowSettings
         do {
             settings = WorkflowSettings(permissionMode: try setting("permission-mode"),
@@ -187,14 +199,14 @@ public enum WorkflowFile {
         // is what a person would have to go and edit. See research.md §4.
 
         let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model", "labels",
-                                   "effort", "options", WorkflowCooldown.key]
+                                   "effort", "options", "enabled", WorkflowCooldown.key]
         let unknown = mapping.filter { !known.contains($0.key) }.mapValues(\.jsonValue)
 
         return Workflow(workflowID: workflowID, folder: project,
                         name: mapping["name"]?.scalar,
                         triggers: triggers, mode: mode,
                         prompt: body, problem: problem, unknownFields: unknown,
-                        settings: settings, cooldown: cooldown)
+                        settings: settings, cooldown: cooldown, enabled: enabled)
     }
 
     // MARK: Triggers
