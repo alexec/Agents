@@ -40,7 +40,9 @@ struct ProjectListView: View {
         List(selection: $picked) {
             // Pages about all the work rather than one project: rows of the list like
             // any other, so they take the list's selection and its keys. At the top, so
-            // what they say at a glance is never folded or scrolled away.
+            // what they say at a glance is never folded or scrolled away. Plain `Text`
+            // titles, no icons (#155): a sidebar list draws a `Label`'s title in its own
+            // style, so with icons they did not match the project names below.
             Section("Activity") {
                 EventsRow().font(.body).tag(SidebarItem.events)
                 ResourcesRow().font(.body).tag(SidebarItem.resources)
@@ -552,7 +554,7 @@ private struct SpendingRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Label(today == nil ? "Spending" : "Today", systemImage: "dollarsign.circle")
+            Text(today == nil ? "Spending" : "Today").foregroundStyle(.primary)
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
                 if let today {

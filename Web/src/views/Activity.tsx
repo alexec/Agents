@@ -105,21 +105,22 @@ export function ActivityRows({ store, chosen, onPick }: {
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
   const left = headroom(mac);
-  const row = (page: ActivityPage, glyph: string, title: string, help: string, detail: preact.ComponentChildren) => (
+  // The page's name in the projects' type, with no glyph, as the window's rows have it (#155).
+  const row = (page: ActivityPage, title: string, help: string, detail: preact.ComponentChildren) => (
     <button class={`row activity-row${chosen === page ? " chosen" : ""}`} aria-current={chosen === page} title={help}
       onClick={() => onPick(page)}>
-      <span class="title"><span class="glyph" aria-hidden="true">{glyph}</span> {title}</span>
+      <span class="title">{title}</span>
       <span class="detail">{detail}</span>
     </button>
   );
   return (
     <>
-      {row("events", "ϟ", "Events", "What happened, what came of it, and who is waiting", last && `Last ${clock(last)}`)}
-      {row("resources", "⚿", "Resources", "Who holds the simulators, browsers and screen, and who is waiting",
+      {row("events", "Events", "What happened, what came of it, and who is waiting", last && `Last ${clock(last)}`)}
+      {row("resources", "Resources", "Who holds the simulators, browsers and screen, and who is waiting",
         held + waiting > 0 && `${held} held · ${waiting} waiting`)}
-      {row("runtimes", "▣", "Runtimes", "What each runtime can be started on right now",
+      {row("runtimes", "Runtimes", "What each runtime can be started on right now",
         out > 0 && <><span class="dot failure" aria-hidden="true" /> {out} out</>)}
-      {row("spending", "$", today ? "Today" : "Spending", today ? "What every agent has cost today. Opens Spending." : "What all of the work has cost",
+      {row("spending", today ? "Today" : "Spending", today ? "What every agent has cost today. Opens Spending." : "What all of the work has cost",
         (today || left) && (
           <span class={`spending${closeToFull(mac) && chosen !== "spending" ? " close" : ""}`}>
             {today && <span>{today}</span>}{left && <span>{left}</span>}

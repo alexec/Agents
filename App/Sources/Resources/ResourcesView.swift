@@ -258,7 +258,7 @@ struct ResourcesRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Label("Resources", systemImage: "lock")
+            Text("Resources").foregroundStyle(.primary)
             Spacer()
             if let counts {
                 Text(counts)

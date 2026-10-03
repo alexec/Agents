@@ -18,6 +18,7 @@ LAN=0
 HOST_FIRST=0
 EXTRA_ENV=()
 CONTROL_ENV=()
+APP_ARGS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -32,7 +33,8 @@ while [ $# -gt 0 ]; do
     --seeded)    SEEDED=1 ;;         # the root exists, filled beforehand (scripts/seed-archived.swift), with no control/ yet
     --env)       EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the host, e.g. AGENTS_TEST_…=…
     --control-env) CONTROL_ENV+=("$2"); shift ;;  # KEY=VALUE for the control plane, e.g. AGENTS_SSH=…
-    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]…" >&2; exit 2 ;;
+    --appearance) APP_ARGS+=(--appearance "$2"); shift ;;  # light|dark|system for the window, no setting changed
+    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -154,7 +156,7 @@ if [ "$WINDOW" = 1 ]; then
   else
     OPEN_FLAGS+=(--env AGENTS_CONTROL="$(code --client)")
   fi
-  "${CLEAN[@]}" open "${OPEN_FLAGS[@]}" "$APP" --args --walk "run-$SLUG" -ApplePersistenceIgnoreState YES
+  "${CLEAN[@]}" open "${OPEN_FLAGS[@]}" "$APP" --args --walk "run-$SLUG" -ApplePersistenceIgnoreState YES ${APP_ARGS[@]+"${APP_ARGS[@]}"}
   for _ in $(seq 1 100); do
     APP_PID="$(pgrep -f "Agents.app/Contents/MacOS/Agents --walk run-$SLUG( |$)" | head -1 || true)"
     [ -n "$APP_PID" ] && break
