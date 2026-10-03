@@ -270,6 +270,9 @@ public actor AgentStore {
         return handle
     }
 
+    /// Whether the agent's transcript is held open for appending. For a test (#163).
+    func holdsTranscript(of agentID: UUID) -> Bool { appendHandles[agentID] != nil }
+
     /// Let go of an agent's handle: it is finished, or archived, or the daemon is going.
     public func closeTranscript(for agentID: UUID) {
         try? appendHandles.removeValue(forKey: agentID)?.close()

@@ -118,8 +118,14 @@ public struct SSHCommand: Sendable {
         process.standardInput = try stdin.map { try FileHandle(forReadingFrom: $0) } ?? FileHandle.nullDevice
 
         let collected = Collected()
-        out.fileHandleForReading.readabilityHandler = { handle in collected.append(handle.availableData, to: \.out) }
-        err.fileHandleForReading.readabilityHandler = { handle in collected.append(handle.availableData, to: \.err) }
+        // Empty is the end of the pipe, reported again and again until the handler goes
+        // (#163), and the end of a pipe can come well before the process's exit.
+        for (pipe, path) in [(out, \Collected.out), (err, \Collected.err)] {
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty { handle.readabilityHandler = nil } else { collected.append(data, to: path) }
+            }
+        }
 
         let status: Int32 = try await withCheckedThrowingContinuation { continuation in
             process.terminationHandler = { finished in continuation.resume(returning: finished.terminationStatus) }

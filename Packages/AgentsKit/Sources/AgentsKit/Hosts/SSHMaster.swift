@@ -65,7 +65,12 @@ public actor SSHMaster {
         let errors = Pipe()
         process.standardError = errors
         let stderr = StderrTail()
-        errors.fileHandleForReading.readabilityHandler = { handle in stderr.append(handle.availableData) }
+        // Empty is the end of the pipe, reported again and again until the handler goes
+        // (#163): a forked ssh can hold stderr open after this one exits.
+        errors.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty { handle.readabilityHandler = nil } else { stderr.append(data) }
+        }
         process.terminationHandler = { [weak self] finished in
             errors.fileHandleForReading.readabilityHandler = nil
             Task { await self?.exited(finished) }

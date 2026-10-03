@@ -10,6 +10,9 @@ public final class RuntimeProcess: @unchecked Sendable {
     private let outPipe = Pipe()
     private let errPipe = Pipe()
     public let transport: FDTransport
+    /// This side's descriptors, as numbered at launch: what `cleanUp` must give back.
+    /// For a test to look for afterwards (#163).
+    let heldDescriptors: [Int32]
 
     public init(executable: URL,
                 arguments: [String],
@@ -28,16 +31,28 @@ public final class RuntimeProcess: @unchecked Sendable {
         process.standardOutput = outPipe
         process.standardError = errPipe
 
-        transport = FDTransport(readFD: dup(outPipe.fileHandleForReading.fileDescriptor),
-                                writeFD: dup(inPipe.fileHandleForWriting.fileDescriptor))
+        let readFD = dup(outPipe.fileHandleForReading.fileDescriptor)
+        let writeFD = dup(inPipe.fileHandleForWriting.fileDescriptor)
+        transport = FDTransport(readFD: readFD, writeFD: writeFD)
+        heldDescriptors = [readFD, writeFD,
+                           inPipe.fileHandleForWriting.fileDescriptor,
+                           outPipe.fileHandleForReading.fileDescriptor,
+                           errPipe.fileHandleForReading.fileDescriptor]
 
         // Nobody reads a runtime's stderr but the log. Draining it matters anyway: a
         // full pipe stops the process writing, and a stopped process looks like a hung
         // agent.
+        //
+        // Empty is the end of the pipe, and it is reported again and again until the
+        // handler goes: left in place, it is a core spinning for the daemon's life
+        // (#163). So it takes itself away there, whether or not `cleanUp` ever runs.
         errPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
-            guard !data.isEmpty, let onStandardError else { return }
-            onStandardError(String(decoding: data, as: UTF8.self))
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+                return
+            }
+            onStandardError?(String(decoding: data, as: UTF8.self))
         }
 
         process.terminationHandler = { process in
@@ -53,6 +68,9 @@ public final class RuntimeProcess: @unchecked Sendable {
     }
 
     public var isRunning: Bool { process.isRunning }
+    /// Whether stderr still has a handler on it. One left on a pipe at its end is a
+    /// core spinning (#163).
+    var watchesStandardError: Bool { errPipe.fileHandleForReading.readabilityHandler != nil }
     public var processIdentifier: Int32 { process.processIdentifier }
 
     public func terminate() {
@@ -65,8 +83,13 @@ public final class RuntimeProcess: @unchecked Sendable {
         POSIX.kill(process.processIdentifier, SIGKILL)
     }
 
-    /// Let go of the pipes. Called once the process is gone.
+    private let cleanedUp = ManagedAtomicFlag()
+
+    /// Let go of the pipes. Called once the process is gone, by whichever comes first:
+    /// a stop (`ACPSession.end`) or the process dying by itself (`ACPSession.noteExit`).
+    /// The second call does nothing.
     public func cleanUp() {
+        guard cleanedUp.set() else { return }
         errPipe.fileHandleForReading.readabilityHandler = nil
         transport.close()
         try? inPipe.fileHandleForWriting.close()

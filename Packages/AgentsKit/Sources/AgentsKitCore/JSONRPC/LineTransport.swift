@@ -109,6 +109,10 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
 
     public func lines() -> AsyncThrowingStream<String, any Error> { stream }
 
+    /// A transport dropped without being closed still gives its descriptors back
+    /// (#163). `close` is a latch, so one already closed is left alone.
+    deinit { close() }
+
     public func close() {
         guard closed.set() else { return }
         continuation.finish()

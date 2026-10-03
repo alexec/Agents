@@ -1561,7 +1561,14 @@ extension DaemonCore {
     /// actor awaiting is an actor free to run something else; and it cannot outlast
     /// `end`, which this already waited for.
     func releaseRuntime(for agentID: UUID) async {
-        guard let session = live[agentID] else { return }
+        guard let session = live[agentID] else {
+            // Already forgotten: its process exited before the turn's failure got here.
+            // The ending just written reopened the transcript after `forget` closed it,
+            // and nothing else would close it again — one descriptor kept per runtime
+            // that dies (#163).
+            await store.closeTranscript(for: agentID)
+            return
+        }
         let draining = forget(agentID)
         await session.end(gracePeriod: .seconds(3))
         await draining?.value

@@ -1181,6 +1181,28 @@ public actor ACPSession {
         releaseAllNotificationDrains()
         eventsContinuation.yield(.processExited(status: status))
         eventsContinuation.finish()
+        Task { await letGoOfTheGoneProcess() }
+    }
+
+    /// How long a runtime that has died is given for the last of its output to be read.
+    /// Its stdout reaches the end at once unless something it started still holds it.
+    static let lastWordsAfterExit: Duration = .seconds(2)
+
+    /// A runtime that dies by itself is never `end`ed: the daemon only forgets it. So
+    /// what `end` would let go of is let go of here (#163): the connection, which fails
+    /// a turn still waiting on it, and the pipes.
+    ///
+    /// The connection is closed once its reader has reached the end of stdout, so
+    /// whatever the runtime said before dying is still read; or after a short wait, for
+    /// a child of the runtime (npx's node) that outlives it holding stdout open, which
+    /// would otherwise leave the turn waiting for good.
+    func letGoOfTheGoneProcess() async {
+        let deadline = ContinuousClock.now.advanced(by: Self.lastWordsAfterExit)
+        while !connection.isClosed, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        await closeConnection()
+        process?.cleanUp()
     }
 }
 
