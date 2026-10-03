@@ -21,11 +21,13 @@ extension DaemonCore {
         // on: the cheapest of its models, whether or not it has been used here before.
         let draft = try await options(DaemonAPI.OptionsRequest(runtimeID: runtime.id, cwd: folder))
         let model = RuntimeAssessment.cheapestModel(in: draft.options)
-        let report = RuntimeAssessment.reportPath(project: folder, runtimeID: runtime.id, date: now())
+        let today = now()
+        let report = RuntimeAssessment.freshReportPath(project: folder, runtimeID: runtime.id, date: today)
         // show_file takes a Markdown file that is not there yet only in a folder that is.
         try? FileManager.default.createDirectory(at: report.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
-        let day = report.deletingPathExtension().lastPathComponent.dropFirst(runtime.id.count + 1)
+        let day = RuntimeAssessment.reportPath(project: folder, runtimeID: runtime.id, date: today)
+            .deletingPathExtension().lastPathComponent.dropFirst(runtime.id.count + 1)
         let shortID = String(UUID().uuidString.prefix(8)).lowercased()
         let scope = RuntimeAssessment.scopePath(root: locations.root, shortID: shortID)
         let version = await runtimeVersion(draft: draft.draftID)

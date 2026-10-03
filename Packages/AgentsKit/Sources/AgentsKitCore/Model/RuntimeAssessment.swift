@@ -114,6 +114,22 @@ public enum RuntimeAssessment {
         return project.appendingPathComponent(".agents/reviews/runtimes/\(runtimeID)-\(stamp).md")
     }
 
+    /// The report path, or the first of `-2`, `-3`, … not yet taken: a second assessment
+    /// the same day must open its report empty, as the first did.
+    public static func freshReportPath(project: URL, runtimeID: String, date: Date,
+                                       calendar: Calendar = .current,
+                                       exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> URL {
+        let first = reportPath(project: project, runtimeID: runtimeID, date: date, calendar: calendar)
+        let stem = first.deletingPathExtension().lastPathComponent
+        var path = first
+        var n = 1
+        while exists(path) {
+            n += 1
+            path = first.deletingLastPathComponent().appendingPathComponent("\(stem)-\(n).md")
+        }
+        return path
+    }
+
     /// The cheapest model a runtime offers, by the first of these words any of its models
     /// carries, in this order. The nightly runtime check (#39) uses the same list.
     public static let cheapWords = ["haiku", "nano", "flash-lite", "lite", "mini", "flash", "small"]

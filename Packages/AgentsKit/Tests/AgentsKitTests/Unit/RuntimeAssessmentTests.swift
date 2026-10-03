@@ -387,6 +387,26 @@ struct RuntimeAssessmentTests {
         #expect(path.path == "/tmp/work/.agents/reviews/runtimes/codex-2027-01-15.md")
     }
 
+    @Test func aSecondAssessmentTheSameDayGetsAFileOfItsOwn() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let taken: Set<String> = ["/tmp/work/.agents/reviews/runtimes/codex-2027-01-15.md",
+                                  "/tmp/work/.agents/reviews/runtimes/codex-2027-01-15-2.md"]
+        let path = RuntimeAssessment.freshReportPath(project: URL(filePath: "/tmp/work"), runtimeID: "codex",
+                                                     date: start, calendar: calendar) { taken.contains($0.path) }
+        #expect(path.path == "/tmp/work/.agents/reviews/runtimes/codex-2027-01-15-3.md")
+    }
+
+    /// A card in the middle of a turn is not a new turn: the first real run counted three
+    /// turns that ended with finish_turn as silent, because each asked for a card after it.
+    @Test func aCardAfterTheEndingIsStillTheSameTurn() {
+        var record = goodRecord()
+        let i = record.transcript.firstIndex { if case .workReported = $0.kind { return true } else { return false } }!
+        record.transcript.insert(contentsOf: [entry(22.5, .stateChanged(.waitingOnUser, reason: nil)),
+                                              entry(22.6, .stateChanged(.running, reason: nil))], at: i + 1)
+        #expect(verdicts(record)["ending"] == .passed)
+    }
+
     /// The brief names every step, the events, the helper's label, and the ask tool where
     /// there is one; and says not offered where there is none.
     @Test func theBriefNamesEveryStep() {

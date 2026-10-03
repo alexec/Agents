@@ -370,8 +370,13 @@ private struct Scorer {
     func silentEndings() -> Int {
         var reported = true
         var silent = 0
+        var last: AgentState?
         for entry in record.transcript {
+            defer { if case .stateChanged(let state, _) = entry.kind { last = state } }
             switch entry.kind {
+            // Running again after a card is the same turn going on, not a new one.
+            case .stateChanged(.running, _) where last == .waitingOnUser:
+                break
             case .stateChanged(.running, _), .stateChanged(.starting, _):
                 reported = false
             case .workReported:
