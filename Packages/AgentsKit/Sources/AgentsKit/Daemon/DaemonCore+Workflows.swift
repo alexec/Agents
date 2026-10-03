@@ -712,12 +712,51 @@ extension DaemonCore {
                 detail: WorkflowSettings.refusalDetail(setting: setting, value: value,
                                                        offered: offered, runtime: runtime.name))
         case .resolved(let options):
+            // Offered is not taken (#143). What a runtime offers can hang on the model:
+            // Claude lists Auto and an effort in `session/new`, and on haiku has
+            // neither — the effort is refused, and Auto comes back as Accept edits with
+            // no error. So the settings are set here, on the draft, and read back; one
+            // the runtime would not keep refuses the run as one it never offered does.
+            if let refusal = await made.session.apply(options).first {
+                drafts.removeValue(forKey: draftID)
+                await endDraft(draft)
+                throw SettingRefused(setting: Self.settingName(refusal.id, in: advertised),
+                                     detail: Self.notKeptDetail(refusal, in: advertised,
+                                                                runtime: runtime.name))
+            }
             // The same session, handed on. `start` takes the draft by this id and
             // reuses it, so asking what the runtime offered costs no second process.
             return DaemonAPI.StartRequest(runtimeID: runtime.id, cwd: folder,
                                           prompt: prompt, startOptions: options,
                                           draftID: draftID)
         }
+    }
+
+    /// The file's name for an advertised option: `permission-mode` for the mode,
+    /// `model`, `effort`, and the option's own id for the rest, as `resolve` refuses.
+    static func settingName(_ id: String, in advertised: [ConfigOption]) -> String {
+        if id == ModeMemory.modeOption(in: advertised)?.id { return WorkflowSettings.Setting.permissionMode }
+        if id == WorkflowSettings.modelOption(in: advertised)?.id { return WorkflowSettings.Setting.model }
+        if id == WorkflowSettings.effortOption(in: advertised)?.id { return WorkflowSettings.Setting.effort }
+        return id
+    }
+
+    /// The sentence for a setting the runtime offered and then would not keep.
+    static func notKeptDetail(_ refusal: ACPSession.RefusedOption, in advertised: [ConfigOption],
+                              runtime: String) -> String {
+        let asked = refusal.value.stringValue ?? "\(refusal.value)"
+        let setting = settingName(refusal.id, in: advertised)
+        if let instead = refusal.instead {
+            return "\(runtime) offers \"\(asked)\" for \(setting) but would not keep it with the rest of "
+                + "this file's settings — it switched to \"\(instead.stringValue ?? "\(instead)")\""
+        }
+        let why: String
+        if let error = refusal.error as? JSONRPCError {
+            why = error.data?["details"]?.stringValue ?? error.message
+        } else {
+            why = "\(refusal.error)"
+        }
+        return "\(runtime) would not take \"\(asked)\" for \(setting) with the rest of this file's settings: \(why)"
     }
 
     private func adoptAndPrompt(agentID: UUID, prompt: String,

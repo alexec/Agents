@@ -40,6 +40,10 @@ actor FakeACPAgent {
         /// What `session/set_config_option` fails with, by option id (049: OpenCode refusing
         /// a model of a provider nobody signed in to).
         var setOptionErrors: [String: JSONRPCError] = [:]
+        /// What `session/set_config_option` puts in place of the value it was sent, by option
+        /// id, while answering with success: Claude's adapter turning Auto into Accept edits
+        /// on a model without it (#143).
+        var setOptionInstead: [String: JSONValue] = [:]
         /// What the runtime calls the session, sent as a `session_info_update`.
         var title: String?
         /// `_meta` on the `session/prompt` result: where Claude's and Codex's adapters put
@@ -256,6 +260,10 @@ actor FakeACPAgent {
             }
             if let error = script.setOptionErrors[id] { return .failure(error) }
             setOptions.append((id, params?["value"] ?? .null))
+            // The answer carries the options as they now are, as the protocol says.
+            if let index = script.configOptions.firstIndex(where: { $0.id == id }) {
+                script.configOptions[index].currentValue = script.setOptionInstead[id] ?? params?["value"]
+            }
             let options = (try? JSONValue.encoding(script.configOptions)) ?? .array([])
             return .success(["configOptions": options])
 

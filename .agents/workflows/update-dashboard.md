@@ -6,7 +6,7 @@ on:
       between: "04:00-04:00"
 agent: new
 runtime: claude
-model: haiku
+model: sonnet
 effort: low
 permission-mode: auto
 cooldown: 20h

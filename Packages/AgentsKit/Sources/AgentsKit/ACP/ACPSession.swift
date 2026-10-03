@@ -86,6 +86,8 @@ public enum ACPSessionError: Error, Sendable {
     case needsSignIn
     /// The runtime did not advertise the thing we were about to ask it for.
     case notSupported(String)
+    /// The runtime said yes to a value for this option and is using another (#143).
+    case notKept(String)
 }
 
 /// One conversation with one runtime.
@@ -665,17 +667,42 @@ public actor ACPSession {
 
     /// Apply everything the user chose in the start form, in one go.
     /// Applies each remembered choice, and returns the ones the runtime refused.
+    ///
+    /// The model first and the mode last (#143). What a runtime offers can hang on the
+    /// model: Claude's adapter has no effort and no Auto for haiku, and switching to it
+    /// drops the effort and turns an Auto already set into Accept edits without an
+    /// error. Set before the model, both looked taken and were not.
     @discardableResult
     public func apply(_ startOptions: StartOptions) async -> [RefusedOption] {
         var refused: [RefusedOption] = []
-        for (id, value) in startOptions.values.sorted(by: { $0.key < $1.key }) {
+        for (id, value) in Self.applyOrder(startOptions.values, advertised: options) {
             // One option a runtime has since stopped offering must not stop an agent
             // starting, so a refusal here is handed back to be noted, and passed over.
             do { _ = try await setOption(id: id, value: value) } catch {
                 refused.append(RefusedOption(id: id, value: value, error: error))
             }
         }
+        // A mode taken and swapped for another is refused as well: Claude's adapter
+        // answers Auto on a model without it with success, and Accept edits as the
+        // current value. Only the mode is read back. A model may come back under its
+        // full id for the alias it was set with, and that is the same model.
+        if let mode = ModeMemory.modeOption(in: options), let asked = startOptions.values[mode.id],
+           let current = mode.currentValue, current != asked,
+           !refused.contains(where: { $0.id == mode.id }) {
+            refused.append(RefusedOption(id: mode.id, value: asked,
+                                         error: ACPSessionError.notKept(mode.id),
+                                         instead: current))
+        }
         return refused
+    }
+
+    /// The order `apply` sets options in: the model, then the rest by id, then the mode.
+    static func applyOrder(_ values: [String: JSONValue],
+                           advertised: [ConfigOption]) -> [(key: String, value: JSONValue)] {
+        let model = WorkflowSettings.modelOption(in: advertised)?.id ?? modelOption
+        let mode = ModeMemory.modeOption(in: advertised)?.id ?? modeOption
+        func rank(_ id: String) -> Int { id == model ? 0 : id == mode ? 2 : 1 }
+        return values.sorted { (rank($0.key), $0.key) < (rank($1.key), $1.key) }
     }
 
     /// A remembered choice the runtime would not take when the agent started.
@@ -683,6 +710,9 @@ public actor ACPSession {
         public var id: String
         public var value: JSONValue
         public var error: any Error
+        /// What the runtime put in its place, when it answered with success and another
+        /// value rather than with an error.
+        public var instead: JSONValue?
     }
 
     /// The user's answer to a question the agent is blocked on. `nil` cancels it.

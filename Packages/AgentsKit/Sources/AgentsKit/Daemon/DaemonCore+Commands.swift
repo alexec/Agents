@@ -350,6 +350,7 @@ extension DaemonCore {
         await prepareServing(session, agentID: agent.id)
 
         await noteRefused(await session.apply(agent.startOptions), agentID: agent.id)
+        await adoptAppliedOptions(from: session, agentID: agent.id)
         noteEffectiveSandbox(agentID: agent.id, choice: sandbox.choice, reason: sandbox.reason)
         agent = agents[agent.id] ?? agent
         changed(agent)
@@ -1074,6 +1075,7 @@ extension DaemonCore {
                                                  choice: sandbox.choice)
         changed(updated)
         await noteRefused(await session.apply(updated.startOptions), agentID: agent.id)
+        await adoptAppliedOptions(from: session, agentID: agent.id)
         noteEffectiveSandbox(agentID: agent.id, choice: sandbox.choice, reason: sandbox.reason)
         live[agent.id] = session
         listen(to: session, agentID: agent.id)
@@ -1779,11 +1781,32 @@ extension DaemonCore {
                 await record(.runtimeNote("\(name) isn’t signed in to \(provider), so it can’t use \(choice). "
                                           + "Sign it in from the runtime menu, then pick the model again."), for: agentID)
                 askForSignIn(runtimeID: agent.runtimeID, agentID: agentID)
+            } else if let instead = refusal.instead {
+                // It said yes and used another (#143): the note names both, so a
+                // conversation asking for permission says why.
+                let options = agent.advertisedOptions.first { $0.id == refusal.id }
+                await record(.runtimeNote("\(name) wouldn’t run in \(Self.choiceName(refusal.value, in: options)) here, "
+                                          + "so it’s in \(Self.choiceName(instead, in: options))."), for: agentID)
             } else {
                 await record(.runtimeNote("\(name) wouldn’t take \(choice) for \(refusal.id), so it kept its own."),
                              for: agentID)
             }
         }
+        changed(agent)
+    }
+
+    /// A value as its option's menu names it, `Accept edits` for `acceptEdits`.
+    static func choiceName(_ value: JSONValue, in option: ConfigOption?) -> String {
+        option?.options?.first { $0.value == value }?.name ?? value.stringValue ?? "\(value)"
+    }
+
+    /// The options a session says it is on after `apply`, onto the record (#143).
+    /// Captured before it, they kept the runtime's first answer, and every window
+    /// showed that mode. Empty is not an answer, as everywhere else.
+    func adoptAppliedOptions(from session: ACPSession, agentID: UUID) async {
+        let applied = await session.options
+        guard !applied.isEmpty, var agent = agents[agentID] else { return }
+        agent.advertisedOptions = applied
         changed(agent)
     }
 

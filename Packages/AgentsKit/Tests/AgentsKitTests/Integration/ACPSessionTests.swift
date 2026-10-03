@@ -105,6 +105,32 @@ struct ACPSessionTests {
         #expect(applied.first?.value.stringValue == "b")
     }
 
+    /// #143, for every start and every pick-up alike: the model first, the mode last, and
+    /// a mode answered with another value comes back refused, saying which.
+    @Test func applySetsTheModelFirstAndTheModeLastAndCatchesASwappedMode() async throws {
+        var script = FakeACPAgent.Script()
+        let choices = { (values: [String]) in values.map { ConfigChoice(value: .string($0), name: $0) } }
+        script.configOptions = [
+            ConfigOption(id: "effort", name: "Effort", category: "thought_level", type: "select",
+                         currentValue: "default", options: choices(["default", "low"])),
+            ConfigOption(id: "mode", name: "Mode", category: "mode", type: "select",
+                         currentValue: "default", options: choices(["default", "acceptEdits", "auto"])),
+            ConfigOption(id: "model", name: "Model", category: "model", type: "select",
+                         currentValue: "default", options: choices(["default", "haiku"])),
+        ]
+        script.setOptionInstead = ["mode": "acceptEdits"]
+        let (session, agent) = pair(script)
+        try await session.initialize()
+        try await session.newSession(cwd: URL(fileURLWithPath: "/tmp"))
+
+        let refused = await session.apply(StartOptions(values: ["effort": "low", "mode": "auto", "model": "haiku"]))
+        #expect(await agent.setOptions.map(\.id) == ["model", "effort", "mode"])
+        try #require(refused.count == 1)
+        #expect(refused[0].id == "mode")
+        #expect(refused[0].value == .string("auto"))
+        #expect(refused[0].instead == .string("acceptEdits"))
+    }
+
     @Test func aPermissionBlocksTheAgentUntilItIsAnswered() async throws {
         var script = FakeACPAgent.Script()
         script.permission = ["toolCall": ["toolCallId": "t1", "title": "Write hello.txt"],

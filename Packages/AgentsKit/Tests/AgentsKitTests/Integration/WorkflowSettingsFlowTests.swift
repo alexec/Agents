@@ -153,6 +153,51 @@ struct WorkflowSettingsFlowTests {
         #expect(launcher.launchCount == 1)
     }
 
+    /// #143: the mode is set after the model, and the agent's record shows the mode the
+    /// runtime answered with rather than the one `session/new` advertised.
+    @Test func theModeGoesAfterTheModelAndTheRecordShowsIt() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(file("permission-mode: auto\nmodel: haiku"), as: "say-hello", in: work)
+
+        let (core, launcher) = try await core(locations, script: offering(modes: ["default", "auto"],
+                                                                          models: ["opus", "haiku"]))
+        await core.rescanWorkflows(in: work)
+        _ = try await run(core, work)
+
+        let sent = await launcher.lastAgent?.setOptions.map(\.id) ?? []
+        #expect(sent.first == "llm")
+        #expect(sent.last == "permission_mode")
+        let agent = try #require(await core.allAgents().first)
+        let mode = ModeMemory.modeOption(in: agent.advertisedOptions)
+        #expect(mode?.currentValue == .string("auto"))
+    }
+
+    /// #143: Claude's adapter offers Auto, and on haiku answers a set of it with success
+    /// and Accept edits. That is a setting the runtime would not keep, and no agent runs.
+    @Test func aModeTheRuntimeSwapsForAnotherStartsNoAgent() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(file("permission-mode: auto\nmodel: haiku"), as: "say-hello", in: work)
+
+        var script = offering(modes: ["default", "acceptEdits", "auto"], models: ["opus", "haiku"])
+        script.setOptionInstead = ["permission_mode": "acceptEdits"]
+        let (core, launcher) = try await core(locations, script: script)
+        await core.rescanWorkflows(in: work)
+        let summary = try await run(core, work)
+
+        #expect(await core.allAgents().isEmpty)
+        guard case .refused(.settingRefused(let setting, let detail), _, _) = summary.lastOutcome else {
+            Issue.record("expected a settings refusal, got \(String(describing: summary.lastOutcome))")
+            return
+        }
+        #expect(setting == WorkflowSettings.Setting.permissionMode)
+        #expect(detail.contains("\"auto\""))
+        #expect(detail.contains("\"acceptEdits\""))
+        #expect(await core.drafts.isEmpty)
+        #expect(launcher.launchCount == 1)
+    }
+
     @Test func aWorkflowNamingAnUnknownRuntimeIsRefusedNotRehomed() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
