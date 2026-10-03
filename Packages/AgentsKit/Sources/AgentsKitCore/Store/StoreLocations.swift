@@ -224,6 +224,10 @@ public struct StoreLocations: Sendable {
     /// Each finished turn of the transcript, as the chat shows it by default. Derived,
     /// so it may be deleted at any time and is built again from the transcript.
     public func turns(_ id: UUID) -> URL { agent(id).appendingPathComponent("turns.jsonl") }
+    /// Every call the agent made to the app's own tools, as the daemon answered it (#47).
+    public func appTools(_ id: UUID) -> URL { agent(id).appendingPathComponent("app-tools.jsonl") }
+    /// What the daemon made of each runtime assessment it scored (#47), by agent.
+    public var assessments: URL { root.appendingPathComponent("assessments", isDirectory: true) }
 
     public func createDirectories() throws {
         try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
