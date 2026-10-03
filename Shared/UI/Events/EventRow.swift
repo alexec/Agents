@@ -136,18 +136,4 @@ enum EventDay {
            calendar.isDate(date, inSameDayAs: yesterday) { return "Yesterday" }
         return date.formatted(.dateTime.weekday(.wide).day().month(.wide))
     }
-
-    /// Events newest first, cut into days, newest day first.
-    static func grouped(_ events: [Event], calendar: Calendar = .current) -> [(day: Date, events: [Event])] {
-        var days: [(day: Date, events: [Event])] = []
-        for event in events {
-            let day = calendar.startOfDay(for: event.at)
-            if days.last?.day == day {
-                days[days.count - 1].events.append(event)
-            } else {
-                days.append((day, [event]))
-            }
-        }
-        return days
-    }
 }

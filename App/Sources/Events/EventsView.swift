@@ -30,13 +30,14 @@ struct EventsView: View {
     private var filter: EventFilter { EventFilter(scope: scope, groups: groups) }
 
     /// The daemon sends pages already narrowed; narrowing here too keeps the list right
-    /// in the moment between a capsule changing and its page arriving.
-    private var events: [Event] {
-        model.work.recentEvents.filter(filter.matches)
+    /// in the moment between a capsule changing and its page arriving. Narrowed and cut
+    /// into days once per change of the events or the filter, not per redraw (#137).
+    private var shown: ShownEvents {
+        model.work.shownEvents(filter)
     }
 
-    private var unseen: Int {
-        isScrolledDown ? events.filter { $0.position > seenHead }.count : 0
+    private func unseen(_ events: [Event]) -> Int {
+        isScrolledDown ? events.count(where: { $0.position > seenHead }) : 0
     }
 
     private var pickedEvent: Event? {
@@ -44,6 +45,7 @@ struct EventsView: View {
     }
 
     var body: some View {
+        let shown = self.shown
         HStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -60,13 +62,13 @@ struct EventsView: View {
                         }
                         filters
                             .padding(.top, 20)
-                        if events.isEmpty {
+                        if shown.events.isEmpty {
                             Text(model.work.eventsLoaded ? emptyWords : "Loading…")
                                 .appText(.supporting)
                                 .foregroundStyle(.secondary)
                                 .padding(.top, 20)
                         }
-                        ForEach(EventDay.grouped(events), id: \.day) { day in
+                        ForEach(shown.days, id: \.day) { day in
                             Text(EventDay.heading(for: day.day).uppercased())
                                 .appText(.fine).fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
@@ -102,8 +104,9 @@ struct EventsView: View {
                     if !isScrolledDown, let head { seenHead = head }
                 }
                 .overlay(alignment: .top) {
-                    if unseen > 0 {
-                        Button("\(unseen) new") {
+                    let newCount = unseen(shown.events)
+                    if newCount > 0 {
+                        Button("\(newCount) new") {
                             withAnimation { proxy.scrollTo(Self.top, anchor: .top) }
                         }
                         .buttonStyle(.plain)

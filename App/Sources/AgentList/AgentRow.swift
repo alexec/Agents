@@ -26,8 +26,10 @@ struct AgentRow: View {
     /// under Complete with a spinner and its first title, and one prompted again sat
     /// under Working with a tick. The heading was right, because it is counted from the
     /// model; the row was not, because nothing made the stack hand it the new copy.
-    /// Reading the model here makes this row observe the agent itself.
-    private var agent: Agent { model.agents.first { $0.id == given.id } ?? given }
+    /// Reading the model here makes this row observe the agent itself. By id, from the
+    /// model's index rather than a pass over every agent held: `agent` is read dozens of
+    /// times a row (#135).
+    private var agent: Agent { model.work.agent(given.id) ?? given }
 
     var body: some View {
         rowContent
