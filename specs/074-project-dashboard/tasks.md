@@ -28,7 +28,7 @@ compaction, downsampling.
 **Independent test**: an agent sets one tile of each type; the Mac shows value, keeper, section, age.
 
 - [X] T009 [P] [US1] `TileCheck`: parse `set_tile` arguments into a `TileFile`, every rule in data-model.md, refusal sentences naming the field, in `Packages/AgentsKit/Sources/AgentsKitCore/Dashboard/TileCheck.swift`
-- [X] T010 [US1] `DashboardStore`: per project `<root>/dashboards/<key>/` (key = 16 hex of SHA-256 of the standardized path), `state.json`, `points/<id>.jsonl`, whole writes by temp + rename, skip identical bytes, at most one point a minute, in `Packages/AgentsKit/Sources/AgentsKit/Dashboard/DashboardStore.swift`
+- [X] T010 [US1] `DashboardStore`: per project `<root>/dashboards/<key>/` (key = 16 hex of an FNV-1a hash of the standardized path), `state.json`, `points/<id>.jsonl`, whole writes by temp + rename, skip identical bytes, at most one point a minute, in `Packages/AgentsKit/Sources/AgentsKit/Dashboard/DashboardStore.swift`
 - [X] T011 [US1] `setTile`/`removeTile`/`readDashboard` in `DaemonCore+Dashboard.swift`: caller from token, project = `projectFolder` (never cwd), missing folder refused (#119), keeper agent or the agent's `startedByWorkflow`, other keeper refused naming it, 120 sets an hour, 60 tiles, 8 KB, 8 MB history; answer per contracts/agent-tools.md
 - [X] T012 [US1] Three tools in `AppService.swift` (`DashboardCall`, sink, schemas), `AppTool.swift` names, relay in `Daemon/Sources/main.swift`, methods in `ConnectionRole.agentMethods`, dispatch in `DaemonCore+Dispatch.swift`
 - [X] T013 [US1] `dashboard/changed` with summary, once a second per project; clients refetch: `App/Sources/AppModel.swift`, `Packages/AgentsKit/Sources/AgentsKitCore/Client/AgentsModel.swift`, `Web/src/model/store.ts`

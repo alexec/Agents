@@ -37,7 +37,7 @@ file settles the points the spec leaves to the plan.
 
 ## R4. Host state and its key
 
-- **Decision**: `<root>/dashboards/<key>/` where `key` is the first 16 hex characters of SHA-256 of
+- **Decision**: `<root>/dashboards/<key>/` where `key` is 16 hex characters of an FNV-1a hash (the same on Linux, which has no CryptoKit) of
   the standardized project path. `state.json` holds, per tile: when it was made (the order), when
   last set, the hash of the host's last write, keeper changes; plus removal notes (30 days) and
   each agent's sets in the last hour. `points/<id>.jsonl` holds `{"t": <unix s>, "v": <number>}`
@@ -54,7 +54,7 @@ file settles the points the spec leaves to the plan.
 
 ## R6. Telling clients
 
-- **Decision**: `dashboard/changed` carries `{folder}` only, at most once a second per project
+- **Decision**: `dashboard/changed` carries `{folder, summary}` (the row's line, not the tiles), at most once a second per project
   (trailing edge). A client showing that project's Dashboard, or its row, asks `dashboard/get`
   again. The row's summary (`tileCount`, `bad`, `summary`) rides on `dashboard/get` and on a
   small `dashboard/summaries` for every project, read once at start.
@@ -66,7 +66,7 @@ file settles the points the spec leaves to the plan.
 - **Decision**: the workflows' `FolderWatch` on the project root already fires for every path
   under `/.agents`. Its callback also schedules a Dashboard rescan when a changed path starts with
   `<folder>/.agents/dashboard/` (so a worktree's `.agents/worktrees/x/.agents/dashboard/` never
-  counts). A file whose SHA-256 differs from the host's last write is "changed outside Agents".
+  counts). A file whose hash differs from the host's last write is "changed outside Agents".
 
 ## R8. Where the person's controls go
 
@@ -77,5 +77,7 @@ file settles the points the spec leaves to the plan.
 ## R9. Servers and moving projects
 
 - **Decision**: the store is plain Foundation, so the Linux agentsd has it. Clients route
-  `dashboard/*` by host as they route `workflows/*`. Moving a project (#61) copies
-  `dashboards/<old key>/` to the new key; removing a project deletes it.
+  `dashboard/*` by host as they route `workflows/*`. Moving a project (#61) should carry
+  `dashboards/<old key>/` to the new key, and removing a project delete it: `DashboardStore`
+  has both, but neither is wired in slice 1 (the daemon has no project remove; #61's move does not
+  carry it yet).

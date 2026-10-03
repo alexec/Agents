@@ -43,8 +43,8 @@ Swift Charts: the research named it, but a 30-point line is twenty lines of `Pat
 else in the app imports Charts). The web page draws an SVG polyline.
 
 **Storage**: tile files in the project (`.agents/dashboard/*.json`); host state in
-`<root>/dashboards/<key>/state.json` and `points/<id>.jsonl`. The key is the SHA-256 of the
-standardized project path, first 16 hex characters.
+`<root>/dashboards/<key>/state.json` and `points/<id>.jsonl`. The key is a 64-bit FNV-1a hash of the
+standardized project path, as 16 hex characters.
 
 **Testing**: `swift test --package-path Packages/AgentsKit` (Swift Testing); `npm test` in `Web/`
 via `scripts/web.sh check`; run-app scratch root with a real Claude agent posting tiles; Chrome via
