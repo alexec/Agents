@@ -197,10 +197,10 @@ The Remote's project page gets a Dashdashboard row above Sessions. It shows the 
 - **The files are in the project folder, committed**: one per tile, `.agents/dashboard/<id>.json`, beside `.agents/workflows/`. They are reviewable and diffable, travel with the repo and with #61's move, and a clone has the dashboard's current state.
 - **The host always writes the project folder, never a worktree.** An agent in `.agents/worktrees/x` posting a tile writes `<project>/.agents/dashboard/`, so there is one dashboard per project, whichever checkout the agent is in. A worktree's copy of the folder is what its branch inherited, and the host never reads it.
 - **Churn is kept to value changes.** A file holds the tile's definition, current value, keeper, source, section and `hidden`. It holds no timestamps and no points. Posting the same value again doesn't touch the file; only the host's record of when it was confirmed changes. So "Open bugs 4" posted hourly makes a git change only on the day it becomes 3.
-- **The host does not commit** (recommended; see the open question in [§8](#8-decisions)). Changed tiles show as changes in the project folder, in the Changes pane like any other, and ride the next commit made there, by the person or the lead.
+- **The host does not commit** (Alex, [§8](#8-decisions)). Changed tiles show as changes in the project folder, in the Changes pane like any other, and ride the next commit made there, by the person or the lead.
 - **Files changed outside the tools are read, and marked.** The host watches `.agents/dashboard/`, as it reads `.agents/workflows/`. A `git pull` or a hand edit is picked up. A file whose content differs from the host's last write shows "changed outside Agents" in the tile's detail. A file that doesn't parse shows as a broken tile with the error, as an unreadable workflow does.
 - **C comes in slice 2**, as a tile kind whose `source` is an event pattern plus a bucket (`per: hour | day`). It is created with `set_tile` like any other tile, so an agent sets it up once and the host keeps it. This gives dashboards 6 and 7, and part of 8, for nothing. Its file holds the pattern, not the counts.
-- **Briefing:** dashboard-keeping guidance goes in the agent's briefing next to the lease guidance: "If you keep something the person checks often, keep it as a tile." Agents already end turns with `finish_turn`, and a lead that sets three tiles before it does is the whole of dashboard 1.
+- **Briefing:** dashboard-keeping guidance goes in the agent's briefing next to the lease guidance: "If you keep something the person checks often, keep it as a tile." It also says that `.agents/dashboard/` is written only through the tools, never by hand from a worktree, so a merge can't carry an old copy back (Alex: the briefing is the only guard). Agents already end turns with `finish_turn`, and a lead that sets three tiles before it does is the whole of dashboard 1.
 
 ### The tools, sketched
 
@@ -378,7 +378,11 @@ Alex settled these on 2026-10-02, answering the #122 ideation agent's form.
 | 6 | Built-in tiles | **A one-click set the person adds** (slice 3), never automatic | [§7](#7-a-recommended-first-slice) |
 | 7 | The phone | **Read, Hide and Remove.** No reordering | [§5](#5-ui-placement-and-parity) |
 
-**Still open, for the spec.** These follow from answer 1, and the #122 ideation agent's recommendation is given with each:
+**Settled after, the same day.** Two questions followed from answer 1:
 
-- **Who commits the tile files?** The recommendation is that the host never commits. Changed tiles sit as changes in the project folder and ride the next commit made there. The other choice is that the host commits them itself, on a timer, with a fixed message. That writes to the person's branch unasked and races agents committing in the same folder, so it is not recommended. Alex, is "they ride the next commit" acceptable, given that the project folder's checkout will often show `.agents/dashboard/` as changed?
-- **Do worktree branches carry stale copies?** A branch made from the project folder inherits `.agents/dashboard/` as committed at that moment. The host never reads a worktree's copy. But a merge back could carry an old value over a newer one, if the branch touched the files, which agents can't do through the tools. The recommendation is to list `.agents/dashboard/` in the briefing as written only through the tools.
+| # | Question | Alex's answer | Where it shows above |
+|---|---|---|---|
+| 8 | Who commits the tile files? | **They ride the next commit.** The host never commits. Changed tiles sit as changes in the project folder, so `.agents/dashboard/` will often show as changed there, and they go in with whatever is committed next | [§3](#3-how-data-gets-in) |
+| 9 | Old copies on worktree branches | **The briefing only.** Agents are told that `.agents/dashboard/` is written only through the tools. Nothing else is enforced: no merge warning and no merge driver | [§3](#3-how-data-gets-in) |
+
+Nothing is open for the spec now.
