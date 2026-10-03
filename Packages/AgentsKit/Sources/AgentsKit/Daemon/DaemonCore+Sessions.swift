@@ -12,7 +12,7 @@ import Foundation
 /// first, because the sessions are the person's own and nothing leaves the project.
 extension DaemonCore {
     public func labelVocabulary(_ request: DaemonAPI.LabelVocabularyRequest) -> [String] {
-        SessionLabelPolicy.vocabulary(in: request.folder, agents: agents.values).map(\.value)
+        SessionLabelPolicy.vocabulary(in: request.folder, agents: agents.inProject(request.folder)).map(\.value)
     }
 
     /// A window or paired device changes labels as the person. The daemon assigns
@@ -26,7 +26,7 @@ extension DaemonCore {
             agent.labels = try SessionLabelPolicy.change(
                 current: agent.labels, add: request.add, remove: request.remove,
                 actor: .person,
-                projectLabels: SessionLabelPolicy.vocabulary(in: agent.projectFolder, agents: agents.values))
+                projectLabels: SessionLabelPolicy.vocabulary(in: agent.projectFolder, agents: agents.inProject(agent.projectFolder)))
         } catch {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: error.localizedDescription)
@@ -37,7 +37,7 @@ extension DaemonCore {
 
     public func listSessions(_ request: DaemonAPI.ListSessionsRequest) throws -> String {
         let caller = try sessionCaller(token: request.token)
-        return SessionLookup.list(in: caller.projectFolder, agents: agents.values, caller: caller.id)
+        return SessionLookup.list(in: caller.projectFolder, agents: agents.inProject(caller.projectFolder), caller: caller.id)
     }
 
     /// The history, or the sentence saying why not. A refusal is a normal result the
@@ -45,7 +45,7 @@ extension DaemonCore {
     public func readSession(_ request: DaemonAPI.ReadSessionRequest) async throws -> String {
         let caller = try sessionCaller(token: request.token)
         switch SessionLookup.find(request.session, in: caller.projectFolder,
-                                  agents: agents.values, retired: retired.values) {
+                                  agents: agents.inProject(caller.projectFolder), retired: retired.values) {
         case .refused(let sentence):
             return sentence
         case .session(let agent):

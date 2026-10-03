@@ -176,7 +176,7 @@ extension DaemonCore {
                 current: checked.agent.labels, add: request.addLabels,
                 remove: request.removeLabels, actor: .agent,
                 projectLabels: SessionLabelPolicy.vocabulary(
-                    in: checked.agent.projectFolder, agents: agents.values))
+                    in: checked.agent.projectFolder, agents: agents.inProject(checked.agent.projectFolder)))
         } catch {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: "Nothing was recorded: \(error.localizedDescription)")

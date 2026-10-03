@@ -44,7 +44,7 @@ extension DaemonCore {
     /// One name an agent wrote, as an agent it may wait on.
     private func waitTarget(named name: String, for caller: Agent) throws -> Agent {
         let project = caller.projectFolder
-        let here = agents.values.filter { $0.projectFolder == project && $0.state != .archived }
+        let here = agents.live.values.filter { $0.projectFolder == project }
         let target: Agent
         if let id = UUID(uuidString: name), let found = agents[id] {
             guard found.projectFolder == project else {
@@ -194,7 +194,8 @@ extension DaemonCore {
     func closeWaits(on agentID: UUID, how: WaitEnding.How) -> [UUID] {
         let at = now()
         var touched: [UUID] = []
-        for var agent in agents.values where agent.id != agentID {
+        // A blocked agent is a finished one, never archived (#164).
+        for var agent in agents.live.values where agent.id != agentID {
             guard var report = agent.report, report.isOpenBlock, var block = report.block,
                   block.waits.contains(where: { $0.agentID == agentID && $0.ending == nil })
             else { continue }
@@ -265,7 +266,7 @@ extension DaemonCore {
     /// Every open block whose time to check again has come (US4). Called on the
     /// workflow heartbeat, which is what catches a Mac that slept through the time.
     func resumeDueBlocks(now: Date) async {
-        let due = agents.values.filter {
+        let due = agents.live.values.filter {
             $0.state == .finished && $0.report?.isOpenBlock == true
                 && $0.report?.block?.isDue(now: now) == true
         }.map(\.id)
@@ -299,7 +300,7 @@ extension DaemonCore {
         }
         // A resume queued and never sent: the block says cleared, and the prompt is
         // still first in line.
-        let unsent = agents.values.filter { agent in
+        let unsent = agents.live.values.filter { agent in
             agent.state == .finished && agent.report?.outcome == .blocked
                 && agent.report?.block?.clearedAt != nil && agent.report?.block?.clearedBy != .dropped
                 && agent.queuedPrompts.first?.from == .app

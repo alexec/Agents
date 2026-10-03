@@ -8,7 +8,7 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView,
+  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -458,8 +458,7 @@ export class Store extends Work {
     };
     // Lean: the columns read none of the option and command lists, 4 MB of 200 agents (#107).
     // The open session's come with loadWhole.
-    const agents = await this.link.call("agents/list",
-      { includeArchived: false, archivedCommands: false, archivedOnly: false, lean: true }, host).catch(failed("agents/list"));
+    const agents = await this.listLive(host).catch(failed("agents/list"));
     if (agents) this.replaceAgents(agents, host);
     const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
@@ -488,6 +487,26 @@ export class Store extends Work {
         [host]: [...permissions].sort((a, b) => a.askedAt - b.askedAt) };
       if (elicitations) this.elicitations.value = { ...this.elicitations.value, [host]: elicitations };
     });
+  }
+
+  /**
+   * Every live agent on a host, a page at a time: a host answers at most a page (#164).
+   * Paged until one comes back short; a page longer than asked is a host from before pages.
+   */
+  private async listLive(host: string): Promise<Agent[]> {
+    const limit = 500;
+    const listed: Agent[] = [];
+    const seen = new Set<string>();
+    let after: ListCursor | undefined;
+    for (let page = 0; page < 20; page++) {
+      const got = await this.link.call("agents/list",
+        { includeArchived: false, archivedCommands: false, archivedOnly: false, lean: true, limit, ...(after ? { after } : {}) }, host);
+      for (const agent of got) if (!seen.has(agent.id)) { seen.add(agent.id); listed.push(agent); }
+      const last = got[got.length - 1];
+      if (got.length !== limit || !last) break;
+      after = { lastActivityAt: last.lastActivityAt, id: last.id };
+    }
+    return listed;
   }
 
   /** The projects whose archived sessions have been listed since this connection opened. */

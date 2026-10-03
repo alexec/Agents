@@ -153,8 +153,7 @@ extension DaemonCore {
     /// Every agent that is waiting on something, for the page's Waiting now strip.
     /// Both kinds of waiting, as `WaitStatus` says them.
     func waitingAgents() -> [DaemonAPI.WaitingAgent] {
-        agents.values
-            .filter { $0.state != .archived }
+        agents.live.values
             .compactMap { agent -> (Agent, WaitStatus)? in
                 WaitStatus.of(agent, names: { self.agents[$0]?.title }).map { (agent, $0) }
             }

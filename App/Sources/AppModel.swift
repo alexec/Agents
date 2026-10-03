@@ -754,6 +754,29 @@ final class AppModel {
         work.agents(in: key, group: group)
     }
 
+    /// How many archived sessions an Archived fold shows: enough to find last week's; the
+    /// rest are on the phone's archive and in Events.
+    static let archivedShown = 50
+
+    /// A project's newest archived sessions, for its Archived fold when it opens (#164):
+    /// the window holds the live agents, and a page of archived ones per open fold.
+    func loadArchived(in key: ProjectKey) async {
+        let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder,
+                                            limit: Self.archivedShown, lean: true)
+        guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
+                                                                  returning: [Agent].self) else { return }
+        work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
+    }
+
+    /// A workflow's newest runs, archived ones included, for its History (#164).
+    func loadRuns(of workflowID: String, in folder: URL, on host: HostID, limit: Int) async {
+        let request = DaemonAPI.ListRequest(archivedCommands: false, folder: folder,
+                                            startedByWorkflow: workflowID, limit: limit, lean: true)
+        guard let listed = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
+                                                              returning: [Agent].self) else { return }
+        work.takeListed(listed.map { var agent = $0; agent.host = host; return agent })
+    }
+
     /// This window's own counts for a project, from the grouping its panel uses.
     func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
     func unreadCount(in key: ProjectKey?) -> Int { work.unreadCount(in: key) }
@@ -2005,9 +2028,10 @@ final class AppModel {
         } else {
             serverCosts[host] = try? await server.call(DaemonAPI.Method.costState, returning: DaemonAPI.CostState.self)
         }
-        if let listed = try? await server.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(lean: true),
-                                               returning: [Agent].self) {
-            work.replaceAgents(listed, from: host)
+        if let listed = try? await server.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true)) {
+            let live = Set(listed.map(\.id))
+            work.replaceAgents(listed + work.agents.filter { $0.host == host && $0.state == .archived && !live.contains($0.id) },
+                               from: host)
         }
         if let listed = try? await server.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(),
                                                returning: [DaemonAPI.ProjectSummary].self) {
@@ -2106,10 +2130,13 @@ final class AppModel {
         await attempt {
             // Lean: the sessions column reads none of the option and command lists, and
             // they were 4 MB of 200 agents (#107). The open chat's come with `loadWholeAgent`.
-            let listed = try await self.client.call(DaemonAPI.Method.agentsList,
-                                                    DaemonAPI.ListRequest(lean: true),
-                                                    returning: [Agent].self)
-            self.work.replaceAgents(listed, from: .mac)
+            // Live only, a page at a time (#164, #165). Archived agents come a project at a
+            // time when its Archived fold opens, or by search; the ones already here (an
+            // open fold, the chat being read) are kept, and the live copy wins.
+            let listed = try await self.client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
+            let live = Set(listed.map(\.id))
+            let archived = self.work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) }
+            self.work.replaceAgents(listed + archived, from: .mac)
             Perf.sinceLaunch("first-list")
             // Whatever the list already shows was spent before this window opened, so
             // the session total starts from here rather than from the beginning of time.

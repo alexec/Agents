@@ -211,7 +211,7 @@ extension DaemonCore {
             initialLabels = try SessionLabelPolicy.change(
                 current: [], add: request.labels,
                 actor: labelOwner ?? (starter == nil ? .person : .agent),
-                projectLabels: SessionLabelPolicy.vocabulary(in: request.cwd, agents: agents.values))
+                projectLabels: SessionLabelPolicy.vocabulary(in: request.cwd, agents: agents.inProject(request.cwd)))
         } catch {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: error.localizedDescription)
@@ -877,7 +877,7 @@ extension DaemonCore {
     /// whole of "it becomes promptable again where it stands".
     func drainEverythingHolding() async {
         held.removeAll()
-        for (id, agent) in agents where !agent.queuedPrompts.isEmpty {
+        for (id, agent) in agents.live where !agent.queuedPrompts.isEmpty {
             // Put away is put away. A held prompt on an agent archived since would
             // otherwise take it out of the archive at midnight and spend money on it.
             // `held` alone is not the test: it is memory, and a restart forgets it.

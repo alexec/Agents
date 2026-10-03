@@ -125,7 +125,8 @@ extension DaemonCore {
     /// Every wait this event satisfies. No `await`: `raise` calls this between giving
     /// the event its place and returning, and nothing may slip in between.
     func matchWaits(_ event: Event) {
-        for id in Array(agents.keys) {
+        // Only agents with a wait: the rest can't match (#164).
+        for id in Array(agents.withEventWait) {
             // Never on news of itself: an agent that waits on `agent.*` and then ends
             // its turn would otherwise be woken by its own ending.
             guard var agent = agents[id], var wait = agent.eventWait,
@@ -227,7 +228,7 @@ extension DaemonCore {
     /// One timer, aimed at the earliest deadline of any open wait.
     func armEventWaitTimer() {
         eventWaitTimer?.cancel()
-        let deadlines = agents.values.compactMap { agent -> Date? in
+        let deadlines = agents.withEventWait.compactMap { agents[$0] }.compactMap { agent -> Date? in
             guard let wait = agent.eventWait, wait.isOpen else { return nil }
             return wait.deadline
         }
@@ -276,7 +277,7 @@ extension DaemonCore {
     /// nothing was running ends now. Nothing is raised for the time the daemon was down.
     func resumeEventWaitsAfterRestart() async {
         loadEventsIfNeeded()
-        for agent in agents.values {
+        for agent in agents.withEventWait.compactMap({ agents[$0] }) {
             guard let wait = agent.eventWait, !wait.isOpen, let promptID = wait.resumePromptID,
                   agent.queuedPrompts.first?.id == promptID else { continue }
             var position: EventPosition?
@@ -352,7 +353,7 @@ extension DaemonCore {
         let trimmed = given.trimmingCharacters(in: .whitespacesAndNewlines)
         if let id = UUID(uuidString: trimmed), agents[id] != nil { return id.uuidString }
         let folder = caller.projectFolder
-        let here = agents.values.filter { $0.projectFolder == folder && $0.state != .archived && $0.id != caller.id }
+        let here = agents.live.values.filter { $0.projectFolder == folder && $0.id != caller.id }
         let named = here.filter { ($0.title ?? "").caseInsensitiveCompare(trimmed) == .orderedSame }
         if named.count == 1 { return named[0].id.uuidString }
         let listing = here.compactMap(\.title).sorted().map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")

@@ -19,7 +19,9 @@ public actor DaemonCore {
     /// CLI, a credential or a network.
     let launcher: any SessionLauncher
 
-    var agents: [UUID: Agent] = [:]
+    /// Every agent held, live ones apart from archived ones, with the counts a change
+    /// keeps current (#164). See `AgentTable`.
+    var agents = AgentTable()
     var live: [UUID: ACPSession] = [:]
     var eventTasks: [UUID: Task<Void, Never>] = [:]
     var turnTasks: [UUID: Task<Void, Never>] = [:]
@@ -271,7 +273,19 @@ public actor DaemonCore {
     lazy var retentionStore = RetentionStore(locations: locations)
     lazy var archiveIndexStore = ArchiveIndex(locations: locations)
     /// What is left of every retired agent, by id. Read at start, before the agents.
-    var retired: [UUID: Tombstone] = [:]
+    var retired: [UUID: Tombstone] = [:] {
+        didSet { tombstoneIndex = nil }
+    }
+    /// `retired` by project, made when first asked after it changed (#164).
+    var tombstoneIndex: [URL: [Tombstone]]?
+    /// The project names last worked out, and for which folders (#164).
+    var projectNamesCache: (folders: Set<URL>, names: [URL: String])?
+    /// What each project was last told as, so an agent change that moves nothing in its
+    /// project's row says nothing (#164). A window that connects lists them anyway.
+    var lastProjectSent: [URL: DaemonAPI.ProjectSummary] = [:]
+    /// Set while many agents change at once (`noteRetirements`): the projects to tell
+    /// when it is over, once each.
+    var heldProjectChanges: Set<URL>?
     /// The person's settings and the clock retirement counts by, as `retention.json` has them.
     var retention = RetentionStore.File()
     var retentionIsLoaded = false
@@ -812,6 +826,8 @@ public actor DaemonCore {
         // project after the agent is what lets a sidebar row say a project needs you
         // in a window that is looking at a different one.
         projectChanged(forAgentIn: agent.projectFolder)
+        // And the project it left, whose counts it has just taken with it.
+        if let left = before?.projectFolder, left != agent.projectFolder { projectChanged(forAgentIn: left) }
         // Here and **not** in `move(_:on:)`, though that is the single transition
         // writer and the tidier-looking hook. An agent is created with
         // `agents[agent.id] = agent` directly in `start(_:)` before any transition
@@ -1100,22 +1116,47 @@ public actor DaemonCore {
     }
 
     public func allAgents(includeArchived: Bool = true) -> [Agent] {
-        agents.values
-            .filter { includeArchived || $0.state != .archived }
-            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+        (includeArchived ? agents.values : Array(agents.live.values))
+            .sorted { DaemonAPI.ListCursor.listOrder($0, $1) }
     }
 
-    /// `agents/list`, narrowed the way the request asks.
+    /// `agents/list`, narrowed the way the request asks, a page at a time (#164).
+    ///
+    /// Bounded: at most `ListRequest.maximumLimit`, `defaultLimit` when unsaid, and the
+    /// next page `after` the last. Archived agents come one project at a time (`folder`),
+    /// or by id, workflow or search; a list of everything is the live agents. The
+    /// archived ones were nine tenths of what each change and each list walked.
     public func listAgents(_ request: DaemonAPI.ListRequest) -> [Agent] {
         let folder = request.folder.map(Project.standardize)
-        var listed = allAgents(includeArchived: request.includeArchived || request.archivedOnly)
-            .filter { agent in
-                (!request.archivedOnly || agent.state == .archived)
-                    && (folder == nil || agent.projectFolder == folder)
-                    && (request.startedByWorkflow == nil || agent.startedByWorkflow == request.startedByWorkflow)
-                    && (request.agentID == nil || agent.id == request.agentID)
-            }
-        if let limit = request.limit { listed = Array(listed.prefix(max(0, limit))) }
+        let archived = request.includeArchived || request.archivedOnly
+        let matcher = request.query.flatMap { words -> SessionLabelQuery? in
+            let words = words.trimmingCharacters(in: .whitespacesAndNewlines)
+            return words.isEmpty ? nil : SessionLabelQuery(words)
+        }
+        // Where to look: one agent, one project, or the live agents, with the archived
+        // ones only when something narrows them.
+        let pool: [Agent]
+        if let id = request.agentID {
+            pool = agents[id].map { [$0] } ?? []
+        } else if let folder {
+            pool = request.archivedOnly
+                ? agents.agents(in: folder).filter { $0.state == .archived }
+                : archived ? agents.agents(in: folder)
+                : agents.agents(in: folder).filter { $0.state != .archived }
+        } else if archived, request.startedByWorkflow != nil || matcher != nil {
+            pool = request.archivedOnly ? Array(agents.archived.values) : agents.values
+        } else {
+            pool = request.archivedOnly ? [] : Array(agents.live.values)
+        }
+        var listed = pool.filter { agent in
+            (archived || agent.state != .archived)
+                && (!request.archivedOnly || agent.state == .archived)
+                && (request.startedByWorkflow == nil || agent.startedByWorkflow == request.startedByWorkflow)
+                && (matcher?.matches(agent) ?? true)
+                && (request.after.map { $0.id != agent.id && !DaemonAPI.ListCursor.listOrder(agent, $0) } ?? true)
+        }
+        listed.sort { DaemonAPI.ListCursor.listOrder($0, $1) }
+        listed = Array(listed.prefix(request.pageSize))
         if request.lean { return listed.map { $0.leaned() } }
         if !request.archivedCommands {
             for i in listed.indices where listed[i].state == .archived { listed[i].availableCommands = [] }

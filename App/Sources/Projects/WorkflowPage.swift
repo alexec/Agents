@@ -68,6 +68,18 @@ struct WorkflowPage: View {
             model.openWorkflow = nil
         }
         .onChange(of: workflowID) { shownRuns = Self.runsAtFirst }
+        // Its runs, archived ones too, asked of the host: the window holds only the live
+        // agents (#164). One more than shown, so Show more knows there is more.
+        .task(id: RunsWanted(workflowID: workflowID, shown: shownRuns)) {
+            guard let workflow = summary?.workflow else { return }
+            await model.loadRuns(of: workflow.workflowID, in: workflow.folder,
+                                 on: model.selectedProjectHost, limit: shownRuns + 1)
+        }
+    }
+
+    private struct RunsWanted: Hashable {
+        var workflowID: Workflow.ID
+        var shown: Int
     }
 
     @ViewBuilder

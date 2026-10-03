@@ -205,7 +205,7 @@ extension DaemonCore {
         let caller = try helperCaller(token: request.token, refusing: "Nothing was listed")
         let folder = caller.projectFolder
         let places = "This project has \(helperPlaces(in: folder))."
-        let mine = HelperLimit.helpers(in: folder, agents: agents.values)
+        let mine = HelperLimit.helpers(in: folder, agents: agents.inProject(folder))
             .filter { $0.startedByAgent == caller.id }
         // Which runtimes it may name, last (#117): live, as a tool's description is not.
         let runtimes = runtimeChoices(in: folder)
@@ -250,9 +250,9 @@ extension DaemonCore {
     func helperPlaces(in folder: URL, reservationsToIgnore: Int = 0) -> String {
         let limits = helperLimits(in: folder)
         let reserved = max(0, reservedStarts[folder, default: 0] - reservationsToIgnore)
-        let running = HelperLimit.running(in: folder, agents: agents.values, reserved: reserved,
+        let running = HelperLimit.running(in: folder, agents: agents.inProject(folder), reserved: reserved,
                                           comingBack: comingBack)
-        let kept = HelperLimit.placesInUse(in: folder, agents: agents.values, reserved: reserved)
+        let kept = HelperLimit.placesInUse(in: folder, agents: agents.inProject(folder), reserved: reserved)
         return "\(running) of \(limits.running) running, \(kept) of \(limits.notArchived) not archived"
     }
 
@@ -268,7 +268,7 @@ extension DaemonCore {
         }
         let starting = reserved == 0 ? "" : " (\(reserved) still starting)"
         var full: [String] = []
-        let kept = HelperLimit.helpers(in: folder, agents: agents.values)
+        let kept = HelperLimit.helpers(in: folder, agents: agents.inProject(folder))
         if kept.count + reserved >= limits.notArchived {
             full.append("this project already has \(kept.count + reserved) of \(limits.notArchived) "
                 + "agents started by agents not yet archived\(quoted(kept))\(starting). "
@@ -277,7 +277,7 @@ extension DaemonCore {
                         + "or ask the person to archive one, to free that place."
                     : "Only the person can archive one to free that place."))
         }
-        let running = HelperLimit.runningHelpers(in: folder, agents: agents.values, comingBack: comingBack)
+        let running = HelperLimit.runningHelpers(in: folder, agents: agents.inProject(folder), comingBack: comingBack)
         if running.count + reserved >= limits.running {
             full.append("this project already has \(running.count + reserved) of \(limits.running) "
                 + "agents started by agents running\(quoted(running))\(starting). "

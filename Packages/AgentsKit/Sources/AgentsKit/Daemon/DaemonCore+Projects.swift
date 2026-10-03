@@ -14,8 +14,66 @@ import Foundation
 extension DaemonCore {
     // MARK: Reading
 
-    /// Every project, named, stamped and counted.
+    /// Every project, named, stamped and counted, from each folder's tally (#164).
     public func allProjects(includeArchived: Bool = true) -> [DaemonAPI.ProjectSummary] {
+        let records = projectRecords()
+        var summaries = projectFolders().compactMap { summary(of: $0, records: records) }
+        if !includeArchived { summaries = summaries.filter { !$0.project.isArchived } }
+        return summaries.sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
+    /// The union: every folder an agent is in, and every folder we kept a record for.
+    /// And every folder a retired agent was in, so a project whose agents have all
+    /// been retired keeps what it cost (051).
+    func projectFolders() -> Set<URL> {
+        var folders = Set(agents.tallies.keys)
+        folders.formUnion(projectRecords().keys)
+        folders.formUnion(tombstonesByProject().keys)
+        return folders
+    }
+
+    /// One project's summary from its tally, its record and its tombstones: the same
+    /// thing `rebuiltProjects` says of it, for the cost of one project rather than every
+    /// agent there has ever been (#164). Nil when the folder is not a project.
+    func summary(of folder: URL, records: [URL: Project]) -> DaemonAPI.ProjectSummary? {
+        let tally = agents.tallies[folder]
+        let gone = tombstonesByProject()[folder] ?? []
+        guard tally != nil || records[folder] != nil || !gone.isEmpty else { return nil }
+        var project = records[folder]
+            ?? Project(folder: folder, addedAt: tally?.oldestCreated ?? gone.map(\.createdAt).min() ?? Date())
+        var costToDate = tally?.costToDate ?? [:]
+        for tombstone in gone {
+            for (currency, amount) in tombstone.costToDate {
+                costToDate[currency, default: 0] += amount
+            }
+        }
+        let newest = tally?.newestActivity ?? gone.map(\.lastActivityAt).max() ?? project.addedAt
+        project.helperLimits = configuredHelperLimits(in: project.folder)
+        var summary = DaemonAPI.ProjectSummary(
+            project: project,
+            name: projectNames()[folder] ?? folder.lastPathComponent,
+            exists: Self.isDirectory(folder),
+            lastActivityAt: newest,
+            counts: tally?.counts ?? [:],
+            costToDate: costToDate,
+            unmeasuredAgents: tally?.unmeasured ?? 0)
+        summary.retiredCount = gone.count
+        return summary
+    }
+
+    /// Every project's name, disambiguated against the others, worked out again only
+    /// when the set of folders moves.
+    func projectNames() -> [URL: String] {
+        let folders = projectFolders()
+        if let projectNamesCache, projectNamesCache.folders == folders { return projectNamesCache.names }
+        let names = ProjectNaming.displayNames(for: Array(folders))
+        projectNamesCache = (folders, names)
+        return names
+    }
+
+    /// Every project, counted the long way from every agent held: what the tallies are
+    /// checked against (`ProjectTallyTests`). Not called by the daemon itself.
+    func rebuiltProjects(includeArchived: Bool = true) -> [DaemonAPI.ProjectSummary] {
         let records = projectRecords()
         let agentsByFolder = Dictionary(grouping: agents.values) { $0.projectFolder }
         let retiredByFolder = tombstonesByProject()
@@ -89,8 +147,7 @@ extension DaemonCore {
 
     /// One project, or nil when that folder is not one.
     func projectSummary(for folder: URL) -> DaemonAPI.ProjectSummary? {
-        let standardized = Project.standardize(folder)
-        return allProjects().first { $0.folder == standardized }
+        summary(of: Project.standardize(folder), records: projectRecords())
     }
 
     /// The kept records, by folder.
@@ -120,8 +177,25 @@ extension DaemonCore {
     /// Sent after the agent change that caused it, because an agent changing state is
     /// what moves a project's counts, and a sidebar that says a project needs you is
     /// this notification arriving in a window that is looking somewhere else.
+    ///
+    /// Only when it says something new (#164): a label or a plan moves the agent and
+    /// nothing in its project's row. While retirements are being noted they are held,
+    /// and each project is told once at the end.
     func projectChanged(forAgentIn folder: URL) {
+        let folder = Project.standardize(folder)
+        if heldProjectChanges != nil {
+            heldProjectChanges?.insert(folder)
+            return
+        }
         guard let summary = projectSummary(for: folder) else { return }
+        guard lastProjectSent[folder] != summary else { return }
+        sendProject(summary)
+    }
+
+    /// Every `project/changed` goes through here, so `lastProjectSent` is what the
+    /// windows were last told.
+    func sendProject(_ summary: DaemonAPI.ProjectSummary) {
+        lastProjectSent[summary.folder] = summary
         broadcast(DaemonAPI.Notification.projectChanged, summary)
     }
 
@@ -149,7 +223,7 @@ extension DaemonCore {
                                message: "\(standardized.path) could not be added.")
         }
         adoptWorkflows(in: standardized)
-        broadcast(DaemonAPI.Notification.projectChanged, summary)
+        sendProject(summary)
         // A project's needs go with it when it is archived and come back when it is not;
         // nothing else about a project moves a need.
         reconsider()
@@ -170,7 +244,7 @@ extension DaemonCore {
         var records = projectRecords()
         // A folder that became a project by an agent running in it has no record yet;
         // the one made here keeps the age the derived project already had.
-        let oldest = agents.values.filter { $0.projectFolder == standardized }.map(\.createdAt).min()
+        let oldest = agents.tallies[standardized]?.oldestCreated
         var record = records[standardized] ?? Project(folder: standardized, addedAt: oldest ?? Date())
         // Once for each step: a project laid out by an older layout gets only what
         // was added since, never the steps it already had back.
@@ -241,8 +315,8 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) is not a project.")
         }
-        let live = agents.values
-            .filter { $0.projectFolder == standardized && $0.state.holdsRuntime }
+        let live = agents.agents(in: standardized)
+            .filter { $0.state.holdsRuntime }
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
         if !live.isEmpty {
             let names = live.map { $0.title ?? "an agent" }
@@ -267,7 +341,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) is not a project.")
         }
-        broadcast(DaemonAPI.Notification.projectChanged, summary)
+        sendProject(summary)
         // A project's needs go with it when it is archived and come back when it is not;
         // nothing else about a project moves a need.
         reconsider()
@@ -307,7 +381,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) is not a project.")
         }
-        broadcast(DaemonAPI.Notification.projectChanged, summary)
+        sendProject(summary)
         return summary
     }
 
@@ -361,7 +435,7 @@ extension DaemonCore {
         let before = projectConfigCache[folder] ?? nil
         projectConfigCache[folder] = nil
         guard configuredHelperLimits(in: folder) != before, let summary = projectSummary(for: folder) else { return }
-        broadcast(DaemonAPI.Notification.projectChanged, summary)
+        sendProject(summary)
     }
 
     /// Helper limits kept in `projects.json` before #126, written into each project's
@@ -407,7 +481,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) is not a project.")
         }
-        broadcast(DaemonAPI.Notification.projectChanged, summary)
+        sendProject(summary)
         // A project's needs go with it when it is archived and come back when it is not;
         // nothing else about a project moves a need.
         reconsider()

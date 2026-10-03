@@ -141,8 +141,8 @@ extension DaemonCore {
     func ownsItsFolder(_ agent: Agent) -> Bool {
         guard let worktree = agent.worktree else { return false }
         let root = worktree.root.resolvingSymlinksInPath().path
-        return !agents.values.contains { other in
-            other.id != agent.id && other.state != .archived
+        return !agents.live.values.contains { other in
+            other.id != agent.id
                 && (other.cwd.resolvingSymlinksInPath().path == root
                     || Self.relative(other.cwd.resolvingSymlinksInPath().path, to: root) != nil)
         }

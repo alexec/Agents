@@ -821,6 +821,11 @@ export interface LineMember {
   isCallOpen: boolean;
 }
 
+export interface ListCursor {
+  lastActivityAt: WireDate;
+  id: UUID;
+}
+
 export interface ListRequest {
   includeArchived: boolean;
   archivedCommands: boolean;
@@ -830,6 +835,8 @@ export interface ListRequest {
   limit?: number;
   lean: boolean;
   agentID?: UUID;
+  after?: ListCursor;
+  query?: string;
 }
 
 export interface MCPServer {
@@ -2000,7 +2007,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
-  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID"] },
+  ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
+  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   Need: { required: ["id", "agentID", "folder", "kind", "raisedAt", "headline"], optional: [] },

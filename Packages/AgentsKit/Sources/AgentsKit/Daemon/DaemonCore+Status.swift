@@ -10,7 +10,7 @@ extension DaemonCore {
     /// Mid-turn means starting, running or waiting on the person. The last counts:
     /// swapping the binary under a pending permission would drop the question.
     func status() -> DaemonAPI.DaemonStatus {
-        let holding = agents.values.filter { $0.state.holdsRuntime }
+        let holding = agents.live.values.filter { $0.state.holdsRuntime }
         let inFlight = holding.filter {
             switch $0.state {
             case .starting, .running, .waitingOnUser: true
@@ -25,7 +25,7 @@ extension DaemonCore {
     /// what the Remove dialog has just told the person will happen.
     func quit(_ request: DaemonAPI.QuitRequest) async throws {
         if request.stopAgents {
-            for agent in agents.values where agent.state.holdsRuntime {
+            for agent in agents.live.values where agent.state.holdsRuntime {
                 try? await stop(agent.id)
             }
         } else if status().turnsInFlight > 0 {

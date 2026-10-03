@@ -1399,11 +1399,23 @@ public enum DaemonAPI {
         /// A host from before #107 ignores it and lists everything, so ask with `limit: 1`
         /// as well and look for the id in what comes back.
         public var agentID: UUID?
+        /// Where the last page ended: the next page starts after this agent (#164).
+        public var after: ListCursor?
+        /// Only agents whose title or labels match, as the sidebar's search reads it
+        /// (`SessionLabelQuery`), archived ones included when `includeArchived` is.
+        /// What a search asks the host for, rather than filtering what it holds (#165).
+        public var query: String?
+
+        /// How many come back when `limit` is not said, and the most that ever do (#164).
+        /// A whole list is pages: ask again `after` the last until fewer than asked come.
+        public static let defaultLimit = 500
+        public static let maximumLimit = 1_000
 
         public init(includeArchived: Bool = true, archivedCommands: Bool = true,
                     archivedOnly: Bool = false, folder: URL? = nil,
                     startedByWorkflow: String? = nil, limit: Int? = nil,
-                    lean: Bool = false, agentID: UUID? = nil) {
+                    lean: Bool = false, agentID: UUID? = nil,
+                    after: ListCursor? = nil, query: String? = nil) {
             self.includeArchived = includeArchived
             self.archivedCommands = archivedCommands
             self.archivedOnly = archivedOnly
@@ -1412,11 +1424,25 @@ public enum DaemonAPI {
             self.limit = limit
             self.lean = lean
             self.agentID = agentID
+            self.after = after
+            self.query = query
         }
 
         /// One agent's whole record, archived or not (#107).
         public static func whole(_ agentID: UUID) -> ListRequest {
             ListRequest(includeArchived: true, limit: 1, agentID: agentID)
+        }
+
+        /// How many this asks for, as the host will answer it.
+        public var pageSize: Int { min(max(0, limit ?? Self.defaultLimit), Self.maximumLimit) }
+
+        /// The same request for the page after `page`, or nil when `page` was the last. A
+        /// page longer than asked is a host from before pages, which sent everything.
+        public func next(after page: [Agent]) -> ListRequest? {
+            guard page.count == pageSize, pageSize > 0, let last = page.last else { return nil }
+            var next = self
+            next.after = ListCursor(last)
+            return next
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1429,6 +1455,37 @@ public enum DaemonAPI {
             limit = try c.decodeIfPresent(Int.self, forKey: .limit)
             lean = try c.decodeIfPresent(Bool.self, forKey: .lean) ?? false
             agentID = try c.decodeIfPresent(UUID.self, forKey: .agentID)
+            after = try c.decodeIfPresent(ListCursor.self, forKey: .after)
+            query = try c.decodeIfPresent(String.self, forKey: .query)
+        }
+    }
+
+    /// Where a page of `agents/list` ended (#164): its last agent's activity and id. The
+    /// list is newest activity first, and by id among equals, so the next page is
+    /// everything after this point. An agent that moves between pages may be listed
+    /// twice or not at all; `agent/changed` carries it either way.
+    public struct ListCursor: Codable, Hashable, Sendable {
+        public var lastActivityAt: Date
+        public var id: UUID
+
+        public init(lastActivityAt: Date, id: UUID) {
+            self.lastActivityAt = lastActivityAt
+            self.id = id
+        }
+
+        public init(_ agent: Agent) {
+            self.init(lastActivityAt: agent.lastActivityAt, id: agent.id)
+        }
+
+        /// The list's order: newest activity first, then by id.
+        public static func listOrder(_ a: Agent, _ b: Agent) -> Bool {
+            listOrder(a, ListCursor(b))
+        }
+
+        /// Whether `a` comes before the point `b` in the list's order.
+        public static func listOrder(_ a: Agent, _ b: ListCursor) -> Bool {
+            if a.lastActivityAt != b.lastActivityAt { return a.lastActivityAt > b.lastActivityAt }
+            return a.id.uuidString < b.id.uuidString
         }
     }
 

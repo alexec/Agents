@@ -22,13 +22,13 @@ extension DaemonCore {
     /// awake all night for an unanswered question is the one abuse this feature must
     /// not commit, and it is what reusing either neighbour would do.
     var hasWorkInFlight: Bool {
-        agents.values.contains { $0.state == .starting || $0.state == .running }
+        agents.inFlight > 0
     }
 
     /// How many, for the words. Same rule as `hasWorkInFlight` and derived from the
     /// same place, so the two can never disagree about what counts.
     var agentsInFlight: Int {
-        agents.values.count { $0.state == .starting || $0.state == .running }
+        agents.inFlight
     }
 
     /// Take or let go of the Mac's idle sleep, according to what is happening now.

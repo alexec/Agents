@@ -254,18 +254,15 @@ private struct ProjectFold: View {
     let folds: SidebarFolds
     let query: String
 
-    /// Enough archived chats to find last week's; the rest are on the phone's archive
-    /// and in Events. A list of every chat ever is the thing projects replaced.
-    private static let archivedShown = 50
-
     private var key: ProjectKey { summary.key }
 
     var body: some View {
         let lists = sessionLists()
         let searching = !query.isEmpty
+        let isOpen = searching || folds.isOpen(key)
         if !searching || lists.hasAny || hasWorkflowMatch || nameMatches {
             DisclosureGroup(isExpanded: Binding(
-                get: { searching || folds.isOpen(key) },
+                get: { isOpen },
                 set: { folds.set(key, open: $0) })) {
                 // The project's pinned pages (#159), beside the Dashboard its own row opens,
                 // before its sessions. Not while searching: the search is for sessions.
@@ -289,7 +286,7 @@ private struct ProjectFold: View {
                 archivedSessions(lists.shown[.archived] ?? [])
                 ProjectWorkflowRows(project: key, query: query, folds: folds)
             } label: {
-                ProjectRow(summary: summary, label: label, isFolded: !(searching || folds.isOpen(key)))
+                ProjectRow(summary: summary, label: label, isFolded: !isOpen)
                     .font(.body)
                     // As tall as its one or two lines and a little air (#104).
                     .listRowInsets(.vertical, 3)
@@ -323,11 +320,15 @@ private struct ProjectFold: View {
     @ViewBuilder
     private func archivedSessions(_ archived: [Agent]) -> some View {
         let retiredLine = query.isEmpty ? RetirementWords.retiredLine(summary.retiredCount) : nil
-        if !archived.isEmpty || retiredLine != nil {
+        // How many there are is the host's count: the window holds a page of them only
+        // once the fold is open (#164).
+        let count = query.isEmpty ? max(summary.counts[.archived] ?? 0, archived.count) : archived.count
+        let isOpen = !query.isEmpty || folds.isOpen(key, .archivedSessions)
+        if count > 0 || !archived.isEmpty || retiredLine != nil {
             DisclosureGroup(isExpanded: Binding(
-                get: { !query.isEmpty || folds.isOpen(key, .archivedSessions) },
+                get: { isOpen },
                 set: { folds.set(key, .archivedSessions, open: $0) })) {
-                ForEach(query.isEmpty ? Array(archived.prefix(Self.archivedShown)) : archived) { agent in
+                ForEach(query.isEmpty ? Array(archived.prefix(AppModel.archivedShown)) : archived) { agent in
                     SessionSidebarRow(agent: agent)
                 }
                 if let retiredLine {
@@ -338,7 +339,11 @@ private struct ProjectFold: View {
             } label: {
                 // Named for what it holds: the project's row is often scrolled away by
                 // the time this is read.
-                SidebarSubheading(title: "Archived sessions", count: archived.count)
+                SidebarSubheading(title: "Archived sessions", count: count)
+            }
+            // A page of them when the fold opens (#164).
+            .task(id: query.isEmpty && isOpen) {
+                if query.isEmpty && isOpen { await model.loadArchived(in: key) }
             }
         }
     }
