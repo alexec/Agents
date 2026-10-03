@@ -100,7 +100,7 @@ extension DaemonCore {
             if !FileManager.default.fileExists(atPath: url.path) {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                         withIntermediateDirectories: true)
-                FileManager.default.createFile(atPath: url.path, contents: nil)
+                _ = FileManager.default.createFile(atPath: url.path, contents: nil)
             }
             let handle = try FileHandle(forWritingTo: url)
             defer { try? handle.close() }
