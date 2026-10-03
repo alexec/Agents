@@ -158,7 +158,10 @@ public final class ControlService: @unchecked Sendable {
             // Started again after it took over (R16): it serves, as any copy would. A store
             // with records that it never took is a handover that didn't finish.
             let settings = try? ControlRecords.decoder.decode(ControlSettings.self, from: object.data)
-            guard settings?.currentEndpoints.first?.url == configuration.url.absoluteString else {
+            // Or it took over, then handed over again and forwards (#61, T129): its own
+            // forwarding note says so, and it forwards again below.
+            let forwarded = try await store.get(forwardingKey) != nil
+            guard settings?.currentEndpoints.first?.url == configuration.url.absoluteString || forwarded else {
                 throw Failure("this store holds records from a handover that didn't finish; empty it and receive again")
             }
             phase.set(.serving)

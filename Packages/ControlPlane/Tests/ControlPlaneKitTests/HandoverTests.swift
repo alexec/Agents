@@ -255,6 +255,16 @@ extension ControlServiceTests {
         #expect(again.forwardingUntil.now != nil)
         await again.stop()
 
+        // Started as the cloud copy always is, with --receive left on: it forwards too.
+        var receiving = ControlService.Configuration(store: store, privateKey: control.privateKey, url: url,
+                                                     bind: "127.0.0.1", port: port, name: "test", machineID: "m",
+                                                     receive: true)
+        receiving.resumeForwarding = true
+        let cloud = try ControlService(receiving)
+        try await cloud.start()
+        #expect(cloud.phase.now == .forwarding)
+        await cloud.stop()
+
         let serving = try copy(resume: false)
         try await serving.start()
         #expect(serving.phase.now == .serving)
