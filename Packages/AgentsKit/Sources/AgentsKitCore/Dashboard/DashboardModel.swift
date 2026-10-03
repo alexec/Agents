@@ -3,6 +3,14 @@ import Foundation
 /// What a Dashboard means, said once for the Mac, the Remote and the host (074). The web
 /// page says the same in `Web/src/model/dashboard.ts`.
 public enum DashboardModel {
+    /// Where a Dashboard lives (#127), said at the foot of the page on the Mac, the
+    /// Remote and the web page alike: the tiles and their trends are files in the project.
+    public static let filesSentence = "Tiles and their trends are files in .agents/dashboard/ in this project, "
+        + "which you may commit"
+
+    /// Where a number tile's trend is kept (#127).
+    public static func historyFile(_ id: String) -> String { ".agents/dashboard/history/\(id).jsonl" }
+
     /// Past its own stale-after time, or never set on this host (FR-024, a clone).
     public static func isStale(_ tile: TileView, now: Date) -> Bool {
         guard let file = tile.tile, let setAt = tile.setAt else { return true }

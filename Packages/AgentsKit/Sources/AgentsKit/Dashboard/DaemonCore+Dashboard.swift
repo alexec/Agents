@@ -52,7 +52,7 @@ extension DaemonCore {
             }
         }
         if check.tile.type == .number, dashboardStore.historyBytes(project) >= TileLimits.historyBytes {
-            throw dashboardRefusal(TileCheck.lead + "this project's Dashboard history on this host is at its 8 MB limit; "
+            throw dashboardRefusal(TileCheck.lead + "this project's Dashboard history is at its 8 MB limit; "
                 + "remove a number tile you no longer keep.")
         }
 
@@ -85,8 +85,11 @@ extension DaemonCore {
         state.removals = state.removals.filter { at.timeIntervalSince($0.value.at) < TileLimits.removalKept }
         dashboardStore.save(state, for: project)
         if let number = tile.number {
-            dashboardStore.record(number.value, at: at, for: check.id, in: project)
-            notes.append("Recorded a point (\(dashboardStore.points(project, check.id).count) kept).")
+            let kept = dashboardStore.record(number.value, at: at, for: check.id, in: project)
+            let count = dashboardStore.points(project, check.id).count
+            notes.append(kept
+                ? "Recorded a point in .agents/dashboard/history/\(check.id).jsonl (\(count) kept)."
+                : "The trend already ends at this value, so no point was added (\(count) kept).")
         }
         if tile.isHidden {
             notes.append("The person has hidden this tile; it is kept up to date out of sight.")
@@ -233,6 +236,11 @@ extension DaemonCore {
     func dashboardFilesChanged(_ changed: [URL], in project: URL) {
         let prefix = DashboardStore.tilesFolder(project).path
         guard changed.contains(where: { $0.path == prefix || $0.path.hasPrefix(prefix + "/") }) else { return }
+        // A pull can bring history too (#127): read it again rather than show the old.
+        let history = DashboardStore.historyFolder(project).path
+        if changed.contains(where: { $0.path == history || $0.path.hasPrefix(history + "/") || $0.path == prefix }) {
+            dashboardStore.forgetPoints(project)
+        }
         dashboardChanged(project)
     }
 
@@ -241,7 +249,7 @@ extension DaemonCore {
         let at = now()
         for project in allProjects(includeArchived: true) {
             let folder = Project.standardize(project.folder)
-            guard FileManager.default.fileExists(atPath: dashboardStore.folder(for: folder).path) else { continue }
+            guard dashboardStore.hasHistory(folder) else { continue }
             dashboardStore.compact(folder, now: at)
         }
     }

@@ -1,17 +1,22 @@
 import Foundation
 import AgentsKitCore
 
-/// Where a project's Dashboard is kept (074): its tiles' current state in the project,
-/// and everything that would churn git on the host.
+/// Where a project's Dashboard is kept (074): its tiles and their trends in the project,
+/// and the host's own bookkeeping on the host.
 ///
 /// - `<project>/.agents/dashboard/<id>.json`: one file per tile, committed with the
 ///   project. Written whole (temporary file, then rename), and not at all when the bytes
 ///   would be the same (FR-015, FR-016). Always the project folder, never a worktree's
 ///   copy: the caller hands the project folder, never an agent's `cwd` (FR-014).
+/// - `<project>/.agents/dashboard/history/<id>.jsonl`: a number tile's points, one a
+///   line, so its trend travels with the project (#127). Folded on every write to each
+///   hour's last point for 7 days and each day's last to 90, a value equal to the last
+///   kept is never written, and the file is not touched when its bytes would be the same.
 /// - `<root>/dashboards/<key>/state.json`: when each tile was made and last set, the
 ///   hash of the host's last write (to tell an outside change), keeper changes, removal
 ///   notes and each agent's recent sets (FR-019).
-/// - `<root>/dashboards/<key>/points/<id>.jsonl`: a number tile's points, one a line.
+/// - `<root>/dashboards/<key>/points/<id>.jsonl`: where points were kept before #127,
+///   moved into the project the first time they are read.
 ///
 /// Called only from inside the daemon's actor, which is what makes one write at a time
 /// per project. Plain Foundation, so the Linux daemon has it too.
@@ -110,64 +115,91 @@ final class DashboardStore: @unchecked Sendable {
 
     // MARK: Points
 
+    static func historyFolder(_ project: URL) -> URL {
+        tilesFolder(project).appendingPathComponent("history", isDirectory: true)
+    }
+
     private func pointsFile(_ project: URL, _ id: String) -> URL {
+        Self.historyFolder(project).appendingPathComponent("\(id).jsonl")
+    }
+
+    /// Where this host kept a tile's points before #127.
+    private func hostPointsFile(_ project: URL, _ id: String) -> URL {
         folder(for: project).appendingPathComponent("points/\(id).jsonl")
     }
 
     func points(_ project: URL, _ id: String) -> [TilePoint] {
         let key = Self.key(project) + "/" + id
         if let known = pointCache[key] { return known }
-        var out: [TilePoint] = []
-        if let data = try? Data(contentsOf: pointsFile(project, id)) {
-            for line in data.split(separator: UInt8(ascii: "\n")) {
-                if let row = try? JSONDecoder().decode(PointLine.self, from: Data(line)) {
-                    out.append(TilePoint(at: Date(timeIntervalSince1970: row.t), value: row.v))
-                }
+        var out = Self.readPoints(pointsFile(project, id))
+        // Points this host kept before #127, folded into the project's once.
+        let legacy = hostPointsFile(project, id)
+        if FileManager.default.fileExists(atPath: legacy.path) {
+            let merged = (Self.readPoints(legacy) + out).sorted { $0.at < $1.at }
+            out = Self.compacted(merged, now: Date())
+            if (try? writePoints(out, for: id, in: project)) != nil {
+                try? FileManager.default.removeItem(at: legacy)
             }
         }
         pointCache[key] = out
         return out
     }
 
-    /// Record a point. A second in the same minute replaces the first (research R5).
-    func record(_ value: Double, at: Date, for id: String, in project: URL) {
+    private static func readPoints(_ url: URL) -> [TilePoint] {
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        return data.split(separator: UInt8(ascii: "\n")).compactMap { line in
+            (try? JSONDecoder().decode(PointLine.self, from: Data(line)))
+                .map { TilePoint(at: Date(timeIntervalSince1970: $0.t), value: $0.v) }
+        }
+    }
+
+    /// Record a point (#127). Nothing is written for a value equal to the last kept: the
+    /// trend already says it. Otherwise the history is folded with it and written only
+    /// if its bytes changed, so a second set in the same hour replaces that hour's point.
+    /// Returns whether a point was added.
+    @discardableResult
+    func record(_ value: Double, at: Date, for id: String, in project: URL) -> Bool {
         var all = points(project, id)
-        if let last = all.last, Int(last.at.timeIntervalSince1970 / 60) == Int(at.timeIntervalSince1970 / 60) {
-            all[all.count - 1] = TilePoint(at: at, value: value)
-            rewritePoints(all, for: id, in: project)
-            return
-        }
+        if all.last?.value == value { return false }
         all.append(TilePoint(at: at, value: value))
-        pointCache[Self.key(project) + "/" + id] = all
-        let url = pointsFile(project, id)
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let line = Self.line(TilePoint(at: at, value: value))
-        if let handle = try? FileHandle(forWritingTo: url) {
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: line)
-            try? handle.close()
-        } else {
-            try? line.write(to: url, options: .atomic)
-        }
+        rewritePoints(Self.compacted(all, now: at), for: id, in: project)
+        return true
     }
 
     func rewritePoints(_ all: [TilePoint], for id: String, in project: URL) {
         pointCache[Self.key(project) + "/" + id] = all
+        try? writePoints(all, for: id, in: project)
+    }
+
+    /// The file for `all`, whole, and only when its bytes change; none for no points.
+    private func writePoints(_ all: [TilePoint], for id: String, in project: URL) throws {
         let url = pointsFile(project, id)
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard !all.isEmpty else {
+            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            return
+        }
         var data = Data()
         for point in all { data.append(Self.line(point)) }
-        try? data.write(to: url, options: .atomic)
+        if let old = try? Data(contentsOf: url), old == data { return }
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
     }
 
     func deletePoints(_ id: String, in project: URL) {
         pointCache.removeValue(forKey: Self.key(project) + "/" + id)
         try? FileManager.default.removeItem(at: pointsFile(project, id))
+        try? FileManager.default.removeItem(at: hostPointsFile(project, id))
     }
 
-    /// The project's history on this host, in bytes (FR-021).
+    /// Read every point again: the history files changed outside the app, by a pull or
+    /// by hand.
+    func forgetPoints(_ project: URL) {
+        pointCache = pointCache.filter { !$0.key.hasPrefix(Self.key(project) + "/") }
+    }
+
+    /// The project's history, in bytes (FR-021).
     func historyBytes(_ project: URL) -> Int {
-        let folder = folder(for: project).appendingPathComponent("points", isDirectory: true)
+        let folder = Self.historyFolder(project)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
         return names.reduce(0) { total, name in
             let size = (try? FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent(name).path)[.size]) as? Int
@@ -175,30 +207,38 @@ final class DashboardStore: @unchecked Sendable {
         }
     }
 
-    /// Fold old points (FR-020): every point to 7 days, the hour's last to 90 days, the
-    /// day's last to a year, then gone. Run on the housekeeping tick, never on a read.
+    /// Whether the project has any history to fold, here or from before #127.
+    func hasHistory(_ project: URL) -> Bool {
+        FileManager.default.fileExists(atPath: Self.historyFolder(project).path)
+            || FileManager.default.fileExists(atPath: folder(for: project).appendingPathComponent("points").path)
+    }
+
+    /// Fold old points (FR-020, #127), on the housekeeping tick, so a tile nobody sets
+    /// still loses what has aged out. Never on a read.
     func compact(_ project: URL, now: Date) {
-        let folder = folder(for: project).appendingPathComponent("points", isDirectory: true)
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
-        for name in names where name.hasSuffix(".jsonl") {
-            let id = String(name.dropLast(6))
+        var ids: Set<String> = []
+        for folder in [Self.historyFolder(project), folder(for: project).appendingPathComponent("points", isDirectory: true)] {
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+            for name in names where name.hasSuffix(".jsonl") { ids.insert(String(name.dropLast(6))) }
+        }
+        for id in ids.sorted() where TileLimits.isValidID(id) {
             let all = points(project, id)
             let folded = Self.compacted(all, now: now)
             if folded != all { rewritePoints(folded, for: id, in: project) }
         }
     }
 
+    /// Each hour's last point for 7 days, each day's last to 90 days, then nothing
+    /// (Alex, 2026-10-03, #127); and a run of equal values kept as its first point, the
+    /// moment the value became what it is.
     static func compacted(_ points: [TilePoint], now: Date) -> [TilePoint] {
         var out: [TilePoint] = []
         var lastBucket: (Int, Int)?
         for point in points {
             let age = now.timeIntervalSince(point.at)
-            if age > 365 * 86_400 { continue }
-            let bucket: (Int, Int)
-            let seconds = Int(point.at.timeIntervalSince1970)
-            if age > 90 * 86_400 { bucket = (2, seconds / 86_400) }
-            else if age > 7 * 86_400 { bucket = (1, seconds / 3600) }
-            else { bucket = (0, seconds / 60) }
+            if age > 90 * 86_400 { continue }
+            let seconds = Int(point.at.timeIntervalSince1970.rounded(.down))
+            let bucket = age > 7 * 86_400 ? (1, seconds / 86_400) : (0, seconds / 3600)
             if let lastBucket, lastBucket == bucket, !out.isEmpty {
                 out[out.count - 1] = point
             } else {
@@ -206,7 +246,9 @@ final class DashboardStore: @unchecked Sendable {
             }
             lastBucket = bucket
         }
-        return out
+        var kept: [TilePoint] = []
+        for point in out where kept.last?.value != point.value { kept.append(point) }
+        return kept
     }
 
     /// At most `limit` points from `since` on, evenly picked, the last always kept.
@@ -219,7 +261,8 @@ final class DashboardStore: @unchecked Sendable {
 
     // MARK: A project going
 
-    /// Removing a project deletes its history here; its files are left alone (FR-022).
+    /// Removing a project deletes what this host kept about it; its files, history
+    /// included since #127, are left alone (FR-022).
     func deleteHistory(_ project: URL) {
         states.removeValue(forKey: project)
         pointCache = pointCache.filter { !$0.key.hasPrefix(Self.key(project) + "/") }
@@ -248,8 +291,16 @@ final class DashboardStore: @unchecked Sendable {
         var v: Double
     }
 
+    /// Keys sorted, so the same points are always the same bytes: the file is in the
+    /// project now (#127), and a line that reorders itself is a diff about nothing.
+    private static let lineEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
+    }()
+
     private static func line(_ point: TilePoint) -> Data {
-        var data = (try? JSONEncoder().encode(PointLine(t: point.at.timeIntervalSince1970.rounded(), v: point.value))) ?? Data()
+        var data = (try? lineEncoder.encode(PointLine(t: point.at.timeIntervalSince1970.rounded(), v: point.value))) ?? Data()
         data.append(0x0A)
         return data
     }

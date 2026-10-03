@@ -2,6 +2,14 @@
 // Remote. Dates are the wire's: seconds since 2001, so differences are seconds.
 import type { DashboardSnapshot, DashboardSummary, TileGood, TileLevel, TileView } from "../protocol/generated";
 
+/** DashboardModel.filesSentence (#127): the tiles and their trends are files in the project. */
+export const filesSentence = "Tiles and their trends are files in .agents/dashboard/ in this project, which you may commit";
+
+/** DashboardModel.historyFile (#127): where a number tile's trend is kept. */
+export function historyFile(id: string): string {
+  return `.agents/dashboard/history/${id}.jsonl`;
+}
+
 /** Past its own stale-after time, or never set on this host (FR-024). */
 export function isStale(tile: TileView, now: number): boolean {
   if (!tile.tile || tile.setAt === undefined) return true;

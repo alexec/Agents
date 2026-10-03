@@ -76,6 +76,11 @@ project folder, never in a worktree. A file changes only when a value does, so s
 same number every hour changes nothing in git. The app never commits these files. They show
 in the project's changes and go in with whatever is committed next.
 
-When each tile was last set, a number's history, and who removed what are kept by the host
-the project is on, not in the project. A clone on another machine shows the tiles' values
-greyed, with "age unknown", until their keepers set them there.
+A number's trend is kept in the project too, in `.agents/dashboard/history/<id>.jsonl`: each
+hour's last point for a week, then each day's last to 90 days, and nothing written while the
+number holds still. A clone on another machine shows the trends. To keep them out of the
+repository, add `.agents/dashboard/history/` to `.gitignore`.
+
+When each tile was last set and who removed what are kept by the host the project is on, not
+in the project. A clone on another machine shows the tiles' values greyed, with "age
+unknown", until their keepers set them there.

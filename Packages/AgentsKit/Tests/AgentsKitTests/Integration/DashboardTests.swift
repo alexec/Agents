@@ -236,7 +236,7 @@ struct DashboardTests {
     @Test func readDashboardListsEveryTileWithItsKeeperAndPoints() async throws {
         let s = try await setUp([("Lead", false, nil, .finished), ("Helper", false, nil, .finished)])
         _ = try await set(s, "Lead", number("open_bugs", 6))
-        s.clock.advance(minutes: 5)
+        s.clock.advance(minutes: 60)
         _ = try await set(s, "Lead", number("open_bugs", 4))
         let read = try await s.core.readDashboard(.init(token: s.tokens["Helper"]!))
         #expect(read.contains("open_bugs — Open bugs [number] in Quality"))
@@ -296,7 +296,7 @@ struct DashboardTests {
 
     // MARK: History
 
-    @Test func compactionKeepsMinutesForAWeekHoursToNinetyDaysAndDaysToAYear() {
+    @Test func compactionKeepsHoursForAWeekAndDaysToNinetyDays() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         var points: [TilePoint] = []
         // Every 10 minutes for 400 days.
@@ -307,15 +307,107 @@ struct DashboardTests {
         }
         let folded = DashboardStore.compacted(points, now: now)
         let week = folded.filter { now.timeIntervalSince($0.at) <= 7 * 86_400 }
-        let hours = folded.filter { (7 * 86_400 + 3600...90 * 86_400).contains(now.timeIntervalSince($0.at)) }
-        let days = folded.filter { now.timeIntervalSince($0.at) > 91 * 86_400 }
-        #expect(week.count >= 7 * 144 - 1)
-        #expect((83 * 24 - 30...83 * 24 + 30).contains(hours.count))
-        #expect((270...276).contains(days.count))
-        #expect(folded.allSatisfy { now.timeIntervalSince($0.at) <= 365 * 86_400 })
+        let days = folded.filter { now.timeIntervalSince($0.at) > 7 * 86_400 + 86_400 }
+        #expect((7 * 24 - 1...7 * 24 + 1).contains(week.count))
+        #expect((81...83).contains(days.count))
+        #expect(folded.allSatisfy { now.timeIntervalSince($0.at) <= 90 * 86_400 })
+        #expect(folded.count <= 7 * 24 + 86, "about 6 KB a tile at most")
         let sent = DashboardStore.downsampled(folded, since: now.addingTimeInterval(-30 * 86_400), limit: 120)
         #expect(sent.count == 120)
         #expect(sent.last == folded.last)
+    }
+
+    @Test func aRunOfEqualValuesIsKeptAsItsFirstPoint() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let points = [3.0, 3, 4, 4, 4, 3].enumerated().map {
+            TilePoint(at: now.addingTimeInterval(Double($0.offset - 6) * 3600), value: $0.element)
+        }
+        #expect(DashboardStore.compacted(points, now: now).map(\.value) == [3, 4, 3])
+        #expect(DashboardStore.compacted(points, now: now).first?.at == points[0].at)
+    }
+
+    // MARK: History in the project (#127)
+
+    private func history(_ s: Setup, _ id: String) -> URL {
+        s.project.appendingPathComponent(".agents/dashboard/history/\(id).jsonl")
+    }
+
+    @Test func theDashboardSaysItsTilesAreProjectFiles() {
+        // The web page's test pins the same words.
+        #expect(DashboardModel.filesSentence
+                == "Tiles and their trends are files in .agents/dashboard/ in this project, which you may commit")
+        #expect(DashboardModel.historyFile("open_bugs") == ".agents/dashboard/history/open_bugs.jsonl")
+    }
+
+    @Test func pointsAreKeptInTheProjectAndAnotherHostReadsThem() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        _ = try await set(s, "Lead", number("open_bugs", 6))
+        s.clock.advance(minutes: 60)
+        _ = try await set(s, "Lead", number("open_bugs", 4))
+        let lines = try String(contentsOf: history(s, "open_bugs"), encoding: .utf8).split(separator: "\n")
+        #expect(lines.count == 2)
+        let t = Int(s.clock.now.timeIntervalSince1970)
+        #expect(lines.map(String.init) == [#"{"t":\#(t - 3600),"v":6}"#, #"{"t":\#(t),"v":4}"#],
+                "the same points are always the same bytes")
+        #expect(!FileManager.default.fileExists(
+            atPath: s.locations.root.appendingPathComponent("dashboards/\(DashboardStore.key(s.project))/points").path),
+            "nothing about the trend is kept on the host")
+
+        // A clone's host: a new root, the same project files.
+        let other = StoreLocations(root: s.locations.root.deletingLastPathComponent().appendingPathComponent("other"))
+        try other.createDirectories()
+        let there = DaemonCore(store: try AgentStore(locations: other), locations: other,
+                               discovery: .findsEverything, launcher: FakeLauncher(), now: { s.clock.now })
+        await there.loadFromDisk()
+        #expect(await there.dashboardSnapshot(s.project).tiles.first?.points.map(\.value) == [6, 4])
+    }
+
+    @Test func theSameValueOrTheSameHourWritesNothingNew() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        _ = try await set(s, "Lead", number("open_bugs", 6))
+        let first = try Data(contentsOf: history(s, "open_bugs"))
+        let stamp = try FileManager.default.attributesOfItem(atPath: history(s, "open_bugs").path)[.modificationDate] as? Date
+
+        s.clock.advance(minutes: 90)
+        try await Task.sleep(for: .milliseconds(20))
+        let same = try await set(s, "Lead", number("open_bugs", 6))
+        #expect(same.contains("no point was added"))
+        let again = try FileManager.default.attributesOfItem(atPath: history(s, "open_bugs").path)[.modificationDate] as? Date
+        #expect(stamp == again, "a value the trend already ends at is not a write")
+
+        // Two sets in one hour leave one point, the later.
+        s.clock.advance(minutes: 60)
+        _ = try await set(s, "Lead", number("open_bugs", 5))
+        s.clock.advance(minutes: 10)
+        _ = try await set(s, "Lead", number("open_bugs", 7))
+        let points = await s.core.dashboardSnapshot(s.project).tiles[0].points.map(\.value)
+        #expect(points == [6, 7])
+        #expect(try Data(contentsOf: history(s, "open_bugs")) != first)
+    }
+
+    @Test func pointsThisHostKeptBeforeAreMovedIntoTheProjectOnce() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        let legacy = s.locations.root.appendingPathComponent("dashboards/\(DashboardStore.key(s.project))/points/open_bugs.jsonl")
+        try FileManager.default.createDirectory(at: legacy.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let t = s.clock.now.timeIntervalSince1970
+        try Data("{\"t\":\(t - 7200),\"v\":9}\n{\"t\":\(t - 7100),\"v\":8}\n{\"t\":\(t - 3600),\"v\":7}\n".utf8)
+            .write(to: legacy)
+        _ = try await set(s, "Lead", number("open_bugs", 6))
+
+        #expect(await s.core.dashboardSnapshot(s.project).tiles[0].points.map(\.value) == [8, 7, 6],
+                "folded by the project's policy: that hour's last")
+        #expect(!FileManager.default.fileExists(atPath: legacy.path))
+        #expect(try String(contentsOf: history(s, "open_bugs"), encoding: .utf8).split(separator: "\n").count == 3)
+    }
+
+    @Test func aPulledHistoryIsReadAgain() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        _ = try await set(s, "Lead", number("open_bugs", 6))
+        _ = await s.core.dashboardSnapshot(s.project)
+        let t = s.clock.now.timeIntervalSince1970
+        try Data("{\"t\":\(t - 3600),\"v\":2}\n{\"t\":\(t),\"v\":6}\n".utf8).write(to: history(s, "open_bugs"))
+        await s.core.dashboardFilesChanged([history(s, "open_bugs")], in: s.project)
+        #expect(await s.core.dashboardSnapshot(s.project).tiles[0].points.map(\.value) == [2, 6])
     }
 
     @Test func theRowSummarySaysTheWorstLiveStatusAndTheFirstNumber() {
