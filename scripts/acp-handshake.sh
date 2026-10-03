@@ -16,6 +16,10 @@
 #   ./scripts/acp-handshake.sh --scratch-home   each with an empty HOME of its own, so
 #                                               nothing of the person's is read or written
 #   ./scripts/acp-handshake.sh --no-sessions    capabilities only, no conversation opened
+#   ./scripts/acp-handshake.sh claude codex     only the runtimes named
+#
+# With AGENTS_HANDSHAKE_SESSIONS=<folder>, each runtime's answer to session/new is written
+# there as <runtime>.json, so the options it offers (its models, say) can be read after.
 set -u
 
 python3 - "$@" <<'PY'
@@ -23,9 +27,14 @@ import json, os, queue, subprocess, sys, tempfile, threading, time
 
 SCRATCH_HOME = "--scratch-home" in sys.argv[1:]
 SESSIONS = "--no-sessions" not in sys.argv[1:]
+NAMED = [a for a in sys.argv[1:] if not a.startswith("--")]
+SESSIONS_OUT = os.environ.get("AGENTS_HANDSHAKE_SESSIONS")
 
 RUNTIMES = {
-    "claude": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
+    # AGENTS_CLAUDE_VERSION names the adapter version to run (#39's nightly), since a bare
+    # npx -y can run whichever copy npx has cached.
+    "claude": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"
+               + (f"@{os.environ['AGENTS_CLAUDE_VERSION']}" if os.environ.get("AGENTS_CLAUDE_VERSION") else "")],
     "grok": ["grok", "agent", "stdio"],
     "copilot": ["copilot", "--acp"],
     # Not "agent", which is what Cursor calls itself and what Grok installs.
@@ -331,9 +340,15 @@ def check_options(name, session):
         print(f"   option {oid:38} no longer offered")
     return new
 
+unknown = [name for name in NAMED if name not in RUNTIMES]
+if unknown:
+    print(f"no runtime called {', '.join(unknown)}; try {', '.join(RUNTIMES)}")
+    sys.exit(2)
 missing = 0
 unread = []
 for name, command in RUNTIMES.items():
+    if NAMED and name not in NAMED:
+        continue
     print(f"\n== {name}")
     conversation, result = handshake(name, command)
     if result is None:
@@ -369,6 +384,10 @@ for name, command in RUNTIMES.items():
             print(f"   options not read: {why}")
             unread.append(name)
         else:
+            if SESSIONS_OUT:
+                os.makedirs(SESSIONS_OUT, exist_ok=True)
+                with open(f"{SESSIONS_OUT}/{name}.json", "w") as f:
+                    json.dump(session, f, indent=2)
             missing += check_options(name, session)
             missing += check_meta("session/new", session)
             capabilities = result.get("agentCapabilities") or {}

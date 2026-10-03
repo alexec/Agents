@@ -26,7 +26,10 @@ import json, os, queue, re, subprocess, sys, tempfile, threading, time
 # and that each lever produces the right wire shape. This script exists to catch a
 # *runtime* that moved, not a table that did, and it has to be able to run without a build.
 RUNTIMES = {
-    "claude": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
+    # AGENTS_CLAUDE_VERSION names the adapter version to run (#39's nightly), since a bare
+    # npx -y can run whichever copy npx has cached.
+    "claude": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"
+               + (f"@{os.environ['AGENTS_CLAUDE_VERSION']}" if os.environ.get("AGENTS_CLAUDE_VERSION") else "")],
     "grok": ["grok", "agent", "stdio"],
     "copilot": ["copilot", "--acp"],
     # Not "agent", which is what Cursor calls itself and what Grok installs.
