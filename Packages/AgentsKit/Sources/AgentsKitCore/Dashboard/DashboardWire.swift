@@ -92,11 +92,14 @@ public struct DashboardSnapshot: Codable, Sendable, Hashable {
     public var tiles: [TileView]
     /// The host's clock when this was made, so ages are measured against one clock.
     public var now: Date
+    /// Update now's state (#146). Nil from a host that predates it: no button.
+    public var update: DashboardUpdate?
 
-    public init(folder: URL, tiles: [TileView], now: Date) {
+    public init(folder: URL, tiles: [TileView], now: Date, update: DashboardUpdate? = nil) {
         self.folder = folder
         self.tiles = tiles
         self.now = now
+        self.update = update
     }
 }
 

@@ -819,6 +819,17 @@ final class AppModel {
         await refreshDashboard(folder)
     }
 
+    /// Update now (#146): the project's dashboard workflow, or a one-off agent. A refusal
+    /// (running, cooling down, waiting for approval) is said, as Run now's is.
+    func updateDashboard(_ folder: URL) async {
+        let host = selectedProjectHost
+        await attempt(on: host) {
+            try await self.client(for: host).call(DaemonAPI.Method.dashboardUpdate,
+                                                  DaemonAPI.DashboardRequest(folder: folder))
+        }
+        await refreshDashboard(folder)
+    }
+
     /// A tile's keeper: its session, or its workflow's page (FR-030).
     func openKeeper(_ keeper: KeeperView, folder: URL) {
         switch keeper.kind {

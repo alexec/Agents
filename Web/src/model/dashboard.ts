@@ -1,6 +1,7 @@
 // What a Dashboard means (074), as AgentsKitCore's DashboardModel says it for the window and the
 // Remote. Dates are the wire's: seconds since 2001, so differences are seconds.
-import type { DashboardSnapshot, DashboardSummary, TileGood, TileLevel, TileView } from "../protocol/generated";
+import type { DashboardSnapshot, DashboardSummary, DashboardUpdate, TileGood, TileLevel, TileView, WireDate } from "../protocol/generated";
+import { fromWireDate } from "../protocol/dates";
 
 /** DashboardModel.filesSentence (#127): the tiles and their trends are files in the project. */
 export const filesSentence = "Tiles and their trends are files in .agents/dashboard/ in this project, which you may commit";
@@ -121,4 +122,36 @@ export function sparkline(tile: TileView, width: number, height: number): string
     const y = high === low ? height / 2 : height - (height * (p.value - low)) / (high - low);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
+}
+
+/** DashboardUpdate.cooldown (#146): Update now waits this long after the last start. */
+export const updateCooldown = 5 * 60;
+
+/** DashboardUpdate.readyAt: when Update now may start another, while that is still to come. */
+export function updateReadyAt(update: DashboardUpdate, now: number): number | null {
+  if (update.lastStartedAt === undefined) return null;
+  const end = update.lastStartedAt + updateCooldown;
+  return end > now ? end : null;
+}
+
+/** DashboardUpdate.canPress. */
+export function canUpdate(update: DashboardUpdate, now: number): boolean {
+  return !update.isRunning && update.blocked === undefined && updateReadyAt(update, now) === null;
+}
+
+function clock(at: number): string {
+  return fromWireDate(at as WireDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+
+/** DashboardUpdate.line: what is going, why it can't, or how the last one went, in 24-hour times. */
+export function updateLine(update: DashboardUpdate, now: number): string | null {
+  if (update.isRunning) return `${update.name} is running`;
+  if (update.blocked !== undefined) return `Update now can't start: ${update.blocked}`;
+  if (update.lastStartedAt === undefined) return null;
+  const sameDay = fromWireDate(update.lastStartedAt).toDateString() === fromWireDate(now as WireDate).toDateString();
+  const when = sameDay ? clock(update.lastStartedAt)
+    : fromWireDate(update.lastStartedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + " " + clock(update.lastStartedAt);
+  if (update.lastFailed) return `The last update, ${when}, did not finish`;
+  const ready = updateReadyAt(update, now);
+  return ready === null ? `Last update ${when}` : `Last update ${when}; again from ${clock(ready)}`;
 }

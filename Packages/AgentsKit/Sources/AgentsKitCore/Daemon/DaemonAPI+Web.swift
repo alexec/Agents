@@ -97,6 +97,8 @@ public extension DaemonAPI {
                 Row(Method.dashboardHide, params: TileRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.dashboardShow, params: TileRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.dashboardRemove, params: TileRequest.self, result: Empty.self, kind: .hostRequest),
+                // Update now (#146), from every client alike.
+                Row(Method.dashboardUpdate, params: DashboardRequest.self, result: DashboardUpdate.self, kind: .hostRequest),
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),

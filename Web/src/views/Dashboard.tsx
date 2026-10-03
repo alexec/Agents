@@ -6,13 +6,13 @@ import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
 import {
-  ageWords, agoWords, change, changeWords, filesSentence, historyFile, isGood, isStale, isWide, keeperNote, numberWords, rowDetail,
-  sections, shownLevel, sparkline,
+  ageWords, agoWords, canUpdate, change, changeWords, filesSentence, historyFile, isGood, isStale, isWide, keeperNote, numberWords, rowDetail,
+  sections, shownLevel, sparkline, updateLine,
 } from "../model/dashboard";
 import { isSafeLink, Markdown } from "../render/markdown";
-import type { TileCell, TileLink, TileView } from "../protocol/generated";
+import type { DashboardUpdate, TileCell, TileLink, TileView } from "../protocol/generated";
 import { go } from "../route";
-import { fromWireDate } from "../protocol/dates";
+import { fromWireDate, toWireDate } from "../protocol/dates";
 
 export function DashboardRow({ store, host, folder, chosen, onPick }: {
   store: Store; host: string; folder: string; chosen: boolean; onPick: () => void;
@@ -51,6 +51,7 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
             onChange={(e) => (showsHidden.value = (e.currentTarget as HTMLInputElement).checked)} />
           Show Hidden Tiles{hiddenCount > 0 ? ` (${hiddenCount})` : ""}
         </label>
+        {snapshot?.update && <UpdateNow store={store} host={host} folder={folder} update={snapshot.update} down={down} />}
         {/* Starting an agent, from the project's own page (#151), as the window's toolbar has it. */}
         <button class="icon" aria-label="New session" title="Start a new session in this project" disabled={down}
           onClick={() => go({ host, project: folder, compose: true })}>✎</button>
@@ -59,6 +60,7 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
         <div class="dashboard-body">
           <p class="quiet">{projectName}{Number.isFinite(newest) && snapshot
             ? ` · updated ${agoWords(snapshot.now - newest)}` : " · kept by its agents"}</p>
+          {snapshot?.update && <UpdateLine host={host} folder={folder} update={snapshot.update} />}
           {!snapshot && <p class="hint">Loading…</p>}
           {snapshot && groups.length === 0 && (
             <p class="hint">{hiddenCount > 0 ? "Every tile is hidden. Show Hidden Tiles brings them back."
@@ -81,6 +83,40 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Update now (#146): Updating… while a run is going, off while it can't start. */
+function UpdateNow({ store, host, folder, update, down }: {
+  store: Store; host: string; folder: string; update: DashboardUpdate; down: boolean;
+}) {
+  // Ticks so the cooldown's end turns the button back on.
+  const tick = useSignal(0);
+  useEffect(() => { const timer = setInterval(() => (tick.value += 1), 15_000); return () => clearInterval(timer); }, []);
+  void tick.value;
+  const now = toWireDate(new Date());
+  return (
+    <button class="update-now" disabled={down || !canUpdate(update, now)} aria-busy={update.isRunning}
+      title={update.workflowID ? `Run \u201C${update.name}\u201D now, as Run now would` : "Start an agent to set every tile again from its source"}
+      onClick={() => void store.updateDashboard(host, folder)}>
+      {update.isRunning ? "Updating…" : "↻ Update now"}
+    </button>
+  );
+}
+
+/** What is going, why it can't, or how the last one went, with the way to its session. */
+function UpdateLine({ host, folder, update }: { host: string; folder: string; update: DashboardUpdate }) {
+  const line = updateLine(update, toWireDate(new Date()));
+  if (!line) return null;
+  const failed = update.lastFailed && !update.isRunning;
+  return (
+    <p class={`update-line small${failed ? " failure" : " quiet"}`}>{line}
+      {update.blocked !== undefined && update.workflowID
+        ? <>{" · "}<button class="link" onClick={() => go({ host, project: folder, workflow: update.workflowID })}>Open Workflow</button></>
+        : update.agentID && (update.isRunning || update.lastFailed)
+          ? <>{" · "}<button class="link" onClick={() => go({ host, project: folder, session: update.agentID })}>Open Session</button></>
+          : null}
+    </p>
   );
 }
 
@@ -155,7 +191,7 @@ function Value({ host, folder, tile, now }: { store: Store; host: string; folder
     case "status": {
       const level = shownLevel(tile, now) ?? "unknown";
       return (
-        <p class="status"><span class={`light ${level}`} aria-label={level} /> {file.status?.line}
+        <p class="tile-status"><span class={`light ${level}`} aria-label={level} /> {file.status?.line}
           {file.status?.since && <span class="small quiet"><br />since {file.status.since}</span>}</p>
       );
     }

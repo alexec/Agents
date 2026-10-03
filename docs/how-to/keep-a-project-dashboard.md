@@ -22,7 +22,22 @@ and decide what stays.
 
 The Dashboard changes as agents set tiles. You don't need to reload it.
 
-## Read a tile
+## Bring it up to date now
+
+**Update now**, at the top of the Dashboard (on the phone, the ↻ in the toolbar), asks an agent to
+set the tiles again there and then, rather than waiting for their keepers:
+
+- If the project has a workflow labelled `dashboard`, such as the nightly **Update the
+  dashboard**, it runs that workflow once, as **Run now** on its page would. It runs even when the
+  workflow is off. While the workflow's file waits for your approval, or it is past a limit,
+  nothing starts. The line under the title says why and opens the workflow.
+- With no such workflow, it starts an agent of its own, **Update the dashboard**. That agent sets
+  each tile again from the `source` its keeper gave it, and leaves alone any tile it can't read.
+
+While it runs, the button reads **Updating…** and the tiles change as they're set. The line under
+the title says when the last update started, and links to its session if it did not finish. Update
+now works once every 5 minutes, and only one runs at a time. Every device has the button.
+
 
 Each tile has a title, its value and a foot naming who keeps it and how old it is:
 

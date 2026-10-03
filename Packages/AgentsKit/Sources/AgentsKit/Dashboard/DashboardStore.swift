@@ -342,6 +342,14 @@ struct DashboardState: Codable, Sendable, Hashable {
     var removals: [String: Removal] = [:]
     /// Each agent's sets in the last hour, by agent id (FR-009).
     var sets: [String: [Date]] = [:]
+    /// The one-off agent Update now last started, for a project with no dashboard
+    /// workflow (#146). Its agent is nil while the runtime is still starting.
+    var updater: Updater?
+
+    struct Updater: Codable, Sendable, Hashable {
+        var agentID: UUID?
+        var startedAt: Date
+    }
 
     struct TileRecord: Codable, Sendable, Hashable {
         var made: Date

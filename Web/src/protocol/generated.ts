@@ -466,6 +466,7 @@ export interface DashboardSnapshot {
   folder: URLString;
   tiles: TileView[];
   now: WireDate;
+  update?: DashboardUpdate;
 }
 
 export interface DashboardSummary {
@@ -473,6 +474,16 @@ export interface DashboardSummary {
   tiles: number;
   bad: number;
   line: string;
+}
+
+export interface DashboardUpdate {
+  workflowID?: string;
+  name: string;
+  isRunning: boolean;
+  agentID?: UUID;
+  lastStartedAt?: WireDate;
+  lastFailed: boolean;
+  blocked?: string;
 }
 
 export interface DeclaredResource {
@@ -1657,6 +1668,7 @@ export interface Methods {
   "dashboard/remove": { params: TileRequest; result: Empty };
   "dashboard/show": { params: TileRequest; result: Empty };
   "dashboard/summaries": { params: Empty; result: DashboardSummary[] };
+  "dashboard/update": { params: DashboardRequest; result: DashboardUpdate };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
   "elicitations/pending": { params: Empty; result: ElicitationRequest[] };
   "events/list": { params: EventsListRequest; result: EventsPage };
@@ -1722,6 +1734,7 @@ export const MethodTarget = {
   "dashboard/remove": "host",
   "dashboard/show": "host",
   "dashboard/summaries": "host",
+  "dashboard/update": "host",
   "elicitations/answer": "host",
   "elicitations/pending": "host",
   "events/list": "host",
@@ -1814,8 +1827,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CostState: { required: ["limits", "today", "day"], optional: [] },
   DashboardChangedNotification: { required: ["folder", "summary"], optional: [] },
   DashboardRequest: { required: ["folder"], optional: [] },
-  DashboardSnapshot: { required: ["folder", "tiles", "now"], optional: [] },
+  DashboardSnapshot: { required: ["folder", "tiles", "now"], optional: ["update"] },
   DashboardSummary: { required: ["folder", "tiles", "bad", "line"], optional: [] },
+  DashboardUpdate: { required: ["name", "isRunning", "lastFailed"], optional: ["workflowID", "agentID", "lastStartedAt", "blocked"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
