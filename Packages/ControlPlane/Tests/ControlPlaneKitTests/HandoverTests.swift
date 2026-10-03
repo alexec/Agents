@@ -265,6 +265,32 @@ extension ControlServiceTests {
         #expect(later.phase.now == .serving)
     }
 
+    /// R16, T129: a host that never said an epoch is on a build that can't follow a list.
+    /// The announce names it and refuses, unless the driver insists.
+    @Test func anAnnounceIsRefusedWhileAHostCantFollow() async throws {
+        let old = try await start()
+        defer { Task { await old.service.stop() } }
+        // Enrolled, and never connected since with a build that keeps a list.
+        let key = ControlAgreement.generate()
+        _ = try await use(try await old.service.codes.issue(.host).text, at: old.url,
+                          method: DaemonAPI.Method.hostsAnnounce, params: try JSONValue.encoding(
+            DaemonAPI.HostAnnounce(publicKey: key.publicKey, name: "old-box", platform: "Linux arm64", version: "0.1.0",
+                                   machineID: "linux-old")))
+        let handover = try await Handover.Link(old.url, pin: nil, privateKey: control.privateKey)
+        let place = try JSONValue.encoding(ControlEndpoint(url: "https://agents.example.com"))
+        do {
+            _ = try await handover.call(Handover.Method.announce, ["endpoint": place])
+            Issue.record("announced past a host that can't follow")
+        } catch let error as JSONRPCError {
+            #expect(error.message.contains("old-box (0.1.0)"))
+        }
+        #expect(await old.service.methods.controlSettings.epoch == nil)
+        let forced = try await handover.call(Handover.Method.announce, ["endpoint": place, "force": true])
+            .decode(Handover.Status.self)
+        #expect(forced.epoch == 1)
+        await handover.close()
+    }
+
     @Test func onlyTheControlPlanesKeyDrivesAHandover() async throws {
         let old = try await start()
         defer { Task { await old.service.stop() } }

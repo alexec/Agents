@@ -148,6 +148,15 @@ public enum Handover {
             guard phase == .serving else { throw refuse("Announce from a copy that is serving.") }
             let endpoint = try params?["endpoint"]?.decode(ControlEndpoint.self)
             guard let endpoint, endpoint.isAcceptable else { throw refuse("Say the new place: https, with a pin or none.") }
+            // A host on a build from before lists (it never said an epoch) would be left
+            // behind for good: named, and refused unless the driver insists (R16, T129).
+            if params?["force"]?.boolValue != true {
+                let behind = await service.methods.allHosts.filter { $0.knownEpoch == nil }
+                if !behind.isEmpty {
+                    let names = behind.map { "\($0.name) (\($0.version))" }.joined(separator: ", ")
+                    throw refuse("Not moving: \(names) can't follow a move. Update it first, or remove it and add it again afterwards.")
+                }
+            }
             // Before any list, this copy's own place: not the settings' `url`, which another
             // copy on the same bucket rewrites to its own when it starts (T128).
             let settings = await service.methods.controlSettings

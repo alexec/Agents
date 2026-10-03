@@ -789,6 +789,21 @@ the Mac. Without a Mac host a set-up has no notifications, which is #61's separa
   so the container can restart; on records it never took it refuses to start.
 - An `endpointsChanged` event closes members at every copy, so a bucket set-up with several
   copies announces everywhere at once.
+- **On one bucket (T128)** the other copy is started serving, not receiving, on the same
+  bucket. `handover/mark` proves it: one copy leaves a one-off object outside `v1/`, and
+  the other must find it (`agents-control handover shares`). Then announce, freeze and
+  forward, with no copy and no take. Two things broke on a shared bucket and are fixed:
+  a starting copy writes its own `url` into the shared settings, so announce now starts
+  from the copy's own place; and a settings change on a version another copy has replaced
+  is made again on the new one.
+- **Forwarding survives a restart (#61 P4).** `forward` notes it in the store, keyed by the
+  copy's address, and a restarted copy forwards again. Agents Host passes
+  `--no-forwarding` whenever it isn't forwarding. A cloud copy that should serve again on
+  a shared bucket is started with `AGENTS_CONTROL_FORWARDING=0`.
+- **A host that can't follow stops the announce (T129).** A host record with no
+  `knownEpoch` never said one, so it runs a build from before lists. The announce names
+  it and refuses ("Update it first, or remove it and add it again afterwards"). The
+  command line's `--force` goes on anyway.
 - Not covered by freezing: `agents-control code` run on the machine itself writes a code
   straight into the store. Don't make codes during a handover.
 

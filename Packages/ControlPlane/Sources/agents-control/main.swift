@@ -376,7 +376,8 @@ func handover() async {
             show(try await link("--at", pin: "--pin").call(Handover.Method.status))
         case "announce":
             show(try await link("--at", pin: "--pin").call(Handover.Method.announce,
-                                                          ["endpoint": try JSONValue.encoding(await endpoints()[0])]))
+                                                          ["endpoint": try JSONValue.encoding(await endpoints()[0]),
+                                                           "force": .bool(arguments.contains("--force"))]))
         case "forward":
             // 30 days at most, the copy's own rule; --days for fewer.
             var params: [String: JSONValue] = ["endpoints": try JSONValue.encoding(await endpoints())]
@@ -413,7 +414,7 @@ func handover() async {
             fail("""
             usage: agents-control handover status|freeze|unfreeze|withdraw|take|stop --at URL [--pin PIN] [--json]
                    agents-control handover shares --at URL [--pin PIN] --with URL [--with-pin PIN]
-                   agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN] [--days N]
+                   agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN] [--days N] [--force]
             (URL may be `self`: the copy serving this store, at the address and pin its settings say)
                    agents-control handover copy --from URL|STORE [--from-pin PIN] --to URL|STORE [--to-pin PIN]
             """)
