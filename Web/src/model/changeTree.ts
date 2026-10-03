@@ -136,3 +136,22 @@ export function statusPhrase(file: ChangedFile): string {
   if (file.state === "untracked") return "untracked, not in git";
   return statusWord(file.state);
 }
+
+/** ChangeWords.lines. */
+export function lineWords(added?: number, removed?: number): string | undefined {
+  if (added === undefined || removed === undefined || (!added && !removed)) return undefined;
+  if (!removed) return added === 1 ? "1 line added" : `${added} lines added`;
+  if (!added) return removed === 1 ? "1 line removed" : `${removed} lines removed`;
+  return `${added} ${added === 1 ? "line" : "lines"} added, ${removed} removed`;
+}
+
+/** ChangeWords.label, for a file's row: its name, what happened, and how much. */
+export function fileWords(file: ChangedFile, name = fileName(file)): string {
+  return [name, statusPhrase(file), lineWords(file.added, file.removed), file.inProgress ? "still being edited" : undefined]
+    .filter(Boolean).join(", ");
+}
+
+/** ChangeWords.label, for a folder's total. */
+export function totalWords(t: Totals): string {
+  return [t.files === 1 ? "1 changed file" : `${t.files} changed files`, lineWords(t.added, t.removed)].filter(Boolean).join(", ");
+}
