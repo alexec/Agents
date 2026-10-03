@@ -17,14 +17,16 @@ struct EventsListView: View {
     private var filter: EventFilter { EventFilter(scope: scope) }
 
     /// The Mac sends pages already narrowed; narrowing here too keeps the list right in
-    /// the moment between the menu changing and its page arriving.
-    private var events: [Event] {
-        model.work.recentEvents.filter(filter.matches)
+    /// the moment between the menu changing and its page arriving. Narrowed and cut into
+    /// days once per change of the events or the filter, not per redraw (#137).
+    private var shown: ShownEvents {
+        model.work.shownEvents(filter)
     }
 
     var body: some View {
+        let shown = self.shown
         List {
-            if events.isEmpty {
+            if shown.events.isEmpty {
                 Text(model.work.eventsLoaded
                      ? "Nothing has happened yet. Events appear here as agents, workflows and the Mac do things."
                      : "Loading…")
@@ -32,7 +34,7 @@ struct EventsListView: View {
                     .foregroundStyle(.secondary)
                     .paperListRow()
             }
-            ForEach(EventDay.grouped(events), id: \.day) { day in
+            ForEach(shown.days, id: \.day) { day in
                 Section(EventDay.heading(for: day.day)) {
                     ForEach(day.events, id: \.position) { event in
                         EventRow(event: event, scopeName: scopeName(event.scope),

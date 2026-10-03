@@ -172,7 +172,13 @@ public final class AgentsModel {
     /// The newest events (042), newest first, as far back as has been paged in. A new
     /// or changed event from `events/changed` is put in by its position. Empty until a
     /// page has been asked for, and on a daemon too old to have events.
-    public private(set) var recentEvents: [Event] = []
+    public private(set) var recentEvents: [Event] = [] {
+        didSet { eventsRevision &+= 1 }
+    }
+    /// The last `shownEvents` worked out, and for what (#137).
+    @ObservationIgnored private var eventsRevision = 0
+    @ObservationIgnored private var shownMemo: (revision: Int, filter: EventFilter, calendar: Calendar,
+                                                shown: ShownEvents)?
     /// Whether the daemon has older events than `recentEvents` reaches.
     public private(set) var moreEvents = false
     /// What `recentEvents` is narrowed to. Set by whoever asks for a page, before it
@@ -637,6 +643,20 @@ public final class AgentsModel {
         moreEvents = page.hasMore
         waitingAgents = page.waiting
         eventsLoaded = true
+    }
+
+    /// `recentEvents` narrowed to `filter` and cut into days, as an Events page draws
+    /// them. Worked out again only when the events, the filter or the calendar change,
+    /// not on every redraw of the page (#137). Reads `recentEvents` either way, so a page
+    /// asking is redrawn when they change.
+    public func shownEvents(_ filter: EventFilter, calendar: Calendar = .current) -> ShownEvents {
+        let events = recentEvents
+        if let memo = shownMemo, memo.revision == eventsRevision, memo.filter == filter, memo.calendar == calendar {
+            return memo.shown
+        }
+        let shown = ShownEvents(events.filter(filter.matches), calendar: calendar)
+        shownMemo = (eventsRevision, filter, calendar, shown)
+        return shown
     }
 
     /// One event, new or changed, put in by its position so the list stays newest first.
@@ -1180,3 +1200,24 @@ private struct AgentBuckets {
     var byKey: [Key: [AgentGroup: [Agent]]] = [:]
 }
 
+/// The events an Events page shows, and the same cut into days (#137).
+public struct ShownEvents {
+    /// Newest first, as `recentEvents` holds them.
+    public let events: [Event]
+    /// Newest day first, each day's events newest first.
+    public let days: [(day: Date, events: [Event])]
+
+    public init(_ events: [Event], calendar: Calendar = .current) {
+        self.events = events
+        var days: [(day: Date, events: [Event])] = []
+        for event in events {
+            let day = calendar.startOfDay(for: event.at)
+            if days.last?.day == day {
+                days[days.count - 1].events.append(event)
+            } else {
+                days.append((day, [event]))
+            }
+        }
+        self.days = days
+    }
+}

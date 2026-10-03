@@ -106,4 +106,31 @@ struct FiledOnceTests {
         model.takeListed([])
         #expect(model.agents.count == 3)
     }
+
+    private func event(_ position: EventPosition, _ folder: URL, at offset: Double) -> Event {
+        Event(EventDraft(name: "agent.finished", at: t0.addingTimeInterval(offset),
+                         scope: .project(folder: folder), sentence: "finished", details: [:]),
+              position: position)
+    }
+
+    @Test func shownEventsFollowTheEventsAndTheFilter() {
+        let model = AgentsModel()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let day: Double = 86_400
+        model.takeEvents(DaemonAPI.EventsPage(events: [event(4, api, at: day + 60), event(3, web, at: day),
+                                                       event(2, api, at: 60), event(1, api, at: 0)],
+                                              waiting: [], hasMore: false))
+        let all = model.shownEvents(EventFilter(), calendar: calendar)
+        #expect(all.events.map(\.position) == [4, 3, 2, 1])
+        #expect(all.days.map { $0.events.map(\.position) } == [[4, 3], [2, 1]])
+
+        let onlyAPI = EventFilter(scope: .project(folder: api))
+        #expect(model.shownEvents(onlyAPI, calendar: calendar).days.map { $0.events.map(\.position) } == [[4], [2, 1]])
+
+        model.takeEvent(event(5, api, at: day + 120))
+        #expect(model.shownEvents(onlyAPI, calendar: calendar).events.map(\.position) == [5, 4, 2, 1],
+                "a new event is shown, not the copy worked out before it")
+        #expect(model.shownEvents(EventFilter(), calendar: calendar).events.count == 5)
+    }
 }

@@ -123,6 +123,13 @@ struct RedrawCostBenchmarks {
         model.takeEvents(DaemonAPI.EventsPage(events: Self.events(), waiting: [], hasMore: false))
         let filter = EventFilter(scope: .project(folder: Project.standardize(Self.folders[0])))
         let before = Self.median { for _ in 0..<10 { _ = Self.eventsViewBeforeCalls(model, filter) } }
-        print("BENCH #137 events view (old body pattern), 1000 events: redraw \(before / 10)")
+        // Since #137: one memoised read, then the unseen count over what it returns.
+        let after = Self.median {
+            for _ in 0..<10 {
+                let shown = model.shownEvents(filter)
+                _ = shown.events.isEmpty ? 0 : shown.days.count + shown.events.count(where: { $0.position > 500 })
+            }
+        }
+        print("BENCH #137 events view, 1000 events: redraw before \(before / 10), after \(after / 10)")
     }
 }
