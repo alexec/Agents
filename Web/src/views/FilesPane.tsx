@@ -3,7 +3,7 @@
 // (what the agent changed), and Page (a live page the agent shows, or one opened from Files).
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import type { DirectoryEntry } from "../protocol/generated";
+import type { Agent, DirectoryEntry } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { replace, route } from "../route";
@@ -136,6 +136,7 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
               onClick={() => setPane(session, { tab })}>{label}</button>
           ))}
         </span>
+        {agent && pane.tab === "page" && pane.page && <PinButton store={store} host={host} agent={agent} file={pane.page} />}
         <button class="icon" aria-label="Close Files" onClick={() => replace({ ...route.value, files: false })}>✕</button>
       </header>
       <div class="scroll pane-body">
@@ -147,4 +148,26 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
       </div>
     </aside>
   );
+}
+
+/**
+ * Pin to Project, or Unpin when it is pinned (#159): the page under the project, beside its
+ * Dashboard. From a worktree, the same path in the project folder, where the pin opens it.
+ */
+function PinButton({ store, host, agent, file }: { store: Store; host: string; agent: Agent; file: string }) {
+  const folder = agent.worktree?.project ?? agent.cwd;
+  const base = pathOf(agent.worktree ? agent.cwd : folder) + "/";
+  const absolute = file.startsWith("/") ? file : pathOf(file);
+  if (!absolute.startsWith(base) || !/\.(md|markdown|mdown|mkd|html?)$/i.test(absolute)) return null;
+  const path = absolute.slice(base.length);
+  const pins = store.pinsIn(host, folder);
+  if (pins.some((p) => p.path === path)) {
+    return <button class="icon" aria-label="Unpin" title="Pinned under the project. Click to unpin it."
+      onClick={() => void store.unpin(host, folder, path)}>📌</button>;
+  }
+  const full = pins.length >= 10;
+  return <button class="icon" aria-label="Pin to Project" disabled={full}
+    title={full ? "This project already has 10 pinned pages, the most it can have. Unpin one first."
+      : "Pin to Project: under the project in the sidebar, beside its Dashboard."}
+    onClick={() => void store.pin(host, folder, path)}>📍</button>;
 }

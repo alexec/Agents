@@ -40,6 +40,13 @@ public final class AgentsModel {
     public var dashboards: [URL: DashboardSnapshot] = [:]
     public private(set) var dashboardRevisions: [URL: Int] = [:]
 
+    /// Each project's pinned pages (#159), by its standardized folder: kept current by
+    /// `pins/changed`, which carries them. A project with none is absent.
+    public private(set) var pins: [URL: [PinView]] = [:]
+    /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
+    /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
+    public private(set) var pageRevisions: [URL: Int] = [:]
+
     /// Each project's plugins, by its standardized folder, as the daemon last listed them:
     /// which are waiting for the person's OK (security review, S2).
     public private(set) var plugins: [URL: [ProjectPlugin]] = [:]
@@ -266,6 +273,8 @@ public final class AgentsModel {
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
         case dashboardChanged(DaemonAPI.DashboardChangedNotification)
+        case pinsChanged(DaemonAPI.PinsChangedNotification)
+        case pagesChanged(DaemonAPI.PagesChangedNotification)
         case pluginsChanged(DaemonAPI.PluginsList)
         case costChanged(DaemonAPI.CostState)
         case retentionChanged(DaemonAPI.RetentionState)
@@ -301,6 +310,8 @@ public final class AgentsModel {
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
         case DaemonAPI.Notification.dashboardChanged:
             return decode(DaemonAPI.DashboardChangedNotification.self, Update.dashboardChanged)
+        case DaemonAPI.Notification.pinsChanged: return decode(DaemonAPI.PinsChangedNotification.self, Update.pinsChanged)
+        case DaemonAPI.Notification.pagesChanged: return decode(DaemonAPI.PagesChangedNotification.self, Update.pagesChanged)
         case DaemonAPI.Notification.pluginsChanged: return decode(DaemonAPI.PluginsList.self, Update.pluginsChanged)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
         case DaemonAPI.Notification.retentionChanged: return decode(DaemonAPI.RetentionState.self, Update.retentionChanged)
@@ -421,6 +432,13 @@ public final class AgentsModel {
             dashboardSummaries[folder] = notification.summary
             dashboardRevisions[folder, default: 0] += 1
 
+        case .pinsChanged(let notification):
+            let folder = Project.standardize(notification.folder)
+            pins[folder] = notification.pins.isEmpty ? nil : notification.pins
+
+        case .pagesChanged(let notification):
+            pageRevisions[Project.standardize(notification.folder), default: 0] += 1
+
         case .pluginsChanged(let list):
             replacePlugins(list)
 
@@ -539,6 +557,24 @@ public final class AgentsModel {
         let folder = Project.standardize(snapshot.folder)
         dashboards[folder] = snapshot
         dashboardSummaries[folder] = DashboardModel.summary(snapshot)
+    }
+
+    /// One project's pinned pages, in their order.
+    public func pins(in folder: URL?) -> [PinView] {
+        folder.map { pins[Project.standardize($0)] ?? [] } ?? []
+    }
+
+    public func replacePins(_ listed: [ProjectPins]) {
+        pins = Dictionary(listed.map { (Project.standardize($0.folder), $0.pins) }, uniquingKeysWith: { $1 })
+    }
+
+    /// A project's pins as a screen left them, before the host says so: a drop, an Unpin.
+    public func setPins(_ list: [PinView], in folder: URL) {
+        pins[Project.standardize(folder)] = list.isEmpty ? nil : list
+    }
+
+    public func pageRevision(in folder: URL?) -> Int {
+        folder.map { pageRevisions[Project.standardize($0)] ?? 0 } ?? 0
     }
 
     public func dashboardRevision(in folder: URL?) -> Int {

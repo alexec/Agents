@@ -935,3 +935,16 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .file-tree .tree-row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
 .file-tree .tree-row .icon { display: inline-block; width: 14px; text-align: center; font-size: 11px; }
 .file-tree:focus-visible .tree-row.cursor, .file-tree:focus .tree-row.cursor { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* A pinned page (#159) in the chat's place. */
+.pinned-page { display: flex; flex-direction: column; }
+.pinned-page .pin-head { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pinned-page .pin-head h1 { margin: 0; }
+.pinned-page .live-page { flex: 1; overflow: auto; }
+.pinned-page .page-source { flex: 1; overflow: auto; padding: 8px 16px; }
+.pinned-page .page-source pre { margin: 0; white-space: pre-wrap; font-size: 12px; }
+.pinned-page > .hint { padding: 24px; text-align: center; }
+/* A page tile (#159): the top of a project's page, with Open for the rest. */
+.page-tile-body { max-height: 300px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 80%, transparent);
+  mask-image: linear-gradient(#000 80%, transparent); }
+pre.page-tile-body { white-space: pre-wrap; font-size: 11px; margin: 0; }

@@ -64,12 +64,13 @@ struct RemoteView: View {
     /// somewhere you go from the project and come back out of, not a third column.
     private var path: Binding<[RemoteRoute]> {
         Binding(get: {
-                    [model.openDashboard ? RemoteRoute.dashboard : nil,
+                    [model.openDashboard ? RemoteRoute.dashboard : nil, model.openPin.map(RemoteRoute.page),
                      model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
                         .compactMap { $0 }
                 },
                 set: { routes in
                     model.openDashboard = routes.contains(.dashboard)
+                    model.openPin = routes.lazy.compactMap(\.pinPath).first
                     model.openWorkflow = routes.lazy.compactMap(\.workflowID).first
                     model.selection = routes.compactMap(\.agentID).last
                 })
@@ -95,6 +96,10 @@ struct RemoteView: View {
                             }
                         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
                         case .dashboard: DashboardPage().paperGround()
+                        case .page(let path):
+                            if let folder = model.selectedProject {
+                                PinnedPage(folder: folder, path: path).paperGround()
+                            }
                         }
                     }
             }
@@ -147,6 +152,13 @@ enum RemoteRoute: Hashable {
     case agent(UUID)
     /// The project's Dashboard (074).
     case dashboard
+    /// One of the project's pinned pages (#159), by its path in the project.
+    case page(String)
+
+    var pinPath: String? {
+        if case .page(let path) = self { return path }
+        return nil
+    }
 
     var workflowID: Workflow.ID? {
         if case .workflow(let id) = self { return id }

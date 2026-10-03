@@ -42,3 +42,9 @@ test("cleaning keeps each tile and heading once and drops empty sections", () =>
   assert.deepEqual(d.cleaned({ sections: [{ title: "", tiles: ["a", "a"] }, { tiles: ["b", "x"] }, { title: "E", tiles: [] }] },
     new Set(["a", "b"])), { sections: [{ tiles: ["a", "b"] }] });
 });
+
+test("a page tile (#159) is wide and never stale", () => {
+  const page = { ...tile("p", undefined, 5), tile: { title: "Roadmap", type: "page", keeper: { agent: "a" }, page: { file: "docs/roadmap.md" } } };
+  assert.equal(d.isWide(page), true);
+  assert.equal(d.isStale(page, 10 ** 12), false);
+});

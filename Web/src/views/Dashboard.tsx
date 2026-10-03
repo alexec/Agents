@@ -255,7 +255,7 @@ function Tile({ store, host, folder, tile, now, down, onDetail, drag, moves }: {
   );
 }
 
-function Value({ host, folder, tile, now }: { store: Store; host: string; folder: string; tile: TileView; now: number }) {
+function Value({ store, host, folder, tile, now }: { store: Store; host: string; folder: string; tile: TileView; now: number }) {
   const file = tile.tile;
   if (!file) return <p class="failure">⚠︎ {tile.problem ?? "This tile's file can't be read."}</p>;
   switch (file.type) {
@@ -299,6 +299,8 @@ function Value({ host, folder, tile, now }: { store: Store; host: string; folder
       return <div class="note"><Markdown text={file.note?.markdown ?? ""} /></div>;
     case "link":
       return <LinkValue host={host} folder={folder} link={file.link ?? {}} />;
+    case "page":
+      return <PageValue store={store} host={host} folder={folder} file={file.page?.file ?? ""} />;
   }
 }
 
@@ -313,7 +315,41 @@ function LinkValue({ host, folder, link }: { host: string; folder: string; link:
   }
   if (link.session) return <button class="link" onClick={() => go({ host, project: folder, session: link.session })}>A session →</button>;
   if (link.workflow) return <button class="link" onClick={() => go({ host, project: folder, workflow: link.workflow })}>Workflow {link.workflow} →</button>;
+  // A document or a page of the project's opens where a pinned one does (#159).
+  if (link.file && /\.(md|markdown|mdown|mkd|html?)$/i.test(link.file)) {
+    return <button class="link" onClick={() => go({ host, project: folder, page: link.file })}>{link.file} →</button>;
+  }
   return <span>{link.file ?? ""}</span>;
+}
+
+/**
+ * A page tile (#159): the top of the project's document, live, and Open for the whole of it in
+ * the chat's place. HTML is its source here, as a pinned one is: the page allows no frames.
+ */
+function PageValue({ store, host, folder, file }: { store: Store; host: string; folder: string; file: string }) {
+  const text = useSignal<string | null>(null);
+  const problem = useSignal<string | null>(null);
+  const revision = store.pageRevisions.value[`${host}|${folderKey(folder)}`] ?? 0;
+  useEffect(() => {
+    let gone = false;
+    store.readPage(host, folder, file).then((r) => {
+      if (gone) return;
+      if (r.kind === "text") { text.value = r.text; problem.value = null; }
+      else if (r.kind !== "unchanged") problem.value = `${file} can't be shown as a page.`;
+    }).catch(() => { if (!gone) problem.value = `${file} isn't in the project folder.`; });
+    return () => { gone = true; };
+  }, [host, folder, file, revision]);
+  const isHTML = /\.html?$/i.test(file);
+  return (
+    <div class="page-tile">
+      {problem.value ? <p class="failure">⚠︎ {problem.value}</p>
+        : text.value === null ? <p class="hint">Reading {file}…</p>
+        : isHTML ? <pre class="page-tile-body">{text.value}</pre>
+        : <div class="page-tile-body note"><Markdown text={text.value} /></div>}
+      <p class="small quiet"><span>{file}</span>{" · "}
+        <button class="link" onClick={() => go({ host, project: folder, page: file })}>Open</button></p>
+    </div>
+  );
 }
 
 function TileDetail({ tile, now, onClose }: { tile: TileView; now: number; onClose: () => void }) {

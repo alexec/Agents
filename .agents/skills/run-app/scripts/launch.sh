@@ -34,7 +34,8 @@ while [ $# -gt 0 ]; do
     --env)       EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the host, e.g. AGENTS_TEST_…=…
     --control-env) CONTROL_ENV+=("$2"); shift ;;  # KEY=VALUE for the control plane, e.g. AGENTS_SSH=…
     --appearance) APP_ARGS+=(--appearance "$2"); shift ;;  # light|dark|system for the window, no setting changed
-    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark]" >&2; exit 2 ;;
+    --app-arg)   APP_ARGS+=("$2"); shift ;;   # one more argument for the window, e.g. a defaults key: -key value
+    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]…" >&2; exit 2 ;;
   esac
   shift
 done

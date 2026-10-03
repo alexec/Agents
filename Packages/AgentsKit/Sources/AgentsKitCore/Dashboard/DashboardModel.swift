@@ -13,7 +13,10 @@ public enum DashboardModel {
 
     /// Past its own stale-after time, or never set on this host (FR-024, a clone).
     public static func isStale(_ tile: TileView, now: Date) -> Bool {
-        guard let file = tile.tile, let setAt = tile.setAt else { return true }
+        guard let file = tile.tile else { return true }
+        // A page's value is its file, live: never stale (#159).
+        if file.type == .page { return false }
+        guard let setAt = tile.setAt else { return true }
         return now.timeIntervalSince(setAt) > file.staleAfter
     }
 

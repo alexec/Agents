@@ -16,7 +16,10 @@ export function historyFile(id: string): string {
 
 /** Past its own stale-after time, or never set on this host (FR-024). */
 export function isStale(tile: TileView, now: number): boolean {
-  if (!tile.tile || tile.setAt === undefined) return true;
+  if (!tile.tile) return true;
+  // A page's value is its file, live: never stale (#159).
+  if (tile.tile.type === "page") return false;
+  if (tile.setAt === undefined) return true;
   return now - tile.setAt > (tile.tile.stale_after_hours ?? 24) * 3600;
 }
 
@@ -184,7 +187,7 @@ export function neighbour(shown: { title: string | null; tiles: TileView[] }[], 
 
 /** Tables and notes take the grid's width. */
 export function isWide(tile: TileView): boolean {
-  return tile.tile?.type === "table" || tile.tile?.type === "note";
+  return tile.tile?.type === "table" || tile.tile?.type === "note" || tile.tile?.type === "page";
 }
 
 /** The row's line: "8 tiles · 1 to watch · Open bugs 4" (the window's DashboardRow.detail). */

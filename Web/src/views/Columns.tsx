@@ -25,6 +25,7 @@ import { WorkflowRow } from "./WorkflowRow";
 import { Resources } from "./Resources";
 import { WorkflowPage } from "./WorkflowPage";
 import { DashboardPage, DashboardRow } from "./Dashboard";
+import { PinnedPage, PinnedPageRows } from "./Pins";
 import { workflowSummary } from "../model/workflows";
 import { Sidebar } from "./Sidebar";
 import { ActivityPageView } from "./Activity";
@@ -40,7 +41,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   const down = session.state.value.kind === "down";
   // Which single column a narrow window shows: the deepest one the route names.
   const wide = sidebarFits.value;
-  const depth = r.session || r.workflow || r.dashboard || r.compose ? "chat" : r.project ? "sessions" : "projects";
+  const depth = r.session || r.workflow || r.dashboard || r.page || r.compose ? "chat" : r.project ? "sessions" : "projects";
   const project = r.host && r.project
     ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
     : undefined;
@@ -73,6 +74,9 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
           ) : r.host && r.project && project && r.dashboard ? (
             <DashboardPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
               down={down || !store.hostIsOnline(r.host)} />
+          ) : r.host && r.project && project && r.page ? (
+            <PinnedPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
+              path={r.page} down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.project && project ? (
             <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
           ) : wide ? <NothingChosen /> : <section class="chat empty" aria-label="Chat"><p>Choose a project.</p></section>}
@@ -251,6 +255,10 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
         {project && host && folder && !search.value && (
           <DashboardRow store={store} host={host} folder={folder} chosen={!!r.dashboard}
             onPick={() => go({ host, project: folder, dashboard: true })} />
+        )}
+        {/* Then its pinned pages (#159), as the window lists them under the project. */}
+        {project && host && folder && !search.value && (
+          <PinnedPageRows store={store} host={host} folder={folder} chosen={r.page} down={linkDown} />
         )}
         {project && (
           <section class="group-list" aria-label="Sessions">

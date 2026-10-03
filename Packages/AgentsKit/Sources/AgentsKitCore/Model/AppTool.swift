@@ -99,6 +99,13 @@ public enum AppTool {
     /// Put a tile somewhere else on the Dashboard (#147).
     public static let moveTile = "move_tile"
 
+    /// Pin a Markdown or HTML page under the project, beside its Dashboard (#159).
+    public static let pinPage = "pin_page"
+    /// Unpin a page this agent pinned (#159).
+    public static let unpinPage = "unpin_page"
+    /// Put a pinned page somewhere else among the pins (#159).
+    public static let movePin = "move_pin"
+
     /// The older names for the two halves of `finishTurn`, served from 2026-09-23 (023)
     /// until 2026-09-29. No longer offered or answered; kept only so a conversation that
     /// called them still draws without them, the way it did.
@@ -112,7 +119,7 @@ public enum AppTool {
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
         listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, publishEvent, listSessions, readSession, archiveAgent,
-        setTile, removeTile, readDashboard,
+        setTile, removeTile, readDashboard, moveTile, pinPage, unpinPage, movePin,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

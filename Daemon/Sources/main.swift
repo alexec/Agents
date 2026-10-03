@@ -179,6 +179,15 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
             return await relay(DaemonAPI.Method.dashboardMoveTile,
                                DaemonAPI.MoveTileRequest(token: token, arguments: arguments),
                                fallback: "Moved.")
+        case .pin(let arguments):
+            return await relay(DaemonAPI.Method.pinsPinPage,
+                               DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Pinned.")
+        case .unpin(let arguments):
+            return await relay(DaemonAPI.Method.pinsUnpinPage,
+                               DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Unpinned.")
+        case .movePin(let arguments):
+            return await relay(DaemonAPI.Method.pinsMovePin,
+                               DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Moved.")
         case .read:
             return await relay(DaemonAPI.Method.dashboardRead,
                                DaemonAPI.DashboardTokenRequest(token: token),

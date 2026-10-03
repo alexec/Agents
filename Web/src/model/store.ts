@@ -8,6 +8,7 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage,
+  PagesChangedNotification, PinsChangedNotification, PinView,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -93,6 +94,11 @@ export class Work {
   /** The Dashboards opened, by `host|folder`; asked again when `dashboardRevisions` moves. */
   readonly dashboards = signal<Record<string, DashboardSnapshot>>({});
   readonly dashboardRevisions = signal<Record<string, number>>({});
+
+  /** Each project's pinned pages by `host|folder` (#159), kept by pins/changed. */
+  readonly pins = signal<Record<string, PinView[]>>({});
+  /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
+  readonly pageRevisions = signal<Record<string, number>>({});
 
   /** Each project's workflows by `host|folder`, listed when the project is chosen. */
   readonly workflows = signal<Record<string, WorkflowSummary[]>>({});
@@ -181,6 +187,17 @@ export class Work {
           this.dashboardSummaries.value = { ...this.dashboardSummaries.value, [key]: note.summary };
           this.dashboardRevisions.value = { ...this.dashboardRevisions.value, [key]: (this.dashboardRevisions.value[key] ?? 0) + 1 };
         });
+        return true;
+      }
+      case "pins/changed": {
+        const note = params as PinsChangedNotification;
+        this.pins.value = { ...this.pins.value, [`${host}|${folderKey(note.folder)}`]: note.pins };
+        return true;
+      }
+      case "pages/changed": {
+        const note = params as PagesChangedNotification;
+        const key = `${host}|${folderKey(note.folder)}`;
+        this.pageRevisions.value = { ...this.pageRevisions.value, [key]: (this.pageRevisions.value[key] ?? 0) + 1 };
         return true;
       }
       case "workflow/removed": {
@@ -454,6 +471,11 @@ export class Store extends Work {
       for (const summary of listed) held[`${host}|${folderKey(summary.folder)}`] = summary;
       this.dashboardSummaries.value = held;
     }).catch(failed("dashboard/summaries"));
+    void this.link.call("pins/list", {}, host).then((listed) => {
+      const held = Object.fromEntries(Object.entries(this.pins.value).filter(([key]) => !key.startsWith(`${host}|`)));
+      for (const project of listed) held[`${host}|${folderKey(project.folder)}`] = project.pins;
+      this.pins.value = held;
+    }).catch(failed("pins/list"));
     void this.link.call("leases/snapshot", {}, host).then((snapshot) => {
       this.leases.value = { ...this.leases.value, [host]: snapshot };
     }).catch(failed("leases/snapshot"));
@@ -713,6 +735,40 @@ export class Store extends Work {
   /** What the person typed on a live page, written to the file as the window writes it. */
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
+  }
+
+  // MARK: Pinned pages (#159)
+
+  pinsIn(host: string, folder: string): PinView[] {
+    return this.pins.value[`${host}|${folderKey(folder)}`] ?? [];
+  }
+
+  /** A file of the project's: a pinned page, a page tile's, or what an HTML page draws from. */
+  readPage(host: string, folder: string, path: string, knownStamp?: FileStamp) {
+    return this.link.call("pins/read", { folder: folder as never, path, ...(knownStamp ? { knownStamp } : {}) }, host);
+  }
+
+  async writePage(host: string, folder: string, path: string, text: string): Promise<boolean> {
+    return (await this.act("pins/write", { folder: folder as never, path, text }, host)) !== null;
+  }
+
+  async pin(host: string, folder: string, path: string): Promise<void> {
+    const pins = await this.act("pins/pin", { folder: folder as never, path }, host);
+    if (pins) this.pins.value = { ...this.pins.value, [`${host}|${folderKey(folder)}`]: pins };
+  }
+
+  async unpin(host: string, folder: string, path: string): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    this.pins.value = { ...this.pins.value, [key]: this.pinsIn(host, folder).filter((p) => p.path !== path) };
+    await this.act("pins/unpin", { folder: folder as never, path }, host);
+  }
+
+  /** A drop or a Move item: shown at once, then the whole order sent once. */
+  async arrangePins(host: string, folder: string, paths: string[]): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    const held = this.pinsIn(host, folder);
+    this.pins.value = { ...this.pins.value, [key]: paths.flatMap((path) => held.filter((p) => p.path === path)) };
+    await this.act("pins/arrange", { folder: folder as never, paths }, host);
   }
 
   /** One project's Dashboard (074), asked for when it opens and on each dashboard/changed for it. */

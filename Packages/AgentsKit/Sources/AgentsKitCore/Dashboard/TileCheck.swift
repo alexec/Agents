@@ -33,10 +33,10 @@ public struct TileCheck: Sendable, Equatable {
             return fail("`title` is over \(TileLimits.titleLength) characters.")
         }
         guard let rawType = text("type") else {
-            return fail("say its `type`: number, status, table, note or link.")
+            return fail("say its `type`: number, status, table, note, link or page.")
         }
         guard let type = TileType(rawValue: rawType.lowercased()) else {
-            return fail("`type` \"\(rawType)\" is not one of number, status, table, note or link.")
+            return fail("`type` \"\(rawType)\" is not one of number, status, table, note, link or page.")
         }
         let section = text("section")
         if tooLong("section", section, TileLimits.sectionLength) {
@@ -166,6 +166,21 @@ public struct TileCheck: Sendable, Equatable {
                 return fail("the link is over \(TileLimits.sourceLength) characters.")
             }
             tile.link = link
+
+        case .page:
+            guard let file = text("file") else {
+                return fail("a page tile needs `file`: a Markdown or HTML file in the project, e.g. docs/roadmap.md.")
+            }
+            guard !file.hasPrefix("/"), let path = PinRules.normalize(file) else {
+                return fail("`file` has to be a path inside the project, from its folder, e.g. docs/roadmap.md.")
+            }
+            guard PinRules.kind(path) != nil else {
+                return fail("a page tile shows a Markdown (.md) or HTML (.html) file.")
+            }
+            guard path.count <= TileLimits.sourceLength else {
+                return fail("`file` is over \(TileLimits.sourceLength) characters.")
+            }
+            tile.page = TilePage(file: path)
         }
 
         let takeOver = arguments?["take_over"]?.boolValue ?? false

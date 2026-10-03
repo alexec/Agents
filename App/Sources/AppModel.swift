@@ -115,6 +115,7 @@ final class AppModel {
             selection = nil
             openWorkflow = nil
             openDashboard = false
+            openPin = nil
             composing = false
         }
     }
@@ -272,6 +273,7 @@ final class AppModel {
             if showsSpending { return .spending }
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
+            if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
             return openDashboard || composing ? .project(key) : nil
         }
@@ -286,6 +288,8 @@ final class AppModel {
                 showsRuntimes = false
                 select(key)
                 openWorkflow = id
+            case .pin(let path, let key):
+                showPin(path, in: key)
             case .spending:
                 showsSpending = true
             case .resources:
@@ -343,6 +347,7 @@ final class AppModel {
             selection = nil
             openWorkflow = nil
             openDashboard = false
+            openPin = nil
         }
     }
 
@@ -352,6 +357,7 @@ final class AppModel {
         selection = nil
         openWorkflow = nil
         openDashboard = false
+        openPin = nil
         composing = false
     }
 
@@ -387,6 +393,7 @@ final class AppModel {
             if selection != nil {
                 openWorkflow = nil
                 openDashboard = false
+                openPin = nil
                 composing = false
             }
             chatOpening = selection.map { (agent: $0, timing: Perf.begin("chat-open")) }
@@ -410,6 +417,7 @@ final class AppModel {
         didSet {
             if openWorkflow != nil {
                 openDashboard = false
+                openPin = nil
                 composing = false
             }
         }
@@ -422,8 +430,31 @@ final class AppModel {
             guard openDashboard, !oldValue else { return }
             selection = nil
             openWorkflow = nil
+            openPin = nil
             composing = false
         }
+    }
+
+    /// The selected project's pinned page (#159) open in the chat's place, by its path in
+    /// the project: a fourth sibling of `selection`, `openWorkflow` and `openDashboard`.
+    var openPin: String? {
+        didSet {
+            guard openPin != nil else { return }
+            selection = nil
+            openWorkflow = nil
+            openDashboard = false
+            composing = false
+        }
+    }
+
+    /// A project's pinned page, from its row or a page tile's Open.
+    func showPin(_ path: String, in key: ProjectKey) {
+        showsSpending = false
+        showsResources = false
+        showsEvents = false
+        showsRuntimes = false
+        select(key)
+        openPin = path
     }
 
     // What the prompt bar is holding before there is an agent to hold it. It lives
@@ -786,6 +817,66 @@ final class AppModel {
                                    DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
                                                                    workflowID: summary.workflowID,
                                                                    enabled: enabled))
+    }
+
+    // MARK: Pinned pages (#159)
+
+    func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }
+    func pageRevision(in folder: URL?) -> Int { work.pageRevision(in: folder) }
+
+    func refreshPins() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty(),
+                                                  returning: [ProjectPins].self) else { return }
+        work.replacePins(listed)
+    }
+
+    /// A file of a project's, for a pinned page, a page tile, or what an HTML page draws.
+    func readPage(_ path: String, in key: ProjectKey, known: FileStamp? = nil) async throws -> FileReading {
+        try await client(for: key.host).call(DaemonAPI.Method.pinsRead,
+                                             DaemonAPI.PinReadRequest(folder: key.folder, path: path, knownStamp: known),
+                                             returning: FileReading.self)
+    }
+
+    /// What the person typed on a pinned Markdown page. Why it was not saved, or nil.
+    func writePage(_ path: String, in key: ProjectKey, text: String) async -> String? {
+        do {
+            try await client(for: key.host).call(DaemonAPI.Method.pinsWrite,
+                                                 DaemonAPI.PinWriteRequest(folder: key.folder, path: path, text: text))
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// Pin to Project, from the files pane: a path absolute on the project's host.
+    func pin(_ path: String, in key: ProjectKey) async {
+        await attempt(on: key.host) {
+            let pins = try await self.client(for: key.host).call(DaemonAPI.Method.pinsPin,
+                                                                 DaemonAPI.PinRequest(folder: key.folder, path: path),
+                                                                 returning: [PinView].self)
+            self.work.setPins(pins, in: key.folder)
+        }
+    }
+
+    func unpin(_ path: String, in key: ProjectKey) async {
+        work.setPins(pins(in: key.folder).filter { $0.path != path }, in: key.folder)
+        if openPin == path, selectedProjectKey == key { showProject(key) }
+        await attempt(on: key.host) {
+            try await self.client(for: key.host).call(DaemonAPI.Method.pinsUnpin,
+                                                      DaemonAPI.PinPathRequest(folder: key.folder, path: path))
+        }
+    }
+
+    /// A drop or a Move item: shown at once, then the whole order sent once.
+    func arrangePins(_ paths: [String], in key: ProjectKey) async {
+        let held = pins(in: key.folder)
+        work.setPins(paths.compactMap { path in held.first { $0.path == path } }, in: key.folder)
+        await attempt(on: key.host) {
+            try await self.client(for: key.host).call(DaemonAPI.Method.pinsArrange,
+                                                      DaemonAPI.PinArrangeRequest(folder: key.folder, paths: paths))
+        }
     }
 
     // MARK: Dashboard (074)
@@ -1948,6 +2039,7 @@ final class AppModel {
         async let accounts: Void = refreshAccounts()
         async let workflows: Void = refreshWorkflows()
         async let dashboards: Void = refreshDashboardSummaries()
+        async let pinned: Void = refreshPins()
         async let permissions: Void = refreshPermissions()
         async let elicitations: Void = refreshElicitations()
         async let attention: Void = refreshAttention()
@@ -1964,7 +2056,7 @@ final class AppModel {
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
-        _ = await (runtimes, accounts, workflows, dashboards, permissions,
+        _ = await (runtimes, accounts, workflows, dashboards, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person)
         #if DEBUG

@@ -78,6 +78,11 @@ struct ProjectPageView: View {
                     DashboardRow(folder: folder)
                 }
 
+                // Then its pinned pages (#159), as the Mac lists them under the project.
+                if query.isEmpty, let folder = model.selectedProject {
+                    PinnedPageCards(folder: folder)
+                }
+
                 if !isEmpty {
                     SectionHeading(title: "Sessions")
                 }

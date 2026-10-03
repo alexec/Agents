@@ -188,6 +188,8 @@ struct ProjectListView: View {
             folds.set(ProjectKey(host: agent.host, folder: agent.projectFolder), open: true)
         } else if case .workflow(_, let key) = item {
             folds.set(key, open: true)
+        } else if case .pin(_, let key) = item {
+            folds.set(key, open: true)
         }
         if picked.count <= 1 || !picked.contains(item) { picked = [item] }
     }
@@ -265,6 +267,11 @@ private struct ProjectFold: View {
             DisclosureGroup(isExpanded: Binding(
                 get: { searching || folds.isOpen(key) },
                 set: { folds.set(key, open: $0) })) {
+                // The project's pinned pages (#159), beside the Dashboard its own row opens,
+                // before its sessions. Not while searching: the search is for sessions.
+                if !searching {
+                    PinnedPageRows(project: key)
+                }
                 ForEach(AgentGroup.live, id: \.self) { group in
                     ForEach(group.headings(lists.shown[group] ?? [])) { part in
                         SidebarSubheading(title: part.title, count: part.agents.count,

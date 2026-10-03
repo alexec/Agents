@@ -306,6 +306,16 @@ public actor DaemonCore {
     /// a successor take its predecessor's tiles over (074 research R1).
     var sessionReads: [UUID: Set<UUID>] = [:]
 
+    // MARK: Pinned pages (#159)
+
+    /// A `pins/changed` waiting to go, per project: at most one a second.
+    var pinBroadcasts: [URL: Task<Void, Never>] = [:]
+    /// The pins last told to screens, so a pinned file coming or going is told once.
+    var pinsSent: [URL: [PinView]] = [:]
+    /// A `pages/changed` waiting to go, per project, and the folders it will name.
+    var pageBroadcasts: [URL: Task<Void, Never>] = [:]
+    var pagesPending: [URL: Set<String>] = [:]
+
     // MARK: Events (042)
 
     /// Where the log and the event sources' memory are kept between runs.

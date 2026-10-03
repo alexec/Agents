@@ -16,7 +16,7 @@ A project's Dashboard is made of tiles that agents keep with `set_tile` (see
 | --- | --- |
 | `id` | 1 to 40 lowercase letters, digits, `_` and `-`, not starting with `_`, unique in the project. It is the file's name. |
 | `title` | Up to 80 characters. |
-| `type` | `number`, `status`, `table`, `note` or `link`. |
+| `type` | `number`, `status`, `table`, `note`, `link` or `page`. |
 | `section` | Optional, up to 40 characters. Tiles are grouped under it, unless the tile has been moved to another (see [Order](#order)). |
 | `source` | Where the value came from, in one line, up to 200 characters. Required for `number` and `table`. |
 | `stale_after_hours` | 1 to 168. Past it without a set, the tile is greyed. 24 if not given. |
@@ -29,7 +29,8 @@ A project's Dashboard is made of tiles that agents keep with `set_tile` (see
 | `status` | `level` (`ok`, `warn`, `bad`, `unknown`), `line`, `since` | `line` up to 200 characters, `since` up to 40. |
 | `table` | `columns`, `rows` | 1 to 6 columns, up to 50 rows, 200 characters a cell. A cell is text, or `{"text", "url"}` for a link. |
 | `note` | `markdown` | 4 KB. Shown as a chat message is, without images. |
-| `link` | one of `url` (http or https), `session` (an id), `file` (a path in the project), `workflow` (an id) | The tile's title names it. |
+| `link` | one of `url` (http or https), `session` (an id), `file` (a path in the project), `workflow` (an id) | The tile's title names it. A Markdown or HTML `file` opens in the chat's place, as a pinned page does. |
+| `page` | `file`: a Markdown or HTML file in the project, from its folder | Drawn live, two cells across: the top of it, about 300 pt (a third of the phone's screen), with **Open** for the rest in the chat's place. Markdown is drawn read-only. HTML is drawn with scripts and the network off on the Mac and the phone, and as its source on the web page. Never greyed: its value is the file. A missing file shows as a broken tile. The file need not be pinned (#159). |
 
 A tile's file is at most 8 KB. A project holds at most 60 tiles, hidden ones included. An agent
 may set at most 120 tiles an hour. A refused call says which limit, and nothing is written.
@@ -63,7 +64,7 @@ and the web page. An agent uses `move_tile`. The order is one file in the projec
 
 ## Staleness
 
-A tile not set within its `stale_after_hours` is greyed on every device, and its foot says how
+A `page` tile is never greyed: its value is the file, read live. Any other tile not set within its `stale_after_hours` is greyed on every device, and its foot says how
 old it is. A greyed status shows no colour. A tile whose keeper is archived or retired says so
 at its foot. Greyed tiles don't count towards the Dashboard row's summary or its red dot.
 

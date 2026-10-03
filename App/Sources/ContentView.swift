@@ -96,6 +96,13 @@ struct ContentView: View {
                 DashboardPage(folder: folder)
             }
             .paperGround()
+        } else if let path = model.openPin, let key = model.selectedProjectKey, let summary = model.selectedProjectSummary {
+            // One of the project's pinned pages (#159), live, where the chat would be.
+            VStack(spacing: 0) {
+                OfflineStrip(host: summary.host)
+                PinnedPage(project: key, path: path)
+            }
+            .paperGround()
         } else if let id = model.selection, model.selectedAgent == nil, let gone = model.retiredTombstone(id) {
             // Retired (051): nothing left to chat with, only who it was.
             RetiredAgentPage(tombstone: gone, startedBy: model.retiredStarterLabel(gone)).paperGround()

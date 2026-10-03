@@ -23,6 +23,7 @@ import { SessionRow } from "./SessionRow";
 import { blockLines } from "../model/block";
 import { sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
+import { PinnedPageRows } from "./Pins";
 
 /** Enough archived sessions to find last week's, as the window shows. */
 const archivedShown = 50;
@@ -47,8 +48,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   const r = route.value;
   // What is open, from anywhere (a link, Back), unfolds its project so its row is there to light.
   useEffect(() => {
-    if (r.host && r.project && (r.session || r.workflow)) folds.set(r.host, r.project, true);
-  }, [r.host, r.project, r.session, r.workflow]);
+    if (r.host && r.project && (r.session || r.workflow || r.page)) folds.set(r.host, r.project, true);
+  }, [r.host, r.project, r.session, r.workflow, r.page]);
   const projects = orderedProjects(store);
   const offline = store.hosts.value.filter((h) => h.state !== "online");
   return (
@@ -191,6 +192,11 @@ function ProjectFold({ store, host, project, query, linkDown }: {
       </div>
       {unfolded && (
         <div class="fold-body">
+          {/* The project's pinned pages (#159), beside the Dashboard its row opens, before its sessions. */}
+          {!searching && (
+            <PinnedPageRows store={store} host={host.id} folder={folder} down={down}
+              chosen={r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder) ? r.page : undefined} />
+          )}
           {groups.map((group) => (
             <div class="group" key={group.group} role="group" aria-label={group.title}>
               <h3 class={`subhead${group.group === "needsAttention" ? " needs" : ""}`}>
@@ -262,7 +268,7 @@ function folderPath(folder: string): string {
 /** Every row the keys move through, in the order shown. */
 function navRows(list: HTMLElement): HTMLElement[] {
   return [...list.querySelectorAll<HTMLElement>(
-    ".activity .row, .project-fold > .row.project .pick, .nav-item .row.session, .nav-item .row.workflow .pick, details.archived > summary",
+    ".activity .row, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, details.archived > summary",
   )].filter((el) => el.offsetParent !== null);
 }
 

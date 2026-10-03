@@ -98,6 +98,8 @@ extension DaemonCore {
         let standardized = Project.standardize(folder)
         guard workflowWatchers[standardized] == nil, Self.isDirectory(standardized) else { return }
         workflowWatchers[standardized] = FolderWatch(root: standardized) { [weak self] changed in
+            // Pinned pages and page tiles (#159) can be anywhere in the project.
+            Task { await self?.pinFilesChanged(changed, in: standardized) }
             guard changed.contains(where: { $0.path.contains("/.agents") }) else { return }
             Task {
                 await self?.scheduleWorkflowRescan(in: standardized)

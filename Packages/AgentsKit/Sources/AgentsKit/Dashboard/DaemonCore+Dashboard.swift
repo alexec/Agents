@@ -131,11 +131,13 @@ extension DaemonCore {
     public func readDashboard(_ request: DaemonAPI.DashboardTokenRequest) throws -> String {
         let caller = try dashboardCaller(request.token)
         let snapshot = dashboardSnapshot(caller.projectFolder, withUpdate: false)
+        // The project's pinned pages first, as the sidebar shows them (#159).
+        let pins = pinsWords(caller.projectFolder, for: caller)
         guard !snapshot.tiles.isEmpty else {
-            return "This project's Dashboard has no tiles yet. Keep one with set_tile."
+            return pins + "\n\nThis project's Dashboard has no tiles yet. Keep one with set_tile."
         }
         let mine = tileKeeper(for: caller)
-        var blocks: [String] = []
+        var blocks: [String] = [pins]
         var position = 0
         // In the order the person sees them, under their headings and numbered (#147).
         for section in DashboardModel.sections(snapshot, includeHidden: true) {
@@ -475,6 +477,8 @@ enum DashboardWords {
             guard let link = tile.link else { return "—" }
             return link.url ?? link.session.map { "session \($0)" } ?? link.file.map { "file \($0)" }
                 ?? link.workflow.map { "workflow \($0)" } ?? "—"
+        case .page:
+            return tile.page.map { "page \($0.file)" } ?? "—"
         }
     }
 }

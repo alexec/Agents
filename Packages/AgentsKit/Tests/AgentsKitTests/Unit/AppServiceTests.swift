@@ -66,7 +66,8 @@ struct AppServiceTests {
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
                 AppService.publishEventToolName,
                 AppService.setTileToolName, AppService.removeTileToolName,
-                AppService.readDashboardToolName, AppService.moveTileToolName])
+                AppService.readDashboardToolName, AppService.moveTileToolName,
+                AppService.pinPageToolName, AppService.unpinPageToolName, AppService.movePinToolName])
 
         let finish = tools.first?["inputSchema"]
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
@@ -650,6 +651,17 @@ struct AppServiceTests {
     /// The app tells its own tools apart by the end of their names (a runtime may
     /// prefix them), so no tool's name may end with another's. 036's release_resource
     /// once ended with lease_resource, and every release became an extension.
+    /// The one pair that does (#159): unpin_page ends with pin_page, so it is matched first,
+    /// under every runtime's spelling. A real agent's unpin was taken for a pin before this.
+    @Test func unpinPageIsNeverTakenForPinPage() throws {
+        for prefix in ["", "mcp__agents__", "agents_", "agents__"] {
+            #expect(try AppService.dashboardCall(named: prefix + AppTool.unpinPage, ["path": "a.md"])?.get()
+                    == .unpin(arguments: ["path": "a.md"]))
+            #expect(try AppService.dashboardCall(named: prefix + AppTool.pinPage, ["path": "a.md"])?.get()
+                    == .pin(arguments: ["path": "a.md"]))
+        }
+    }
+
     @Test func noToolNameEndsWithAnother() {
         let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
                      AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent,

@@ -26,17 +26,19 @@ public struct TileFile: Codable, Hashable, Sendable {
     public var table: TileTable?
     public var note: TileNote?
     public var link: TileLink?
+    /// A live page from the project (#159).
+    public var page: TilePage?
 
     enum CodingKeys: String, CodingKey {
         case title, type, section, keeper, source
         case staleAfterHours = "stale_after_hours"
-        case hidden, number, status, table, note, link
+        case hidden, number, status, table, note, link, page
     }
 
     public init(title: String, type: TileType, section: String? = nil, keeper: TileKeeper,
                 source: String? = nil, staleAfterHours: Int? = nil, hidden: Bool? = nil,
                 number: TileNumber? = nil, status: TileStatus? = nil, table: TileTable? = nil,
-                note: TileNote? = nil, link: TileLink? = nil) {
+                note: TileNote? = nil, link: TileLink? = nil, page: TilePage? = nil) {
         self.title = title
         self.type = type
         self.section = section
@@ -49,6 +51,7 @@ public struct TileFile: Codable, Hashable, Sendable {
         self.table = table
         self.note = note
         self.link = link
+        self.page = page
     }
 
     public var isHidden: Bool { hidden == true }
@@ -74,7 +77,7 @@ public struct TileFile: Codable, Hashable, Sendable {
 }
 
 public enum TileType: String, Codable, Hashable, Sendable, CaseIterable {
-    case number, status, table, note, link
+    case number, status, table, note, link, page
 }
 
 /// Who may set a tile: an agent, or a workflow whose every run keeps it (FR-010).
@@ -189,6 +192,15 @@ public struct TileLink: Codable, Hashable, Sendable {
         self.file = file
         self.workflow = workflow
     }
+}
+
+/// A Markdown document or HTML page in the project, drawn live on the tile (#159). Its
+/// value is the file, so the tile never goes stale.
+public struct TilePage: Codable, Hashable, Sendable {
+    /// A path inside the project, from its folder.
+    public var file: String
+
+    public init(file: String) { self.file = file }
 }
 
 /// The limits in spec 074 (FR-002, FR-009, FR-021, FR-023), said once.

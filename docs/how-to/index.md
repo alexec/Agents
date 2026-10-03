@@ -86,5 +86,7 @@ something particular done.
   agent finishes, stops or asks.
 - [Keep a project Dashboard](keep-a-project-dashboard.md): the tiles agents keep about a
   project, on the Mac, the phone and the web page, and hiding or removing them.
+- [Pin a page to a project](pin-a-page-to-a-project.md): a document or an HTML page
+  under its project in the sidebar, beside the Dashboard, live as it changes.
 - [Have an agent wait for something](wait-for-something.md): checks passing, another
   agent finishing or the Mac waking, and agents telling each other.

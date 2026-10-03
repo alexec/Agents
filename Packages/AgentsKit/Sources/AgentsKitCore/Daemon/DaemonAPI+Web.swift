@@ -71,6 +71,9 @@ public extension DaemonAPI {
                 // The Dashboard (074), as the window's row and page have it.
                 Row(Method.dashboardGet, params: DashboardRequest.self, result: DashboardSnapshot.self, kind: .hostRequest),
                 Row(Method.dashboardSummaries, params: Empty.self, result: [DashboardSummary].self, kind: .hostRequest),
+                // Pinned pages (#159): the sidebar's rows and the pages themselves.
+                Row(Method.pinsList, params: Empty.self, result: [ProjectPins].self, kind: .hostRequest),
+                Row(Method.pinsRead, params: PinReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 // Acting
                 Row(Method.agentsStart, params: StartRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),
@@ -101,6 +104,11 @@ public extension DaemonAPI {
                 Row(Method.dashboardUpdate, params: DashboardRequest.self, result: DashboardUpdate.self, kind: .hostRequest),
                 // A drop or a Move menu item (#147): the whole new order.
                 Row(Method.dashboardArrange, params: ArrangeRequest.self, result: Empty.self, kind: .hostRequest),
+                // Pin, Unpin, a drop, and typing on a pinned page (#159), from every client alike.
+                Row(Method.pinsPin, params: PinRequest.self, result: [PinView].self, kind: .hostRequest),
+                Row(Method.pinsUnpin, params: PinPathRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.pinsArrange, params: PinArrangeRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.pinsWrite, params: PinWriteRequest.self, result: Empty.self, kind: .hostRequest),
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
@@ -153,6 +161,10 @@ public extension DaemonAPI {
                 // Who holds what, for the page's read-only Resources list (#116).
                 Row(Notification.leasesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.dashboardChanged, params: DashboardChangedNotification.self, result: Empty.self,
+                    kind: .hostNotification),
+                Row(Notification.pinsChanged, params: PinsChangedNotification.self, result: Empty.self,
+                    kind: .hostNotification),
+                Row(Notification.pagesChanged, params: PagesChangedNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 // An ad-hoc dictionary from ControlRouter.describe.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),

@@ -53,6 +53,9 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.dashboardRemoveTile,
         DaemonAPI.Method.dashboardMoveTile,
         DaemonAPI.Method.dashboardRead,
+        DaemonAPI.Method.pinsPinPage,
+        DaemonAPI.Method.pinsUnpinPage,
+        DaemonAPI.Method.pinsMovePin,
         DaemonAPI.Method.agentsMoveSelf,
     ]).union(strangerMethods)
 

@@ -247,6 +247,8 @@ final class RemoteModel {
     var openWorkflow: Workflow.ID?
     /// Whether the project's Dashboard (074) is pushed over the project page.
     var openDashboard = false
+    /// The project's pinned page (#159) pushed over the project page, by its path in it.
+    var openPin: String?
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
@@ -1123,6 +1125,7 @@ final class RemoteModel {
         await refreshEvents()
         await refreshWorkflows()
         await refreshDashboardSummaries()
+        await refreshPins()
         await refreshRuntimes()
         await refreshModes()
         await refreshSandboxSettings()
@@ -1545,6 +1548,64 @@ final class RemoteModel {
                                                   DaemonAPI.WorkflowsListRequest(),
                                                   returning: [WorkflowSummary].self) else { return }
         work.replaceWorkflows(listed)
+    }
+
+    // MARK: Pinned pages (#159)
+
+    func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }
+
+    func refreshPins() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty(),
+                                                  returning: [ProjectPins].self) else { return }
+        work.replacePins(listed)
+    }
+
+    /// A file of the project's: a pinned page, a page tile's, or what an HTML page draws.
+    func readPage(_ path: String, in folder: URL, known: FileStamp? = nil) async throws -> FileReading {
+        try await client.call(DaemonAPI.Method.pinsRead,
+                              DaemonAPI.PinReadRequest(folder: folder, path: path, knownStamp: known),
+                              returning: FileReading.self)
+    }
+
+    /// What the person typed on a pinned Markdown page. Why it was not saved, or nil.
+    func writePage(_ path: String, in folder: URL, text: String) async -> String? {
+        do {
+            try await client.call(DaemonAPI.Method.pinsWrite, DaemonAPI.PinWriteRequest(folder: folder, path: path, text: text))
+            return nil
+        } catch {
+            return sentence(for: error)
+        }
+    }
+
+    func pin(_ path: String, in folder: URL) async {
+        do {
+            let pins = try await client.call(DaemonAPI.Method.pinsPin, DaemonAPI.PinRequest(folder: folder, path: path),
+                                             returning: [PinView].self)
+            work.setPins(pins, in: folder)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    func unpin(_ path: String, in folder: URL) async {
+        work.setPins(pins(in: folder).filter { $0.path != path }, in: folder)
+        if openPin == path { openPin = nil }
+        do {
+            try await client.call(DaemonAPI.Method.pinsUnpin, DaemonAPI.PinPathRequest(folder: folder, path: path))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// A Move item or a drag in Edit: shown at once, then the whole order sent once.
+    func arrangePins(_ paths: [String], in folder: URL) async {
+        let held = pins(in: folder)
+        work.setPins(paths.compactMap { path in held.first { $0.path == path } }, in: folder)
+        do {
+            try await client.call(DaemonAPI.Method.pinsArrange, DaemonAPI.PinArrangeRequest(folder: folder, paths: paths))
+        } catch {
+            problem = sentence(for: error)
+        }
     }
 
     // MARK: The Dashboard (074)

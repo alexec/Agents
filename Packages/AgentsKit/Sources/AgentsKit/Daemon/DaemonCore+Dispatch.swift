@@ -682,6 +682,44 @@ extension DaemonCore {
                 try arrangeDashboard(request)
                 return .success([:])
 
+            case DaemonAPI.Method.pinsPinPage:
+                let request = try require(params, as: DaemonAPI.PinToolRequest.self)
+                return .success(["note": .string(try pinPage(request))])
+
+            case DaemonAPI.Method.pinsUnpinPage:
+                let request = try require(params, as: DaemonAPI.PinToolRequest.self)
+                return .success(["note": .string(try unpinPage(request))])
+
+            case DaemonAPI.Method.pinsMovePin:
+                let request = try require(params, as: DaemonAPI.PinToolRequest.self)
+                return .success(["note": .string(try movePin(request))])
+
+            case DaemonAPI.Method.pinsList:
+                return .success(try JSONValue.encoding(pinsList()))
+
+            case DaemonAPI.Method.pinsPin:
+                let request = try require(params, as: DaemonAPI.PinRequest.self)
+                return .success(try JSONValue.encoding(try pinByPerson(request)))
+
+            case DaemonAPI.Method.pinsUnpin:
+                let request = try require(params, as: DaemonAPI.PinPathRequest.self)
+                try unpinByPerson(request)
+                return .success([:])
+
+            case DaemonAPI.Method.pinsArrange:
+                let request = try require(params, as: DaemonAPI.PinArrangeRequest.self)
+                try arrangePins(request)
+                return .success([:])
+
+            case DaemonAPI.Method.pinsRead:
+                let request = try require(params, as: DaemonAPI.PinReadRequest.self)
+                return .success(try JSONValue.encoding(try readPage(request)))
+
+            case DaemonAPI.Method.pinsWrite:
+                let request = try require(params, as: DaemonAPI.PinWriteRequest.self)
+                try writePage(request)
+                return .success([:])
+
             case DaemonAPI.Method.dashboardRead:
                 let request = try require(params, as: DaemonAPI.DashboardTokenRequest.self)
                 return .success(["note": .string(try readDashboard(request))])

@@ -5,7 +5,7 @@
 // through `artifact/write`, as the window writes it. While they type, the page doesn't move.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { FileStamp } from "../protocol/generated";
+import type { FileReading, FileStamp } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { indexContaining, merge, split, type Passage } from "../model/passages";
@@ -32,8 +32,19 @@ interface Editing {
   draft: string;
 }
 
-export function LiveDocument({ store, host, agentID, path, line }: {
-  store: Store; host: string; agentID: string; path: string; line?: number | undefined;
+/**
+ * Where a page is read and written: an agent's folder (the default), or a project's own folder
+ * for a pinned page (#159). `changed` moves whenever the page may have changed on disk.
+ */
+export interface PageSource {
+  read: (stamp?: FileStamp) => Promise<FileReading>;
+  write: (text: string) => Promise<boolean>;
+  watch: () => () => void;
+  changed: number | undefined;
+}
+
+export function LiveDocument({ store, host, agentID, path, line, source }: {
+  store: Store; host: string; agentID: string; path: string; line?: number | undefined; source?: PageSource | undefined;
 }) {
   const loaded = useSignal<Loaded>({ kind: "reading" });
   const editing = useSignal<Editing | null>(null);
@@ -43,6 +54,17 @@ export function LiveDocument({ store, host, agentID, path, line }: {
   const container = useRef<HTMLDivElement>(null);
   const folder = path.slice(0, path.lastIndexOf("/")) || "/";
   const name = nameOf(path);
+  const change = store.filesChanged.value;
+  const page: PageSource = source ?? {
+    read: (stamp) => store.readFile(host, agentID, path, stamp),
+    write: (text) => store.writeArtifact(host, agentID, path, text),
+    watch: () => {
+      store.watchFolder(host, agentID, folder);
+      return () => store.unwatchFolder(host, agentID, folder);
+    },
+    changed: change && change.agentID === agentID && change.folders.some((f) => f.replace(/\/+$/, "") === folder)
+      ? change.at : undefined,
+  };
 
   // Reads are counted, and any that lands after a later one started is dropped (the window's #89).
   const reads = useRef(0);
@@ -50,7 +72,7 @@ export function LiveDocument({ store, host, agentID, path, line }: {
     const was = loaded.peek();
     const n = ++reads.current;
     try {
-      const r = await store.readFile(host, agentID, path, was.kind === "text" ? was.stamp : undefined);
+      const r = await page.read(was.kind === "text" ? was.stamp : undefined);
       if (n !== reads.current || r.kind === "unchanged") return;
       if (r.kind !== "text") {
         loaded.value = { kind: "refused", why: `${name} is not text, so it can't be read as a page.` };
@@ -84,16 +106,15 @@ export function LiveDocument({ store, host, agentID, path, line }: {
   useEffect(() => {
     loaded.value = { kind: "reading" };
     editing.value = null;
-    store.watchFolder(host, agentID, folder);
+    const unwatch = page.watch();
     void read();
-    return () => store.unwatchFolder(host, agentID, folder);
+    return unwatch;
   }, [host, agentID, path]);
 
   // The host says the folder changed: read again, with the stamp held so an unchanged file costs nothing.
-  const change = store.filesChanged.value;
   useEffect(() => {
-    if (change && change.agentID === agentID && change.folders.some((f) => f.replace(/\/+$/, "") === folder)) void read();
-  }, [change?.at]);
+    if (page.changed !== undefined) void read();
+  }, [page.changed]);
 
   // The line the agent named: go to its passage, once the page has it.
   useEffect(() => {
@@ -115,7 +136,7 @@ export function LiveDocument({ store, host, agentID, path, line }: {
     const result = merge(edit.base, now.text, edit.mine, edit.draft);
     const outcome = "merged" in result ? result.merged : result.collided;
     theirs.value = "collided" in result && result.collided.theirs ? result.collided.theirs : null;
-    if (!(await store.writeArtifact(host, agentID, path, outcome.text))) return;
+    if (!(await page.write(outcome.text))) return;
     // What was written is now the base: the next keystroke merges against it.
     const passages = split(outcome.text);
     const mine = passages[outcome.passageIndex];

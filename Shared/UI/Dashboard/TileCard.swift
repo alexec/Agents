@@ -13,6 +13,9 @@ struct TileCard: View {
     var openKeeper: (() -> Void)?
     /// Picking a link tile, or a table cell with a link.
     var openLink: ((TileLink) -> Void)?
+    /// A page tile's page, drawn live by the app the card is in (#159): the Mac and the
+    /// phone read the project's files differently.
+    var page: ((TilePage) -> AnyView)?
 
     private var isStale: Bool { DashboardModel.isStale(tile, now: now) }
 
@@ -55,6 +58,14 @@ struct TileCard: View {
             case .table: table(file)
             case .note: note(file)
             case .link: link(file)
+            case .page:
+                if let shown = file.page, let page {
+                    page(shown)
+                } else {
+                    Label(file.page?.file ?? "", systemImage: "doc.text")
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                }
             }
         } else {
             Label(tile.problem ?? "This tile's file can't be read.", systemImage: "exclamationmark.triangle")
@@ -214,7 +225,7 @@ struct TileCard: View {
     /// Whether this tile takes the whole width of the grid: tables and notes do.
     static func isWide(_ tile: TileView) -> Bool {
         guard let type = tile.tile?.type else { return false }
-        return type == .table || type == .note
+        return type == .table || type == .note || type == .page
     }
 }
 

@@ -167,7 +167,8 @@ struct DashboardPage: View {
     private func card(_ tile: TileView, now: Date) -> some View {
         TileCard(tile: tile, now: now, rowLimit: 5,
                  openKeeper: { if let folder { model.openKeeper(tile.keeper, folder: folder) } },
-                 openLink: open)
+                 openLink: open,
+                 page: { page in AnyView(folder.map { PageTileBody(folder: $0, file: page.file) }) })
             .contentShape(.rect)
             .onTapGesture {
                 if let rows = tile.tile?.table?.rows.count, rows > 5 { wholeTable = tile }
@@ -227,6 +228,9 @@ struct DashboardPage: View {
             model.selection = session
         } else if let workflow = link.workflow, let folder {
             model.openWorkflow = Project.standardize(folder).path + "/" + workflow
+        } else if let file = link.file.flatMap(PinRules.normalize), PinRules.kind(file) != nil {
+            // A document or a page of the project's opens where a pinned one does (#159).
+            model.openPin = file
         }
     }
 }

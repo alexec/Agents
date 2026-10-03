@@ -189,9 +189,44 @@ struct FilesPane: View {
             if let openFile = state.openFile, canDrawPage(openFile) {
                 pageControls(openFile)
             }
+            if let openFile = state.openFile, let path = pinPath(openFile) {
+                pinButton(path)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+    }
+
+    /// The open file's path in the project, when it is a page that can be pinned (#159):
+    /// from a worktree, the same path in the project folder, where the pin opens it.
+    private func pinPath(_ url: URL) -> String? {
+        let file = url.path(percentEncoded: false)
+        let path = agent.worktree != nil
+            ? PinRules.relative(file, in: agent.cwd) : PinRules.relative(file, in: agent.projectFolder)
+        return path.flatMap { PinRules.kind($0) == nil ? nil : $0 }
+    }
+
+    /// Pin to Project, or Unpin when it is pinned: beside the Dashboard, under the project.
+    @ViewBuilder
+    private func pinButton(_ path: String) -> some View {
+        let project = ProjectKey(host: agent.host, folder: agent.projectFolder)
+        let pins = model.pins(in: project.folder)
+        if pins.contains(where: { $0.path == path }) {
+            Button { Task { await model.unpin(path, in: project) } } label: {
+                Label("Unpin", systemImage: "pin.fill").labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .help("Pinned under the project. Click to unpin it.")
+        } else {
+            let full = pins.count >= PinLimits.perProject
+            Button { Task { await model.pin(path, in: project) } } label: {
+                Label("Pin to Project", systemImage: "pin").labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .disabled(full)
+            .help(full ? "This project already has \(PinLimits.perProject) pinned pages, the most it can have. Unpin one first."
+                       : "Pin to Project: under the project in the sidebar, beside its Dashboard.")
+        }
     }
 
     /// An HTML file's two ways of being read (#67): the page or its source, one choice

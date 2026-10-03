@@ -48,6 +48,7 @@ Each tile has a title, its value and a foot naming who keeps it and how old it i
 | Table | Up to 6 columns. The phone shows the first 5 rows; tap for all of them. |
 | Note | A short piece of Markdown. |
 | Link | A web page, a session, a workflow or a file in the project. |
+| Page | A document or an HTML page from the project, live: its top, with **Open** for the rest. Never grey. See [Pin a page to a project](pin-a-page-to-a-project.md). |
 
 Click the keeper's name in a tile's foot to open its session or workflow. On the Mac, double-click a tile, or pick **Details…** from its **···**
 menu, for where its value came from, who has kept it, whether its file was changed outside

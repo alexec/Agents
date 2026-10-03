@@ -8,6 +8,9 @@ extension AppService {
     public static let removeTileToolName = AppTool.removeTile
     public static let readDashboardToolName = AppTool.readDashboard
     public static let moveTileToolName = AppTool.moveTile
+    public static let pinPageToolName = AppTool.pinPage
+    public static let unpinPageToolName = AppTool.unpinPage
+    public static let movePinToolName = AppTool.movePin
 
     /// One of the three Dashboard calls, as the agent made it. A set's arguments go to the
     /// daemon as they are: it is the one place that knows a tile's rules.
@@ -17,6 +20,11 @@ extension AppService {
         case read
         /// `move_tile`'s arguments, checked by the daemon as a set's are (#147).
         case move(arguments: JSONValue)
+        /// `pin_page`, `unpin_page` and `move_pin` (#159): the project's pinned pages,
+        /// beside its Dashboard, checked by the daemon.
+        case pin(arguments: JSONValue)
+        case unpin(arguments: JSONValue)
+        case movePin(arguments: JSONValue)
     }
 
     /// Where those go.
@@ -35,6 +43,10 @@ extension AppService {
         }
         if name.hasSuffix(readDashboardToolName) { return .success(.read) }
         if name.hasSuffix(moveTileToolName) { return .success(.move(arguments: arguments ?? .object([:]))) }
+        // unpin_page before pin_page: it ends with it, and a name is matched by its end.
+        if name.hasSuffix(unpinPageToolName) { return .success(.unpin(arguments: arguments ?? .object([:]))) }
+        if name.hasSuffix(pinPageToolName) { return .success(.pin(arguments: arguments ?? .object([:]))) }
+        if name.hasSuffix(movePinToolName) { return .success(.movePin(arguments: arguments ?? .object([:]))) }
         return nil
     }
 
@@ -46,7 +58,8 @@ extension AppService {
             glances at to see how the project stands. If you keep something the person \
             checks often (a count, whether something is live, a short list), keep it as a \
             tile and set it again when it changes. A tile is a number (with its trend), a \
-            status light, a table, a note or a link. You keep the tiles you set (an agent a \
+            status light, a table, a note, a link, or a page: a Markdown or HTML file in \
+            the project drawn live on the tile. You keep the tiles you set (an agent a \
             workflow started keeps them for the workflow); no one else may change them. \
             Setting the same value again only refreshes its age. Each tile is written to \
             .agents/dashboard/<id>.json in the project folder, never in a worktree; never \
@@ -59,7 +72,7 @@ extension AppService {
                 "id": ["type": "string",
                        "description": "1 to 40 lowercase letters, digits, _ and -, not starting with _, unique in the project, e.g. open_bugs."],
                 "title": ["type": "string", "description": "What the person reads on the tile, up to 80 characters."],
-                "type": ["type": "string", "enum": ["number", "status", "table", "note", "link"]],
+                "type": ["type": "string", "enum": ["number", "status", "table", "note", "link", "page"]],
                 "section": ["type": "string", "description": "A heading to group it under, e.g. Shipping."],
                 "source": ["type": "string",
                            "description": "Where the value came from, in one line. Required for number and table."],
@@ -77,7 +90,10 @@ extension AppService {
                 "markdown": ["type": "string", "description": "note: Markdown, up to 4 KB, no images."],
                 "url": ["type": "string", "description": "link: a web address."],
                 "session": ["type": "string", "description": "link: a session's id in this project."],
-                "file": ["type": "string", "description": "link: a file in the project, from its folder."],
+                "file": ["type": "string", "description": """
+                    link: a file in the project, from its folder. page: the Markdown or HTML \
+                    file to draw, from the project folder, e.g. docs/roadmap.md.
+                    """],
                 "workflow": ["type": "string", "description": "link: a workflow's id."],
                 "take_over": ["type": "boolean", "description": """
                     Take over a tile whose keeper is archived, or whose session you are \
@@ -85,6 +101,62 @@ extension AppService {
                     """],
             ],
             "required": .array(["id", "title", "type"]),
+        ],
+    ]
+
+    static let pinPageTool: JSONValue = [
+        "name": .string(pinPageToolName),
+        "title": "Pin a page to the project",
+        "description": """
+            Pin a Markdown document or HTML page in this project under the project in the \
+            person's sidebar, beside its Dashboard, such as a roadmap, a coverage report or \
+            a review the person will come back to. It opens live, as show_file does. Pin \
+            what lasts, not what you are writing this turn (show it with show_file). The \
+            path is in the project folder: an agent in a worktree pins the same path, and \
+            the pin opens the project folder's copy once the branch lands. Pinning a path \
+            already pinned changes only its title. The pins are kept in .agents/pins.json \
+            in the project folder; never edit it by hand. At most 10 a project.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "path": ["type": "string",
+                         "description": "The .md or .html file, from the project folder (e.g. docs/roadmap.md), or absolute."],
+                "title": ["type": "string", "description": "What the row says, up to 60 characters. The file's name if left out."],
+                "position": ["type": "string", "enum": ["first", "last"], "description": "Where among the pins; last if left out."],
+            ],
+            "required": .array(["path"]),
+        ],
+    ]
+
+    static let unpinPageTool: JSONValue = [
+        "name": .string(unpinPageToolName),
+        "title": "Unpin a page",
+        "description": "Unpin a page you pinned (or your workflow did) from the project. The file is left as it is.",
+        "inputSchema": [
+            "type": "object",
+            "properties": ["path": ["type": "string", "description": "The pinned file, from the project folder."]],
+            "required": .array(["path"]),
+        ],
+    ]
+
+    static let movePinTool: JSONValue = [
+        "name": .string(movePinToolName),
+        "title": "Move a pinned page",
+        "description": """
+            Put a pinned page somewhere else among the project's pins: before or after \
+            another, or first or last. Any pin, as the person can drag any pin; the latest \
+            move wins. Only when asked. The Dashboard is always first.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "path": ["type": "string", "description": "The pinned page to move."],
+                "before": ["type": "string", "description": "Put it just before this pinned page."],
+                "after": ["type": "string", "description": "Put it just after this pinned page."],
+                "position": ["type": "string", "enum": ["first", "last"]],
+            ],
+            "required": .array(["path"]),
         ],
     ]
 
@@ -131,7 +203,7 @@ extension AppService {
         "name": .string(readDashboardToolName),
         "title": "Read the project's Dashboard",
         "description": """
-            Every tile on this project's Dashboard, in the order shown, under its section \
+            This project's pinned pages, then every tile on its Dashboard, in the order shown, under its section \
             headings and numbered: its value, who keeps it, how old it is, whether the \
             person hid it, and a number's last 10 points. Read it to build on \
             other agents' tiles, or to pick up the tiles of a session you are continuing.

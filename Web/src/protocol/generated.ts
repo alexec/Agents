@@ -54,6 +54,7 @@ export const Failure = {
   notPermitted: -32045,
   notSupported: -32009,
   notYours: -32027,
+  pinRefused: -32061,
   projectHasLiveAgents: -32013,
   retireRefused: -32051,
   runtimeNotFound: -32001,
@@ -881,6 +882,11 @@ export interface OptionsResponse {
   commands: SlashCommand[];
 }
 
+export interface PagesChangedNotification {
+  folder: URLString;
+  folders: string[];
+}
+
 export type Parking =
   | { whenTurnEnds: { since: WireDate } }
   | { parked: { at: WireDate } };
@@ -922,6 +928,57 @@ export interface PermissionRequest {
   subagent?: string;
 }
 
+export interface PinArrangeRequest {
+  folder: URLString;
+  paths: string[];
+}
+
+export type PinKind = "markdown" | "html";
+
+export interface PinPathRequest {
+  folder: URLString;
+  path: string;
+}
+
+export interface PinReadRequest {
+  folder: URLString;
+  path: string;
+  knownStamp?: FileStamp;
+}
+
+export interface PinRequest {
+  folder: URLString;
+  path: string;
+  title?: string;
+}
+
+export interface PinView {
+  path: string;
+  title: string;
+  kind: PinKind;
+  missing: boolean;
+  pinnedBy: PinnerView;
+}
+
+export interface PinWriteRequest {
+  folder: URLString;
+  path: string;
+  text: string;
+}
+
+export type PinnerKind = "person" | "agent" | "workflow";
+
+export interface PinnerView {
+  kind: PinnerKind;
+  id: string;
+  name: string;
+}
+
+export interface PinsChangedNotification {
+  folder: URLString;
+  pins: PinView[];
+}
+
 export interface Plan {
   planID?: string;
   entries: PlanEntry[];
@@ -954,6 +1011,11 @@ export interface Project {
   laidOutAt?: WireDate;
   layoutVersion?: number;
   helperLimits?: HelperLimits;
+}
+
+export interface ProjectPins {
+  folder: URLString;
+  pins: PinView[];
 }
 
 export interface ProjectRequest {
@@ -1252,6 +1314,7 @@ export interface TileFile {
   table?: TileTable;
   note?: TileNote;
   link?: TileLink;
+  page?: TilePage;
 }
 
 export type TileGood = "up" | "down";
@@ -1280,6 +1343,10 @@ export interface TileNumber {
   good?: TileGood;
 }
 
+export interface TilePage {
+  file: string;
+}
+
 export interface TilePoint {
   at: WireDate;
   value: number;
@@ -1301,7 +1368,7 @@ export interface TileTable {
   rows: TileCell[][];
 }
 
-export type TileType = "number" | "status" | "table" | "note" | "link";
+export type TileType = "number" | "status" | "table" | "note" | "link" | "page";
 
 export interface TileView {
   id: string;
@@ -1716,6 +1783,12 @@ export interface Methods {
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
+  "pins/arrange": { params: PinArrangeRequest; result: Empty };
+  "pins/list": { params: Empty; result: ProjectPins[] };
+  "pins/pin": { params: PinRequest; result: PinView[] };
+  "pins/read": { params: PinReadRequest; result: FileReading };
+  "pins/unpin": { params: PinPathRequest; result: Empty };
+  "pins/write": { params: PinWriteRequest; result: Empty };
   "presence/report": { params: PresenceReport; result: Empty };
   "projects/add": { params: ProjectRequest; result: ProjectSummary };
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
@@ -1785,6 +1858,12 @@ export const MethodTarget = {
   "options/remembered": "host",
   "permissions/answer": "host",
   "permissions/pending": "host",
+  "pins/arrange": "host",
+  "pins/list": "host",
+  "pins/pin": "host",
+  "pins/read": "host",
+  "pins/unpin": "host",
+  "pins/write": "host",
   "presence/report": "host",
   "projects/add": "host",
   "projects/clone": "host",
@@ -1817,6 +1896,8 @@ export interface Notifications {
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
   "modes/changed": Record<string, JSONValue>;
+  "pages/changed": PagesChangedNotification;
+  "pins/changed": PinsChangedNotification;
   "project/changed": ProjectSummary;
   "storage/writeFailed": WriteFailure;
   "workflow/changed": WorkflowSummary;
@@ -1914,14 +1995,24 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Need: { required: ["id", "agentID", "folder", "kind", "raisedAt", "headline"], optional: [] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
+  PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
   PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
+  PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
+  PinPathRequest: { required: ["folder", "path"], optional: [] },
+  PinReadRequest: { required: ["folder", "path"], optional: ["knownStamp"] },
+  PinRequest: { required: ["folder", "path"], optional: ["title"] },
+  PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: [] },
+  PinWriteRequest: { required: ["folder", "path", "text"], optional: [] },
+  PinnerView: { required: ["kind", "id", "name"], optional: [] },
+  PinsChangedNotification: { required: ["folder", "pins"], optional: [] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify"] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits"] },
+  ProjectPins: { required: ["folder", "pins"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: [] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
@@ -1951,11 +2042,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
   TileCell: { required: ["text"], optional: ["url"] },
-  TileFile: { required: ["title", "type", "keeper"], optional: ["section", "source", "stale_after_hours", "hidden", "number", "status", "table", "note", "link"] },
+  TileFile: { required: ["title", "type", "keeper"], optional: ["section", "source", "stale_after_hours", "hidden", "number", "status", "table", "note", "link", "page"] },
   TileKeeper: { required: [], optional: ["agent", "workflow"] },
   TileLink: { required: [], optional: ["url", "session", "file", "workflow"] },
   TileNote: { required: ["markdown"], optional: [] },
   TileNumber: { required: ["value"], optional: ["unit", "good"] },
+  TilePage: { required: ["file"], optional: [] },
   TilePoint: { required: ["at", "value"], optional: [] },
   TileRequest: { required: ["folder", "id"], optional: [] },
   TileStatus: { required: ["level", "line"], optional: ["since"] },
