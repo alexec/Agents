@@ -215,7 +215,7 @@ public enum EventCatalogue {
         ("run_in_flight", WorkflowRefusal.runInFlight.message),
         ("chain_too_deep", "its chain was too deep"),
         ("archived", WorkflowRefusal.archived.message),
-        ("over_limit", "too many workflows are running"),
+        ("over_limit", "over a workflow limit"),
         ("unreadable", "its file could not be read"),
         ("trigger_not_supported", "it watches for something this version cannot"),
         ("agent_unavailable", WorkflowRefusal.agentUnavailable.message),
@@ -237,6 +237,7 @@ public enum EventCatalogue {
             .map { .exactly($0.message, code: $0.code) }
             + [.starting("this chain is already ", code: "chain_too_deep"),
                .starting("this project already runs its ", code: "over_limit"),
+               .starting("this project already has ", code: "over_limit"),
                .ending(" workflows are already running, across every project", code: "over_limit"),
                .ending(" is not something this version can watch for", code: "trigger_not_supported")],
         wording: .codes(Dictionary(uniqueKeysWithValues: refusedReasons.map { ($0.code, $0.words) })))

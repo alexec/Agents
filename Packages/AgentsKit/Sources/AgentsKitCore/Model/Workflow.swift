@@ -198,7 +198,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// none of its triggers fire, and Run now still runs it.
     public var isEnabled: Bool
     /// Which ceiling this one is past, if any: listed, and inert until something else
-    /// is archived. Resolved by the daemon because it is a fact about every project at
+    /// is approved, archived or removed — `.project` for a waiting one past the three
+    /// a project may have waiting (#132), `.total` for an approved one past the ten. Resolved by the daemon because it is a fact about every project at
     /// once rather than about this workflow, and two windows must not count differently.
     public var overLimit: WorkflowLimit?
     /// When a clock will next make it run. `nil` when nothing will.
@@ -264,6 +265,13 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         self.isRunning = isRunning
     }
 
+    /// Waiting for approval behind the three a project may have waiting (#132): listed
+    /// and inert, with no Approve until one ahead of it is approved or removed.
+    public var waitsItsTurn: Bool { awaitingApproval != nil && overLimit == .project }
+
+    /// Whether Approve is offered: waiting, and one of the ones allowed to wait.
+    public var canBeApproved: Bool { awaitingApproval != nil && !waitsItsTurn }
+
     /// Whether this row is the one thing on the page that wants a person.
     ///
     /// The app's rule is that grey is everything and colour means somebody is needed.
@@ -287,7 +295,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// alike: that nothing fires it, that it still holds its place under the ceiling,
     /// and that Run now still works, the three things that set it apart from archived.
     public static let turnedOffSentence = "Turned off — none of its triggers run it. "
-        + "It keeps its place among this project's \(WorkflowLimit.project.allowed) workflows, "
+        + "It still counts towards the workflow limits, "
         + "and Run now still runs it"
 
     /// The same, led by why it is off when that is something the person is waiting on
@@ -295,7 +303,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var turnedOffSentence: String {
         guard let why = offReason?.sentence else { return Self.turnedOffSentence }
         return why + ". None of its triggers run it until it is turned on. "
-            + "It keeps its place among this project's \(WorkflowLimit.project.allowed) workflows, "
+            + "It still counts towards the workflow limits, "
             + "and Run now still runs it"
     }
 

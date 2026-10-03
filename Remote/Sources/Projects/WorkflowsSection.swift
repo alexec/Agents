@@ -131,7 +131,11 @@ private struct WorkflowRow: View {
     /// `WorkflowOutcome.summary`'s, which is where the Mac reads them, so a refusal
     /// is worded the same on both screens.
     private var happening: String? {
-        // Nothing else about it matters until somebody has read it, on the Mac.
+        // Nothing else about it matters until somebody has read it, on the Mac — or,
+        // waiting its turn behind three others, until one of those goes (#132).
+        if summary.waitsItsTurn, let limit = summary.overLimit {
+            return "\(limit.sentence). \(limit.remedy)"
+        }
         if let waiting = summary.awaitingApproval {
             return (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK on the Mac"
         }

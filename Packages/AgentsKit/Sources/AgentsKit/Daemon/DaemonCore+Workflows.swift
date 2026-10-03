@@ -72,8 +72,10 @@ extension DaemonCore {
         // Read once for the lot rather than once each: this is a file read, and a
         // project may hold a few dozen workflows.
         let records = workflowStore.load()
+        let ceilings = workflowCeilings(records: records)
         for workflow in held {
-            broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
+            broadcast(DaemonAPI.Notification.workflowChanged,
+                      summary(for: workflow, records: records, ceilings: ceilings))
         }
     }
 
@@ -151,13 +153,16 @@ extension DaemonCore {
         loadWorkflows(in: standardized)
         let after = workflows[standardized] ?? [:]
 
-        for (id, workflow) in after where before[id] != workflow {
-            broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow))
-        }
-        for id in before.keys where after[id] == nil {
+        let moved = Set(after.keys.filter { before[$0] != after[$0] })
+        let gone = before.keys.filter { after[$0] == nil }
+        for id in gone {
             broadcast(DaemonAPI.Notification.workflowRemoved,
                       DaemonAPI.WorkflowRemovedNotification(folder: standardized, workflowID: id))
         }
+        guard !moved.isEmpty || !gone.isEmpty else { return }
+        // Every one, not only those whose file moved: a file arriving, changing or going
+        // can move another across the waiting ceiling (#132).
+        rebroadcastWorkflows(in: standardized)
     }
 
     func loadWorkflows(in folder: URL) {
@@ -182,9 +187,10 @@ extension DaemonCore {
         // Read once for the whole answer rather than once per workflow: this is the
         // call a window makes when it opens, and a project may hold a few dozen.
         let records = workflowStore.load()
+        let ceilings = workflowCeilings(records: records)
         return folders
             .flatMap { workflows[$0]?.values ?? [:].values }
-            .map { summary(for: $0, records: records) }
+            .map { summary(for: $0, records: records, ceilings: ceilings) }
             .sorted { $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending }
     }
 
@@ -203,12 +209,13 @@ extension DaemonCore {
 
     /// A workflow plus everything the app knows about it, resolved here so that two
     /// windows cannot disagree about when it next runs.
-    func summary(for workflow: Workflow, records: WorkflowRecords? = nil) -> WorkflowSummary {
+    func summary(for workflow: Workflow, records: WorkflowRecords? = nil,
+                 ceilings: WorkflowCeilings? = nil) -> WorkflowSummary {
         let records = records ?? workflowStore.load()
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
         let archived = state?.isArchived ?? false
         let enabled = !WorkflowState.isOff(workflow, state)
-        let overLimit = archived ? nil : limitReached(by: workflow, records: records)
+        let overLimit = archived ? nil : limitReached(by: workflow, records: records, ceilings: ceilings)
         // A file waiting for the person has no next run: nothing fires until they approve.
         let waiting = archived ? nil : awaitingApproval(workflow, state: state, records: records)
         let runs = !archived && enabled && overLimit == nil && waiting == nil && workflow.problem == nil
@@ -237,70 +244,79 @@ extension DaemonCore {
         workflowRuns[workflow.id] != nil
     }
 
-    /// Every workflow this daemon will act on, in the order the ceilings are applied:
-    /// each project's first few by file name, then the first few of those overall.
+    /// Where every workflow stands against the two ceilings, worked out once (#132).
+    ///
+    /// The per-project ceiling counts only workflows waiting for the person's OK: the
+    /// worry is a queue nobody reviewed, and a workflow somebody approved is not that.
+    /// The total counts the approved ones, which are the ones that can run.
     ///
     /// By name rather than by age, and by project path rather than by when a project
     /// was added, because a folder has no reliable age — a checkout writes every file
     /// at the same instant — and because two machines looking at the same work have to
     /// come out with the same list.
     ///
-    /// Archived workflows are not in it at all. That is the whole reason archiving is
-    /// the way to make room: it is the one move that changes this list without
-    /// deleting anybody's file.
-    func liveWorkflowIDs(records: WorkflowRecords) -> [(folder: URL, workflowID: String)] {
-        let perProject = workflows.keys.sorted { $0.path < $1.path }.flatMap { folder in
-            (workflows[folder] ?? [:]).keys
-                .filter { records.state(folder: folder, workflowID: $0)?.isArchived != true }
-                .sorted()
-                .prefix(WorkflowLimit.project.allowed)
-                .map { (folder: folder, workflowID: $0) }
+    /// Archived workflows are in neither. That is why archiving makes room: it is the
+    /// one move that changes these lists without deleting anybody's file.
+    struct WorkflowCeilings {
+        /// Each project's waiting workflows by file name; the first few may wait.
+        var waiting: [URL: [String]] = [:]
+        /// Approved and not archived, in the order the total is applied.
+        var approved: [(folder: URL, workflowID: String)] = []
+
+        /// The waiting ones a project is allowed, which are the ones that can be approved.
+        func mayWait(in folder: URL) -> ArraySlice<String> {
+            (waiting[folder] ?? []).prefix(WorkflowLimit.project.allowed)
         }
-        return Array(perProject.prefix(WorkflowLimit.total.allowed))
     }
 
-    /// The ones from a single project, which is what the tool counts before writing.
-    func liveWorkflowIDs(in folder: URL, records: WorkflowRecords) -> [String] {
-        let standardized = Project.standardize(folder)
-        return liveWorkflowIDs(records: records)
-            .filter { $0.folder == standardized }
-            .map(\.workflowID)
-    }
-
-    /// How many of a project's workflows are live — not archived — which is what the
-    /// per-project ceiling counts.
-    func liveWorkflowCount(in folder: URL, records: WorkflowRecords) -> Int {
-        let standardized = Project.standardize(folder)
-        return (workflows[standardized] ?? [:]).keys
-            .filter { records.state(folder: standardized, workflowID: $0)?.isArchived != true }
-            .count
-    }
-
-    /// How many are live everywhere, which is what the total ceiling counts. Each
-    /// project contributes at most its own allowance: ten projects holding three each
-    /// is thirty, and the point of the total is that it is not.
-    func liveWorkflowCount(records: WorkflowRecords) -> Int {
-        workflows.keys.reduce(0) { running, folder in
-            running + min(liveWorkflowCount(in: folder, records: records),
-                          WorkflowLimit.project.allowed)
+    /// Read once for a whole listing: deciding whether a workflow waits reads its file.
+    func workflowCeilings(records: WorkflowRecords) -> WorkflowCeilings {
+        var ceilings = WorkflowCeilings()
+        for folder in workflows.keys.sorted(by: { $0.path < $1.path }) {
+            for id in (workflows[folder] ?? [:]).keys.sorted() {
+                guard let workflow = workflows[folder]?[id] else { continue }
+                let state = records.state(folder: folder, workflowID: id)
+                guard state?.isArchived != true else { continue }
+                if awaitingApproval(workflow, state: state, records: records) != nil {
+                    ceilings.waiting[folder, default: []].append(id)
+                } else {
+                    ceilings.approved.append((folder: folder, workflowID: id))
+                }
+            }
         }
+        return ceilings
     }
 
     /// Which ceiling, if either, this workflow is past. Archived ones are past neither:
     /// they are out of the way, which is the point of archiving.
-    func limitReached(by workflow: Workflow, records: WorkflowRecords) -> WorkflowLimit? {
+    ///
+    /// A waiting one is only ever past its project's: it runs nothing until approved,
+    /// so the total has nothing to say about it. An approved one is only ever past the
+    /// total: a project may hold as many approved workflows as the machine allows.
+    func limitReached(by workflow: Workflow, records: WorkflowRecords,
+                      ceilings: WorkflowCeilings? = nil) -> WorkflowLimit? {
         guard records.state(folder: workflow.folder,
                             workflowID: workflow.workflowID)?.isArchived != true else { return nil }
-        // Its own project first. Told that this project is full, somebody knows where to
-        // look; told the machine is full when it is their fourth here, they do not.
-        let mine = (workflows[workflow.folder] ?? [:]).keys
-            .filter { records.state(folder: workflow.folder, workflowID: $0)?.isArchived != true }
-            .sorted()
-            .prefix(WorkflowLimit.project.allowed)
-        guard mine.contains(workflow.workflowID) else { return .project }
-        let live = liveWorkflowIDs(records: records)
-        let isLive = live.contains { $0.folder == workflow.folder && $0.workflowID == workflow.workflowID }
-        return isLive ? nil : .total
+        let ceilings = ceilings ?? workflowCeilings(records: records)
+        if ceilings.waiting[workflow.folder]?.contains(workflow.workflowID) == true {
+            return ceilings.mayWait(in: workflow.folder).contains(workflow.workflowID) ? nil : .project
+        }
+        let live = ceilings.approved.prefix(WorkflowLimit.total.allowed)
+        return live.contains { $0.folder == workflow.folder && $0.workflowID == workflow.workflowID }
+            ? nil : .total
+    }
+
+    /// Tell the windows about every other workflow in a project, after something that
+    /// can move one across a ceiling: approving, archiving or removing a waiting one
+    /// lets the next in line be approved.
+    func rebroadcastWorkflows(in folder: URL, except: Set<String> = []) {
+        let standardized = Project.standardize(folder)
+        let records = workflowStore.load()
+        let ceilings = workflowCeilings(records: records)
+        for (id, workflow) in workflows[standardized] ?? [:] where !except.contains(id) {
+            broadcast(DaemonAPI.Notification.workflowChanged,
+                      summary(for: workflow, records: records, ceilings: ceilings))
+        }
     }
 
     // MARK: The clock
@@ -1033,6 +1049,8 @@ extension DaemonCore {
         try keep("this workflow's settings") { try workflowStore.save(records) }
         let summary = summary(for: workflow, records: records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
+        // Putting a waiting one away lets the next in line be approved (#132).
+        rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
         return summary
     }
 

@@ -144,7 +144,9 @@ private struct WorkflowListRow: View {
             if summary.isArchived {
                 Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
             } else if summary.awaitingApproval != nil {
-                Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                if summary.canBeApproved {
+                    Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                }
             } else {
                 Button("Run now") { Task { await model.runWorkflow(summary) } }
             }

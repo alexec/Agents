@@ -98,7 +98,7 @@ test("off says so in place of a next time, and in what is happening (#100)", () 
 test("off says why when it started off, as the Mac and the Remote do (#124)", () => {
   const summary = { workflow: { workflowID: "n", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
     isArchived: false, isEnabled: false, isRunning: false, nextFireAtByTrigger: [] };
-  const rest = ". None of its triggers run it until it is turned on. It keeps its place among this project's 3 workflows, and Run now still runs it";
+  const rest = ". None of its triggers run it until it is turned on. It still counts towards the workflow limits, and Run now still runs it";
   assert.equal(w.happening({ ...summary, offReason: "writtenByAgent" }),
     "Off: written by an agent. Turn it on when you are ready" + rest);
   assert.equal(w.happening({ ...summary, offReason: "file" }),
@@ -107,6 +107,17 @@ test("off says why when it started off, as the Mac and the Remote do (#124)", ()
   assert.equal(w.happening({ ...summary, offReason: "person" }), w.turnedOffSentence);
   assert.equal(w.happening({ ...summary, offReason: "writtenByAgent", awaitingApproval: { isNew: true } }),
     "New — approve it on the Mac to let it run · Off: written by an agent. Turn it on when you are ready");
+});
+
+test("a waiting workflow past the three says why, with no Approve (#132)", () => {
+  const summary = { workflow: { workflowID: "d", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
+    isArchived: false, isEnabled: false, isRunning: false, nextFireAtByTrigger: [],
+    awaitingApproval: { digest: "x", isNew: true }, overLimit: "project" };
+  assert.equal(w.waitsItsTurn(summary), true);
+  assert.equal(w.happening(summary),
+    "This project already has 3 workflows waiting for approval. Approve or remove one of the 3 workflows waiting for approval first");
+  assert.equal(w.workflowStatus(summary).words, "Over the limit");
+  assert.equal(w.waitsItsTurn({ ...summary, overLimit: undefined }), false);
 });
 
 // Finer matching (073): filters in words, lists included, held to EventPatternFinerTests.swift's

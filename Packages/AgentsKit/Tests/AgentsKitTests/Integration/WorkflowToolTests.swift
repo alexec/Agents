@@ -263,18 +263,24 @@ struct WorkflowToolTests {
         #expect(await core.allWorkflows(in: work).first?.isArchived == true)
     }
 
-    @Test func aFourthWorkflowIsRefusedWithTheThreeItAlreadyHas() async throws {
-        // The ceiling an agent meets. Told rather than written-and-inert: an agent that
-        // hears this now can offer to change one of the three instead.
+    @Test func aFourthWaitingWorkflowIsRefusedWithTheThreeItAlreadyHas() async throws {
+        // The ceiling an agent meets (#132). Told rather than written-and-inert: an agent
+        // that hears this now can offer to change one of the three instead.
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, agentID) = try await core(locations, in: work)
+        await core.startWorkflows()
         for name in ["one", "two", "three"] {
             _ = try await call(core, token, .write, id: name, content: sample, keepingAlive: agentID)
         }
 
-        await #expect(throws: JSONRPCError.self) {
-            try await call(core, token, .write, id: "four", content: sample, keepingAlive: agentID)
+        do {
+            _ = try await call(core, token, .write, id: "four", content: sample, keepingAlive: agentID)
+            Issue.record("a fourth waiting workflow was written")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.workflowLimitReached)
+            #expect(error.message.hasPrefix("Approve or remove one of the 3 workflows waiting for approval first."))
+            #expect(error.message.contains("one, three, two are waiting"))
         }
 
         #expect(FileManager.default.fileExists(
@@ -282,10 +288,38 @@ struct WorkflowToolTests {
         #expect(await core.allWorkflows(in: work).count == 3)
     }
 
+    @Test func approvedWorkflowsDoNotCountTowardsTheThreeWaiting() async throws {
+        // Five approved already (#132): an agent may still write three for the person
+        // to look at, and the fourth is refused for waiting, not for the five.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try FileManager.default.createDirectory(at: WorkflowFile.folder(in: work), withIntermediateDirectories: true)
+        for name in ["a", "b", "c", "d", "e"] {
+            try Data(sample.utf8).write(to: WorkflowFile.url(for: name, in: work))
+        }
+        let (core, token, agentID) = try await core(locations, in: work)
+        await core.rescanWorkflows(in: work)
+        await core.startWorkflows()
+
+        for name in ["one", "two", "three"] {
+            let answer = try await call(core, token, .write, id: name, content: sample, keepingAlive: agentID)
+            #expect(answer.contains("Created \(name)"))
+        }
+        await #expect(throws: JSONRPCError.self) {
+            try await call(core, token, .write, id: "four", content: sample, keepingAlive: agentID)
+        }
+        // Changing an approved one would make a fourth waiting, so it is refused too.
+        await #expect(throws: JSONRPCError.self) {
+            try await call(core, token, .write, id: "a", content: sample + "\nAnd more.", keepingAlive: agentID)
+        }
+        #expect(await core.allWorkflows(in: work).filter { $0.overLimit != nil }.isEmpty)
+    }
+
     @Test func changingOneOfTheThreeIsFineAtTheLimit() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, agentID) = try await core(locations, in: work)
+        await core.startWorkflows()
         for name in ["one", "two", "three"] {
             _ = try await call(core, token, .write, id: name, content: sample, keepingAlive: agentID)
         }
@@ -300,6 +334,7 @@ struct WorkflowToolTests {
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, agentID) = try await core(locations, in: work)
+        await core.startWorkflows()
         for name in ["one", "two", "three"] {
             _ = try await call(core, token, .write, id: name, content: sample, keepingAlive: agentID)
         }
@@ -318,7 +353,7 @@ struct WorkflowToolTests {
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, agentID) = try await core(locations, in: work)
-        // Ten elsewhere, three at a time, which is all any project may run.
+        // Twelve approved elsewhere: more than the ten the machine runs.
         for index in 0..<4 {
             let other = root.appendingPathComponent("full\(index)", isDirectory: true)
             try FileManager.default.createDirectory(

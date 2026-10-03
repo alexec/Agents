@@ -162,11 +162,12 @@ struct WorkflowEnabledTests {
     }
 
     @Test func anOffWorkflowKeepsItsPlaceUnderTheCeiling() async throws {
-        // Off for an afternoon must not let a fourth workflow in, which would then be
-        // pushed back out when the first is turned on again.
+        // Off for an afternoon must not let a fourth waiting workflow in, which would
+        // then be pushed back out when the first is turned on again.
         let (locations, work) = try temporary()
-        for name in ["a-one", "b-two", "c-three", "d-four"] { try write(halfHourly, as: name, in: work) }
         let core = try await core(locations)
+        await core.startWorkflows()
+        for name in ["a-one", "b-two", "c-three", "d-four"] { try write(halfHourly, as: name, in: work) }
         await core.rescanWorkflows(in: work)
         try await turn(core, work, "a-one", on: false)
 

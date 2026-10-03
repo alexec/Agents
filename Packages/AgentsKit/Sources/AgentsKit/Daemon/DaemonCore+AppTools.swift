@@ -662,33 +662,35 @@ extension DaemonCore {
                                message: "That front matter could not be read: \(why). Nothing was written.")
         }
 
-        // A new one, in a project already holding as many as it may. Refused here
-        // rather than written and left inert, because an agent that is told now can
-        // offer to change one of the three instead — and because a file written to no
-        // effect is the kind of thing nobody finds until it matters.
+        // Whatever an agent writes waits for the person's OK, so a fourth waiting one in
+        // this project is refused here rather than written and left inert (#132): an
+        // agent told now can offer to change one of the three instead, and a file
+        // written to no effect is the kind of thing nobody finds until it matters. One
+        // already waiting is not a new place, and an archived one takes none.
         let exists = FileManager.default.fileExists(atPath: url.path)
-        if !exists {
-            adoptWorkflows(in: project)
-            let records = workflowStore.load()
-            if liveWorkflowCount(in: project, records: records) >= WorkflowLimit.project.allowed {
-                let names = liveWorkflowIDs(in: project, records: records).joined(separator: ", ")
-                throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
-                                   message: """
-                                    Nothing was written: a project may run \
-                                    \(WorkflowLimit.project.allowed) workflows and this one \
-                                    already has \(names). Change one of those instead, or ask \
-                                    them to archive one to make room.
-                                    """)
-            }
-            if liveWorkflowCount(records: records) >= WorkflowLimit.total.allowed {
-                throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
-                                   message: """
-                                    Nothing was written: \(WorkflowLimit.total.allowed) \
-                                    workflows are already running across their projects, which \
-                                    is as many as this app runs at once. Ask them to archive \
-                                    one — anywhere — to make room.
-                                    """)
-            }
+        adoptWorkflows(in: project)
+        let before = workflowStore.load()
+        let ceilings = workflowCeilings(records: before)
+        let isArchived = before.state(folder: project, workflowID: workflowID)?.isArchived ?? false
+        let waiting = ceilings.waiting[Project.standardize(project)] ?? []
+        if !isArchived, !waiting.contains(workflowID), waiting.count >= WorkflowLimit.project.allowed {
+            let names = waiting.prefix(WorkflowLimit.project.allowed).joined(separator: ", ")
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
+                               message: """
+                                \(WorkflowLimit.project.remedy). Nothing was written: \
+                                \(names) are waiting for their OK in this project. Change one \
+                                of those instead, or ask them to approve or remove one to \
+                                make room.
+                                """)
+        }
+        if !exists, ceilings.approved.count >= WorkflowLimit.total.allowed {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
+                               message: """
+                                Nothing was written: \(WorkflowLimit.total.allowed) \
+                                workflows are already running across their projects, which \
+                                is as many as this app runs at once. Ask them to archive \
+                                one — anywhere — to make room.
+                                """)
         }
         try FileManager.default.createDirectory(at: WorkflowFile.folder(in: project),
                                                 withIntermediateDirectories: true)

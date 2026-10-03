@@ -163,6 +163,7 @@ export function isOn(s: WorkflowSummary): boolean {
 export function workflowStatus(s: WorkflowSummary): { mark: string; words: string; tinted: boolean } {
   const tinted = workflowNeedsAPerson(s);
   if (s.isArchived) return { mark: "▣", words: "Archived", tinted };
+  if (waitsItsTurn(s)) return { mark: "✋", words: "Over the limit", tinted };
   if (s.awaitingApproval) return { mark: "✋", words: "Waiting for your OK", tinted };
   if (!isOn(s)) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
@@ -267,7 +268,7 @@ const failedWords: Record<string, string> = {
 };
 const refusedWords: Record<string, string> = {
   run_in_flight: "a run is still going", chain_too_deep: "its chain was too deep", archived: "it is archived",
-  over_limit: "too many workflows are running", unreadable: "its file could not be read",
+  over_limit: "over a workflow limit", unreadable: "its file could not be read",
   trigger_not_supported: "it watches for something this version cannot",
   agent_unavailable: "the agent it would have resumed is gone",
   no_triggering_agent: "nothing triggered it, so there was no agent to resume",
@@ -412,9 +413,14 @@ export function lastRanLine(summary: WorkflowSummary, now = new Date()): string 
 
 const limitAllowed: Record<WorkflowLimit, number> = { project: 3, total: 10 };
 
+/** WorkflowSummary.waitsItsTurn (#132): waiting behind the three a project may have waiting. */
+export function waitsItsTurn(s: WorkflowSummary): boolean {
+  return !!s.awaitingApproval && s.overLimit === "project";
+}
+
 /** WorkflowSummary.turnedOffSentence (#100). */
 export const turnedOffSentence = "Turned off — none of its triggers run it. "
-  + `It keeps its place among this project's ${limitAllowed.project} workflows, and Run now still runs it`;
+  + "It still counts towards the workflow limits, and Run now still runs it";
 
 /** WorkflowOffReason.sentence (#124): why it is off, or null for the person's own switch. */
 export function offReasonSentence(s: WorkflowSummary): string | null {
@@ -431,16 +437,17 @@ export function turnedOffSentenceFor(s: WorkflowSummary): string {
   const why = offReasonSentence(s);
   if (!why) return turnedOffSentence;
   return `${why}. None of its triggers run it until it is turned on. `
-    + `It keeps its place among this project's ${limitAllowed.project} workflows, and Run now still runs it`;
+    + "It still counts towards the workflow limits, and Run now still runs it";
 }
 
 function limitSentence(limit: WorkflowLimit): string {
-  return limit === "project" ? `This project already runs its ${limitAllowed.project} workflows`
+  return limit === "project" ? `This project already has ${limitAllowed.project} workflows waiting for approval`
     : `${limitAllowed.total} workflows are already running, across every project`;
 }
 
 function limitRemedy(limit: WorkflowLimit): string {
-  return limit === "project" ? "Archive another in this project to let it run" : "Archive one, in any project, to let it run";
+  return limit === "project" ? `Approve or remove one of the ${limitAllowed.project} workflows waiting for approval first`
+    : "Archive one, in any project, to let it run";
 }
 
 /** WorkflowRefusal.message. */
@@ -450,7 +457,7 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("archived" in refusal) return "it is archived";
   if ("disabled" in refusal) return "it is turned off";
   if ("overLimit" in refusal) {
-    return refusal.overLimit._0 === "project" ? `this project already runs its ${limitAllowed.project} workflows`
+    return refusal.overLimit._0 === "project" ? `this project already has ${limitAllowed.project} workflows waiting for approval`
       : `${limitAllowed.total} workflows are already running, across every project`;
   }
   if ("unreadable" in refusal) return refusal.unreadable._0;
@@ -476,7 +483,9 @@ function refusedSummary(outcome: Extract<WorkflowOutcome, { refused: unknown }>)
 export function happening(summary: WorkflowSummary, now = new Date()): string | null {
   const parts: string[] = [];
   if (summary.isArchived) parts.push("Archived — it will not run until it is restored");
-  else if (summary.awaitingApproval) {
+  else if (waitsItsTurn(summary) && summary.overLimit) {
+    return `${limitSentence(summary.overLimit)}. ${limitRemedy(summary.overLimit)}`;
+  } else if (summary.awaitingApproval) {
     const waiting = (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on the Mac to let it run";
     const why = offReasonSentence(summary);
     return why ? `${waiting} · ${why}` : waiting;

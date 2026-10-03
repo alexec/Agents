@@ -125,9 +125,9 @@ A workflow does not run, and its page says why, when:
   file as you saw it: a file that changes afterwards waits again. Changes made on the
   workflow's page in Agents count as approved unless the workflow was already waiting,
   and workflows that existed before this version were approved as they stood;
-- it is not one of the first three workflows in its project that are not archived, taken
-  in order of file name, or not one of the first ten of those across every project.
-  Archiving one makes room; turning one off does not;
+- it is approved but not one of the first ten approved workflows across every project,
+  taken in order of project folder and then file name. Archiving one anywhere makes room;
+  turning one off does not. See [Limits](#limits);
 - it was set off by a chain of workflows already three deep;
 - the day's spending limit has been reached;
 - the project folder is not there;
@@ -182,6 +182,25 @@ whether a trigger is held for then. Its menu changes the cooldown by rewriting
 `cooldown:` in the file. The project page's row, the phone and the web page say "at most
 once every 15 minutes" after the triggers.
 
+## Limits
+
+Two limits, both fixed:
+
+- **At most three workflows waiting for approval in one project.** Approved workflows do
+  not count, so a project may have as many approved workflows as the next limit allows.
+  An agent writing a fourth with `manage_workflows`, or changing an approved one so it
+  would wait, is refused: *Approve or remove one of the 3 workflows waiting for approval
+  first.* A file that arrives in `.agents/workflows/` some other way, such as a merge or a
+  copy, is still listed, but past the first three waiting (in order of file name) it is
+  inert: its row says *This project already has 3 workflows waiting for approval. Approve
+  or remove one of the 3 workflows waiting for approval first*, and it has no
+  **Approve** until one of the three ahead of it is approved, archived or removed.
+- **At most ten approved workflows run, across every project.** Past that, a workflow is
+  listed and says *10 workflows are already running, across every project*. Archiving
+  one anywhere makes room.
+
+Archived workflows count towards neither. Turned-off ones still count.
+
 ## Off and archived
 
 Both stop a workflow running, and neither touches its file. They differ in what else
@@ -192,7 +211,7 @@ they do:
 | Where it is listed | In its place, marked **Off** | Under **Archived workflows** |
 | Its triggers | Do not run it; each one skipped is counted on its row | Do not run it; nothing is recorded |
 | **Run now** | Runs it, to try it | Refuses |
-| The three-per-project ceiling | Still counts, so turning it off and on again moves nothing | Frees its place |
+| The [limits](#limits) | Still counts, so turning it off and on again moves nothing | Frees its place |
 | Turned back on by | **Enabled**, **Turn On**, the phone, or an agent if an agent turned it off (not one an agent wrote, or one whose file says `enabled: false`) | **Bring Back** |
 
 A new workflow an agent writes with `manage_workflows` starts turned off, whatever its

@@ -163,24 +163,25 @@ struct WorkflowRefusalTests {
 
     // MARK: The project's ceiling
 
-    @Test func afterThreeLiveOnesTheRestAreListedAndInert() async throws {
-        // The ceiling binds what runs, not what may exist: a file somebody wrote is
-        // still on the page, saying why it is not running, rather than vanishing.
+    @Test func approvedOnesPastThreeInAProjectAllRun() async throws {
+        // The project's ceiling counts only what waits for approval (#132), so a
+        // project that ran three before and had a fourth inert now runs all of them.
         let (locations, root) = try temporary()
         let work = try project(root)
-        for name in ["a-one", "b-two", "c-three", "d-four"] {
+        for name in ["a-one", "b-two", "c-three", "d-four", "e-five"] {
             try write(onSchedule, as: name, in: work)
         }
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
-        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "d-four"))
+        for name in ["a-one", "b-two", "c-three", "d-four", "e-five"] {
+            try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: name))
+        }
 
         let listed = await core.allWorkflows(in: work)
-        #expect(listed.count == 4, "a file past the limit must still be listed")
-        #expect(listed.filter { $0.overLimit != nil }.map(\.workflowID) == ["d-four"])
-        #expect(await refusal(core, work, "d-four") == .overLimit(.project))
-        #expect(await core.allAgents().isEmpty)
+        #expect(listed.count == 5)
+        #expect(listed.allSatisfy { $0.overLimit == nil })
+        #expect(await core.allAgents().count == 5)
     }
 
     @Test func theFirstThreeStillRun() async throws {

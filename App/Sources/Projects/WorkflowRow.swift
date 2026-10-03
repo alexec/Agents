@@ -65,7 +65,9 @@ struct WorkflowRow: View {
                 Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
             } else {
                 if summary.awaitingApproval != nil {
-                    Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                    if summary.canBeApproved {
+                        Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                    }
                 } else {
                     Button("Run now") { Task { await model.runWorkflow(summary) } }
                 }
@@ -165,11 +167,14 @@ struct WorkflowRow: View {
                     .appText(.fine)
             } else if summary.awaitingApproval != nil {
                 // The one thing to do with a file nobody has looked at. Open it first —
-                // the row itself opens it — and approve what you read.
-                Button("Approve") { Task { await model.approveWorkflow(summary) } }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .help("Let this workflow run as its file now reads")
+                // the row itself opens it — and approve what you read. Not offered to
+                // one waiting its turn behind three others (#132): the row says why.
+                if summary.canBeApproved {
+                    Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
+                        .help("Let this workflow run as its file now reads")
+                }
             } else {
                 if summary.isRunning {
                     Text("Running…")
@@ -215,7 +220,11 @@ struct WorkflowRow: View {
     /// instead, because it is the more useful fact about it.
     private var outcomeText: String? {
         if summary.isArchived { return "Archived — it will not run" }
-        // Ahead of everything else: nothing about it matters until somebody has read it.
+        // Ahead of everything else: nothing about it matters until somebody has read it,
+        // and one waiting its turn cannot be read into running until another goes.
+        if summary.waitsItsTurn, let limit = summary.overLimit {
+            return "\(limit.sentence). \(limit.remedy)"
+        }
         if let waiting = summary.awaitingApproval {
             // The mode it would run in is on the line above, where every row says it.
             return (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK"
@@ -260,6 +269,7 @@ struct WorkflowStatusIcon: View {
 
     private var label: String {
         if summary.isArchived { return "Archived" }
+        if summary.waitsItsTurn { return "Over the limit" }
         if summary.awaitingApproval != nil { return "Waiting for your OK" }
         if !summary.isEnabled { return "Turned off" }
         if summary.overLimit != nil { return "Over the limit" }
