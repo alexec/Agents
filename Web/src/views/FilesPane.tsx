@@ -1,7 +1,7 @@
 // The files pane (071 US4; frame B): a fourth column from 1440, over the chat below that. Three
 // tabs, as the window's pane has: Files (the session's folder, browsed, a file opened), Changes
 // (what the agent changed), and Page (a live page the agent shows, or one opened from Files).
-import { useSignal } from "@preact/signals";
+import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { DirectoryEntry } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -11,6 +11,8 @@ import { Changes, Counts, StatusSquare } from "./Changes";
 import { canonical, index } from "../model/changeTree";
 import type { ChangesList } from "../protocol/generated";
 import { FileView } from "./files/FileView";
+import { Tree } from "./files/Tree";
+import { sorted } from "../model/fileTree";
 import { extensionOf, nameOf, paneOf, pathOf, setPane, type Tab } from "./files/paneState";
 import { LiveDocument } from "./LiveDocument";
 
@@ -18,11 +20,30 @@ const tabs: { tab: Tab; label: string }[] = [
   { tab: "files", label: "Files" }, { tab: "changes", label: "Changes" }, { tab: "page", label: "Page" },
 ];
 
+/** Below 760 the page is the phone's one column at a time, and Files lists one folder at a time, as the Remote does. */
+const narrowQuery = typeof matchMedia === "function" ? matchMedia("(max-width: 759px)") : null;
+const narrow = signal(narrowQuery?.matches ?? false);
+narrowQuery?.addEventListener("change", (e) => { narrow.value = e.matches; });
+
+/** A file open under Files, with Back to where it was opened from. */
+function OpenFile({ store, host, session, file, back }: { store: Store; host: string; session: string; file: string; back: string }) {
+  return (
+    <div class="file">
+      <div class="crumbs">
+        {/* Back finds the folder with this file marked (#66). */}
+        <button class="link" onClick={() => setPane(session, { file: undefined, last: file })}>‹ {nameOf(back)}</button>
+        <span class="title">{nameOf(file)}</span>
+        {(extensionOf(file) === "md" || extensionOf(file) === "markdown") && (
+          <button class="link" onClick={() => setPane(session, { tab: "page", page: file, line: undefined })}>Open as Page</button>
+        )}
+      </div>
+      <FileView store={store} host={host} agentID={session} path={file} />
+    </div>
+  );
+}
+
 function Browser({ store, host, session, root }: { store: Store; host: string; session: string; root: string }) {
   const pane = paneOf(session);
-  const folder = pane.folder ?? root;
-  const entries = useSignal<DirectoryEntry[]>([]);
-  const failed = useSignal<string | null>(null);
   const changedAt = store.filesChanged.value?.agentID === session ? store.filesChanged.value.at : 0;
   // What changed, for the same rows as Changes: a changed file in its status colour, a folder
   // with the total under it (#63). Asked while the pane is shown, again on each change.
@@ -33,14 +54,30 @@ function Browser({ store, host, session, root }: { store: Store; host: string; s
     return () => { current = false; };
   }, [host, session, changedAt]);
   const marks = index(changes.value?.files ?? []);
+  if (narrow.value) return <FolderList store={store} host={host} session={session} root={root} marks={marks} changedAt={changedAt} />;
+  // The tree stays under an open file rather than going, so Back finds it as it was left (#66).
+  return (
+    <>
+      {pane.file && <OpenFile store={store} host={host} session={session} file={pane.file} back={root} />}
+      <Tree store={store} host={host} session={session} root={root} marks={marks} changedAt={changedAt} hidden={!!pane.file} />
+    </>
+  );
+}
+
+/** The phone's way: one folder at a time, a folder tapped to go into it, Back to come out. */
+function FolderList({ store, host, session, root, marks, changedAt }: {
+  store: Store; host: string; session: string; root: string; marks: ReturnType<typeof index>; changedAt: number;
+}) {
+  const pane = paneOf(session);
+  const folder = pane.folder ?? root;
+  const entries = useSignal<DirectoryEntry[]>([]);
+  const failed = useSignal<string | null>(null);
   useEffect(() => {
     failed.value = null;
     // A slow listing of the last folder must not land under this one (the window's #89).
     let current = true;
     void store.listFiles(host, session, folder).then(
-      (listing) => {
-        if (current) entries.value = [...listing.entries].sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || a.name.localeCompare(b.name));
-      },
+      (listing) => { if (current) entries.value = sorted(listing).entries; },
       (e) => { if (current) { entries.value = []; failed.value = describe(e); } });
     return () => { current = false; };
   }, [host, session, folder, changedAt]);
@@ -49,22 +86,7 @@ function Browser({ store, host, session, root }: { store: Store; host: string; s
     return () => store.unwatchFolder(host, session, folder);
   }, [host, session, folder]);
 
-  if (pane.file) {
-    const file = pane.file;
-    return (
-      <div class="file">
-        <div class="crumbs">
-          {/* Back finds the folder with this file marked (#66). */}
-          <button class="link" onClick={() => setPane(session, { file: undefined, last: file })}>‹ {nameOf(folder)}</button>
-          <span class="title">{nameOf(file)}</span>
-          {(extensionOf(file) === "md" || extensionOf(file) === "markdown") && (
-            <button class="link" onClick={() => setPane(session, { tab: "page", page: file, line: undefined })}>Open as Page</button>
-          )}
-        </div>
-        <FileView store={store} host={host} agentID={session} path={file} />
-      </div>
-    );
-  }
+  if (pane.file) return <OpenFile store={store} host={host} session={session} file={pane.file} back={folder} />;
   // Up to the session's own folder and no further: the host refuses anything outside it.
   const parent = folder !== root && folder.startsWith(root) ? folder.slice(0, folder.lastIndexOf("/")) || "/" : null;
   return (
@@ -114,7 +136,7 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
         <button class="icon" aria-label="Close Files" onClick={() => replace({ ...route.value, files: false })}>✕</button>
       </header>
       <div class="scroll pane-body">
-        {pane.tab === "files" && root && <Browser store={store} host={host} session={session} root={root} />}
+        {pane.tab === "files" && root && <Browser key={session} store={store} host={host} session={session} root={root} />}
         {pane.tab === "changes" && <Changes store={store} host={host} session={session} />}
         {pane.tab === "page" && (pane.page
           ? <LiveDocument store={store} host={host} agentID={session} path={pane.page} line={pane.line} />
