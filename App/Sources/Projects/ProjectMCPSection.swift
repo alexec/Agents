@@ -10,6 +10,7 @@ struct ProjectMCPSection: View {
 
     @State private var servers: [DaemonAPI.ProjectMCPServer] = []
     @State private var problem: String?
+    @State private var approvalsProblem: String?
     @State private var file = ""
     @State private var adding = false
     @State private var failure: String?
@@ -33,6 +34,9 @@ struct ProjectMCPSection: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .paperRow()
         } else {
+            if let approvalsProblem {
+                Text(approvalsProblem).appText(.fine).foregroundStyle(SharedInk.attention)
+            }
             if let failure {
                 Text(failure).appText(.fine).foregroundStyle(SharedInk.attention)
             }
@@ -82,6 +86,7 @@ struct ProjectMCPSection: View {
         guard let fresh = await model.mcpServers(at: place.destination) else { return }
         servers = fresh.servers
         problem = fresh.problem
+        approvalsProblem = fresh.approvalsProblem
         if case .you = place, let snapshot = await model.sharedSnapshot() {
             file = snapshot.mcp.file
         } else if case .project(let folder) = place {

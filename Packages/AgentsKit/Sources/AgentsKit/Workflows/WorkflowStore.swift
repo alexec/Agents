@@ -186,6 +186,9 @@ struct WorkflowRecords: Codable, Sendable {
     /// When approval began. Every workflow file present then was approved as it stood,
     /// so the upgrade stops nothing; any file new or changed after it waits.
     var approvalsBegan: Date?
+    /// Read from a file that is there and could not be read (#169): approval has begun,
+    /// nothing is approved, and the file is left as it is. Not written.
+    var unreadable = false
 
     /// How long a run is believed. A run in flight for a week is a run whose agent will
     /// not be finishing, and holding its workflow any longer only stops it firing.
@@ -199,16 +202,17 @@ struct WorkflowRecords: Codable, Sendable {
 extension WorkflowRecords {
     /// Read leniently, key by key.
     ///
-    /// This file already existed when `runs` was added, and `WorkflowStore.load()` reads
-    /// a file it cannot decode as empty — so a synthesized decoder, which requires every
-    /// key, would have read every file written before this one as nothing, and quietly
-    /// un-archived every workflow the person had put away. One run that will not decode
-    /// costs that run: a trigger from a newer build is not worth the archive beside it.
+    /// This file already existed when `runs` was added, and a file that cannot be decoded
+    /// approves nothing (#169) — so a synthesized decoder, which requires every key,
+    /// would have read every file written before this one as unreadable. One run or state
+    /// that will not decode costs that one: a trigger or an outcome from a newer build is
+    /// not worth every workflow's history beside it.
     ///
     /// In an extension, so the memberwise initialiser the rest of this file uses stays.
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        states = try c.decodeIfPresent([WorkflowState].self, forKey: .states) ?? []
+        states = (try c.decodeIfPresent([Lossy<WorkflowState>].self, forKey: .states) ?? [])
+            .compactMap(\.value)
         lastTickAt = try c.decodeIfPresent(Date.self, forKey: .lastTickAt)
         runs = (try c.decodeIfPresent([Lossy<WorkflowRun>].self, forKey: .runs) ?? [])
             .compactMap(\.value)
@@ -222,10 +226,11 @@ extension WorkflowRecords {
 /// the same reasons: it is tens of entries for one person, it changes when somebody
 /// pauses something, and `cat` will show it to you.
 ///
-/// A missing or unreadable file is empty state rather than an error. Losing it loses
-/// which agent a standing workflow had and what was approved — every workflow, and
-/// whether it is off or archived, is still in the repository, which is the right thing
-/// to keep.
+/// A missing file is empty state, approval not yet begun. A file that is there and
+/// cannot be read approves nothing and is left as it is (#169, `ApprovalFile`): every
+/// workflow waits for the person, and only their Approve replaces the file, keeping a
+/// copy of the old one. Every workflow, and whether it is off or archived, is still in
+/// the repository.
 public struct WorkflowStore: Sendable {
     private let locations: StoreLocations
 
@@ -233,18 +238,22 @@ public struct WorkflowStore: Sendable {
         self.locations = locations
     }
 
+    var file: URL { locations.workflows }
+
     func load() -> WorkflowRecords {
-        guard let data = try? Data(contentsOf: locations.workflows),
-              let records = try? StoreCoding.decoder.decode(WorkflowRecords.self, from: data) else {
-            return WorkflowRecords()
+        switch ApprovalFile.read(WorkflowRecords.self, at: locations.workflows) {
+        case .missing: return WorkflowRecords()
+        case .read(let records): return records
+        case .unreadable: return WorkflowRecords(approvalsBegan: Date(), unreadable: true)
         }
-        return records
     }
 
-    func save(_ records: WorkflowRecords) throws {
+    /// `replacing` is the person's own act, the only write that replaces a file that
+    /// could not be read; any other write leaves that file alone.
+    func save(_ records: WorkflowRecords, replacing: Bool = false) throws {
         let data = try StoreCoding.encoder.encode(records)
-        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try data.write(to: locations.workflows, options: .atomic)
+        try ApprovalFile.write(data, to: locations.workflows, overUnreadable: records.unreadable,
+                               replacing: replacing)
     }
 }
 

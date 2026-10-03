@@ -250,9 +250,13 @@ extension DaemonAPI {
     public struct MCPListAnswer: Codable, Sendable {
         public var servers: [ProjectMCPServer]
         public var problem: String?
-        public init(servers: [ProjectMCPServer], problem: String? = nil) {
+        /// The approvals file could not be read, so every server waits (#169): what the
+        /// section says above them.
+        public var approvalsProblem: String?
+        public init(servers: [ProjectMCPServer], problem: String? = nil, approvalsProblem: String? = nil) {
             self.servers = servers
             self.problem = problem
+            self.approvalsProblem = approvalsProblem
         }
     }
 

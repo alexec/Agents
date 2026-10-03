@@ -86,13 +86,19 @@ extension DaemonCore {
 
     func mcpList(_ request: DaemonAPI.MCPListRequest) throws -> DaemonAPI.MCPListAnswer {
         try requireMCPProject(request.destination)
+        let approvals = mcpApprovalStore.load()
         let listed = MCPProjectListing.list(destination: request.destination,
                                             personalHome: locations.personalHome,
                                             sidecar: MCPCatalogSidecar.load(from: mcpInstaller.sidecarURL),
-                                            approvals: mcpApprovalStore.load())
+                                            approvals: approvals)
         let kind = Self.mcpDestinationKind(request.destination)
         DaemonLog.shared.write("mcp: list \(kind) → \(listed.servers.count)")
-        return .init(servers: listed.servers, problem: listed.problem)
+        // Only a project's servers are approved; the person's own are not asked about.
+        var approvalsProblem: String?
+        if case .project = request.destination, approvals.unreadable {
+            approvalsProblem = ApprovalFile.note(mcpApprovalStore.file)
+        }
+        return .init(servers: listed.servers, problem: listed.problem, approvalsProblem: approvalsProblem)
     }
 
     func mcpApprove(_ request: DaemonAPI.MCPApproveRequest) throws -> DaemonAPI.MCPListAnswer {
@@ -116,7 +122,7 @@ extension DaemonCore {
         var records = mcpApprovalStore.load()
         do {
             try records.approve(folder: folder, name: request.name, digest: request.digest, entry: entry)
-            try mcpApprovalStore.save(records)
+            try mcpApprovalStore.save(records, replacing: true)
         } catch let error as DaemonAPI.MCPCatalogError {
             throw Self.mcpRefusal(error)
         }

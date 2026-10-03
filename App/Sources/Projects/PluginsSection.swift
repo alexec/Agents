@@ -67,8 +67,8 @@ private struct PluginRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if let waiting = plugin.awaitingApproval {
-                    Text((waiting.isNew ? "New" : "Changed since you approved it")
-                         + " — waiting for your OK. No agent is given it until then.")
+                    Text((waiting.note ?? (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK.")
+                         + " No agent is given it until then.")
                         .appText(.supporting)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

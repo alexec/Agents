@@ -23,10 +23,12 @@ extension DaemonCore {
     ///
     /// Nothing waits before approval has begun: everything present then is about to be
     /// approved as it stands, and the daemon begins approval before anything can fire.
+    /// A records file that could not be read has begun and approved nothing (#169).
     func awaitingApproval(_ workflow: Workflow, state: WorkflowState?,
                           records: WorkflowRecords) -> WorkflowApproval? {
         guard records.approvalsBegan != nil, let digest = workflowDigest(workflow), digest != state?.approvedDigest else { return nil }
-        return WorkflowApproval(digest: digest, isNew: state?.approvedDigest == nil)
+        return WorkflowApproval(digest: digest, isNew: state?.approvedDigest == nil,
+                                note: records.unreadable ? ApprovalFile.note(workflowStore.file) : nil)
     }
 
     /// The first start with approval: every file already here is approved as it stands,
@@ -75,7 +77,7 @@ extension DaemonCore {
                                message: "\(WorkflowLimit.project.sentence). \(WorkflowLimit.project.remedy).")
         }
         approve(workflow, digest: request.digest, in: &records)
-        try keep("this workflow's settings") { try workflowStore.save(records) }
+        try keep("this workflow's settings") { try workflowStore.save(records, replacing: true) }
         let summary = summary(for: workflow, records: records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
         // Its place among the waiting is free for the next in line.

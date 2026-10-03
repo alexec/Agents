@@ -30,7 +30,8 @@ extension DaemonCore {
         guard records.approvalsBegan != nil, let digest = DotAgents.pluginDigest(plugin) else { return nil }
         let approved = records.approved[Self.pluginKey(plugin)]
         guard digest != approved else { return nil }
-        return WorkflowApproval(digest: digest, isNew: approved == nil)
+        return WorkflowApproval(digest: digest, isNew: approved == nil,
+                                note: records.unreadable ? ApprovalFile.note(pluginApprovalStore.file) : nil)
     }
 
     /// The first start with approval: every plugin already in a project is approved as it
@@ -99,7 +100,7 @@ extension DaemonCore {
         }
         var records = pluginApprovalStore.load()
         records.approved[Self.pluginKey(plugin)] = request.digest
-        try keep("the plugin approval") { try pluginApprovalStore.save(records) }
+        try keep("the plugin approval") { try pluginApprovalStore.save(records, replacing: true) }
         DaemonLog.shared.write("plugins: \(plugin.lastPathComponent) in \(project.path) approved")
         let list = DaemonAPI.PluginsList(folder: project, plugins: projectPlugins(in: project))
         broadcast(DaemonAPI.Notification.pluginsChanged, list)

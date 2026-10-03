@@ -35,7 +35,8 @@ extension WorkflowSummary {
                                             detail: limit.remedy, tint: .attention))
         } else if let waiting = awaitingApproval {
             lines.append(WorkflowStatusLine(symbol: "checkmark.shield",
-                                            text: waiting.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
+                                            text: waiting.note.map { "Waiting for your OK — \($0)" }
+                                                ?? (waiting.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK"),
                                             detail: "Read the prompt and settings below, then Approve to let it run",
                                             tint: .attention))
         }
