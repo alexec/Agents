@@ -27,6 +27,10 @@ actor FakeACPAgent {
         /// still working" should use rather than `turnDelay`: the turn cannot end
         /// early on a slow machine, and the test does not wait on a clock.
         var gate: TurnGate?
+        /// End a turn held at `gate` with `cancelled` when `session/cancel` comes, as the
+        /// real adapters do. Off, a held turn hears nothing and keeps going: an adapter
+        /// stuck in a tool of its own (#139: Codex in its `wait`).
+        var endsOnCancel = false
         /// Send `updates` on the first turn only. A real runtime never sends the same
         /// tool call again on a later turn; one that replays its script does, and a
         /// test about tool calls then reads the replay as the call starting over (035).
@@ -153,6 +157,11 @@ actor FakeACPAgent {
     /// Tasks announced and not yet ended, which is what Stop can reach.
     private var runningTasks: [String: String] = [:]
     private(set) var stopRequests: [JSONValue] = []
+    /// How many `session/cancel` notifications came.
+    private(set) var cancels = 0
+    /// The held turn's wait, resumed by the gate (false) or by a cancel (true).
+    private var heldTurn: (turn: Int, wait: CheckedContinuation<Bool, Never>)?
+    private var heldTurns = 0
 
     init(script: Script = Script(), transport: any LineTransport) {
         self.script = script
@@ -166,6 +175,38 @@ actor FakeACPAgent {
     private func attach() async {
         box.attach(self)
         await connection.start()
+        let incoming = connection.incomingNotifications()
+        Task { [weak self] in
+            for await note in incoming where note.method == ACP.Method.cancel {
+                await self?.heardCancel()
+            }
+        }
+    }
+
+    private func heardCancel() {
+        cancels += 1
+        guard script.endsOnCancel else { return }
+        guard let held = heldTurn else { return }
+        releaseHeldTurn(held.turn, cancelled: true)
+    }
+
+    /// Only the turn named: a gate opened after a cancel ended its turn must not end
+    /// the next one.
+    private func releaseHeldTurn(_ turn: Int, cancelled: Bool) {
+        guard let held = heldTurn, held.turn == turn else { return }
+        heldTurn = nil
+        held.wait.resume(returning: cancelled)
+    }
+
+    /// Wait at the gate, or, for a script that ends on cancel, until a cancel comes.
+    /// True when it was the cancel.
+    private func hold(at gate: TurnGate) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            heldTurns += 1
+            let turn = heldTurns
+            heldTurn = (turn, continuation)
+            Task { await gate.pass(); await self.releaseHeldTurn(turn, cancelled: false) }
+        }
     }
 
     func handle(method: String, params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
@@ -352,8 +393,9 @@ actor FakeACPAgent {
         if failing, let meta = script.sessionInfoMeta {
             await send(update: ["sessionUpdate": "session_info_update", "_meta": meta])
         }
-        if let gate = script.gate { await gate.pass() }
-        var result: [String: JSONValue] = ["stopReason": .string(script.stopReason)]
+        var stopReason = script.stopReason
+        if let gate = script.gate, await hold(at: gate) { stopReason = "cancelled" }
+        var result: [String: JSONValue] = ["stopReason": .string(stopReason)]
         if let usage = script.usage { result["usage"] = usage }
         if failing, let meta = script.promptResultMeta { result["_meta"] = meta }
         return .success(.object(result))
