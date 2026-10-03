@@ -5,7 +5,7 @@
 // conversations come a page at a time as the top is reached, and the pane follows the end
 // unless the person has scrolled up.
 import { useSignal } from "@preact/signals";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../model/background";
 import { display, isPersonsAsk, isWorking, storedTurn, turns, type ChatTurn, type Item } from "../model/turns";
@@ -22,7 +22,8 @@ import { PromptMenus } from "./PromptMenus";
 import { SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
-import { detailSummaries, detailTitles, TurnView, type TurnDetail } from "./chat/Rows";
+import { CallActionsContext, detailSummaries, detailTitles, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
+import { setPane } from "./files/paneState";
 
 const detailKey = "agents.turnDetail";
 
@@ -54,6 +55,22 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const rows: ChatTurn[] = [...store.turns.value.map(storedTurn), ...turns(store.items.value)];
   const background = agent?.background ?? [];
   const live = agent ? isWorking(agent.state) : false;
+
+  // What an open call's links do here (the window's ChatActions): a file it touched opens in the
+  // Files pane at the line it named, as the Remote's does, and an edit opens under Changes.
+  const callActions = useMemo<CallActions>(() => {
+    const showPane = () => { if (!route.peek().files) replace({ ...route.peek(), files: true }); };
+    return {
+      open: (location) => {
+        setPane(session, { tab: "files", file: location.path, fileLine: location.line, last: location.path });
+        showPane();
+      },
+      showEdit: (diff) => {
+        setPane(session, { tab: "changes", changed: diff.path });
+        showPane();
+      },
+    };
+  }, [session]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -162,6 +179,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {hostDown && <OfflineStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
+      <CallActionsContext.Provider value={callActions}>
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, index) => (
@@ -174,6 +192,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
       </div>
+      </CallActionsContext.Provider>
       {newBelow.value && <button class="jump" onClick={toEnd}>New messages ↓</button>}
       <footer class="foot">
         <BackgroundRows agent={agent} />

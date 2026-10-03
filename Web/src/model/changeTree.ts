@@ -90,6 +90,11 @@ export function canonical(path: string): string {
   return path.replace(/^\/private(?=\/(?:tmp|var|etc)(?:\/|$))/, "");
 }
 
+/** One file by two names: an edit's path as the agent wrote it, and the path Changes lists it by. */
+export function sameFile(a: string, b: string): boolean {
+  return canonical(a).replace(/\/+$/, "") === canonical(b).replace(/\/+$/, "");
+}
+
 /** ChangeTree.Index: a changed file by path, and each folder above one with its totals. Look up with `canonical`. */
 export function index(files: readonly ChangedFile[]): { files: Map<string, ChangedFile>; folders: Map<string, Totals> } {
   const byPath = new Map<string, ChangedFile>();

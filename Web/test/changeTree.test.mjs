@@ -39,3 +39,9 @@ test("a status is said in words, a rename with where it was", () => {
   assert.equal(t.statusPhrase(file("x", "untracked")), "untracked, not in git");
   assert.equal(t.statusPhrase({ ...file("new.txt", "renamed"), oldPath: "/work/old.txt" }), "renamed from old.txt");
 });
+
+test("Show in Changes finds an edit's file by the path Changes lists it under (#153)", () => {
+  assert.ok(t.sameFile("/private/tmp/work/a.txt", "/tmp/work/a.txt"));
+  assert.ok(t.sameFile("/work/a.txt", "/work/a.txt"));
+  assert.ok(!t.sameFile("/work/a.txt", "/work/b.txt"));
+});

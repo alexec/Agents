@@ -10,7 +10,7 @@ import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { lineDiff, wantsWhole } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
-import { build, lines, statusGlyph, statusPhrase, totals, type Totals } from "../model/changeTree";
+import { build, lines, sameFile, statusGlyph, statusPhrase, totals, type Totals } from "../model/changeTree";
 
 /** A changed file's square, in its status colour, with the status in words for a reader (#63). */
 export function StatusSquare({ file }: { file: ChangedFile }) {
@@ -31,7 +31,7 @@ export function Counts({ added, removed }: { added?: number | undefined; removed
 
 const folderCounts = (t: Totals) => <Counts added={t.added} removed={t.removed} />;
 
-function Lines({ lines }: { lines: DiffLine[] }) {
+export function Lines({ lines }: { lines: DiffLine[] }) {
   return (
     <pre class="diff-lines">
       {lines.map((line, i) => (
@@ -71,7 +71,9 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
   const detail = useSignal<ChangedFileDetail | null>(null);
   const failed = useSignal<string | null>(null);
   const collapsed = useSignal<ReadonlySet<string>>(new Set());
-  const open = paneOf(session).changed;
+  // The file open, by the path Changes lists it under: Show in Changes names it by the edit's path.
+  const named = paneOf(session).changed;
+  const open = named === undefined ? undefined : list.value?.files.find((f) => sameFile(f.path, named))?.path ?? named;
   // Read again whenever the agent's folders change.
   const changedAt = store.filesChanged.value?.agentID === session ? store.filesChanged.value.at : 0;
   const agentState = store.agent(host, session)?.state;
@@ -84,6 +86,10 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
       (e) => { if (current) failed.value = describe(e); });
     return () => { current = false; };
   }, [host, session, changedAt, agentState]);
+  // Opened from an edit in the chat, the file's row is brought into view.
+  useEffect(() => {
+    if (open) document.querySelector(".changes .row.changed.chosen")?.scrollIntoView({ block: "nearest" });
+  }, [open, !!list.value]);
   const whole = wantsWhole(list.value?.files.find((f) => f.path === open), list.value?.git);
   useEffect(() => {
     detail.value = null;

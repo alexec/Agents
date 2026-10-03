@@ -11,6 +11,8 @@ export interface PaneState {
   folder?: string | undefined;
   /** The file open under Files. */
   file?: string | undefined;
+  /** The line of it a tool call named, opened from the chat. */
+  fileLine?: number | undefined;
   /** The file last open, marked in its folder when Back comes to it (#66). */
   last?: string | undefined;
   /** The tree's open folders, by path (#133): kept while files are opened and closed. */
