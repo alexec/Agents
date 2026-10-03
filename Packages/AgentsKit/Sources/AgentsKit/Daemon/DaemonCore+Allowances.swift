@@ -154,6 +154,7 @@ extension DaemonCore {
         let at = now()
         let before = state
         state.worked(now: at)
+        if let model = currentModel(of: agent) { state.clearModels { $0.model == model.value } }
         if let rateLimit = latestRateLimit[agentID] { state.lastRateLimit = rateLimit }
         if state != before { setAllowanceState(state) }
         if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked", after: before) }
@@ -161,9 +162,50 @@ extension DaemonCore {
 
     /// A failed runtime is marked out even when the failure was not a quota error.
     /// A recognised spent allowance already has its more specific out state.
-    func runtimeFailed(agentID: UUID) {
+    ///
+    /// A provider's failure (#140) is the model's, not the runtime's: the model the
+    /// agent was on is marked, and the runtime's other models stay in. With no model
+    /// to charge it to, nothing is marked, since a provider being down says nothing
+    /// about the runtime.
+    func runtimeFailed(agentID: UUID, error: (any Error)? = nil, words: String? = nil) {
         guard let agent = agents[agentID] else { return }
-        markRuntimeFailed(poolEntry(for: agent))
+        let provider = (error as? JSONRPCError).map(ProviderFailure.recognises) == true
+            || words.map(ProviderFailure.recognises(words:)) == true
+        guard provider else { return markRuntimeFailed(poolEntry(for: agent)) }
+        guard let model = currentModel(of: agent) else {
+            DaemonLog.shared.write("agent \(agentID): \(agent.runtimeID)'s provider failed on a model not known; nothing marked")
+            return
+        }
+        var state = allowanceState(for: poolEntry(for: agent))
+        guard state.markModelFailed(model.value, name: model.name, now: now()) else { return }
+        setAllowanceState(state)
+        DaemonLog.shared.write("agent \(agentID): \(agent.runtimeID)'s provider failed on \(model.value); the model is marked, not the runtime")
+    }
+
+    /// A turn is answering (#140): its tool calls are coming back. A runtime out because
+    /// it failed is back now, not at the turn's end, so the agent proving it works can
+    /// start a helper on it in the same turn; and the model it is on is no longer out.
+    func runtimeAnswering(agentID: UUID) {
+        guard let agent = agents[agentID] else { return }
+        let entry = poolEntry(for: agent)
+        // Most calls find nothing to do: no state, or nothing out.
+        guard let before = allowances[AllowanceState.credentialKey(for: entry)],
+              before.isOut || before.modelsOut != nil else { return }
+        var state = before
+        let back = state.answering(now: now())
+        if let model = currentModel(of: agent) { state.clearModels { $0.model == model.value } }
+        guard state != before else { return }
+        setAllowanceState(state)
+        if back { raiseAllowanceBack(entry, how: "answering", after: before) }
+    }
+
+    /// The model an agent is on, as its runtime's model menu has it: the value and the
+    /// name the menu shows. Nil when the runtime has no model menu.
+    func currentModel(of agent: Agent) -> (value: String, name: String?)? {
+        guard let option = WorkflowSettings.modelOption(in: agent.advertisedOptions),
+              let value = agent.startOptions.values[option.id] ?? option.currentValue,
+              let model = value.stringValue else { return nil }
+        return (model, option.options?.first { $0.value == value }?.name)
     }
 
     func runtimeFailed(runtimeID: String) {
@@ -368,7 +410,8 @@ extension DaemonCore {
     func settleAllowanceClocks(now at: Date) {
         var changed = false
         for key in Array(allowances.keys) {
-            guard var state = allowances[key], state.isOut || state.status != .available else { continue }
+            guard var state = allowances[key],
+                  state.isOut || state.status != .available || state.modelsOut != nil else { continue }
             let wasOut = state.isOut
             guard state.settle(now: at) else { continue }
             allowances[key] = state
@@ -415,7 +458,8 @@ extension DaemonCore {
     private func checkAllowance(_ entry: PoolEntry, expected: AllowanceState) async {
         let key = expected.credentialKey
         defer { allowanceChecks.remove(key) }
-        let passed = await probeAllowance(runtimeID: entry.runtimeID)
+        let passed = await probeAllowance(runtimeID: entry.runtimeID,
+                                          skipping: Set(expected.modelsOut(now: now()).map(\.model)))
         guard var state = allowances[key], state.status == expected.status,
               state.since == expected.since else { return }
         let at = now()
@@ -432,7 +476,8 @@ extension DaemonCore {
 
     /// A separate, short conversation in the daemon's own folder. It has no app tools
     /// or project content, and a read-only mode wherever the runtime advertises one.
-    private func probeAllowance(runtimeID: String) async -> Bool {
+    /// A model a provider failed on is skipped (#140): its outage is not the runtime's.
+    private func probeAllowance(runtimeID: String, skipping: Set<String> = []) async -> Bool {
         var session: ACPSession?
         var chosen: [String] = []
         do {
@@ -453,7 +498,9 @@ extension DaemonCore {
                 return false
             }
             if let model = WorkflowSettings.modelOption(in: options),
-               let choice = Self.probeModel(in: model.options ?? []) {
+               let choice = Self.probeModel(in: (model.options ?? []).filter {
+                   !skipping.contains($0.value.stringValue ?? "")
+               }) {
                 try await made.setOption(id: model.id, value: choice.value)
                 chosen.append("model \(choice.value.stringValue ?? choice.name)")
             }

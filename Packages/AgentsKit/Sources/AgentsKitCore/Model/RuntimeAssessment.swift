@@ -164,7 +164,9 @@ public enum RuntimeAssessment {
                              agentShortID: String, date: String) -> String {
         let modelWords = model.map { "model `\($0)`" } ?? "its default model"
         let ownAsk = escalationTool.map {
-            "Ask one question with your runtime's own question tool, `\($0)`, not `ask_form`: \"Is this assessment running unattended?\" with the options Yes and No."
+            "Ask one question with your runtime's own question tool, `\($0)`, not `ask_form`: \"Is this assessment running unattended?\" with the options Yes and No. "
+                + "It is one of your runtime's built-in tools, not one of the app's, so look for it among those; "
+                + "call it rather than deciding from a list that it is missing, and if the call is refused, put its words in the report."
         } ?? "Your runtime has no question tool the app can carry. Ask nothing here; write `not offered` for this step."
         let lease = "assess-\(agentShortID)"
         let workflow = throwawayWorkflowID(agentShortID)

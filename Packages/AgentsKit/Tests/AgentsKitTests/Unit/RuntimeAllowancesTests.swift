@@ -79,9 +79,9 @@ struct RuntimeChooserAllowanceTests {
         let until = now.addingTimeInterval(1800)
         let allowances = RuntimeAllowances(rows: [row("copilot:sign-in", rateLimitedUntil: until)], at: now)
         #expect(!allowances.isOut("copilot"))
-        let note = allowances.rateLimitNote(for: "copilot")
+        let note = allowances.availableNote(for: "copilot")
         #expect(note?.contains("Rate limited") == true)
-        #expect(allowances.rateLimitNote(for: "grok") == nil)
+        #expect(allowances.availableNote(for: "grok") == nil)
     }
 
     /// A rate limit that has run out is a reading, not a change, and must not go on
@@ -89,7 +89,7 @@ struct RuntimeChooserAllowanceTests {
     @Test func aRateLimitThatHasRunOutSaysNothing() {
         let until = now.addingTimeInterval(-1)
         let allowances = RuntimeAllowances(rows: [row("copilot:sign-in", rateLimitedUntil: until)], at: now)
-        #expect(allowances.rateLimitNote(for: "copilot") == nil)
+        #expect(allowances.availableNote(for: "copilot") == nil)
         #expect(!allowances.isOut("copilot"))
     }
 }

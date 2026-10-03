@@ -37,12 +37,13 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
 
     /// A rate limit, which is not an out runtime: the runtime can still take a turn, and
     /// `isUsable` says so. It is a throttle all the same, and a chooser that says
-    /// nothing about it reads as no throttle at all. Nil unless it is rate limited right
-    /// now, so a limit that has run out does not keep claiming to be one.
-    public func rateLimitNote(for runtimeID: String) -> String? {
-        guard let row = firstRow(runtimeID),
-              case .rateLimited = row.state.current(now: at) else { return nil }
-        return row.line(now: at)
+    /// nothing about it reads as no throttle at all. Nor is a model out (#140): the
+    /// runtime's other models work. Nil unless it is rate limited right now or a model
+    /// is out, so a limit that has run out does not keep claiming to be one.
+    public func availableNote(for runtimeID: String) -> String? {
+        guard let row = firstRow(runtimeID) else { return nil }
+        if case .rateLimited = row.state.current(now: at) { return row.line(now: at) }
+        return PoolWords.modelsOut(row.state, now: at)
     }
 
     private func firstRow(_ runtimeID: String) -> Row? {
@@ -71,7 +72,7 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
 
         public var id: String { credentialKey }
         public var runtimeID: String { AllowanceState.runtimeID(of: credentialKey) }
-        public func line(now: Date) -> String { PoolWords.state(state, now: now) }
+        public func line(now: Date) -> String { PoolWords.stateWithModels(state, now: now) }
     }
 }
 

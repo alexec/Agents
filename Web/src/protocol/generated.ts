@@ -1060,6 +1060,7 @@ export interface RuntimeStatus {
   availability: RuntimeAvailability;
   checkedAt: WireDate;
   outdated: boolean;
+  poolNote?: string;
 }
 
 export type SandboxChoice = "runtime" | "on" | "off";
@@ -1876,7 +1877,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
-  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: [] },
+  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote"] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },

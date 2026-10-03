@@ -61,6 +61,7 @@ extension DaemonCore {
             }
         }
         status.outdated = status.availability.isAvailable && discovery.isOutdated(status.runtime)
+        status.poolNote = poolNote(runtimeID: status.runtime.id)
         return status
     }
 

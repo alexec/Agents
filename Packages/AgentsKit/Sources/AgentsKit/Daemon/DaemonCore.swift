@@ -1152,6 +1152,8 @@ public actor DaemonCore {
             await record(kind, for: agentID)
             notePlanning(kind, agentID: agentID)
             heardAfterTheEnd(kind, agentID: agentID)
+            // A tool call coming back is the runtime answering (#140).
+            if case .toolCallUpdate(let call) = kind, call.status == "completed" { runtimeAnswering(agentID: agentID) }
 
         case .optionsChanged(let options):
             guard var agent = agents[agentID] else { return }

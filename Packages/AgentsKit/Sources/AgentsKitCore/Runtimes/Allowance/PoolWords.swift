@@ -43,6 +43,21 @@ public enum PoolWords {
         }
     }
 
+    /// The models a provider failed on, while the runtime works (#140): "Model
+    /// ling-3.0-flash out since 09:05 · checking after 13:05". Nil when none is out.
+    public static func modelsOut(_ state: AllowanceState, now: Date) -> String? {
+        let marks = state.modelsOut(now: now)
+        guard !marks.isEmpty else { return nil }
+        return marks.map {
+            "Model \($0.name ?? $0.model) out since \(time($0.since, now: now)) · checking after \(time($0.retryAfter, now: now))"
+        }.joined(separator: " · ")
+    }
+
+    /// The state line with any models out after it: the Pool page's line for a runtime.
+    public static func stateWithModels(_ state: AllowanceState, now: Date) -> String {
+        [Self.state(state, now: now), modelsOut(state, now: now)].compactMap { $0 }.joined(separator: " · ")
+    }
+
     /// What the runtime last said is left of its plan window: "28% left this week ·
     /// resets Sun 20:39 · as of 14:02". Nil when there is no reading, or its window has
     /// reset since, when it would say nothing true about the new one.

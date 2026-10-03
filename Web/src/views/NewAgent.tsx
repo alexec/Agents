@@ -136,6 +136,9 @@ export function NewAgent({ store, host, folder, projectName, down }: {
 
   const state = form.value.state;
   const runtimeName = runtimes.find((r) => r.runtime.id === chosenRuntime)?.runtime.name ?? "the runtime";
+  // Where the runtime stands in the pool when it, or one of its models, is out (#140): the
+  // Pool page's line, as the window's chooser says it under the runtime's name.
+  const poolNote = runtimes.find((r) => r.runtime.id === chosenRuntime)?.poolNote;
   const hostRecord = store.hosts.value.find((h) => h.id === host);
   const machine = host === "mac" ? "this Mac" : hostRecord?.name ?? host;
   const path = decodeURI(folderKey(folder).replace(/^file:\/\//, ""));
@@ -199,6 +202,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
             <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]}
               onChange={(o, v) => (form.value = { ...form.value, chosen: { ...form.value.chosen, [o.id]: v } })} disabled={down} />
           )}
+          {poolNote && <p class="quiet small">{runtimeName}: {poolNote}</p>}
         </Prompt>
       </footer>
     </section>
