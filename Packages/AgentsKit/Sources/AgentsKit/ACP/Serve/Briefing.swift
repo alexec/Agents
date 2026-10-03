@@ -127,9 +127,8 @@ public enum Briefing {
     /// guard against a worktree's old copy riding back on a merge (Alex, 2026-10-02).
     public static let dashboard = """
         If you keep something the person checks often, keep it as a tile on the project's \
-        Dashboard with \(AppTool.setTile), and set it again when it changes. \
-        .agents/dashboard/ is written only through those tools: never edit it by hand, \
-        and never in a worktree.
+        Dashboard with \(AppTool.setTile). .agents/dashboard/ is written only through \
+        those tools, never by hand or in a worktree.
         """
 
     /// Who is who, for the sentence below (#121).

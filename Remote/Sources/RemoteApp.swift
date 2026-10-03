@@ -64,10 +64,12 @@ struct RemoteView: View {
     /// somewhere you go from the project and come back out of, not a third column.
     private var path: Binding<[RemoteRoute]> {
         Binding(get: {
-                    [model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
+                    [model.openDashboard ? RemoteRoute.dashboard : nil,
+                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
                         .compactMap { $0 }
                 },
                 set: { routes in
+                    model.openDashboard = routes.contains(.dashboard)
                     model.openWorkflow = routes.lazy.compactMap(\.workflowID).first
                     model.selection = routes.compactMap(\.agentID).last
                 })
@@ -92,6 +94,7 @@ struct RemoteView: View {
                                     .task(id: id) { await model.lookUpRetired(id) }
                             }
                         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
+                        case .dashboard: DashboardPage().paperGround()
                         }
                     }
             }
@@ -142,6 +145,8 @@ struct RemoteView: View {
 enum RemoteRoute: Hashable {
     case workflow(Workflow.ID)
     case agent(UUID)
+    /// The project's Dashboard (074).
+    case dashboard
 
     var workflowID: Workflow.ID? {
         if case .workflow(let id) = self { return id }

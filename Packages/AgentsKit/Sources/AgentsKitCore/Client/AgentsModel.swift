@@ -30,6 +30,14 @@ public final class AgentsModel {
     /// own model because a workflow is about the work, and the phone will want them.
     public private(set) var workflows: [WorkflowSummary] = []
 
+    /// Each project's Dashboard row (074), by its standardized folder: kept current by
+    /// `dashboard/changed`, which carries it.
+    public private(set) var dashboardSummaries: [URL: DashboardSummary] = [:]
+    /// The Dashboards a screen has asked for, by folder. Refetched by whoever shows one
+    /// when `dashboardRevisions` moves: the notification says only that it changed.
+    public var dashboards: [URL: DashboardSnapshot] = [:]
+    public private(set) var dashboardRevisions: [URL: Int] = [:]
+
     /// Each project's plugins, by its standardized folder, as the daemon last listed them:
     /// which are waiting for the person's OK (security review, S2).
     public private(set) var plugins: [URL: [ProjectPlugin]] = [:]
@@ -237,6 +245,7 @@ public final class AgentsModel {
         case usage(DaemonAPI.UsageNotification)
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
+        case dashboardChanged(DaemonAPI.DashboardChangedNotification)
         case pluginsChanged(DaemonAPI.PluginsList)
         case costChanged(DaemonAPI.CostState)
         case retentionChanged(DaemonAPI.RetentionState)
@@ -270,6 +279,8 @@ public final class AgentsModel {
         case DaemonAPI.Notification.agentUsage: return decode(DaemonAPI.UsageNotification.self, Update.usage)
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
+        case DaemonAPI.Notification.dashboardChanged:
+            return decode(DaemonAPI.DashboardChangedNotification.self, Update.dashboardChanged)
         case DaemonAPI.Notification.pluginsChanged: return decode(DaemonAPI.PluginsList.self, Update.pluginsChanged)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
         case DaemonAPI.Notification.retentionChanged: return decode(DaemonAPI.RetentionState.self, Update.retentionChanged)
@@ -385,6 +396,11 @@ public final class AgentsModel {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
 
+        case .dashboardChanged(let notification):
+            let folder = Project.standardize(notification.folder)
+            dashboardSummaries[folder] = notification.summary
+            dashboardRevisions[folder, default: 0] += 1
+
         case .pluginsChanged(let list):
             replacePlugins(list)
 
@@ -486,6 +502,27 @@ public final class AgentsModel {
     public func plugins(in folder: URL?) -> [ProjectPlugin] {
         guard let folder else { return [] }
         return plugins[Project.standardize(folder)] ?? []
+    }
+
+    /// One project's Dashboard row, or nil when it has no tiles.
+    public func dashboardSummary(in folder: URL?) -> DashboardSummary? {
+        guard let folder else { return nil }
+        return dashboardSummaries[Project.standardize(folder)]
+    }
+
+    public func replaceDashboardSummaries(_ listed: [DashboardSummary]) {
+        dashboardSummaries = Dictionary(listed.map { (Project.standardize($0.folder), $0) }, uniquingKeysWith: { $1 })
+    }
+
+    /// A Dashboard as fetched; its row follows it.
+    public func store(_ snapshot: DashboardSnapshot) {
+        let folder = Project.standardize(snapshot.folder)
+        dashboards[folder] = snapshot
+        dashboardSummaries[folder] = DashboardModel.summary(snapshot)
+    }
+
+    public func dashboardRevision(in folder: URL?) -> Int {
+        folder.map { dashboardRevisions[Project.standardize($0)] ?? 0 } ?? 0
     }
 
     /// The workflows of one project, which is what a project page shows.

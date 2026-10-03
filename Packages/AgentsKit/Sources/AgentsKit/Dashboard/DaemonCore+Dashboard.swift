@@ -79,9 +79,8 @@ extension DaemonCore {
         state.sets[callerKey] = recent + [at]
         if let removal = state.removals.removeValue(forKey: check.id),
            at.timeIntervalSince(removal.at) < TileLimits.removalKept {
-            notes.append("\(removal.by.prefix(1).uppercased() + removal.by.dropFirst()) removed this tile on "
-                + "\(DashboardWords.dayAndTime(removal.at)); posting has put it back. If it is not wanted, "
-                + "stop keeping it with remove_tile.")
+            notes.append("This tile had been removed by \(removal.by), on \(DashboardWords.dayAndTime(removal.at)); "
+                + "posting has put it back. If it is no longer wanted, stop keeping it with remove_tile.")
         }
         state.removals = state.removals.filter { at.timeIntervalSince($0.value.at) < TileLimits.removalKept }
         dashboardStore.save(state, for: project)

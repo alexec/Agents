@@ -114,6 +114,7 @@ final class AppModel {
             // out of.
             selection = nil
             openWorkflow = nil
+            openDashboard = false
         }
     }
 
@@ -340,7 +341,10 @@ final class AppModel {
             work.watching = selection
             presence?.watching(selection)
             // A session picked is the session shown, not a workflow left open over it.
-            if selection != nil { openWorkflow = nil }
+            if selection != nil {
+                openWorkflow = nil
+                openDashboard = false
+            }
             chatOpening = selection.map { (agent: $0, timing: Perf.begin("chat-open")) }
             Task { await loadTranscript() }
         }
@@ -358,7 +362,19 @@ final class AppModel {
     /// which would have had to learn about a case it has nothing to say about. One
     /// more field costs one line. The two are exclusive, and `ContentView`'s `page`
     /// binding is the single place navigation sets either.
-    var openWorkflow: Workflow.ID?
+    var openWorkflow: Workflow.ID? {
+        didSet { if openWorkflow != nil { openDashboard = false } }
+    }
+
+    /// Whether the selected project's Dashboard (074) is open in the chat's place: a third
+    /// sibling of `selection` and `openWorkflow`, exclusive with both.
+    var openDashboard = false {
+        didSet {
+            guard openDashboard, !oldValue else { return }
+            selection = nil
+            openWorkflow = nil
+        }
+    }
 
     // What the prompt bar is holding before there is an agent to hold it. It lives
     // here rather than in the view so that starting an agent does not throw it away
@@ -720,6 +736,47 @@ final class AppModel {
                                    DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
                                                                    workflowID: summary.workflowID,
                                                                    enabled: enabled))
+    }
+
+    // MARK: Dashboard (074)
+
+    func dashboardSummary(in folder: URL?) -> DashboardSummary? { work.dashboardSummary(in: folder) }
+    func dashboard(in folder: URL?) -> DashboardSnapshot? { folder.flatMap { work.dashboards[Project.standardize($0)] } }
+    func dashboardRevision(in folder: URL?) -> Int { work.dashboardRevision(in: folder) }
+
+    func refreshDashboardSummaries() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.dashboardSummaries, DaemonAPI.Empty(),
+                                                  returning: [DashboardSummary].self) else { return }
+        work.replaceDashboardSummaries(listed)
+    }
+
+    /// The selected project's Dashboard, asked for when its page opens and again on each
+    /// `dashboard/changed` for it.
+    func refreshDashboard(_ folder: URL) async {
+        let host = selectedProjectHost
+        guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.dashboardGet,
+                                                               DaemonAPI.DashboardRequest(folder: folder),
+                                                               returning: DashboardSnapshot.self) else { return }
+        work.store(snapshot)
+    }
+
+    /// Hide, Show or Remove a tile: the person's, from any client (FR-027 to FR-029).
+    func actOnTile(_ method: String, folder: URL, id: String) async {
+        let host = selectedProjectHost
+        await attempt(on: host) {
+            try await self.client(for: host).call(method, DaemonAPI.TileRequest(folder: folder, id: id))
+        }
+        await refreshDashboard(folder)
+    }
+
+    /// A tile's keeper: its session, or its workflow's page (FR-030).
+    func openKeeper(_ keeper: KeeperView, folder: URL) {
+        switch keeper.kind {
+        case .agent:
+            if let id = UUID(uuidString: keeper.id) { openAgent(id) }
+        case .workflow:
+            showWorkflow(folder: folder, workflowID: keeper.id)
+        }
     }
 
     /// A project's plugins, asked for when its page opens; kept current after that by
@@ -1799,6 +1856,7 @@ final class AppModel {
         async let runtimes: Void = refreshRuntimes()
         async let accounts: Void = refreshAccounts()
         async let workflows: Void = refreshWorkflows()
+        async let dashboards: Void = refreshDashboardSummaries()
         async let permissions: Void = refreshPermissions()
         async let elicitations: Void = refreshElicitations()
         async let attention: Void = refreshAttention()
@@ -1815,7 +1873,7 @@ final class AppModel {
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
-        _ = await (runtimes, accounts, workflows, permissions,
+        _ = await (runtimes, accounts, workflows, dashboards, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person)
         #if DEBUG
