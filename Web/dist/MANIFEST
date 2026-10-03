@@ -2,7 +2,7 @@ agents-web 1
 node v26.8.2
 esbuild 0.28.2
 src 8f8e373d500f414f7435fdc1d2fe9dd697e60cfb03b69657cecb873ac31b84df Web/.node-version
-src 43cae8a6ea9fe863b8269397bcd12b5aab2c47737bb7990b0462be5e9a5016d1 Web/assets/favicon.png
+src fc008a0b40d2586a84f6b1679e1678d44bfff0a4fc6d8776c3825bf14553f11a Web/assets/favicon.png
 src 2988323949d72f3c9bb89538700328a0db5097f4b97607a3474a64626e066e5d Web/build.mjs
 src f9d0b81df4d08d68dc34d483550654f595ec4104b68e1d0214f9e69c0123676e Web/index.html
 src 5718e0d8895fff9aefca5cda475a7eb34ec1f8fc90d916490c9b784f4b0c8887 Web/package-lock.json
@@ -74,5 +74,5 @@ src 9838ad5dba49e5370dee419f649225856f3f7ce109aac9fdc545f060d1582930 Web/src/wir
 src 4a7a33a6a90610a8f3e62bdbc4fa5094899931b11f579f5c55b56c5570e63f86 Web/tsconfig.json
 out 87b2578255f607ca0423be5eb8402096200a6538209d5b2e38a55ac5cabf3d84 Web/dist/app.css
 out 82f9e1094c35c82650535e3a4c8de1b5a15baffb3c381a7dab1b6c2c293c5170 Web/dist/app.js
-out 43cae8a6ea9fe863b8269397bcd12b5aab2c47737bb7990b0462be5e9a5016d1 Web/dist/assets/favicon.png
+out fc008a0b40d2586a84f6b1679e1678d44bfff0a4fc6d8776c3825bf14553f11a Web/dist/assets/favicon.png
 out f9d0b81df4d08d68dc34d483550654f595ec4104b68e1d0214f9e69c0123676e Web/dist/index.html
