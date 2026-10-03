@@ -27,28 +27,36 @@ struct ArchiveToolsetTests {
             #expect(platform.command == "agy_acp_server.par", "\(name)")
             #expect(platform.arguments == (name.hasPrefix("linux-") ? ["--uid="] : []), "\(name)")
         }
-        // Measured by hand on 2026-09-25 (research R2).
-        #expect(toolset.manifest.platforms["darwin-aarch64"]?.sha256
-                == "0fab9938812e6b32b3b543e65e4f3a0025ceef755413db13542d9a9b81ea803c")
+        // Measured by hand on 2026-09-25 (research R2), for the release pinned then. A newer
+        // pin (the nightly runtime check re-pins it, #39) is held to the shape above instead.
+        if toolset.manifest.version == "1.2.1" {
+            #expect(toolset.manifest.platforms["darwin-aarch64"]?.sha256
+                    == "0fab9938812e6b32b3b543e65e4f3a0025ceef755413db13542d9a9b81ea803c")
+        }
     }
 
     @Test func theBundledOpenCodeProgramIsPinnedFromItsGitHubReleaseForEveryPlatform() throws {
         let toolset = try ArchiveToolset.load(from: Self.bundled.appendingPathComponent("opencode"))
         #expect(toolset.manifest.runtimeID == "opencode")
-        #expect(toolset.manifest.version == "1.18.33")
+        // Whichever release is pinned (the nightly runtime check re-pins it, #39), every
+        // platform comes from that one release.
+        let version = toolset.manifest.version
+        #expect(version.split(separator: ".").count == 3 && version.allSatisfy { $0.isNumber || $0 == "." })
         #expect(Set(toolset.manifest.platforms.keys) == [
             "darwin-aarch64", "darwin-x86_64", "darwin-x86_64-baseline",
             "linux-aarch64", "linux-aarch64-musl", "linux-x86_64", "linux-x86_64-baseline",
             "linux-x86_64-musl", "linux-x86_64-baseline-musl"])
         for (name, platform) in toolset.manifest.platforms {
-            #expect(platform.url.absoluteString.hasPrefix("https://github.com/anomalyco/opencode/releases/download/v1.18.33/"), "\(name)")
+            #expect(platform.url.absoluteString.hasPrefix("https://github.com/anomalyco/opencode/releases/download/v\(version)/"), "\(name)")
             #expect(platform.format == (name.hasPrefix("darwin-") ? .zip : .tarGz), "\(name)")
             #expect(platform.sha256.count == 64 && platform.sha256.allSatisfy(\.isHexDigit), "\(name)")
             #expect(platform.command == "opencode" && platform.arguments.isEmpty, "\(name)")
         }
-        // Hashed by hand from the downloaded zip on 2026-09-28 (research R1).
-        #expect(toolset.manifest.platforms["darwin-aarch64"]?.sha256
-                == "24b12873e605b3db3387cb355f43ba7451cd6065c180d8c188663337d2eeb553")
+        // Hashed by hand from the downloaded zip on 2026-09-28 (research R1), for 1.18.33.
+        if version == "1.18.33" {
+            #expect(toolset.manifest.platforms["darwin-aarch64"]?.sha256
+                    == "24b12873e605b3db3387cb355f43ba7451cd6065c180d8c188663337d2eeb553")
+        }
         #expect(ArchiveToolset.vendor(of: toolset) == "GitHub")
     }
 
