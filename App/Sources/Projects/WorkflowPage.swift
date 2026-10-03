@@ -75,12 +75,16 @@ struct WorkflowPage: View {
         let workflow = summary.workflow
         VStack(alignment: .leading, spacing: 22) {
             heading(summary)
-            if let problem = workflow.problem {
-                broken(problem, workflow: workflow)
+            // The page answers four questions in this order (#142): is it running and
+            // why not, what it does, when it runs, and what it has done.
+            status(summary)
+            if workflow.problem != nil {
+                broken(workflow)
             }
-            triggers(summary)
             form(summary)
-            runs(workflow)
+            triggers(summary)
+            unknownKeys(workflow)
+            history(summary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         // The column the transcript, the prompt bar and the project page all use, so
@@ -92,8 +96,8 @@ struct WorkflowPage: View {
 
     // MARK: The title line
 
-    /// The name, what it is, and what is happening to it — the row's three lines, in
-    /// the row's words — and on the right, the two things you do to a workflow.
+    /// The name and what it is, in the row's words, and on the right the things you do
+    /// to a workflow. What is happening to it is the status card's (#142).
     ///
     /// Deliberately the same sentence as the row: this page is the row opened up, not
     /// a second description of the same workflow that could come to disagree with it.
@@ -112,27 +116,6 @@ struct WorkflowPage: View {
                         .appText(.supporting)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-                if let happening = happening(summary) {
-                    HStack(spacing: 4) {
-                        Text(happening)
-                        if let agentID = ranAgentID(summary) {
-                            Text("·")
-                            Button {
-                                model.openWorkflow = nil
-                                model.selection = agentID
-                            } label: {
-                                HStack(spacing: 2) {
-                                    Text("Open the agent it started")
-                                    Image(systemName: "arrow.right")
-                                }
-                            }
-                            .buttonStyle(.link)
-                        }
-                    }
-                    .appText(.supporting)
-                    .foregroundStyle((summary.needsAPerson ? StateTint.attention : .none).style(or: .secondary))
-                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 0)
@@ -211,18 +194,164 @@ struct WorkflowPage: View {
     /// The raw text is here because the problem alone is not enough to act on: a
     /// person told their metadata block is never closed still has to go and look, and
     /// the thing they need to look at is a dozen lines long and already in hand.
+    /// The problem itself is the status card's first line; this is the file under it.
     @ViewBuilder
-    private func broken(_ problem: WorkflowProblem, workflow: Workflow) -> some View {
+    private func broken(_ workflow: Workflow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(problem.message, systemImage: "exclamationmark.triangle")
-                .appText(.reading)
-                .tinted(problem.needsAPerson ? .failure : .none)
-                .fixedSize(horizontal: false, vertical: true)
             if let rawText {
                 block(rawText)
             }
         }
         .task(id: workflow) { rawText = await readRaw(workflow) }
+    }
+
+    // MARK: Why it is or isn't running (#142)
+
+    /// One line of the status card: what is true, and whether it wants a person.
+    private struct StatusLine: Identifiable {
+        var symbol: String
+        var text: String
+        var detail: String? = nil
+        var tint: StateTint = .none
+        var agentID: UUID? = nil
+        var id: String { symbol + text }
+    }
+
+    /// Everything that decides whether it runs, a line each, most important first:
+    /// what stops it, then what it is doing, then when it next runs. The heading keeps
+    /// only the summary sentence, so none of this is said twice.
+    private func status(_ summary: WorkflowSummary) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Status")
+            VStack(alignment: .leading, spacing: 0) {
+                let lines = statusLines(summary)
+                ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                    if index > 0 { Divider().padding(.leading, 42) }
+                    statusRow(line)
+                }
+            }
+            .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+        }
+    }
+
+    private func statusRow(_ line: StatusLine) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: line.symbol)
+                .appText(.reading)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(line.text)
+                    .appText(.reading)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail = line.detail {
+                    Text(detail)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 12)
+            if let agentID = line.agentID {
+                Button {
+                    model.openWorkflow = nil
+                    model.selection = agentID
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("Open the agent")
+                        Image(systemName: "arrow.right")
+                    }
+                }
+                .buttonStyle(.link)
+                .appText(.fine)
+            }
+        }
+        .foregroundStyle(line.tint.style(or: .primary))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+    }
+
+    private func statusLines(_ summary: WorkflowSummary) -> [StatusLine] {
+        let workflow = summary.workflow
+        var lines: [StatusLine] = []
+        if summary.isArchived {
+            lines.append(StatusLine(symbol: "archivebox",
+                                    text: "Archived — it will not run until it is brought back",
+                                    detail: "Archived workflows count towards neither limit"))
+        }
+        if let problem = workflow.problem {
+            lines.append(StatusLine(symbol: "exclamationmark.triangle", text: problem.message,
+                                    detail: problem.needsAPerson ? "The file is below" : "Left alone until this version knows it",
+                                    tint: problem.needsAPerson ? .failure : .none))
+        }
+        if summary.waitsItsTurn, let limit = summary.overLimit {
+            lines.append(StatusLine(symbol: "hourglass", text: "Waiting its turn: \(limit.sentence)",
+                                    detail: limit.remedy, tint: .attention))
+        } else if let waiting = summary.awaitingApproval {
+            lines.append(StatusLine(symbol: "checkmark.shield",
+                                    text: waiting.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
+                                    detail: "Read the prompt and settings below, then Approve to let it run",
+                                    tint: .attention))
+        }
+        if !summary.isArchived {
+            lines.append(enabledLine(summary))
+        }
+        if let limit = summary.overLimit, !summary.waitsItsTurn {
+            lines.append(StatusLine(symbol: "exclamationmark.triangle", text: "Over the limit: \(limit.sentence)",
+                                    detail: limit.remedy, tint: .attention))
+        }
+        if summary.isRunning {
+            lines.append(StatusLine(symbol: "play.circle", text: "Running now",
+                                    agentID: ranAgentID(summary)))
+        }
+        if let end = summary.cooldownEndsAt {
+            lines.append(StatusLine(symbol: "hourglass",
+                                    text: "Cooling down until \(end.formatted(date: .omitted, time: .shortened))",
+                                    detail: summary.holdsAFire ? "A trigger came in meanwhile; it runs once then" : nil))
+        }
+        if case .refused = summary.lastOutcome, let outcome = summary.lastOutcome {
+            lines.append(StatusLine(symbol: "xmark.circle", text: outcome.summary,
+                                    tint: summary.needsAPerson && summary.awaitingApproval == nil && summary.overLimit == nil
+                                        ? .attention : .none))
+        }
+        lines.append(nextLine(summary))
+        return lines
+    }
+
+    /// Whether the switch is on, and where that came from: the file, an agent, or the
+    /// person here (#124, #125).
+    private func enabledLine(_ summary: WorkflowSummary) -> StatusLine {
+        let file = "\(WorkflowPaths.folderName)/\(summary.workflowID).\(WorkflowPaths.fileExtension)"
+        guard !summary.isEnabled else {
+            return StatusLine(symbol: "checkmark.circle",
+                              text: summary.workflow.enabled == true ? "On — its file says enabled: true"
+                                                                     : "On — its file does not say enabled:, so it is on",
+                              detail: "Enabled writes enabled: false into \(file)")
+        }
+        let text: String
+        switch summary.offReason {
+        case .file?: text = "Off — its file says enabled: false"
+        case .writtenByAgent?: text = "Off — written by an agent, so it arrived off"
+        case .agent?: text = "Off — an agent turned it off"
+        case .person?, nil: text = "Off — turned off here"
+        }
+        return StatusLine(symbol: "pause.circle", text: text,
+                          detail: "None of its triggers run it; Run now still does. It still counts towards the workflow limits")
+    }
+
+    /// When it next runs, or that nothing will until something changes.
+    private func nextLine(_ summary: WorkflowSummary) -> StatusLine {
+        let blocked = summary.isArchived || !summary.isEnabled || summary.workflow.problem != nil
+            || summary.awaitingApproval != nil || summary.overLimit != nil
+        if let next = summary.nextFireAt, !blocked {
+            return StatusLine(symbol: "calendar",
+                              text: "Next run \(next.formatted(.relative(presentation: .named)))",
+                              detail: next.formatted(date: .abbreviated, time: .shortened))
+        }
+        if !blocked, summary.workflow.canFire {
+            return StatusLine(symbol: "bolt", text: "Runs when one of its triggers fires")
+        }
+        return StatusLine(symbol: "calendar", text: "No next run",
+                          detail: blocked ? "Until what is above changes" : "Nothing it waits for can run it; Run now still does")
     }
 
     // MARK: What sends it (#98)
@@ -251,7 +380,6 @@ struct WorkflowPage: View {
                 .paperRaised(in: RoundedRectangle(cornerRadius: 18))
             }
             cooldown(summary)
-            lastRan(summary)
         }
     }
 
@@ -398,7 +526,7 @@ struct WorkflowPage: View {
     private func lastRan(_ summary: WorkflowSummary) -> some View {
         if let at = summary.lastFiredAt {
             let when = at.formatted(.relative(presentation: .named))
-            note(["Last ran \(when)", summary.lastFiredBy?.phrase].compactMap { $0 }.joined(separator: ", "))
+            note(["Last ran \(when)", summary.lastFiredBy?.phrase].compactMap { $0 }.joined(separator: ", ") + ".")
         } else {
             note("Has not run yet.")
         }
@@ -431,33 +559,38 @@ struct WorkflowPage: View {
     /// to find them again — and because a hidden control is not an explanation.
     private func form(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
-        return GlassEffectContainer(spacing: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                fileAndRuntime(summary)
-                block(workflow.prompt.isEmpty ? "(no prompt)" : workflow.prompt)
-                switch workflow.mode {
-                case .triggering:
-                    note("This workflow resumes the agent that triggered it, so these do not apply.")
-                case .standing:
-                    note("Applied when its standing agent is started, and again if it has to be replaced.")
-                case .new:
-                    EmptyView()
-                }
-                // The prompt's two pills: the permission mode on the left, and the
-                // model, its effort and the rest behind one pill on the right.
-                if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
-                    HStack(alignment: .top, spacing: 10) {
-                        settingControl(summary, name: "Permission mode",
-                                       setting: WorkflowSettings.Setting.permissionMode,
-                                       value: workflow.settings.permissionMode,
-                                       option: remembered.flatMap(ModeMemory.modeOption(in:)),
-                                       runtime: runtime,
-                                       chosen: binding(summary, \.permissionMode) { $0.permissionMode = $1 })
-                        Spacer(minLength: 16)
-                        modelPill(summary, runtime: runtime)
+        return VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("What it does")
+            GlassEffectContainer(spacing: 12) {
+                VStack(alignment: .leading, spacing: 12) {
+                    fileAndRuntime(summary)
+                    agentRow(summary)
+                    block(workflow.prompt.isEmpty ? "(no prompt)" : workflow.prompt)
+                    switch workflow.mode {
+                    case .triggering:
+                        note("This workflow resumes the agent that triggered it, so these do not apply.")
+                    case .standing:
+                        note("Applied when its standing agent is started, and again if it has to be replaced.")
+                    case .new:
+                        EmptyView()
                     }
-                    .disabled(workflow.mode == .triggering)
-                    refusals(summary, runtime: runtime)
+                    // The prompt's two pills: the permission mode on the left, and the
+                    // model, its effort and the rest behind one pill on the right.
+                    if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
+                        HStack(alignment: .top, spacing: 10) {
+                            settingControl(summary, name: "Permission mode",
+                                           setting: WorkflowSettings.Setting.permissionMode,
+                                           value: workflow.settings.permissionMode,
+                                           option: remembered.flatMap(ModeMemory.modeOption(in:)),
+                                           runtime: runtime,
+                                           chosen: binding(summary, \.permissionMode) { $0.permissionMode = $1 })
+                            Spacer(minLength: 16)
+                            modelPill(summary, runtime: runtime)
+                        }
+                        .disabled(workflow.mode == .triggering)
+                        refusals(summary, runtime: runtime)
+                    }
+                    labelsRow(summary)
                 }
             }
         }
@@ -466,6 +599,121 @@ struct WorkflowPage: View {
         .task(id: RememberedKey(runtimeID: runtimeID(workflow), folder: workflow.folder)) {
             remembered = nil
             remembered = await model.rememberedOptions(runtimeID: runtimeID(workflow), cwd: workflow.folder)
+        }
+    }
+
+    /// Who gets the prompt (#142): `agent:` said in words, read-only like the rest of
+    /// what the workflow is, and for a standing workflow the agent it keeps.
+    private func agentRow(_ summary: WorkflowSummary) -> some View {
+        let mode = summary.workflow.mode
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: mode == .new ? "plus.circle" : mode == .standing ? "person.crop.circle" : "arrow.uturn.backward.circle")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+            Text(modeWords(mode))
+                .appText(.fine)
+            Text("agent: \(mode.rawValue)")
+                .appText(.fine).monospaced()
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            if mode == .standing {
+                standingAgent(summary)
+            }
+        }
+    }
+
+    private func modeWords(_ mode: WorkflowMode) -> String {
+        switch mode {
+        case .new: "Starts a new agent each run"
+        case .standing: "Sends each run to its standing agent"
+        case .triggering: "Resumes the agent that triggered it"
+        }
+    }
+
+    /// The standing agent by name, a click from its conversation, or that the next run
+    /// starts one. The look stands in with the newest agent the workflow started; the
+    /// store's own `standingAgentID` is not in the summary yet.
+    @ViewBuilder
+    private func standingAgent(_ summary: WorkflowSummary) -> some View {
+        let folder = Project.standardize(summary.folder)
+        let kept = model.agents
+            .filter { $0.projectFolder == folder && $0.startedByWorkflow == summary.workflowID && $0.archivedAt == nil }
+            .max { $0.createdAt < $1.createdAt }
+        if let kept {
+            Button {
+                model.openWorkflow = nil
+                model.selection = kept.id
+            } label: {
+                HStack(spacing: 2) {
+                    Text(kept.title ?? "Untitled")
+                    Image(systemName: "arrow.right")
+                }
+            }
+            .buttonStyle(.link)
+            .appText(.fine)
+            .lineLimit(1)
+        } else {
+            Text("None yet — the next run starts it")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// The labels each run's new agent gets, as the tag input sessions use (#50). Shown
+    /// and not yet editable: the settings writer does not write `labels:` yet.
+    private func labelsRow(_ summary: WorkflowSummary) -> some View {
+        let labels = summary.workflow.settings.labels
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "tag")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                LabelTagField(labels: labels.map { SessionLabel(value: $0, owner: .agent) },
+                              add: { _ in }, remove: { _ in })
+                    .disabled(true)
+            }
+            note(labels.isEmpty
+                 ? "No labels: each run's agent starts with none."
+                 : summary.workflow.mode == .new
+                    ? "Each run's new agent gets these labels."
+                    : "Given to an agent this workflow starts; one it reuses keeps its own.")
+        }
+    }
+
+    // MARK: The rest of the file (#142)
+
+    /// Front-matter keys this version does not know, with what the file says, so the
+    /// reader knows the file says more than the page does. Grey: a key from a later
+    /// version asks nothing of anyone.
+    @ViewBuilder
+    private func unknownKeys(_ workflow: Workflow) -> some View {
+        if !workflow.unknownFields.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionTitle("From a later version")
+                VStack(alignment: .leading, spacing: 6) {
+                    note("This version does not understand these lines in the file. They are kept as they are when the page changes it.")
+                    ForEach(workflow.unknownFields.sorted { $0.key < $1.key }, id: \.key) { key, value in
+                        Text("\(key): \(yaml(value))")
+                            .appText(.code)
+                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+            }
+        }
+    }
+
+    /// A value as one line: a scalar as the file writes it, anything nested as JSON.
+    private func yaml(_ value: JSONValue) -> String {
+        switch value {
+        case .string(let text): return text
+        case .null: return "null"
+        default:
+            let data = (try? JSONEncoder().encode(value)) ?? Data()
+            return String(decoding: data, as: UTF8.self)
         }
     }
 
@@ -693,16 +941,15 @@ struct WorkflowPage: View {
     /// here exactly as it reads there — and carries the same marker saying a workflow
     /// started it. Three to begin with: there is no end to a workflow's runs, and the
     /// form above must not be pushed off the page by them.
-    private func runs(_ workflow: Workflow) -> some View {
+    private func history(_ summary: WorkflowSummary) -> some View {
+        let workflow = summary.workflow
         let folder = Project.standardize(workflow.folder)
         let started = model.agents
             .filter { $0.projectFolder == folder && $0.startedByWorkflow == workflow.workflowID }
             .sorted { $0.createdAt > $1.createdAt }
         return VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Recent runs")
-            if started.isEmpty {
-                note("Nothing has run yet.")
-            }
+            sectionTitle("History")
+            lastRan(summary)
             ForEach(started.prefix(shownRuns)) { agent in
                 Button {
                     model.openWorkflow = nil
@@ -764,40 +1011,6 @@ struct WorkflowPage: View {
     /// The file as its host reads it (058, R11), this Mac's included.
     private func readRaw(_ workflow: Workflow) async -> String? {
         await model.readText(url(workflow), on: model.selectedProjectHost)
-    }
-
-    /// When it next runs and what happened last, as one sentence. The row's third line,
-    /// which is where a refusal becomes visible at all.
-    private func happening(_ summary: WorkflowSummary) -> String? {
-        var parts: [String] = []
-        if summary.isArchived {
-            parts.append("Archived — it will not run until it is restored")
-        } else if summary.waitsItsTurn, let limit = summary.overLimit {
-            parts.append("\(limit.sentence). \(limit.remedy)")
-            return parts.joined(separator: " · ")
-        } else if let waiting = summary.awaitingApproval {
-            // What waits on the person is the file, and it is on this page to be read.
-            parts.append((waiting.isNew ? "New" : "Changed since you approved it")
-                         + " — read it below, then Approve to let it run")
-            // Approving one that starts off does not start it (#124): say so now, not
-            // after they have approved it and wondered why nothing ran.
-            if let why = summary.offReason?.sentence { parts.append(why) }
-            return parts.joined(separator: " · ")
-        } else if !summary.isEnabled {
-            parts.append(summary.turnedOffSentence)
-        } else if let limit = summary.overLimit {
-            parts.append("\(limit.sentence). \(limit.remedy)")
-        } else if let next = summary.nextFireAt {
-            parts.append("Next \(next.formatted(.relative(presentation: .named)))")
-        }
-        if let outcome = summary.lastOutcome {
-            let when = outcome.at.formatted(.relative(presentation: .named))
-            switch outcome {
-            case .ran: parts.append("Ran \(when)")
-            case .refused: parts.append(outcome.summary)
-            }
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private func ranAgentID(_ summary: WorkflowSummary) -> UUID? {
