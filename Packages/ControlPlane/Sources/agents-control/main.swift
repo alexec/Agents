@@ -15,6 +15,7 @@ import Musl
 //   agents-control serve --home DIR [--no-bonjour] [--key-fd N] [--store-credentials-fd N]
 //   agents-control serve … [--web DIR] [--web-port N] [--no-web]
 //   agents-control serve … [--host-root DIR]    this Mac's host's root: its join in control/status (#113)
+//   agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding (AGENTS_CONTROL_FORWARDING=0)
 //   agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
 //   agents-control move --from ROOT     an old set-up's devices into this store, once (T084)
@@ -148,6 +149,8 @@ func serve() async {
             peerURL: environment["AGENTS_CONTROL_PEER_URL"].flatMap(URL.init(string:)),
             receive: arguments.contains("--receive") || environment["AGENTS_CONTROL_RECEIVE"] == "1")
         configuration.web = web()
+        // A copy that was forwarding forwards again after a restart, unless told to serve.
+        configuration.resumeForwarding = !arguments.contains("--no-forwarding") && environment["AGENTS_CONTROL_FORWARDING"] != "0"
         // Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
         if let file = home?.appendingPathComponent(WebRemoteFile.name) {
             try? FileManager.default.removeItem(at: file)
@@ -373,7 +376,8 @@ func handover() async {
             show(try await link("--at", pin: "--pin").call(Handover.Method.status))
         case "announce":
             show(try await link("--at", pin: "--pin").call(Handover.Method.announce,
-                                                          ["endpoint": try JSONValue.encoding(await endpoints()[0])]))
+                                                          ["endpoint": try JSONValue.encoding(await endpoints()[0]),
+                                                           "force": .bool(arguments.contains("--force"))]))
         case "forward":
             // 30 days at most, the copy's own rule; --days for fewer.
             var params: [String: JSONValue] = ["endpoints": try JSONValue.encoding(await endpoints())]
@@ -386,6 +390,16 @@ func handover() async {
         case "withdraw": show(try await link("--at", pin: "--pin").call(Handover.Method.withdraw))
         case "take": show(try await link("--at", pin: "--pin").call(Handover.Method.take))
         case "stop": show(try await link("--at", pin: "--pin").call(Handover.Method.stop))
+        case "shares":
+            // Whether two copies read one store (a bucket, R16 3): a mark left at one is
+            // found at the other.
+            let at = await link("--at", pin: "--pin"), with = await link("--with", pin: "--with-pin")
+            let nonce = UUID().uuidString.lowercased()
+            _ = try await at.call(Handover.Method.mark, ["nonce": .string(nonce), "leave": true])
+            guard try await with.call(Handover.Method.mark, ["nonce": .string(nonce)])["found"]?.boolValue == true else {
+                fail("not the same store: \(value("--with") ?? "") doesn't see what \(value("--at") ?? "") wrote")
+            }
+            print("the same store")
         case "copy":
             // Either end a copy (https://…, over its handover session) or a store this
             // machine opens (file://…, s3://…).
@@ -399,7 +413,8 @@ func handover() async {
         default:
             fail("""
             usage: agents-control handover status|freeze|unfreeze|withdraw|take|stop --at URL [--pin PIN] [--json]
-                   agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN] [--days N]
+                   agents-control handover shares --at URL [--pin PIN] --with URL [--with-pin PIN]
+                   agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN] [--days N] [--force]
             (URL may be `self`: the copy serving this store, at the address and pin its settings say)
                    agents-control handover copy --from URL|STORE [--from-pin PIN] --to URL|STORE [--to-pin PIN]
             """)

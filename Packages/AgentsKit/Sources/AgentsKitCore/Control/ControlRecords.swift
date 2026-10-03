@@ -106,16 +106,27 @@ public actor ControlRecords {
         }
     }
 
-    /// Changes the settings against the version read.
+    /// Changes the settings against the version read. Another copy on the same bucket may
+    /// have written them since (it writes its own address when it starts, T128): the change
+    /// is made again on what is there now, a few times at most.
     public func changeSettings(_ change: (inout ControlSettings) -> Void) async throws -> ControlSettings {
-        guard let held = settingsHeld else { throw StoreError.unavailable("there are no settings to change yet") }
-        var settings = held.record
-        change(&settings)
-        guard settings != held.record else { return settings }
-        settings.rev = (settings.rev ?? 0) + 1
-        let (kept, etag) = try await write(settings, to: Self.settingsKey, when: .matching(held.etag))
-        settingsHeld = Held(record: kept, etag: etag)
-        return kept
+        for attempt in 1...3 {
+            guard let held = settingsHeld else { throw StoreError.unavailable("there are no settings to change yet") }
+            var settings = held.record
+            change(&settings)
+            guard settings != held.record else { return settings }
+            settings.rev = (settings.rev ?? 0) + 1
+            do {
+                let (kept, etag) = try await write(settings, to: Self.settingsKey, when: .matching(held.etag))
+                settingsHeld = Held(record: kept, etag: etag)
+                return kept
+            } catch StoreError.conflict where attempt < 3 {
+                guard let object = try await store.get(Self.settingsKey),
+                      let now = try? Self.decoder.decode(ControlSettings.self, from: object.data) else { throw StoreError.conflict(key: Self.settingsKey) }
+                settingsHeld = Held(record: now, etag: object.etag)
+            }
+        }
+        throw StoreError.conflict(key: Self.settingsKey)
     }
 
     // MARK: Clients

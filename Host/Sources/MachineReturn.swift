@@ -33,6 +33,11 @@ final class MachineReturn {
     var place: String { model.settings.movedTo ?? "" }
     var placeName: String { URL(string: place)?.host ?? place }
     var checked: Bool { reachable == .yes && ready == .yes }
+    /// Both copies read one bucket (R16 3, T128): this Mac's copy serves it at once, and
+    /// nothing is copied.
+    var shared: Bool { HandoverTool.sharesBucket(model) }
+    /// This Mac's copy was started for the return, so a cancel stops it again.
+    private var startedHere = false
 
     private func handover(_ arguments: [String]) async -> ControlTool.Result {
         await HandoverTool.run(arguments, model: model)
@@ -56,6 +61,7 @@ final class MachineReturn {
             reachable = .no("The control plane is unreachable, so this Mac can't take it back from there. Check the machine is running, then Check Again.")
             return
         }
+        if shared { return await checkShared() }
         // This Mac's copy: forwarding stops, the store from before is kept aside, and it
         // starts empty to receive.
         if model.settings.receiving != true { aside = await model.prepareReturn() }
@@ -68,6 +74,22 @@ final class MachineReturn {
             try? await Task.sleep(for: .milliseconds(500))
         }
         ready = .no("This Mac's copy didn't start. Its log is at \(model.paths.controlLog.path).")
+    }
+
+    /// On a bucket: this Mac's copy serves it beside the other one, and both must find
+    /// each other's mark.
+    private func checkShared() async {
+        if !startedHere { await model.prepareSharedReturn(); startedHere = true }
+        for _ in 0..<40 {
+            if let mine = await HandoverTool.status(["--at", "self"], model: model) {
+                guard mine.phase == "serving" else { break }
+                let same = await HandoverTool.shares(place, model: model)
+                ready = same.ok ? .yes : .no("\(placeName) keeps a store of its own, not this Mac's bucket, so this Mac can't serve its records.")
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        ready = .no("This Mac's copy didn't start on the bucket. Its log is at \(model.paths.controlLog.path).")
     }
 
     // MARK: W · tell everyone
@@ -112,17 +134,25 @@ final class MachineReturn {
         guard frozen.ok else { return await stop(at: 0, frozen.problem) }
         stages[0] = .done
 
-        stages[1] = .doing
-        let copy = await handover(["copy", "--from", place, "--to", "self"])
-        guard copy.ok else { return await stop(at: 1, copy.problem) }
-        copied = copy.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        stages[1] = .done
+        if shared {
+            // One bucket: this Mac's copy already serves these records.
+            copied = "Nothing to copy: both read the same bucket"
+            stages[1] = .done
+            taken = true
+            stages[2] = .done
+        } else {
+            stages[1] = .doing
+            let copy = await handover(["copy", "--from", place, "--to", "self"])
+            guard copy.ok else { return await stop(at: 1, copy.problem) }
+            copied = copy.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            stages[1] = .done
 
-        stages[2] = .doing
-        let take = await handover(["take", "--at", "self"])
-        guard take.ok else { return await stop(at: 2, take.problem) }
-        taken = true
-        stages[2] = .done
+            stages[2] = .doing
+            let take = await handover(["take", "--at", "self"])
+            guard take.ok else { return await stop(at: 2, take.problem) }
+            taken = true
+            stages[2] = .done
+        }
 
         // From here this Mac serves; the other machine tells whoever still goes there.
         stages[3] = .doing
@@ -160,7 +190,7 @@ final class MachineReturn {
             _ = await handover(["unfreeze", "--at", place])
             _ = await handover(["withdraw", "--at", place])
         }
-        if model.settings.receiving == true { await model.undoReturn() }
+        if model.settings.receiving == true || startedHere { await model.undoReturn() }
     }
 }
 
@@ -192,7 +222,7 @@ struct MachineReturnSheet: View {
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Pieces.stepTitle("1 · Check both ends")
             Pieces.tick(back.reachable, "\(back.placeName) answers, and holds this control plane's key")
-            Pieces.tick(back.ready, "This Mac's copy is ready, empty, waiting for it",
+            Pieces.tick(back.ready, back.shared ? "This Mac's copy serves the same bucket" : "This Mac's copy is ready, empty, waiting for it",
                         note: back.aside.map { "The store from before the move is kept in Agents Control as \($0)." })
             HStack(alignment: .top, spacing: 10) {
                 Text("!").font(.body.weight(.semibold)).foregroundStyle(.secondary).frame(width: 16)

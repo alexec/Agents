@@ -21,7 +21,14 @@ services:
     image: agents-control:latest
     restart: unless-stopped
     environment:
-      AGENTS_STORE: file:///data/store
+      # A folder in the data volume, or the bucket Agents Host already uses (s3://bucket/prefix),
+      # so a move copies nothing (058 R16 3). The bucket's keys go in deploy/.env.
+      AGENTS_STORE: ${AGENTS_STORE:-file:///data/store}
+      AGENTS_STORE_ENDPOINT: ${AGENTS_STORE_ENDPOINT:-}
+      AGENTS_STORE_REGION: ${AGENTS_STORE_REGION:-}
+      AGENTS_STORE_PATH_STYLE: ${AGENTS_STORE_PATH_STYLE:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AGENTS_CONTROL_URL: https://${AGENTS_DOMAIN:?set AGENTS_DOMAIN to the name that points at this machine}
       AGENTS_CONTROL_KEY_FILE: /run/secrets/control-key
       AGENTS_CONTROL_NAME: ${AGENTS_CONTROL_NAME:-${AGENTS_DOMAIN}}

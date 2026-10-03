@@ -519,9 +519,9 @@ only.
 - [ ] T127 (frames U–Y approved by Alex 2026-10-01, `look/move/`; built: `Host/Sources/MachineReturn.swift`, frame Y's row; the sequence walked with Pebble and a Linux host, `walks/t127-return.md`; the sheet on screen still to walk) Agents Host, **Run it here again…**: an empty folder store with the earlier one
   kept aside, its copy in `--receive`, then the same steps the other way, with the cloud
   copy forwarding afterwards.
-- [ ] T128 [P] Agents Host with a bucket store moves with no copy (R16 3): announce, stop
+- [x] T128 (`handover/mark` + `agents-control handover shares`; `MachineMove`/`MachineReturn` skip copy and take when `settings.store == .bucket`; compose.public.yaml takes `AGENTS_STORE` and the bucket's settings; fixed on the way: announce's list from the copy's own place, `changeSettings` retries a conflict; test `aMoveOnOneBucketNeedsNoCopy`) [P] Agents Host with a bucket store moves with no copy (R16 3): announce, stop
   the old copy, start the new ones on the same bucket, forward.
-- [ ] T129 Walk the independent test above, both directions, on scratch roots and with
+- [ ] T129 (walked by command sequence 2026-10-02, both directions with Pebble, the devbox, a Mac host and the store window: `walks/us7-cloud-move.md`, fix `f54aaf33`; the older-build refusal proven by test only (`0dc1355e`), the sheets on screen still to walk) Walk the independent test above, both directions, on scratch roots and with
   Pebble. Include one member offline through the announce (it must come back through the
   forwarder), one move refused by a host on an older build, and a copy failure part-way
   (the old copy must unfreeze with nothing changed). Record it in

@@ -43,6 +43,8 @@ public struct S3Store: ControlStore {
         /// environment (contracts/store.md "Configuration").
         public init?(url: URL, environment: [String: String]) {
             guard url.scheme == "s3", let bucket = url.host, !bucket.isEmpty else { return nil }
+            // Set but empty is unset: compose passes `${X:-}` through as "".
+            let environment = environment.filter { !$0.value.isEmpty }
             let region = environment["AGENTS_STORE_REGION"] ?? environment["AWS_REGION"]
                 ?? environment["AWS_DEFAULT_REGION"] ?? "us-east-1"
             let endpoint = environment["AGENTS_STORE_ENDPOINT"].flatMap(URL.init(string:))

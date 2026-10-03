@@ -33,6 +33,9 @@ public enum Handover {
         public static let forward = "handover/forward"
         public static let take = "handover/take"
         public static let stop = "handover/stop"
+        /// Leaves a mark in this copy's store, or looks for one another copy left: two
+        /// copies on one bucket find each other's (R16 3, T128).
+        public static let mark = "handover/mark"
         public static let list = "store/list"
         public static let get = "store/get"
         public static let put = "store/put"
@@ -126,12 +129,39 @@ public enum Handover {
             }
             return .string(try await store.put(key, data, when: .absent))
 
+        case Method.mark:
+            // A bucket move (R16 3) has no copy to check, only that both read one store.
+            guard phase != .receiving else { throw refuse("A receiving copy has no store to share.") }
+            guard let nonce = params?["nonce"]?.stringValue, !nonce.isEmpty,
+                  nonce.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" }) else { throw refuse("Say the mark.") }
+            let key = "handover/mark-\(nonce)"
+            if params?["leave"]?.boolValue == true {
+                _ = try await store.put(key, Data(nonce.utf8), when: .absent)
+                return ["found": true]
+            }
+            let found = try await store.get(key) != nil
+            if found { try? await store.delete(key) }
+            return ["found": .bool(found)]
+
         case Method.announce:
             // The new place goes after the ones members have now (R16 step 2).
             guard phase == .serving else { throw refuse("Announce from a copy that is serving.") }
             let endpoint = try params?["endpoint"]?.decode(ControlEndpoint.self)
             guard let endpoint, endpoint.isAcceptable else { throw refuse("Say the new place: https, with a pin or none.") }
-            var list = await service.methods.controlSettings.currentEndpoints.filter { $0.url != endpoint.url }
+            // A host on a build from before lists (it never said an epoch) would be left
+            // behind for good: named, and refused unless the driver insists (R16, T129).
+            if params?["force"]?.boolValue != true {
+                let behind = await service.methods.allHosts.filter { $0.knownEpoch == nil }
+                if !behind.isEmpty {
+                    let names = behind.map { "\($0.name) (\($0.version))" }.joined(separator: ", ")
+                    throw refuse("Not moving: \(names) can't follow a move. Update it first, or remove it and add it again afterwards.")
+                }
+            }
+            // Before any list, this copy's own place: not the settings' `url`, which another
+            // copy on the same bucket rewrites to its own when it starts (T128).
+            let settings = await service.methods.controlSettings
+            let current = settings.endpoints.flatMap { $0.isEmpty ? nil : $0 } ?? [own(service)]
+            var list = current.filter { $0.url != endpoint.url }
             list.append(endpoint)
             try await changeEndpoints(list, service: service)
             return try JSONValue.encoding(await status(service))
@@ -162,6 +192,7 @@ public enum Handover {
             // Stop Forwarding (frames T and Y): anyone still to hear pairs again.
             guard phase == .forwarding else { throw refuse("This copy isn't forwarding.") }
             service.forwardingUntil.set(Date())
+            try? await service.markForwarding(Date())
             service.log("forwarding stopped")
             return try JSONValue.encoding(await status(service))
 
@@ -176,6 +207,7 @@ public enum Handover {
             try await changeEndpoints(list, service: service)
             service.forwardingUntil.set(until)
             service.phase.set(.forwarding)
+            try await service.markForwarding(until)
             service.log("forwarding until \(until.formatted(.iso8601)): members are told \(list.map(\.url).joined(separator: ", "))")
             return try JSONValue.encoding(await status(service))
 
@@ -335,4 +367,33 @@ final class PhaseBox: @unchecked Sendable {
 extension ControlService {
     /// Every member's socket here closes, so each reconnects and is given the list.
     func closeMembers() { sockets.closeAll() }
+
+    /// Where a copy notes that it forwards, so it forwards again after a restart instead of
+    /// serving records it handed over (#61 P4). Keyed by its own address, since copies on
+    /// one bucket share the store; outside `v1/`, so a handover never copies it.
+    var forwardingKey: String { "handover/forwarding-" + ControlCode.base64url(Data(configuration.url.absoluteString.utf8)) }
+
+    func markForwarding(_ until: Date) async throws {
+        let data = try ControlRecords.encoder.encode(["until": until])
+        if let held = try await configuration.store.get(forwardingKey) {
+            _ = try await configuration.store.put(forwardingKey, data, when: .matching(held.etag))
+        } else {
+            _ = try await configuration.store.put(forwardingKey, data, when: .absent)
+        }
+    }
+
+    /// At start: forwarding again, frozen, if this copy was; or the note dropped when Agents
+    /// Host says its copy serves again.
+    func resumeForwardingIfMarked() async throws {
+        guard let object = try await configuration.store.get(forwardingKey) else { return }
+        guard configuration.resumeForwarding,
+              let until = (try? ControlRecords.decoder.decode([String: Date].self, from: object.data))?["until"] else {
+            try? await configuration.store.delete(forwardingKey)
+            return
+        }
+        await methods.setFrozen(true)
+        forwardingUntil.set(until)
+        phase.set(.forwarding)
+        log("forwarding again until \(until.formatted(.iso8601)), as before it stopped")
+    }
 }

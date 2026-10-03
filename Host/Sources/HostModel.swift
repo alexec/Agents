@@ -316,6 +316,17 @@ final class HostModel {
         return aside
     }
 
+    /// On a bucket (T128): this Mac's copy stops forwarding and serves the bucket beside the
+    /// other machine's, with nothing kept aside.
+    func prepareSharedReturn() async {
+        await services.unregister(.control)
+        for _ in 0..<20 where await services.running(.control) != nil { try? await Task.sleep(for: .milliseconds(250)) }
+        settings.forwardingUntil = nil
+        settings.receiving = false
+        settings.save(paths)
+        _ = await start(.control)
+    }
+
     /// Cancelled before this Mac took over: its empty copy stops again.
     func undoReturn() async {
         await services.unregister(.control)
