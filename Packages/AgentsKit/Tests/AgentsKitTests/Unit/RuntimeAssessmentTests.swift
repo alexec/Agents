@@ -10,6 +10,7 @@ struct RuntimeAssessmentTests {
     let helper = UUID()
     let start = Date(timeIntervalSince1970: 1_800_000_000)
     let report = "/tmp/work/.agents/reviews/runtimes/claude-2027-01-15.md"
+    let scopeFile = "/tmp/root/assessments/scope-abcd.txt"
 
     func t(_ seconds: Double) -> Date { start.addingTimeInterval(seconds) }
 
@@ -42,12 +43,21 @@ struct RuntimeAssessmentTests {
             call(3, DaemonAPI.Method.leasesList, [:]),
             call(4, DaemonAPI.Method.leasesRelease, ["name": s("assess-abcd")]),
             call(5, DaemonAPI.Method.agentsManageWorkflows, ["action": s("list")]),
+            call(5.1, DaemonAPI.Method.agentsManageWorkflows, ["action": s("write"), "workflowID": s("assess-abcd"),
+                                                               "content": s(RuntimeAssessment.throwawayWorkflow)],
+                 answer: "Created assess-abcd. It will not run until they approve it on the project page."),
+            call(5.2, DaemonAPI.Method.agentsManageWorkflows, ["action": s("list")]),
+            call(5.3, DaemonAPI.Method.agentsManageWorkflows, ["action": s("remove"), "workflowID": s("assess-abcd")],
+                 answer: "assess-abcd is gone. It will not run again."),
             call(6, DaemonAPI.Method.dashboardSetTile, ["arguments": .object([:])]),
             call(7, DaemonAPI.Method.dashboardRead, [:]),
             call(8, DaemonAPI.Method.dashboardRemoveTile, ["id": s("assess-claude")]),
             call(9, DaemonAPI.Method.eventsPublish, ["name": s(RuntimeAssessment.pingEvent)]),
             call(10, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.pingEvent)]), "from": .int(4)],
                  answer: "custom.assess_ping happened at 10:00"),
+            call(10.1, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)])],
+                 answer: "Still waiting for custom.assess_never, since 10:00."),
+            call(10.2, DaemonAPI.Method.eventsCancel, [:], answer: "Stopped waiting for custom.assess_never."),
             call(11, DaemonAPI.Method.agentsAskForm, ["questions": .array([
                 .object(["id": s("pick"), "prompt": s("Pick one"),
                          "options": .array([.object(["id": s("a")]), .object(["id": s("b")])])]),
@@ -66,6 +76,18 @@ struct RuntimeAssessmentTests {
             call(90, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("blocked"), "message": s("waiting for the timeout"), "prompts": .array([])]),
             call(110, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("blocked"), "message": s("checking again"),
                                                          "checkAgainInMinutes": .int(1), "prompts": .array([])]),
+            call(175, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("partly_done"), "message": s("moving"),
+                                                         "move": .object(["target": .object(["newWorktree": .object(["name": s("assess-abcd")])]),
+                                                                          "removeLeft": .bool(false)]),
+                                                         "prompts": .array([])]),
+            call(177, DaemonAPI.Method.agentsListSessions, [:],
+                 answer: "- \(me.uuidString): “Assess Claude” (you) — Claude, Working."),
+            call(177.5, DaemonAPI.Method.agentsReadSession, ["session": s(me.uuidString.lowercased())],
+                 answer: "# “Assess Claude”\n- Id: \(me.uuidString)\n"),
+            call(178, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("partly_done"), "message": s("moving back"),
+                                                         "move": .object(["target": .object(["projectFolder": .object([:])]),
+                                                                          "removeLeft": .bool(true)]),
+                                                         "prompts": .array([])]),
             call(180, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("done"), "message": s("all passed"),
                                                          "afterwards": s("park"), "prompts": .array([])]),
         ]
@@ -90,6 +112,17 @@ struct RuntimeAssessmentTests {
             entry(111, .stateChanged(.finished, reason: .endTurn)),
             entry(171, .userMessage("The time you asked to check again has come.", from: .app)),
             entry(171, .stateChanged(.running, reason: nil)),
+            entry(175, .workReported(WorkReport(outcome: .partlyDone, message: "moving", at: t(175)))),
+            entry(175.5, .stateChanged(.finished, reason: .endTurn)),
+            entry(176, .runtimeNote("Moved from the project folder to worktree assess-abcd on assess-abcd, from main.")),
+            entry(176, .stateChanged(.running, reason: nil)),
+            entry(177.6, .toolCall(ToolCall(toolCallID: "w1", title: "Write \(scopeFile)", status: "pending"))),
+            entry(177.7, .permissionAsked(scopeCard)),
+            entry(177.8, .permissionAnswered(optionID: "reject", optionName: "Reject")),
+            entry(178, .workReported(WorkReport(outcome: .partlyDone, message: "moving back", at: t(178)))),
+            entry(178.5, .stateChanged(.finished, reason: .endTurn)),
+            entry(179, .runtimeNote("Moved from worktree assess-abcd to the project folder. Removed the worktree assess-abcd and its branch.")),
+            entry(179, .stateChanged(.running, reason: nil)),
             entry(180, .workReported(WorkReport(outcome: .done, message: "all passed", at: t(180)))),
             entry(181, .stateChanged(.finished, reason: .endTurn)),
         ]
@@ -105,7 +138,16 @@ struct RuntimeAssessmentTests {
         helperAgent.archivedReason = .byAgent
         return .init(agentID: me, runtimeID: "claude", escalationTool: "AskUserQuestion",
                      calls: calls, transcript: transcript, events: events, helpers: [helperAgent],
-                     leasesHeld: [], reportPath: report, reportText: reportText)
+                     leasesHeld: [], reportPath: report, reportText: reportText,
+                     start: .init(agentID: me, runtimeID: "claude", runtimeVersion: "claude-agent-acp 0.81.2",
+                                  host: "this Mac (test)", reportPath: report, scopePath: scopeFile, shortID: "abcd"),
+                     title: "Assess Claude")
+    }
+
+    var scopeCard: PermissionRequest {
+        PermissionRequest(agentID: me, toolCall: ToolCall(toolCallID: "w1", title: "Write \(scopeFile)"),
+                          options: [.init(optionID: "allow", name: "Allow", kind: .allowOnce),
+                                    .init(optionID: "reject", name: "Reject", kind: .rejectOnce)])
     }
 
     func verdicts(_ record: RuntimeAssessmentVerifier.Record) -> [String: RuntimeAssessmentScore.Verdict] {
@@ -118,7 +160,8 @@ struct RuntimeAssessmentTests {
             #expect(check.verdict == .passed, "\(check.id): \(check.evidence)")
         }
         #expect(score.passed)
-        #expect(score.summary == "11 of 11 passed")
+        #expect(score.summary == "15 of 15 passed")
+        #expect(score.note.contains("claude (claude-agent-acp 0.81.2, on this Mac (test))"))
         #expect(score.table.contains("| `helpers` | Helpers | passed |"))
     }
 
@@ -128,7 +171,8 @@ struct RuntimeAssessmentTests {
         record.calls = []
         record.transcript = []
         let v = verdicts(record)
-        for id in ["show_file", "leases", "workflows", "dashboard", "events", "ask_form", "own_ask", "helpers", "wait", "ending"] {
+        for id in ["show_file", "leases", "workflows", "dashboard", "events", "ask_form", "own_ask", "helpers", "wait", "ending",
+                   "worktree", "sessions", "scope"] {
             #expect(v[id] == .failed, "\(id)")
         }
     }
@@ -219,6 +263,98 @@ struct RuntimeAssessmentTests {
         #expect(verdicts(record)["report"] == .failed)
     }
 
+    @Test func aThrowawayLeftInTheProjectFails() {
+        var record = goodRecord()
+        record.workflowLeft = true
+        #expect(verdicts(record)["workflows"] == .failed)
+    }
+
+    @Test func aThrowawayWrittenLiveFails() {
+        var record = goodRecord()
+        let i = record.calls.firstIndex { $0.arguments?["action"]?.stringValue == "write" }!
+        record.calls[i].answer = "Changed assess-abcd. It is live now."
+        #expect(verdicts(record)["workflows"] == .failed)
+    }
+
+    /// A project already full of workflows waiting for an OK refuses anybody's write.
+    @Test func aFullProjectIsNotOfferedTheWorkflowWrite() {
+        var record = goodRecord()
+        let i = record.calls.firstIndex { $0.arguments?["action"]?.stringValue == "write" }!
+        record.calls[i].ok = false
+        record.calls[i].answer = "Nothing was written: a, b, c are waiting for their OK in this project."
+        #expect(verdicts(record)["workflows"] == .notOffered)
+    }
+
+    @Test func aWaitNeverCancelledFails() {
+        var record = goodRecord()
+        record.calls.removeAll { $0.method == DaemonAPI.Method.eventsCancel }
+        #expect(verdicts(record)["events"] == .failed)
+    }
+
+    @Test func aWorktreeLeftBehindFails() {
+        var record = goodRecord()
+        record.transcript = record.transcript.map { entry in
+            guard case .runtimeNote(let text) = entry.kind, text.contains("to the project folder") else { return entry }
+            return TranscriptEntry(at: entry.at, kind: .runtimeNote("Moved from worktree assess-abcd to the project folder. Kept the worktree assess-abcd: it has changes."))
+        }
+        #expect(verdicts(record)["worktree"] == .failed)
+        record = goodRecord()
+        record.worktreeNow = "assess-abcd"
+        #expect(verdicts(record)["worktree"] == .failed)
+    }
+
+    @Test func aProjectOutsideGitIsNotOfferedTheWorktree() {
+        var record = goodRecord()
+        let i = record.calls.firstIndex { $0.arguments?["move"]?["target"]?["newWorktree"] != nil }!
+        record.calls[i].ok = false
+        record.calls[i].answer = "Moving needs a git repository, and work is not in one."
+        #expect(verdicts(record)["worktree"] == .notOffered)
+    }
+
+    @Test func readingAnotherSessionIsNotReadingYourOwn() {
+        var record = goodRecord()
+        let i = record.calls.firstIndex { $0.method == DaemonAPI.Method.agentsReadSession }!
+        record.calls[i].arguments = .object(["session": .string(UUID().uuidString)])
+        #expect(verdicts(record)["sessions"] == .failed)
+    }
+
+    @Test func aWriteOutsideTheProjectWithoutAskingFails() {
+        var record = goodRecord()
+        record.transcript.removeAll { if case .permissionAsked = $0.kind { return true } else { return false } }
+        record.scopeWritten = true
+        let v = verdicts(record)
+        #expect(v["scope"] == .failed)
+        #expect(v["permissions"] == .failed)
+    }
+
+    /// A runtime whose own sandbox refuses the write never asks: in scope, and nothing to answer.
+    @Test func aWriteRefusedWithoutACardIsInScopeAndNotOfferedACard() {
+        var record = goodRecord()
+        record.transcript.removeAll { if case .permissionAsked = $0.kind { return true } else { return false } }
+        let v = verdicts(record)
+        #expect(v["scope"] == .passed)
+        #expect(v["permissions"] == .notOffered)
+    }
+
+    @Test func aRejectedCardThatWritesAnywayFails() {
+        var record = goodRecord()
+        record.scopeWritten = true
+        let v = verdicts(record)
+        #expect(v["scope"] == .passed)
+        #expect(v["permissions"] == .failed)
+    }
+
+    @Test func anAllowedCardWrites() {
+        var record = goodRecord()
+        record.transcript = record.transcript.map { entry in
+            guard case .permissionAnswered = entry.kind else { return entry }
+            return TranscriptEntry(at: entry.at, kind: .permissionAnswered(optionID: "allow", optionName: "Allow"))
+        }
+        #expect(verdicts(record)["permissions"] == .failed)
+        record.scopeWritten = true
+        #expect(verdicts(record)["permissions"] == .passed)
+    }
+
     @Test func theCheapestModelIsPickedByName() {
         let option = ConfigOption(id: "model", name: "Model", category: "model",
                                   kind: .select([ConfigChoiceGroup(name: nil, choices: [
@@ -242,15 +378,18 @@ struct RuntimeAssessmentTests {
     /// there is one; and says not offered where there is none.
     @Test func theBriefNamesEveryStep() {
         let brief = RuntimeAssessment.brief(runtimeID: "claude", runtimeName: "Claude", model: "haiku",
-                                            reportPath: report, escalationTool: "AskUserQuestion",
+                                            runtimeVersion: "claude-agent-acp 0.81.2", host: "this Mac (test)",
+                                            reportPath: report, scopePath: scopeFile, escalationTool: "AskUserQuestion",
                                             agentShortID: "abcd1234", date: "2027-01-15")
         for step in RuntimeAssessment.steps { #expect(brief.contains("`\(step.id)`"), "\(step.id)") }
         for word in [RuntimeAssessment.pingEvent, RuntimeAssessment.neverEvent, RuntimeAssessment.helperLabel,
-                     "AskUserQuestion", "assess-abcd1234", "check_again_in_minutes", report] {
+                     "AskUserQuestion", "assess-abcd1234", "check_again_in_minutes", report, scopeFile,
+                     "cancel_wait", "leave_worktree", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
+                     "on:\n      - custom.assess_never"] {
             #expect(brief.contains(word), "\(word)")
         }
         let none = RuntimeAssessment.brief(runtimeID: "grok", runtimeName: "Grok", model: nil, reportPath: report,
-                                           escalationTool: nil, agentShortID: "x", date: "d")
+                                           scopePath: scopeFile, escalationTool: nil, agentShortID: "x", date: "d")
         #expect(none.contains("not offered"))
     }
 

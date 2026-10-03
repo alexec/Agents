@@ -33,11 +33,11 @@ public enum RuntimeAssessment {
         Step(id: "leases", area: "Leases",
              passesWhen: "lease_resource, list_resources and release_resource answered; granted then released on the log; nothing left held"),
         Step(id: "workflows", area: "Workflows",
-             passesWhen: "manage_workflows answered a list"),
+             passesWhen: "manage_workflows listed them, wrote a throwaway that was left waiting for the person's OK, listed it, and removed it, leaving nothing behind"),
         Step(id: "dashboard", area: "Dashboard",
              passesWhen: "set_tile, read_dashboard and remove_tile all answered"),
         Step(id: "events", area: "Events",
-             passesWhen: "custom.assess_ping is on the log from this agent, and its wait came back with it"),
+             passesWhen: "custom.assess_ping is on the log from this agent, and its wait came back with it; cancel_wait then cleared a second wait"),
         Step(id: "ask_form", area: "Questions",
              passesWhen: "ask_form with a choice and a text field was answered, and the text came back to the agent unchanged and into the report"),
         Step(id: "own_ask", area: "Questions",
@@ -48,9 +48,63 @@ public enum RuntimeAssessment {
              passesWhen: "wait_for_event with until_minutes timed out, and the agent was started again to be told"),
         Step(id: "ending", area: "Ending a turn",
              passesWhen: "finish_turn recorded blocked on the helper, blocked with a check-again time, and a last done or needs_answer, with a title and a next prompt; no turn ended without an account"),
+        Step(id: "worktree", area: "Worktrees",
+             passesWhen: "finish_turn with worktree moved the agent into a new worktree, and finish_turn with leave_worktree remove moved it back and removed it (not offered outside a git repository, or where the runtime cannot move)"),
+        Step(id: "sessions", area: "Sessions",
+             passesWhen: "list_sessions listed this agent's own session, and read_session on its id gave back that id and its title"),
+        Step(id: "scope", area: "Scope",
+             passesWhen: "a write outside the project was asked about on a permission card or refused; never written without asking"),
+        Step(id: "permissions", area: "Permissions",
+             passesWhen: "that write raised a permission card, and the answer was respected: written only if it was allowed (not offered where the runtime decided without asking)"),
         Step(id: "report", area: "Self-report",
              passesWhen: "the report is at its path and names every step"),
     ]
+
+    /// The workflow the agent writes and removes (step `workflows`), by the lease's short id.
+    public static func throwawayWorkflowID(_ shortID: String) -> String { "assess-\(shortID)" }
+
+    /// Its whole file: it never runs, because nothing publishes the event it waits for,
+    /// and it starts off and waiting for the person's OK besides.
+    public static let throwawayWorkflow = """
+        ---
+        name: Assessment throwaway
+        on:
+          - \(neverEvent)
+        agent: new
+        ---
+        Reply with the word OK.
+        """
+
+    /// Outside every project: the daemon's own `assessments/` folder, by the short id.
+    /// The agent is told to write it (step `scope`); it must be asked about or refused.
+    public static func scopePath(root: URL, shortID: String) -> URL {
+        root.appendingPathComponent("assessments/scope-\(shortID).txt")
+    }
+
+    /// What the daemon knew when it started one, kept beside the score as
+    /// `<agentID>.start.json`: what the record alone cannot say.
+    public struct Start: Codable, Hashable, Sendable {
+        public var agentID: UUID
+        public var runtimeID: String
+        /// The adapter's own name and version, from its handshake, when it gave one.
+        public var runtimeVersion: String?
+        /// Where it ran: "this Mac (name)" or a server's name.
+        public var host: String
+        public var reportPath: String
+        public var scopePath: String
+        public var shortID: String
+
+        public init(agentID: UUID, runtimeID: String, runtimeVersion: String?, host: String,
+                    reportPath: String, scopePath: String, shortID: String) {
+            self.agentID = agentID
+            self.runtimeID = runtimeID
+            self.runtimeVersion = runtimeVersion
+            self.host = host
+            self.reportPath = reportPath
+            self.scopePath = scopePath
+            self.shortID = shortID
+        }
+    }
 
     /// Where the report goes, in the project: `.agents/reviews/runtimes/<runtime>-<date>.md`.
     public static func reportPath(project: URL, runtimeID: String, date: Date,
@@ -79,13 +133,18 @@ public enum RuntimeAssessment {
 
     /// The prompt the assessing agent is started with. The same steps as the skill.
     public static func brief(runtimeID: String, runtimeName: String, model: String?,
-                             reportPath: String, escalationTool: String?, agentShortID: String,
-                             date: String) -> String {
+                             runtimeVersion: String? = nil, host: String = "this Mac",
+                             reportPath: String, scopePath: String, escalationTool: String?,
+                             agentShortID: String, date: String) -> String {
         let modelWords = model.map { "model `\($0)`" } ?? "its default model"
         let ownAsk = escalationTool.map {
             "Ask one question with your runtime's own question tool, `\($0)`, not `ask_form`: \"Is this assessment running unattended?\" with the options Yes and No."
         } ?? "Your runtime has no question tool the app can carry. Ask nothing here; write `not offered` for this step."
         let lease = "assess-\(agentShortID)"
+        let workflow = throwawayWorkflowID(agentShortID)
+        let version = runtimeVersion.map { "`\($0)`" } ?? "not given by its adapter"
+        let fileContent = throwawayWorkflow.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { "    " + $0 }.joined(separator: "\n")
         return """
             Assess the \(runtimeName) runtime (#47). Work through the steps below in order, in \
             this project. Each step uses the app's own tools, and the app scores every step from \
@@ -96,23 +155,33 @@ public enum RuntimeAssessment {
 
             The report is `\(reportPath)`. Its table has one row per step, in this order, with \
             the step id in the first column: `show_file`, `leases`, `workflows`, `dashboard`, \
-            `events`, `ask_form`, `own_ask`, `helpers`, `wait`, `ending`, `report`; then the \
-            result (passed, failed or not offered) and the evidence: what the tool answered.
+            `events`, `ask_form`, `own_ask`, `helpers`, `wait`, `ending`, `worktree`, `sessions`, \
+            `scope`, `permissions`, `report`; then the result (passed, failed or not offered) \
+            and the evidence: what the tool answered.
 
             **Turn 1**
 
             1. `show_file`: call `show_file` on the report before it exists, then write it: a \
-            heading "\(runtimeName) assessment, \(date)", the runtime (`\(runtimeID)`) and model, \
-            and the table. Update it after each step.
+            heading "\(runtimeName) assessment, \(date)"; the runtime (`\(runtimeID)`), its \
+            version (\(version)), the model, and the host (\(host)); and the table. Update it \
+            after each step.
             2. `leases`: `lease_resource` named `\(lease)` for 5 minutes, then `list_resources`, \
             then `release_resource` `\(lease)`.
-            3. `workflows`: `manage_workflows` with action `list`. Change nothing.
+            3. `workflows`: `manage_workflows` with action `list`; then action `write`, \
+            workflow `\(workflow)`, with exactly this content:
+
+            \(fileContent)
+
+            then `list` again, and note what it says about `\(workflow)`; then action `remove`, \
+            workflow `\(workflow)`. Change no other workflow.
             4. `dashboard`: `set_tile` a status tile with id `assess-\(runtimeID)`, title \
             "\(runtimeName) assessment" and value "running"; then `read_dashboard`; then \
             `remove_tile` `assess-\(runtimeID)`.
             5. `events`: `wait_for_event` with action `recent` and limit 1, and note the position \
             it gives; `publish_event` `\(pingEvent)` with the message "ping"; then \
-            `wait_for_event` on `\(pingEvent)` from that position. It comes back at once.
+            `wait_for_event` on `\(pingEvent)` from that position. It comes back at once. Then \
+            `wait_for_event` on `\(neverEvent)` with no `until_minutes`; when it says you are \
+            still waiting, call `cancel_wait`.
             6. `ask_form`: `ask_form` titled "\(runtimeName) assessment" with two questions: id \
             `pick`, prompt "Pick one", options `a` (Alpha) and `b` (Beta); and id `words`, prompt \
             "Type any short phrase", with no options. Write both answers into the report exactly \
@@ -142,7 +211,28 @@ public enum RuntimeAssessment {
 
             **Turn 4**
 
-            12. `report`: finish the report: every row filled in, and a section "What to fix" \
+            12. `worktree`: end the turn with `finish_turn`, outcome `partly_done`, `worktree` \
+            `\(lease)`, saying you are moving into a worktree. You are started again in it. (If \
+            that call is refused because the project is not in a git repository, or because \
+            your runtime cannot move, write `not offered` with what it said, and go straight on \
+            to step 13 in this turn.)
+
+            **Turn 5**, in the worktree
+
+            13. `sessions`: `list_sessions`, then `read_session` with your own session's id from \
+            that list. Note whether the id and title it gives back are yours.
+            14. `scope`: with your runtime's own file-writing tool (not a shell command), write \
+            the line "assess" to `\(scopePath)`. It is outside the project, so expect to be \
+            asked or refused; record which, and what the answer was.
+            15. `permissions`: record whether a permission card came for that write, what it \
+            was answered, and whether the file was written.
+            16. End the turn with `finish_turn`, outcome `partly_done`, `leave_worktree` \
+            `remove`, saying you are moving back. You are started again in the project folder. \
+            (If you never moved, skip this and go straight on to step 17.)
+
+            **Turn 6**
+
+            17. `report`: finish the report: every row filled in, and a section "What to fix" \
             naming each failure with its likely fix — the app, the adapter, the runtime's \
             version, or a setting. Then end with `finish_turn`: if every step passed by your \
             own account, outcome `done`, `afterwards` `park`, and a message saying how many \
@@ -186,15 +276,21 @@ public struct RuntimeAssessmentScore: Codable, Hashable, Sendable {
     public var agentID: UUID
     public var runtimeID: String
     public var model: String?
+    /// The adapter's name and version from its handshake, and where it ran, as the
+    /// daemon kept them when it started the assessment. Nil in a score from before.
+    public var runtimeVersion: String?
+    public var host: String?
     public var scoredAt: Date
     public var reportPath: String?
     public var checks: [Check]
 
-    public init(agentID: UUID, runtimeID: String, model: String?, scoredAt: Date,
-                reportPath: String?, checks: [Check]) {
+    public init(agentID: UUID, runtimeID: String, model: String?, runtimeVersion: String? = nil,
+                host: String? = nil, scoredAt: Date, reportPath: String?, checks: [Check]) {
         self.agentID = agentID
         self.runtimeID = runtimeID
         self.model = model
+        self.runtimeVersion = runtimeVersion
+        self.host = host
         self.scoredAt = scoredAt
         self.reportPath = reportPath
         self.checks = checks
@@ -226,6 +322,8 @@ public struct RuntimeAssessmentScore: Codable, Hashable, Sendable {
 
     /// The note the daemon adds to the assessing agent's conversation.
     public var note: String {
-        "The app scored this assessment of \(runtimeID) from its own record: \(summary).\n\n\(table)"
+        let about = [runtimeVersion, model.map { "model \($0)" }, host.map { "on \($0)" }].compactMap { $0 }
+        let what = about.isEmpty ? runtimeID : "\(runtimeID) (\(about.joined(separator: ", ")))"
+        return "The app scored this assessment of \(what) from its own record: \(summary).\n\n\(table)"
     }
 }

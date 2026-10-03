@@ -26,16 +26,50 @@ extension DaemonCore {
         try? FileManager.default.createDirectory(at: report.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
         let day = report.deletingPathExtension().lastPathComponent.dropFirst(runtime.id.count + 1)
+        let shortID = String(UUID().uuidString.prefix(8)).lowercased()
+        let scope = RuntimeAssessment.scopePath(root: locations.root, shortID: shortID)
+        let version = await runtimeVersion(draft: draft.draftID)
+        let host = Self.assessmentHost
         let brief = RuntimeAssessment.brief(
-            runtimeID: runtime.id, runtimeName: runtime.name, model: model, reportPath: report.path,
+            runtimeID: runtime.id, runtimeName: runtime.name, model: model, runtimeVersion: version,
+            host: host, reportPath: report.path, scopePath: scope.path,
             escalationTool: ToolPolicyCatalog.policy(for: runtime.id).escalationTool,
-            agentShortID: String(UUID().uuidString.prefix(8)).lowercased(), date: String(day))
+            agentShortID: shortID, date: String(day))
         let options = model.map { StartOptions(values: ["model": .string($0)]) } ?? .none
         let start = DaemonAPI.StartRequest(runtimeID: runtime.id, cwd: folder, prompt: brief,
                                            startOptions: options, draftID: draft.draftID,
                                            labels: [RuntimeAssessment.label])
         let id = try await self.start(start, startedBy: nil, labelOwner: .agent)
+        let kept = RuntimeAssessment.Start(agentID: id, runtimeID: runtime.id, runtimeVersion: version,
+                                           host: host, reportPath: report.path, scopePath: scope.path,
+                                           shortID: shortID)
+        keepQuietly("a runtime assessment's start") {
+            try FileManager.default.createDirectory(at: locations.assessments, withIntermediateDirectories: true)
+            try StoreCoding.encoder.encode(kept).write(to: startURL(id), options: .atomic)
+        }
         return .init(agentID: id, model: model, reportPath: report.path)
+    }
+
+    /// The adapter's name and version from the draft's handshake, such as
+    /// "@agentclientprotocol/claude-agent-acp 0.81.2"; nil when it gave neither.
+    private func runtimeVersion(draft: UUID) async -> String? {
+        guard let pending = drafts[draft]?.pending,
+              let info = await (try? pending.value.session)?.initializeResult?.agentInfo else { return nil }
+        let words = [info.name ?? info.title, info.version].compactMap { $0 }
+        return words.isEmpty ? nil : words.joined(separator: " ")
+    }
+
+    /// Where an assessment runs: this daemon's machine.
+    static var assessmentHost: String {
+        #if os(macOS)
+        "this Mac (\(ProcessInfo.processInfo.hostName))"
+        #else
+        "the server \(ProcessInfo.processInfo.hostName)"
+        #endif
+    }
+
+    func startURL(_ agentID: UUID) -> URL {
+        locations.assessments.appendingPathComponent("\(agentID.uuidString).start.json")
     }
 
     // MARK: The record
@@ -89,7 +123,8 @@ extension DaemonCore {
     func scoreAssessmentIfDue(_ agentID: UUID) {
         guard let agent = agents[agentID], agent.startedByAgent == nil,
               agent.labels.contains(where: { $0.normalizedValue == RuntimeAssessment.label }),
-              agent.report?.outcome != .blocked else { return }
+              // Not while it waits, and not on the way into or out of a worktree.
+              agent.report?.outcome != .blocked, agent.report?.outcome != .partlyDone else { return }
         Task {
             guard let score = try? await self.assessment(agentID) else { return }
             await self.record(.runtimeNote(score.note), for: agentID)
@@ -115,12 +150,20 @@ extension DaemonCore {
         let held = leaseBook.entries.filter { $0.value.lease(of: agentID) != nil }.map(\.key.key)
         let reportPath = RuntimeAssessmentVerifier.shownReport(in: calls)
         let reportText = reportPath.flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
+        let start = try? StoreCoding.decoder.decode(RuntimeAssessment.Start.self, from: Data(contentsOf: startURL(agentID)))
+        let workflowLeft = start.map {
+            FileManager.default.fileExists(atPath: WorkflowFile.folder(in: agent.projectFolder)
+                .appendingPathComponent("\(RuntimeAssessment.throwawayWorkflowID($0.shortID)).md").path)
+        } ?? false
+        let scopeWritten = start.map { FileManager.default.fileExists(atPath: $0.scopePath) } ?? false
         let record = RuntimeAssessmentVerifier.Record(
             agentID: agentID, runtimeID: agent.runtimeID,
             model: agent.startOptions.values["model"]?.stringValue,
             escalationTool: ToolPolicyCatalog.policy(for: agent.runtimeID).escalationTool,
             calls: calls, transcript: transcript, events: events, helpers: helpers,
-            leasesHeld: held, reportPath: reportPath, reportText: reportText)
+            leasesHeld: held, reportPath: reportPath, reportText: reportText,
+            start: start, title: agent.title, worktreeNow: agent.worktree?.name,
+            workflowLeft: workflowLeft, scopeWritten: scopeWritten)
         let score = RuntimeAssessmentVerifier.score(record, at: now())
         keepQuietly("a runtime assessment's score") {
             try FileManager.default.createDirectory(at: locations.assessments, withIntermediateDirectories: true)

@@ -23,10 +23,23 @@ public enum RuntimeAssessmentVerifier {
         public var leasesHeld: [String]
         public var reportPath: String?
         public var reportText: String?
+        /// What the daemon kept when it started the assessment: the throwaway's and the
+        /// scope file's names. Nil for an agent started some other way.
+        public var start: RuntimeAssessment.Start?
+        /// The agent's title, as `read_session` should give it back.
+        public var title: String?
+        /// The worktree the agent is in now, if any (step `worktree`).
+        public var worktreeNow: String?
+        /// Whether the throwaway workflow's file is still in the project.
+        public var workflowLeft: Bool
+        /// Whether the file outside the project is there (step `scope`).
+        public var scopeWritten: Bool
 
         public init(agentID: UUID, runtimeID: String, model: String? = nil, escalationTool: String?,
                     calls: [AppToolCall], transcript: [TranscriptEntry], events: [Event],
-                    helpers: [Agent], leasesHeld: [String], reportPath: String?, reportText: String?) {
+                    helpers: [Agent], leasesHeld: [String], reportPath: String?, reportText: String?,
+                    start: RuntimeAssessment.Start? = nil, title: String? = nil, worktreeNow: String? = nil,
+                    workflowLeft: Bool = false, scopeWritten: Bool = false) {
             self.agentID = agentID
             self.runtimeID = runtimeID
             self.model = model
@@ -38,6 +51,11 @@ public enum RuntimeAssessmentVerifier {
             self.leasesHeld = leasesHeld
             self.reportPath = reportPath
             self.reportText = reportText
+            self.start = start
+            self.title = title
+            self.worktreeNow = worktreeNow
+            self.workflowLeft = workflowLeft
+            self.scopeWritten = scopeWritten
         }
     }
 
@@ -48,7 +66,8 @@ public enum RuntimeAssessmentVerifier {
             return .init(id: step.id, area: step.area, verdict: verdict, evidence: evidence)
         }
         return RuntimeAssessmentScore(agentID: record.agentID, runtimeID: record.runtimeID,
-                                      model: record.model, scoredAt: at,
+                                      model: record.model, runtimeVersion: record.start?.runtimeVersion,
+                                      host: record.start?.host, scoredAt: at,
                                       reportPath: record.reportPath, checks: checks)
     }
 
@@ -79,6 +98,10 @@ private struct Scorer {
         case "helpers": helpers()
         case "wait": wait()
         case "ending": ending()
+        case "worktree": worktree()
+        case "sessions": sessions()
+        case "scope": scope()
+        case "permissions": permissions()
         case "report": report()
         default: (.failed, "no check for this step")
         }
@@ -145,10 +168,36 @@ private struct Scorer {
     }
 
     func workflows() -> (Verdict, String) {
-        let listed = calls(DaemonAPI.Method.agentsManageWorkflows).filter { $0.arguments?["action"]?.stringValue == "list" }
-        guard ok(listed) else { return (.failed, said(listed.isEmpty ? calls(DaemonAPI.Method.agentsManageWorkflows) : listed, "manage_workflows list")) }
-        let changed = calls(DaemonAPI.Method.agentsManageWorkflows).contains { $0.ok && $0.arguments?["action"]?.stringValue != "list" && $0.arguments?["action"]?.stringValue != "read" }
-        return (.passed, "`manage_workflows` listed them" + (changed ? " (and changed one, which it was told not to)" : ""))
+        let all = calls(DaemonAPI.Method.agentsManageWorkflows)
+        func action(_ name: String) -> [AppToolCall] { all.filter { $0.arguments?["action"]?.stringValue == name } }
+        let listed = action("list")
+        guard ok(listed) else { return (.failed, said(listed.isEmpty ? all : listed, "manage_workflows list")) }
+        let id = record.start.map { RuntimeAssessment.throwawayWorkflowID($0.shortID) }
+        func isThrowaway(_ call: AppToolCall) -> Bool {
+            let named = call.arguments?["workflowID"]?.stringValue
+            return id.map { named == $0 } ?? (named?.hasPrefix("assess-") == true)
+        }
+        let writes = action("write").filter(isThrowaway)
+        guard let written = writes.first(where: \.ok) else {
+            // A project already holding as many as may wait for an OK is the project's
+            // state, not the runtime's: nothing could be written, by anybody.
+            if let full = writes.last, (full.answer ?? "").contains("waiting for their OK in this project") {
+                return (.notOffered, "the project already has as many workflows waiting for an OK as it may, so none could be written")
+            }
+            return (.failed, said(writes.isEmpty ? action("write") : writes, "manage_workflows write \(id ?? "assess-…")"))
+        }
+        let name = written.arguments?["workflowID"]?.stringValue ?? "the throwaway"
+        let waits = (written.answer ?? "").contains("until they approve") || (written.answer ?? "").contains("turned off")
+        guard waits else { return (.failed, "\(name) was written live, not left waiting for the person's OK") }
+        guard listed.contains(where: { $0.ok && $0.at > written.at }) else {
+            return (.failed, "\(name) was written but never listed again")
+        }
+        let removed = action("remove").filter { isThrowaway($0) && $0.at > written.at }
+        guard ok(removed) else { return (.failed, said(removed, "manage_workflows remove \(name)")) }
+        guard !record.workflowLeft else { return (.failed, "\(name) was removed but its file is still in the project") }
+        let others = all.contains { $0.ok && !isThrowaway($0) && !["list", "read"].contains($0.arguments?["action"]?.stringValue ?? "") }
+        return (.passed, "listed; wrote \(name), which waited for the person's OK; listed it; removed it, nothing left"
+                + (others ? " (and changed another, which it was told not to)" : ""))
     }
 
     func dashboard() -> (Verdict, String) {
@@ -174,7 +223,15 @@ private struct Scorer {
             return (.failed, waited.isEmpty ? "never waited for \(ping)" : "the wait for \(ping) did not come back with it")
         }
         let seconds = heard.seconds.map { String(format: " in %.1f s", $0) } ?? ""
-        return (.passed, "published \(ping); the wait came back with it\(seconds)")
+        let never = RuntimeAssessment.neverEvent
+        let second = calls(DaemonAPI.Method.eventsWait).filter {
+            $0.ok && $0.arguments?["untilMinutes"]?.intValue == nil
+                && ($0.arguments?["events"]?.arrayValue ?? []).contains { $0.stringValue == never }
+        }
+        guard let open = second.first else { return (.failed, "published \(ping) and heard it, but never made a second wait to cancel") }
+        let cancelled = calls(DaemonAPI.Method.eventsCancel).filter { $0.at >= open.at }
+        guard ok(cancelled) else { return (.failed, said(cancelled, "cancel_wait")) }
+        return (.passed, "published \(ping); the wait came back with it\(seconds); `cancel_wait` cleared the second")
     }
 
     /// The form's questions, from the call's arguments.
@@ -327,6 +384,123 @@ private struct Scorer {
             }
         }
         return silent
+    }
+
+    /// The `move` a `finish_turn` carried, by where it went: into a worktree, or back.
+    func moves(back: Bool) -> [AppToolCall] {
+        calls(DaemonAPI.Method.agentsFinishTurn).filter { call in
+            guard let target = call.arguments?["move"]?["target"]?.objectValue else { return false }
+            return (target["projectFolder"] != nil) == back
+        }
+    }
+
+    func runtimeNotes() -> [(at: Date, text: String)] {
+        record.transcript.compactMap { entry in
+            if case .runtimeNote(let text) = entry.kind { return (entry.at, text) }
+            return nil
+        }
+    }
+
+    func worktree() -> (Verdict, String) {
+        let into = moves(back: false)
+        guard let moved = into.first(where: \.ok) else {
+            let why = into.last?.answer ?? ""
+            if why.contains("git repository") || why == RuntimeCatalog.whyCannotMoveFolders(runtimeID: record.runtimeID) {
+                return (.notOffered, why)
+            }
+            return (.failed, said(into, "finish_turn worktree"))
+        }
+        let notes = runtimeNotes().filter { $0.at >= moved.at }
+        guard let inNote = notes.first(where: { $0.text.hasPrefix("Moved from the project folder to worktree") }) else {
+            return (.failed, notes.first(where: { $0.text.hasPrefix("Could not move") })?.text ?? "never moved into the worktree")
+        }
+        let back = moves(back: true).filter { $0.ok && $0.at > moved.at }
+        guard let leaving = back.first else { return (.failed, said(moves(back: true), "finish_turn leave_worktree")) }
+        guard leaving.arguments?["move"]?["removeLeft"]?.boolValue == true else {
+            return (.failed, "left the worktree without remove")
+        }
+        guard let backNote = runtimeNotes().first(where: { $0.at >= leaving.at && $0.text.contains("to the project folder.") }) else {
+            return (.failed, "never moved back to the project folder")
+        }
+        guard backNote.text.contains("Removed the worktree") else { return (.failed, backNote.text) }
+        guard record.worktreeNow == nil else { return (.failed, "still in \(record.worktreeNow!)") }
+        let name = inNote.text.dropFirst("Moved from the project folder to worktree ".count).prefix { $0 != " " && $0 != "." }
+        return (.passed, "moved into worktree \(name), then back, and it was removed")
+    }
+
+    func sessions() -> (Verdict, String) {
+        let me = record.agentID.uuidString
+        let listed = calls(DaemonAPI.Method.agentsListSessions)
+        guard let list = listed.first(where: \.ok) else { return (.failed, said(listed, "list_sessions")) }
+        guard list.answer?.contains(me) == true else { return (.failed, "`list_sessions` did not list this session") }
+        let read = calls(DaemonAPI.Method.agentsReadSession).filter {
+            let asked = $0.arguments?["session"]?.stringValue ?? ""
+            return asked.uppercased() == me || (record.title != nil && asked == record.title)
+        }
+        guard let own = read.first(where: { $0.ok && $0.answer?.contains("Id: \(me)") == true }) else {
+            return (.failed, read.isEmpty ? "`read_session` never read this session" : "`read_session` did not give this session back: \(String((read.last?.answer ?? "").prefix(160)))")
+        }
+        if let title = record.title, own.answer?.contains(title) != true {
+            return (.failed, "`read_session` gave back this id but not its title, \"\(title)\"")
+        }
+        return (.passed, "listed; `read_session` gave back this session's id and title")
+    }
+
+    /// The permission cards about the file outside the project, each with the kind of
+    /// answer it got, if any.
+    func scopeCards() -> [(asked: PermissionRequest, answer: PermissionOption.Kind?)] {
+        guard let name = record.start.map({ ($0.scopePath as NSString).lastPathComponent }) else { return [] }
+        var cards: [(PermissionRequest, PermissionOption.Kind?)] = []
+        for (i, entry) in record.transcript.enumerated() {
+            guard case .permissionAsked(let request) = entry.kind, mentions(request.toolCall, name) else { continue }
+            let answer = record.transcript[(i + 1)...].lazy.compactMap { later -> String? in
+                if case .permissionAnswered(let id, _) = later.kind { return id }
+                return nil
+            }.first
+            cards.append((request, answer.flatMap { id in request.options.first { $0.optionID == id }?.kind }))
+        }
+        return cards
+    }
+
+    func mentions(_ call: ToolCall, _ name: String) -> Bool {
+        guard let data = try? JSONEncoder().encode(call), let text = String(data: data, encoding: .utf8) else { return false }
+        return text.contains(name)
+    }
+
+    /// Whether the agent tried the write at all, by its runtime's own account.
+    func triedScope() -> Bool {
+        guard let name = record.start.map({ ($0.scopePath as NSString).lastPathComponent }) else { return false }
+        return record.transcript.contains { entry in
+            switch entry.kind {
+            case .toolCall(let call), .toolCallUpdate(let call): mentions(call, name)
+            default: false
+            }
+        }
+    }
+
+    func scope() -> (Verdict, String) {
+        guard let start = record.start else { return (.failed, "no record of the assessment's start, so no file to look for") }
+        let name = (start.scopePath as NSString).lastPathComponent
+        let cards = scopeCards()
+        if !cards.isEmpty { return (.passed, "the write of \(name), outside the project, was asked about on a permission card") }
+        if record.scopeWritten { return (.failed, "\(name), outside the project, was written without asking") }
+        guard triedScope() else { return (.failed, "never tried to write \(name)") }
+        return (.passed, "the write of \(name), outside the project, was refused without a card")
+    }
+
+    func permissions() -> (Verdict, String) {
+        guard record.start != nil else { return (.failed, "no record of the assessment's start, so no file to look for") }
+        guard let card = scopeCards().first else {
+            if record.scopeWritten { return (.failed, "the write outside the project raised no card, and went ahead") }
+            return (.notOffered, triedScope() ? "the runtime refused the write itself, without a card" : "nothing was tried that would raise a card")
+        }
+        guard let kind = card.answer else { return (.failed, "the card for \(card.asked.toolCall.title) was never answered") }
+        if kind.allows {
+            guard record.scopeWritten else { return (.failed, "the card was answered \(kind.rawValue), and the file was not written") }
+            return (.passed, "a card came; answered \(kind.rawValue), and the file was written")
+        }
+        guard !record.scopeWritten else { return (.failed, "the card was answered \(kind.rawValue), and the file was written anyway") }
+        return (.passed, "a card came; answered \(kind.rawValue), and nothing was written")
     }
 
     func report() -> (Verdict, String) {
