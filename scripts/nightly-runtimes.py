@@ -581,6 +581,13 @@ def check(args):
             model = cheapest_model(load(os.path.join(sessions, f"{rid}.json"), None))
             try:
                 ok, out = real_turn(client, root, rid, model)
+                if not ok and model:
+                    # The cheapest model can be a free one whose provider is down; the runtime
+                    # is not at fault if its own default model answers.
+                    ok, again = real_turn(client, root, rid, None)
+                    out = (f"{again}, after {out}" if ok else f"{out}\n\nthen on the default model: {again}")
+                    out = out.splitlines()[0] if ok else out
+                    model = model if not ok else f"default; {model} failed"
             except Exception as e:
                 ok, out = False, f"{type(e).__name__}: {e}"
             steps["turn"] = {"ok": ok, "output": tail(out), "model": model}
