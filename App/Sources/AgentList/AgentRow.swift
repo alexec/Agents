@@ -111,8 +111,9 @@ struct AgentRow: View {
                 // state is the icon's; what it is doing is the title, which the agent
                 // keeps current; this is what it said.
                 // Stop, park or archive on its way, from whichever control sent it (#87).
-                // In the report's place, so the row keeps its height: a list row keeps the
-                // height of its first draw.
+                // In the report's place, at the report line's height. Nothing is held for
+                // the line when there is none (#144): the row is fixed to its height below,
+                // so the list measures it again when a line arrives.
                 if let acting = model.acting(agent.id) {
                     Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                         .frame(height: isCompact ? 14 : nil)
@@ -129,12 +130,6 @@ struct AgentRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
-                } else if isCompact {
-                    // List rows keep the height of their first draw; leave room for the
-                    // line under the title so it is not cut in half when a report arrives.
-                    Color.clear
-                        .frame(height: 14)
-                        .accessibilityHidden(true)
                 }
 
                 // Working in a worktree (030): named, because with two agents in one
