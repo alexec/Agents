@@ -1650,6 +1650,14 @@ export interface WorkflowSettings {
   labels: string[];
 }
 
+export interface WorkflowSettingsRequest {
+  folder: URLString;
+  workflowID: string;
+  settings: WorkflowSettings;
+  cooldown?: string;
+  labels?: string[];
+}
+
 export interface WorkflowSummary {
   workflow: Workflow;
   isArchived: boolean;
@@ -1802,6 +1810,7 @@ export interface Methods {
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
+  "workflows/settings": { params: WorkflowSettingsRequest; result: WorkflowSummary };
   "worktrees/list": { params: WorktreesListRequest; result: WorktreesListResponse };
 }
 
@@ -1877,6 +1886,7 @@ export const MethodTarget = {
   "workflows/enable": "host",
   "workflows/list": "host",
   "workflows/run": "host",
+  "workflows/settings": "host",
   "worktrees/list": "host",
 } as const;
 
@@ -2079,6 +2089,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
+  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },

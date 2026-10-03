@@ -117,6 +117,9 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.workflowsArchive, params: WorkflowArchiveRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
+                // Its settings, labels and cooldown on the page (#162), each control its one key.
+                Row(Method.workflowsSettings, params: WorkflowSettingsRequest.self, result: WorkflowSummary.self,
+                    kind: .hostRequest),
                 // New project (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
                 // as the window's projects column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),

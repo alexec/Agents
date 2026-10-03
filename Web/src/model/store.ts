@@ -7,7 +7,7 @@ import type {
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot,
-  DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage,
+  DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
@@ -826,6 +826,47 @@ export class Store extends Work {
     const changed = await this.act("workflows/archive",
       { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, archived }, host);
     if (changed) this.upsertWorkflow(changed, host);
+  }
+
+  private settingsInFlight = new Map<string, Promise<unknown>>();
+
+  /**
+   * One setting, its label list or its cooldown (#162), written to the file through the daemon
+   * as the window's page writes it. `change` is applied to what the file says when the call is
+   * sent, after any earlier change to the same workflow has been answered, so two quick changes
+   * cannot undo each other. The answer replaces the one summary; the list is not asked for
+   * again. Answers the daemon's refusal, for the page to say beside the controls, or null.
+   */
+  setWorkflowSettings(host: string, summary: WorkflowSummary,
+                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[] }): Promise<string | null> {
+    const { folder, workflowID } = summary.workflow;
+    const key = `${host}|${folderKey(folder)}|${workflowID}`;
+    const send = async (): Promise<string | null> => {
+      const latest = (this.workflows.value[`${host}|${folderKey(folder)}`] ?? []).find((w) => w.workflow.workflowID === workflowID) ?? summary;
+      const current = latest.workflow.settings;
+      const settings = change.settings ? change.settings(current) : current;
+      try {
+        const updated = await this.link.call("workflows/settings", {
+          folder, workflowID, settings,
+          ...(change.cooldown !== undefined ? { cooldown: change.cooldown } : {}),
+          ...(change.labels !== undefined ? { labels: change.labels(current.labels) } : {}),
+        }, host);
+        this.upsertWorkflow(updated, host);
+        return null;
+      } catch (error) {
+        log("call.failed", error instanceof CallFailed ? error.code : undefined);
+        return describe(error);
+      }
+    };
+    const next = (this.settingsInFlight.get(key) ?? Promise.resolve()).then(send);
+    this.settingsInFlight.set(key, next);
+    void next.finally(() => { if (this.settingsInFlight.get(key) === next) this.settingsInFlight.delete(key); });
+    return next;
+  }
+
+  /** What a runtime last advertised in a folder, for the workflow page's menus; starts nothing. */
+  async rememberedOptions(host: string, runtimeID: string, folder: string): Promise<ConfigOption[]> {
+    return (await this.link.call("options/remembered", { runtimeID, cwd: folder as never }, host).catch(() => null)) ?? [];
   }
 
   /** Mark as Unread / Mark as Read (#70). */

@@ -34,8 +34,38 @@ test("agent mode, labels and unknown keys are said in the window's words", () =>
     ["notify: slack", 'retry: {"times":2}']);
 });
 
-test("the settings are shown read-only with the runtime's defaults named", () => {
-  const rows = w.settingRows({ ...input.workflow, settings: { permissionMode: "plan", options: { fast: "true" }, labels: [] } }, () => "Claude");
-  assert.deepEqual(rows, [["Runtime", "Claude (default)"], ["Permission mode", "plan"], ["Model", "Runtime default"],
-    ["Effort", "Runtime default"], ["fast", "true"]]);
+// The page's menus (#162), as WorkflowSettings.swift and the window's WorkflowPage have them.
+const ws = await load("src/model/workflowSettings.ts");
+const select = (id, category, values) => ({ id, name: id, category, type: "select", currentValue: values[0], options: values.map((v) => ({ value: v, name: v.toUpperCase() })) });
+const advertised = [select("mode", "mode", ["default", "plan"]), select("model", "model", ["opus", "haiku"]),
+  select("effort", "thought_level", ["low", "high"]), { id: "fast", name: "Fast", type: "boolean", currentValue: false }];
+
+test("the mode, model and effort have keys of their own; the rest go under options", () => {
+  assert.equal(ws.modelOption(advertised).id, "model");
+  assert.equal(ws.effortOption(advertised).id, "effort");
+  assert.deepEqual(ws.otherOptions(advertised).map((o) => o.id), ["fast"]);
+});
+
+test("each menu's first choice leaves the key out, named for its menu", () => {
+  const menu = ws.withDefault(advertised[1], "Model");
+  assert.equal(menu.options[0].options[0].name, "Model: runtime default");
+  assert.equal(menu.options[0].options[0].value, null);
+  assert.deepEqual(menu.options[1].options.map((c) => c.value), ["opus", "haiku"]);
+  const fast = ws.selectable(advertised[3]);
+  assert.deepEqual(fast.options.map((c) => c.value), ["true", "false"]);
+  assert.equal(ws.shown("yes", advertised[3]), "true");
+});
+
+test("a value the runtime does not offer is said, naming what it does", () => {
+  const lines = ws.refusals({ permissionMode: "yolo", model: "opus", options: { fast: "on", colour: "red" }, labels: [] }, advertised, "Claude");
+  assert.deepEqual(lines, [
+    '"yolo" is not a permission mode Claude offers here — it offers default, plan',
+    "colour: red — Claude does not offer this option here",
+  ]);
+});
+
+test("the cooldown is written as the file writes it", () => {
+  assert.equal(ws.cooldownFileText(15 * 60), "15m");
+  assert.equal(ws.cooldownFileText(90 * 60), "1h30m");
+  assert.equal(ws.cooldownFileText(24 * 3600), "1d");
 });

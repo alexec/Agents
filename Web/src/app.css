@@ -786,10 +786,10 @@ button.remove:hover { opacity: 1; }
 .workflow-page .link { border: 0; background: none; padding: 0; color: var(--tint-link, #2f6fd1); cursor: pointer; white-space: nowrap; }
 .workflow-page .agent-mode { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .workflow-page .agent-mode code { font: 11.5px var(--font-mono); }
-.workflow-page .settings { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 16px; }
-.workflow-page .settings div { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
-.workflow-page .settings dt { opacity: 0.7; }
-.workflow-page .settings dd { margin: 0; }
+.workflow-page .workflow-settings { display: flex; flex-direction: column; gap: 8px; }
+.workflow-page .file-and-runtime .quiet { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.workflow-page .marked { margin: 0; color: var(--tint-attention); }
+.workflow-page .pill[disabled], .workflow-page .pill:has(select:disabled) { opacity: 0.55; }
 .workflow-page .labels:empty { display: none; }
 .workflow-page .unknown-keys { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .workflow-page .unknown-keys code { font: 12px var(--font-mono); opacity: 0.7; }

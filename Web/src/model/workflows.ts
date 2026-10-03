@@ -621,16 +621,3 @@ export function cooldownSentence(s: WorkflowSummary): string | null {
   return sentence;
 }
 
-/** The settings the window's form edits, as name and value, read-only here (#142). */
-export function settingRows(w: Workflow, runtimeName: (id: string) => string | undefined): [string, string][] {
-  const st = w.settings;
-  const runtime = st.runtimeID ?? defaultRuntime;
-  const rows: [string, string][] = [
-    ["Runtime", (runtimeName(runtime) ?? runtime) + (st.runtimeID ? "" : " (default)")],
-    ["Permission mode", st.permissionMode ?? "Runtime default"],
-    ["Model", st.model ?? "Runtime default"],
-    ["Effort", st.effort ?? "Runtime default"],
-  ];
-  for (const [id, value] of Object.entries(st.options).sort(([a], [b]) => a.localeCompare(b))) rows.push([id, value]);
-  return rows;
-}
