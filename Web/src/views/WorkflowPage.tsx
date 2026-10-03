@@ -3,22 +3,27 @@
 // Archive or Bring Back; the status card, why it is or isn't running; what it does (who gets the
 // prompt and, for a standing one, its agent; the prompt; its settings; its labels); what makes it
 // run, a line a trigger, and its cooldown; what its file says that this version does not know; and
-// the sessions it started. Every attribute is shown and none of the settings is edited here yet.
+// the sessions it started. Every attribute is shown; the settings, labels and cooldown are edited
+// here as in the window (#162), what the workflow is (name, triggers, prompt, agent mode) is not.
+import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import { folderKey, projectFolder } from "../model/groups";
 import {
-  cooldownSentence, labelsNote, agentModeWords, settingRows, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
+  cooldownSentence, labelsNote, agentModeWords, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   triggerSummary, workflowSummary,
 } from "../model/workflows";
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { SessionRow } from "./SessionRow";
 import { blockLines } from "../model/block";
+import { CooldownMenu, RuntimeRow, WorkflowSettingsForm } from "./WorkflowSettings";
 
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
   store: Store; host: string; folder: string; projectName: string; workflowID: string; down: boolean;
 }) {
   const summary = (store.workflows.value[`${host}|${folderKey(folder)}`] ?? []).find((w) => w.workflow.workflowID === workflowID);
+  // The daemon's refusal of the last change, said beside the controls until the next one.
+  const problem = useSignal<{ workflowID: string; text: string } | null>(null);
   const back = <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>;
   if (!summary) {
     return (
@@ -36,6 +41,10 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
     ? (store.agents.value[host] ?? []).find((a) => a.id === summary.standingAgentID && a.archivedAt === undefined) : undefined;
   const cooldown = cooldownSentence(summary);
   const unknown = unknownLines(workflow);
+  // A file that could not be read has no settings to show, so a change would write the empty ones.
+  const locked = down || workflow.problem !== undefined;
+  const change = (what: Parameters<Store["setWorkflowSettings"]>[2]) =>
+    void store.setWorkflowSettings(host, summary, what).then((refusal) => { problem.value = refusal ? { workflowID, text: refusal } : null; });
   const runs = (store.agents.value[host] ?? [])
     .filter((a) => a.startedByWorkflow === workflowID && projectFolder(a) === folderKey(folder))
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -87,7 +96,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           </ul>
 
           <h2 class="section-head">What it does</h2>
-          <p class="quiet small">.agents/workflows/{workflow.workflowID}.md</p>
+          <RuntimeRow store={store} host={host} summary={summary} disabled={locked} change={change} />
           <p class="agent-mode">
             <span>{agentModeWords(workflow.mode)}</span> <code class="quiet">agent: {workflow.mode}</code>
             {workflow.mode === "standing" && (standing
@@ -95,17 +104,8 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
               : <span class="quiet"> · Started on the next run</span>)}
           </p>
           <pre class="prompt-text">{workflow.prompt || "(no prompt)"}</pre>
-          {workflow.mode === "triggering" && <p class="quiet small">This workflow resumes the agent that triggered it, so these do not apply.</p>}
-          {workflow.mode === "standing" && <p class="quiet small">Applied when its standing agent is started, and again if it has to be replaced.</p>}
-          <dl class="settings">
-            {settingRows(workflow, runtimeName).map(([name, value]) => (
-              <div key={name}><dt>{name}</dt><dd>{value}</dd></div>
-            ))}
-          </dl>
-          <div class="labels" role="group" aria-label="Labels">
-            {workflow.settings.labels.map((label) => <span key={label} class="chip label">{label}</span>)}
-          </div>
-          <p class="quiet small">{labelsNote(workflow)} Its settings and labels are changed in the window or on the Remote.</p>
+          <WorkflowSettingsForm store={store} host={host} summary={summary} disabled={locked} problem={problem.value?.workflowID === workflowID ? problem.value.text : null} change={change} />
+          <p class="quiet small">{workflow.problem ? "Its settings can be changed here once its file can be read." : labelsNote(workflow)}</p>
 
           <h2 class="section-head">Triggers</h2>
           {workflow.triggers.length === 0 ? <p class="hint">None could be read from the file.</p> : (
@@ -134,7 +134,8 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
               })}
             </ul>
           )}
-          {cooldown && <p class="quiet small">{cooldown}</p>}
+          <CooldownMenu summary={summary} disabled={locked} change={change} />
+          <p class="quiet small">{cooldown ?? "No cooldown: every trigger runs it, one run at a time."}</p>
 
           {unknown.length > 0 && (
             <>
