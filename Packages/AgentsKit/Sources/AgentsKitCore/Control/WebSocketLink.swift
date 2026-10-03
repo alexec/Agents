@@ -81,9 +81,14 @@ public final class WebSocketLink: NSObject, LineTransport, URLSessionWebSocketDe
         task.receive { [weak self] result in
             guard let self else { return }
             switch result {
-            case .success(.string(let text)):
-                for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-                    self.continuation.yield(String(line))
+            case .success(.string(var text)):
+                // By bytes, not characters (#165): a frame arrives as a bridged string, and
+                // splitting one by Character walked every grapheme of every 20 KB record,
+                // the window's largest cost per agent change once its sidebar stopped
+                // refiling. A JSON line ends at an ASCII newline, which is one byte.
+                text.makeContiguousUTF8()
+                for line in text.utf8.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true) {
+                    self.continuation.yield(String(decoding: line, as: UTF8.self))
                 }
                 self.receive()
             case .success(.data(let data)):

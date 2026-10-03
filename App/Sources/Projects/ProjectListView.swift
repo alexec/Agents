@@ -89,6 +89,14 @@ struct ProjectListView: View {
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
         .searchable(text: $query, placement: .sidebar, prompt: "Search sessions and workflows")
+        // The archived sessions that match are the hosts' to find, a capped page each,
+        // after a pause in the typing (#165). The live ones are already here.
+        .task(id: query) {
+            let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !words.isEmpty { try? await Task.sleep(for: .milliseconds(250)) }
+            guard !Task.isCancelled else { return }
+            await model.searchSessions(words)
+        }
         .searchFocused($searchFocused)
         // What this Mac and its hosts are doing, pinned at the foot: status lines rather
         // than somewhere to go, so not rows of the list. Each is absent when there is
@@ -257,9 +265,11 @@ private struct ProjectFold: View {
     private var key: ProjectKey { summary.key }
 
     var body: some View {
-        let lists = sessionLists()
         let searching = !query.isEmpty
         let isOpen = searching || folds.isOpen(key)
+        // Folded, nothing under the row is drawn, so nothing is filed for it: the row
+        // reads its own numbers off the project's shelf (#165).
+        let lists = isOpen ? sessionLists() : SessionLists()
         if !searching || lists.hasAny || hasWorkflowMatch || nameMatches {
             DisclosureGroup(isExpanded: Binding(
                 get: { isOpen },
@@ -321,7 +331,7 @@ private struct ProjectFold: View {
     private func archivedSessions(_ archived: [Agent]) -> some View {
         let retiredLine = query.isEmpty ? RetirementWords.retiredLine(summary.retiredCount) : nil
         // How many there are is the host's count: the window holds a page of them only
-        // once the fold is open (#164).
+        // while the fold is open (#165).
         let count = query.isEmpty ? max(summary.counts[.archived] ?? 0, archived.count) : archived.count
         let isOpen = !query.isEmpty || folds.isOpen(key, .archivedSessions)
         if count > 0 || !archived.isEmpty || retiredLine != nil {
@@ -341,9 +351,13 @@ private struct ProjectFold: View {
                 // the time this is read.
                 SidebarSubheading(title: "Archived sessions", count: count)
             }
-            // A page of them when the fold opens (#164).
+            // A page of them while the fold is open, let go when it closes (#165).
             .task(id: query.isEmpty && isOpen) {
-                if query.isEmpty && isOpen { await model.loadArchived(in: key) }
+                if query.isEmpty && isOpen {
+                    await model.loadArchived(in: key)
+                } else if query.isEmpty {
+                    model.letGoOfArchived(in: key)
+                }
             }
         }
     }
@@ -362,9 +376,9 @@ private struct ProjectFold: View {
         var lists = SessionLists()
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matcher = words.isEmpty ? nil : SessionLabelQuery(words)
-        // Folded, only what the row's own counts need: nothing is drawn under it.
+        let shelf = model.work.shelf(key)
         for group in AgentGroup.allCases {
-            let held = model.agents(in: key, group: group)
+            let held = shelf.groups[group] ?? []
             lists.all[group] = held
             lists.shown[group] = matcher.map { held.filter($0.matches) } ?? held
         }

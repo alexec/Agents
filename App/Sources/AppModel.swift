@@ -768,6 +768,45 @@ final class AppModel {
         work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
     }
 
+    /// Let go of a project's archived sessions when its Archived fold closes (#165),
+    /// keeping the one being read.
+    func letGoOfArchived(in key: ProjectKey) {
+        let held = work.agents(in: key, group: .archived).map(\.id).filter { $0 != selection }
+        work.forget(held)
+    }
+
+    /// The most a search brings back from each host.
+    static let searchShown = 200
+    /// Archived sessions a search brought in, let go when the search ends.
+    @ObservationIgnored private var searched: Set<UUID> = []
+
+    /// Ask every host for the sessions matching `words`, archived ones included, a capped
+    /// page each (#165): the sidebar holds the live ones and filters those itself.
+    func searchSessions(_ words: String) async {
+        let earlier = searched.filter { $0 != selection }
+        searched = []
+        guard !words.isEmpty else {
+            work.forget(earlier.filter { work.agent($0)?.state == .archived && !isInOpenArchivedFold($0) })
+            return
+        }
+        let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
+        let hosts: [HostID] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
+        for host in hosts {
+            guard let found = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
+                                                                 returning: [Agent].self) else { continue }
+            let fresh = found.filter { $0.state == .archived && work.agent($0.id) == nil }.map(\.id)
+            searched.formUnion(fresh)
+            work.takeListed(found.filter { $0.state == .archived }.map { var agent = $0; agent.host = host; return agent })
+        }
+    }
+
+    /// Whether an archived session is on show in its project's open Archived fold.
+    private func isInOpenArchivedFold(_ id: UUID) -> Bool {
+        guard let agent = work.agent(id) else { return false }
+        // As the sidebar keeps them: in defaults, read here once per search ended.
+        return SidebarFolds().isOpen(ProjectKey(host: agent.host, folder: agent.projectFolder), .archivedSessions)
+    }
+
     /// A workflow's newest runs, archived ones included, for its History (#164).
     func loadRuns(of workflowID: String, in folder: URL, on host: HostID, limit: Int) async {
         let request = DaemonAPI.ListRequest(archivedCommands: false, folder: folder,
