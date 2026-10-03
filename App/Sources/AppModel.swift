@@ -86,6 +86,9 @@ final class AppModel {
     var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
     /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
     private(set) var clientPermissions = ClientPermissionSettings()
+    /// What agents call the person (#121), as this Mac keeps it; nil until it is read,
+    /// so a server is never told a blank before the Mac's own answer is in.
+    private(set) var person: PersonSettings?
     /// Each runtime's command sandbox default (064).
     private(set) var sandboxSettings = SandboxSettings()
 
@@ -992,6 +995,28 @@ final class AppModel {
         clientPermissions = settings
     }
 
+    func refreshPerson() async {
+        guard let settings = try? await client.call(DaemonAPI.Method.personState, Optional<String>.none,
+                                                    returning: PersonSettings.self) else { return }
+        person = settings
+    }
+
+    /// Save what agents call the person and copy it to every connected server (#121),
+    /// with the name filled in from this Mac's account, so a server's agents call the
+    /// person what this Mac's do and not by that server's account name.
+    func setPerson(_ settings: PersonSettings) async {
+        var saved: PersonSettings?
+        await attempt {
+            saved = try await self.client.call(DaemonAPI.Method.personSet, settings, returning: PersonSettings.self)
+        }
+        guard let saved else { return }
+        person = saved
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.personSet, saved.resolved(),
+                                                     returning: PersonSettings.self)
+        }
+    }
+
     /// Save Cursor/Grok permission mode and copy it to every connected server (061).
     func setClientPermissions(_ settings: ClientPermissionSettings) async {
         var saved: ClientPermissionSettings?
@@ -1465,6 +1490,10 @@ final class AppModel {
             guard let settings = try? params?.decode(ClientPermissionSettings.self) else { return }
             clientPermissions = settings
 
+        case DaemonAPI.Notification.personChanged:
+            guard let settings = try? params?.decode(PersonSettings.self) else { return }
+            person = settings
+
         case DaemonAPI.Notification.sandboxChanged:
             guard let settings = try? params?.decode(SandboxSettings.self) else { return }
             sandboxSettings = settings
@@ -1712,6 +1741,10 @@ final class AppModel {
         // And Cursor/Grok permission mode (061).
         _ = try? await server.call(DaemonAPI.Method.clientPermissionsSet, clientPermissions,
                                    returning: ClientPermissionSettings.self)
+        // And what agents call the person, as this Mac resolves it (#121).
+        if let person {
+            _ = try? await server.call(DaemonAPI.Method.personSet, person.resolved(), returning: PersonSettings.self)
+        }
         // And each runtime's sandbox default (064).
         _ = try? await server.call(DaemonAPI.Method.sandboxSet, sandboxSettings,
                                    returning: SandboxSettings.self)
@@ -1774,6 +1807,7 @@ final class AppModel {
         async let retention: Void = refreshRetentionState()
         async let clientPermissions: Void = refreshClientPermissions()
         async let sandbox: Void = refreshSandboxSettings()
+        async let person: Void = refreshPerson()
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
@@ -1783,7 +1817,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox)
+                   transcript, runtimeStates, sandbox, person)
         #if DEBUG
         openFromLaunchArguments()
         #endif

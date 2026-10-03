@@ -1143,7 +1143,15 @@ extension DaemonCore {
             let managesAgents = agents[agentID]?.startedByAgent == nil
             // With what the person declared on this machine, and what each is for (#116).
             loadDeclaredIfNeeded()
-            let briefing = [Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID), managesAgents: managesAgents),
+            // Who is who (#121): the runtime by its display name, the person by theirs,
+            // and a helper's starter by title.
+            let starter = agents[agentID]?.startedByAgent.map { agents[$0]?.title }
+            let naming = Briefing.Naming(runtime: RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID,
+                                         person: personSettings.effectiveName(),
+                                         pronouns: personSettings.givenPronouns,
+                                         startedBy: starter.map { $0 ?? "" })
+            let briefing = [Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID), managesAgents: managesAgents,
+                                          naming: naming),
                             LeaseWords.declaredBriefing(declaredResources)].compactMap { $0 }
             outgoing.append(.text(briefing.joined(separator: "\n\n")))
         }

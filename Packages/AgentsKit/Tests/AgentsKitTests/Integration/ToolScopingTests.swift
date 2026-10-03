@@ -111,9 +111,29 @@ struct ToolScopingTests {
         }
 
         let sent = await launcher.allAgents.first?.promptContent?.arrayValue ?? []
-        #expect(sent.last?["text"]?.stringValue == Briefing.text(for: ToolPolicyCatalog.cursor))
+        #expect(sent.last?["text"]?.stringValue == Briefing.asSent(to: "cursor"))
         #expect(sent.last?["text"]?.stringValue?.contains("CreateGoal") == false,
                 "Cursor's goal tools are its own to use, not residue to be warned about")
+    }
+
+    /// Who is who (#121): the runtime by its display name and the person by the name
+    /// they set, with the pronouns they gave, in the briefing the runtime is sent.
+    @Test func theBriefingNamesTheRuntimeAndThePerson() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        _ = try await core.setPerson(PersonSettings(name: "Sam", pronouns: "she/her"))
+
+        _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
+        await eventually("the prompt reached the runtime") {
+            await launcher.allAgents.first?.promptContent != nil
+        }
+
+        let text = await launcher.allAgents.first?.promptContent?.arrayValue?.last?["text"]?.stringValue ?? ""
+        #expect(text.contains(Briefing.naming(.init(runtime: "Grok", person: "Sam", pronouns: "she/her"))))
+        #expect(text.contains("\"Grok (this agent) will…\""))
+        #expect(text.contains("\"Sam, do you want…?\""))
+        #expect(PersonSettingsStore(locations: locations).load() == PersonSettings(name: "Sam", pronouns: "she/her"))
     }
 
     /// The other shape making it out of the building. An allow list is a different

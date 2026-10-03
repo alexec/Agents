@@ -24,6 +24,11 @@ struct ElicitationSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
+                // Who is asking, by title and runtime (#121).
+                if let asker = model.work.askerLine(request.agentID) {
+                    Text(asker).appText(.fine).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Text(request.title)
                     .appText(.reading).fontWeight(.semibold)
                     .fixedSize(horizontal: false, vertical: true)

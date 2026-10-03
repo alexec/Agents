@@ -59,19 +59,22 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
-/// Settings ▸ General: appearance, whether this Mac stays awake, and archived agents.
+/// Settings ▸ General: appearance, what agents call you, whether this Mac stays awake, and
+/// archived agents.
 struct GeneralSettingsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Form {
             AppearanceSettingsView()
+            PersonSettingsSection()
             WakeSettingsSection()
             ArchiveSettingsSection()
         }
         .paperForm()
         .task {
             await model.refreshWakeSettings()
+            await model.refreshPerson()
             await model.refreshRetentionState()
         }
     }
