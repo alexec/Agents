@@ -159,7 +159,7 @@ private struct SandboxDefaultRow: View {
 }
 
 /// "Assess…" (#47): pick a project on this Mac, and an agent on this runtime is started there
-/// with the assessment's steps, on the cheapest model the runtime has offered. Its report
+/// with the assessment's steps, on the cheapest model the runtime offers. Its report
 /// goes to `.agents/reviews/runtimes/` in that project, and the app's own score into its
 /// conversation when it ends.
 private struct AssessRuntimeRow: View {

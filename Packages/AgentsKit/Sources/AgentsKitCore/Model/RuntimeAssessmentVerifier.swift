@@ -131,9 +131,15 @@ private struct Scorer {
             $0.ok && $0.arguments?["name"]?.stringValue?.trimmingCharacters(in: .whitespaces).lowercased() == key
         }
         guard !released.isEmpty else { return (.failed, said(calls(DaemonAPI.Method.leasesRelease), "release_resource")) }
-        let mine = record.events.filter { $0.details["agent"] == record.agentID.uuidString && $0.details["resource"]?.lowercased() == key }
-        guard mine.contains(where: { $0.name == "lease.granted" }) else { return (.failed, "no lease.granted for \(name) on the log") }
-        guard mine.contains(where: { $0.name == "lease.released" }) else { return (.failed, "no lease.released for \(name) on the log") }
+        // Granted names the agent; released names only the resource, so it is the release
+        // of that resource after this agent's grant.
+        let onIt = record.events.filter { $0.details["resource"]?.lowercased() == key }
+        guard let granted = onIt.first(where: { $0.name == "lease.granted" && $0.details["agent"] == record.agentID.uuidString }) else {
+            return (.failed, "no lease.granted to this agent for \(name) on the log")
+        }
+        guard onIt.contains(where: { $0.name == "lease.released" && $0.position > granted.position }) else {
+            return (.failed, "no lease.released for \(name) on the log")
+        }
         guard !record.leasesHeld.contains(where: { $0.lowercased() == key }) else { return (.failed, "\(name) is still held") }
         return (.passed, "\(name): granted, listed, released; nothing left held")
     }
@@ -228,7 +234,10 @@ private struct Scorer {
             return (.failed, "the helper \(id.uuidString.prefix(8)) is not marked as this agent's")
         }
         guard ok(calls(DaemonAPI.Method.agentsListHelpers)) else { return (.failed, said(calls(DaemonAPI.Method.agentsListHelpers), "list_my_agents")) }
-        guard appPrompts.contains(where: { $0.at > call.at && $0.text.contains("The block you reported has cleared") }) else {
+        // Resumed when it finished, or told at the block that it already had (a quick
+        // runtime's helper can end before its starter's turn does).
+        let resumed = appPrompts.contains { $0.at > call.at && $0.text.contains("The block you reported has cleared") }
+        guard resumed || blockFoundHelperDone(id) else {
             return (.failed, "never started again when the helper finished")
         }
         let parked = calls(DaemonAPI.Method.agentsParkHelper).filter { $0.arguments?["agentID"]?.stringValue?.uppercased() == id.uuidString }
@@ -242,6 +251,17 @@ private struct Scorer {
             return (.failed, "the helper is not archived by an agent")
         }
         return (.passed, "helper \(id.uuidString.prefix(8)) on \(helper.runtimeID): marked as this agent's, resumed this one when it finished, parked, archived")
+    }
+
+    /// A block on the helper refused because the helper had already ended: the daemon's
+    /// own account of the helper finishing first.
+    func blockFoundHelperDone(_ helper: UUID?) -> Bool {
+        calls(DaemonAPI.Method.agentsFinishTurn).contains { call in
+            !call.ok && call.arguments?["outcome"]?.stringValue == "blocked"
+                && (call.answer ?? "").contains("has already ended")
+                && (helper == nil || (call.arguments?["waitingOn"]?.arrayValue ?? [])
+                    .contains { $0.stringValue?.uppercased() == helper?.uuidString })
+        }
     }
 
     func wait() -> (Verdict, String) {
@@ -263,10 +283,15 @@ private struct Scorer {
         let finished = calls(DaemonAPI.Method.agentsFinishTurn).filter(\.ok)
         let blocked = finished.filter { $0.arguments?["outcome"]?.stringValue == "blocked" }
         let onHelper = blocked.contains { !($0.arguments?["waitingOn"]?.arrayValue ?? []).isEmpty }
+            || blockFoundHelperDone(nil)
         let withTime = blocked.contains { $0.arguments?["checkAgainInMinutes"]?.intValue != nil }
         let last = finished.last?.arguments?["outcome"]?.stringValue
-        let titled = finished.contains { !($0.arguments?["title"]?.stringValue ?? "").isEmpty }
-        let prompted = finished.contains { !($0.arguments?["prompts"]?.arrayValue ?? []).isEmpty }
+        // A block refused only because the helper had already ended still carried what it said.
+        let sent = finished + calls(DaemonAPI.Method.agentsFinishTurn).filter {
+            !$0.ok && ($0.answer ?? "").contains("has already ended")
+        }
+        let titled = sent.contains { !($0.arguments?["title"]?.stringValue ?? "").isEmpty }
+        let prompted = sent.contains { !($0.arguments?["prompts"]?.arrayValue ?? []).isEmpty }
         let outcomes = finished.compactMap { $0.arguments?["outcome"]?.stringValue }.joined(separator: ", ")
         var missing: [String] = []
         if !onHelper { missing.append("blocked on the helper") }

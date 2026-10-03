@@ -17,7 +17,10 @@ extension DaemonCore {
                                message: "There is no runtime called \(request.runtimeID).")
         }
         let folder = request.folder.standardizedFileURL
-        let model = cheapestRememberedModel(runtimeID: runtime.id)
+        // What the runtime offers here, from a draft of the session the agent then starts
+        // on: the cheapest of its models, whether or not it has been used here before.
+        let draft = try await options(DaemonAPI.OptionsRequest(runtimeID: runtime.id, cwd: folder))
+        let model = RuntimeAssessment.cheapestModel(in: draft.options)
         let report = RuntimeAssessment.reportPath(project: folder, runtimeID: runtime.id, date: now())
         // show_file takes a Markdown file that is not there yet only in a folder that is.
         try? FileManager.default.createDirectory(at: report.deletingLastPathComponent(),
@@ -29,20 +32,10 @@ extension DaemonCore {
             agentShortID: String(UUID().uuidString.prefix(8)).lowercased(), date: String(day))
         let options = model.map { StartOptions(values: ["model": .string($0)]) } ?? .none
         let start = DaemonAPI.StartRequest(runtimeID: runtime.id, cwd: folder, prompt: brief,
-                                           startOptions: options, labels: [RuntimeAssessment.label])
+                                           startOptions: options, draftID: draft.draftID,
+                                           labels: [RuntimeAssessment.label])
         let id = try await self.start(start, startedBy: nil, labelOwner: .agent)
         return .init(agentID: id, model: model, reportPath: report.path)
-    }
-
-    /// The cheapest model the runtime last offered in any folder, or nil to leave it to
-    /// the runtime's default. Starts nothing: a runtime never used here has no list yet.
-    func cheapestRememberedModel(runtimeID: String) -> String? {
-        if rememberedOptions == nil { rememberedOptions = optionCache.load() }
-        let entries = (rememberedOptions ?? [:])
-            .filter { $0.key.hasPrefix(runtimeID + "\t") && $0.value.isWorthKeeping }
-            .map(\.value)
-            .sorted { $0.savedAt > $1.savedAt }
-        return entries.lazy.compactMap { RuntimeAssessment.cheapestModel(in: $0.options) }.first
     }
 
     // MARK: The record

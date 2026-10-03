@@ -95,7 +95,7 @@ struct RuntimeAssessmentTests {
         ]
         let events = [
             event(2, "lease.granted", ["agent": me.uuidString, "resource": "assess-abcd"]),
-            event(4, "lease.released", ["agent": me.uuidString, "resource": "assess-abcd"]),
+            event(4, "lease.released", ["how": "released", "resource": "assess-abcd"]),
             event(9, RuntimeAssessment.pingEvent, [:], publisher: me),
             event(40, "agent.parked", ["agent": helper.uuidString]),
         ]
@@ -131,6 +131,25 @@ struct RuntimeAssessmentTests {
         for id in ["show_file", "leases", "workflows", "dashboard", "events", "ask_form", "own_ask", "helpers", "wait", "ending"] {
             #expect(v[id] == .failed, "\(id)")
         }
+    }
+
+    @Test func aLeaseGrantedToSomebodyElseIsNotThisAgents() {
+        var record = goodRecord()
+        record.events[0].details["agent"] = UUID().uuidString
+        #expect(verdicts(record)["leases"] == .failed)
+    }
+
+    /// A quick helper ends before its starter blocks on it; the daemon refuses the block,
+    /// saying so, and that counts as the helper having finished.
+    @Test func aHelperThatFinishedBeforeTheBlockStillPasses() {
+        var record = goodRecord()
+        let i = record.calls.firstIndex { $0.arguments?["waitingOn"] != nil }!
+        record.calls[i].ok = false
+        record.calls[i].answer = "Nothing was recorded: “Reply OK” has already ended (complete — OK). Use what it said rather than waiting on it."
+        record.transcript.removeAll { if case .userMessage(let text, _, _) = $0.kind { return text.contains("has cleared") } else { return false } }
+        let v = verdicts(record)
+        #expect(v["helpers"] == .passed)
+        #expect(v["ending"] == .passed)
     }
 
     @Test func aLeaseLeftHeldFails() {

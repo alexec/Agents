@@ -25,7 +25,7 @@ the app answered, so a pass never rests on the agent's word.
    On an iPhone or iPad, open **Runtimes** at the foot of **Spending**, and touch and hold the
    runtime.
 2. Click **Assess…** (on the phone, **Assess in…**) and pick the project.
-   The agent starts on the cheapest model the runtime has offered here, such as Haiku for
+   The agent starts on the cheapest model the runtime offers, such as Haiku for
    Claude, and opens.
 3. Answer its two questions: a short form, and one question it asks with the runtime's own
    question tool, where the runtime has one. Any answer will do. If the runtime asks

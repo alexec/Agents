@@ -123,7 +123,9 @@ public enum RuntimeAssessment {
             with outcome done and the message OK." Then call `list_my_agents`. End this turn with \
             `finish_turn`: outcome `blocked`, `waiting_on` the helper's id, title \
             "Assess \(runtimeName)", a message saying you are waiting on the helper, and a \
-            `next_prompt`. You are started again when the helper finishes.
+            `next_prompt`. You are started again when the helper finishes. (If that call is \
+            refused because the helper has already finished, go straight on to step 9 in \
+            this turn.)
 
             **Turn 2**, once the helper has finished
 

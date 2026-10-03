@@ -13,7 +13,7 @@ from its own record, so the result never rests on the agent's word.
 
 The usual way in is **Settings ▸ Agent Runtimes ▸ <runtime> ▸ Assess…**, which picks a
 project and calls the daemon's `runtimes/assess`. That starts an agent on the runtime, on
-the cheapest model it has offered here (Haiku for Claude), labelled `assess-runtime`, with
+the cheapest model it offers (Haiku for Claude), read from a draft of the session it starts on, labelled `assess-runtime`, with
 the brief: `RuntimeAssessment.brief` in
 `Packages/AgentsKit/Sources/AgentsKitCore/Model/RuntimeAssessment.swift`. The brief is the
 source of truth for the steps; this file names the same ones, and a test keeps the ids in
@@ -48,7 +48,7 @@ as written, even when it expects a failure, and records what the tool answered.
 | `events` | 1 | `wait_for_event recent`, `publish_event custom.assess_ping`, `wait_for_event` on it from that position | the event is on the log from this agent; the wait came back with it |
 | `ask_form` | 1 | `ask_form` with a choice (`pick`) and a text field (`words`) | answered; the typed text came back in the tool's answer unchanged, and is in the report |
 | `own_ask` | 1 | one question with the runtime's own tool (Claude `AskUserQuestion`, Codex `request_user_input`, Cursor `AskQuestion`, Antigravity `ask_question`) | an elicitation reached the app beyond `ask_form`'s; **not offered** where `ToolPolicy.escalationTool` is nil (Grok, Copilot, Gemini, OpenCode) and none came |
-| `helpers` | 1–2 | `start_agent` a helper on the same runtime, `list_my_agents`, `finish_turn blocked waiting_on` it; then `park_agent` and `archive_agent` it | helper marked as this agent's; the "block … has cleared" prompt resumed it; `agent.parked` on the log; helper archived by an agent |
+| `helpers` | 1–2 | `start_agent` a helper on the same runtime, `list_my_agents`, `finish_turn blocked waiting_on` it (refused if it has already finished, which counts); then `park_agent` and `archive_agent` it | helper marked as this agent's; the "block … has cleared" prompt resumed it; `agent.parked` on the log; helper archived by an agent |
 | `wait` | 2–3 | `wait_for_event custom.assess_never until_minutes 1`, then `finish_turn blocked` | the "timed out" prompt started it again |
 | `ending` | 1–4 | `finish_turn` blocked on the helper (with title and next prompt), blocked on the wait, blocked with `check_again_in_minutes 1`, then `done` + park or `needs_answer` | every one recorded as sent; the last is done or needs_answer; no turn ended without an account |
 | `report` | 4 | finishes `.agents/reviews/runtimes/<runtime>-<date>.md`: a row per step and "What to fix" | the file is there and names every step |
