@@ -1,0 +1,8 @@
+— turn
+outcome: {"control":"▸ 7 steps","controlLeft":576,"turnLeft":576,"stepsLeft":null,"stepsRule":null,"lines":["Read README.md, list the files in this folder, then write no","▸ 7 steps","Alex, notes.md is written: it says this is a scratch project","Complete Claude read the README, listed the folder, and wrot"]}
+shot before-turn-outcome.png
+steps: {"control":"▾ Hide steps","controlLeft":576,"turnLeft":576,"stepsLeft":597,"stepsRule":"2px","lines":["Read README.md, list the files in this folder, then write no","▾ Hide steps","Read file List files in project folder Tool Search Mcp Agent","Alex, notes.md is written: it says this is a scratch project","Complete Claude read the README, listed the folder, and wrot"]}
+shot before-turn-steps.png
+details: {"control":"▾ Hide steps","controlLeft":576,"turnLeft":576,"stepsLeft":597,"stepsRule":"2px","lines":["Read README.md, list the files in this folder, then write no","▾ Hide steps","Read file 1 # Work 2 3 A scratch project. README.md:1 Argume","Alex, notes.md is written: it says this is a scratch project","Complete Claude read the README, listed the folder, and wrot"]}
+shot before-turn-details.png
+errors: ["rendering: Autofocus processing was blocked because a document already has a focused element."]
