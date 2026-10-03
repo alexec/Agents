@@ -151,10 +151,13 @@ struct WorkflowPage: View {
             } else {
                 if summary.awaitingApproval != nil {
                     // This page is where the file is read, so this is where approving it
-                    // means most. Run now comes back once it is approved.
-                    Button("Approve") { Task { await model.approveWorkflow(summary) } }
-                        .buttonStyle(.paperProminent)
-                        .help("Let this workflow run as its file now reads")
+                    // means most. Run now comes back once it is approved. One waiting its
+                    // turn behind three others has none yet (#132); the page says why.
+                    if summary.canBeApproved {
+                        Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                            .buttonStyle(.paperProminent)
+                            .help("Let this workflow run as its file now reads")
+                    }
                 } else {
                     // Offered even on a workflow that cannot fire on its own. Being able to
                     // try one is what makes writing one worth doing, and a refusal says why
@@ -760,6 +763,9 @@ struct WorkflowPage: View {
         var parts: [String] = []
         if summary.isArchived {
             parts.append("Archived — it will not run until it is restored")
+        } else if summary.waitsItsTurn, let limit = summary.overLimit {
+            parts.append("\(limit.sentence). \(limit.remedy)")
+            return parts.joined(separator: " · ")
         } else if let waiting = summary.awaitingApproval {
             // What waits on the person is the file, and it is on this page to be read.
             parts.append((waiting.isNew ? "New" : "Changed since you approved it")

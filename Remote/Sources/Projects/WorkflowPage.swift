@@ -441,6 +441,9 @@ struct WorkflowPage: View {
         var parts: [String] = []
         if summary.isArchived {
             parts.append("Archived — it will not run until it is restored")
+        } else if summary.waitsItsTurn, let limit = summary.overLimit {
+            // Ahead of off: a workflow an agent wrote is both, and this is what stops it (#132).
+            parts.append("\(limit.sentence). \(limit.remedy)")
         } else if summary.isRunning {
             parts.append("Running now")
         } else if !summary.isEnabled {
