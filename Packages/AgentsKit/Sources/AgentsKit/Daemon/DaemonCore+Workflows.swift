@@ -961,6 +961,8 @@ extension DaemonCore {
         persistWorkflowRuns()
         if let workflow = workflow(run.workflowID, in: run.folder) {
             broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow))
+            // Update now's line (#146) says the run is over.
+            if workflow.settings.labels.contains(DashboardUpdate.label) { dashboardChanged(workflow.folder) }
         }
 
         let folder = Project.standardize(run.folder)

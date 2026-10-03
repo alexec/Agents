@@ -121,7 +121,7 @@ extension DaemonCore {
     /// `read_dashboard`: every tile in the caller's project, for agents to build on.
     public func readDashboard(_ request: DaemonAPI.DashboardTokenRequest) throws -> String {
         let caller = try dashboardCaller(request.token)
-        let snapshot = dashboardSnapshot(caller.projectFolder)
+        let snapshot = dashboardSnapshot(caller.projectFolder, withUpdate: false)
         guard !snapshot.tiles.isEmpty else {
             return "This project's Dashboard has no tiles yet. Keep one with set_tile."
         }
@@ -152,7 +152,9 @@ extension DaemonCore {
 
     // MARK: The person's
 
-    public func dashboardSnapshot(_ folder: URL) -> DashboardSnapshot {
+    /// `withUpdate` reads the project's workflows for Update now (#146); a row's summary has
+    /// no use for it.
+    public func dashboardSnapshot(_ folder: URL, withUpdate: Bool = true) -> DashboardSnapshot {
         let project = Project.standardize(folder)
         let state = dashboardStore.state(project)
         let at = now()
@@ -168,14 +170,15 @@ extension DaemonCore {
                             recent: Array(points.suffix(TileLimits.recentPoints)),
                             keeperChanges: record?.keeperChanges ?? [])
         }
-        return DashboardSnapshot(folder: project, tiles: DashboardModel.ordered(tiles), now: at)
+        return DashboardSnapshot(folder: project, tiles: DashboardModel.ordered(tiles), now: at,
+                                 update: withUpdate ? dashboardUpdate(project) : nil)
     }
 
     public func dashboardSummaries() -> [DashboardSummary] {
         allProjects(includeArchived: false).compactMap { project in
             let folder = Project.standardize(project.folder)
             guard FileManager.default.fileExists(atPath: DashboardStore.tilesFolder(folder).path) else { return nil }
-            return DashboardModel.summary(dashboardSnapshot(folder))
+            return DashboardModel.summary(dashboardSnapshot(folder, withUpdate: false))
         }
     }
 
@@ -228,7 +231,7 @@ extension DaemonCore {
         dashboardBroadcasts[project] = nil
         broadcast(DaemonAPI.Notification.dashboardChanged,
                   DaemonAPI.DashboardChangedNotification(folder: project,
-                                                         summary: DashboardModel.summary(dashboardSnapshot(project))))
+                                                         summary: DashboardModel.summary(dashboardSnapshot(project, withUpdate: false))))
     }
 
     /// A changed path under the project's own `.agents/dashboard/` (a hand edit, a pull)
@@ -315,7 +318,7 @@ extension DaemonCore {
         return view.kind == .workflow ? "the workflow \u{201C}\(view.name)\u{201D}" : "the agent \u{201C}\(view.name)\u{201D}"
     }
 
-    private func requireFolder(_ project: URL) throws {
+    func requireFolder(_ project: URL) throws {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: project.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             throw dashboardRefusal(TileCheck.lead + "the project folder \(project.path) is not there.")
@@ -329,7 +332,7 @@ extension DaemonCore {
         return agent
     }
 
-    private func dashboardRefusal(_ message: String) -> JSONRPCError {
+    func dashboardRefusal(_ message: String) -> JSONRPCError {
         JSONRPCError(code: DaemonAPI.Failure.dashboardRefused, message: message)
     }
 }

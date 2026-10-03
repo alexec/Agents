@@ -787,7 +787,9 @@ public actor DaemonCore {
     }
 
     func changed(_ agent: Agent) {
+        let before = agents[agent.id]
         agents[agent.id] = agent
+        dashboardUpdaterMoved(agent, from: before)
         saveQuietly(agent)
         // The index of archived agents follows them in and out (051). Only when it
         // concerns one: this runs on every streamed token of a live agent.

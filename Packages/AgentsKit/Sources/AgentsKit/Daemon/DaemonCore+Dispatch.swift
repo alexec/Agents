@@ -689,6 +689,10 @@ extension DaemonCore {
                 try setTileHidden(request, hidden: method == DaemonAPI.Method.dashboardHide)
                 return .success([:])
 
+            case DaemonAPI.Method.dashboardUpdate:
+                let request = try require(params, as: DaemonAPI.DashboardRequest.self)
+                return .success(try JSONValue.encoding(try await updateDashboard(request)))
+
             case DaemonAPI.Method.dashboardRemove:
                 let request = try require(params, as: DaemonAPI.TileRequest.self)
                 try removeTileByPerson(request, from: surface)
