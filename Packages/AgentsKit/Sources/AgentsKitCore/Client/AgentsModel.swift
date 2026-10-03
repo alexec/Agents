@@ -820,6 +820,29 @@ public final class AgentsModel {
     /// The symbol that mark is drawn with.
     public static let startedByAgentSymbol = "person.2"
 
+    /// Who is asking, at the head of a question or permission card (#121): the agent's
+    /// title and runtime, and for a helper who started it. A card read beside others,
+    /// on a phone, then has a named asker even when the question says "I" and "you".
+    /// `nil` when the agent is not known here.
+    public func askerLine(_ agentID: UUID, subagent: String? = nil) -> String? {
+        guard let agent = agent(agentID) else { return nil }
+        let starter = startedByAgentLabel(agent).map { "s" + $0.dropFirst() }
+        return Self.askerLine(title: agent.title,
+                              runtime: RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID,
+                              startedBy: starter, subagent: subagent)
+    }
+
+    /// The words, apart from looking anything up: "Asked by “#116 helper” (Claude),
+    /// started by “Project lead”". An untitled agent is named by its runtime alone.
+    public static func askerLine(title: String?, runtime: String, startedBy: String? = nil,
+                                 subagent: String? = nil) -> String {
+        let title = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var asker = title.flatMap { $0.isEmpty ? nil : "\u{201C}\($0)\u{201D} (\(runtime))" } ?? runtime
+        // Its subagent asking, not the agent itself (057).
+        if let subagent { asker = "subagent \u{201C}\(subagent)\u{201D} of " + asker }
+        return "Asked by " + asker + (startedBy.map { ", " + $0 } ?? "")
+    }
+
     // MARK: Blocked (039)
 
     /// The block this agent is sitting in, if it is: a settled agent whose last report

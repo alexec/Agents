@@ -24,6 +24,10 @@ struct ElicitationView: View {
     var body: some View {
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 12) {
+                // Who is asking, by title and runtime (#121).
+                if let asker = model.work.askerLine(request.agentID) {
+                    Text(asker).appText(.fine).foregroundStyle(.secondary)
+                }
                 Text(request.title).appText(.reading).fontWeight(.semibold)
                 if let message = request.message, message != request.title {
                     Text(message).appText(.reading)
