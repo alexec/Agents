@@ -62,6 +62,8 @@ something particular done.
   keeps.
 - [Sign a runtime in](sign-a-runtime-in.md): sign Claude Code, Codex, Copilot, Cursor, Grok
   or Antigravity in or out from the app, and give Gemini its key.
+- [Assess a runtime](assess-a-runtime.md): have an agent on a runtime work through the app's
+  tools, and read the app's own score of it.
 - [Share skills, instructions and servers with every agent](share-skills-across-agents.md):
   put them in `~/.agents` once, for every runtime and project.
 - [Add a skill from a catalogue](add-a-skill-from-a-catalogue.md): search skills.sh, look
