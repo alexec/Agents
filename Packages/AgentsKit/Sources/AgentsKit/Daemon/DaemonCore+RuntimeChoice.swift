@@ -22,6 +22,20 @@ extension DaemonCore {
         return "out of the pool: \(PoolWords.state(state, now: at))"
     }
 
+    /// The runtime's models out, in the Pool page's words, or nil (#140).
+    func modelsOutNote(runtimeID: String) -> String? {
+        PoolWords.modelsOut(allowanceState(for: Self.ownEntry(runtimeID: runtimeID)), now: now())
+    }
+
+    /// Its Pool page line when the runtime or any of its models is out, else nil.
+    func poolNote(runtimeID: String) -> String? {
+        let at = now()
+        var state = allowanceState(for: Self.ownEntry(runtimeID: runtimeID))
+        state.settle(now: at)
+        guard state.isOut || !state.modelsOut(now: at).isEmpty else { return nil }
+        return PoolWords.stateWithModels(state, now: at)
+    }
+
     /// Where "here" is, as the refusal says it.
     static var here: String {
         #if os(macOS)
@@ -51,10 +65,11 @@ extension DaemonCore {
         for runtime in RuntimeCatalog.builtIn {
             if let why = whyUnavailable(runtime.id) {
                 not.append("\(runtime.id) (\(why))")
-            } else if let model = rememberedModel(runtimeID: runtime.id, folder: folder) {
-                available.append("\(runtime.id) (model \(model))")
             } else {
-                available.append(runtime.id)
+                // A model out is said beside it (#140): the runtime takes agents, that model may not.
+                let notes = [rememberedModel(runtimeID: runtime.id, folder: folder).map { "model \($0)" },
+                             modelsOutNote(runtimeID: runtime.id)].compactMap { $0 }
+                available.append(notes.isEmpty ? runtime.id : "\(runtime.id) (\(notes.joined(separator: "; ")))")
             }
         }
         var lines = [available.isEmpty

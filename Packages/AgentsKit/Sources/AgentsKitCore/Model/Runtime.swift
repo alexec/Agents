@@ -167,6 +167,10 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
     /// Available, from the app's own toolset, but not the one this app carries: an update
     /// named a newer pin, and the row offers **Update** (047, 046).
     public var outdated: Bool
+    /// Where it stands in the pool, in the Pool page's words, when anything is out: the
+    /// runtime, or one of its models (#140). Nil when all of it is in. For a client
+    /// with no Pool page of its own, such as the web page's runtime picker.
+    public var poolNote: String?
 
     public var id: String { runtime.id }
 

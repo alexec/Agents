@@ -311,7 +311,7 @@ struct PromptBar: View {
                         }
                         ForEach(availableRuntimes) { status in
                             SelectChoice(title: status.runtime.name,
-                                         description: rateLimitNote(status.runtime.id) ?? signInNote(status.runtime.id),
+                                         description: availableNote(status.runtime.id) ?? signInNote(status.runtime.id),
                                          isChosen: status.runtime.id == model.draftRuntimeID) {
                                 chooseRuntime(status.runtime.id)
                                 dismiss()
@@ -1082,9 +1082,10 @@ struct PromptBar: View {
 
     /// A rate limit is not an out runtime: the runtime can still take a turn, and
     /// `isUsable` says so. It is a throttle, though, and one row in the available run
-    /// that says nothing about it reads as no throttle at all.
-    private func rateLimitNote(_ runtimeID: String) -> String? {
-        model.runtimeAllowances?.rateLimitNote(for: runtimeID)
+    /// that says nothing about it reads as no throttle at all. A model out is said the
+    /// same way (#140).
+    private func availableNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.availableNote(for: runtimeID)
     }
 
     /// What is wrong with it, under the name. It says nothing about another runtime:

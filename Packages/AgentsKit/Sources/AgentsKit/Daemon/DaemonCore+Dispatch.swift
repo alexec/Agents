@@ -18,6 +18,8 @@ extension DaemonCore {
         // call, which may be the last one its token is good for.
         let caller = params?["token"]?.stringValue.flatMap { appTokens[$0] }
         let began = now()
+        // Its runtime is answering: back in the pool now, not when the turn ends (#140).
+        if let caller { runtimeAnswering(agentID: caller) }
         // Who asked travels with the work, so a runtime started deep inside it is started
         // with what that connection lent (043).
         let answer = await RequestConnection.$current.withValue(connection) {

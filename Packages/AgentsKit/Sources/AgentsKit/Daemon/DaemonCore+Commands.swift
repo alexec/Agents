@@ -1271,7 +1271,7 @@ extension DaemonCore {
         } else {
             retrying = await applyRecognition(recognition, agentID: agentID, reason: &reason)
             if reason == .runtimeError || reason == .processDied {
-                runtimeFailed(agentID: agentID)
+                runtimeFailed(agentID: agentID, words: result.runtimeError?.sentence)
             }
         }
         _ = retrying
@@ -1485,8 +1485,8 @@ extension DaemonCore {
            await applyRecognition(limit, agentID: agentID, reason: &limitReason) || limitReason != .refusal {
             ending = .turnEnded(limitReason)
         }
-        if case .none = limit { runtimeFailed(agentID: agentID) }
-        if case .otherTyped = limit { runtimeFailed(agentID: agentID) }
+        if case .none = limit { runtimeFailed(agentID: agentID, error: error) }
+        if case .otherTyped = limit { runtimeFailed(agentID: agentID, error: error) }
         await move(agentID, on: ending)
         await releaseRuntime(for: agentID)
         // A move asked for before the runtime fell over is still made, but nothing starts

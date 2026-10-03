@@ -95,7 +95,7 @@ struct ChoiceRows: View {
     /// which is a reason in the out run and a throttle in the other.
     private func detail(for status: RuntimeStatus, out: Bool) -> String? {
         if let reason = status.unavailableReason { return reason }
-        return out ? outNote(status.runtime.id) : rateLimitNote(status.runtime.id)
+        return out ? outNote(status.runtime.id) : availableNote(status.runtime.id)
     }
 
     /// The runtimes in two runs, as the Mac's chooser draws them (065): those that can
@@ -123,9 +123,9 @@ struct ChoiceRows: View {
     }
 
     /// A rate limit is not an out runtime, and an available run that says nothing about
-    /// one reads as no limit at all.
-    private func rateLimitNote(_ runtimeID: String) -> String? {
-        model.runtimeAllowances?.rateLimitNote(for: runtimeID)
+    /// one reads as no limit at all. Nor is a model out (#140), said the same way.
+    private func availableNote(_ runtimeID: String) -> String? {
+        model.runtimeAllowances?.availableNote(for: runtimeID)
     }
 
     /// Project folder, a new worktree, or one already there (030), as the Mac's start

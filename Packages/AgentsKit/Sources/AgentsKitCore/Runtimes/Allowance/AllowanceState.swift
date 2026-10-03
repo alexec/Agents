@@ -20,11 +20,14 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     public var spent: Spent
     /// Rate limits in a row, trimmed to the policy's window (R7).
     public var rateLimitStreak: [Date]
+    /// Models whose provider failed, while the runtime itself still works (#140). Nil
+    /// when none: a model's failure never takes its runtime's other models out.
+    public var modelsOut: [ModelOut]?
 
     public init(credentialKey: String, entryID: UUID, status: Status = .available, since: Date,
                 learnedFrom: Source = .person, lastRateLimit: RateLimitInfo? = nil,
                 reading: AllowanceReading? = nil,
-                spent: Spent = .known(nil), rateLimitStreak: [Date] = []) {
+                spent: Spent = .known(nil), rateLimitStreak: [Date] = [], modelsOut: [ModelOut]? = nil) {
         self.credentialKey = credentialKey
         self.entryID = entryID
         self.status = status
@@ -34,6 +37,24 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         self.reading = reading
         self.spent = spent
         self.rateLimitStreak = rateLimitStreak
+        self.modelsOut = modelsOut
+    }
+
+    /// One model a provider failed on (#140): its value as the runtime's model menu has
+    /// it, the name the menu shows, and when the mark lapses. A mark only says so: it
+    /// stops nothing, and a turn that works on the model clears it.
+    public struct ModelOut: Codable, Hashable, Sendable {
+        public var model: String
+        public var name: String?
+        public var since: Date
+        public var retryAfter: Date
+
+        public init(model: String, name: String? = nil, since: Date, retryAfter: Date) {
+            self.model = model
+            self.name = name
+            self.since = since
+            self.retryAfter = retryAfter
+        }
     }
 
     public enum Status: Codable, Hashable, Sendable {
@@ -113,8 +134,10 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     /// Apply the short rate-limit clock. A spent allowance needs a successful check.
     @discardableResult
     public mutating func settle(now: Date) -> Bool {
+        let lapsed = modelsOut.map { marks in marks.contains { $0.retryAfter <= now } } ?? false
+        if lapsed { clearModels { $0.retryAfter <= now } }
         let settled = current(now: now)
-        guard settled != status else { return false }
+        guard settled != status else { return lapsed }
         status = settled
         since = now
         rateLimitStreak = []
@@ -158,6 +181,39 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         status = .out(until: nil, retryAfter: now.addingTimeInterval(Self.retryWithoutATime), why: .runtimeFailed)
         since = now
         learnedFrom = .runtimeFailure
+        rateLimitStreak = []
+        return true
+    }
+
+    /// A provider failed on one model, not the runtime (#140). Marked once: a second
+    /// failure on a model already out keeps its first time.
+    @discardableResult
+    public mutating func markModelFailed(_ model: String, name: String?, now: Date) -> Bool {
+        guard !(modelsOut ?? []).contains(where: { $0.model == model }) else { return false }
+        modelsOut = (modelsOut ?? []) + [ModelOut(model: model, name: name, since: now,
+                                                  retryAfter: now.addingTimeInterval(Self.retryWithoutATime))]
+        return true
+    }
+
+    /// The model marks that `lapsed` says are over, dropped. Nil again when none is left.
+    public mutating func clearModels(where lapsed: (ModelOut) -> Bool) {
+        let kept = (modelsOut ?? []).filter { !lapsed($0) }
+        modelsOut = kept.isEmpty ? nil : kept
+    }
+
+    /// The models still marked out, as of `now`.
+    public func modelsOut(now: Date) -> [ModelOut] {
+        (modelsOut ?? []).filter { $0.retryAfter > now }
+    }
+
+    /// A turn on a failed runtime is answering (#140): its tool calls are coming back, so
+    /// it is not failed any more, before that turn ends. Only a failure: a spent
+    /// allowance waits for the turn's ending or its check, which say more.
+    @discardableResult
+    public mutating func answering(now: Date) -> Bool {
+        guard case .out(_, _, .runtimeFailed) = status else { return false }
+        status = .available
+        since = now
         rateLimitStreak = []
         return true
     }
