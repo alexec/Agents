@@ -26,9 +26,10 @@ or branch yourself: the script works in a tree of its own.
 3. Run `scripts/nightly-runtimes.py check`. It starts and stops a scratch host of its own;
    never stop any other `agentsd` or `agents-control`.
 4. Run `scripts/nightly-runtimes.py report`. It opens or updates one pull request per pinned
-   runtime that passed, and one issue per runtime that failed.
+   runtime that passed, and one issue per cause of failure (runtimes that failed for the same
+   cause share it). What already fails on main is listed, not filed.
 5. If you started any helper agent, archive it with `archive_agent` (never delete its
    worktree).
 
 Finish with `done`, and in the message list each runtime tested with its versions and what
-the report opened, plus each runtime skipped and why. Then park.
+the report opened, plus anything already failing on main and each runtime skipped and why. Then park.

@@ -220,7 +220,10 @@ this, and more, for each runtime with a new release: `scripts/nightly-runtimes.p
 it in a tree of its own, builds Agents Host, runs the AgentsKit runtime tests, the
 handshake and the tools check, and has one real turn through a scratch `agentsd` on the
 cheapest model the runtime offers. A pinned runtime that passes becomes a pull request on
-`nightly/runtime-<id>`; one that fails becomes an issue naming the step. A runtime with
+`nightly/runtime-<id>`; one that fails becomes an issue naming the step. It tests on this
+Mac's `main` and runs the same build and tests on `main` unchanged: what already fails there
+is listed as "already failing on main" and filed for no runtime, and runtimes that fail for
+one cause share one issue. A runtime with
 nothing new, or out of the pool, costs nothing. It arrives waiting for your OK: turn it
 off first (**Turn Off** on its row), then **Approve**, and turn it on when you want it.
 To try it without opening anything:
