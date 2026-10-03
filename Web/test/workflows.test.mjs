@@ -102,7 +102,7 @@ test("off says why when it started off, as the Mac and the Remote do (#124)", ()
   assert.equal(w.happening({ ...summary, offReason: "writtenByAgent" }),
     "Off: written by an agent. Turn it on when you are ready" + rest);
   assert.equal(w.happening({ ...summary, offReason: "file" }),
-    "Off: its file asks to start off. Turn it on when you are ready" + rest);
+    "Off: its file says enabled: false. Turn it on when you are ready" + rest);
   assert.equal(w.happening({ ...summary, offReason: "agent" }), "Off: an agent turned it off" + rest);
   assert.equal(w.happening({ ...summary, offReason: "person" }), w.turnedOffSentence);
   assert.equal(w.happening({ ...summary, offReason: "writtenByAgent", awaitingApproval: { isNew: true } }),
@@ -148,4 +148,9 @@ test("a list is a capsule joined by | and a cause joined by |", () => {
   assert.equal(w.causePhrase({ trigger: { _0: t } }), "on agent.finished labels bug outcome done|nothing_to_do");
   // A value that is neither one value nor a list is not dropped into a wider trigger's words.
   assert.deepEqual(w.triggerFilters(event("agent.finished", { outcome: { is: "done" } })), []);
+});
+
+test("the page says the switch is a line in the workflow's file, in the window's words (#125)", () => {
+  assert.equal(w.switchesSentence({ workflow: { workflowID: "nightly" } }),
+    "Enabled and Archive are saved in .agents/workflows/nightly.md, a file in this project you may commit");
 });

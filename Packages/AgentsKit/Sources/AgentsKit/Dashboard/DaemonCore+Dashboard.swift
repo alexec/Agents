@@ -277,8 +277,8 @@ extension DaemonCore {
             return sessionReads[caller.id]?.contains(id) == true && !working.contains(keeper.state)
         }
         if let workflow = held.workflow {
-            guard workflows[project]?[workflow] != nil else { return true }
-            return workflowStore.load().state(folder: project, workflowID: workflow)?.isArchived == true
+            guard let found = workflows[project]?[workflow] else { return true }
+            return found.isArchived
         }
         return true
     }
@@ -287,7 +287,7 @@ extension DaemonCore {
         guard let keeper else { return KeeperView(kind: .agent, id: "", name: "nobody", state: .unknown) }
         if let workflow = keeper.workflow {
             let found = workflows[project]?[workflow]
-            let archived = workflowStore.load().state(folder: project, workflowID: workflow)?.isArchived == true
+            let archived = found?.isArchived == true
             return KeeperView(kind: .workflow, id: workflow, name: found?.name ?? workflow,
                               state: found == nil ? .unknown : archived ? .archived : .active)
         }

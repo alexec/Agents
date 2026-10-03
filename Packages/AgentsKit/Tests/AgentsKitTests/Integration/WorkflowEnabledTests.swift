@@ -82,7 +82,10 @@ struct WorkflowEnabledTests {
         }
         #expect(repeats >= 1)
         #expect(await core.allAgents().isEmpty)
-        #expect(try Data(contentsOf: url) == before, "turning off never touches the file")
+        let text = try String(contentsOf: url, encoding: .utf8)
+        #expect(text.contains("enabled: false"), "the switch lives in the file (#125)")
+        #expect(text.replacingOccurrences(of: "enabled: false\n", with: "") == String(decoding: before, as: UTF8.self),
+                "and nothing else in it changes")
         // Not news: the log is spared a refusal every half hour.
         #expect(!(await core.eventLog.events.contains { $0.name == "workflow.refused" }))
     }

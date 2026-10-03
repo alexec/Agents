@@ -136,8 +136,17 @@ struct WorkflowPage: View {
                 }
             }
             Spacer(minLength: 0)
-            actions(summary)
-                .padding(.top, 6)
+            VStack(alignment: .trailing, spacing: 4) {
+                actions(summary)
+                // They write the workflow's file (#125), so say so where they are.
+                Text(summary.switchesSentence)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 260, alignment: .trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 6)
         }
     }
 
@@ -177,8 +186,8 @@ struct WorkflowPage: View {
                     .controlSize(.small)
                     .appText(.fine)
                     .help(summary.isEnabled
-                          ? "Turn this workflow off: its triggers stop, and it stays on the list"
-                          : "Turn this workflow back on")
+                          ? "Turn this workflow off: its triggers stop, and it stays on the list. Writes enabled: false into its file"
+                          : "Turn this workflow back on. Takes enabled: false out of its file")
                     .accessibilityLabel("Enabled")
                 // One click, and back to the project: the same thing the archive
                 // button on a chat does, so putting a thing away is one gesture
@@ -192,7 +201,7 @@ struct WorkflowPage: View {
                     Label("Archive", systemImage: "archivebox")
                 }
                 .buttonStyle(.paper)
-                .help("Archive this workflow and go back to the project")
+                .help("Archive this workflow and go back to the project. Writes archived: true into its file")
             }
         }
     }

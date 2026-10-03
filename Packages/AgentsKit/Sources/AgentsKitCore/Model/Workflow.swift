@@ -69,11 +69,18 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// file's `cooldown:` (#103). A trigger inside it is held, and the latest held one
     /// runs once when it ends; `nil` is no cooldown, as before.
     public var cooldown: TimeInterval?
-    /// Where the Enabled switch starts, from the file's `enabled:` (#42): `false` is a
-    /// workflow checked in for somebody to turn on when they are ready. `nil` is a file
-    /// that does not say, which starts on. Once anybody moves the switch, their choice
-    /// is kept by the app and this no longer decides.
+    /// The Enabled switch, from the file's `enabled:` (#42, #125): `false` is off,
+    /// `nil` or `true` is on. The switch writes this line, so the choice travels with
+    /// the project to every clone and host.
     public var enabled: Bool?
+    /// Archived, from the file's `archived: true` (#125). Archive writes the line and
+    /// Bring Back takes it out; `nil` is a file that does not say, which is not archived.
+    public var archived: Bool?
+
+    /// Whether it is put away.
+    public var isArchived: Bool { archived == true }
+    /// Whether its switch is off.
+    public var isOff: Bool { enabled == false }
 
     /// Unique across projects, so one window showing two of them cannot collide.
     public var id: String { folder.path + "/" + workflowID }
@@ -83,9 +90,10 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
                 prompt: String = "", problem: WorkflowProblem? = nil,
                 unknownFields: [String: JSONValue] = [:],
                 settings: WorkflowSettings = WorkflowSettings(),
-                cooldown: TimeInterval? = nil, enabled: Bool? = nil) {
+                cooldown: TimeInterval? = nil, enabled: Bool? = nil, archived: Bool? = nil) {
         self.cooldown = cooldown
         self.enabled = enabled
+        self.archived = archived
         self.workflowID = workflowID
         self.folder = Project.standardize(folder)
         self.name = name ?? Self.defaultName(for: workflowID)
@@ -307,6 +315,14 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
             + "and Run now still runs it"
     }
 
+    /// What the page says under Enabled and Archive (#125): they are lines in the
+    /// workflow's own file, so moving them is a change in the project. The Remote and
+    /// the web page say the same words.
+    public var switchesSentence: String {
+        "Enabled and Archive are saved in \(WorkflowPaths.folderName)/\(workflow.workflowID).\(WorkflowPaths.fileExtension), "
+            + "a file in this project you may commit"
+    }
+
     /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome
     /// this version does not know (a refusal added later) costs the outcome rather than
     /// the whole project's list.
@@ -350,7 +366,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
 /// Why a workflow is off (#124). The page leads with it, so one that started off is
 /// read as waiting for somebody to turn it on rather than as something gone wrong.
 public enum WorkflowOffReason: String, Codable, Hashable, Sendable {
-    /// Its file says `enabled: false` and nobody has turned it on yet (#42).
+    /// Its file says `enabled: false`, and this host did not see who wrote it: checked
+    /// in that way (#42), or turned off on another clone (#125).
     case file
     /// An agent wrote it through manage_workflows, and new ones start off so the
     /// person turns them on knowingly.
@@ -363,7 +380,7 @@ public enum WorkflowOffReason: String, Codable, Hashable, Sendable {
     /// What the page says first. `nil` for the person's own switch: they know.
     public var sentence: String? {
         switch self {
-        case .file: "Off: its file asks to start off. Turn it on when you are ready"
+        case .file: "Off: its file says enabled: false. Turn it on when you are ready"
         case .writtenByAgent: "Off: written by an agent. Turn it on when you are ready"
         case .agent: "Off: an agent turned it off"
         case .person: nil

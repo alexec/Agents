@@ -41,7 +41,7 @@ struct WorkflowRunStoreTests {
         let read = WorkflowStore(locations: locations).load()
 
         #expect(read.states.count == 1, "the archived workflow is still archived")
-        #expect(read.states.first?.isArchived == true)
+        #expect(read.states.first?.legacy?.isArchived == true, "kept until it is written into the file")
         #expect(read.lastTickAt != nil)
         #expect(read.runs.isEmpty)
     }
@@ -53,7 +53,7 @@ struct WorkflowRunStoreTests {
         let store = WorkflowStore(locations: locations)
         let written = run()
         var records = WorkflowRecords()
-        records.update(folder: written.folder, workflowID: "nightly") { $0.isArchived = true }
+        records.update(folder: written.folder, workflowID: "nightly") { $0.approvedDigest = "abc" }
         records.runs = [written]
 
         try store.save(records)
@@ -61,18 +61,18 @@ struct WorkflowRunStoreTests {
 
         #expect(read.runs == [written])
         #expect(read.runs.first?.depth == 1, "the depth is what the chain ceiling counts from")
-        #expect(read.state(folder: written.folder, workflowID: "nightly")?.isArchived == true)
+        #expect(read.state(folder: written.folder, workflowID: "nightly")?.approvedDigest == "abc")
     }
 
     /// One run that will not decode costs that run, not the file — and certainly not the
-    /// archived workflows beside it.
+    /// approvals beside it.
     @Test func oneBadRunCostsThatRunAndNothingElse() throws {
         let locations = temporary()
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let store = WorkflowStore(locations: locations)
         var records = WorkflowRecords()
         records.update(folder: URL(filePath: "/tmp/somewhere/api"), workflowID: "nightly") {
-            $0.isArchived = true
+            $0.approvedDigest = "abc"
         }
         records.runs = [run("good")]
         try store.save(records)
@@ -84,7 +84,7 @@ struct WorkflowRunStoreTests {
 
         let read = store.load()
         #expect(read.runs.map(\.workflowID) == ["good"])
-        #expect(read.states.first?.isArchived == true)
+        #expect(read.states.first?.approvedDigest == "abc")
     }
 
     /// Every writer of this file reads it whole and writes it whole, so a run survives a

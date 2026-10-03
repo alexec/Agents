@@ -19,6 +19,10 @@ extension DaemonCore {
         for project in allProjects(includeArchived: false) where project.exists {
             adoptWorkflows(in: project.folder)
         }
+        // The switches and archives kept here before #125, into their files once. After
+        // adoption, so the files are read, and before approval begins, so a first start
+        // approves the files as they will stand.
+        migrateWorkflowSwitchesToFiles()
         // After adoption, because a run is judged against the workflow files, and before
         // the held events are replayed, so nothing they fire collides with a run that is
         // already over.
@@ -213,8 +217,8 @@ extension DaemonCore {
                  ceilings: WorkflowCeilings? = nil) -> WorkflowSummary {
         let records = records ?? workflowStore.load()
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
-        let archived = state?.isArchived ?? false
-        let enabled = !WorkflowState.isOff(workflow, state)
+        let archived = workflow.isArchived
+        let enabled = !workflow.isOff
         let overLimit = archived ? nil : limitReached(by: workflow, records: records, ceilings: ceilings)
         // A file waiting for the person has no next run: nothing fires until they approve.
         let waiting = archived ? nil : awaitingApproval(workflow, state: state, records: records)
@@ -236,7 +240,8 @@ extension DaemonCore {
             nextFireAtByTrigger: runs ? workflow.triggers.map { $0.schedule?.nextDue(after: now) } : [],
             cooldownEndsAt: workflow.cooldownEnds(after: state?.lastFiredAt, now: now),
             holdsAFire: state?.heldFire != nil,
-            offReason: WorkflowState.offReason(workflow, state))
+            offReason: WorkflowState.offReason(workflow, state,
+                                               digest: enabled ? nil : workflowDigest(workflow)))
     }
 
     /// Whether a run of it is in flight.
@@ -276,7 +281,7 @@ extension DaemonCore {
             for id in (workflows[folder] ?? [:]).keys.sorted() {
                 guard let workflow = workflows[folder]?[id] else { continue }
                 let state = records.state(folder: folder, workflowID: id)
-                guard state?.isArchived != true else { continue }
+                guard !workflow.isArchived else { continue }
                 if awaitingApproval(workflow, state: state, records: records) != nil {
                     ceilings.waiting[folder, default: []].append(id)
                 } else {
@@ -295,8 +300,7 @@ extension DaemonCore {
     /// total: a project may hold as many approved workflows as the machine allows.
     func limitReached(by workflow: Workflow, records: WorkflowRecords,
                       ceilings: WorkflowCeilings? = nil) -> WorkflowLimit? {
-        guard records.state(folder: workflow.folder,
-                            workflowID: workflow.workflowID)?.isArchived != true else { return nil }
+        guard !workflow.isArchived else { return nil }
         let ceilings = ceilings ?? workflowCeilings(records: records)
         if ceilings.waiting[workflow.folder]?.contains(workflow.workflowID) == true {
             return ceilings.mayWait(in: workflow.folder).contains(workflow.workflowID) ? nil : .project
@@ -422,13 +426,12 @@ extension DaemonCore {
                 // Nothing is recorded against an archived one, here or on a lifecycle
                 // event. A refusal is news, and "the thing you put away did not run"
                 // is not news every half hour for as long as the file exists.
-                let state = records.state(folder: folder, workflowID: workflow.workflowID)
-                guard state?.isArchived != true else { continue }
+                guard !workflow.isArchived else { continue }
                 // Turned off is recorded, unlike archived (#100): the workflow is still
                 // on the list, and its row saying how many times it did not run is how
                 // somebody notices it has been off since Tuesday. Repeats count up on
                 // one line, so this is one line however long it stays off.
-                if WorkflowState.isOff(workflow, state) {
+                if workflow.isOff {
                     record(.refused(.disabled, at: now, repeats: 1), for: workflow)
                 } else if wasAway {
                     record(.refused(.missedWhileClosed, at: now, repeats: 1), for: workflow)
@@ -473,8 +476,8 @@ extension DaemonCore {
         // everything else, because nothing else matters about a file nobody has seen.
         // Turning off is the same kind of decision, and stops a trigger the same way; Run
         // now is not a trigger, and runs an off workflow so it can be tried (#100).
-        let disabled = !byHand && WorkflowState.isOff(workflow, state)
-        if !(state?.isArchived ?? false), !disabled,
+        let disabled = !byHand && workflow.isOff
+        if !workflow.isArchived, !disabled,
            awaitingApproval(workflow, state: state, records: records) != nil {
             let refusal = WorkflowRefusal.awaitingApproval
             record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
@@ -484,7 +487,7 @@ extension DaemonCore {
         if let refusal = workflow.refusalIfBlocked(
             isRunning: workflowRuns[key] != nil,
             depth: depth,
-            isArchived: state?.isArchived ?? false,
+            isArchived: workflow.isArchived,
             isDisabled: disabled,
             overLimit: limitReached(by: workflow, records: records),
             dayLimitReached: isDayLimitReached(),
@@ -886,7 +889,6 @@ extension DaemonCore {
         let folder = agent.projectFolder
         guard let byID = workflows[folder], !byID.isEmpty else { return }
         let depth = depth ?? workflowChainDepth(causedBy: agentID)
-        let records = workflowStore.load()
 
         let trigger: WorkflowTrigger
         switch event {
@@ -897,7 +899,7 @@ extension DaemonCore {
         }
 
         for workflow in byID.values where workflow.responds(to: event)
-            && records.state(folder: folder, workflowID: workflow.workflowID)?.isArchived != true
+            && !workflow.isArchived
             && !isOwnAgent(agentID, of: workflow, endingRun: endingRun) {
             // Detached, because this is called from inside the actor by `move`, and
             // firing awaits things that can call back into it. The shape `beginTurn`
@@ -930,9 +932,8 @@ extension DaemonCore {
                                 .map { ["outcome": $0.outcome.rawValue] } ?? [:]) { $1 },
                          chainDepth: run.depth + 1))
         guard let byID = workflows[folder] else { return }
-        let records = workflowStore.load()
         for other in byID.values where other.respondsToCompletion(of: run.workflowID)
-            && records.state(folder: folder, workflowID: other.workflowID)?.isArchived != true {
+            && !other.isArchived {
             Task { [weak self] in
                 await self?.fire(other, on: .workflowCompleted(id: run.workflowID),
                                  depth: run.depth + 1)
@@ -959,7 +960,7 @@ extension DaemonCore {
         for state in records.states {
             guard let held = state.heldFire else { continue }
             guard let workflow = workflows[state.folder]?[state.workflowID],
-                  !state.isArchived, !WorkflowState.isOff(workflow, state) else {
+                  !workflow.isArchived, !workflow.isOff else {
                 records.update(folder: state.folder, workflowID: state.workflowID) { $0.heldFire = nil }
                 dropped = true
                 continue
@@ -997,10 +998,11 @@ extension DaemonCore {
 
     /// Turn one on or off (#100).
     ///
-    /// The app's own state, as archiving is, and never written into the file: a
-    /// workflow off for an afternoon is not a commit. Unlike archiving, the last
-    /// outcome is kept — turning a workflow off and on again should not forget that
-    /// it was failing.
+    /// Written into the workflow's own file as `enabled: false`, and taken out again
+    /// when it is turned on (#125), so the switch travels with the project. Who moved
+    /// it stays on this host, for the page's reason and the rule about agents. Unlike
+    /// archiving, the last outcome is kept — turning a workflow off and on again should
+    /// not forget that it was failing.
     public func setWorkflowEnabled(_ request: DaemonAPI.WorkflowEnableRequest,
                                    byAgent: Bool = false) throws -> WorkflowSummary {
         guard let workflow = workflow(request.workflowID, in: request.folder) else {
@@ -1008,49 +1010,63 @@ extension DaemonCore {
                                message: "There is no workflow called \(request.workflowID) in this project.")
         }
         var records = workflowStore.load()
+        let written = try editWorkflowFile(workflow, in: &records) {
+            try WorkflowSwitches.setting(enabled: request.enabled, in: $0)
+        }
         records.update(folder: request.folder, workflowID: request.workflowID) {
-            $0.isDisabled = !request.enabled
-            $0.disabledByAgent = !request.enabled && byAgent
-            $0.enabledChosen = true
-            $0.writtenOffByAgent = false
+            $0.offBy = request.enabled ? nil : (byAgent ? .agent : .person)
+            $0.offDigest = request.enabled ? nil : written.digest
             // A held trigger was a trigger, and none run an off workflow.
             if !request.enabled { $0.heldFire = nil }
         }
         try keep("this workflow's settings") { try workflowStore.save(records) }
-        let summary = summary(for: workflow, records: records)
-        broadcast(DaemonAPI.Notification.workflowChanged, summary)
-        return summary
+        return try rereadAfterWrite(workflow)
     }
 
     /// Put one away, or bring it back.
     ///
     /// The counterweight to an agent writing a workflow without asking first, and the
-    /// reason it can. Not a delete: the file stays in the project, where it is still a
-    /// file somebody can read, edit or commit — the app simply stops acting on it, and
-    /// says so on the row rather than making the workflow disappear.
-    ///
-    /// It is also the whole of holding a workflow. There was a pause beside this, and
-    /// it earned nothing: two switches that both mean "do not run this", one of them
-    /// reversible in exactly the same tap as the other. Archiving says the same thing
-    /// and says where the row went.
+    /// reason it can. Not a delete: the file stays in the project, with `archived: true`
+    /// in its front matter (#125), where it is still a file somebody can read, edit or
+    /// commit — the app simply stops acting on it, and says so on the row rather than
+    /// making the workflow disappear.
     public func archiveWorkflow(_ request: DaemonAPI.WorkflowArchiveRequest) throws -> WorkflowSummary {
         guard let workflow = workflow(request.workflowID, in: request.folder) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(request.workflowID) in this project.")
         }
         var records = workflowStore.load()
+        try editWorkflowFile(workflow, in: &records) {
+            try WorkflowSwitches.setting(archived: request.archived, in: $0)
+        }
         records.update(folder: request.folder, workflowID: request.workflowID) {
-            $0.isArchived = request.archived
             // What it last did belonged to the life it had before. Keeping it would
             // leave a restored workflow wearing a refusal from a fortnight ago.
             $0.lastOutcome = nil
             $0.heldFire = nil
         }
         try keep("this workflow's settings") { try workflowStore.save(records) }
-        let summary = summary(for: workflow, records: records)
+        // The rescan tells every window, and every other workflow in the project:
+        // putting a waiting one away lets the next in line be approved (#132).
+        return try rereadAfterWrite(workflow)
+    }
+
+    /// The workflow as its file now says, after the app wrote it.
+    ///
+    /// Synchronously, and not through the watcher. The watcher is debounced by 250ms and
+    /// will fire anyway and find nothing changed; waiting that long to tell the window
+    /// what it just asked for is the kind of lag that reads as the app having ignored
+    /// you. The rescan also broadcasts to every other window.
+    func rereadAfterWrite(_ workflow: Workflow) throws -> WorkflowSummary {
+        rescanWorkflows(in: workflow.folder)
+        guard let reread = self.workflow(workflow.workflowID, in: workflow.folder) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "\(workflow.workflowID) went while it was being changed.")
+        }
+        let summary = summary(for: reread)
+        // A change the rescan could not see — the outcome or held trigger let go — is
+        // still news to the windows.
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
-        // Putting a waiting one away lets the next in line be approved (#132).
-        rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
         return summary
     }
 
@@ -1114,24 +1130,12 @@ extension DaemonCore {
         // written — but only if what it changed was approved already, and only from a
         // person's connection. Security review S6 kept a phone's edit waiting for the
         // Mac; since #111 a phone may approve as the Mac may, so the phone's save is the
-        // person's too. An agent's never is.
-        let before = workflowStore.load()
-        let wasApproved = awaitingApproval(existing, state: before.state(folder: existing.folder,
-                                                                         workflowID: existing.workflowID),
-                                           records: before) == nil
-
-        do {
-            try Data(edited.utf8).write(to: url, options: .atomic)
-        } catch {
-            if let failure = WriteFailure(error, keeping: url.lastPathComponent) { throw Self.refusal(failure) }
-            throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
-                               message: "\(url.lastPathComponent) could not be written: \(error.localizedDescription)")
-        }
-        if wasApproved, RequestConnection.role.isPerson {
-            var records = workflowStore.load()
-            approve(existing, digest: ContentDigest.sha256(Data(edited.utf8)), in: &records)
-            try keep("this workflow's settings") { try workflowStore.save(records) }
-        }
+        // person's too. An agent's never is. `rewriteWorkflowFile` carries the approval
+        // only when the old bytes were approved.
+        var records = workflowStore.load()
+        try rewriteWorkflowFile(existing, to: edited, from: original, in: &records,
+                                carryApproval: RequestConnection.role.isPerson)
+        try keep("this workflow's settings") { try workflowStore.save(records) }
 
         // Synchronously, and not through the watcher. The watcher is debounced by
         // 250ms and will fire anyway and find nothing changed; waiting that long to

@@ -139,6 +139,12 @@ struct WorkflowPage: View {
                         get: { summary.isEnabled },
                         set: { on in Task { await model.setWorkflowEnabled(summary, on) } }))
                         .appText(.reading)
+                    // They write the workflow's file (#125), the Mac page's words.
+                    Text(summary.switchesSentence)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

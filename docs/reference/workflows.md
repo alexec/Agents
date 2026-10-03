@@ -49,7 +49,8 @@ Check the build and say whether it is green.
 | `effort:` | One of the runtime's levels, such as `low` or `high` | How hard the agent thinks. Without it, the runtime's own default. |
 | `labels:` | A list of up to five names, each 1–24 characters | Each newly started workflow session gets these agent-owned labels. A standing or triggering run reusing an existing session keeps that session’s labels. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
-| `enabled:` | `true` or `false` | Where its **Enabled** switch starts. `false` is a workflow checked in to be turned on when you are ready: it arrives turned off, and **Run now** still runs it. Once anybody moves the switch, that choice is kept and this no longer decides. An agent cannot turn on a workflow whose file says `false`; only you can. Anything else stops the workflow running, and its page says what is wrong. |
+| `enabled:` | `true` or `false` | Its **Enabled** switch. `false` is turned off: none of its triggers run it, and **Run now** still does. Without it, or with `true`, it is on. The switch, **Turn Off** and **Turn On** write this line and nothing else: off adds `enabled: false`, on takes the line out. So the switch goes wherever the file goes, to another clone or another Mac or server, and shows in a commit. An agent cannot turn on a workflow whose file says `false` unless an agent turned it off, on this Mac or server, and the file has not changed since; only you can. Anything else stops the workflow running, and its page says what is wrong. |
+| `archived:` | `true` or `false` | Whether it is archived. **Archive** adds `archived: true` and **Bring Back** takes the line out, so it is archived wherever the file goes. See [Off and archived](#off-and-archived). Anything else stops the workflow running, and its page says what is wrong. |
 | `cooldown:` | A length of time in minutes, hours or days, such as `15m`, `2h`, `1h30m` or `1d`; at least a minute | The least time from the start of one run to the start of the next. See [Cooldown](#cooldown). A value that is not a length of time stops the workflow running, and its page says what is wrong. |
 
 For example, to start a new agent whenever `main` moves, or another agent publishes
@@ -115,8 +116,9 @@ A workflow does not run, and its page says why, when:
 - it is archived;
 - it is turned off. Unlike archived, this is recorded on its row, as **Did not run — it
   is turned off**, counted on one line however many times it is skipped. **Run now**
-  still runs it. A workflow that started off says why first: **Off: its file asks to
-  start off** (`enabled: false`), **Off: written by an agent** (see below), or **Off: an
+  still runs it. A workflow that is off says why first, unless you turned it off on
+  this Mac or server: **Off: its file says enabled: false** (checked in that way, or
+  turned off on another clone), **Off: written by an agent** (see below), or **Off: an
   agent turned it off**. The Mac, the phone and the web page say the same. While one
   that started off is still waiting for your OK, its page says both, so approving it is
   not mistaken for turning it on;
@@ -203,8 +205,21 @@ Archived workflows count towards neither. Turned-off ones still count.
 
 ## Off and archived
 
-Both stop a workflow running, and neither touches its file. They differ in what else
-they do:
+Both stop a workflow running, and both are kept in the workflow's own file, as
+`enabled: false` and `archived: true`, so they go with the project to every clone, Mac
+and server. **Turning a workflow off or archiving it changes a file in your project,
+which you may commit.** Each writes its one line and nothing else, and doing the
+opposite takes the line out again, leaving the file as it was. A workflow you had
+approved stays approved: the app made the change you asked for, not a new workflow.
+One still waiting for your OK still waits.
+
+What stays on this Mac or server, and is not written into the project, is the
+workflow's history there: its runs and outcomes, a held trigger, the agent a
+`standing` workflow keeps, what you have approved, and who turned it off. That last is
+why a workflow turned off on another clone says **Off: its file says enabled: false**
+here.
+
+They differ in what else they do:
 
 | | Turned off | Archived |
 | --- | --- | --- |
@@ -215,11 +230,17 @@ they do:
 | Turned back on by | **Enabled**, **Turn On**, the phone, or an agent if an agent turned it off (not one an agent wrote, or one whose file says `enabled: false`) | **Bring Back** |
 
 A new workflow an agent writes with `manage_workflows` starts turned off, whatever its
-file says, so you turn it on knowingly once you have approved it. The app records that
-itself and leaves the file exactly as the agent wrote it; an agent cannot turn it on.
-An agent changing a workflow that already exists leaves its switch where it was. A file
-you or an agent put in `.agents/workflows/` some other way, such as a merge, starts on
-unless it says `enabled: false`.
+file says, so you turn it on knowingly once you have approved it: the app writes
+`enabled: false` into it, and an agent cannot turn it on. An agent changing a workflow
+that already exists through `manage_workflows` leaves its `enabled:` and `archived:`
+lines as they were, whatever its new text says. A file you or an agent put in
+`.agents/workflows/` some other way, such as a merge or an edit, is on unless it says
+`enabled: false`, and archived only if it says `archived: true`; a change to it waits
+for your OK like any other.
+
+Before this version, the switch and the archive were kept on the Mac or server rather
+than in the file. The first start of this version writes each one into its workflow's
+file once, so a project's files may change then.
 
 Off is for a workflow you still use but want quiet for a while: while a test is flaky,
 or while you are away. Archive is for one you are putting away.

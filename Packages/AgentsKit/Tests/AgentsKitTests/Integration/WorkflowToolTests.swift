@@ -195,8 +195,9 @@ struct WorkflowToolTests {
         let answer = try await call(core, token, .write, id: "advisories", content: sample)
 
         #expect(answer.contains("Created advisories"))
-        #expect(try Data(contentsOf: WorkflowFile.url(for: "advisories", in: work))
-                == Data(sample.utf8))
+        // As handed over, with the switch a new one starts with (#124, #125).
+        #expect(try String(contentsOf: WorkflowFile.url(for: "advisories", in: work), encoding: .utf8)
+                == sample.replacingOccurrences(of: "agent: new", with: "agent: new\nenabled: false"))
         // Live: nothing follows. No confirmation, and no enable step either.
         #expect(await core.allWorkflows(in: work).count == 1)
     }
@@ -494,7 +495,7 @@ struct WorkflowToolTests {
 
         let answer = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
         #expect(FileManager.default.fileExists(atPath: WorkflowFile.url(for: "advisories", in: work).path))
-        #expect(answer.contains("It is turned off, so none of its triggers run it until they turn it on"))
+        #expect(answer.contains("It is turned off (the app wrote `enabled: false` into it), so none of its triggers run it until they turn it on"))
         #expect(!answer.contains("pause"))
         #expect(description.contains("does not run until they approve it"))
     }

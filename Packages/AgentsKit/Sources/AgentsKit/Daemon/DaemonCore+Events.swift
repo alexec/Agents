@@ -120,13 +120,12 @@ extension DaemonCore {
         case .mac: folders = Array(workflows.keys)
         case .project(let folder): folders = [folder]
         }
-        let records = workflowStore.load()
         // The agent the event is about, or the one that published it (FR-023).
         let triggeringAgent = event.details["agent"].flatMap(UUID.init(uuidString:)) ?? event.publisher?.agentID
         for folder in folders {
             for workflow in (workflows[folder] ?? [:]).values.sorted(by: { $0.workflowID < $1.workflowID }) {
                 guard workflow.problem == nil,
-                      records.state(folder: folder, workflowID: workflow.workflowID)?.isArchived != true,
+                      !workflow.isArchived,
                       !(event.subject == .workflow && event.details["workflow"] == workflow.workflowID),
                       !(event.subject == .agent && triggeringAgent.map {
                           isOwnAgent($0, of: workflow, endingRun: endingRun) } == true),

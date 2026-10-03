@@ -51,6 +51,9 @@ public enum WorkflowFile {
                    case .success(let length) = WorkflowCooldown.parse(text) {
                     workflow.cooldown = length
                 }
+                // Its switch and its archive, so a broken file put away stays put away.
+                workflow.enabled = WorkflowSwitches.flag(mapping["enabled"])
+                workflow.archived = WorkflowSwitches.flag(mapping[WorkflowSwitches.archived])
             }
             return workflow
         }
@@ -180,6 +183,18 @@ public enum WorkflowFile {
             }
         }
 
+        // Put away (#125). As strict as `enabled:`: a workflow meant to be archived and
+        // running is what the key prevents.
+        var archived: Bool?
+        if let node = mapping[WorkflowSwitches.archived] {
+            switch node.scalar {
+            case "true": archived = true
+            case "false": archived = false
+            case "": break
+            default: return broken("`archived:` must be true or false")
+            }
+        }
+
         let settings: WorkflowSettings
         do {
             settings = WorkflowSettings(permissionMode: try setting("permission-mode"),
@@ -199,14 +214,16 @@ public enum WorkflowFile {
         // is what a person would have to go and edit. See research.md §4.
 
         let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model", "labels",
-                                   "effort", "options", "enabled", WorkflowCooldown.key]
+                                   "effort", "options", "enabled", WorkflowSwitches.archived,
+                                   WorkflowCooldown.key]
         let unknown = mapping.filter { !known.contains($0.key) }.mapValues(\.jsonValue)
 
         return Workflow(workflowID: workflowID, folder: project,
                         name: mapping["name"]?.scalar,
                         triggers: triggers, mode: mode,
                         prompt: body, problem: problem, unknownFields: unknown,
-                        settings: settings, cooldown: cooldown, enabled: enabled)
+                        settings: settings, cooldown: cooldown, enabled: enabled,
+                        archived: archived)
     }
 
     // MARK: Triggers
@@ -353,5 +370,34 @@ public enum WorkflowFile {
         guard parts.count == 2 else { return (hour, 0) }
         guard let minute = Int(parts[1]), WorkflowSchedule.allowedMinutes.contains(minute) else { return nil }
         return (hour, minute)
+    }
+}
+
+/// The two lines of a workflow's front matter the app writes for the person (#125):
+/// `enabled: false` while it is turned off, `archived: true` while it is put away.
+///
+/// Both are left out when they say the default, so turning a workflow off and on again,
+/// or archiving and bringing it back, leaves the file exactly as it was.
+public enum WorkflowSwitches {
+    public static let enabled = "enabled"
+    public static let archived = "archived"
+
+    /// `true` or `false`, leniently, for a file that is broken somewhere else.
+    static func flag(_ node: YAMLNode?) -> Bool? {
+        switch node?.scalar {
+        case "true": true
+        case "false": false
+        default: nil
+        }
+    }
+
+    /// The file's text with its switch set: `enabled: false` when off, no line when on.
+    public static func setting(enabled: Bool, in text: String) throws -> String {
+        try FrontMatterEdit.set(Self.enabled, to: enabled ? nil : "false", in: text)
+    }
+
+    /// The file's text archived or brought back: `archived: true`, or no line.
+    public static func setting(archived: Bool, in text: String) throws -> String {
+        try FrontMatterEdit.set(Self.archived, to: archived ? "true" : nil, in: text)
     }
 }
