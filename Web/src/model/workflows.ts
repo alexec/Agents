@@ -425,11 +425,16 @@ export const turnedOffSentence = "Turned off — none of its triggers run it. "
 /** WorkflowOffReason.sentence (#124): why it is off, or null for the person's own switch. */
 export function offReasonSentence(s: WorkflowSummary): string | null {
   switch ((s as { offReason?: string }).offReason) {
-    case "file": return "Off: its file asks to start off. Turn it on when you are ready";
+    case "file": return "Off: its file says enabled: false. Turn it on when you are ready";
     case "writtenByAgent": return "Off: written by an agent. Turn it on when you are ready";
     case "agent": return "Off: an agent turned it off";
     default: return null;
   }
+}
+
+/** WorkflowSummary.switchesSentence (#125): the switch is a line in the workflow's file. */
+export function switchesSentence(s: WorkflowSummary): string {
+  return `Enabled and Archive are saved in .agents/workflows/${s.workflow.workflowID}.md, a file in this project you may commit`;
 }
 
 /** The instance WorkflowSummary.turnedOffSentence: led by why, when there is a why. */

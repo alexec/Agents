@@ -105,6 +105,10 @@ were approved as they stood.
 - Archive it: on the Mac, swipe the row left with two fingers, right-click it and choose
   **Archive**, or click **Archive** on its page. It stays listed under **Archived workflows** and
   does not run until you click **Bring Back**. The file is kept.
+- Both write the workflow's own file: off adds `enabled: false` and archive adds
+  `archived: true`, and turning it back on or bringing it back takes the line out. That
+  is a change in your project you may commit, and it is how the choice reaches your other
+  clones, Macs and servers. Commit it if they should have it too.
 - To remove it for good, delete its file. **Show in Finder** on the row's menu finds it.
 
 ## If it doesn't work

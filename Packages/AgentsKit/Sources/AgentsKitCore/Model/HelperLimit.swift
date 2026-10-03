@@ -7,10 +7,11 @@ import Foundation
 /// refused if it would break either.
 ///
 /// The person sets both per project, in Project Settings ▸ General, and only the person:
-/// the setting is an operator's (`projects/setHelperLimits` is in neither the agent's
-/// nor the device's allowlist), for the reason `WorkflowLimit` gives — a ceiling
-/// something can raise for itself is not a ceiling. And the person's own setting has a
-/// hard maximum, so a typo cannot let a project fill.
+/// `projects/setHelperLimits` is not in the agent's allowlist, for the reason
+/// `WorkflowLimit` gives — a ceiling something can raise for itself is not a ceiling.
+/// They are kept in the project's own `.agents/project.json` (#126), so they travel with
+/// it. And the setting has a hard maximum, enforced whatever the file says, so neither a
+/// typo nor a hand edit can let a project fill.
 public enum HelperLimit {
     /// What a project with no setting gets.
     public static let defaultRunning = 3
@@ -81,11 +82,11 @@ public enum HelperLimit {
 }
 
 /// One project's two helper limits, as the person set them (#64), and whether agents
-/// may archive the helpers they started (#120). Kept on `Project`.
+/// may archive the helpers they started (#120). Kept in `.agents/project.json` (#126).
 ///
 /// Each is nil until the person sets it, which is the default; `effective` is what is
 /// enforced, clamped to the hard maximums whatever the file says, so a hand-edited
-/// `projects.json` cannot raise a ceiling either.
+/// `.agents/project.json` cannot raise a ceiling either.
 public struct HelperLimits: Codable, Hashable, Sendable {
     public var running: Int?
     public var notArchived: Int?

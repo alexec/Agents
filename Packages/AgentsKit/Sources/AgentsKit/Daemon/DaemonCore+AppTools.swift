@@ -674,7 +674,9 @@ extension DaemonCore {
         adoptWorkflows(in: project)
         let before = workflowStore.load()
         let ceilings = workflowCeilings(records: before)
-        let isArchived = before.state(folder: project, workflowID: workflowID)?.isArchived ?? false
+        let existingText = exists ? try? String(contentsOf: url, encoding: .utf8) : nil
+        let existing = existingText.map { WorkflowFile.parse($0, workflowID: workflowID, in: project) }
+        let isArchived = existing?.isArchived ?? false
         let waiting = ceilings.waiting[Project.standardize(project)] ?? []
         if !isArchived, !waiting.contains(workflowID), waiting.count >= WorkflowLimit.project.allowed {
             let names = waiting.prefix(WorkflowLimit.project.allowed).joined(separator: ", ")
@@ -695,35 +697,48 @@ extension DaemonCore {
                                 one — anywhere — to make room.
                                 """)
         }
+        // The switch and the archive are the person's, and live in the file (#125), so
+        // the app keeps them whatever the agent's text says. A new one starts off
+        // (#124), so the person turns it on knowingly rather than finding it ran the
+        // moment they approved it; no front matter the agent chooses can opt it out.
+        // A change to one that exists leaves its switch and archive where they were.
+        // Everything else is written exactly as it was handed over: nothing is
+        // re-serialised from the parsed form, which is what makes a key this version
+        // does not know survive being written by an agent running against a later one.
+        var text = content
+        do {
+            let off = existing?.isOff ?? true
+            if parsed.isOff != off { text = try WorkflowSwitches.setting(enabled: !off, in: text) }
+            if let existing, parsed.isArchived != existing.isArchived {
+                text = try WorkflowSwitches.setting(archived: existing.isArchived, in: text)
+            }
+        } catch let refusal as FrontMatterEdit.Refusal {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
+                               message: "Nothing was written: \(refusal.message).")
+        }
         try FileManager.default.createDirectory(at: WorkflowFile.folder(in: project),
                                                 withIntermediateDirectories: true)
-        // Written whole, exactly as it was handed over. Nothing is re-serialised from
-        // the parsed form, which is what makes a key this version does not know survive
-        // being written by an agent running against a later one.
-        // A new one starts off (#124), so the person turns it on knowingly rather than
-        // finding it ran the moment they approved it. Recorded here, by the daemon, and
-        // not written into the file: the file stays exactly what the agent handed over,
-        // and no front matter the agent chooses can opt it out. Only a new file: a
-        // change to one that exists leaves its switch where somebody put it.
+        let digest = ContentDigest.sha256(Data(text.utf8))
         var records = workflowStore.load()
-        if !exists {
-            records.update(folder: project, workflowID: workflowID) {
-                $0.isDisabled = true
-                $0.disabledByAgent = false
-                $0.enabledChosen = true
-                $0.writtenOffByAgent = true
+        records.update(folder: project, workflowID: workflowID) {
+            if !exists {
+                $0.offBy = .writtenByAgent
+                $0.offDigest = digest
                 $0.heldFire = nil
+            } else if let existingText, $0.offDigest == ContentDigest.sha256(Data(existingText.utf8)) {
+                // Who turned it off has not changed with its text. Its approval has.
+                $0.offDigest = digest
             }
-            try keep("this workflow's settings") { try workflowStore.save(records) }
         }
-        try Data(content.utf8).write(to: url, options: .atomic)
+        try keep("this workflow's settings") { try workflowStore.save(records) }
+        try Data(text.utf8).write(to: url, options: .atomic)
         // An archived id written to again stays archived. The one thing the person can
         // say about a workflow they did not ask for should not be undone by the agent
         // that wrote it.
-        let archived = records.state(folder: project, workflowID: workflowID)?.isArchived ?? false
+        let archived = isArchived
         rescanWorkflows(in: project)
         let warning = unofferedWarning(for: parsed).map { " " + $0 } ?? ""
-        let startsOff = exists ? "" : " It starts turned off: once they have approved it, they turn it on from its page when they are ready, and you cannot."
+        let startsOff = exists ? "" : " It starts turned off (the app wrote `enabled: false` into it): once they have approved it, they turn it on from its page when they are ready, and you cannot."
         if archived {
             return """
                 \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
@@ -746,7 +761,8 @@ extension DaemonCore {
         if !exists {
             return """
                 Created \(workflowID). \(parsed.summary). \
-                It is turned off, so none of its triggers run it until they turn it on \
+                It is turned off (the app wrote `enabled: false` into it), so none of its \
+                triggers run it until they turn it on \
                 from the project page, where they can also run it, or archive it if it \
                 is not what they wanted. Tell them it is there and what it does.
                 """ + warning
@@ -784,34 +800,35 @@ extension DaemonCore {
                                message: "There is no workflow called \(id) in this project.")
         }
         let state = workflowStore.load().state(folder: project, workflowID: id)
-        let isOff = WorkflowState.isOff(found, state)
+        let isOff = found.isOff
         if enabled, !isOff { return "\(id) is already on." }
         if !enabled, isOff { return "\(id) is already turned off." }
-        // Its file starts it off (#42) and nobody has turned it on: that is waiting for
-        // the person as much as a switch they moved themselves.
-        if enabled, state?.enabledChosen != true, found.enabled == false {
+        // Only what an agent turned off, on this host, in the file as it stands: a file
+        // that says `enabled: false` for any other reason is waiting for the person.
+        switch WorkflowState.offReason(found, state, digest: workflowDigest(found)) {
+        case .file? where enabled:
             throw JSONRPCError(code: DaemonAPI.Failure.workflowTurnedOffByPerson,
                                message: """
                                 Nothing was changed: \(id)'s file says `enabled: false`, so it \
-                                starts off until the person turns it on from the project page. \
+                                stays off until the person turns it on from the project page. \
                                 Ask them to if it should run.
                                 """)
-        }
-        if enabled, state?.writtenOffByAgent == true {
+        case .writtenByAgent? where enabled:
             throw JSONRPCError(code: DaemonAPI.Failure.workflowTurnedOffByPerson,
                                message: """
                                 Nothing was changed: \(id) was written by an agent, so it \
                                 starts off until the person turns it on from its page. Ask \
                                 them to if it should run.
                                 """)
-        }
-        if enabled, state?.disabledByAgent != true {
+        case .person? where enabled:
             throw JSONRPCError(code: DaemonAPI.Failure.workflowTurnedOffByPerson,
                                message: """
                                 Nothing was changed: \(id) was turned off by the person, so \
                                 only they can turn it back on, from the project page. Ask \
                                 them to if it should run again.
                                 """)
+        default:
+            break
         }
         let summary = try setWorkflowEnabled(
             DaemonAPI.WorkflowEnableRequest(folder: project, workflowID: id, enabled: enabled),

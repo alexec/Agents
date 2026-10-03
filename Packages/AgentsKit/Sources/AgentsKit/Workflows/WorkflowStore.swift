@@ -20,31 +20,49 @@ public struct HeldWorkflowFire: Codable, Hashable, Sendable {
 
 /// What the app remembers about a workflow that its file cannot say.
 ///
-/// A few things, and the reason each is here rather than in the repository is the same:
-/// writing it back would put the app's own bookkeeping into the project's history,
-/// where nobody wants to review it. Archiving a workflow is not a commit.
+/// Its history on this host: runs, outcomes, a held trigger, the standing agent, and
+/// what the person approved. Whether it is turned off or archived is not here: since
+/// #125 that is the file's own `enabled:` and `archived:`, so it travels with the
+/// project to every clone and host.
 public struct WorkflowState: Codable, Hashable, Sendable {
     public var folder: URL
     public var workflowID: String
-    /// Put away by the person: off the project page and never fired again, with the
-    /// file left where it is. This is the answer to an agent writing a workflow
-    /// nobody asked for, and the reason writing one no longer asks first.
-    public var isArchived: Bool
-    /// Turned off (#100): kept on the list and under the ceiling, and none of its
-    /// triggers fire. Off rather than on as the stored sense, so a file from before
-    /// this reads as every workflow on.
-    public var isDisabled: Bool
-    /// Whether an agent turned it off, through `manage_workflows`. An agent may turn
-    /// back on what an agent turned off, and never what the person did: the same rule
-    /// that keeps an archived workflow archived when an agent writes it again.
-    public var disabledByAgent: Bool
-    /// Whether anybody has moved the switch (#42). Until then a file saying
-    /// `enabled: false` keeps it off; after, `isDisabled` alone decides.
-    public var enabledChosen: Bool
-    /// Set off when an agent created it through `manage_workflows` (#124), so the
-    /// person turns it on knowingly; cleared once anybody moves the switch. Only the
-    /// reason the page gives: `isDisabled` is what keeps it off.
-    public var writtenOffByAgent: Bool
+    /// Who turned it off on this host, for the page's reason and for the rule that an
+    /// agent may turn back on only what an agent turned off (#100, #124). Held against
+    /// `offDigest`: once the file is no longer the one this host wrote, the reason is
+    /// somebody else's and reads as `.file`.
+    public var offBy: WorkflowOffReason?
+    /// SHA-256 of the file when `offBy` was recorded, kept current through the app's
+    /// own edits of the file.
+    public var offDigest: String?
+    /// The switch and archive as kept here before #125, read only to write them into
+    /// the file once (`migrateWorkflowSwitchesToFiles`), then cleared. Kept until that
+    /// write succeeds, so a project folder that is away for now is migrated later.
+    public var legacy: LegacySwitches?
+
+    /// What `workflows.json` said about a workflow's switch and archive before #125.
+    public struct LegacySwitches: Codable, Hashable, Sendable {
+        public var isArchived = false
+        public var isDisabled = false
+        public var disabledByAgent = false
+        public var enabledChosen = false
+        public var writtenOffByAgent = false
+
+        /// Whether it was off, by the rule of the day: the switch as last moved, or,
+        /// before anybody moved it, off if either the app or the file said so.
+        func isOff(fileSaysOff: Bool) -> Bool {
+            enabledChosen ? isDisabled : (isDisabled || fileSaysOff)
+        }
+
+        /// Who turned it off, as `offBy` records it; nil for its file.
+        var offBy: WorkflowOffReason? {
+            if writtenOffByAgent { return .writtenByAgent }
+            if disabledByAgent { return .agent }
+            return enabledChosen ? .person : nil
+        }
+
+        var isEmpty: Bool { self == LegacySwitches() }
+    }
     /// The agent a `standing` workflow keeps. Adopted on its first fire, and replaced
     /// when the one it had is gone.
     public var standingAgentID: UUID?
@@ -66,32 +84,43 @@ public struct WorkflowState: Codable, Hashable, Sendable {
 
     public var key: String { folder.path + "/" + workflowID }
 
-    /// Whether `workflow` is turned off: the switch as last moved, or, before anybody
-    /// has moved it, off if either the app or the file's `enabled: false` says so.
-    public static func isOff(_ workflow: Workflow, _ state: WorkflowState?) -> Bool {
-        if let state, state.enabledChosen { return state.isDisabled }
-        return state?.isDisabled == true || workflow.enabled == false
+    /// Whether `workflow` is turned off: its file's `enabled: false` (#125).
+    public static func isOff(_ workflow: Workflow) -> Bool {
+        workflow.isOff
     }
 
-    /// Why it is off, for its page (#124), or `nil` while it is on.
-    public static func offReason(_ workflow: Workflow, _ state: WorkflowState?) -> WorkflowOffReason? {
-        guard isOff(workflow, state) else { return nil }
-        if state?.writtenOffByAgent == true { return .writtenByAgent }
-        if state?.enabledChosen != true, workflow.enabled == false { return .file }
-        return state?.disabledByAgent == true ? .agent : .person
+    /// Why it is off, for its page (#124), or `nil` while it is on. `digest` is the
+    /// file's as it is now: a reason recorded against another version of the file is
+    /// not this one's.
+    public static func offReason(_ workflow: Workflow, _ state: WorkflowState?,
+                                 digest: String?) -> WorkflowOffReason? {
+        guard workflow.isOff else { return nil }
+        if let by = state?.offBy, digest != nil, state?.offDigest == digest { return by }
+        return .file
     }
 
-    /// Read leniently, because a file written before archiving existed has no such key
-    /// and losing every pause to a new field would be a poor trade.
+    enum CodingKeys: String, CodingKey {
+        case folder, workflowID, offBy, offDigest, standingAgentID, lastFiredAt, lastFiredBy
+        case lastOutcome, lastCausingEvent, approvedDigest, heldFire
+        // Before #125.
+        case isArchived, isDisabled, disabledByAgent, enabledChosen, writtenOffByAgent
+    }
+
+    /// Read leniently, because a file written before a field existed has no such key
+    /// and losing every workflow's history to a new field would be a poor trade.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         folder = Project.standardize(try c.decode(URL.self, forKey: .folder))
         workflowID = try c.decode(String.self, forKey: .workflowID)
-        isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
-        isDisabled = try c.decodeIfPresent(Bool.self, forKey: .isDisabled) ?? false
-        disabledByAgent = try c.decodeIfPresent(Bool.self, forKey: .disabledByAgent) ?? false
-        enabledChosen = try c.decodeIfPresent(Bool.self, forKey: .enabledChosen) ?? false
-        writtenOffByAgent = try c.decodeIfPresent(Bool.self, forKey: .writtenOffByAgent) ?? false
+        offBy = (try? c.decodeIfPresent(WorkflowOffReason.self, forKey: .offBy)) ?? nil
+        offDigest = try c.decodeIfPresent(String.self, forKey: .offDigest)
+        var legacy = LegacySwitches()
+        legacy.isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        legacy.isDisabled = try c.decodeIfPresent(Bool.self, forKey: .isDisabled) ?? false
+        legacy.disabledByAgent = try c.decodeIfPresent(Bool.self, forKey: .disabledByAgent) ?? false
+        legacy.enabledChosen = try c.decodeIfPresent(Bool.self, forKey: .enabledChosen) ?? false
+        legacy.writtenOffByAgent = try c.decodeIfPresent(Bool.self, forKey: .writtenOffByAgent) ?? false
+        self.legacy = legacy.isEmpty ? nil : legacy
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
         lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
@@ -104,16 +133,35 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         heldFire = try? c.decodeIfPresent(HeldWorkflowFire.self, forKey: .heldFire)
     }
 
-    public init(folder: URL, workflowID: String, isArchived: Bool = false,
+    /// Written in the old keys while a migration is still owed, so an older build
+    /// reading this file back still finds its switches.
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(folder, forKey: .folder)
+        try c.encode(workflowID, forKey: .workflowID)
+        try c.encodeIfPresent(offBy, forKey: .offBy)
+        try c.encodeIfPresent(offDigest, forKey: .offDigest)
+        if let legacy {
+            try c.encode(legacy.isArchived, forKey: .isArchived)
+            try c.encode(legacy.isDisabled, forKey: .isDisabled)
+            try c.encode(legacy.disabledByAgent, forKey: .disabledByAgent)
+            try c.encode(legacy.enabledChosen, forKey: .enabledChosen)
+            try c.encode(legacy.writtenOffByAgent, forKey: .writtenOffByAgent)
+        }
+        try c.encodeIfPresent(standingAgentID, forKey: .standingAgentID)
+        try c.encodeIfPresent(lastFiredAt, forKey: .lastFiredAt)
+        try c.encodeIfPresent(lastFiredBy, forKey: .lastFiredBy)
+        try c.encodeIfPresent(lastOutcome, forKey: .lastOutcome)
+        try c.encodeIfPresent(lastCausingEvent, forKey: .lastCausingEvent)
+        try c.encodeIfPresent(approvedDigest, forKey: .approvedDigest)
+        try c.encodeIfPresent(heldFire, forKey: .heldFire)
+    }
+
+    public init(folder: URL, workflowID: String,
                 standingAgentID: UUID? = nil,
                 lastFiredAt: Date? = nil, lastOutcome: WorkflowOutcome? = nil) {
         self.folder = Project.standardize(folder)
         self.workflowID = workflowID
-        self.isArchived = isArchived
-        self.isDisabled = false
-        self.disabledByAgent = false
-        self.enabledChosen = false
-        self.writtenOffByAgent = false
         self.standingAgentID = standingAgentID
         self.lastFiredAt = lastFiredAt
         self.lastOutcome = lastOutcome
@@ -175,8 +223,9 @@ extension WorkflowRecords {
 /// pauses something, and `cat` will show it to you.
 ///
 /// A missing or unreadable file is empty state rather than an error. Losing it loses
-/// which workflows were archived and which agent a standing workflow had — every
-/// workflow itself is still in the repository, which is the right thing to keep.
+/// which agent a standing workflow had and what was approved — every workflow, and
+/// whether it is off or archived, is still in the repository, which is the right thing
+/// to keep.
 public struct WorkflowStore: Sendable {
     private let locations: StoreLocations
 

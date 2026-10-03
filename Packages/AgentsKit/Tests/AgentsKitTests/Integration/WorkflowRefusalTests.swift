@@ -125,10 +125,10 @@ struct WorkflowRefusalTests {
         #expect(await core.allAgents().isEmpty)
     }
 
-    @Test func archivingNeverTouchesTheFile() async throws {
-        // The same contract pausing has. A workflow put away is still a file in the
-        // repository, reviewable and restorable, rather than something deleted behind
-        // the author's back.
+    @Test func archivingKeepsTheFileAndWritesOnlyItsLine() async throws {
+        // A workflow put away is still a file in the repository, reviewable and
+        // restorable, rather than something deleted behind the author's back. Since
+        // #125 the archive is that file's own `archived: true`, and nothing else in it.
         let (locations, root) = try temporary()
         let work = try project(root)
         let url = try write(onSchedule, as: "unwanted", in: work)
@@ -139,7 +139,8 @@ struct WorkflowRefusalTests {
         _ = try await core.archiveWorkflow(
             DaemonAPI.WorkflowArchiveRequest(folder: work, workflowID: "unwanted", archived: true))
 
-        #expect(try Data(contentsOf: url) == before)
+        let after = try String(contentsOf: url, encoding: .utf8)
+        #expect(after.replacingOccurrences(of: "archived: true\n", with: "") == String(decoding: before, as: UTF8.self))
         #expect(await core.allWorkflows(in: work).first?.isArchived == true)
     }
 

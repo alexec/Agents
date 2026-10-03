@@ -76,6 +76,12 @@ struct DashboardPage: View {
                             }
                         }
                     }
+                    // The tiles are the project's files (#127), the Mac page's words.
+                    Text(DashboardModel.filesSentence + ".")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 10)
                 } else {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 }

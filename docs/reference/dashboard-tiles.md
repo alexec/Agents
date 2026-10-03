@@ -54,22 +54,39 @@ at its foot. Greyed tiles don't count towards the Dashboard row's summary or its
 `<project>/.agents/dashboard/<id>.json`, written whole by the host in the project folder, never
 in a worktree, keys sorted. It holds the fields above, the keeper (`{"agent": "<id>"}` or
 `{"workflow": "<id>"}`), `hidden` when you hid it, and the value under the type's name. It
-holds no times and no history, so setting the same value again leaves it as it is. A file
+holds no times and no history (its trend has a file of its own, below), so setting the same
+value again leaves it as it is. A file
 edited by hand or brought by a pull is shown, marked "changed outside Agents" in the tile's
 detail; the keeper's next set overwrites it. A file that can't be read shows as a broken tile
 with the reason.
 
 ## History
 
-Kept by the host the project is on, in `dashboards/` in its root, not in the project:
+A number tile's trend is kept in the project, beside its tile, in
+`<project>/.agents/dashboard/history/<id>.jsonl`: one point a line, `{"t":<seconds since
+1970>,"v":<value>}`, written by the host in the project folder, never in a worktree. So the
+trend goes wherever the project goes, and a clone on another Mac or server shows it.
 
 | Age | Kept |
 | --- | --- |
-| Up to 7 days | Every point, at most one a minute. A second in the same minute replaces the first. |
-| 7 to 90 days | The last point of each hour. |
-| 90 days to a year | The last point of each day. |
-| Over a year | Nothing. |
+| Up to 7 days | The last point of each hour. A second set in the same hour replaces that hour's point. |
+| 7 to 90 days | The last point of each day. |
+| Over 90 days | Nothing. |
+
+That is at most about 250 lines, some 6 KB, a tile. The file changes only when the trend does:
+
+- a set whose value is the one the trend already ends at adds no point, so a number that
+  holds still never touches the file;
+- a run of equal values is kept as its first point, the moment the value became what it is;
+- the file is rewritten only when its bytes change.
+
+The app never commits it. It shows in the project's changes and goes in with whatever is
+committed next. To keep trends out of the repository, add `.agents/dashboard/history/` to
+`.gitignore`: the app still keeps them in the folder, and a clone starts its trends empty.
+A history file changed by a pull is read again.
 
 At most 8 MB of history a project; past it, a number tile's set is refused until a tile is
 removed. A screen is sent at most 120 points a tile, over 30 days. Removing a tile deletes its
-history. Who removed a tile, and when, is kept 30 days, only to tell its keeper.
+history file. Before this version the trend was kept by the host, in `dashboards/` in its
+root; the first time a tile's trend is read, those points are folded as above, moved into the
+project's file and removed from the host. Who removed a tile, and when, is kept 30 days, only to tell its keeper.

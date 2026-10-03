@@ -6,7 +6,7 @@
 import type { Store } from "../model/store";
 import { folderKey, projectFolder } from "../model/groups";
 import {
-  happening, isOn, isSupportedTrigger, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
+  happening, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   triggerSummary, workflowSummary, workflowNeedsAPerson,
 } from "../model/workflows";
 import { go } from "../route";
@@ -52,6 +52,8 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                   onChange={(e) => void store.setWorkflowEnabled(host, summary, (e.currentTarget as HTMLInputElement).checked)} />
                 Enabled
               </label>
+              {/* The switch writes the workflow's file (#125), the window's words. */}
+              <p class="quiet small">{switchesSentence(summary)}</p>
             </div>
           )}
 

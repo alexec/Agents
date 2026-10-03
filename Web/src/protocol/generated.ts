@@ -1464,6 +1464,7 @@ export interface Workflow {
   settings: WorkflowSettings;
   cooldown?: number;
   enabled?: boolean;
+  archived?: boolean;
 }
 
 export interface WorkflowApproval {
@@ -1922,7 +1923,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
   WorkflowRemovedNotification: { required: ["folder", "workflowID"], optional: [] },

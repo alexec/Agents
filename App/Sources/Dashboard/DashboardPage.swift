@@ -73,6 +73,11 @@ struct DashboardPage: View {
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
                         sectionView(section.title, section.tiles, now: snapshot.now)
                     }
+                    // The tiles are the project's files (#127).
+                    Text(DashboardModel.filesSentence + ".")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 }
@@ -224,6 +229,7 @@ struct TileDetail: View {
             Text(tile.tile?.title ?? tile.id).appText(.title).fontWeight(.semibold)
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
                 row("File", ".agents/dashboard/\(tile.id).json")
+                if tile.tile?.type == .number { row("History", DashboardModel.historyFile(tile.id)) }
                 row("Kept by", "\(tile.keeper.name) (\(tile.keeper.kind.rawValue))"
                     + (DashboardModel.keeperNote(tile.keeper).map { ", \($0)" } ?? ""))
                 row("Set", DashboardModel.ageWords(tile, now: now))

@@ -70,7 +70,7 @@ struct WorkflowTriggerCodingTests {
              "lastOutcome":{"refused":{"_0":{"babysittingStopped":{"pr":3,"runs":3}},"at":0,"repeats":1}}}
             """
         let state = try JSONDecoder().decode(WorkflowState.self, from: Data(json.utf8))
-        #expect(state.isArchived)
+        #expect(state.legacy?.isArchived == true)
         #expect(state.lastOutcome == nil)
     }
 }

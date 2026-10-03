@@ -5,9 +5,9 @@ import Testing
 
 /// A file that says `enabled: false` arrives turned off (#42).
 ///
-/// The Enabled switch is the app's own state, never written to the file, so a workflow
-/// checked in for somebody to turn on when they are ready needs the file to say where
-/// the switch starts. Once anybody moves the switch, that choice is kept, as before.
+/// Since #125 the file's `enabled:` is the switch itself: a workflow checked in for
+/// somebody to turn on when they are ready says `enabled: false`, and the switch writes
+/// the same line.
 @Suite("A workflow that starts off", .timeLimit(.minutes(1)))
 struct WorkflowStartsOffTests {
     private func temporary() throws -> (StoreLocations, URL) {
@@ -167,9 +167,9 @@ struct WorkflowStartsOffTests {
         #expect(off.nextFireAt == nil)
         #expect(off.turnedOffSentence.hasPrefix("Off: written by an agent. Turn it on when you are ready."))
         #expect(try await call(core, token, agentID, .list).contains("written by an agent"))
-        // The file is exactly what the agent handed over: the daemon keeps the switch.
+        // The agent's text with the switch the app keeps written into it (#125).
         let onDisk = try String(contentsOf: WorkflowFile.url(for: "nightly", in: work), encoding: .utf8)
-        #expect(onDisk == text(enabled: "true"))
+        #expect(onDisk == text(enabled: "false"))
 
         await core.tickWorkflows(now: nineOClock)
         await core.tickWorkflows(now: nineOClock.addingTimeInterval(60))
@@ -220,7 +220,7 @@ struct WorkflowStartsOffTests {
         await core.rescanWorkflows(in: work)
         let fromFile = try #require(await summary(core, work, "weekly"))
         #expect(fromFile.offReason == .file)
-        #expect(fromFile.turnedOffSentence.hasPrefix("Off: its file asks to start off."))
+        #expect(fromFile.turnedOffSentence.hasPrefix("Off: its file says enabled: false."))
 
         _ = try await core.setWorkflowEnabled(
             DaemonAPI.WorkflowEnableRequest(folder: work, workflowID: "weekly", enabled: false))

@@ -6,7 +6,8 @@ import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
 import {
-  ageWords, agoWords, change, changeWords, isGood, isStale, isWide, keeperNote, numberWords, rowDetail, sections, shownLevel, sparkline,
+  ageWords, agoWords, change, changeWords, filesSentence, historyFile, isGood, isStale, isWide, keeperNote, numberWords, rowDetail,
+  sections, shownLevel, sparkline,
 } from "../model/dashboard";
 import { isSafeLink, Markdown } from "../render/markdown";
 import type { TileCell, TileLink, TileView } from "../protocol/generated";
@@ -71,6 +72,8 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
               </div>
             </div>
           ))}
+          {/* The tiles are the project's files (#127), the window's words. */}
+          {snapshot && <p class="quiet small">{filesSentence}.</p>}
           {opened && snapshot && <TileDetail tile={opened} now={snapshot.now} onClose={() => (detail.value = null)} />}
         </div>
       </div>
@@ -189,6 +192,7 @@ function TileDetail({ tile, now, onClose }: { tile: TileView; now: number; onClo
       <h2>{tile.tile?.title ?? tile.id}</h2>
       <dl>
         <dt>File</dt><dd><code>.agents/dashboard/{tile.id}.json</code></dd>
+        {tile.tile?.type === "number" && <><dt>History</dt><dd><code>{historyFile(tile.id)}</code></dd></>}
         <dt>Kept by</dt><dd>{tile.keeper.name} ({tile.keeper.kind}){keeperNote(tile) ? `, ${keeperNote(tile)}` : ""}</dd>
         <dt>Set</dt><dd>{ageWords(tile, now)}</dd>
         {tile.tile?.source && <><dt>Source</dt><dd>{tile.tile.source}</dd></>}
