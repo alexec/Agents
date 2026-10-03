@@ -34,6 +34,8 @@ struct SessionsColumn: View {
     private static let archivedShown = 50
 
     var body: some View {
+        // Each group asked for once a redraw; the model files them once per change (#135).
+        let lists = sessionLists()
         List(selection: $picked) {
             // The Dashboard, then two groups: the sessions, archived ones folded at their
             // foot, then the workflows. A search narrows both.
@@ -48,7 +50,7 @@ struct SessionsColumn: View {
                 Section {
                     // The same headings the project page draws, one step down.
                     ForEach(AgentGroup.live, id: \.self) { group in
-                        ForEach(group.headings(matching(model.agents(in: model.selectedProjectKey, group: group)))) { part in
+                        ForEach(group.headings(lists.shown[group] ?? [])) { part in
                             subheading(part.title, count: part.agents.count,
                                        unread: part.agents.filter(\.showsUnread).count)
                             ForEach(part.agents) { agent in
@@ -56,7 +58,7 @@ struct SessionsColumn: View {
                             }
                         }
                     }
-                    if query.isEmpty, !hasLive {
+                    if query.isEmpty, !lists.hasLive {
                         Text("No sessions yet. Say what you want done on the right.")
                             .appText(.fine)
                             .foregroundStyle(.secondary)
@@ -64,9 +66,9 @@ struct SessionsColumn: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.vertical, 6)
                     }
-                    archivedSessions
+                    archivedSessions(lists.shown[.archived] ?? [])
                 } header: {
-                    heading("Sessions", count: liveCount)
+                    heading("Sessions", count: lists.liveCount)
                 }
             }
             ProjectWorkSections(folder: model.selectedProject, query: query)
@@ -80,7 +82,7 @@ struct SessionsColumn: View {
         .overlay {
             if model.selectedProjectSummary == nil {
                 EmptyState.noProject
-            } else if !hasAny, !query.isEmpty {
+            } else if !query.isEmpty, !hasAny(lists) {
                 ContentUnavailableView("No matches",
                                        systemImage: "bubble.left.and.bubble.right",
                                        description: Text("No session or workflow matches “\(query)”."))
@@ -264,8 +266,7 @@ struct SessionsColumn: View {
     /// Archived sessions, folded under the live ones, with what has been retired from
     /// here (051) as the last line.
     @ViewBuilder
-    private var archivedSessions: some View {
-        let archived = matching(model.agents(in: model.selectedProjectKey, group: .archived))
+    private func archivedSessions(_ archived: [Agent]) -> some View {
         let retiredLine = query.isEmpty
             ? RetirementWords.retiredLine(model.selectedProjectSummary?.retiredCount) : nil
         if !archived.isEmpty || retiredLine != nil {
@@ -315,20 +316,31 @@ struct SessionsColumn: View {
         return agents.filter(matcher.matches)
     }
 
-    /// The sessions under the Sessions heading that are not archived.
-    private var liveCount: Int {
-        AgentGroup.live.reduce(0) { $0 + matching(model.agents(in: model.selectedProjectKey, group: $1)).count }
+    /// The selected project's sessions in each group, as held and as the search leaves them.
+    private struct SessionLists {
+        var all: [AgentGroup: [Agent]] = [:]
+        var shown: [AgentGroup: [Agent]] = [:]
+
+        /// The sessions under the Sessions heading that are not archived.
+        var liveCount: Int { AgentGroup.live.reduce(0) { $0 + (shown[$1]?.count ?? 0) } }
+
+        /// Whether the project has a session that is not archived.
+        var hasLive: Bool { AgentGroup.live.contains { !(all[$0]?.isEmpty ?? true) } }
     }
 
-    /// Whether the project has a session that is not archived.
-    private var hasLive: Bool {
-        AgentGroup.live.contains { !model.agents(in: model.selectedProjectKey, group: $0).isEmpty }
+    private func sessionLists() -> SessionLists {
+        var lists = SessionLists()
+        for group in AgentGroup.allCases {
+            let held = model.agents(in: model.selectedProjectKey, group: group)
+            lists.all[group] = held
+            lists.shown[group] = matching(held)
+        }
+        return lists
     }
 
-    private var hasAny: Bool {
-        AgentGroup.allCases.contains {
-            !matching(model.agents(in: model.selectedProjectKey, group: $0)).isEmpty
-        } || model.workflows(in: model.selectedProject).contains(where: SessionLabelQuery(query).matches)
+    private func hasAny(_ lists: SessionLists) -> Bool {
+        AgentGroup.allCases.contains { !(lists.shown[$0]?.isEmpty ?? true) }
+            || model.workflows(in: model.selectedProject).contains(where: SessionLabelQuery(query).matches)
     }
 }
 

@@ -17,7 +17,9 @@ import Observation
 @MainActor
 @Observable
 public final class AgentsModel {
-    public private(set) var agents: [Agent] = []
+    public private(set) var agents: [Agent] = [] {
+        didSet { bucketsRevision &+= 1 }
+    }
     public private(set) var projects: [DaemonAPI.ProjectSummary] = []
     public private(set) var permissions: [PermissionRequest] = []
     public private(set) var elicitations: [ElicitationRequest] = []
@@ -123,7 +125,19 @@ public final class AgentsModel {
     /// Files an agent has asked be put in front of the user, one per agent, newest
     /// winning. Held rather than acted on, because the client hearing this may be
     /// showing another conversation.
-    public private(set) var filesToShow: [UUID: ShownFile] = [:]
+    public private(set) var filesToShow: [UUID: ShownFile] = [:] {
+        didSet { bucketsRevision &+= 1 }
+    }
+
+    /// Every agent held, filed once by project folder and group (#135).
+    ///
+    /// The Sessions column, the project rows and the menus ask for one project's group
+    /// many times a redraw, and asking used to be a pass over every agent ever held,
+    /// archived ones included. They are filed again only after `agents` or
+    /// `filesToShow` has changed, and only when something next asks.
+    @ObservationIgnored private var bucketsRevision = 0
+    @ObservationIgnored private var buckets = AgentBuckets()
+    @ObservationIgnored private var bucketsBuiltAt = -1
 
     /// Chats the daemon is queueing to pick back up after a restart, held only while
     /// it is doing it. Not on any record: the queue lives and dies with the daemon
@@ -948,7 +962,7 @@ public final class AgentsModel {
 
     public func agent(_ id: UUID?) -> Agent? {
         guard let id else { return nil }
-        return agents.first { $0.id == id }
+        return filed().byID[id]
     }
 
     /// Which runtime a new agent gets when nobody has said.
@@ -983,23 +997,19 @@ public final class AgentsModel {
 
     public func agents(in key: ProjectKey?, group: AgentGroup) -> [Agent] {
         guard let key else { return [] }
-        return agents(in: key.folder, group: group).filter { $0.host == key.host }
+        return filed().byKey[AgentBuckets.Key(folder: standardized(key.folder), host: key.host)]?[group] ?? []
     }
 
     public func counts(in key: ProjectKey?) -> [AgentGroup: Int] {
         guard let key else { return [:] }
-        let wanted = Project.standardize(key.folder)
-        var counts: [AgentGroup: Int] = [:]
-        for agent in agents where agent.host == key.host && projectFolder(of: agent) == wanted {
-            counts[group(of: agent), default: 0] += 1
-        }
-        return counts
+        let groups = filed().byKey[AgentBuckets.Key(folder: standardized(key.folder), host: key.host)] ?? [:]
+        return groups.mapValues(\.count)
     }
 
     public func unreadCount(in key: ProjectKey?) -> Int {
         guard let key else { return 0 }
-        let wanted = Project.standardize(key.folder)
-        return agents.filter { $0.host == key.host && projectFolder(of: $0) == wanted && $0.showsUnread }.count
+        let groups = filed().byKey[AgentBuckets.Key(folder: standardized(key.folder), host: key.host)] ?? [:]
+        return groups.values.reduce(0) { $0 + $1.count(where: \.showsUnread) }
     }
 
     /// What the Dock badge counts for one project: every session under Needs you, and
@@ -1007,8 +1017,7 @@ public final class AgentsModel {
     /// it is added back here: a new finish still raises the badge.
     public func attentionCount(in key: ProjectKey?) -> Int {
         guard let key else { return 0 }
-        let wanted = Project.standardize(key.folder)
-        return agents.filter { $0.host == key.host && projectFolder(of: $0) == wanted && wantsALook($0) }.count
+        return Self.attention(in: filed().byKey[AgentBuckets.Key(folder: standardized(key.folder), host: key.host)])
     }
 
     /// Needs you, Blocked from an older daemon, or unread: what the badge and the widget
@@ -1038,10 +1047,47 @@ public final class AgentsModel {
     /// raw is how a project ends up looking empty while its agents are plainly running.
     public func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         guard let folder else { return [] }
-        let wanted = Project.standardize(folder)
-        let found = agents.filter { self.projectFolder(of: $0) == wanted && self.group(of: $0) == group }
-        guard group == .parked else { return found }
-        return found.sorted { ($0.parking?.parkedAt ?? .distantPast) > ($1.parking?.parkedAt ?? .distantPast) }
+        return filed().byFolder[standardized(folder)]?[group] ?? []
+    }
+
+    /// The buckets for what is held now, filed again if `agents` or `filesToShow` has
+    /// changed since they were. Both are read every time, so a view asking is still
+    /// redrawn when either changes.
+    private func filed() -> AgentBuckets {
+        let held = agents
+        _ = filesToShow
+        guard bucketsBuiltAt != bucketsRevision else { return buckets }
+        var built = AgentBuckets()
+        for agent in held {
+            if built.byID[agent.id] == nil { built.byID[agent.id] = agent }
+            let folder = projectFolder(of: agent)
+            let group = group(of: agent)
+            built.byFolder[folder, default: [:]][group, default: []].append(agent)
+            built.byKey[AgentBuckets.Key(folder: folder, host: agent.host), default: [:]][group, default: []].append(agent)
+        }
+        // Parked reads most recently parked first (040, FR-003); the rest keep the
+        // newest-activity order `agents` is held in.
+        let parkedFirst: (Agent, Agent) -> Bool = {
+            ($0.parking?.parkedAt ?? .distantPast) > ($1.parking?.parkedAt ?? .distantPast)
+        }
+        for folder in built.byFolder.keys { built.byFolder[folder]?[.parked]?.sort(by: parkedFirst) }
+        for key in built.byKey.keys { built.byKey[key]?[.parked]?.sort(by: parkedFirst) }
+        buckets = built
+        bucketsBuiltAt = bucketsRevision
+        // A project's folder is resolved once per change rather than once per ask:
+        // `Project.standardize` asks the file system about every component of the path.
+        wantedFolders = [:]
+        return built
+    }
+
+    @ObservationIgnored private var wantedFolders: [URL: URL] = [:]
+
+    /// A project's folder as agents are filed under it, remembered until the next filing.
+    private func standardized(_ folder: URL) -> URL {
+        if let known = wantedFolders[folder] { return known }
+        let standardized = Project.standardize(folder)
+        wantedFolders[folder] = standardized
+        return standardized
     }
 
     /// The agent's folder as projects compare it, remembered after the first ask.
@@ -1076,12 +1122,7 @@ public final class AgentsModel {
     /// looked at is under Stopped, and wants nobody (FR-008, FR-011, FR-012).
     public func counts(in folder: URL?) -> [AgentGroup: Int] {
         guard let folder else { return [:] }
-        let wanted = Project.standardize(folder)
-        var counts: [AgentGroup: Int] = [:]
-        for agent in agents where projectFolder(of: agent) == wanted {
-            counts[group(of: agent), default: 0] += 1
-        }
-        return counts
+        return (filed().byFolder[standardized(folder)] ?? [:]).mapValues(\.count)
     }
 
     /// How many finished conversations in this project nobody has looked at since,
@@ -1089,15 +1130,23 @@ public final class AgentsModel {
     /// "complete": a complete chat that has been read is not news.
     public func unreadCount(in folder: URL?) -> Int {
         guard let folder else { return 0 }
-        let wanted = Project.standardize(folder)
-        return agents.filter { projectFolder(of: $0) == wanted && $0.showsUnread }.count
+        let groups = filed().byFolder[standardized(folder)] ?? [:]
+        return groups.values.reduce(0) { $0 + $1.count(where: \.showsUnread) }
     }
 
     /// `attentionCount(in:)` by folder alone, as the phone and the widget ask.
     public func attentionCount(in folder: URL?) -> Int {
         guard let folder else { return 0 }
-        let wanted = Project.standardize(folder)
-        return agents.filter { projectFolder(of: $0) == wanted && wantsALook($0) }.count
+        return Self.attention(in: filed().byFolder[standardized(folder)])
+    }
+
+    /// `wantsALook` counted over one project's buckets: every agent under Needs you or
+    /// Blocked, and the unread ones under the rest.
+    private static func attention(in groups: [AgentGroup: [Agent]]?) -> Int {
+        (groups ?? [:]).reduce(0) { total, bucket in
+            total + (bucket.key == .needsAttention || bucket.key == .blocked
+                ? bucket.value.count : bucket.value.count(where: \.showsUnread))
+        }
     }
 
     /// The question this agent is blocked on, if it still is.
@@ -1116,3 +1165,18 @@ public final class AgentsModel {
         return elicitations.first { $0.agentID == agentID }
     }
 }
+
+/// `AgentsModel`'s agents filed by project folder (standardized) and group, and again
+/// by folder and host, each list in the order `agents(in:group:)` returns.
+private struct AgentBuckets {
+    struct Key: Hashable {
+        var folder: URL
+        var host: HostID
+    }
+
+    /// The first agent held with each id, as `agents.first { $0.id == id }` finds it.
+    var byID: [UUID: Agent] = [:]
+    var byFolder: [URL: [AgentGroup: [Agent]]] = [:]
+    var byKey: [Key: [AgentGroup: [Agent]]] = [:]
+}
+

@@ -19,6 +19,74 @@ struct FiledOnceTests {
         return agent
     }
 
+    /// `agents(in:group:)` as it was: a pass over everything held.
+    private func scanned(_ model: AgentsModel, _ folder: URL, _ group: AgentGroup, host: HostID? = nil) -> [UUID] {
+        let wanted = Project.standardize(folder)
+        let found = model.agents.filter {
+            $0.projectFolder == wanted && model.group(of: $0) == group && (host == nil || $0.host == host)
+        }
+        guard group == .parked else { return found.map(\.id) }
+        return found.sorted { ($0.parking?.parkedAt ?? .distantPast) > ($1.parking?.parkedAt ?? .distantPast) }.map(\.id)
+    }
+
+    private func expectAgreement(_ model: AgentsModel, _ note: Comment) {
+        for folder in [api, web] {
+            for group in AgentGroup.allCases {
+                #expect(model.agents(in: folder, group: group).map(\.id) == scanned(model, folder, group), note)
+                for host in [HostID.mac, devbox] {
+                    #expect(model.agents(in: ProjectKey(host: host, folder: folder), group: group).map(\.id)
+                            == scanned(model, folder, group, host: host), note)
+                }
+            }
+            let key = ProjectKey(host: .mac, folder: folder)
+            let held = model.agents.filter { $0.projectFolder == Project.standardize(folder) }
+            let mine = held.filter { $0.host == .mac }
+            #expect(model.unreadCount(in: folder) == held.count(where: \.showsUnread), note)
+            #expect(model.unreadCount(in: key) == mine.count(where: \.showsUnread), note)
+            #expect(model.attentionCount(in: folder) == held.count(where: model.wantsALook), note)
+            #expect(model.attentionCount(in: key) == mine.count(where: model.wantsALook), note)
+            var counts: [AgentGroup: Int] = [:]
+            for one in mine { counts[model.group(of: one), default: 0] += 1 }
+            #expect(model.counts(in: key) == counts, note)
+        }
+    }
+
+    @Test func theBucketsAgreeWithAScanAfterEveryChange() throws {
+        let model = AgentsModel()
+        var agents: [Agent] = []
+        for (index, state) in AgentState.allCases.enumerated() {
+            agents.append(agent(api, state, at: Double(index)))
+            agents.append(agent(web, state, at: Double(index) + 0.5))
+            agents.append(agent(api, state, at: Double(index) + 0.25, host: devbox))
+        }
+        var older = agent(api, .finished, at: 20); older.parking = .parked(at: t0)
+        var newer = agent(api, .finished, at: 10); newer.parking = .parked(at: t0.addingTimeInterval(60))
+        var unread = agent(api, .finished, at: 30); unread.isUnread = true
+        model.replaceAgents(agents + [older, newer, unread])
+        expectAgreement(model, "listed")
+        #expect(model.agents(in: api, group: .parked).map(\.id) == [newer.id, older.id], "most recently parked first")
+
+        var moved = agents[1]
+        moved.state = .running
+        moved.lastActivityAt = t0.addingTimeInterval(100)
+        model.upsert(moved)
+        expectAgreement(model, "an agent changed")
+        #expect(model.agent(moved.id)?.state == .running, "the index has the new copy")
+
+        model.apply(DaemonAPI.Notification.agentShowFile,
+                    try JSONValue.encoding(DaemonAPI.ShowFileNotification(agentID: moved.id,
+                                                                          file: ShownFile(path: "/tmp/work/web/a"))))
+        expectAgreement(model, "a file to show")
+        #expect(model.agents(in: web, group: .needsAttention).contains { $0.id == moved.id })
+        _ = model.takeFileToShow(for: moved.id)
+        expectAgreement(model, "the file seen")
+
+        model.apply(DaemonAPI.Notification.agentRemoved,
+                    try JSONValue.encoding(DaemonAPI.AgentRemovedNotification(agentID: unread.id)))
+        expectAgreement(model, "an agent removed")
+        #expect(model.agent(unread.id) == nil)
+    }
+
     @Test func takingAListMergesKeepsListsAndSortsOnce() {
         let model = AgentsModel()
         var held = agent(api, .finished, at: 0)
