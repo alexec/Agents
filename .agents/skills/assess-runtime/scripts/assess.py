@@ -2,6 +2,7 @@
 """Assess runtimes unattended (#47), on a daemon's root: start, answer, follow, score.
 
   assess.py ROOT RUNTIME [RUNTIME …] --folder PROJECT [--minutes 20] [--json OUT]
+  assess.py ROOT RUNTIME --folder PROJECT --follow AGENT    carry on one whose driver stopped
 
 For each runtime, one at a time: `runtimes/assess` starts the assessing agent in PROJECT
 (which must be one of the daemon's projects). Then this answers what a person would, for
@@ -62,6 +63,11 @@ def assess(client, runtime, folder, minutes):
         return {"runtime": runtime, "skipped": str(e)}
     agent = started["agentID"]
     print(f"{runtime}: assessing as {agent} on {started.get('model') or 'the default model'}", flush=True)
+    return follow(client, runtime, agent, started.get("model"), started.get("reportPath"), minutes)
+
+
+def follow(client, runtime, agent, model, report_path, minutes):
+    """Answer for the assessing agent and its helpers until its last turn, then score it."""
     end = time.time() + minutes * 60
     answered = set()
     record = None
@@ -89,7 +95,7 @@ def assess(client, runtime, folder, minutes):
         print(f"  {runtime}: not finished after {minutes} min; scoring what is there", flush=True)
     time.sleep(2)  # the daemon scores behind the ending
     score = client.call("runtimes/assessment", {"agentID": agent}, timeout=60)
-    return {"runtime": runtime, "agent": agent, "model": started.get("model"), "reportPath": started.get("reportPath"),
+    return {"runtime": runtime, "agent": agent, "model": model, "reportPath": report_path,
             "state": (record or {}).get("state"), "outcome": ((record or {}).get("report") or {}).get("outcome"),
             "score": score}
 
@@ -108,11 +114,18 @@ def main():
     parser.add_argument("--folder", required=True)
     parser.add_argument("--minutes", type=int, default=20)
     parser.add_argument("--json", help="write every result here too")
+    parser.add_argument("--follow", metavar="AGENT",
+                        help="carry on an assessment already started (its driver stopped): RUNTIME is its runtime")
     args = parser.parse_args()
     client = Client(args.root)
     results = []
     for runtime in args.runtimes:
-        result = assess(client, runtime, os.path.abspath(args.folder), args.minutes)
+        if args.follow:
+            record = next(a for a in client.call("agents/list", {"includeArchived": True}) if a["id"] == args.follow)
+            result = follow(client, runtime, args.follow, (record.get("startOptions") or {}).get("values", {}).get("model"),
+                            None, args.minutes)
+        else:
+            result = assess(client, runtime, os.path.abspath(args.folder), args.minutes)
         results.append(result)
         if "skipped" in result:
             print(f"\n## {runtime}: skipped\n\n{result['skipped']}\n", flush=True)
