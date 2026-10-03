@@ -154,6 +154,16 @@ for (const scene of scenes) {
         say(`${title}: ${JSON.stringify(await visible(".workflow-page h1, .workflow-page .heading p, .workflow-page .trigger"))}`);
         await shot(name);
       }
+    } else if (scene === "startsoff") {
+      // #124: a workflow that started off says why, an agent's and a file's.
+      await openProject();
+      await page.waitFor(`document.querySelector(".workflows .row")`, 30_000);
+      for (const [title, name] of [["Nightly check", "startsoff-agent"], ["Weekly review", "startsoff-file"]]) {
+        await clickRow(".workflows", title);
+        await sleep(500);
+        say(`${title}: ${JSON.stringify(await visible(".workflow-page h1, .workflow-page .happening"))}`);
+        await shot(name);
+      }
     } else if (scene === "changes") {
       // #63 Changes as a tree with status colours; Files as the same rows; #66 Back with the file marked.
       await openProject();

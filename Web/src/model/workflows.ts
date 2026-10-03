@@ -416,6 +416,24 @@ const limitAllowed: Record<WorkflowLimit, number> = { project: 3, total: 10 };
 export const turnedOffSentence = "Turned off — none of its triggers run it. "
   + `It keeps its place among this project's ${limitAllowed.project} workflows, and Run now still runs it`;
 
+/** WorkflowOffReason.sentence (#124): why it is off, or null for the person's own switch. */
+export function offReasonSentence(s: WorkflowSummary): string | null {
+  switch ((s as { offReason?: string }).offReason) {
+    case "file": return "Off: its file asks to start off. Turn it on when you are ready";
+    case "writtenByAgent": return "Off: written by an agent. Turn it on when you are ready";
+    case "agent": return "Off: an agent turned it off";
+    default: return null;
+  }
+}
+
+/** The instance WorkflowSummary.turnedOffSentence: led by why, when there is a why. */
+export function turnedOffSentenceFor(s: WorkflowSummary): string {
+  const why = offReasonSentence(s);
+  if (!why) return turnedOffSentence;
+  return `${why}. None of its triggers run it until it is turned on. `
+    + `It keeps its place among this project's ${limitAllowed.project} workflows, and Run now still runs it`;
+}
+
 function limitSentence(limit: WorkflowLimit): string {
   return limit === "project" ? `This project already runs its ${limitAllowed.project} workflows`
     : `${limitAllowed.total} workflows are already running, across every project`;
@@ -459,8 +477,10 @@ export function happening(summary: WorkflowSummary, now = new Date()): string | 
   const parts: string[] = [];
   if (summary.isArchived) parts.push("Archived — it will not run until it is restored");
   else if (summary.awaitingApproval) {
-    return (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on the Mac to let it run";
-  } else if (!isOn(summary)) parts.push(turnedOffSentence);
+    const waiting = (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on the Mac to let it run";
+    const why = offReasonSentence(summary);
+    return why ? `${waiting} · ${why}` : waiting;
+  } else if (!isOn(summary)) parts.push(turnedOffSentenceFor(summary));
   else if (summary.overLimit) parts.push(`${limitSentence(summary.overLimit)}. ${limitRemedy(summary.overLimit)}`);
   else if (summary.nextFireAt !== undefined) parts.push(`Next ${namedRelative(fromWireDate(summary.nextFireAt), now)}`);
   const outcome = summary.lastOutcome;

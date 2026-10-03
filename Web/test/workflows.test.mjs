@@ -95,6 +95,20 @@ test("off says so in place of a next time, and in what is happening (#100)", () 
   assert.equal(w.happening(refused), "Missed 2 times — the app was closed");
 });
 
+test("off says why when it started off, as the Mac and the Remote do (#124)", () => {
+  const summary = { workflow: { workflowID: "n", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
+    isArchived: false, isEnabled: false, isRunning: false, nextFireAtByTrigger: [] };
+  const rest = ". None of its triggers run it until it is turned on. It keeps its place among this project's 3 workflows, and Run now still runs it";
+  assert.equal(w.happening({ ...summary, offReason: "writtenByAgent" }),
+    "Off: written by an agent. Turn it on when you are ready" + rest);
+  assert.equal(w.happening({ ...summary, offReason: "file" }),
+    "Off: its file asks to start off. Turn it on when you are ready" + rest);
+  assert.equal(w.happening({ ...summary, offReason: "agent" }), "Off: an agent turned it off" + rest);
+  assert.equal(w.happening({ ...summary, offReason: "person" }), w.turnedOffSentence);
+  assert.equal(w.happening({ ...summary, offReason: "writtenByAgent", awaitingApproval: { isNew: true } }),
+    "New — approve it on the Mac to let it run · Off: written by an agent. Turn it on when you are ready");
+});
+
 // Finer matching (073): filters in words, lists included, held to EventPatternFinerTests.swift's
 // summaries. The page names the event where the Mac says its meaning; the filters read the same.
 test("an event trigger's filters are said in the Mac's words, lists included", () => {

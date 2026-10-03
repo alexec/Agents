@@ -115,7 +115,11 @@ A workflow does not run, and its page says why, when:
 - it is archived;
 - it is turned off. Unlike archived, this is recorded on its row, as **Did not run — it
   is turned off**, counted on one line however many times it is skipped. **Run now**
-  still runs it;
+  still runs it. A workflow that started off says why first: **Off: its file asks to
+  start off** (`enabled: false`), **Off: written by an agent** (see below), or **Off: an
+  agent turned it off**. The Mac, the phone and the web page say the same. While one
+  that started off is still waiting for your OK, its page says both, so approving it is
+  not mistaken for turning it on;
 - its file is new, or has changed since you approved it, and you have not approved it.
   Its row and page say **waiting for your OK** and offer **Approve**. Approval is of the
   file as you saw it: a file that changes afterwards waits again. Changes made on the
@@ -189,7 +193,14 @@ they do:
 | Its triggers | Do not run it; each one skipped is counted on its row | Do not run it; nothing is recorded |
 | **Run now** | Runs it, to try it | Refuses |
 | The three-per-project ceiling | Still counts, so turning it off and on again moves nothing | Frees its place |
-| Turned back on by | **Enabled**, **Turn On**, the phone, or an agent if an agent turned it off | **Bring Back** |
+| Turned back on by | **Enabled**, **Turn On**, the phone, or an agent if an agent turned it off (not one an agent wrote, or one whose file says `enabled: false`) | **Bring Back** |
+
+A new workflow an agent writes with `manage_workflows` starts turned off, whatever its
+file says, so you turn it on knowingly once you have approved it. The app records that
+itself and leaves the file exactly as the agent wrote it; an agent cannot turn it on.
+An agent changing a workflow that already exists leaves its switch where it was. A file
+you or an agent put in `.agents/workflows/` some other way, such as a merge, starts on
+unless it says `enabled: false`.
 
 Off is for a workflow you still use but want quiet for a while: while a test is flaky,
 or while you are away. Archive is for one you are putting away.
