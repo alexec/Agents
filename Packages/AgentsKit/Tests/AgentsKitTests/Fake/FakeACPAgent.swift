@@ -157,7 +157,7 @@ actor FakeACPAgent {
     /// Tasks announced and not yet ended, which is what Stop can reach.
     private var runningTasks: [String: String] = [:]
     private(set) var stopRequests: [JSONValue] = []
-    /// How many `session/cancel` notifications came.
+    /// How many `session/cancel` notifications came while a turn was held.
     private(set) var cancels = 0
     /// The held turn's wait, resumed by the gate (false) or by a cancel (true).
     private var heldTurn: (turn: Int, wait: CheckedContinuation<Bool, Never>)?
@@ -184,9 +184,10 @@ actor FakeACPAgent {
     }
 
     private func heardCancel() {
+        // Only a cancel of a turn under way: the one letting a session go is not counted.
+        guard let held = heldTurn else { return }
         cancels += 1
         guard script.endsOnCancel else { return }
-        guard let held = heldTurn else { return }
         releaseHeldTurn(held.turn, cancelled: true)
     }
 
@@ -205,7 +206,7 @@ actor FakeACPAgent {
             heldTurns += 1
             let turn = heldTurns
             heldTurn = (turn, continuation)
-            Task { await gate.pass(); await self.releaseHeldTurn(turn, cancelled: false) }
+            Task { await gate.pass(); self.releaseHeldTurn(turn, cancelled: false) }
         }
     }
 

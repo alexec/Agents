@@ -118,7 +118,8 @@ struct FinishTurnEndsTurnTests {
         #expect(agent.state == .finished)
         #expect(agent.endedReason == .endTurn)
         #expect(agent.report?.outcome == .partlyDone)
-        #expect(await launcher.lastAgent?.cancels == 1)
+        // The app's cancel, and the one letting its session go, which it ignores too.
+        #expect((await launcher.lastAgent?.cancels ?? 0) >= 1)
         #expect(await core.turnTasks[id] == nil)
         // Its late answer, if it ever comes, is let go: the record keeps one ending.
         gate.open()
@@ -167,7 +168,7 @@ struct FinishTurnEndsTurnTests {
         let (id, token) = try await start(core, in: work, "Write the notes")
         await running(core, id)
         await eventually("the fake is in its turn") { gate.turnsArrived == 1 }
-        let fake = try #require(await launcher.lastAgent)
+        let fake = try #require(launcher.lastAgent)
 
         try await finish(core, id, token, "done", "Notes written.")
         // Four pieces of a closing message, each sooner than the quiet the app waits
