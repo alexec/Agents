@@ -79,6 +79,7 @@
 | Change | Issue | Page | Notes |
 |---|---|---|---|
 | Declared resources with descriptions, counted holders ("2 of 3 held") | #116 | **has**, read-only | A **Resources** fold under each host lists the declared resources with their descriptions and "2 of 3 held", each holder, and anything else held or awaited; kept by `leases/changed` (added to `WebSignatures`). **web: by design** for declaring, editing and ending leases: they are the Mac's (Settings ▸ Resources, the Resources page), as on the Remote. |
+| The project Dashboard: row at the top of the sessions column, page of tiles, greying, detail, Hide/Show/Remove, live | #122 (074) | **has** | Same row, sections, grid (tables and notes across), SVG sparklines, greyed stale tiles, a keeper foot that opens the session or workflow; Hide/Show/Remove and Details… in a tile's ···. Show Hidden Tiles is a check box in the page's head, where the window has it in a menu. Shots: `specs/074-project-dashboard/walks/074-web-*.png`; window: `specs/074-project-dashboard/look/mac-dashboard.png`. |
 
 ## Left out by design
 
@@ -95,6 +96,7 @@ Of the rows above, the page lacked or partly had 12 before this branch. All 12 a
 #87, #98, #100, #83 (page side), #88, #101, the sessions column, #63 (Changes), #63 (Files), #66, #82, #90.
 
 The window's shots found two more, both closed: answer cards held while their host is down (#83), and the Changes total line (#63).
+
 
 What is still different, and why:
 - **#83, "said at once":** neither the window nor the page hears a paused host for about a minute. Both learn of it from the control plane, which is #106's lane.

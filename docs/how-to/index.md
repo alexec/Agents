@@ -82,5 +82,7 @@ something particular done.
 
 - [Set up a workflow](set-up-a-workflow.md): start agents on a schedule, or when another
   agent finishes, stops or asks.
+- [Keep a project Dashboard](keep-a-project-dashboard.md): the tiles agents keep about a
+  project, on the Mac, the phone and the web page, and hiding or removing them.
 - [Have an agent wait for something](wait-for-something.md): checks passing, another
   agent finishing or the Mac waking, and agents telling each other.

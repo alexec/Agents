@@ -328,8 +328,12 @@ extension DaemonCore {
 
 /// The Dashboard's words that are the host's.
 enum DashboardWords {
+    /// 24-hour, as the rest of the app's times are: "18:41".
     static func time(_ date: Date) -> String {
-        date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 
     static func dayAndTime(_ date: Date) -> String {
