@@ -80,6 +80,7 @@
 |---|---|---|---|
 | Declared resources with descriptions, counted holders ("2 of 3 held") | #116 | **has**, read-only | A **Resources** fold under each host lists the declared resources with their descriptions and "2 of 3 held", each holder, and anything else held or awaited; kept by `leases/changed` (added to `WebSignatures`). **web: by design** for declaring, editing and ending leases: they are the Mac's (Settings ▸ Resources, the Resources page), as on the Remote. |
 | The project Dashboard: row at the top of the sessions column, page of tiles, greying, detail, Hide/Show/Remove, live | #122 (074) | **has** | Same row, sections, grid (tables and notes across), SVG sparklines, greyed stale tiles, a keeper foot that opens the session or workflow; Hide/Show/Remove and Details… in a tile's ···. Show Hidden Tiles is a check box in the page's head, where the window has it in a menu. Shots: `specs/074-project-dashboard/walks/074-web-*.png`; window: `specs/074-project-dashboard/look/mac-dashboard.png`. |
+| Assess a runtime: **Assess…** in Settings ▸ Agent Runtimes on the Mac, **Assess in…** in a runtime's menu on the Remote's Runtimes page | #47 | lacks, **web: by design** | The page has neither Settings nor a Runtimes page (both left out by design below), so it has nowhere to start one. What an assessment does is all in its conversation, which the page shows like any other: the steps, the form it asks, and the app's scored table as a note at the end. |
 
 ## Left out by design
 
@@ -89,6 +90,7 @@
 - Approving a workflow, and changing a workflow's settings: the page says "approve it on the Mac", and shows the settings only in the workflow's one-line summary.
 - HTML as a live page.
 - Declaring, editing and removing resources, and ending leases (#116): the Mac's.
+- Starting a runtime assessment (#47): it lives in Settings ▸ Agent Runtimes and on the Remote's Runtimes page, neither of which the page has.
 
 ## Counts
 

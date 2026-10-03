@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Each runtime on the Mac and where its allowance stands (065, US4): out, since when,
 /// when it is next checked, and what is left of its plan. The Mac's Agent Runtimes
-/// words, as a list. Mark available is a swipe action; nothing else here changes a thing.
+/// words, as a list. Mark available is a swipe action, and Assess in… (#47) is in a row's menu.
 struct RuntimesView: View {
     @Environment(RemoteModel.self) private var model
 
@@ -12,6 +12,14 @@ struct RuntimesView: View {
             if let allowances = model.runtimeAllowances {
                 ForEach(allowances.rows) { row in
                     RuntimeAllowanceRow(row: row, at: allowances.at)
+                        // Assess it (#47), in one of the Mac's projects, as Settings does there.
+                        .contextMenu {
+                            Menu("Assess in…") {
+                                ForEach(macProjects) { summary in
+                                    Button(summary.name) { assess(row.runtimeID, in: summary.project.folder) }
+                                }
+                            }
+                        }
                         .swipeActions {
                             if row.state.isOut {
                                 Button("Mark available") { Task { await model.markRuntimeAvailable(row.credentialKey) } }
@@ -32,6 +40,21 @@ struct RuntimesView: View {
         }
         .task { await model.refreshRuntimeAllowances() }
         .refreshable { await model.refreshRuntimeAllowances() }
+        .alert("Not started", isPresented: Binding(get: { refusal != nil }, set: { if !$0 { refusal = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(refusal ?? "")
+        }
+    }
+
+    @State private var refusal: String?
+
+    private var macProjects: [DaemonAPI.ProjectSummary] {
+        model.projects.filter { $0.host == .mac && $0.exists }
+    }
+
+    private func assess(_ runtimeID: String, in folder: URL) {
+        Task { refusal = await model.assessRuntime(runtimeID, in: folder) }
     }
 }
 
