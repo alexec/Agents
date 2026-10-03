@@ -976,6 +976,8 @@ public actor DaemonCore {
             workflowRunFinished(agentID: agentID)
             workflowsRespond(to: next == .finished ? .finished : .stopped,
                              agentID: agentID, depth: depth, causingEvent: cause, endingRun: endingRun)
+            // A runtime assessment's last turn is scored from the record (#47).
+            if next == .finished { scoreAssessmentIfDue(agentID) }
         // An agent that has started has neither finished nor stopped, so it fires
         // nothing. Named rather than folded in with `.running`, because it is not
         // running — it is about to be.

@@ -82,6 +82,7 @@ nav:
       - how-to/set-up-a-workflow.md
       - how-to/keep-a-project-dashboard.md
       - how-to/sign-a-runtime-in.md
+      - how-to/assess-a-runtime.md
       - how-to/share-skills-across-agents.md
       - how-to/add-a-skill-from-a-catalogue.md
       - how-to/add-an-mcp-server-from-the-registry.md

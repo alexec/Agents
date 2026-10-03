@@ -1005,6 +1005,21 @@ final class AppModel {
         work.replaceRuntimeAllowances(allowances)
     }
 
+    /// Assess a runtime (#47): start an agent on it, in a project on this Mac, with the
+    /// assessment's steps, and open it. Nil when it started; the daemon's refusal if not
+    /// (a runtime out of the pool, not installed, not signed in).
+    func assessRuntime(_ runtimeID: String, in folder: URL) async -> String? {
+        do {
+            let started = try await client.call(DaemonAPI.Method.runtimesAssess,
+                                                DaemonAPI.AssessRuntimeRequest(runtimeID: runtimeID, folder: folder),
+                                                returning: DaemonAPI.AssessRuntimeResult.self)
+            openAgent(started.agentID)
+            return nil
+        } catch {
+            return (error as? JSONRPCError)?.message ?? error.localizedDescription
+        }
+    }
+
     /// The Mac's word on the plans it relays, to every connected server (052, R6).
     private func sendSharedAllowances(_ allowances: RuntimeAllowances) async {
         let shared = allowances.shared ?? []

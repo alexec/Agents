@@ -6,7 +6,7 @@ time, so the agent running it can hold the "build" lease around the one phase th
 
   nightly-runtimes.py plan   [--available claude,codex,…] [--runtimes …] [--force]
   nightly-runtimes.py build  [RUN]        xcodebuild Agents Host + the runtime tests  (lease "build")
-  nightly-runtimes.py check  [RUN]        handshake, tools and one real turn, on a scratch root
+  nightly-runtimes.py check  [RUN] [--assess]  handshake, tools, one real turn (+ #47's assessment)
   nightly-runtimes.py report [RUN] [--dry-run]
 
 Each phase takes the run that `plan` made (the latest, without RUN). Every phase also takes
@@ -29,7 +29,10 @@ build    xcodegen + xcodebuild -scheme AgentsHost into <home>/tree/build/DD, the
 check    Starts a scratch host on that build (the run-app skill's launch.sh --no-window),
          installs each app-copy runtime from its new pin, then per runtime:
          scripts/acp-handshake.sh, scripts/runtime-tools.sh (a NEW tool fails), and one real
-         turn through agentsd on the cheapest model the runtime offers. Stops the host.
+         turn through agentsd on the cheapest model the runtime offers. With --assess, a
+         runtime whose turn passed is then assessed (#47, the assess-runtime skill): an agent
+         on it works through the app's tools and the daemon scores it. Off by default: it
+         takes about five minutes a runtime. Stops the host.
 report   A pinned runtime that passed every step: one PR per runtime, on the branch
          nightly/runtime-<id> off origin/main (only its toolset folder changes), opened or
          updated. A runtime that failed a step: one issue per runtime, opened or commented
@@ -535,6 +538,26 @@ def real_turn(client, root, rid, model, timeout=300):
     return True, what
 
 
+def assess_client(tree):
+    path = os.path.join(tree, ".agents/skills/assess-runtime/scripts/assess.py")
+    spec = importlib.util.spec_from_file_location("nightly_assess", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def assessment(tree, client, root, rid):
+    """(ok, the daemon's table) for one runtime, assessed unattended on the scratch root."""
+    module = assess_client(tree)
+    result = module.assess(client, rid, os.path.join(root, "work"), 20)
+    if "skipped" in result:
+        return False, "not started: " + result["skipped"]
+    checks = result["score"]["checks"]
+    ok = not any(c["verdict"] == "failed" for c in checks)
+    passed = sum(c["verdict"] == "passed" for c in checks)
+    return ok, f"{passed} of {len(checks)} passed, ended {result['outcome']}\n\n" + module.table(result["score"])
+
+
 def check(args):
     run = run_dir(args.home, args.run)
     record = load(os.path.join(run, "run.json"), {})
@@ -593,6 +616,14 @@ def check(args):
             steps["turn"] = {"ok": ok, "output": tail(out), "model": model}
             if not ok:
                 entry["status"] = "failed"
+            elif args.assess:
+                try:
+                    ok, out = assessment(tree, client, root, rid)
+                except Exception as e:
+                    ok, out = False, f"{type(e).__name__}: {e}"
+                steps["assess"] = {"ok": ok, "output": tail(out)}
+                if not ok:
+                    entry["status"] = "failed"
             print(f"{rid}: " + ", ".join(f"{s} {'ok' if v['ok'] else 'FAILED'}" for s, v in steps.items()))
     finally:
         save(os.path.join(run, "run.json"), record)
@@ -601,7 +632,7 @@ def check(args):
 
 # ---- report -----------------------------------------------------------------------------
 
-STEP_ORDER = ["update", "build", "tests", "start", "install", "handshake", "tools", "turn"]
+STEP_ORDER = ["update", "build", "tests", "start", "install", "handshake", "tools", "turn", "assess"]
 
 
 def steps_table(entry):
@@ -790,6 +821,8 @@ def main():
     parser.add_argument("--force", action="store_true", help="test even what has not changed")
     parser.add_argument("--dry-run", action="store_true", help="report: open, push and record nothing")
     parser.add_argument("--keep", action="store_true", help="check: leave the scratch root on disk")
+    parser.add_argument("--assess", action="store_true",
+                        help="check: also assess each runtime whose turn passed (#47); off by default")
     args = parser.parse_args()
     args.home = os.path.abspath(os.path.expanduser(args.home))
     {"plan": plan, "build": build, "check": check, "report": report}[args.phase](args)

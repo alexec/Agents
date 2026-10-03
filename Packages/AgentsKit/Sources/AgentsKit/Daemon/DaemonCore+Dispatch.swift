@@ -14,6 +14,10 @@ extension DaemonCore {
                        from surface: Surface? = nil, connection: UUID? = nil,
                        peer: Int32? = nil, role: ConnectionRole = .control) async -> Result<JSONValue, JSONRPCError> {
         if let refusal = await tokenRefusal(params, peer: peer) { return .failure(refusal) }
+        // An agent's call to the app's own tools, kept as answered (#47). Read before the
+        // call, which may be the last one its token is good for.
+        let caller = params?["token"]?.stringValue.flatMap { appTokens[$0] }
+        let began = now()
         // Who asked travels with the work, so a runtime started deep inside it is started
         // with what that connection lent (043).
         let answer = await RequestConnection.$current.withValue(connection) {
@@ -21,6 +25,7 @@ extension DaemonCore {
                 await dispatch(method: method, params: params, from: surface, connection: connection, role: role)
             }
         }
+        if let caller { keepAppToolCall(caller, method: method, params: params, answer: answer, began: began) }
         return retiredInstead(of: answer, params: params)
     }
 
@@ -592,6 +597,14 @@ extension DaemonCore {
                 // Someone is looking at the runtimes: ask what is left, behind the answer.
                 Task { await self.measureAllowances() }
                 return .success(try JSONValue.encoding(runtimeAllowances()))
+
+            case DaemonAPI.Method.runtimesAssess:
+                let request = try require(params, as: DaemonAPI.AssessRuntimeRequest.self)
+                return .success(try JSONValue.encoding(try await assessRuntime(request)))
+
+            case DaemonAPI.Method.runtimesAssessment:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                return .success(try JSONValue.encoding(try await assessment(request.agentID)))
 
             case DaemonAPI.Method.runtimesMarkAvailable:
                 let request = try require(params, as: DaemonAPI.MarkRuntimeAvailable.self)

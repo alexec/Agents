@@ -34,6 +34,12 @@ struct AgentRuntimesSettingsView: View {
                     }
                 }
                 .paperListRow()
+                // Assess it (#47): an agent on it works through every group of the app's
+                // tools, and the daemon scores what it did from its own record.
+                Section("Assessment") {
+                    AssessRuntimeRow(runtimeID: status.id, name: status.runtime.name)
+                }
+                .paperListRow()
                 // Its command sandbox (064): a default every agent on it follows, or why
                 // the app has no say.
                 Section("Command sandbox") {
@@ -149,5 +155,57 @@ private struct SandboxDefaultRow: View {
         Binding(
             get: { model.sandboxSettings.choice(for: runtimeID) },
             set: { choice in Task { await model.setSandboxDefault(choice, for: runtimeID) } })
+    }
+}
+
+/// "Assess…" (#47): pick a project on this Mac, and an agent on this runtime is started there
+/// with the assessment's steps, on the cheapest model the runtime offers. Its report
+/// goes to `.agents/reviews/runtimes/` in that project, and the app's own score into its
+/// conversation when it ends.
+private struct AssessRuntimeRow: View {
+    @Environment(AppModel.self) private var model
+    let runtimeID: String
+    let name: String
+    @State private var refusal: String?
+    @State private var starting = false
+
+    private var projects: [DaemonAPI.ProjectSummary] {
+        model.projects.filter { $0.host == .mac && $0.exists && $0.project.archivedAt == nil }
+    }
+
+    var body: some View {
+        LabeledContent {
+            Menu("Assess…") {
+                ForEach(projects) { summary in
+                    Button(summary.name) { assess(in: summary.project.folder) }
+                }
+            }
+            .menuStyle(.button)
+            .fixedSize()
+            .disabled(projects.isEmpty || starting)
+        } label: {
+            Text("Check \(name) with the app’s tools")
+        }
+        Text("Starts an agent on \(name) that works through the app’s tools — ending a turn, questions, "
+             + "files, helpers, leases, events, the Dashboard and workflows — and writes a report. The app "
+             + "scores it from its own record. It asks you two short questions.")
+            .appText(.supporting)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        if let refusal {
+            Text(refusal)
+                .appText(.supporting)
+                .foregroundStyle(StateTint.failure.style(or: .primary))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func assess(in folder: URL) {
+        starting = true
+        refusal = nil
+        Task {
+            refusal = await model.assessRuntime(runtimeID, in: folder)
+            starting = false
+        }
     }
 }

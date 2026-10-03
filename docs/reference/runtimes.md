@@ -368,6 +368,7 @@ When a runtime's sandbox cannot start, the agent stops with a card saying so, an
 ## See also
 
 - [Sign a runtime in](../how-to/sign-a-runtime-in.md)
+- [Assess a runtime](../how-to/assess-a-runtime.md)
 - [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
 - [Why agents' own tools are taken away](../explanation/scoped-tools.md)
 - [Tools the app gives agents](agent-tools.md)

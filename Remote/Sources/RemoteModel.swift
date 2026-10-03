@@ -1466,6 +1466,19 @@ final class RemoteModel {
         work.replaceRuntimeAllowances(allowances)
     }
 
+    /// Assess a runtime (#47) in a project on the Mac: the daemon starts an agent on it with
+    /// the assessment's steps. Nil when it started; the daemon's refusal if not.
+    func assessRuntime(_ runtimeID: String, in folder: URL) async -> String? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.runtimesAssess,
+                                      DaemonAPI.AssessRuntimeRequest(runtimeID: runtimeID, folder: folder),
+                                      returning: DaemonAPI.AssessRuntimeResult.self)
+            return nil
+        } catch {
+            return (error as? JSONRPCError)?.message ?? error.localizedDescription
+        }
+    }
+
     /// What each agent holds and waits for (036). The phone only reads it: the
     /// Resources page and ending a lease are the Mac's (FR-011).
     private func refreshLeases() async {
