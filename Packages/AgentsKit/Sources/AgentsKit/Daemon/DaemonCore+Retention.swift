@@ -197,6 +197,7 @@ extension DaemonCore {
         live.removeValue(forKey: id)
         eventTasks.removeValue(forKey: id)
         turnTasks.removeValue(forKey: id)
+        endWatch(id)
         terminalServices.removeValue(forKey: id)
         shownPlanFiles.removeValue(forKey: id)
         openEventWaits.removeValue(forKey: id)
@@ -221,6 +222,7 @@ extension DaemonCore {
         if live[id] != nil { held.append("live") }
         if eventTasks[id] != nil { held.append("eventTasks") }
         if turnTasks[id] != nil { held.append("turnTasks") }
+        if finishedTurns[id] != nil { held.append("finishedTurns") }
         if terminalServices[id] != nil { held.append("terminalServices") }
         if shownPlanFiles[id] != nil { held.append("shownPlanFiles") }
         if openEventWaits[id] != nil { held.append("openEventWaits") }

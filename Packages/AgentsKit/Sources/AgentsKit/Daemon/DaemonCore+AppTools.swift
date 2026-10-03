@@ -292,6 +292,9 @@ extension DaemonCore {
         // behind when the daemon is killed mid-call.
         await record(.workReported(report), for: agentID)
         changed(agent)
+        // The turn is over when the agent says so, whether or not its runtime lets go
+        // of the prompt (#139).
+        watchTheEnd(of: agentID)
         // A report that says the agent is stuck begins a need without a state change,
         // which is why this is the one place besides `move` that has to ask (021).
         reconsider()

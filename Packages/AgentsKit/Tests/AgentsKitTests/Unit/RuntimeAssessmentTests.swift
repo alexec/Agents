@@ -311,6 +311,15 @@ struct RuntimeAssessmentTests {
         #expect(verdicts(record)["worktree"] == .notOffered)
     }
 
+    /// OpenCode is never offered the move, so there is no call to find.
+    @Test func aRuntimeThatCannotMoveIsNotOfferedTheWorktree() {
+        var record = goodRecord()
+        record.calls.removeAll { $0.arguments?["move"] != nil }
+        #expect(verdicts(record)["worktree"] == .failed)
+        record.runtimeID = "opencode"
+        #expect(verdicts(record)["worktree"] == .notOffered)
+    }
+
     @Test func readingAnotherSessionIsNotReadingYourOwn() {
         var record = goodRecord()
         let i = record.calls.firstIndex { $0.method == DaemonAPI.Method.agentsReadSession }!
@@ -377,6 +386,9 @@ struct RuntimeAssessmentTests {
                                   ])]))
         #expect(RuntimeAssessment.cheapestModel(in: [option]) == "haiku")
         #expect(RuntimeAssessment.cheapestModel(in: []) == nil)
+        #expect(RuntimeAssessment.model(asked: nil, in: [option]) == "haiku")
+        #expect(RuntimeAssessment.model(asked: "default", in: [option]) == nil)
+        #expect(RuntimeAssessment.model(asked: "sonnet", in: [option]) == "sonnet")
     }
 
     @Test func theReportGoesUnderReviewsRuntimes() {
