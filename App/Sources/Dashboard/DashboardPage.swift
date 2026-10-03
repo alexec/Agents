@@ -1,55 +1,6 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The Dashboard row (074 FR-031): at the top of the sessions column, a row like a
-/// workflow's, with how many tiles there are and a red mark when a live tile is bad.
-/// Tagged into the column's one selection, so it is picked as a session is.
-struct DashboardRow: View {
-    @Environment(AppModel.self) private var model
-    let folder: URL
-
-    var body: some View {
-        let summary = model.dashboardSummary(in: folder)
-        HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Image(systemName: "square.grid.2x2")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                    Text("Dashboard")
-                        .appText(.supporting).fontWeight(.semibold)
-                    if (summary?.bad ?? 0) > 0 {
-                        Circle().fill(StateTint.failure.style(or: .secondary)).frame(width: 7, height: 7)
-                            .accessibilityLabel("A tile needs a look")
-                    }
-                }
-                Text(Self.detail(summary))
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
-        }
-        .padding(.vertical, 6)
-        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-        .tag(ColumnPick.dashboard)
-        .accessibilityElement(children: .combine)
-        // Its line is the project's own, read when the project is picked; dashboard/changed
-        // keeps it after that.
-        .task(id: folder) { await model.refreshDashboard(folder) }
-        .contextMenu {
-            Button("Open") { model.openDashboard = true }
-        }
-    }
-
-    static func detail(_ summary: DashboardSummary?) -> String {
-        guard let summary, summary.tiles > 0 else { return "No tiles yet" }
-        let count = summary.tiles == 1 ? "1 tile" : "\(summary.tiles) tiles"
-        return summary.line.isEmpty ? count : "\(count) · \(summary.line)"
-    }
-}
-
 /// A project's Dashboard, in the chat's place (FR-031): tiles in sections, in the order
 /// they were made, small ones in a grid of 180 pt cells and tables and notes across.
 struct DashboardPage: View {
@@ -82,7 +33,10 @@ struct DashboardPage: View {
             .padding(.top, 24)
             .padding(.bottom, 40)
         }
-        .navigationTitle("Dashboard")
+        // The project's own page now a project's row opens it (#145): named for the
+        // project, as a chat is named for its session.
+        .navigationTitle(AppCheckout.windowTitle(model.selectedProjectSummary?.name))
+        .navigationSubtitle("Dashboard")
         .task(id: model.dashboardRevision(in: folder)) { await model.refreshDashboard(folder) }
         .sheet(item: $detail) { tile in
             TileDetail(tile: tile, now: snapshot?.now ?? .now) { detail = nil }.paperSheet()

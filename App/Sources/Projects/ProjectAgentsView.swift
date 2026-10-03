@@ -7,8 +7,8 @@ import SwiftUI
 /// session and carrying one on happen in the same place, and sending turns this pane
 /// into the session without the bar moving. Above the prompt, the project's name and
 /// where it is, where a chat's transcript would be. The project's sessions and workflows
-/// are the middle column's (`SessionsColumn`), and so is the button to its settings, a
-/// sheet (`ProjectSettingsSheet`). Anything in it waiting for somebody's OK — a plugin, a
+/// are under it in the sidebar (#145), and the button to its settings, a sheet
+/// (`ProjectSettingsSheet`), is in the detail's toolbar. Anything in it waiting for somebody's OK — a plugin, a
 /// workflow — is one banner across the top, since no agent gets it until somebody looks.
 ///
 /// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
@@ -104,7 +104,7 @@ struct ProjectAgentsView: View {
 /// the pane: plugins new or changed since they were approved, which no agent is given
 /// until then, and workflows likewise, which do not run. Review opens the one thing when
 /// there is one, and otherwise the place they are listed.
-private struct WaitingForOKBanner: View {
+struct WaitingForOKBanner: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
     let folder: URL?

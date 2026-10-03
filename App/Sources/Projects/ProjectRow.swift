@@ -1,26 +1,31 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One folder in the sidebar.
+/// One folder in the sidebar, the row its sessions fold under (#145).
 ///
 /// The name is the directory's own, grown leftwards only when another project would
-/// otherwise share it. The dot is the whole reason to look at this list: it says
-/// something in here is waiting on you, whichever project you happen to have open.
+/// otherwise share it, and on a server led by the server's name. The dot is the whole
+/// reason to look at this list: it says something in here is waiting on you, whichever
+/// project you happen to have open, folded or not.
 struct ProjectRow: View {
     @Environment(AppModel.self) private var model
     let summary: DaemonAPI.ProjectSummary
+    /// The name as the sidebar shows it: `server:Project` on a server.
+    var label: String? = nil
+    /// Folded, the row says what is under it; unfolded, the rows under it say that.
+    var isFolded = true
 
     var body: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(summary.name)
+                Text(label ?? summary.name)
                     .lineLimit(1)
                     .foregroundStyle(summary.exists ? .primary : .secondary)
                 if !summary.exists {
                     Text("Folder is missing")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
-                } else if let subtitle {
+                } else if isFolded, let subtitle {
                     Text(subtitle)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -101,7 +106,7 @@ struct ProjectRow: View {
 
     /// Said in words, because a coloured dot is not something VoiceOver can read.
     private var accessibilityLabel: String {
-        var parts = [summary.name]
+        var parts = [label ?? summary.name]
         if !summary.exists { parts.append("folder is missing") }
         if let subtitle { parts.append(subtitle) }
         return parts.joined(separator: ", ")

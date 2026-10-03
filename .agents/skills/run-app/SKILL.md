@@ -162,6 +162,8 @@ swift $S/ui.swift windows <APP_PID> # window ids and sizes
 swift $S/ui.swift dump <APP_PID> 14 # the accessibility tree: roles and labels
 swift $S/ui.swift find <APP_PID> "Start"
 swift $S/ui.swift press <APP_PID> "Start"   # AXPress, no pointer, no focus stolen
+swift $S/ui.swift select <APP_PID> "Agents"  # AXSelected on a list row: picks it
+swift $S/ui.swift unfold <APP_PID> "Agents"  # AXDisclosing on a sidebar project (or fold)
 ```
 
 `ui.swift` needs Accessibility permission for whatever process runs it; if it

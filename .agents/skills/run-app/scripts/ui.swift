@@ -164,6 +164,31 @@ case "select":
     print("nothing selectable matched \(arguments[3])")
     exit(1)
 
+case "unfold", "fold":
+    // An outline row (a project in the sidebar, a disclosure group) folded or unfolded
+    // by AXDisclosing on the nearest row above the first matching label. No click.
+    guard arguments.count > 3 else { print("need text to match"); exit(2) }
+    let wanted = arguments[3].lowercased()
+    var found: AXUIElement?
+    walk(app, depth: 0, limit: 30) { element, _ in
+        if found == nil, label(element).lowercased().contains(wanted) { found = element }
+        return found == nil
+    }
+    var candidate = found
+    var hops = 0
+    while let current = candidate, hops < 6 {
+        if role(current) == "AXRow" {
+            let value: CFBoolean = verb == "unfold" ? kCFBooleanTrue : kCFBooleanFalse
+            let result = AXUIElementSetAttributeValue(current, "AXDisclosing" as CFString, value)
+            print(result == .success ? "\(verb)ed: \(label(found!))" : "could not \(verb): \(result.rawValue)")
+            exit(result == .success ? 0 : 1)
+        }
+        candidate = attribute(current, kAXParentAttribute as String).map { $0 as! AXUIElement }
+        hops += 1
+    }
+    print("no row matched \(arguments[3])")
+    exit(1)
+
 case "set":
     guard arguments.count > 4 else { print("need text and value"); exit(2) }
     let needle = arguments[3].lowercased()

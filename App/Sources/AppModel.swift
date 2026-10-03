@@ -115,6 +115,7 @@ final class AppModel {
             selection = nil
             openWorkflow = nil
             openDashboard = false
+            composing = false
         }
     }
 
@@ -147,6 +148,7 @@ final class AppModel {
             // come back to.
             selection = nil
             openWorkflow = nil
+            composing = false
         }
     }
 
@@ -161,6 +163,7 @@ final class AppModel {
             showsRuntimes = false
             selection = nil
             openWorkflow = nil
+            composing = false
         }
     }
 
@@ -174,6 +177,7 @@ final class AppModel {
             showsRuntimes = false
             selection = nil
             openWorkflow = nil
+            composing = false
         }
     }
 
@@ -190,6 +194,7 @@ final class AppModel {
             showsEvents = false
             selection = nil
             openWorkflow = nil
+            composing = false
         }
     }
 
@@ -254,17 +259,33 @@ final class AppModel {
 
     /// What is picked in the sidebar, as one value.
     ///
-    /// The projects and Spending share a column, so they have to share a selection:
-    /// two bindings would let both look picked at once. `selectedProject` stays the
-    /// stored fact — it is what the window reopens on — and this is the view of it
-    /// the list is driven by.
+    /// Activity, the projects and their sessions and workflows share one list (#145), so
+    /// they have to share a selection: two bindings would let both look picked at once.
+    /// `selectedProject` stays the stored fact — it is what New Session starts in — and
+    /// this is the view of it the list is driven by. A project's new session lights its
+    /// project's row, since that is where it will be.
     var sidebarItem: SidebarItem? {
         get {
-            showsEvents ? .events : showsResources ? .resources : showsRuntimes ? .runtimes
-                : showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project)
+            if showsEvents { return .events }
+            if showsResources { return .resources }
+            if showsRuntimes { return .runtimes }
+            if showsSpending { return .spending }
+            guard let key = selectedProjectKey else { return nil }
+            if let id = openWorkflow { return .workflow(id, in: key) }
+            if let selection { return .session(selection) }
+            return openDashboard || composing ? .project(key) : nil
         }
         set {
             switch newValue {
+            case .session(let id):
+                openAgent(id)
+            case .workflow(let id, let key):
+                showsSpending = false
+                showsResources = false
+                showsEvents = false
+                showsRuntimes = false
+                select(key)
+                openWorkflow = id
             case .spending:
                 showsSpending = true
             case .resources:
@@ -307,9 +328,31 @@ final class AppModel {
         showsSpending = false
         showsResources = false
         showsEvents = false
+        showsRuntimes = false
         select(key)
+        // Its Dashboard, which says nothing new unless it has to: the project's own page
+        // (#145). Starting a session there is New Session, a step away.
+        openDashboard = true
+    }
+
+    /// A new session in the selected project: the empty chat with its prompt, where a
+    /// session starts (066). The fourth of `selection`'s siblings, exclusive with them.
+    var composing = false {
+        didSet {
+            guard composing, !oldValue else { return }
+            selection = nil
+            openWorkflow = nil
+            openDashboard = false
+        }
+    }
+
+    /// Nothing picked: the help text, not a page (#145). The project stays selected, so
+    /// New Session still knows where to start.
+    func showNothing() {
         selection = nil
         openWorkflow = nil
+        openDashboard = false
+        composing = false
     }
 
     /// Pick a project on a host. The host goes first, so the folder's `didSet` stores
@@ -344,6 +387,7 @@ final class AppModel {
             if selection != nil {
                 openWorkflow = nil
                 openDashboard = false
+                composing = false
             }
             chatOpening = selection.map { (agent: $0, timing: Perf.begin("chat-open")) }
             Task { await loadTranscript() }
@@ -363,7 +407,12 @@ final class AppModel {
     /// more field costs one line. The two are exclusive, and `ContentView`'s `page`
     /// binding is the single place navigation sets either.
     var openWorkflow: Workflow.ID? {
-        didSet { if openWorkflow != nil { openDashboard = false } }
+        didSet {
+            if openWorkflow != nil {
+                openDashboard = false
+                composing = false
+            }
+        }
     }
 
     /// Whether the selected project's Dashboard (074) is open in the chat's place: a third
@@ -373,6 +422,7 @@ final class AppModel {
             guard openDashboard, !oldValue else { return }
             selection = nil
             openWorkflow = nil
+            composing = false
         }
     }
 

@@ -1,16 +1,26 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The folders you work in, and nothing else.
+/// The window's one sidebar (#145): Activity at the top, then every project, each a row
+/// that folds open on its sessions and workflows, and at the foot what this Mac and its
+/// hosts are doing.
 ///
-/// This used to be every agent ever started. A list of folders is the length of the
-/// work rather than the length of the history, which is the whole point of the change.
+/// It used to be two columns, the projects and the sessions of the one picked. The
+/// projects column was mostly closed, and closing it hid what it said at a glance: what
+/// Spending has left, which projects have something going on, that the Mac is being kept
+/// awake, that a host is not answering. One list keeps all of that in sight.
 struct ProjectListView: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
     @Binding var selection: SidebarItem?
 
     @AppStorage("showsArchivedProjects") private var showsArchived = false
+    @State private var folds = SidebarFolds()
+    /// What the list has highlighted — one or several (⌘-click), sessions and workflows
+    /// alike. Drives bulk Archive; `selection` is still the one thing the detail reads.
+    @State private var picked: Set<SidebarItem> = []
+    @State private var query = ""
+    @FocusState private var searchFocused: Bool
     @State private var isChoosingFolder = false
     @State private var isCloning = false
     /// Which machine the New project menu was pointed at (037).
@@ -18,86 +28,75 @@ struct ProjectListView: View {
     @State private var isChoosingServerFolder = false
     @State private var isAddingServer = false
 
+    /// This Mac's projects, then each server's: no headings for hosts (Alex, #145), the
+    /// host is in a server project's own name.
+    private var orderedProjects: [DaemonAPI.ProjectSummary] {
+        let live = model.liveProjects
+        return live.filter { $0.host == .mac }
+            + model.hosts.servers.flatMap { host in live.filter { $0.host == host } }
+    }
+
     var body: some View {
-        List(selection: $selection) {
-            if model.hosts.isEmpty {
-                // With no server the list is exactly what it always was: no headings.
-                projectRows(model.liveProjects)
-            } else {
-                // No host on this Mac, as on a control plane of servers alone: no heading
-                // for one (058, T093a).
-                if model.hasMacHost {
-                    Section { projectRows(model.liveProjects.filter { $0.host == .mac }) } header: {
-                        HostHeading(host: .mac)
-                    }
-                }
-                ForEach(model.hosts.servers, id: \.self) { host in
-                    Section {
-                        projectRows(model.liveProjects.filter { $0.host == host })
-                        GoneProjectRows(host: host)
-                    } header: {
-                        HostHeading(host: host)
-                    }
-                }
-            }
-            // Where the project will be once it is one (027).
-            ForEach(model.clones) { clone in
-                CloningRow(clone: clone).font(.body)
-            }
-
-            if !model.archivedProjects.isEmpty {
-                Section(isExpanded: $showsArchived) {
-                    ForEach(model.archivedProjects, id: \.key) { summary in
-                        ArchivedProjectRow(summary: summary).font(.body)
-                    }
-                } header: {
-                    Text("Archived")
-                }
-            }
-
-            if !model.isConnected, !model.controlPlaneAway, model.hasMacHost {
-                // Said rather than left to look like a quiet afternoon: what is listed
-                // may have moved on, and the window is going back for it by itself.
-                // The control plane being away is the strip's sentence, and the projects
-                // stay listed under it (058, frame H).
-                if model.hosts.isOffline(.mac) {
-                    MacHostDownNotice()
-                } else {
-                    Text("Connecting…")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
-                }
-            } else if model.projects.isEmpty, model.clones.isEmpty, model.hasLoadedProjects {
-                EmptyProjectList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
-                    .font(.body)
-            }
-
+        List(selection: $picked) {
             // Pages about all the work rather than one project: rows of the list like
-            // any other, so they take the list's selection and its keys, rather than
-            // buttons pinned under it painting a highlight of their own. Always there,
-            // so each can be found before it has anything to say.
+            // any other, so they take the list's selection and its keys. At the top, so
+            // what they say at a glance is never folded or scrolled away.
             Section("Activity") {
                 EventsRow().font(.body).tag(SidebarItem.events)
                 ResourcesRow().font(.body).tag(SidebarItem.resources)
                 RuntimesRow().font(.body).tag(SidebarItem.runtimes)
                 SpendingRow(selection: $selection).font(.body).tag(SidebarItem.spending)
             }
+
+            Section("Projects") {
+                ForEach(orderedProjects, id: \.key) { summary in
+                    ProjectFold(summary: summary, folds: folds, query: query)
+                }
+                ForEach(model.hosts.servers, id: \.self) { host in
+                    GoneProjectRows(host: host)
+                }
+                // Where the project will be once it is one (027).
+                ForEach(model.clones) { clone in
+                    CloningRow(clone: clone).font(.body)
+                }
+                if model.projects.isEmpty, model.clones.isEmpty, model.hasLoadedProjects, model.isConnected {
+                    EmptyProjectList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
+                        .font(.body)
+                }
+            }
+
+            if !model.archivedProjects.isEmpty, query.isEmpty {
+                Section(isExpanded: $showsArchived) {
+                    ForEach(model.archivedProjects, id: \.key) { summary in
+                        ArchivedProjectRow(summary: summary).font(.body)
+                    }
+                } header: {
+                    Text("Archived projects")
+                }
+            }
         }
         .listStyle(.sidebar)
-        // Rows as tall as their lines (#104). The sidebar's row size sets the least a row
-        // may be, and at the system's medium a project of one line stood 32pt tall around
-        // 16pt of name; nothing short of the whole list's size moves that floor. Small
-        // also makes the sidebar's own text small, so each row says `.font(.body)` to
-        // keep the size it was read at.
+        // Rows as tall as their lines (#104). Small also makes the sidebar's own text
+        // small, so each row says `.font(.body)` to keep the size it was read at.
         .environment(\.sidebarRowSize, .small)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
-        // Why the Mac is awake, pinned at the foot: a status line rather than somewhere
-        // to go, so not a row of the list. It is absent entirely when there is nothing
-        // to say, which is most of the time (024 FR-015).
-        .safeAreaInset(edge: .bottom) {
-            WakefulnessRow()
+        .searchable(text: $query, placement: .sidebar, prompt: "Search sessions and workflows")
+        .searchFocused($searchFocused)
+        // What this Mac and its hosts are doing, pinned at the foot: status lines rather
+        // than somewhere to go, so not rows of the list. Each is absent when there is
+        // nothing to say, which is most of the time (024 FR-015).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            SidebarFoot()
+        }
+        // ⌫ archives everything highlighted that is not already archived (one or many).
+        .onDeleteCommand { archivePicked() }
+        .onChange(of: picked) { _, picks in applyPicked(picks) }
+        .onChange(of: selection, initial: true) { _, item in applySelection(item) }
+        .onChange(of: requests.wantsSessionSearchFocus) { _, wants in
+            guard wants else { return }
+            searchFocused = true
+            requests.wantsSessionSearchFocus = false
         }
         // A folder dragged in from Finder becomes a project, as File ▸ Add Project
         // Folder… does. Folders only: a file is not somewhere to work.
@@ -107,19 +106,10 @@ struct ProjectListView: View {
             Task { for folder in folders { await model.addProject(folder) } }
             return true
         }
-        // Named only when it is not the ordinary daemon. Two copies of this app can
-        // be running against two roots, and an unlabelled window is the one you
-        // archive the wrong project in.
-        .navigationTitle(StoreLocations.default.isStandard
-                         ? "Projects"
-                         : "Projects — \(StoreLocations.default.name)")
         .toolbar {
-            // One button. Agents are started by telling a project what you want done,
-            // so a button for starting one by hand would be a second way to do the
-            // same thing, in the column that is not even about agents.
-            //
-            // Two ways in, one button: a folder already on the Mac, or a repository
-            // that is not yet (027).
+            // Agents are started by telling a project what you want done, from its page;
+            // this is for a project that is not here yet. Two ways in, one button: a
+            // folder already on the Mac, or a repository that is not yet (027).
             ToolbarItem {
                 Menu {
                     if model.hosts.isEmpty {
@@ -141,7 +131,7 @@ struct ProjectListView: View {
                     Divider()
                     Button("Add Server…") { isAddingServer = true }
                 } label: {
-                    Label("New project", systemImage: "plus")
+                    Label("New project", systemImage: "folder.badge.plus")
                 }
                 .help("Add Folder…, or Clone Git URL…, as a project")
             }
@@ -166,17 +156,67 @@ struct ProjectListView: View {
         }
     }
 
-    @ViewBuilder
-    private func projectRows(_ summaries: [DaemonAPI.ProjectSummary]) -> some View {
-        ForEach(summaries, id: \.key) { summary in
-            ProjectRow(summary: summary)
-                .font(.body)
-                .tag(SidebarItem.project(summary.key))
-                .contextMenu { menu(for: summary) }
-                // As tall as its one or two lines and a little air (#104).
-                .listRowInsets(.vertical, 3)
-                // Last known, not current: the server is not answering (037).
-                .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
+    /// One pick opens that page; several keep what is open only if it is among them.
+    /// None changes nothing: macOS clears a list's selection by itself while rows come
+    /// and go, and that must not empty the detail.
+    private func applyPicked(_ picks: Set<SidebarItem>) {
+        switch picks.count {
+        case 0:
+            break
+        case 1:
+            if let pick = picks.first, selection != pick { selection = pick }
+        default:
+            if let current = selection, !picks.contains(current) { model.showNothing() }
+        }
+    }
+
+    /// What is open, from anywhere — a menu, Go, a banner, a link — lights its row, and
+    /// unfolds its project so the row is there to light.
+    private func applySelection(_ item: SidebarItem?) {
+        guard let item else {
+            if picked.count == 1 { picked = [] }
+            return
+        }
+        if case .session(let id) = item, let agent = model.work.agent(id) {
+            folds.set(ProjectKey(host: agent.host, folder: agent.projectFolder), open: true)
+        } else if case .workflow(_, let key) = item {
+            folds.set(key, open: true)
+        }
+        if picked.count <= 1 || !picked.contains(item) { picked = [item] }
+    }
+
+    private func archivePicked() {
+        var sessions: [UUID] = []
+        var flows: [WorkflowSummary] = []
+        for pick in picked.isEmpty ? Set(selection.map { [$0] } ?? []) : picked {
+            switch pick {
+            case .session(let id):
+                if model.work.agent(id)?.state != .archived { sessions.append(id) }
+            case .workflow(let id, let key):
+                if let summary = model.workflows(in: key.folder).first(where: { $0.id == id }), !summary.isArchived {
+                    flows.append(summary)
+                }
+            default:
+                break
+            }
+        }
+        guard !sessions.isEmpty || !flows.isEmpty else { return }
+        Task {
+            for id in sessions {
+                await model.archive(id, andLeave: false)
+            }
+            for summary in flows {
+                await model.setWorkflowArchived(summary, true)
+            }
+            if case .session(let open) = selection, sessions.contains(open) { model.showNothing() }
+            if case .workflow(let open, _) = selection, flows.contains(where: { $0.id == open }) { model.showNothing() }
+            picked = picked.filter { pick in
+                switch pick {
+                case .session(let id): !sessions.contains(id)
+                case .workflow(let id, _): !flows.contains { $0.id == id }
+                default: true
+                }
+            }
         }
     }
 
@@ -191,9 +231,167 @@ struct ProjectListView: View {
             isCloning = true
         }
     }
+}
 
+/// One project in the sidebar: its row, and folded under it its sessions — Needs you
+/// first, the way the project page groups them — then its workflows, each kind's
+/// archived ones folded once more at its foot.
+///
+/// A search unfolds every project with something that matches and hides the rest.
+private struct ProjectFold: View {
+    @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
+    let summary: DaemonAPI.ProjectSummary
+    let folds: SidebarFolds
+    let query: String
+
+    /// Enough archived chats to find last week's; the rest are on the phone's archive
+    /// and in Events. A list of every chat ever is the thing projects replaced.
+    private static let archivedShown = 50
+
+    private var key: ProjectKey { summary.key }
+
+    var body: some View {
+        let lists = sessionLists()
+        let searching = !query.isEmpty
+        if !searching || lists.hasAny || hasWorkflowMatch || nameMatches {
+            DisclosureGroup(isExpanded: Binding(
+                get: { searching || folds.isOpen(key) },
+                set: { folds.set(key, open: $0) })) {
+                ForEach(AgentGroup.live, id: \.self) { group in
+                    ForEach(group.headings(lists.shown[group] ?? [])) { part in
+                        SidebarSubheading(title: part.title, count: part.agents.count,
+                                          unread: part.agents.filter(\.showsUnread).count)
+                        ForEach(part.agents) { agent in
+                            SessionSidebarRow(agent: agent)
+                        }
+                    }
+                }
+                if !searching, !lists.hasLive {
+                    Text("No sessions yet")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+                archivedSessions(lists.shown[.archived] ?? [])
+                ProjectWorkflowRows(project: key, query: query, folds: folds)
+            } label: {
+                ProjectRow(summary: summary, label: label, isFolded: !(searching || folds.isOpen(key)))
+                    .font(.body)
+                    // As tall as its one or two lines and a little air (#104).
+                    .listRowInsets(.vertical, 3)
+                    // Last known, not current: the server is not answering (037).
+                    .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
+                    .contextMenu { ProjectMenu(summary: summary) }
+                    // On the row, not the group: a group's tag goes to every untagged
+                    // row under it, and the subheadings would light with the project.
+                    .tag(SidebarItem.project(key))
+            }
+        }
+    }
+
+    /// A server's project says which server (Alex, #145): no heading for each host, so
+    /// the host goes in the name. This Mac's go by name alone.
+    private var label: String {
+        summary.host == .mac ? summary.name : "\(model.hosts.label(summary.host)):\(summary.name)"
+    }
+
+    private var nameMatches: Bool {
+        label.localizedCaseInsensitiveContains(query.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var hasWorkflowMatch: Bool {
+        model.workflows(in: key.folder).contains(where: SessionLabelQuery(query).matches)
+    }
+
+    /// Archived sessions, folded under the live ones, with what has been retired from
+    /// here (051) as the last line.
     @ViewBuilder
-    private func menu(for summary: DaemonAPI.ProjectSummary) -> some View {
+    private func archivedSessions(_ archived: [Agent]) -> some View {
+        let retiredLine = query.isEmpty ? RetirementWords.retiredLine(summary.retiredCount) : nil
+        if !archived.isEmpty || retiredLine != nil {
+            DisclosureGroup(isExpanded: Binding(
+                get: { !query.isEmpty || folds.isOpen(key, .archivedSessions) },
+                set: { folds.set(key, .archivedSessions, open: $0) })) {
+                ForEach(query.isEmpty ? Array(archived.prefix(Self.archivedShown)) : archived) { agent in
+                    SessionSidebarRow(agent: agent)
+                }
+                if let retiredLine {
+                    Text(retiredLine)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+            } label: {
+                // Named for what it holds: the project's row is often scrolled away by
+                // the time this is read.
+                SidebarSubheading(title: "Archived sessions", count: archived.count)
+            }
+        }
+    }
+
+    /// The project's sessions in each group, as held and as the search leaves them.
+    private struct SessionLists {
+        var all: [AgentGroup: [Agent]] = [:]
+        var shown: [AgentGroup: [Agent]] = [:]
+
+        /// Whether the project has a session that is not archived.
+        var hasLive: Bool { AgentGroup.live.contains { !(all[$0]?.isEmpty ?? true) } }
+        var hasAny: Bool { AgentGroup.allCases.contains { !(shown[$0]?.isEmpty ?? true) } }
+    }
+
+    private func sessionLists() -> SessionLists {
+        var lists = SessionLists()
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matcher = words.isEmpty ? nil : SessionLabelQuery(words)
+        // Folded, only what the row's own counts need: nothing is drawn under it.
+        for group in AgentGroup.allCases {
+            let held = model.agents(in: key, group: group)
+            lists.all[group] = held
+            lists.shown[group] = matcher.map { held.filter($0.matches) } ?? held
+        }
+        return lists
+    }
+}
+
+/// One session under its project: the sessions column's row, tagged into the sidebar's
+/// one selection.
+private struct SessionSidebarRow: View {
+    @Environment(AppModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        AgentRow(agent: agent, isCompact: true)
+            .padding(.vertical, 2)
+            .listRowInsets(.vertical, 2)
+            .tag(SidebarItem.session(agent.id))
+            // The list's own swipe, in place of the cards' hand-built one.
+            .swipeActions(edge: .trailing) {
+                if agent.state == .archived {
+                    SwipeAction("Bring Back") { await model.unarchive(agent.id) }
+                } else {
+                    SwipeAction("Archive", systemImage: "archivebox") {
+                        await model.archive(agent.id, andLeave: true)
+                    }
+                    .tint(.gray)
+                }
+            }
+    }
+}
+
+/// A project's context menu, and the project menu's items.
+private struct ProjectMenu: View {
+    @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
+    let summary: DaemonAPI.ProjectSummary
+
+    var body: some View {
+        Button("Dashboard") { model.showProject(summary.key) }
+        Button("New Session") {
+            model.select(summary.key)
+            model.composing = true
+            model.draftWorktree = nil
+            requests.focusPrompt()
+        }
+        .disabled(model.hostUnreachable(summary.host))
         Button("Project Settings…") {
             model.showProject(summary.key)
             requests.projectSettings = .general
@@ -210,6 +408,47 @@ struct ProjectListView: View {
             }
             .disabled(!summary.exists)
         }
+    }
+}
+
+/// The sidebar's foot: the connection, then why the Mac is awake. Nothing at all when
+/// both have nothing to say.
+private struct SidebarFoot: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !model.isConnected, !model.controlPlaneAway, model.hasMacHost {
+                // Said rather than left to look like a quiet afternoon: what is listed
+                // may have moved on, and the window is going back for it by itself.
+                // The control plane being away is the strip's sentence, and the projects
+                // stay listed under it (058, frame H).
+                Group {
+                    if model.hosts.isOffline(.mac) {
+                        MacHostDownNotice()
+                    } else {
+                        Text("Connecting…")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 6)
+                    }
+                }
+                .padding(.horizontal, 14)
+            }
+            ForEach(model.hosts.servers.filter { model.hostUnreachable($0) }, id: \.self) { host in
+                // A server gone quiet greys its projects; this says why, once, where the
+                // Mac's own state is said.
+                Label("\(model.hosts.label(host)) is offline", systemImage: "bolt.horizontal.circle")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
+            }
+            WakefulnessRow()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Paper.sidebar)
     }
 }
 
