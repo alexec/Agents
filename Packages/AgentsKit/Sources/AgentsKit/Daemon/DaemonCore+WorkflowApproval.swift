@@ -68,10 +68,18 @@ extension DaemonCore {
                                message: "\(workflow.name) changed after you looked at it, so it was not approved. Look again.")
         }
         var records = workflowStore.load()
+        // Past the project's waiting ceiling, it waits its turn (#132): listed, inert,
+        // and approvable once one of the ones ahead of it is approved or removed.
+        if limitReached(by: workflow, records: records) == .project {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
+                               message: "\(WorkflowLimit.project.sentence). \(WorkflowLimit.project.remedy).")
+        }
         approve(workflow, digest: request.digest, in: &records)
         try keep("this workflow's settings") { try workflowStore.save(records) }
         let summary = summary(for: workflow, records: records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
+        // Its place among the waiting is free for the next in line.
+        rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
         return summary
     }
 }

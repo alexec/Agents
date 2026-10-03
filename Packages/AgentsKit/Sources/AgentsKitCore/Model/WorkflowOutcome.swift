@@ -2,20 +2,20 @@ import Foundation
 
 /// A ceiling on how many workflows may run, and which one has been reached.
 ///
-/// Two of them, and they are different worries. The per-project one is about a project
-/// filling up: an agent can write a workflow without asking anybody, so three is what
-/// stops one project's folder becoming a queue nobody reviewed. The total one is about
-/// the machine: ten running workflows is already more unattended agents than a person
-/// can read after a weekend away, and the count has to hold across projects or ten
-/// projects of three is thirty.
+/// Two of them, and they are different worries. The per-project one is about a queue
+/// nobody reviewed: an agent can write a workflow without asking anybody, so at most
+/// three may wait for the person's OK in one project (#132). Approved ones do not count
+/// towards it — somebody has read those. The total one is about the machine: ten
+/// approved workflows is already more unattended agents than a person can read after a
+/// weekend away, and it holds across every project.
 ///
 /// Both are fixed, and deliberately not settable — the same reasoning as the chain
 /// depth limit, which this sits beside. A ceiling something can raise for itself is not
 /// a ceiling.
 public enum WorkflowLimit: String, Codable, Hashable, Sendable {
-    /// Three live workflows in one project.
+    /// Three workflows waiting for approval in one project.
     case project
-    /// Ten live workflows across every project.
+    /// Ten approved workflows across every project.
     case total
 
     public var allowed: Int {
@@ -28,16 +28,16 @@ public enum WorkflowLimit: String, Codable, Hashable, Sendable {
     /// What a person is told on the row, and an agent in a refusal.
     public var message: String {
         switch self {
-        case .project: return "this project already runs its \(allowed) workflows"
+        case .project: return "this project already has \(allowed) workflows waiting for approval"
         case .total: return "\(allowed) workflows are already running, across every project"
         }
     }
 
-    /// What to do about it, which is the same move in both cases and worth saying
-    /// because "archive" is not the first thing anybody reaches for.
+    /// What to do about it, worth saying because "archive" is not the first thing
+    /// anybody reaches for.
     public var remedy: String {
         switch self {
-        case .project: return "Archive another in this project to let it run"
+        case .project: return "Approve or remove one of the \(allowed) workflows waiting for approval first"
         case .total: return "Archive one, in any project, to let it run"
         }
     }
@@ -47,7 +47,7 @@ public enum WorkflowLimit: String, Codable, Hashable, Sendable {
     /// come to describe the same ceiling differently.
     public var sentence: String {
         switch self {
-        case .project: return "This project already runs its \(allowed) workflows"
+        case .project: return "This project already has \(allowed) workflows waiting for approval"
         case .total: return "\(allowed) workflows are already running, across every project"
         }
     }
