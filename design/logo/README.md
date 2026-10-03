@@ -15,3 +15,10 @@ which is where most icons fall apart.
 
 The dark ground and the absence of colour are deliberate: the app uses colour for one
 thing only, which is something going wrong, and an icon that shouts undoes that.
+
+## Now: Blob
+
+Since 2026-10-03 the icon is **Blob** from `colour/` (violet, oval eyes, the soft outline),
+chosen from the variations in `blob/`. `blob/final/make.sh` draws it and writes the Mac
+and iPhone icons, the docs logo and favicon, and the web page's favicon; rebuild `Web/dist`
+with `scripts/web.sh build` after.
