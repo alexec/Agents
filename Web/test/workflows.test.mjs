@@ -106,7 +106,7 @@ test("off says why when it started off, as the Mac and the Remote do (#124)", ()
   assert.equal(w.happening({ ...summary, offReason: "agent" }), "Off: an agent turned it off" + rest);
   assert.equal(w.happening({ ...summary, offReason: "person" }), w.turnedOffSentence);
   assert.equal(w.happening({ ...summary, offReason: "writtenByAgent", awaitingApproval: { isNew: true } }),
-    "New — approve it on the Mac to let it run · Off: written by an agent. Turn it on when you are ready");
+    "New — approve it on its page to let it run · Off: written by an agent. Turn it on when you are ready");
 });
 
 test("a waiting workflow past the three says why, with no Approve (#132)", () => {

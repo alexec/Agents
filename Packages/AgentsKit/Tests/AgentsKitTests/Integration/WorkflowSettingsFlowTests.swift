@@ -294,6 +294,85 @@ struct WorkflowSettingsFlowTests {
         #expect(try String(contentsOf: url, encoding: .utf8) == original)
     }
 
+    @Test func labelsAreWrittenInTheFileAndLeftAloneWhenNotSent() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let url = try write(file("name: Say hello"), as: "say-hello", in: work)
+        let original = try String(contentsOf: url, encoding: .utf8)
+
+        let (core, _) = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let summary = try await core.setWorkflowSettings(
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                              settings: WorkflowSettings(),
+                                              labels: ["nightly", " review ", "Nightly"]))
+        // Cleaned and folded as a session's labels are, and one line in the file.
+        #expect(summary.workflow.settings.labels == ["nightly", "review"])
+        #expect(try String(contentsOf: url, encoding: .utf8).contains("labels: [nightly, review]\n---"))
+
+        // A save that does not send labels, as a phone from before #142 does, keeps them.
+        let kept = try await core.setWorkflowSettings(
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                              settings: WorkflowSettings(permissionMode: "plan")))
+        #expect(kept.workflow.settings.labels == ["nightly", "review"])
+
+        // None is the line taken out, and the file as it was.
+        _ = try await core.setWorkflowSettings(
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                              settings: WorkflowSettings(), labels: []))
+        #expect(try String(contentsOf: url, encoding: .utf8) == original)
+    }
+
+    @Test func aBlockListOfLabelsStaysABlock() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let url = try write("""
+            ---
+            on:
+              - schedule:
+                  at: [":00"]
+            labels:
+              - nightly   # the night shift
+              # more later
+              - review
+            ---
+
+            Say hello and stop.
+            """, as: "say-hello", in: work)
+
+        let (core, _) = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        _ = try await core.setWorkflowSettings(
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                              settings: WorkflowSettings(), labels: ["nightly", "deploy: prod"]))
+        let after = try String(contentsOf: url, encoding: .utf8)
+        #expect(after.contains("""
+            labels:
+              - nightly   # the night shift
+              - "deploy: prod"
+              # more later
+            ---
+            """))
+        #expect(await core.allWorkflows(in: work).first?.workflow.settings.labels == ["nightly", "deploy: prod"])
+    }
+
+    @Test func aLabelTooLongIsRefusedAndNothingWritten() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let url = try write(file("name: Say hello"), as: "say-hello", in: work)
+        let before = try String(contentsOf: url, encoding: .utf8)
+
+        let (core, _) = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        await #expect(throws: JSONRPCError.self) {
+            try await core.setWorkflowSettings(
+                DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                                  settings: WorkflowSettings(),
+                                                  labels: [String(repeating: "x", count: 40)]))
+        }
+        #expect(try String(contentsOf: url, encoding: .utf8) == before)
+    }
+
     @Test func theWindowHearsAboutItWithoutWaitingForTheWatcher() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)

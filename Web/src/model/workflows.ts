@@ -491,7 +491,7 @@ export function happening(summary: WorkflowSummary, now = new Date()): string | 
   else if (waitsItsTurn(summary) && summary.overLimit) {
     return `${limitSentence(summary.overLimit)}. ${limitRemedy(summary.overLimit)}`;
   } else if (summary.awaitingApproval) {
-    const waiting = (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on the Mac to let it run";
+    const waiting = (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on its page to let it run";
     const why = offReasonSentence(summary);
     return why ? `${waiting} · ${why}` : waiting;
   } else if (!isOn(summary)) parts.push(turnedOffSentenceFor(summary));
@@ -503,4 +503,134 @@ export function happening(summary: WorkflowSummary, now = new Date()): string | 
     else parts.push(refusedSummary(outcome));
   }
   return parts.length ? parts.join(" · ") : null;
+}
+
+// MARK: The page's status card and what it does (#142): WorkflowStatus.swift, ported by hand.
+
+/** One line of the status card: what is true, and whether it wants a person. */
+export interface StatusLine {
+  glyph: string;
+  text: string;
+  detail?: string | undefined;
+  tint?: "attention" | "failure" | undefined;
+  /** The session "Open the agent" goes to, on the line that has one. */
+  agentID?: string | undefined;
+}
+
+function shortTime(date: Date): string {
+  return date.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
+}
+
+/** WorkflowSummary.statusLines: what stops it, then what it is doing, then when it next runs. */
+export function workflowStatusLines(s: WorkflowSummary, now = new Date()): StatusLine[] {
+  const w = s.workflow;
+  const lines: StatusLine[] = [];
+  if (s.isArchived) {
+    lines.push({ glyph: "▣", text: "Archived — it will not run until it is brought back", detail: "Archived workflows count towards neither limit" });
+  }
+  if (w.problem) {
+    const needs = "unreadable" in w.problem;
+    lines.push({ glyph: "⚠︎", text: problemMessage(w.problem),
+      detail: needs ? "Fix its file to let it run" : "Left alone until this version knows it", tint: needs ? "failure" : undefined });
+  }
+  if (waitsItsTurn(s) && s.overLimit) {
+    lines.push({ glyph: "⧗", text: `Waiting its turn: ${limitSentence(s.overLimit)}`, detail: limitRemedy(s.overLimit), tint: "attention" });
+  } else if (s.awaitingApproval) {
+    lines.push({ glyph: "✋", text: s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
+      detail: "Read the prompt and settings below, then Approve to let it run", tint: "attention" });
+  }
+  if (!s.isArchived) lines.push(enabledLine(s));
+  if (s.overLimit && !waitsItsTurn(s)) {
+    lines.push({ glyph: "⚠︎", text: `Over the limit: ${limitSentence(s.overLimit)}`, detail: limitRemedy(s.overLimit), tint: "attention" });
+  }
+  if (s.isRunning) {
+    const outcome = s.lastOutcome;
+    lines.push({ glyph: "▶︎", text: "Running now", agentID: outcome && "ran" in outcome ? outcome.ran.agentID : undefined });
+  }
+  if (s.cooldownEndsAt !== undefined) {
+    lines.push({ glyph: "⧗", text: `Cooling down until ${shortTime(fromWireDate(s.cooldownEndsAt))}`,
+      detail: s.holdsAFire ? "A trigger came in meanwhile; it runs once then" : undefined });
+  }
+  const outcome = s.lastOutcome;
+  if (outcome && "refused" in outcome) {
+    lines.push({ glyph: "✕", text: refusedSummary(outcome),
+      tint: workflowNeedsAPerson(s) && !s.awaitingApproval && !s.overLimit ? "attention" : undefined });
+  }
+  lines.push(nextRunLine(s, now));
+  return lines;
+}
+
+function enabledLine(s: WorkflowSummary): StatusLine {
+  const file = `.agents/workflows/${s.workflow.workflowID}.md`;
+  if (isOn(s)) {
+    return { glyph: "✓", text: s.workflow.enabled === true ? "On — its file says enabled: true" : "On — its file does not say enabled:, so it is on",
+      detail: `Enabled writes enabled: false into ${file}` };
+  }
+  const why = (s as { offReason?: string }).offReason;
+  const text = why === "file" ? "Off — its file says enabled: false"
+    : why === "writtenByAgent" ? "Off — written by an agent, so it arrived off"
+    : why === "agent" ? "Off — an agent turned it off"
+    : "Off — turned off here";
+  return { glyph: "⏸︎", text, detail: "None of its triggers run it; Run now still does. It still counts towards the workflow limits" };
+}
+
+function nextRunLine(s: WorkflowSummary, now: Date): StatusLine {
+  const blocked = s.isArchived || !isOn(s) || s.workflow.problem !== undefined || !!s.awaitingApproval || !!s.overLimit;
+  if (s.nextFireAt !== undefined && !blocked) {
+    const at = fromWireDate(s.nextFireAt);
+    return { glyph: "◷", text: `Next run ${namedRelative(at, now)}`, detail: at.toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) };
+  }
+  if (!blocked && canFire(s.workflow)) return { glyph: "ϟ", text: "Runs when one of its triggers fires" };
+  return { glyph: "◷", text: "No next run", detail: blocked ? "Until what is above changes" : "Nothing it waits for can run it; Run now still does" };
+}
+
+/** WorkflowMode.words: who gets the prompt. */
+export function agentModeWords(mode: Workflow["mode"]): string {
+  return mode === "new" ? "Starts a new agent each run"
+    : mode === "standing" ? "Sends each run to its standing agent"
+    : "Resumes the agent that triggered it";
+}
+
+/** Workflow.labelsNote. */
+export function labelsNote(w: Workflow): string {
+  if (w.settings.labels.length === 0) return "No labels: each run's agent starts with none.";
+  return w.mode === "new" ? "Each run's new agent gets these labels." : "Given to an agent this workflow starts; one it reuses keeps its own.";
+}
+
+/** Workflow.unknownLines: each key the version does not know, as one line of what the file says. */
+export function unknownLines(w: Workflow): string[] {
+  return Object.keys(w.unknownFields ?? {}).sort().map((key) => {
+    const value = w.unknownFields[key];
+    const text = typeof value === "string" ? value : value === null ? "null" : JSON.stringify(value);
+    return `${key}: ${text}`;
+  });
+}
+
+/** WorkflowSummary.cooldownSentence: how long, when it ends, and whether a fire is held. */
+export function cooldownSentence(s: WorkflowSummary): string | null {
+  const cooldown = s.workflow.cooldown;
+  if (cooldown === undefined) return null;
+  const words = cooldownWords(cooldown);
+  let sentence = `Cooldown ${words}: at most one run starts in any ${words}`;
+  if (s.cooldownEndsAt !== undefined) {
+    const end = shortTime(fromWireDate(s.cooldownEndsAt));
+    sentence += s.holdsAFire ? `. Cooling down until ${end}, then it runs once for what came in meanwhile` : `. Cooling down until ${end}`;
+  } else if (s.holdsAFire) {
+    sentence += ". It runs once more for what came in while this run was going";
+  }
+  return sentence;
+}
+
+/** The settings the window's form edits, as name and value, read-only here (#142). */
+export function settingRows(w: Workflow, runtimeName: (id: string) => string | undefined): [string, string][] {
+  const st = w.settings;
+  const runtime = st.runtimeID ?? defaultRuntime;
+  const rows: [string, string][] = [
+    ["Runtime", (runtimeName(runtime) ?? runtime) + (st.runtimeID ? "" : " (default)")],
+    ["Permission mode", st.permissionMode ?? "Runtime default"],
+    ["Model", st.model ?? "Runtime default"],
+    ["Effort", st.effort ?? "Runtime default"],
+  ];
+  for (const [id, value] of Object.entries(st.options).sort(([a], [b]) => a.localeCompare(b))) rows.push([id, value]);
+  return rows;
 }

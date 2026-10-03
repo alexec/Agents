@@ -909,13 +909,14 @@ final class AppModel {
     /// `cooldown` is the file's `cooldown:` to write (#103), empty to remove it; left
     /// `nil`, the file's is left as it is.
     func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
-                             cooldown: String? = nil) async {
+                             cooldown: String? = nil, labels: [String]? = nil) async {
         do {
             let updated: WorkflowSummary = try await client.call(
                 DaemonAPI.Method.workflowsSettings,
                 DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
                                                   workflowID: summary.workflowID,
-                                                  settings: settings, cooldown: cooldown),
+                                                  settings: settings, cooldown: cooldown,
+                                                  labels: labels),
                 returning: WorkflowSummary.self)
             work.upsert(updated)
         } catch {

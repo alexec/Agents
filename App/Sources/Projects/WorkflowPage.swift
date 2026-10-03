@@ -207,16 +207,6 @@ struct WorkflowPage: View {
 
     // MARK: Why it is or isn't running (#142)
 
-    /// One line of the status card: what is true, and whether it wants a person.
-    private struct StatusLine: Identifiable {
-        var symbol: String
-        var text: String
-        var detail: String? = nil
-        var tint: StateTint = .none
-        var agentID: UUID? = nil
-        var id: String { symbol + text }
-    }
-
     /// Everything that decides whether it runs, a line each, most important first:
     /// what stops it, then what it is doing, then when it next runs. The heading keeps
     /// only the summary sentence, so none of this is said twice.
@@ -224,7 +214,7 @@ struct WorkflowPage: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle("Status")
             VStack(alignment: .leading, spacing: 0) {
-                let lines = statusLines(summary)
+                let lines = summary.statusLines
                 ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
                     if index > 0 { Divider().padding(.leading, 42) }
                     statusRow(line)
@@ -234,7 +224,7 @@ struct WorkflowPage: View {
         }
     }
 
-    private func statusRow(_ line: StatusLine) -> some View {
+    private func statusRow(_ line: WorkflowStatusLine) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: line.symbol)
                 .appText(.reading)
@@ -268,90 +258,6 @@ struct WorkflowPage: View {
         .foregroundStyle(line.tint.style(or: .primary))
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-    }
-
-    private func statusLines(_ summary: WorkflowSummary) -> [StatusLine] {
-        let workflow = summary.workflow
-        var lines: [StatusLine] = []
-        if summary.isArchived {
-            lines.append(StatusLine(symbol: "archivebox",
-                                    text: "Archived — it will not run until it is brought back",
-                                    detail: "Archived workflows count towards neither limit"))
-        }
-        if let problem = workflow.problem {
-            lines.append(StatusLine(symbol: "exclamationmark.triangle", text: problem.message,
-                                    detail: problem.needsAPerson ? "The file is below" : "Left alone until this version knows it",
-                                    tint: problem.needsAPerson ? .failure : .none))
-        }
-        if summary.waitsItsTurn, let limit = summary.overLimit {
-            lines.append(StatusLine(symbol: "hourglass", text: "Waiting its turn: \(limit.sentence)",
-                                    detail: limit.remedy, tint: .attention))
-        } else if let waiting = summary.awaitingApproval {
-            lines.append(StatusLine(symbol: "checkmark.shield",
-                                    text: waiting.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
-                                    detail: "Read the prompt and settings below, then Approve to let it run",
-                                    tint: .attention))
-        }
-        if !summary.isArchived {
-            lines.append(enabledLine(summary))
-        }
-        if let limit = summary.overLimit, !summary.waitsItsTurn {
-            lines.append(StatusLine(symbol: "exclamationmark.triangle", text: "Over the limit: \(limit.sentence)",
-                                    detail: limit.remedy, tint: .attention))
-        }
-        if summary.isRunning {
-            lines.append(StatusLine(symbol: "play.circle", text: "Running now",
-                                    agentID: ranAgentID(summary)))
-        }
-        if let end = summary.cooldownEndsAt {
-            lines.append(StatusLine(symbol: "hourglass",
-                                    text: "Cooling down until \(end.formatted(date: .omitted, time: .shortened))",
-                                    detail: summary.holdsAFire ? "A trigger came in meanwhile; it runs once then" : nil))
-        }
-        if case .refused = summary.lastOutcome, let outcome = summary.lastOutcome {
-            lines.append(StatusLine(symbol: "xmark.circle", text: outcome.summary,
-                                    tint: summary.needsAPerson && summary.awaitingApproval == nil && summary.overLimit == nil
-                                        ? .attention : .none))
-        }
-        lines.append(nextLine(summary))
-        return lines
-    }
-
-    /// Whether the switch is on, and where that came from: the file, an agent, or the
-    /// person here (#124, #125).
-    private func enabledLine(_ summary: WorkflowSummary) -> StatusLine {
-        let file = "\(WorkflowPaths.folderName)/\(summary.workflowID).\(WorkflowPaths.fileExtension)"
-        guard !summary.isEnabled else {
-            return StatusLine(symbol: "checkmark.circle",
-                              text: summary.workflow.enabled == true ? "On — its file says enabled: true"
-                                                                     : "On — its file does not say enabled:, so it is on",
-                              detail: "Enabled writes enabled: false into \(file)")
-        }
-        let text: String
-        switch summary.offReason {
-        case .file?: text = "Off — its file says enabled: false"
-        case .writtenByAgent?: text = "Off — written by an agent, so it arrived off"
-        case .agent?: text = "Off — an agent turned it off"
-        case .person?, nil: text = "Off — turned off here"
-        }
-        return StatusLine(symbol: "pause.circle", text: text,
-                          detail: "None of its triggers run it; Run now still does. It still counts towards the workflow limits")
-    }
-
-    /// When it next runs, or that nothing will until something changes.
-    private func nextLine(_ summary: WorkflowSummary) -> StatusLine {
-        let blocked = summary.isArchived || !summary.isEnabled || summary.workflow.problem != nil
-            || summary.awaitingApproval != nil || summary.overLimit != nil
-        if let next = summary.nextFireAt, !blocked {
-            return StatusLine(symbol: "calendar",
-                              text: "Next run \(next.formatted(.relative(presentation: .named)))",
-                              detail: next.formatted(date: .abbreviated, time: .shortened))
-        }
-        if !blocked, summary.workflow.canFire {
-            return StatusLine(symbol: "bolt", text: "Runs when one of its triggers fires")
-        }
-        return StatusLine(symbol: "calendar", text: "No next run",
-                          detail: blocked ? "Until what is above changes" : "Nothing it waits for can run it; Run now still does")
     }
 
     // MARK: What sends it (#98)
@@ -607,10 +513,10 @@ struct WorkflowPage: View {
     private func agentRow(_ summary: WorkflowSummary) -> some View {
         let mode = summary.workflow.mode
         return HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: mode == .new ? "plus.circle" : mode == .standing ? "person.crop.circle" : "arrow.uturn.backward.circle")
+            Image(systemName: mode.symbol)
                 .appText(.fine)
                 .foregroundStyle(.secondary)
-            Text(modeWords(mode))
+            Text(mode.words)
                 .appText(.fine)
             Text("agent: \(mode.rawValue)")
                 .appText(.fine).monospaced()
@@ -622,24 +528,12 @@ struct WorkflowPage: View {
         }
     }
 
-    private func modeWords(_ mode: WorkflowMode) -> String {
-        switch mode {
-        case .new: "Starts a new agent each run"
-        case .standing: "Sends each run to its standing agent"
-        case .triggering: "Resumes the agent that triggered it"
-        }
-    }
-
     /// The standing agent by name, a click from its conversation, or that the next run
-    /// starts one. The look stands in with the newest agent the workflow started; the
-    /// store's own `standingAgentID` is not in the summary yet.
+    /// starts one: the agent the daemon keeps for it (#142), while it is still here.
     @ViewBuilder
     private func standingAgent(_ summary: WorkflowSummary) -> some View {
-        let folder = Project.standardize(summary.folder)
-        let kept = model.agents
-            .filter { $0.projectFolder == folder && $0.startedByWorkflow == summary.workflowID && $0.archivedAt == nil }
-            .max { $0.createdAt < $1.createdAt }
-        if let kept {
+        if let id = summary.standingAgentID,
+           let kept = model.agents.first(where: { $0.id == id && $0.archivedAt == nil }) {
             Button {
                 model.openWorkflow = nil
                 model.selection = kept.id
@@ -653,14 +547,15 @@ struct WorkflowPage: View {
             .appText(.fine)
             .lineLimit(1)
         } else {
-            Text("None yet — the next run starts it")
+            Text("Started on the next run")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
     }
 
-    /// The labels each run's new agent gets, as the tag input sessions use (#50). Shown
-    /// and not yet editable: the settings writer does not write `labels:` yet.
+    /// The labels each run's new agent gets, in the tag input sessions use (#50): a
+    /// comma adds one, Delete takes one away, and each change writes `labels:` in the
+    /// file through the daemon, as the other settings do.
     private func labelsRow(_ summary: WorkflowSummary) -> some View {
         let labels = summary.workflow.settings.labels
         return VStack(alignment: .leading, spacing: 4) {
@@ -668,16 +563,19 @@ struct WorkflowPage: View {
                 Image(systemName: "tag")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
-                LabelTagField(labels: labels.map { SessionLabel(value: $0, owner: .agent) },
-                              add: { _ in }, remove: { _ in })
-                    .disabled(true)
+                LabelTagField(labels: labels.map { SessionLabel(value: $0, owner: .person) },
+                              suggestions: model.labelSuggestions(in: summary.folder, on: model.selectedProjectHost),
+                              add: { values in setLabels(summary, labels + values) },
+                              remove: { value in
+                                  setLabels(summary, labels.filter { SessionLabelPolicy.key($0) != SessionLabelPolicy.key(value) })
+                              })
             }
-            note(labels.isEmpty
-                 ? "No labels: each run's agent starts with none."
-                 : summary.workflow.mode == .new
-                    ? "Each run's new agent gets these labels."
-                    : "Given to an agent this workflow starts; one it reuses keeps its own.")
+            note(summary.workflow.labelsNote)
         }
+    }
+
+    private func setLabels(_ summary: WorkflowSummary, _ labels: [String]) {
+        Task { await model.setWorkflowSettings(summary, summary.workflow.settings, labels: labels) }
     }
 
     // MARK: The rest of the file (#142)
@@ -692,8 +590,8 @@ struct WorkflowPage: View {
                 sectionTitle("From a later version")
                 VStack(alignment: .leading, spacing: 6) {
                     note("This version does not understand these lines in the file. They are kept as they are when the page changes it.")
-                    ForEach(workflow.unknownFields.sorted { $0.key < $1.key }, id: \.key) { key, value in
-                        Text("\(key): \(yaml(value))")
+                    ForEach(workflow.unknownLines, id: \.self) { line in
+                        Text(line)
                             .appText(.code)
                             .textSelection(.enabled)
                             .foregroundStyle(.secondary)
@@ -703,17 +601,6 @@ struct WorkflowPage: View {
                 .padding(14)
                 .paperRaised(in: RoundedRectangle(cornerRadius: 18))
             }
-        }
-    }
-
-    /// A value as one line: a scalar as the file writes it, anything nested as JSON.
-    private func yaml(_ value: JSONValue) -> String {
-        switch value {
-        case .string(let text): return text
-        case .null: return "null"
-        default:
-            let data = (try? JSONEncoder().encode(value)) ?? Data()
-            return String(decoding: data, as: UTF8.self)
         }
     }
 
@@ -1011,10 +898,5 @@ struct WorkflowPage: View {
     /// The file as its host reads it (058, R11), this Mac's included.
     private func readRaw(_ workflow: Workflow) async -> String? {
         await model.readText(url(workflow), on: model.selectedProjectHost)
-    }
-
-    private func ranAgentID(_ summary: WorkflowSummary) -> UUID? {
-        if case .ran(let agentID, _) = summary.lastOutcome { return agentID }
-        return nil
     }
 }

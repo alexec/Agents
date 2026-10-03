@@ -1502,6 +1502,18 @@ export interface WorkflowApproval {
   isNew: boolean;
 }
 
+export interface WorkflowApproveRequest {
+  folder: URLString;
+  workflowID: string;
+  digest: string;
+}
+
+export interface WorkflowArchiveRequest {
+  folder: URLString;
+  workflowID: string;
+  archived: boolean;
+}
+
 export type WorkflowCause =
   | { byHand: Record<string, never> }
   | { trigger: { _0: WorkflowTrigger } };
@@ -1588,6 +1600,7 @@ export interface WorkflowSummary {
   cooldownEndsAt?: WireDate;
   holdsAFire: boolean;
   offReason?: WorkflowOffReason;
+  standingAgentID?: UUID;
 }
 
 export type WorkflowTrigger = WorkflowTriggerStored;
@@ -1711,6 +1724,8 @@ export interface Methods {
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
+  "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
+  "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
@@ -1778,6 +1793,8 @@ export const MethodTarget = {
   "runtimes/accounts": "host",
   "runtimes/list": "host",
   "surface/identify": "host",
+  "workflows/approve": "host",
+  "workflows/archive": "host",
   "workflows/enable": "host",
   "workflows/list": "host",
   "workflows/run": "host",
@@ -1963,12 +1980,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: [] },
+  WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
+  WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
   WorkflowRemovedNotification: { required: ["folder", "workflowID"], optional: [] },
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },

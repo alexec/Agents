@@ -241,6 +241,10 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// Why it is off, while it is (#124): what the page says beside the switch, so a
     /// workflow that started off reads as waiting for somebody rather than as broken.
     public var offReason: WorkflowOffReason?
+    /// The agent a `standing` workflow sends its runs to (#142), while it is still
+    /// here: `nil` when there is none yet or it has gone, either way the next run
+    /// starts one.
+    public var standingAgentID: UUID?
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
@@ -254,8 +258,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil,
                 nextFireAtByTrigger: [Date?] = [],
                 cooldownEndsAt: Date? = nil, holdsAFire: Bool = false,
-                offReason: WorkflowOffReason? = nil) {
+                offReason: WorkflowOffReason? = nil, standingAgentID: UUID? = nil) {
         self.offReason = offReason
+        self.standingAgentID = standingAgentID
         self.cooldownEndsAt = cooldownEndsAt
         self.holdsAFire = holdsAFire
         self.nextFireAtByTrigger = nextFireAtByTrigger
@@ -344,6 +349,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         cooldownEndsAt = try c.decodeIfPresent(Date.self, forKey: .cooldownEndsAt)
         holdsAFire = try c.decodeIfPresent(Bool.self, forKey: .holdsAFire) ?? false
         offReason = (try? c.decodeIfPresent(WorkflowOffReason.self, forKey: .offReason)) ?? nil
+        standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
     }
 
     /// What its cooldown is doing, in one sentence, for the pages that show triggers

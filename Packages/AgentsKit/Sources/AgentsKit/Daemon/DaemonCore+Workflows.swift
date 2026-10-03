@@ -245,7 +245,16 @@ extension DaemonCore {
             cooldownEndsAt: workflow.cooldownEnds(after: state?.lastFiredAt, now: now),
             holdsAFire: state?.heldFire != nil,
             offReason: WorkflowState.offReason(workflow, state,
-                                               digest: enabled ? nil : workflowDigest(workflow)))
+                                               digest: enabled ? nil : workflowDigest(workflow)),
+            standingAgentID: standingAgent(of: workflow, state: state))
+    }
+
+    /// The agent a standing workflow keeps, if it is still here to be sent the next run
+    /// (#142): the same test the fire makes before reusing it.
+    private func standingAgent(of workflow: Workflow, state: WorkflowState?) -> UUID? {
+        guard workflow.mode == .standing, let id = state?.standingAgentID,
+              let agent = agents[id], agent.state != .archived else { return nil }
+        return id
     }
 
     /// Whether a run of it is in flight.
@@ -569,11 +578,10 @@ extension DaemonCore {
         case .standing:
             var records = workflowStore.load()
             let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
-            let standing = state?.standingAgentID
             // A standing agent that is still here is picked back up. One that has gone
             // is replaced, and the replacement adopted, so a workflow whose agent was
             // archived last week is not dead — it simply starts again.
-            if let standing, agents[standing] != nil, agents[standing]?.state != .archived {
+            if let standing = standingAgent(of: workflow, state: state) {
                 try await adoptAndPrompt(agentID: standing, prompt: prompt, workflow: workflow, run: run)
                 return standing
             }
@@ -1163,6 +1171,20 @@ extension DaemonCore {
                 if length != existing.cooldown {
                     edited = try FrontMatterEdit.set(WorkflowCooldown.key,
                                                      to: length.map(WorkflowCooldown.fileText), in: edited)
+                }
+            }
+            // Held to the rules a session's labels are (#142), since they become one
+            // agent's labels on each run, and written only when they changed.
+            if let typed = request.labels {
+                let labels: [String]
+                do {
+                    labels = try SessionLabelPolicy.change(current: [], add: typed, actor: .person,
+                                                           projectLabels: []).map(\.value)
+                } catch {
+                    throw JSONRPCError(code: JSONRPCError.invalidParams, message: error.localizedDescription)
+                }
+                if labels != existing.settings.labels {
+                    edited = try FrontMatterEdit.set(WorkflowSettings.Setting.labels, toList: labels, in: edited)
                 }
             }
         } catch let refusal as FrontMatterEdit.Refusal {

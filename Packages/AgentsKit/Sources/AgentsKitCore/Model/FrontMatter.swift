@@ -198,6 +198,92 @@ public enum FrontMatterEdit {
         return lines.joined(separator: newline)
     }
 
+    /// Set, change or remove one top-level key whose value is a list of names: `labels:`
+    /// (#142). Empty or `nil` removes it.
+    ///
+    /// Written the way the file already writes it: a one-line `[a, b]` stays one line,
+    /// and a block of `- a` lines stays a block at its own indentation, with any comment
+    /// between the items left where it was. A key the file does not have yet is added
+    /// as one line. A list running over several lines in brackets, an item with more
+    /// under it, or a key whose value is not a list is refused rather than reshaped.
+    public static func set(_ key: String, toList values: [String]?, in source: String) throws -> String {
+        let newline = source.range(of: "\r\n") != nil ? "\r\n" : "\n"
+        var lines = source.components(separatedBy: newline)
+        let values = values ?? []
+
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else {
+            throw Refusal("This file does not start with a metadata block, and one cannot be invented for it")
+        }
+        guard let closing = lines.dropFirst().firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces) == "---"
+        }) else {
+            throw Refusal("The metadata block is never closed")
+        }
+
+        let matches = (1..<closing).filter { isKeyLine(lines[$0], key: key) }
+        guard matches.count <= 1 else {
+            throw Refusal("`\(key):` appears more than once in the metadata — which one is meant is not something to pick between silently")
+        }
+        let flow = "[" + values.map(flowQuoted).joined(separator: ", ") + "]"
+
+        guard let index = matches.first else {
+            guard !values.isEmpty else { return source }
+            lines.insert("\(key): \(flow)", at: closing)
+            return lines.joined(separator: newline)
+        }
+
+        let parts = split(lines[index], key: key)
+        if parts.value.hasPrefix("[") {
+            guard parts.value.hasSuffix("]") else {
+                throw Refusal("`\(key):` is a list over several lines, which this cannot change")
+            }
+            if values.isEmpty {
+                lines.remove(at: index)
+            } else {
+                lines[index] = "\(key):\(parts.spacing)\(flow)\(parts.trailing)"
+            }
+            return lines.joined(separator: newline)
+        }
+        guard parts.value.isEmpty else {
+            throw Refusal("`\(key):` is not written as a list, which this cannot change")
+        }
+
+        // A block list: the `- item` lines after the key, at one indentation. Blank
+        // lines and comments among them are the author's and stay.
+        var end = index + 1
+        while end < closing, isContinuation(lines[end]) || lines[end].trimmingCharacters(in: .whitespaces).isEmpty {
+            end += 1
+        }
+        var items: [Int] = []
+        var pad: String?
+        for line in (index + 1)..<end {
+            let text = lines[line]
+            let trimmed = text.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { continue }
+            let indent = String(text.prefix { $0 == " " })
+            guard trimmed.hasPrefix("-"), pad == nil || pad == indent else {
+                throw Refusal("`\(key):` has a block under it that is not a plain list, which this cannot change")
+            }
+            pad = indent
+            items.append(line)
+        }
+        // An item that stays where it was keeps its line, and with it its comment.
+        let written = values.enumerated().map { position, value in
+            if position < items.count, let pad,
+               split(String(lines[items[position]].dropFirst(pad.count)), key: "-").value == quoted(value) {
+                return lines[items[position]]
+            }
+            return "\(pad ?? "  ")- \(quoted(value))"
+        }
+        for line in items.reversed() { lines.remove(at: line) }
+        if values.isEmpty {
+            lines.remove(at: index)
+        } else {
+            lines.insert(contentsOf: written, at: items.first ?? index + 1)
+        }
+        return lines.joined(separator: newline)
+    }
+
     /// Whether this line is `key:` at column zero, as against a key of the same name
     /// nested under something, or a longer key that merely starts the same way.
     private static func isKeyLine(_ line: String, key: String) -> Bool {
@@ -259,6 +345,17 @@ public enum FrontMatterEdit {
             || value.contains(": ") || value.contains(" #")
             || value.contains("\n") || value.contains("\r")
         guard needsQuotes else { return value }
+        return doubleQuoted(value)
+    }
+
+    /// The same, inside `[…]`, where a comma or a bracket would end the item.
+    private static func flowQuoted(_ value: String) -> String {
+        let quotedHere = quoted(value)
+        guard quotedHere == value, value.contains(where: { ",[]{}".contains($0) }) else { return quotedHere }
+        return doubleQuoted(value)
+    }
+
+    private static func doubleQuoted(_ value: String) -> String {
         let escaped = value
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")

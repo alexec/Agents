@@ -5,8 +5,8 @@ A design note for the look, before any depth is built. The issue is
 which client shows it today. This note says where each one goes, what can be changed from
 the page, and recommends answers to the questions the issue leaves open.
 
-The Mac look is built on this branch (screenshots below). The Remote and the web page wait
-for Alex to approve it.
+Alex approved the Mac look and these answers on 2026-10-03. The depth, the Remote and the web
+page are built on this branch (screenshots below).
 
 ## The page answers four questions, in this order
 
@@ -39,7 +39,7 @@ in its own card, instead of one line in grey under the title.
 | **What it does** (the form, shaped like the prompt bar) | File path | file | Top left pill (Finder), as today | No |
 | | Runtime | `runtime:` | Top right menu, as today | Yes |
 | | **Agent mode** | `agent:` | A row of its own above the prompt: "Starts a new agent each run" / "Sends to its standing agent" / "Resumes the agent that triggered it" | No (see Q2) |
-| | **Standing agent** | app | Same row, for `standing`: its name as a link, or "Started on the next run" when there is none or it has gone | — |
+| | **Standing agent** | `WorkflowSummary.standingAgentID` | Same row, for `standing`: its name as a link, or "Started on the next run" when there is none or it has gone | — |
 | | Prompt | body | Middle, as today | No |
 | | Permission mode | `permission-mode:` | Bottom left pill, as today | Yes |
 | | Model / effort / options | `model:` `effort:` `options:` | Bottom right pill, as today | Yes |
@@ -98,16 +98,32 @@ uses).
    options; it gains the status card, agent mode, standing agent, labels and unknown keys in
    the same order as the Mac.
 
-## What the look build covers (Mac)
+## What is built
 
-Real data: every status line, agent mode, labels (shown, not editable), unknown keys, triggers,
-cooldown, last ran, runs. Placeholder: the standing agent is the newest agent the workflow
-started, not the one the store keeps; the labels field is disabled.
+- **Labels** (Q1): `WorkflowSettingsRequest.labels` writes `labels:` through
+  `FrontMatterEdit.set(_:toList:in:)`, held to `SessionLabelPolicy` and written only when they
+  changed. Left out means left alone, so a phone or page from before this cannot remove them by
+  saving a mode. A one-line `[a, b]` stays one line; a block of `- a` lines stays a block, an
+  item that stays keeping its line and comment. The Mac and the Remote edit them with
+  `LabelTagField`.
+- **Standing agent** (Q3): `WorkflowSummary.standingAgentID` is the agent `WorkflowStore`
+  keeps, while it is here and not archived (the same test the fire makes); `nil` reads
+  "Started on the next run".
+- **Status lines**: `Shared/UI/WorkflowStatus.swift`, so the Mac and the Remote say the same
+  lines; the web page's `workflowStatusLines` is its port.
+- **The Remote** (Q8): Run now or Approve, Enabled, then Status, What it does (agent mode,
+  standing agent, prompt), Settings, Labels, From a later version, Recent runs.
+- **The web page** (Q7): every attribute read-only, in the same order, with Run Now or Approve,
+  Enabled and Archive / Bring Back (`workflows/approve` and `workflows/archive` added to the
+  page's methods). Editing the settings from the web is #162.
 
 ## Screenshots
 
-On a scratch root with three workflows:
+From a run-app root with three workflows, after one run of Nightly review:
 
-- `shot-on.png`: on, standing, with labels, a cooldown and an unknown key.
-- `shot-off-by-file.png`: `enabled: false` in the file.
-- `shot-awaiting-approval.png`: new, waiting for approval.
+- `shot-on.png` / `web-on.png`: on, standing (its agent linked), labels, a cooldown and an
+  unknown key.
+- `shot-off-by-file.png` / `web-off-by-file.png`: `enabled: false` in the file.
+- `shot-awaiting-approval.png` / `web-awaiting-approval.png`: changed since it was approved,
+  `agent: triggering`.
+- `web-approved.png`: the same on the page after Approve.

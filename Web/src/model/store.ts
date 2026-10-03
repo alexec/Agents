@@ -757,6 +757,21 @@ export class Store extends Work {
     if (changed) this.upsertWorkflow(changed, host);
   }
 
+  /** Approve (#142): the digest is what the page was showing, so a file changed since still waits. */
+  async approveWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
+    if (!summary.awaitingApproval) return;
+    const changed = await this.act("workflows/approve",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, digest: summary.awaitingApproval.digest }, host);
+    if (changed) this.upsertWorkflow(changed, host);
+  }
+
+  /** Archive or Bring Back (#142), as the window's page has them. */
+  async setWorkflowArchived(host: string, summary: WorkflowSummary, archived: boolean): Promise<void> {
+    const changed = await this.act("workflows/archive",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, archived }, host);
+    if (changed) this.upsertWorkflow(changed, host);
+  }
+
   /** Mark as Unread / Mark as Read (#70). */
   async setUnread(host: string, agentID: string, unread: boolean): Promise<void> {
     await this.act("agents/setUnread", { agentID: agentID as UUID, unread }, host);
