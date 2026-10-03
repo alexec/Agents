@@ -23,6 +23,10 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// A phone on the direct link with a pairing code and no key yet: it may say who it
     /// is and nothing more. Once it has, it hangs up and comes back as a device.
     case pairing
+    /// Agents Host's window, as its code signature says: whether this Mac's host is
+    /// there and how much it holds, its projects and its agents, and nothing more (#168).
+    /// It starts and stops the host through launchd, never over the socket.
+    case hostApp
     /// Anything else of this account: whether the daemon is there, and no more.
     case stranger
 
@@ -63,6 +67,12 @@ public enum ConnectionRole: String, Sendable, Hashable {
     public static let pairingMethods: Set<String> = Set<String>([DaemonAPI.Method.devicesAnnounce])
         .union(strangerMethods)
 
+    /// Reading what Agents Host's window counts: projects, and agents working.
+    public static let hostAppMethods: Set<String> = Set<String>([
+        DaemonAPI.Method.projectsList,
+        DaemonAPI.Method.agentsList,
+    ]).union(strangerMethods)
+
     /// Enough to find out a daemon is answering, which a client does before anything.
     public static let strangerMethods: Set<String> = [
         DaemonAPI.Method.ping,
@@ -74,6 +84,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         case .control, .device: true
         case .agent: Self.agentMethods.contains(method)
         case .pairing: Self.pairingMethods.contains(method)
+        case .hostApp: Self.hostAppMethods.contains(method)
         case .stranger: Self.strangerMethods.contains(method)
         }
     }

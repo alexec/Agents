@@ -11,7 +11,8 @@ import Security
 /// cannot do is be the app. The kernel names the process on the other end by audit
 /// token, which a caller cannot forge, and the signature on that process says which
 /// program it is and whose. The app and the bridge are control; this daemon's own
-/// binary, run as a runtime's MCP helper, is an agent; anything else is a stranger.
+/// binary, run as a runtime's MCP helper, is an agent; Agents Host may read what its
+/// window counts (#168); anything else is a stranger.
 public struct RolePolicy: Sendable {
     public let role: @Sendable (_ fd: Int32) -> ConnectionRole
     /// Said once in the log, so which door is in place is never a guess.
@@ -28,6 +29,23 @@ public struct RolePolicy: Sendable {
     /// The bundle identifiers that are control. The helper is the daemon's own binary.
     public static let controlIdentifiers = ["com.alexecollins.agents", "com.alexecollins.agents.bridge"]
     public static let helperIdentifier = "agentsd"
+    /// Agents Host, whose window counts this Mac's host's projects and working agents.
+    public static let hostAppIdentifier = "com.alexecollins.agents.host"
+
+    /// Who gets what, each signed by this daemon's team, tried in order. Exact
+    /// identifiers only: anything not named here, of any team, is a stranger.
+    public static let signedRoles: [(role: ConnectionRole, identifiers: [String])] = [
+        (.control, controlIdentifiers),
+        (.agent, [helperIdentifier]),
+        (.hostApp, [hostAppIdentifier]),
+    ]
+
+    /// The role a caller signed by this daemon's team as `identifier` gets: the rule
+    /// `signatures(team:)` checks, by name.
+    public static func role(forSignedIdentifier identifier: String?) -> ConnectionRole {
+        guard let identifier else { return .stranger }
+        return signedRoles.first { $0.identifiers.contains(identifier) }?.role ?? .stranger
+    }
 
     /// The policy for a daemon at `locations`.
     ///
@@ -53,16 +71,15 @@ public struct RolePolicy: Sendable {
     }
 
     #if canImport(Security)
-    /// Control for the app and the bridge, agent for the helper, all signed by `team`.
+    /// `signedRoles`, each signed by `team`: control for the app and the bridge, agent for
+    /// the helper, hostApp for Agents Host.
     public static func signatures(team: String) -> RolePolicy {
-        let wanted = CallerSignature.Requirements(
-            control: CallerSignature.requirement(team: team, identifiers: controlIdentifiers),
-            helper: CallerSignature.requirement(team: team, identifiers: [helperIdentifier]))
+        let wanted = CallerSignature.Requirements(signedRoles.compactMap { rule in
+            CallerSignature.requirement(team: team, identifiers: rule.identifiers).map { (rule.role, $0) }
+        })
         return RolePolicy(summary: "roles by code signature, team \(team)") { fd in
             guard let code = CallerSignature.code(of: fd) else { return .stranger }
-            if let control = wanted.control, CallerSignature.satisfies(code, control) { return .control }
-            if let helper = wanted.helper, CallerSignature.satisfies(code, helper) { return .agent }
-            return .stranger
+            return wanted.rules.first { CallerSignature.satisfies(code, $0.1) }?.0 ?? .stranger
         }
     }
     #endif
@@ -72,8 +89,8 @@ public struct RolePolicy: Sendable {
 enum CallerSignature {
     /// Compiled once and only read after: a requirement is an immutable CF object.
     struct Requirements: @unchecked Sendable {
-        let control: SecRequirement?
-        let helper: SecRequirement?
+        let rules: [(ConnectionRole, SecRequirement)]
+        init(_ rules: [(ConnectionRole, SecRequirement)]) { self.rules = rules }
     }
 
     /// The team this process is signed by, or nil when it is not.
@@ -92,11 +109,15 @@ enum CallerSignature {
     /// One of `identifiers`, signed through Apple by `team`. A development certificate
     /// and a Developer ID one both carry the team as the leaf's organisational unit.
     static func requirement(team: String, identifiers: [String]) -> SecRequirement? {
-        let names = identifiers.map { "identifier \"\($0)\"" }.joined(separator: " or ")
-        let text = "anchor apple generic and certificate leaf[subject.OU] = \"\(team)\" and (\(names))"
         var requirement: SecRequirement?
-        guard SecRequirementCreateWithString(text as CFString, [], &requirement) == errSecSuccess else { return nil }
+        guard SecRequirementCreateWithString(requirementText(team: team, identifiers: identifiers) as CFString,
+                                             [], &requirement) == errSecSuccess else { return nil }
         return requirement
+    }
+
+    static func requirementText(team: String, identifiers: [String]) -> String {
+        let names = identifiers.map { "identifier \"\($0)\"" }.joined(separator: " or ")
+        return "anchor apple generic and certificate leaf[subject.OU] = \"\(team)\" and (\(names))"
     }
 
     /// The running code on the other end of `fd`, by the audit token the kernel keeps

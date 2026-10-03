@@ -101,6 +101,9 @@ public final class DaemonServer: @unchecked Sendable {
     private(set) var listenFD: Int32 = -1
     private let connections = ConnectionSet()
     private let stopped = ManagedAtomicFlag()
+    /// Lines a caller could have said every few seconds: once, then a count (#168).
+    private let repeated = NSLock()
+    private var notices = RepeatedNotice()
     private let onConnectionCountChanged: @Sendable (Int) -> Void
     /// A connection that has gone, by id. What is known about where its person was
     /// goes with it: gone is more truthful than stale (021).
@@ -193,13 +196,33 @@ public final class DaemonServer: @unchecked Sendable {
     private func accepted(_ fd: Int32, peer: Int32?, role: ConnectionRole) {
         // Only what is not a window: a window connects all day, and a helper or a
         // stranger is what anybody reading the log about the socket is looking for.
-        if role != .control {
-            DaemonLog.shared.write("socket: pid \(peer.map(String.init) ?? "?") connected as \(role.rawValue)")
+        // A helper connects once per tool call, which is worth a line each; a stranger or
+        // Agents Host the same pid again and again, which is said once and then counted.
+        let line = "socket: pid \(peer.map(String.init) ?? "?") connected as \(role.rawValue)"
+        switch role {
+        case .control: break
+        case .agent: DaemonLog.shared.write(line)
+        default: sayOnce(line)
         }
         // Everything that reaches this socket is a window on this Mac, until the bridge
         // exists to say otherwise: helpers and probes that connect here never report
         // presence, and a window that does is the Mac.
         serve(FDTransport(socket: fd), identity: ConnectionIdentity(peer: peer, role: role))
+    }
+
+    /// `line` the first time, then how many more times it came, at most once an hour.
+    private func sayOnce(_ line: String) {
+        let now = Date()
+        let say = repeated.withLock { notices.note(line, at: now) }
+        switch say {
+        case .first?:
+            DaemonLog.shared.write(line + " (again within the hour is counted, not logged)")
+        case .again(let times, let since)?:
+            DaemonLog.shared.write(line + ": \(times) more time\(times == 1 ? "" : "s") since "
+                                   + ISO8601DateFormatter().string(from: since))
+        case nil:
+            break
+        }
     }
 
     /// A channel the control plane opened on this host's uplink (058, R3): one virtual
@@ -229,7 +252,7 @@ public final class DaemonServer: @unchecked Sendable {
                 // A phone refused is a phone that does less than it did, and the phone's
                 // own screen is the only other place that would say so.
                 if role == .pairing {
-                    DaemonLog.shared.write("socket: refused \(method) to a \(role.rawValue) connection")
+                    self.sayOnce("socket: refused \(method) to a \(role.rawValue) connection")
                 }
                 return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                              message: "\(method) is not open to this connection (\(role.rawValue))."))

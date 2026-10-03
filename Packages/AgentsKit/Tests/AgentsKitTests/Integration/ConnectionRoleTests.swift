@@ -104,6 +104,44 @@ struct ConnectionRoleTests {
         #expect(heard.all == [DaemonAPI.Method.ping], "nothing refused reached the daemon")
     }
 
+    /// Agents Host's window counts projects and working agents, and does nothing else
+    /// over the socket (#168): before, it was a stranger, refused, and redialled every 5 s.
+    @Test func agentsHostReadsWhatItCountsAndNothingMore() async throws {
+        let path = path()
+        let heard = Heard()
+        let server = try server(.hostApp, at: path, heard: heard)
+        defer { server.stop() }
+        let fd = connect(path)
+        defer { close(fd) }
+
+        for method in [DaemonAPI.Method.ping, DaemonAPI.Method.projectsList, DaemonAPI.Method.agentsList] {
+            #expect(errorCode(await ask(fd, method)) == nil, "\(method)")
+        }
+        for method in [DaemonAPI.Method.permissionsAnswer, DaemonAPI.Method.agentsStart, DaemonAPI.Method.shellInput,
+                       DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.daemonQuit, DaemonAPI.Method.filesBrowse,
+                       DaemonAPI.Method.connectionBindDevice] {
+            #expect(errorCode(await ask(fd, method)) == DaemonAPI.Failure.notPermitted, "\(method)")
+        }
+        #expect(heard.all == [DaemonAPI.Method.ping, DaemonAPI.Method.projectsList, DaemonAPI.Method.agentsList])
+        #expect(!ConnectionRole.hostApp.hearsNotifications && !ConnectionRole.hostApp.isPerson)
+    }
+
+    /// Who is what by signature: exact identifiers of this team, and anything else a
+    /// stranger, a look-alike name included.
+    @Test func agentsHostIsRecognisedByItsOwnIdentifierOnly() {
+        #expect(RolePolicy.role(forSignedIdentifier: "com.alexecollins.agents.host") == .hostApp)
+        #expect(RolePolicy.role(forSignedIdentifier: "com.alexecollins.agents") == .control)
+        #expect(RolePolicy.role(forSignedIdentifier: "com.alexecollins.agents.bridge") == .control)
+        #expect(RolePolicy.role(forSignedIdentifier: "agentsd") == .agent)
+        for other in ["com.alexecollins.agents.hostile", "com.alexecollins.agents.host.helper",
+                      "com.alexecollins.agents.remote", "com.apple.Terminal", "", nil] as [String?] {
+            #expect(RolePolicy.role(forSignedIdentifier: other) == .stranger, "\(other ?? "nil")")
+        }
+        let host = CallerSignature.requirementText(team: "6T4RVD5724", identifiers: [RolePolicy.hostAppIdentifier])
+        #expect(host == "anchor apple generic and certificate leaf[subject.OU] = \"6T4RVD5724\" "
+                + "and (identifier \"com.alexecollins.agents.host\")")
+    }
+
     @Test func aHelperReachesTheAgentToolsAndNothingAWindowDoes() async throws {
         let path = path()
         let heard = Heard()
@@ -322,6 +360,8 @@ struct ConnectionRoleTests {
     @Test func theRequirementsCompile() {
         #expect(CallerSignature.requirement(team: "6T4RVD5724", identifiers: RolePolicy.controlIdentifiers) != nil)
         #expect(CallerSignature.requirement(team: "6T4RVD5724", identifiers: [RolePolicy.helperIdentifier]) != nil)
+        #expect(CallerSignature.requirement(team: "6T4RVD5724", identifiers: [RolePolicy.hostAppIdentifier]) != nil)
+        #expect(RolePolicy.signedRoles.map(\.role) == [.control, .agent, .hostApp])
     }
 
     /// Nothing to tell programs apart by: open, and said so.

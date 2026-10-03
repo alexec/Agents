@@ -156,33 +156,75 @@ final class HostModel {
     }
 
     /// One connection to this Mac's host, kept while it answers: a socket opened every few
-    /// seconds is how a daemon's descriptors ran out once.
+    /// seconds is how a daemon's descriptors ran out once, and how one host logged 25,000
+    /// connections (#168).
     private var hostClient: DaemonClient?
+    /// The host process the kept connection is to: another one is a restart, and dialled.
+    private var hostClientPID: Int32?
+    /// The host said no to the counts on this connection: it is kept, and not asked again.
+    private var hostRefused = false
+    private var hostLink = HostLinkPolicy()
 
     /// From this Mac's own host, over its socket: never starting one.
     private func countWork() async {
-        guard daemonRunning else { projects = nil; working = nil; return }
+        guard daemonRunning else {
+            await dropHostClient()
+            projects = nil
+            working = nil
+            return
+        }
+        if hostClient != nil, hostClientPID != daemonPID { await dropHostClient() }
         let client: DaemonClient
         if let kept = hostClient {
             client = kept
+            // A broken connection is a loss like any other, dialled again after the wait.
+            guard await kept.isConnected else { return await lostHost() }
         } else {
+            guard hostLink.mayDial(at: Date()) else { return }
             client = DaemonClient(link: LookingLink(locations: paths.hostLocations))
-            do { try await client.connect(startIfNeeded: false, timeout: .seconds(2)) } catch { return }
+            do {
+                try await client.connect(startIfNeeded: false, timeout: .seconds(2))
+            } catch {
+                hostLink.failed(at: Date())
+                return
+            }
+            hostLink.connected()
             hostClient = client
+            hostClientPID = daemonPID
+            hostRefused = false
         }
-        let listed = try? await client.call(DaemonAPI.Method.projectsList, [String: String](), returning: JSONValue.self)
-        let agents = try? await client.call(DaemonAPI.Method.agentsList, ["includeArchived": false, "lean": true],
-                                           returning: JSONValue.self)
-        if listed == nil, agents == nil {
-            // Gone away: connect afresh next time.
-            await client.disconnect()
-            hostClient = nil
-            return
+        guard !hostRefused else { return }
+        do {
+            let listed = try await client.call(DaemonAPI.Method.projectsList, [String: String](), returning: JSONValue.self)
+            let agents = try await client.call(DaemonAPI.Method.agentsList, ["includeArchived": false, "lean": true],
+                                               returning: JSONValue.self)
+            if case .array(let all) = listed { projects = all.count }
+            if case .array(let all) = agents {
+                working = all.filter { $0["state"]?.stringValue == AgentState.running.rawValue }.count
+            }
+        } catch {
+            switch HostLinkPolicy.failure(error) {
+            case .refused:
+                // An older host that doesn't know Agents Host: no counts, and no redialling.
+                hostRefused = true
+                projects = nil
+                working = nil
+            case .gone:
+                await lostHost()
+            }
         }
-        if case .array(let all)? = listed { projects = all.count }
-        if case .array(let all)? = agents {
-            working = all.filter { $0["state"]?.stringValue == AgentState.running.rawValue }.count
-        }
+    }
+
+    private func lostHost() async {
+        await dropHostClient()
+        hostLink.failed(at: Date())
+    }
+
+    private func dropHostClient() async {
+        await hostClient?.disconnect()
+        hostClient = nil
+        hostClientPID = nil
+        hostRefused = false
     }
 
     private static func started(_ pid: Int32) -> Date? {
