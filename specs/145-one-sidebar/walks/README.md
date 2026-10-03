@@ -21,8 +21,10 @@ AX (`ui.swift unfold`/`select`: AXDisclosing and AXSelected), with no clicks or 
 | `1-folded-nothing-selected.png` | Activity at the top. Every project folded, each with its counts (*Needs you · 2 unread*, *1 unread*) and the red dot. The server's project reads `build-box:api-server`. *Keeping this Mac awake* is at the foot. With nothing selected, the detail shows the help text. Two columns. |
 | `2-unfolded.png` | *Agents* and *build-box:api-server* unfolded: Needs you, Working (with its background shell), Done (2 unread), Paused, *Archived sessions* folded, Workflows. An unfolded project's row drops its counts, because the rows under it show them. |
 | `3-session-selected.png` | A session picked: its chat in the detail, titled with the session and its project, and the inspector toggle in the toolbar. |
+| `4-project-dashboard.png` | A project picked (after the fix below): only its own row lights. The detail shows its Dashboard, titled with the project. New Session and Project Settings are in the toolbar. |
 | `5-relaunched-folds-kept.png` | The window quit and reopened: the same projects are still unfolded. The real turn has finished and parked itself, and *Today $0* has arrived on Spending. |
 | `6-archived.png` | A session archived (over the socket): it leaves Done, and *Archived sessions* goes from 2 to 3. |
+| `7-workflow-selected.png` | A workflow picked: its row lights and its page opens in the detail. |
 
 ## Found and fixed during the walk
 
@@ -30,10 +32,12 @@ AX (`ui.swift unfold`/`select`: AXDisclosing and AXSelected), with no clicks or 
   `DisclosureGroup`, and a group's tag goes to every untagged row under it. The tag is now on
   the project's row only.
 
-## Not yet walked
+## Not walked
 
-The screen locked part-way, and these need it unlocked:
-- a project picked, showing its Dashboard (the first try is what showed the bug above);
-- the keyboard: ↑/↓ through the list, ←/→ to fold and unfold, ⌘F, ⌫ on several sessions;
+These need real keys and clicks in the front window. They were left alone because Alex was at
+the Mac (idle about 3 minutes):
+- the keyboard: ↑/↓ through the list, ←/→ to fold and unfold (both are the outline's own),
+  ⌘F, and ⌫ on several sessions;
 - the context menus: the project's *Dashboard / New Session / Project Settings… / Archive /
-  Show in Finder*.
+  Show in Finder*;
+- swipe to archive (a List row's swipe cannot be driven at all, see memory).
