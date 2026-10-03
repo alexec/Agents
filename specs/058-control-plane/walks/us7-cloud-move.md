@@ -76,6 +76,10 @@ screen were not walked:** Alex was at the keyboard. See *Not walked*.
   walk can run, with the screen leased, once Alex is away. It needs a scratch Agents Host
   on `AGENTS_ROOT` and AX setting the address field, which may not reach SwiftUI's
   binding.
+  - *Tried at 20:08, with Alex idle and the screen leased:* a scratch Agents Host opened
+    on its own root, but `screencapture -l` said `could not create image from window`.
+    This session has no Screen Recording now. It needs that permission back (for the
+    process this session runs under) before the sheets can be recorded.
 - **The Remote on a phone** over the public certificate: it needs a real Let's Encrypt
   certificate on a real name (T131).
 - **The bucket move through the sheets.** The commands and the MinIO run above stand in.
