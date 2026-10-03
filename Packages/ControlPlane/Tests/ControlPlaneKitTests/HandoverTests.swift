@@ -176,6 +176,95 @@ extension ControlServiceTests {
         await handover.close()
     }
 
+    /// R16 3, T128: two copies on one bucket. No freeze-and-copy of records: announce, then
+    /// the old copy forwards, and members land on the new one with the records they had.
+    @Test func aMoveOnOneBucketNeedsNoCopy() async throws {
+        let bucket = MemoryStore()
+        let old = try await start(store: bucket)
+        defer { Task { await old.service.stop() } }
+        let (client, _, credentials) = try await pairedClient(at: old.url,
+                                                              code: try await old.service.codes.issue(.client).text)
+        let book = EndpointBook(ControlMembership(client: client, controlKey: control.publicKey, addresses: [],
+                                                  name: "test", url: old.url.absoluteString))
+        // The cloud copy starts serving the same bucket, and writes its own `url` there.
+        let new = try await start(store: bucket)
+        defer { Task { await new.service.stop() } }
+        // And one with the same key on a store of its own: not the same control plane's records.
+        let apart = try await start()
+        defer { Task { await apart.service.stop() } }
+
+        let atOld = try await Handover.Link(old.url, pin: nil, privateKey: control.privateKey)
+        let atNew = try await Handover.Link(new.url, pin: nil, privateKey: control.privateKey)
+        let atApart = try await Handover.Link(apart.url, pin: nil, privateKey: control.privateKey)
+        func shares(_ from: Handover.Link, _ to: Handover.Link) async throws -> Bool {
+            let nonce = UUID().uuidString.lowercased()
+            _ = try await from.call(Handover.Method.mark, ["nonce": .string(nonce), "leave": true])
+            return try await to.call(Handover.Method.mark, ["nonce": .string(nonce)])["found"]?.boolValue == true
+        }
+        #expect(try await shares(atOld, atNew))
+        #expect(try await shares(atNew, atOld))
+        #expect(try await !shares(atOld, atApart))
+
+        // Announce from the old copy: its own place first, though the shared settings now
+        // say the new copy's `url`.
+        let place = ControlEndpoint(url: new.url.absoluteString)
+        let told = try await atOld.call(Handover.Method.announce, ["endpoint": try JSONValue.encoding(place)])
+            .decode(Handover.Status.self)
+        #expect(told.endpoints == [ControlEndpoint(url: old.url.absoluteString), place])
+        try await ControlCodeUse.dialEach(book, as: credentials, dial: ControlJoin.nio).close()
+        #expect(book.current.endpointsToDial.count == 2)
+
+        // Freeze and forward; nothing to copy or take.
+        _ = try await atOld.call(Handover.Method.freeze)
+        _ = try await atOld.call(Handover.Method.forward, ["endpoints": try JSONValue.encoding([place])])
+        #expect(try await atNew.status().phase == .serving)
+
+        // Through the forwarder, then to the new copy, same id, no pairing again.
+        do { try await ControlCodeUse.dialEach(book, as: credentials, dial: ControlJoin.nio).close() } catch {}
+        try await ControlCodeUse.dialEach(book, as: credentials, dial: ControlJoin.nio).close()
+        #expect(book.current.endpointsToDial == [place])
+        #expect(await new.service.methods.client(client) != nil)
+        await atOld.close(); await atNew.close(); await atApart.close()
+    }
+
+    /// #61 P4: a copy restarted while forwarding forwards again, rather than serving the
+    /// records it handed over; told to serve, it serves and forgets it forwarded.
+    @Test func aForwardingCopyForwardsAgainAfterARestart() async throws {
+        let store = MemoryStore()
+        let port = try await freePort()
+        let url = URL(string: "http://127.0.0.1:\(port)")!
+        func copy(resume: Bool = true) throws -> ControlService {
+            var configuration = ControlService.Configuration(store: store, privateKey: control.privateKey, url: url,
+                                                             bind: "127.0.0.1", port: port, name: "test", machineID: "m")
+            configuration.resumeForwarding = resume
+            return try ControlService(configuration)
+        }
+        let first = try copy()
+        try await first.start()
+        let handover = try await Handover.Link(url, pin: nil, privateKey: control.privateKey)
+        _ = try await handover.call(Handover.Method.freeze)
+        _ = try await handover.call(Handover.Method.forward, [
+            "endpoints": try JSONValue.encoding([ControlEndpoint(url: "https://agents.example.com")])])
+        await handover.close()
+        await first.stop()
+
+        let again = try copy()
+        try await again.start()
+        #expect(again.phase.now == .forwarding)
+        #expect(await again.methods.frozen)
+        #expect(again.forwardingUntil.now != nil)
+        await again.stop()
+
+        let serving = try copy(resume: false)
+        try await serving.start()
+        #expect(serving.phase.now == .serving)
+        await serving.stop()
+        let later = try copy()
+        try await later.start()
+        defer { Task { await later.stop() } }
+        #expect(later.phase.now == .serving)
+    }
+
     @Test func onlyTheControlPlanesKeyDrivesAHandover() async throws {
         let old = try await start()
         defer { Task { await old.service.stop() } }

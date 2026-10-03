@@ -33,6 +33,9 @@ public final class ControlService: @unchecked Sendable {
         /// Start empty, for a handover to fill (R16): no settings made, every member
         /// refused, only the copy handing over answered, until it says take over.
         public var receive = false
+        /// Start forwarding again if this copy was forwarding when it stopped (#61 P4).
+        /// Agents Host turns it off once its own copy should serve again.
+        public var resumeForwarding = true
 
         /// The web remote's loopback listener (071): the built app and the port, or nil
         /// for none, which is the container's default.
@@ -165,6 +168,7 @@ public final class ControlService: @unchecked Sendable {
             await readiness.set(true)
         } else {
             try await takeUp()
+            try await resumeForwardingIfMarked()
         }
         let configuration = self.configuration
         let servers = ServerFiles.folder()

@@ -43,6 +43,16 @@ enum HandoverTool {
                               paths: model.paths, settings: model.settings)
     }
 
+    /// Whether this Mac's store is a bucket another copy can share: then a move copies
+    /// nothing (R16 3, T128).
+    static func sharesBucket(_ model: HostModel) -> Bool { model.settings.store == .bucket }
+
+    /// Whether the copy at `place` reads the same store as `self`: a mark left here is
+    /// found there.
+    static func shares(_ place: String, model: HostModel) async -> ControlTool.Result {
+        await run(["shares", "--at", "self", "--with", place], model: model)
+    }
+
     static func status(_ arguments: [String], model: HostModel) async -> HandoverStatus? {
         let read = await run(["status"] + arguments + ["--json"], model: model)
         guard read.ok else { return nil }
@@ -87,6 +97,8 @@ final class MachineMove {
     init(model: HostModel) { self.model = model }
 
     var checked: Bool { [answers, trusted, holdsKey, empty].allSatisfy { $0 == .yes } }
+    /// Both copies read one bucket: nothing is copied, the other one already serves.
+    var shared: Bool { HandoverTool.sharesBucket(model) }
 
     private func handover(_ arguments: [String]) async -> ControlTool.Result {
         await HandoverTool.run(arguments, model: model)
@@ -120,6 +132,12 @@ final class MachineMove {
         let result = await handover(["status", "--at", place, "--json"])
         if result.ok, let status = try? JSONDecoder().decode(HandoverStatus.self, from: Data(result.output.utf8)) {
             answers = .yes; trusted = .yes; holdsKey = .yes
+            if shared {
+                let same = status.phase == "serving" ? await HandoverTool.shares(place, model: model) : nil
+                empty = same?.ok == true ? .yes
+                    : .no("It keeps a store of its own. Start it with AGENTS_STORE set to this bucket, without AGENTS_CONTROL_RECEIVE.")
+                return
+            }
             empty = status.phase == "receiving" && !status.hasRecords ? .yes
                 : .no("It already holds a control plane. Empty its store and start it with AGENTS_CONTROL_RECEIVE=1.")
             return
@@ -185,19 +203,27 @@ final class MachineMove {
         guard frozen.ok else { return await stop(at: 0, frozen.problem) }
         stages[0] = .done
 
-        stages[1] = .doing
-        let copy = await handover(["copy", "--from", "self", "--to", place])
-        guard copy.ok else {
-            return await stop(at: 1, copy.problem + " Empty the other machine's store and start it again with AGENTS_CONTROL_RECEIVE=1.")
-        }
-        copied = copy.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        stages[1] = .done
+        if shared {
+            // One bucket (R16 3): the other copy already serves these records.
+            copied = "Nothing to copy: both read the same bucket"
+            stages[1] = .done
+            taken = true
+            stages[2] = .done
+        } else {
+            stages[1] = .doing
+            let copy = await handover(["copy", "--from", "self", "--to", place])
+            guard copy.ok else {
+                return await stop(at: 1, copy.problem + " Empty the other machine's store and start it again with AGENTS_CONTROL_RECEIVE=1.")
+            }
+            copied = copy.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            stages[1] = .done
 
-        stages[2] = .doing
-        let take = await handover(["take", "--at", place])
-        guard take.ok else { return await stop(at: 2, take.problem) }
-        taken = true
-        stages[2] = .done
+            stages[2] = .doing
+            let take = await handover(["take", "--at", place])
+            guard take.ok else { return await stop(at: 2, take.problem) }
+            taken = true
+            stages[2] = .done
+        }
 
         // From here there is no going back from the sheet: the other machine serves.
         stages[3] = .doing
@@ -273,11 +299,13 @@ struct MachineMoveSheet: View {
                 Button("Save Key…") { move.saveKey() }.padding(.top, 2)
             }
             Self.numbered(2) {
-                Text("Start the control plane there, empty, waiting for this one:")
-                Text("AGENTS_CONTROL_RECEIVE=1 docker compose \\\n  -f deploy/compose.public.yaml up -d")
-                    .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
-                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                if move.shared {
+                    Text("Start the control plane there on this Mac's bucket, with the bucket's keys in its deploy/.env:")
+                    Self.command(Self.bucketCommand(host))
+                } else {
+                    Text("Start the control plane there, empty, waiting for this one:")
+                    Self.command("AGENTS_CONTROL_RECEIVE=1 docker compose \\\n  -f deploy/compose.public.yaml up -d")
+                }
                 Text("See Run the control plane in the cloud.").font(.callout).foregroundStyle(.secondary)
             }
             Self.buttons {
@@ -299,7 +327,7 @@ struct MachineMoveSheet: View {
             Self.tick(move.answers, "It answers")
             Self.tick(move.trusted, "Its certificate is publicly trusted", note: "So no pin is needed, and it renews itself.")
             Self.tick(move.holdsKey, "It holds this control plane's key")
-            Self.tick(move.empty, "It's empty, and waiting for this one")
+            Self.tick(move.empty, move.shared ? "It reads this Mac's bucket" : "It's empty, and waiting for this one")
             Self.problemLine(move.problem)
             Self.buttons {
                 Button("Back") { move.step = .key }
@@ -348,6 +376,21 @@ struct MachineMoveSheet: View {
     }
 
     // MARK: Pieces
+
+    static func command(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+            .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    /// compose.public.yaml on the bucket this Mac's copy uses (T128). The keys are not in
+    /// it: they go in the machine's deploy/.env, never on a command line.
+    static func bucketCommand(_ host: HostModel) -> String {
+        let address = StoreAddress(.bucket, bucket: host.settings.bucket, paths: host.paths)
+        let lines = ["AGENTS_STORE=\(address.url)"] + address.environment.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
+        return (lines + ["docker compose -f deploy/compose.public.yaml up -d"]).joined(separator: " \\\n  ")
+    }
 
     static func stepTitle(_ text: String) -> some View {
         Text(text.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
