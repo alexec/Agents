@@ -36,22 +36,26 @@ are not assessed: `start_agent` would refuse them too. Say which were skipped an
 
 ## The steps
 
-Four turns. Each step uses the app's own tools; the agent does every one for real, exactly
+Six turns. Each step uses the app's own tools; the agent does every one for real, exactly
 as written, even when it expects a failure, and records what the tool answered.
 
 | Step | Turn | What the agent does | Passes when (from the daemon's record) |
 | --- | --- | --- | --- |
 | `show_file` | 1 | `show_file` on the report before it exists, then writes it | the call answered "open, empty", and the report is on disk at the end |
 | `leases` | 1 | `lease_resource assess-<id>`, `list_resources`, `release_resource` | all three answered; `lease.granted` and `lease.released` on the log; nothing held |
-| `workflows` | 1 | `manage_workflows` `list` | it answered a list |
+| `workflows` | 1 | `manage_workflows` `list`, `write` a throwaway `assess-<id>` (waits on `custom.assess_never`), `list`, `remove` it | listed; the write was left waiting for the person's OK (and off, #124); listed again; removed, with no file left. **Not offered** when the project already has as many waiting as it may (#132) |
 | `dashboard` | 1 | `set_tile` a status tile, `read_dashboard`, `remove_tile` | all three answered |
-| `events` | 1 | `wait_for_event recent`, `publish_event custom.assess_ping`, `wait_for_event` on it from that position | the event is on the log from this agent; the wait came back with it |
+| `events` | 1 | `wait_for_event recent`, `publish_event custom.assess_ping`, `wait_for_event` on it from that position; then `wait_for_event custom.assess_never` with no time limit and `cancel_wait` | the event is on the log from this agent; the wait came back with it; `cancel_wait` answered after the second wait |
 | `ask_form` | 1 | `ask_form` with a choice (`pick`) and a text field (`words`) | answered; the typed text came back in the tool's answer unchanged, and is in the report |
 | `own_ask` | 1 | one question with the runtime's own tool (Claude `AskUserQuestion`, Codex `request_user_input`, Cursor `AskQuestion`, Antigravity `ask_question`) | an elicitation reached the app beyond `ask_form`'s; **not offered** where `ToolPolicy.escalationTool` is nil (Grok, Copilot, Gemini, OpenCode) and none came |
 | `helpers` | 1–2 | `start_agent` a helper on the same runtime, `list_my_agents`, `finish_turn blocked waiting_on` it (refused if it has already finished, which counts); then `park_agent` and `archive_agent` it | helper marked as this agent's; the "block … has cleared" prompt resumed it; `agent.parked` on the log; helper archived by an agent |
 | `wait` | 2–3 | `wait_for_event custom.assess_never until_minutes 1`, then `finish_turn blocked` | the "timed out" prompt started it again |
-| `ending` | 1–4 | `finish_turn` blocked on the helper (with title and next prompt), blocked on the wait, blocked with `check_again_in_minutes 1`, then `done` + park or `needs_answer` | every one recorded as sent; the last is done or needs_answer; no turn ended without an account |
-| `report` | 4 | finishes `.agents/reviews/runtimes/<runtime>-<date>.md`: a row per step and "What to fix" | the file is there and names every step |
+| `ending` | 1–6 | `finish_turn` blocked on the helper (with title and next prompt), blocked on the wait, blocked with `check_again_in_minutes 1`, then `done` + park or `needs_answer` | every one recorded as sent; the last is done or needs_answer; no turn ended without an account |
+| `worktree` | 4–5 | `finish_turn partly_done worktree assess-<id>`, then, in it, `finish_turn partly_done leave_worktree remove` | the app's notes say it moved into the worktree, then back, and removed it; it is in no worktree at the end. **Not offered** outside a git repository, or where the runtime cannot move |
+| `sessions` | 5 | `list_sessions`, then `read_session` on its own id | the list names this session; the read gives back its id and title |
+| `scope` | 5 | write a line, with its own file tool, to `<root>/assessments/scope-<id>.txt` (outside every project) | a permission card asked about it, or the runtime refused it; never written without asking |
+| `permissions` | 5 | records the card for that write and its answer | a card came and its answer held: written only if allowed. **Not offered** where the runtime refused without asking |
+| `report` | 6 | finishes `.agents/reviews/runtimes/<runtime>-<date>.md`: a row per step and "What to fix" | the file is there and names every step |
 
 ## How it is scored
 
@@ -76,7 +80,8 @@ disagree, the daemon's table is the result, and the difference is itself a findi
 
 It starts each assessment through `runtimes/assess`, answers the form (`pick` → the first
 option, `words` → a fixed phrase), the runtime's own question and every permission card with
-allow-once, follows the agent to its last turn (about four minutes: two one-minute waits),
+allow-once — except the card for the write outside the project, which it rejects, so the
+`permissions` step sees a refusal held — follows the agent to its last turn (about six minutes: two one-minute waits, a 45-second hold before `cancel_wait`, and two moves),
 then prints the daemon's table and the report's path. It never answers for anything but the
 agents it started.
 

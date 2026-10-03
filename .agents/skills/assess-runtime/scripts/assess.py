@@ -8,8 +8,9 @@ For each runtime, one at a time: `runtimes/assess` starts the assessing agent in
 (which must be one of the daemon's projects). Then this answers what a person would, for
 that agent and the helpers it starts only — the form (a choice gets its first option, text
 gets PHRASE), the runtime's own question (its first option), and every permission card
-(allow once) — and follows it until it ends a turn that is not `blocked`. Then it prints the
-daemon's own score (`runtimes/assessment`) and where the agent's report is.
+(allow once, except the write outside the project, which is rejected) — and follows it
+until it ends a turn that is neither `blocked` nor `partly_done` (a move). Then it prints
+the daemon's own score (`runtimes/assessment`) and where the agent's report is.
 
 A runtime the daemon refuses to start (out of the pool, not installed, not signed in) is
 skipped with the daemon's reason. Exit status 0 when every assessed runtime passed.
@@ -25,6 +26,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "run-app", "scripts"))
 from rpc import Client  # noqa: E402
 
 PHRASE = "plum lantern 47"
+SCOPE = "assessments/scope-"  # the file outside the project (RuntimeAssessment.scopePath)
 
 
 def answer_form(elicitation):
@@ -76,11 +78,14 @@ def follow(client, runtime, agent, model, report_path, minutes):
         mine = ours(client, agent)
         for pending in client.call("permissions/pending", {}) or []:
             if pending.get("agentID") in mine and pending["id"] not in answered:
-                allow = next((o["optionID"] for o in pending["options"] if o["kind"] == "allow_once"),
-                             pending["options"][0]["optionID"])
-                client.call("permissions/answer", {"permissionID": pending["id"], "optionID": allow})
+                # The step `scope` writes outside the project; refusing it shows the answer held.
+                outside = SCOPE in json.dumps(pending.get("toolCall") or {})
+                want = ("reject_once", "reject_always") if outside else ("allow_once",)
+                choice = next((o["optionID"] for o in pending["options"] if o["kind"] in want),
+                              pending["options"][0]["optionID"])
+                client.call("permissions/answer", {"permissionID": pending["id"], "optionID": choice})
                 answered.add(pending["id"])
-                print(f"  allowed: {(pending.get('toolCall') or {}).get('title', '?')}", flush=True)
+                print(f"  {'rejected' if outside else 'allowed'}: {(pending.get('toolCall') or {}).get('title', '?')}", flush=True)
         for pending in client.call("elicitations/pending", {}) or []:
             if pending.get("agentID") in mine and pending["id"] not in answered:
                 content = answer_form(pending)
@@ -89,7 +94,7 @@ def follow(client, runtime, agent, model, report_path, minutes):
                 print(f"  answered: {pending.get('message')!r} with {json.dumps(content)}", flush=True)
         record = next((a for a in client.call("agents/list", {"includeArchived": True}) or [] if a.get("id") == agent), None)
         report = (record or {}).get("report") or {}
-        if record and record.get("state") in ("finished", "stopped", "archived") and report.get("outcome") != "blocked":
+        if record and record.get("state") in ("finished", "stopped", "archived") and report.get("outcome") not in ("blocked", "partly_done"):
             break
     else:
         print(f"  {runtime}: not finished after {minutes} min; scoring what is there", flush=True)

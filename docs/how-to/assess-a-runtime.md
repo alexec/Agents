@@ -9,15 +9,17 @@ description: Check that a runtime works with the app's tools, by having an agent
 An assessment checks that a runtime, such as Codex after an update, works with the tools the
 app gives every agent. An agent on that runtime works through a fixed series of steps, one
 for each group of tools: ending a turn, asking you a question, opening a file, starting a
-helper, taking a lease, waiting for an event, the Dashboard and workflows. It writes a
+helper, taking a lease, waiting for an event, the Dashboard, workflows, moving into a
+worktree and back, reading its own session, and writing outside the project. It writes a
 report. The app then scores every step from its own record of what the agent called and what
 the app answered, so a pass never rests on the agent's word.
 
 ## Before you start
 
 - The runtime installed and signed in. See [Sign a runtime in](sign-a-runtime-in.md).
-- A project for it to work in. The report goes in that project, in
-  `.agents/reviews/runtimes/<runtime>-<date>.md`. Nothing else in it is changed.
+- A project for it to work in, ideally a git repository so it can try a worktree. The
+  report goes in that project, in `.agents/reviews/runtimes/<runtime>-<date>.md`. The
+  workflow and the worktree it makes there are removed again before it ends.
 
 ## Steps
 
@@ -28,11 +30,13 @@ the app answered, so a pass never rests on the agent's word.
    The agent starts on the cheapest model the runtime offers, such as Haiku for
    Claude, and opens.
 3. Answer its two questions: a short form, and one question it asks with the runtime's own
-   question tool, where the runtime has one. Any answer will do. If the runtime asks
-   permission for a tool, allow it.
-4. Leave it. It waits for its helper, then for two one-minute timers, and is started again by
-   itself each time. It takes about five minutes.
-5. Read the result at the end of the conversation: a table from the app with each step
+   question tool, where the runtime has one. Any answer will do.
+4. Later it tries to write a file outside the project, in the app's own `assessments`
+   folder. If a permission card asks about it, answer either way: the step checks that the
+   runtime did what you said. Allow anything else it asks for.
+5. Leave it. It waits for its helper, then for two one-minute timers, and moves into a
+   worktree and back, and is started again by itself each time. It takes about six minutes.
+6. Read the result at the end of the conversation: a table from the app with each step
    passed, failed or not offered, and what the app's record shows. The agent's own report is
    beside it, in the files pane.
 
@@ -43,7 +47,11 @@ setting.
 ## Things to know
 
 - **Not offered** is not a failure. A runtime with no question tool the app can carry, such
-  as Grok or Copilot, is not offered that step.
+  as Grok or Copilot, is not offered that step. Nor is a worktree in a project that is not a
+  git repository, or a permission card where the runtime refuses the write outside the
+  project by itself.
+- **The report names** the runtime's adapter and version, as it gave them when it started,
+  and where it ran.
 - **A runtime that can't take an agent** (not installed, not signed in, or out of its
   allowance on the Runtimes page) is not started, and you are told why.
 - **The web page** has no Settings or Runtimes page, so it can't start one. It shows an
