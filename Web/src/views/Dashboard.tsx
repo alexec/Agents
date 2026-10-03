@@ -1,18 +1,23 @@
 // A project's Dashboard (074), as the window has it: a row at the top of the sessions column, and
 // a page in the chat's place with tiles in sections, small ones in a grid and tables and notes
-// across. Greyed when stale, with Hide, Show, Remove and the tile's detail behind its ··· menu.
+// across. Greyed when stale, with Move, Hide, Show, Remove and the tile's detail behind its ···
+// menu. Tiles drag within and between sections, and a section drags by its heading (#147).
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
 import {
-  ageWords, agoWords, canUpdate, change, changeWords, filesSentence, historyFile, isGood, isStale, isWide, keeperNote, numberWords, rowDetail,
-  sections, shownLevel, sparkline, updateLine,
+  ageWords, agoWords, arrangement, canUpdate, change, changeWords, filesSentence, historyFile, isGood, isStale, isWide, keeperNote,
+  moving, movingSection, neighbour, numberWords, rowDetail, sections, shownLevel, sparkline, stepping, updateLine,
 } from "../model/dashboard";
 import { isSafeLink, Markdown } from "../render/markdown";
-import type { DashboardUpdate, TileCell, TileLink, TileView } from "../protocol/generated";
+import type { DashboardOrder, DashboardSnapshot, DashboardUpdate, TileCell, TileLink, TileView } from "../protocol/generated";
 import { go } from "../route";
 import { fromWireDate, toWireDate } from "../protocol/dates";
+
+/** What is being dragged: a tile, by id, or a section, by its heading. In the page, not the
+ *  DataTransfer, which a drop target can't read until the drop. */
+type Dragged = { tile: string } | { section: string | null };
 
 export function DashboardRow({ store, host, folder, chosen, onPick }: {
   store: Store; host: string; folder: string; chosen: boolean; onPick: () => void;
@@ -43,6 +48,27 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
   const newest = snapshot ? Math.max(...snapshot.tiles.map((t) => t.setAt ?? -Infinity)) : -Infinity;
   const hiddenCount = snapshot ? snapshot.tiles.filter((t) => t.tile?.hidden).length : 0;
   const opened = snapshot?.tiles.find((t) => t.id === detail.value);
+  const dragged = useSignal<Dragged | null>(null);
+  const arrange = (change: (order: DashboardOrder) => DashboardOrder | null) => {
+    if (!snapshot || down) return;
+    const order = change(arrangement(snapshot));
+    if (order) void store.arrangeDashboard(host, folder, order);
+  };
+  // A tile dropped on a tile goes before it; on a section's empty space, at its end; a section
+  // dropped on a heading goes before that section.
+  const dropOn = (section: string | null, before?: string) => (e: DragEvent) => {
+    const what = dragged.value;
+    if (!what) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragged.value = null;
+    if ("tile" in what) {
+      if (what.tile !== before) arrange((o) => moving(o, [what.tile], section, before));
+    } else if (before === undefined && what.section !== section) {
+      arrange((o) => movingSection(o, what.section, section));
+    }
+  };
+  const over = (e: DragEvent) => { if (dragged.value) e.preventDefault(); };
   return (
     <section class="chat dashboard-page" aria-label="Dashboard">
       <header class="column-head">{back}<h1>Dashboard</h1>
@@ -66,13 +92,34 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
             <p class="hint">{hiddenCount > 0 ? "Every tile is hidden. Show Hidden Tiles brings them back."
               : "No tiles yet. Agents keep tiles here with set_tile: a number with its trend, a status, a table, a note or a link."}</p>
           )}
-          {groups.map((section) => (
+          {groups.map((section, index) => (
             <div class="tile-section" key={section.title ?? ""}>
-              {section.title && <h2 class="section-head">{section.title}</h2>}
-              <div class="tile-grid">
+              {section.title && (
+                <h2 class="section-head" draggable={!down} title="Drag to move this section"
+                  onDragStart={(e) => { dragged.value = { section: section.title }; e.dataTransfer?.setData("text/plain", section.title!); }}
+                  onDragEnd={() => (dragged.value = null)}
+                  onDragOver={over} onDrop={(e) => {
+                    const what = dragged.value;
+                    if (what && "section" in what) dropOn(section.title)(e);
+                    else dropOn(section.title, section.tiles[0]?.id)(e);
+                  }}>
+                  {section.title}
+                  <SectionMenu down={down} first={index === 0} last={index === groups.length - 1}
+                    onUp={() => arrange((o) => movingSection(o, section.title, groups[index - 1]!.title))}
+                    onDown={() => arrange((o) => movingSection(o, section.title,
+                      index + 2 < groups.length ? groups[index + 2]!.title : undefined))} />
+                </h2>
+              )}
+              <div class="tile-grid" onDragOver={over} onDrop={dropOn(section.title)}>
                 {section.tiles.map((tile) => (
                   <Tile key={tile.id} store={store} host={host} folder={folder} tile={tile} now={snapshot!.now} down={down}
-                    onDetail={() => (detail.value = tile.id)} />
+                    onDetail={() => (detail.value = tile.id)}
+                    drag={{
+                      start: () => (dragged.value = { tile: tile.id }),
+                      end: () => (dragged.value = null),
+                      over, drop: dropOn(section.title, tile.id),
+                    }}
+                    moves={moveItems(snapshot!, tile.id, showsHidden.value, groups, arrange)} />
                 ))}
               </div>
             </div>
@@ -120,8 +167,45 @@ function UpdateLine({ host, folder, update }: { host: string; folder: string; up
   );
 }
 
-function Tile({ store, host, folder, tile, now, down, onDetail }: {
+/** Move Up, Move Down and Move to <section>: the order without a pointer (#147). */
+type MoveItem = { label: string; run: () => void; disabled: boolean };
+
+function moveItems(snapshot: DashboardSnapshot, id: string, includeHidden: boolean,
+  groups: { title: string | null; tiles: TileView[] }[],
+  arrange: (change: (order: DashboardOrder) => DashboardOrder | null) => void): MoveItem[] {
+  const current = groups.find((g) => g.tiles.some((t) => t.id === id))?.title ?? null;
+  return [
+    { label: "Move Up", disabled: neighbour(groups, id, -1) === null, run: () => arrange(() => stepping(snapshot, id, -1, includeHidden)) },
+    { label: "Move Down", disabled: neighbour(groups, id, 1) === null, run: () => arrange(() => stepping(snapshot, id, 1, includeHidden)) },
+    ...groups.filter((g) => g.title !== current).map((g) => ({
+      label: `Move to ${g.title ?? "No Section"}`, disabled: false, run: () => arrange((o) => moving(o, [id], g.title)),
+    })),
+  ];
+}
+
+function SectionMenu({ down, first, last, onUp, onDown }: {
+  down: boolean; first: boolean; last: boolean; onUp: () => void; onDown: () => void;
+}) {
+  const open = useSignal(false);
+  if (first && last) return null;
+  return (
+    <span class="menu-anchor">
+      <button class="icon section-menu" aria-label="Section options" aria-haspopup="true" aria-expanded={open.value}
+        onClick={() => (open.value = !open.value)}>···</button>
+      {open.value && (
+        <div class="popover" role="menu">
+          <button role="menuitem" disabled={down || first} onClick={() => { open.value = false; onUp(); }}>Move Section Up</button>
+          <button role="menuitem" disabled={down || last} onClick={() => { open.value = false; onDown(); }}>Move Section Down</button>
+        </div>
+      )}
+    </span>
+  );
+}
+
+function Tile({ store, host, folder, tile, now, down, onDetail, drag, moves }: {
   store: Store; host: string; folder: string; tile: TileView; now: number; down: boolean; onDetail: () => void;
+  drag: { start: () => void; end: () => void; over: (e: DragEvent) => void; drop: (e: DragEvent) => void };
+  moves: MoveItem[];
 }) {
   const menu = useSignal(false);
   const stale = isStale(tile, now);
@@ -135,7 +219,9 @@ function Tile({ store, host, folder, tile, now, down, onDetail }: {
   };
   const note = keeperNote(tile);
   return (
-    <article class={`tile${isWide(tile) ? " wide" : ""}${stale ? " stale" : ""}`} aria-label={tile.tile?.title ?? tile.id}>
+    <article class={`tile${isWide(tile) ? " wide" : ""}${stale ? " stale" : ""}`} aria-label={tile.tile?.title ?? tile.id}
+      draggable={!down} onDragStart={(e) => { drag.start(); e.dataTransfer?.setData("text/plain", tile.id); }}
+      onDragEnd={drag.end} onDragOver={drag.over} onDrop={drag.drop}>
       <header>
         <h3>{tile.tile?.title ?? tile.id}{tile.tile?.hidden && <span class="quiet" title="Hidden"> (hidden)</span>}</h3>
         <span class="menu-anchor">
@@ -145,6 +231,11 @@ function Tile({ store, host, folder, tile, now, down, onDetail }: {
             <div class="popover" role="menu">
               <button role="menuitem" onClick={() => { menu.value = false; onDetail(); }}>Details…</button>
               <button role="menuitem" disabled={!tile.keeper.id} onClick={() => { menu.value = false; openKeeper(); }}>Open Keeper</button>
+              <hr />
+              {moves.map((item) => (
+                <button key={item.label} role="menuitem" disabled={down || item.disabled}
+                  onClick={() => { menu.value = false; item.run(); }}>{item.label}</button>
+              ))}
               <hr />
               {tile.tile?.hidden
                 ? <button role="menuitem" disabled={down} onClick={() => act("dashboard/show")}>Show</button>

@@ -561,8 +561,8 @@ public actor AppService {
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
         // The two for reading another session in this project, for every agent (065).
         let sessionTools = [Self.listSessionsTool, Self.readSessionTool]
-        // The three for the project's Dashboard, for every agent (074).
-        let dashboardTools = [Self.setTileTool, Self.removeTileTool, Self.readDashboardTool]
+        // The four for the project's Dashboard, for every agent (074, #147).
+        let dashboardTools = [Self.setTileTool, Self.removeTileTool, Self.readDashboardTool, Self.moveTileTool]
         // Moving itself rides on the call that ends the turn, since that is when a move
         // happens (053); not offered on a runtime that would forget the conversation on
         // the way.

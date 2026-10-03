@@ -1,6 +1,9 @@
 // What a Dashboard means (074), as AgentsKitCore's DashboardModel says it for the window and the
 // Remote. Dates are the wire's: seconds since 2001, so differences are seconds.
-import type { DashboardSnapshot, DashboardSummary, DashboardUpdate, TileGood, TileLevel, TileView, WireDate } from "../protocol/generated";
+import type {
+  DashboardOrder, DashboardOrderSection, DashboardSnapshot, DashboardSummary, DashboardUpdate, TileGood, TileLevel, TileView,
+  WireDate,
+} from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
 /** DashboardModel.filesSentence (#127): the tiles and their trends are files in the project. */
@@ -86,16 +89,97 @@ export function ordered(tiles: TileView[]): TileView[] {
   });
 }
 
+/** The tiles by section: as the order puts them (#147), then the ones it doesn't list in their
+ *  files' sections, in made order. DashboardModel.sections. */
 export function sections(snapshot: DashboardSnapshot, includeHidden: boolean): { title: string | null; tiles: TileView[] }[] {
+  const shown = ordered(snapshot.tiles).filter((t) => includeHidden || !t.tile?.hidden);
+  const byID = new Map(shown.map((t) => [t.id, t]));
   const out: { title: string | null; tiles: TileView[] }[] = [];
-  for (const tile of ordered(snapshot.tiles)) {
-    if (!includeHidden && tile.tile?.hidden) continue;
-    const title = tile.tile?.section ?? null;
+  const placed = new Set<string>();
+  const add = (tile: TileView, title: string | null) => {
     const section = out.find((s) => s.title === title);
     if (section) section.tiles.push(tile);
     else out.push({ title, tiles: [tile] });
+  };
+  for (const section of cleaned(snapshot.order ?? { sections: [] }).sections) {
+    for (const id of section.tiles) {
+      const tile = byID.get(id);
+      if (!tile || placed.has(id)) continue;
+      placed.add(id);
+      add(tile, section.title ?? null);
+    }
   }
+  for (const tile of shown) if (!placed.has(tile.id)) add(tile, tile.tile?.section ?? null);
   return out;
+}
+
+/** DashboardOrder.cleaned: each tile once, each heading once, no empty sections. */
+export function cleaned(order: DashboardOrder, known?: Set<string>): DashboardOrder {
+  const seen = new Set<string>();
+  const out: DashboardOrderSection[] = [];
+  for (const section of order.sections) {
+    const title = section.title || undefined;
+    const tiles = section.tiles.filter((id) => (!known || known.has(id)) && !seen.has(id) && (seen.add(id), true));
+    const same = out.find((s) => (s.title ?? null) === (title ?? null));
+    if (same) same.tiles.push(...tiles);
+    else out.push(title === undefined ? { tiles } : { title, tiles });
+  }
+  return { sections: out.filter((s) => s.tiles.length > 0) };
+}
+
+/** The whole order as shown, hidden tiles included: what a drop or a Move item edits and sends. */
+export function arrangement(snapshot: DashboardSnapshot): DashboardOrder {
+  return { sections: sections(snapshot, true).map((s) => (s.title === null ? { tiles: s.tiles.map((t) => t.id) }
+    : { title: s.title, tiles: s.tiles.map((t) => t.id) })) };
+}
+
+/** `ids` into `section`, before `before` or at its end. DashboardOrder.moving. */
+export function moving(order: DashboardOrder, ids: string[], section: string | null, before?: string): DashboardOrder {
+  const sections = order.sections.map((s) => ({ ...s, tiles: s.tiles.filter((id) => !ids.includes(id)) }));
+  let target = sections.find((s) => (s.title ?? null) === section);
+  if (!target) {
+    target = section === null ? { tiles: [] } : { title: section, tiles: [] };
+    sections.push(target);
+  }
+  const at = before !== undefined ? target.tiles.indexOf(before) : -1;
+  target.tiles.splice(at < 0 ? target.tiles.length : at, 0, ...ids);
+  return cleaned({ sections });
+}
+
+/** `ids` just after `after`, in its section. */
+export function movingAfter(order: DashboardOrder, ids: string[], after: string): DashboardOrder {
+  const section = order.sections.find((s) => s.tiles.includes(after));
+  if (!section) return order;
+  const rest = section.tiles.filter((id) => !ids.includes(id));
+  return moving(order, ids, section.title ?? null, rest[rest.indexOf(after) + 1]);
+}
+
+/** The section headed `title` before the one headed `before`, or last when `before` is undefined. */
+export function movingSection(order: DashboardOrder, title: string | null, before: string | null | undefined): DashboardOrder {
+  const sections = [...order.sections];
+  const from = sections.findIndex((s) => (s.title ?? null) === title);
+  if (from < 0) return order;
+  const [section] = sections.splice(from, 1);
+  const at = before === undefined ? -1 : sections.findIndex((s) => (s.title ?? null) === before);
+  sections.splice(at < 0 ? sections.length : at, 0, section!);
+  return { sections };
+}
+
+/** Move Up (-1) or Move Down (+1) among the tiles shown; null at either end of the section. */
+export function stepping(snapshot: DashboardSnapshot, id: string, step: number, includeHidden: boolean): DashboardOrder | null {
+  const next = neighbour(sections(snapshot, includeHidden), id, step);
+  if (next === null) return null;
+  const order = arrangement(snapshot);
+  if (step > 0) return movingAfter(order, [id], next);
+  return moving(order, [id], order.sections.find((s) => s.tiles.includes(next))?.title ?? null, next);
+}
+
+export function neighbour(shown: { title: string | null; tiles: TileView[] }[], id: string, step: number): string | null {
+  for (const section of shown) {
+    const at = section.tiles.findIndex((t) => t.id === id);
+    if (at >= 0) return section.tiles[at + step]?.id ?? null;
+  }
+  return null;
 }
 
 /** Tables and notes take the grid's width. */

@@ -26,7 +26,7 @@ public struct TileCheck: Sendable, Equatable {
             return fail("give the tile an `id`, e.g. open_bugs.")
         }
         guard TileLimits.isValidID(id) else {
-            return fail("`id` \"\(id)\" has to be 1 to 40 lowercase letters, digits, _ and -.")
+            return fail("`id` \"\(id)\" has to be 1 to 40 lowercase letters, digits, _ and -, and not start with _.")
         }
         guard let title = text("title") else { return fail("give the tile a `title`.") }
         if tooLong("title", title, TileLimits.titleLength) {

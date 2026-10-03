@@ -7,7 +7,7 @@ import type {
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot,
-  DashboardChangedNotification, DashboardSnapshot, DashboardSummary, CostState, EventsPage,
+  DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -732,6 +732,15 @@ export class Store extends Work {
   /** Update now (#146): the dashboard workflow, or a one-off agent; a refusal is said. */
   async updateDashboard(host: string, folder: string): Promise<void> {
     await this.act("dashboard/update", { folder: folder as never }, host);
+    await this.loadDashboard(host, folder);
+  }
+
+  /** A drop or a Move item (#147): shown at once, then the whole order sent once. */
+  async arrangeDashboard(host: string, folder: string, order: DashboardOrder): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    const snapshot = this.dashboards.value[key];
+    if (snapshot) this.dashboards.value = { ...this.dashboards.value, [key]: { ...snapshot, order } };
+    await this.act("dashboard/arrange", { folder: folder as never, order }, host);
     await this.loadDashboard(host, folder);
   }
 

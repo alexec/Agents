@@ -188,6 +188,11 @@ export interface AnswerSandboxRequest {
   carryOn: boolean;
 }
 
+export interface ArrangeRequest {
+  folder: URLString;
+  order: DashboardOrder;
+}
+
 export interface ArtifactWriteRequest {
   agentID: UUID;
   path: string;
@@ -461,6 +466,15 @@ export interface DashboardChangedNotification {
   summary: DashboardSummary;
 }
 
+export interface DashboardOrder {
+  sections: DashboardOrderSection[];
+}
+
+export interface DashboardOrderSection {
+  title?: string;
+  tiles: string[];
+}
+
 export interface DashboardRequest {
   folder: URLString;
 }
@@ -470,6 +484,7 @@ export interface DashboardSnapshot {
   tiles: TileView[];
   now: WireDate;
   update?: DashboardUpdate;
+  order?: DashboardOrder;
 }
 
 export interface DashboardSummary {
@@ -1666,6 +1681,7 @@ export interface Methods {
   "clients/forgetSelf": { params: Empty; result: Empty };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
+  "dashboard/arrange": { params: ArrangeRequest; result: Empty };
   "dashboard/get": { params: DashboardRequest; result: DashboardSnapshot };
   "dashboard/hide": { params: TileRequest; result: Empty };
   "dashboard/remove": { params: TileRequest; result: Empty };
@@ -1732,6 +1748,7 @@ export const MethodTarget = {
   "clients/forgetSelf": "control",
   "control/status": "control",
   "cost/state": "host",
+  "dashboard/arrange": "host",
   "dashboard/get": "host",
   "dashboard/hide": "host",
   "dashboard/remove": "host",
@@ -1801,6 +1818,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
+  ArrangeRequest: { required: ["folder", "order"], optional: [] },
   ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
   AttentionDelivery: { required: ["needID"], optional: ["to"] },
@@ -1829,8 +1847,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: [] },
   DashboardChangedNotification: { required: ["folder", "summary"], optional: [] },
+  DashboardOrder: { required: ["sections"], optional: [] },
+  DashboardOrderSection: { required: ["tiles"], optional: ["title"] },
   DashboardRequest: { required: ["folder"], optional: [] },
-  DashboardSnapshot: { required: ["folder", "tiles", "now"], optional: ["update"] },
+  DashboardSnapshot: { required: ["folder", "tiles", "now"], optional: ["update", "order"] },
   DashboardSummary: { required: ["folder", "tiles", "bad", "line"], optional: [] },
   DashboardUpdate: { required: ["name", "isRunning", "lastFailed"], optional: ["workflowID", "agentID", "lastStartedAt", "blocked"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },

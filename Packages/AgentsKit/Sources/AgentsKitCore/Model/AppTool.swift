@@ -96,6 +96,9 @@ public enum AppTool {
     /// Every tile in the caller's project.
     public static let readDashboard = "read_dashboard"
 
+    /// Put a tile somewhere else on the Dashboard (#147).
+    public static let moveTile = "move_tile"
+
     /// The older names for the two halves of `finishTurn`, served from 2026-09-23 (023)
     /// until 2026-09-29. No longer offered or answered; kept only so a conversation that
     /// called them still draws without them, the way it did.

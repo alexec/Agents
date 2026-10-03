@@ -175,6 +175,10 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
             return await relay(DaemonAPI.Method.dashboardRemoveTile,
                                DaemonAPI.RemoveTileRequest(token: token, id: id),
                                fallback: "Removed.")
+        case .move(let arguments):
+            return await relay(DaemonAPI.Method.dashboardMoveTile,
+                               DaemonAPI.MoveTileRequest(token: token, arguments: arguments),
+                               fallback: "Moved.")
         case .read:
             return await relay(DaemonAPI.Method.dashboardRead,
                                DaemonAPI.DashboardTokenRequest(token: token),

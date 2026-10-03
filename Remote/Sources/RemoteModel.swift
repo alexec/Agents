@@ -1583,6 +1583,21 @@ final class RemoteModel {
         await refreshDashboard(folder)
     }
 
+    /// A Move menu item (#147): shown at once, then the whole order sent once.
+    func arrangeDashboard(_ order: DashboardOrder, folder: URL) async {
+        let key = Project.standardize(folder)
+        if var snapshot = work.dashboards[key] {
+            snapshot.order = order
+            work.store(snapshot)
+        }
+        do {
+            try await client.call(DaemonAPI.Method.dashboardArrange, DaemonAPI.ArrangeRequest(folder: folder, order: order))
+        } catch {
+            problem = sentence(for: error)
+        }
+        await refreshDashboard(folder)
+    }
+
     /// A tile's keeper: its conversation, or its workflow's page (FR-030).
     func openKeeper(_ keeper: KeeperView, folder: URL) {
         switch keeper.kind {

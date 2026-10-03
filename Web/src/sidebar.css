@@ -30,10 +30,10 @@
 .with-sidebar .sidebar .row.workflow .run-now { display: none; }
 .with-sidebar .sidebar-head-label { font-size: 11px; font-weight: 600; opacity: 0.5; margin: 12px 8px 4px; }
 
-/* Activity: a glyph, the page's name, and what it says at a glance on the right. */
-.with-sidebar .activity-row { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; padding: 4px 8px; }
-.with-sidebar .activity-row .title { font-weight: 400; }
-.with-sidebar .activity-row .glyph { display: inline-block; width: 18px; opacity: 0.5; text-align: center; }
+/* Activity: the page's name in the projects' type and at their edge (#155), and what it says at a
+   glance on the right. */
+.with-sidebar .activity-row { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; padding: 4px 8px 4px 18px; }
+.with-sidebar .activity-row .title { font-weight: 500; }
 .with-sidebar .activity-row .detail { font-size: 11.5px; opacity: 0.6; font-variant-numeric: tabular-nums; text-align: right; }
 .with-sidebar .activity-row .detail .dot.failure { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
   background: var(--tint-failure); position: static; }

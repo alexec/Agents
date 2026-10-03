@@ -331,7 +331,7 @@ struct EventsRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Label("Events", systemImage: "bolt")
+            Text("Events").foregroundStyle(.primary)
             Spacer()
             if let last = model.work.lastEventAt {
                 Text("Last \(LeaseWords.clock(last))")

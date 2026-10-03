@@ -45,8 +45,9 @@ struct DashboardRow: View {
 }
 
 /// The tiles in one column (FR-032): numbers two across, tables to their first five rows
-/// with a way to see them all, and a long press for Hide, Remove and Open Keeper. The
-/// phone reads, hides and removes; nothing here arranges (Alex's decision 7).
+/// with a way to see them all, and a long press for Move, Hide, Remove and Open Keeper.
+/// The long press is the menu, so tiles move by its Move Up, Move Down and Move to
+/// Section rather than a drag (#147, which replaced Alex's decision 7).
 struct DashboardPage: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.openURL) private var openURL
@@ -175,6 +176,7 @@ struct DashboardPage: View {
                 if let folder {
                     Button("Open Keeper", systemImage: "arrow.right") { model.openKeeper(tile.keeper, folder: folder) }
                         .disabled(tile.keeper.id.isEmpty)
+                    moveItems(tile, folder: folder)
                     Button("Hide", systemImage: "eye.slash") {
                         Task { await model.actOnTile(DaemonAPI.Method.dashboardHide, folder: folder, id: tile.id) }
                     }
@@ -184,6 +186,38 @@ struct DashboardPage: View {
                     }
                 }
             }
+    }
+
+    /// Move Up, Move Down and Move to Section ▸, as the Mac's tile menu has them (#147).
+    @ViewBuilder
+    private func moveItems(_ tile: TileView, folder: URL) -> some View {
+        if let snapshot = model.work.dashboards[Project.standardize(folder)] {
+            let shown = DashboardModel.sections(snapshot)
+            let current = shown.first { $0.tiles.contains { $0.id == tile.id } }?.title
+            Button("Move Up", systemImage: "arrow.up") {
+                arrange(DashboardModel.stepping(tile.id, by: -1, in: snapshot, includeHidden: false), folder: folder)
+            }
+            .disabled(DashboardModel.neighbour(of: tile.id, in: shown, step: -1) == nil)
+            Button("Move Down", systemImage: "arrow.down") {
+                arrange(DashboardModel.stepping(tile.id, by: 1, in: snapshot, includeHidden: false), folder: folder)
+            }
+            .disabled(DashboardModel.neighbour(of: tile.id, in: shown, step: 1) == nil)
+            let others = shown.map(\.title).filter { $0 != current }
+            if !others.isEmpty {
+                Menu("Move to Section", systemImage: "folder") {
+                    ForEach(Array(others.enumerated()), id: \.offset) { _, title in
+                        Button(title ?? "No Section") {
+                            arrange(DashboardModel.arrangement(snapshot).moving([tile.id], to: title), folder: folder)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func arrange(_ order: DashboardOrder?, folder: URL) {
+        guard let order else { return }
+        Task { await model.arrangeDashboard(order, folder: folder) }
     }
 
     private func open(_ link: TileLink) {

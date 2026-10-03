@@ -134,7 +134,7 @@ struct RuntimesRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Label("Runtimes", systemImage: "cpu")
+            Text("Runtimes").foregroundStyle(.primary)
             Spacer()
             if outCount > 0 {
                 HStack(spacing: 4) {

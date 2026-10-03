@@ -99,6 +99,8 @@ public extension DaemonAPI {
                 Row(Method.dashboardRemove, params: TileRequest.self, result: Empty.self, kind: .hostRequest),
                 // Update now (#146), from every client alike.
                 Row(Method.dashboardUpdate, params: DashboardRequest.self, result: DashboardUpdate.self, kind: .hostRequest),
+                // A drop or a Move menu item (#147): the whole new order.
+                Row(Method.dashboardArrange, params: ArrangeRequest.self, result: Empty.self, kind: .hostRequest),
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),

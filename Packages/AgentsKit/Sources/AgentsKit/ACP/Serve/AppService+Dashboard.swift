@@ -1,12 +1,13 @@
 import Foundation
 import AgentsKitCore
 
-// The project's Dashboard (074): three tools every agent has, helpers included. Words
+// The project's Dashboard (074): four tools every agent has, helpers included. Words
 // from specs/074-project-dashboard/contracts/agent-tools.md.
 extension AppService {
     public static let setTileToolName = AppTool.setTile
     public static let removeTileToolName = AppTool.removeTile
     public static let readDashboardToolName = AppTool.readDashboard
+    public static let moveTileToolName = AppTool.moveTile
 
     /// One of the three Dashboard calls, as the agent made it. A set's arguments go to the
     /// daemon as they are: it is the one place that knows a tile's rules.
@@ -14,6 +15,8 @@ extension AppService {
         case set(arguments: JSONValue)
         case remove(id: String)
         case read
+        /// `move_tile`'s arguments, checked by the daemon as a set's are (#147).
+        case move(arguments: JSONValue)
     }
 
     /// Where those go.
@@ -31,6 +34,7 @@ extension AppService {
             return .success(.remove(id: id))
         }
         if name.hasSuffix(readDashboardToolName) { return .success(.read) }
+        if name.hasSuffix(moveTileToolName) { return .success(.move(arguments: arguments ?? .object([:]))) }
         return nil
     }
 
@@ -53,7 +57,7 @@ extension AppService {
             "type": "object",
             "properties": [
                 "id": ["type": "string",
-                       "description": "1 to 40 lowercase letters, digits, _ and -, unique in the project, e.g. open_bugs."],
+                       "description": "1 to 40 lowercase letters, digits, _ and -, not starting with _, unique in the project, e.g. open_bugs."],
                 "title": ["type": "string", "description": "What the person reads on the tile, up to 80 characters."],
                 "type": ["type": "string", "enum": ["number", "status", "table", "note", "link"]],
                 "section": ["type": "string", "description": "A heading to group it under, e.g. Shipping."],
@@ -95,12 +99,41 @@ extension AppService {
         ],
     ]
 
+    static let moveTileTool: JSONValue = [
+        "name": .string(moveTileToolName),
+        "title": "Move a Dashboard tile",
+        "description": """
+            Put a tile somewhere else on this project's Dashboard: next to another tile, \
+            first or last in its section, or into another section. Any tile, not only the \
+            ones you keep; the person drags tiles too, and the latest move wins. Only move \
+            tiles when asked to: setting a tile again never moves it. The order is kept in \
+            .agents/dashboard/_order.json in the project folder; never edit it by hand. \
+            read_dashboard lists the tiles in the order shown.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "id": ["type": "string", "description": "The tile to move."],
+                "before": ["type": "string", "description": "Put it just before this tile, in that tile's section."],
+                "after": ["type": "string", "description": "Put it just after this tile, in that tile's section."],
+                "position": ["type": "string", "enum": ["first", "last"],
+                             "description": "First or last in its section (or in `section`)."],
+                "section": ["type": "string", "description": """
+                    The section to put it in, by its heading; an empty string for the tiles \
+                    under no heading. A heading that is not there yet is added at the end.
+                    """],
+            ],
+            "required": .array(["id"]),
+        ],
+    ]
+
     static let readDashboardTool: JSONValue = [
         "name": .string(readDashboardToolName),
         "title": "Read the project's Dashboard",
         "description": """
-            Every tile on this project's Dashboard: its value, who keeps it, how old it is, \
-            whether the person hid it, and a number's last 10 points. Read it to build on \
+            Every tile on this project's Dashboard, in the order shown, under its section \
+            headings and numbered: its value, who keeps it, how old it is, whether the \
+            person hid it, and a number's last 10 points. Read it to build on \
             other agents' tiles, or to pick up the tiles of a session you are continuing.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],

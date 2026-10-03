@@ -18,6 +18,10 @@ public extension DaemonAPI.Method {
     static let dashboardHide = "dashboard/hide"
     static let dashboardShow = "dashboard/show"
     static let dashboardRemove = "dashboard/remove"
+    /// A person's drop or Move menu item (#147): the whole new order, once.
+    static let dashboardArrange = "dashboard/arrange"
+    /// `move_tile`, relayed (#147).
+    static let dashboardMoveTile = "dashboard/moveTile"
 }
 
 public extension DaemonAPI.Notification {
@@ -74,6 +78,28 @@ public extension DaemonAPI {
         }
     }
 
+    /// The whole order a person left the Dashboard in (#147).
+    struct ArrangeRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var order: DashboardOrder
+
+        public init(folder: URL, order: DashboardOrder) {
+            self.folder = folder
+            self.order = order
+        }
+    }
+
+    /// `move_tile`'s arguments as the agent wrote them, checked by the daemon (#147).
+    struct MoveTileRequest: Codable, Sendable, Hashable {
+        public var token: String
+        public var arguments: JSONValue
+
+        public init(token: String, arguments: JSONValue) {
+            self.token = token
+            self.arguments = arguments
+        }
+    }
+
     struct DashboardChangedNotification: Codable, Sendable, Hashable {
         public var folder: URL
         public var summary: DashboardSummary
@@ -94,12 +120,16 @@ public struct DashboardSnapshot: Codable, Sendable, Hashable {
     public var now: Date
     /// Update now's state (#146). Nil from a host that predates it: no button.
     public var update: DashboardUpdate?
+    /// Where a person or an agent has put the tiles (#147); nil when nobody has moved one.
+    public var order: DashboardOrder?
 
-    public init(folder: URL, tiles: [TileView], now: Date, update: DashboardUpdate? = nil) {
+    public init(folder: URL, tiles: [TileView], now: Date, update: DashboardUpdate? = nil,
+                order: DashboardOrder? = nil) {
         self.folder = folder
         self.tiles = tiles
         self.now = now
         self.update = update
+        self.order = order
     }
 }
 
