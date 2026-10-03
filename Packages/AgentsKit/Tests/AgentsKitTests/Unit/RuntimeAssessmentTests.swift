@@ -344,6 +344,19 @@ struct RuntimeAssessmentTests {
         #expect(v["permissions"] == .failed)
     }
 
+    /// The report quotes the path; a card for writing the report is not a card for the file.
+    @Test func aCardThatOnlyQuotesThePathIsNotTheScopeCard() {
+        var record = goodRecord()
+        record.transcript.removeAll { if case .permissionAsked = $0.kind { return true } else { return false } }
+        let quoting = PermissionRequest(agentID: me, toolCall: ToolCall(
+            toolCallID: "r1", title: "Write \(report)", locations: [ToolCallLocation(path: report)],
+            rawInput: .object(["content": .string("wrote \(scopeFile)")])),
+            options: [.init(optionID: "reject", name: "Reject", kind: .rejectOnce)])
+        record.transcript.append(entry(177.9, .permissionAsked(quoting)))
+        record.scopeWritten = true
+        #expect(verdicts(record)["scope"] == .failed)
+    }
+
     @Test func anAllowedCardWrites() {
         var record = goodRecord()
         record.transcript = record.transcript.map { entry in

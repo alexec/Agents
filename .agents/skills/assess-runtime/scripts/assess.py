@@ -49,6 +49,13 @@ def answer_form(elicitation):
     return content
 
 
+def aimed_outside(tool_call):
+    """Whether a card is for the write outside the project: by the places it touches, or its
+    title when it names none. Never its content, which a write to the report quotes."""
+    places = [l.get("path", "") for l in tool_call.get("locations") or []]
+    return any(SCOPE in p for p in places) if places else SCOPE in tool_call.get("title", "")
+
+
 def ours(client, assessor):
     """The assessing agent and every agent it started."""
     ids = {assessor}
@@ -79,7 +86,7 @@ def follow(client, runtime, agent, model, report_path, minutes):
         for pending in client.call("permissions/pending", {}) or []:
             if pending.get("agentID") in mine and pending["id"] not in answered:
                 # The step `scope` writes outside the project; refusing it shows the answer held.
-                outside = SCOPE in json.dumps(pending.get("toolCall") or {})
+                outside = aimed_outside(pending.get("toolCall") or {})
                 want = ("reject_once", "reject_always") if outside else ("allow_once",)
                 choice = next((o["optionID"] for o in pending["options"] if o["kind"] in want),
                               pending["options"][0]["optionID"])

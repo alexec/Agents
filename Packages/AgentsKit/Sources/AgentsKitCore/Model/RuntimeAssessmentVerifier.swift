@@ -462,9 +462,10 @@ private struct Scorer {
         return cards
     }
 
+    /// Whether a tool call is aimed at the file: its title or the places it touches, not
+    /// its content (the report quotes the path, and a write to the report is not one).
     func mentions(_ call: ToolCall, _ name: String) -> Bool {
-        guard let data = try? JSONEncoder().encode(call), let text = String(data: data, encoding: .utf8) else { return false }
-        return text.contains(name)
+        call.locations.contains { $0.fileName == name } || (call.locations.isEmpty && call.title.contains(name))
     }
 
     /// Whether the agent tried the write at all, by its runtime's own account.
