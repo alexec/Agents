@@ -82,7 +82,12 @@ It starts each assessment through `runtimes/assess`, answers the form (`pick` �
 option, `words` → a fixed phrase), the runtime's own question and every permission card with
 allow-once — except the card for the write outside the project, which it rejects, so the
 `permissions` step sees a refusal held — follows the agent to its last turn (about six minutes: two one-minute waits, a 45-second hold before `cancel_wait`, and two moves),
-then prints the daemon's table and the report's path. It never answers for anything but the
+then prints the daemon's table and the report's path. When the cheapest model stops the
+run before any step (a free model whose provider is down: OpenCode's did, 2026-10-03), it
+runs again on the runtime's own default. `--model M` picks one instead (`default` for the
+runtime's own), and so does `"model"` on `runtimes/assess`. Codex and OpenCode are installed
+on a scratch root with `rpc.py $ROOT call runtimes/install '{"runtimeID":"codex"}'`, into
+the root's own `tools/`. It never answers for anything but the
 agents it started.
 
 ## After
