@@ -10,9 +10,9 @@ import Foundation
 /// session is made, and all four runtimes take them. So the app offers the agent
 /// tools of its own: one that ends a turn — what one passes to `finish_turn` becomes
 /// the line under the agent's name and the row of chips above the prompt — and two
-/// that act mid-turn, `show_file` and `manage_workflows`. Four more act on other
-/// agents — `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` (028) —
-/// and are offered only to an agent the person or a workflow started.
+/// that act mid-turn, `show_file` and `manage_workflows`. Five more act on other
+/// agents — `start_agent`, `stop_agent`, `park_agent`, `archive_agent` (#120) and
+/// `list_my_agents` (028) — and are offered only to an agent the person or a workflow started.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
 /// JSON-RPC over a pipe, which is what `JSONRPCConnection` already does for ACP.
@@ -32,12 +32,13 @@ public actor AppService {
     /// Ask the person and wait: the form card every runtime can reach.
     public static let askFormToolName = AppTool.askForm
 
-    /// And four that act on other agents (028), offered only to an agent the person or
-    /// a workflow started: start one in this project, and stop, park or list the ones
-    /// this agent started.
+    /// And five that act on other agents (028), offered only to an agent the person or
+    /// a workflow started: start one in this project, and stop, park, archive (#120) or
+    /// list the ones this agent started.
     public static let startAgentToolName = AppTool.startAgent
     public static let stopAgentToolName = AppTool.stopAgent
     public static let parkAgentToolName = AppTool.parkAgent
+    public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
     public static let listSessionsToolName = AppTool.listSessions
     public static let readSessionToolName = AppTool.readSession
@@ -115,6 +116,7 @@ public actor AppService {
                    worktree: String? = nil, labels: [String] = [])
         case stop(agentID: String)
         case park(agentID: String)
+        case archive(agentID: String)
         case list
     }
 
@@ -409,11 +411,13 @@ public actor AppService {
                                    worktree: text("worktree"),
                                    labels: arguments?["labels"]?.arrayValue?.compactMap(\.stringValue) ?? []))
         }
-        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(parkAgentToolName) {
+        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(parkAgentToolName)
+            || name.hasSuffix(archiveAgentToolName) {
             guard let id = text("id") else {
                 return .failure("Nothing changed: `id` has to be the id start_agent or list_my_agents gave.")
             }
             if name.hasSuffix(stopAgentToolName) { return .success(.stop(agentID: id)) }
+            if name.hasSuffix(archiveAgentToolName) { return .success(.archive(agentID: id)) }
             return .success(.park(agentID: id))
         }
         if name.hasSuffix(listMyAgentsToolName) {
@@ -532,7 +536,8 @@ public actor AppService {
         // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
         let agentTools = managesAgents
-            ? [Self.startAgentTool, Self.stopAgentTool, Self.parkAgentTool, Self.listMyAgentsTool]
+            ? [Self.startAgentTool, Self.stopAgentTool, Self.parkAgentTool, Self.archiveAgentTool,
+               Self.listMyAgentsTool]
             : []
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
@@ -800,7 +805,8 @@ public actor AppService {
             this turn ends, with afterwards set to park. Park goes with done, \
             nothing_to_do or partly_done. Leave it out and the conversation stays \
             where its ending puts it. If the person sends something before the turn \
-            is over, the ask is dropped. You cannot archive: only the person can.
+            is over, the ask is dropped. You cannot archive yourself: the person can, \
+            and so can the agent that started you, if one did.
 
             If you can carry on once you have an answer, do not use this: ask with your \
             question or form tool, which stops and waits for them. This one does not \
@@ -876,8 +882,8 @@ public actor AppService {
                     "description": """
                         Once this turn ends: park to put the conversation down to come \
                         back to. Goes with done, nothing_to_do or partly_done. Leave \
-                        out to stay where the ending puts it. Only the person can \
-                        archive a session.
+                        out to stay where the ending puts it. You cannot archive \
+                        yourself: the person can, and so can the agent that started you.
                         """,
                 ],
                 "add_labels": ["type": "array", "items": ["type": "string"],
@@ -1151,13 +1157,15 @@ public actor AppService {
             saying which. Use list_my_agents to see yours and how many places of each \
             are in use. Stop one with stop_agent, or park one with park_agent, when its \
             part is done: that frees its running place, and it keeps its other place \
-            until the person archives it.
+            until it is archived. Once its work is merged or abandoned, archive it with \
+            archive_agent to free that place too (where the person allows it); archive \
+            a finished helper rather than removing its worktree under it.
 
             Start one only when part of the work can genuinely run alongside the rest. \
             Do not start one for work you could simply do yourself. The agent you \
             start cannot start agents of its own.
 
-            Returns the new agent's id, which stop_agent and park_agent take.
+            Returns the new agent's id, which stop_agent, park_agent and archive_agent take.
             """,
         "inputSchema": [
             "type": "object",
@@ -1211,7 +1219,7 @@ public actor AppService {
         ],
     ]
 
-    /// The id schema stop and park share.
+    /// The id schema stop, park and archive share.
     private static let agentIDSchema: JSONValue = [
         "type": "object",
         "properties": [
@@ -1243,9 +1251,29 @@ public actor AppService {
             put it down to come back to later. If it is still working, the turn finishes \
             first and it parks when that ends. It stays in the list under Parked. Parking \
             frees its running place; it keeps its not-archived place until it is \
-            archived. Only agents you started can be parked \
-            this way; not yourself (set afterwards to park on finish_turn), and not \
-            anyone else's.
+            archived. Parking one that has already finished is fine. Only agents you \
+            started can be parked this way; not yourself (set afterwards to park on \
+            finish_turn), and not anyone else's. To free its not-archived place too, \
+            archive it with archive_agent.
+            """,
+        "inputSchema": agentIDSchema,
+    ]
+
+    static let archiveAgentTool: JSONValue = [
+        "name": .string(archiveAgentToolName),
+        "title": "Archive an agent you started",
+        "description": """
+            Archive an agent you started with start_agent, as the person's own Archive \
+            would, once its work is merged or abandoned. It leaves the list for Archived, \
+            frees its not-archived place, and its conversation says you archived it. The \
+            person can bring it back. Archive a finished helper rather than removing its \
+            worktree under it.
+
+            Refused while it is still working: wait for it to finish, or stop it with \
+            stop_agent first if its work is no longer wanted. Only agents you started can \
+            be archived; never yourself (set afterwards to park on finish_turn), never \
+            the person's own sessions, and never another agent's. The person can turn \
+            this off for a project in Project Settings.
             """,
         "inputSchema": agentIDSchema,
     ]
@@ -1260,7 +1288,8 @@ public actor AppService {
             how many of this project's running and not-archived places are in use, out \
             of the limits the person set. And which runtimes start_agent can start one \
             on here, as of now, with the model each starts on where known, and why the \
-            others cannot.
+            others cannot. Archive the finished ones whose work is merged or abandoned \
+            with archive_agent, so their places are free for the next.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
     ]

@@ -102,8 +102,9 @@ public enum Briefing {
     public static let helpers = """
         If a piece of the work can go on alongside the rest, you can start agents in \
         this project with \(AppTool.startAgent), up to the limits the person set on how \
-        many may run and how many may be kept, and stop or park them when their part is \
-        done. Do not start one for work you could simply do yourself.
+        many may run and how many may be kept, stop or park them when their part is \
+        done, and archive them once their work is merged or abandoned. Do not start one \
+        for work you could simply do yourself.
         """
 
     /// Take turns with what only one agent can use at a time (036 FR-015). Every

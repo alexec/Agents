@@ -114,7 +114,7 @@ struct ConnectionRoleTests {
 
         for method in [DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.agentsStartHelper,
                        DaemonAPI.Method.agentsStopHelper, DaemonAPI.Method.agentsParkHelper,
-                       DaemonAPI.Method.agentsListHelpers,
+                       DaemonAPI.Method.agentsArchiveHelper, DaemonAPI.Method.agentsListHelpers,
                        DaemonAPI.Method.leasesLease, DaemonAPI.Method.eventsWait] {
             #expect(errorCode(await ask(fd, method)) == nil, "\(method)")
         }
@@ -351,7 +351,7 @@ struct ConnectionRoleTests {
     }
 
     @Test func aHelperMayCallEveryToolItRelaysAndOnlyThose() {
-        #expect(ConnectionRole.agentMethods.count == 21)
+        #expect(ConnectionRole.agentMethods.count == 22)
         #expect(ConnectionRole.agent.allows(DaemonAPI.Method.agentsAskForm))
         #expect(ConnectionRole.stranger.allows(DaemonAPI.Method.daemonStatus))
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.filesBrowse))
