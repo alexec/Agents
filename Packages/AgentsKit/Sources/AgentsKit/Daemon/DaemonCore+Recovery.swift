@@ -119,18 +119,37 @@ extension DaemonCore {
         Task { await pickUpEachInTurn(mine) }
     }
 
-    /// One at a time, most recently active first, which is the order `recover`
-    /// returns them in. Half a dozen runtimes starting at once is half a dozen node
-    /// processes, and a Mac that notices — and while they queue, the chat the person
-    /// was last watching is the one worth having back first.
+    /// Most recently active first, which is the order `recover` returns them in, and
+    /// never more than `pickUpLanes` starting at once. Half a dozen runtimes starting at
+    /// once is half a dozen node processes, and a Mac that notices — and while they
+    /// queue, the chat the person was last watching is the one worth having back first.
+    ///
+    /// Two lanes rather than one (#166): a pick-up whose runtime hangs holds its lane
+    /// until its deadline lets it go, and the rest carry on through the other. More is
+    /// not the fix: each lane is a runtime starting, and the deadlines are what bound one.
     private func pickUpEachInTurn(_ ids: [UUID]) async {
-        for id in ids {
-            // Withdrawn by `stop` while it waited its turn. Nothing to pick up, and
-            // it has already been said to have left the queue.
-            guard resuming.contains(id) else { continue }
-            await pickUp(id)
-            leaveTheQueue(id)
+        var waiting = ids[...]
+        await withTaskGroup(of: Void.self) { lanes in
+            func next() -> Bool {
+                guard let id = waiting.popFirst() else { return false }
+                lanes.addTask { await self.pickUpInItsTurn(id) }
+                return true
+            }
+            for _ in 0..<pickUpLanes where next() {}
+            while await lanes.next() != nil { _ = next() }
         }
+    }
+
+    /// How many pick-ups may be starting a runtime at once.
+    static let pickUpLanes = 2
+    var pickUpLanes: Int { Self.pickUpLanes }
+
+    private func pickUpInItsTurn(_ id: UUID) async {
+        // Withdrawn by `stop` while it waited its turn. Nothing to pick up, and
+        // it has already been said to have left the queue.
+        guard resuming.contains(id) else { return }
+        await pickUp(id)
+        leaveTheQueue(id)
     }
 
     /// Out of the queue, and said to be out of it. Every `true` is followed by a

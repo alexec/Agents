@@ -487,6 +487,14 @@ extension DaemonCore {
             let (made, _) = try await handshakeOnly(runtimeID: runtimeID)
             session = made
             defer { Task { await made.end(gracePeriod: .seconds(1)) } }
+            // From the handshake on, not only around the prompt (#166): a session or an
+            // option that never answers held `allowanceChecks` for good, and the runtime
+            // was never checked again until a restart. The handshake has its own deadline.
+            let timeout = Task {
+                try? await Task.sleep(for: .seconds(90))
+                if !Task.isCancelled { await made.end(gracePeriod: .seconds(1)) }
+            }
+            defer { timeout.cancel() }
             try await made.newSession(cwd: locations.root)
             let options = await made.options
             if let mode = ModeMemory.modeOption(in: options),
@@ -514,11 +522,6 @@ extension DaemonCore {
                 }
                 return text
             }
-            let timeout = Task {
-                try? await Task.sleep(for: .seconds(45))
-                if !Task.isCancelled { await made.end(gracePeriod: .seconds(1)) }
-            }
-            defer { timeout.cancel() }
             let answer = try await made.prompt("Reply with OK. Do not use tools or edit files.")
             await made.end(gracePeriod: .seconds(1))
             let reply = await replies.value.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -21,12 +21,16 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     /// What the sessions it makes advertise. The capability flags decide what an agent
     /// asks of us, so a test that wants to be asked for a file turns them on here.
     private let capabilities: ACP.ClientCapabilities
+    /// The deadlines its sessions are given (#166): a test's milliseconds, or nil for the
+    /// runtime's own.
+    private let deadlines: RuntimeDeadlines?
 
     init(script: FakeACPAgent.Script = .init(), then scripts: [FakeACPAgent.Script] = [],
-         capabilities: ACP.ClientCapabilities = .none) {
+         capabilities: ACP.ClientCapabilities = .none, deadlines: RuntimeDeadlines? = nil) {
         self.defaultScript = script
         self.scripts = scripts
         self.capabilities = capabilities
+        self.deadlines = deadlines
     }
 
     func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
@@ -40,7 +44,8 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
         let (mine, theirs) = PairedTransport.pair()
         let session = ACPSession(transport: mine, capabilities: capabilities,
                                  launch: RuntimeLaunchCatalog.launch(for: runtime.id),
-                                 authMethodBeforeContinuing: ToolPolicyCatalog.policy(for: runtime.id).authMethodBeforeContinuing)
+                                 authMethodBeforeContinuing: ToolPolicyCatalog.policy(for: runtime.id).authMethodBeforeContinuing,
+                                 deadlines: deadlines)
         let agent = FakeACPAgent(script: script, transport: theirs)
         lock.lock()
         agents.append(agent)

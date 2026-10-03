@@ -485,6 +485,10 @@ extension DaemonCore {
             return signInNeeded(runtime: runtime, because: why)
         }
         switch error {
+        case let late as RuntimeDidNotAnswer:
+            DaemonLog.shared.write("\(runtimeID): \(late); ended")
+            return JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
+                                message: RuntimeNote.endedLate(runtime.name, late))
         case ACPSessionError.unsupportedProtocolVersion(let version):
             return JSONRPCError(code: DaemonAPI.Failure.wrongProtocolVersion,
                                 message: "\(runtime.name) speaks protocol version \(version), and this app speaks \(ACP.protocolVersion).")
@@ -987,6 +991,12 @@ extension DaemonCore {
                 throw Self.sandboxWillNotStart(runtime: runtime, detail: sandboxFailure)
             }
             runtimeFailed(agentID: agent.id)
+            // In words, for whoever asked to say on the agent: a pick-up, the queue (#166).
+            if let late = error as? RuntimeDidNotAnswer {
+                DaemonLog.shared.write("agent \(agent.id): \(late); ended")
+                throw JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
+                                   message: RuntimeNote.endedLate(runtime.name, late))
+            }
             // The same refusal a new agent gets, with the ways to sign in, so a window
             // shows the sign-in rather than the protocol's error. Said to every window
             // too: a queued prompt or a pick-up has nobody waiting on the answer.
@@ -1030,7 +1040,7 @@ extension DaemonCore {
                                                   mcpServers: servers,
                                                   meta: meta)
                 await record(.runtimeNote(RuntimeNote.pickedBackUp), for: agent.id)
-            } catch where Self.signInReason(error) == nil {
+            } catch where Self.signInReason(error) == nil && !(error is RuntimeDidNotAnswer) {
                 // The runtime no longer has it. The agent is not lost: it carries on as
                 // the same agent, with our transcript, in a new runtime session.
                 await record(.runtimeNote("\(runtime.name) no longer has this conversation. Carrying on in a new one; everything above is kept."),
@@ -1140,6 +1150,7 @@ extension DaemonCore {
         await move(agentID, on: agents[agentID]?.state == .starting ? .turnBegun : .promptSent)
         endWatch(agentID)
         turnTasks[agentID]?.cancel()
+        silencedTurns.remove(agentID)
         // The words of ours, sent with the first prompt of a conversation and not
         // again. They stay in the runtime's own history from there, and that history is
         // what a runtime replays when the session is picked back up, so sending them
@@ -1194,6 +1205,7 @@ extension DaemonCore {
                 await self.turnFailed(agentID: agentID, error: error)
             }
         }
+        watchForSilence()
     }
 
     /// A typed failure's own sentence, in the conversation (052). A warning is a retry
@@ -1495,7 +1507,8 @@ extension DaemonCore {
         } else if limit.moves || { if case .rateLimited = limit { return true } else { return false } }() {
             // Not "stopped answering" either: the provider said the allowance is spent or
             // the rate limit reached (046 FR-018, 052). `applyRecognition` below says which.
-        } else {
+        } else if silencedTurns.remove(agentID) == nil {
+            // A turn the app ended for its silence has said why already (#166).
             await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
         }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")

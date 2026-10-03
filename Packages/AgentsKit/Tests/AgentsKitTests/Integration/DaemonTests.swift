@@ -541,8 +541,10 @@ struct DaemonTests {
         await core.pickUpAfterRestart(await core.recover())
 
         await eventually("all three were started") { launcher.launchCount == 3 }
-        #expect(launcher.launches.map(\.runtime) == ["cursor", "copilot", "grok"],
-                "most recently active first")
+        // The first two start together, one in each lane (#166), so either may be first.
+        let order = launcher.launches.map(\.runtime)
+        #expect(Set(order.prefix(2)) == ["cursor", "copilot"] && order.last == "grok",
+                "most recently active first: \(order)")
     }
 
     /// Nothing is running yet, and an idle daemon must not exit out from under them.
@@ -585,8 +587,9 @@ struct DaemonTests {
         await eventually("both were said to be coming back") {
             await heard.resuming(true).count == 2
         }
-        #expect(launcher.launchCount <= 1,
-                "and said so before the second runtime was anywhere near being started")
+        // Two lanes (#166): the first two may be starting already, and no more.
+        #expect(launcher.launchCount <= DaemonCore.pickUpLanes,
+                "and said so before the rest were anywhere near being started")
 
         await eventually("and each was said to have left the queue") {
             await heard.resuming(false).count == 2
@@ -612,8 +615,9 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
         await core.pickUpAfterRestart(await core.recover())
 
-        // Mid-batch: the first is on its way and the other two are still waiting.
-        await eventually("the first is being started") { launcher.launchCount == 1 }
+        // Mid-batch: the first two are on their way (two lanes, #166) and the third is
+        // still waiting.
+        await eventually("the first two are being started") { launcher.launchCount == 2 }
         let midway = await core.stillResuming()
         #expect(midway.contains(saved[1].id) && midway.contains(saved[2].id),
                 "the ones not yet picked up")
@@ -652,17 +656,18 @@ struct DaemonTests {
                 "and the one in the middle carries its own explanation")
     }
 
-    /// Half a dozen runtimes starting at once is half a dozen node processes.
-    @Test func theyAreStartedOneAtATime() async throws {
+    /// Half a dozen runtimes starting at once is half a dozen node processes: never more
+    /// than two at a time, and two so that one that hangs does not hold up the rest (#166).
+    @Test func theyAreStartedTwoAtATime() async throws {
         let (locations, work) = try temporary()
         let store = try AgentStore(locations: locations)
         var script = FakeACPAgent.Script()
         script.handshakeDelay = .milliseconds(200)
-        // Long enough that no turn ends while the three are still starting. A turn that
+        // Long enough that no turn ends while the four are still starting. A turn that
         // ends without saying how it went is asked, and that question starts a runtime
         // of its own — which would land between two pick-ups and read as a short gap.
         script.turnDelay = .seconds(2)
-        for _ in 0..<3 {
+        for _ in 0..<4 {
             try await store.save(Agent(runtimeID: "grok", cwd: work, state: .running,
                                        runtimeSessionID: "s", lastActivityAt: Date()))
         }
@@ -671,11 +676,13 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
         await core.pickUpAfterRestart(await core.recover())
 
-        await eventually("all three were started") { launcher.launchCount == 3 }
-        // Each launch waits on the handshake of the one before it. Concurrent starts
-        // would land within a millisecond of each other rather than a handshake apart.
-        #expect(launcher.gapsBetweenLaunches.allSatisfy { $0 >= .milliseconds(150) },
-                "each one waited for the one before it: \(launcher.gapsBetweenLaunches)")
+        await eventually("all four were started") { launcher.launchCount == 4 }
+        let at = launcher.launches.map(\.at)
+        // The first two together, and each after that a handshake behind the one two
+        // before it: its lane was busy until then.
+        #expect(at[1] - at[0] < .milliseconds(150), "the first two started together")
+        #expect(zip(at.dropFirst(2), at).allSatisfy { $0 - $1 >= .milliseconds(150) },
+                "never more than two at once: \(launcher.gapsBetweenLaunches)")
     }
 
     /// No loop guard (Alex, 2026-09-21): a chat cut off on the very turn it was brought
@@ -860,19 +867,22 @@ struct DaemonTests {
         script.handshakeDelay = .milliseconds(500)
         let first = Agent(runtimeID: "grok", cwd: work, state: .running,
                           runtimeSessionID: "s", lastActivityAt: Date())
+        // Two lanes (#166): the second starts beside the first, so the one stopped is third.
+        let second = Agent(runtimeID: "grok", cwd: work, state: .running,
+                           runtimeSessionID: "s", lastActivityAt: Date().addingTimeInterval(-30))
         let withdrawn = Agent(runtimeID: "grok", cwd: work, state: .running,
                               runtimeSessionID: "s", lastActivityAt: Date().addingTimeInterval(-60))
-        for agent in [first, withdrawn] { try await store.save(agent) }
+        for agent in [first, second, withdrawn] { try await store.save(agent) }
 
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
         await core.setConnectionCount(0)
         await core.pickUpAfterRestart(await core.recover())
 
-        // While the first is still starting, stop the one behind it in the queue.
-        // At least one, not exactly one: a turn that ends without saying how it went is
+        // While the first two are still starting, stop the one behind them in the queue.
+        // At least two, not exactly two: a turn that ends without saying how it went is
         // asked, and that question starts a runtime of its own.
-        await eventually("the first is on its way") { launcher.launchCount >= 1 }
+        await eventually("the first two are on their way") { launcher.launchCount >= 2 }
         try await core.stop(withdrawn.id)
 
         #expect(await core.stillResuming().contains(withdrawn.id) == false,
@@ -881,9 +891,11 @@ struct DaemonTests {
         #expect(page.entries.contains { ($0.text ?? "").contains("You stopped this agent before it was picked back up") })
 
         await eventually("the rest of the batch finished") {
-            await core.agent(first.id)?.state == .finished
+            let a = await core.agent(first.id)?.state, b = await core.agent(second.id)?.state
+            return a == .finished && b == .finished
         }
-        #expect(launcher.launchCount == 1, "and the one that was stopped never started")
+        // Not by counting launches: the question asked after a turn can start one too.
+        #expect(await core.agent(withdrawn.id)?.restartPickUps == 0, "and the one that was stopped never started")
         await eventually("and it holds no daemon open") { await core.shouldExit }
     }
 
