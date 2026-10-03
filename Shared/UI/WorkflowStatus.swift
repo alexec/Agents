@@ -138,9 +138,19 @@ extension Workflow {
         }
     }
 
+    /// Whether its settings can be changed from a page: not while its file has a
+    /// problem, because it then reads as empty settings and a change would write those
+    /// over the file's own (#179). The daemon refuses such a write as well.
+    var settingsLocked: Bool { problem != nil }
+
+    /// What the pages say in place of the settings' notes while they are locked; the
+    /// web page's words (#162).
+    static let settingsLockedNote = "Its settings can be changed here once its file can be read."
+
     /// What the page says under a workflow's labels (#142).
     var labelsNote: String {
-        settings.labels.isEmpty
+        if settingsLocked { return Self.settingsLockedNote }
+        return settings.labels.isEmpty
             ? "No labels: each run's agent starts with none."
             : mode == .new
                 ? "Each run's new agent gets these labels."

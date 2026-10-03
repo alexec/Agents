@@ -270,6 +270,47 @@ struct WorkflowSettingsFlowTests {
             with: "agent: new   # a fresh one every time\npermission-mode: plan\n---"))
     }
 
+    /// A file the daemon could not parse reads as empty settings, so a change sent from
+    /// a page would write those over the file's own keys (#179). It is refused, and the
+    /// file is left byte for byte.
+    @Test func aSettingIsNotWrittenToAFileThatCouldNotBeParsed() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let url = try write("""
+            ---
+            on:
+              - schedule:
+                  at: ["22:00"]
+            agent: new
+            permission-mode: plan
+            model: opus
+            labels: [review]
+            options:
+              fast: false
+            ---
+
+            Review the day.
+            """, as: "review", in: work)
+
+        let (core, _) = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let summary = try #require(await core.allWorkflows(in: work).first { $0.workflowID == "review" })
+        #expect(summary.workflow.problem != nil, "an hour is not :00 or :30")
+        let before = try Data(contentsOf: url)
+
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await core.setWorkflowSettings(
+                DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "review",
+                                                  settings: WorkflowSettings(options: ["fast": "true"])))
+        }
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await core.setWorkflowSettings(
+                DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "review",
+                                                  settings: summary.workflow.settings, labels: ["other"]))
+        }
+        #expect(try Data(contentsOf: url) == before)
+    }
+
     @Test func effortAndFastModeAreWrittenAndTakenAwayAgain() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)

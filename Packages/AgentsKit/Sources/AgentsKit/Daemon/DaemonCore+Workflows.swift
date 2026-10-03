@@ -1137,6 +1137,13 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(request.workflowID) in this project.")
         }
+        // A file that could not be parsed reads as empty settings, and every key the
+        // request leaves out is taken out: writing now would wipe the ones the file has
+        // (#179). Every client is refused here; the pages lock the form as well.
+        if let problem = existing.problem {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
+                               message: "Fix the file first: \(problem.message)")
+        }
         let url = WorkflowFile.url(for: existing.workflowID, in: existing.folder)
         guard let original = try? String(contentsOf: url, encoding: .utf8) else {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,

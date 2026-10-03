@@ -322,6 +322,7 @@ struct WorkflowPage: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .fixedSize()
+            .disabled(summary.workflow.settingsLocked)
         }
     }
 
@@ -472,6 +473,9 @@ struct WorkflowPage: View {
                     fileAndRuntime(summary)
                     agentRow(summary)
                     block(workflow.prompt.isEmpty ? "(no prompt)" : workflow.prompt)
+                    if workflow.settingsLocked {
+                        note(Workflow.settingsLockedNote)
+                    }
                     switch workflow.mode {
                     case .triggering:
                         note("This workflow resumes the agent that triggered it, so these do not apply.")
@@ -493,10 +497,11 @@ struct WorkflowPage: View {
                             Spacer(minLength: 16)
                             modelPill(summary, runtime: runtime)
                         }
-                        .disabled(workflow.mode == .triggering)
+                        .disabled(workflow.mode == .triggering || workflow.settingsLocked)
                         refusals(summary, runtime: runtime)
                     }
                     labelsRow(summary)
+                        .disabled(workflow.settingsLocked)
                 }
             }
         }
@@ -630,7 +635,7 @@ struct WorkflowPage: View {
             }
             Spacer(minLength: 8)
             runtimeControl(summary)
-                .disabled(workflow.mode == .triggering)
+                .disabled(workflow.mode == .triggering || workflow.settingsLocked)
         }
     }
 
