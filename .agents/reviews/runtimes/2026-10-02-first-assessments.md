@@ -99,3 +99,98 @@ Three Claude Haiku runs, on a git scratch project, rebased onto main `3a6a5b0b`:
    Afterwards the project had no worktree, no `assess-…` branch, no workflow file, and no
    scope file outside the project. The driver rejected the scope card, and nothing was
    written.
+
+## Codex: 6 of 15, its turn does not end at `finish_turn blocked`
+
+2026-10-03, scratch root `/tmp/run-a47e` on `518a73a8`, with Codex installed there by
+`runtimes/install` (the app's own toolset; adapter `@agentclientprotocol/codex-acp 1.13.1`).
+No model was set: none of Codex's matches a cheap word, and its default is already
+`gpt-6-luna` ("Fast and affordable model for easier tasks").
+
+| Step | Result | From the app's record |
+| --- | --- | --- |
+| `show_file` | passed | `show_file` opened codex-2026-10-03.md empty, before the first write |
+| `leases` | passed | assess-84910759: granted, listed, released; nothing left held |
+| `workflows` | passed | listed; wrote assess-84910759, which waited for the person's OK; listed it; removed it, nothing left |
+| `dashboard` | **failed** | `set_tile` refused: Nothing was set: a status tile needs a `level`: ok, warn, bad or unknown. |
+| `events` | passed | published custom.assess_ping; the wait came back with it in 0.0 s; `cancel_wait` cleared the second |
+| `ask_form` | passed | answered; "plum lantern 47" came back unchanged and is in the report |
+| `own_ask` | **failed** | nothing asked with `request_user_input` reached the app |
+| `helpers` | **failed** | never started again when the helper finished |
+| `wait` | **failed** | never reached (turn 2) |
+| `ending` | **failed** | recorded: blocked; missing: blocked with a check-again time, a last done or needs_answer |
+| `worktree` | **failed** | never reached (turn 4) |
+| `sessions` | **failed** | never reached (turn 5) |
+| `scope` | **failed** | never reached (turn 5) |
+| `permissions` | not offered | never reached (turn 5) |
+| `report` | passed | codex-2026-10-03.md names every step (rows empty from `wait` on) |
+
+What happened, from the record:
+- **The turn never ends after `finish_turn blocked`.** Codex recorded the block at 15:46:26.
+  Three seconds later it called its own built-in multi-agent `wait` tool, with no threads to
+  wait on (`receiverThreadIds: []`). That held the ACP turn open. The helper finished at
+  15:46:33, but the app could not resume an agent whose turn was still running. It was
+  stopped by hand at 15:53, after 7 minutes in that wait. Everything from turn 2 on never
+  ran, so the later rows fail downstream of this one finding. This is the same class as
+  Copilot's helper on 2026-10-02: a runtime that carries on after `finish_turn`.
+- **`own_ask`:** Codex wrote in its report that `request_user_input` was not in its tool
+  list. Codex offers that tool only in some collaboration modes, yet `ToolPolicy` names it
+  as Codex's question tool. Either the policy should give Codex nil here, or the app should
+  start Codex in a mode that has the tool.
+- **`dashboard`:** the model sent a status tile without a `level`. The daemon refused it
+  rightly, and the model went on to `remove_tile` a tile that was never set. That is the
+  model's slip, not the integration's.
+
+## OpenCode: 11 of 15, ends turns without `finish_turn`, and a dead free model empties the pool
+
+2026-10-03, scratch root `/tmp/run-a47f`, with OpenCode installed there by `runtimes/install`.
+Every model OpenCode offers here is a free OpenCode Zen one. The cheap-word rule picked
+`opencode/ling-3.0-flash-fin-free`, and on three runs its provider answered
+`Upstream request failed: Endpoint is unavailable` before the first step. Since then the
+driver reruns on the runtime's own default (`opencode/big-pickle`) when a run stops before
+any step, as the nightly check does. `runtimes/assess` also takes a `model` (`default` for
+the runtime's own). This is the run on the default:
+
+| Step | Result | From the app's record |
+| --- | --- | --- |
+| `show_file` | passed | `show_file` opened opencode-2026-10-03.md empty, before the first write |
+| `leases` | passed | assess-d8899d94: granted, listed, released; nothing left held |
+| `workflows` | passed | listed; wrote assess-d8899d94, which waited for the person's OK; listed it; removed it, nothing left |
+| `dashboard` | passed | `set_tile`, `read_dashboard` and `remove_tile` answered (the first `set_tile` lacked a `level`, and the second had it) |
+| `events` | passed | published custom.assess_ping; the wait came back with it in 0.0 s; `cancel_wait` cleared the second |
+| `ask_form` | passed | answered; "plum lantern 47" came back unchanged and is in the report |
+| `own_ask` | not offered | the runtime has no question tool the app can carry |
+| `helpers` | **failed** | `start_agent` refused: OpenCode isn't available on this Mac (out of the pool: Out since 9:05 AM …) |
+| `wait` | passed | waited 1 min for custom.assess_never; started again when it timed out |
+| `ending` | **failed** | recorded: blocked, blocked, needs_answer; missing: blocked on the helper, 1 turn ended without an account |
+| `worktree` | not offered | OpenCode can't carry its conversation into another folder, so the app offers it no move. The run's daemon said "failed, never called"; the verifier now says not offered (this branch, after the run) |
+| `sessions` | passed | listed; `read_session` gave back this session's id and title |
+| `scope` | passed | the write of scope-d8899d94.txt, outside the project, was asked about on a permission card |
+| `permissions` | passed | a card came; answered reject_once, and nothing was written |
+| `report` | passed | opencode-2026-10-03.md names every step |
+
+What the record shows:
+- **A dead free model takes the whole runtime out of the pool.** The failed first run put
+  OpenCode out of the pool ("Out since 9:05 AM · checking after 1:05 PM"). So the rerun
+  on its working default model could not start its own helper. The pool marks a runtime out
+  when only one of its models failed. This is an app finding, for the availability checks
+  (keep the pool known).
+- **Turns that don't stop at `finish_turn`.** In turn 1 OpenCode recorded `blocked` twice,
+  12 seconds apart, and kept working in the same ACP turn. After the wait timed out, it
+  worked for six minutes (16:11–16:17) and ended that turn without `finish_turn` at all.
+  The same class as Codex and Copilot above.
+- **A card for every tool.** OpenCode asks a permission card for each read and each edit
+  of the report, about 50 in the run. A person running it would answer them all.
+- **The driver rejected one shell `cat >>` of the report.** Its title quoted the scope path,
+  and it named no file locations. The brief says to run no commands, and the report still
+  named every step.
+- The agent's own report said `wait` and `scope` failed. The daemon's record says both
+  passed: the wait did start it again, and a refused write outside the project is the pass.
+
+## Across the three runtimes
+
+The finding that recurs: **Copilot, Codex and OpenCode each carry on after `finish_turn`**.
+Copilot's helper kept working, Codex sat in its own `wait`, and OpenCode kept going or
+ended without one. Only Claude stops where it says it does. The app could end the ACP turn
+itself once `finish_turn` is recorded: cancel the prompt still in flight, so the turn is
+over when the agent says it is.

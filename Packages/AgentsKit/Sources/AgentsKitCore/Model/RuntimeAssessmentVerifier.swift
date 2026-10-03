@@ -408,6 +408,11 @@ private struct Scorer {
 
     func worktree() -> (Verdict, String) {
         let into = moves(back: false)
+        // The app gives a runtime that can't carry its conversation across folders no move
+        // at all, so its refusal never reaches the daemon (053).
+        if into.isEmpty, !RuntimeCatalog.canMoveFolders(runtimeID: record.runtimeID) {
+            return (.notOffered, RuntimeCatalog.whyCannotMoveFolders(runtimeID: record.runtimeID))
+        }
         guard let moved = into.first(where: \.ok) else {
             let why = into.last?.answer ?? ""
             if why.contains("git repository") || why == RuntimeCatalog.whyCannotMoveFolders(runtimeID: record.runtimeID) {

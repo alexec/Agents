@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Assess runtimes unattended (#47), on a daemon's root: start, answer, follow, score.
 
-  assess.py ROOT RUNTIME [RUNTIME …] --folder PROJECT [--minutes 20] [--json OUT]
+  assess.py ROOT RUNTIME [RUNTIME …] --folder PROJECT [--minutes 20] [--json OUT] [--model M]
   assess.py ROOT RUNTIME --folder PROJECT --follow AGENT    carry on one whose driver stopped
 
 For each runtime, one at a time: `runtimes/assess` starts the assessing agent in PROJECT
@@ -11,6 +11,11 @@ gets PHRASE), the runtime's own question (its first option), and every permissio
 (allow once, except the write outside the project, which is rejected) — and follows it
 until it ends a turn that is neither `blocked` nor `partly_done` (a move). Then it prints
 the daemon's own score (`runtimes/assessment`) and where the agent's report is.
+
+The cheapest model can be a free one whose provider is down: an assessment that stops
+before calling any of the app's tools is run again on the runtime's own default, as the
+nightly check (#39) does for its turn. `--model` names one instead (`default` for the
+runtime's own).
 
 A runtime the daemon refuses to start (out of the pool, not installed, not signed in) is
 skipped with the daemon's reason. Exit status 0 when every assessed runtime passed.
@@ -65,9 +70,12 @@ def ours(client, assessor):
     return ids
 
 
-def assess(client, runtime, folder, minutes):
+def assess(client, runtime, folder, minutes, model=None):
+    asked = {"runtimeID": runtime, "folder": "file://" + folder}
+    if model:
+        asked["model"] = model
     try:
-        started = client.call("runtimes/assess", {"runtimeID": runtime, "folder": "file://" + folder}, timeout=180)
+        started = client.call("runtimes/assess", asked, timeout=180)
     except Exception as e:  # the daemon's refusal, in its words
         return {"runtime": runtime, "skipped": str(e)}
     agent = started["agentID"]
@@ -112,6 +120,13 @@ def follow(client, runtime, agent, model, report_path, minutes):
             "score": score}
 
 
+def never_started(result):
+    """Stopped on the cheapest model before a single step: the model, not the runtime."""
+    if "score" not in result or not result.get("model") or result.get("state") != "stopped":
+        return False
+    return not any(c["verdict"] == "passed" for c in result["score"]["checks"])
+
+
 def table(score):
     lines = ["| Step | Result | From the app's record |", "| --- | --- | --- |"]
     for check in score["checks"]:
@@ -126,6 +141,7 @@ def main():
     parser.add_argument("--folder", required=True)
     parser.add_argument("--minutes", type=int, default=20)
     parser.add_argument("--json", help="write every result here too")
+    parser.add_argument("--model", help="a model to assess on, or `default` for the runtime's own (else the cheapest)")
     parser.add_argument("--follow", metavar="AGENT",
                         help="carry on an assessment already started (its driver stopped): RUNTIME is its runtime")
     args = parser.parse_args()
@@ -137,7 +153,10 @@ def main():
             result = follow(client, runtime, args.follow, (record.get("startOptions") or {}).get("values", {}).get("model"),
                             None, args.minutes)
         else:
-            result = assess(client, runtime, os.path.abspath(args.folder), args.minutes)
+            result = assess(client, runtime, os.path.abspath(args.folder), args.minutes, args.model)
+            if not args.model and never_started(result):
+                print(f"  {runtime}: stopped before any app tool on {result['model']}; again on its default model", flush=True)
+                result = assess(client, runtime, os.path.abspath(args.folder), args.minutes, "default")
         results.append(result)
         if "skipped" in result:
             print(f"\n## {runtime}: skipped\n\n{result['skipped']}\n", flush=True)

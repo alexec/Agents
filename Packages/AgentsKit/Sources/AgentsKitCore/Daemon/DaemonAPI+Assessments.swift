@@ -15,10 +15,14 @@ public extension DaemonAPI {
     struct AssessRuntimeRequest: Codable, Sendable, Hashable {
         public var runtimeID: String
         public var folder: URL
+        /// A model to assess on: one of the runtime's values, or `default` for its own
+        /// default. Nil for the cheapest it offers.
+        public var model: String?
 
-        public init(runtimeID: String, folder: URL) {
+        public init(runtimeID: String, folder: URL, model: String? = nil) {
             self.runtimeID = runtimeID
             self.folder = folder
+            self.model = model
         }
     }
 

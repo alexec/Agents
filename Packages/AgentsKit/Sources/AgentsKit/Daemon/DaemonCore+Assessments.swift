@@ -20,7 +20,7 @@ extension DaemonCore {
         // What the runtime offers here, from a draft of the session the agent then starts
         // on: the cheapest of its models, whether or not it has been used here before.
         let draft = try await options(DaemonAPI.OptionsRequest(runtimeID: runtime.id, cwd: folder))
-        let model = RuntimeAssessment.cheapestModel(in: draft.options)
+        let model = RuntimeAssessment.model(asked: request.model, in: draft.options)
         let today = now()
         let report = RuntimeAssessment.freshReportPath(project: folder, runtimeID: runtime.id, date: today)
         // show_file takes a Markdown file that is not there yet only in a folder that is.
