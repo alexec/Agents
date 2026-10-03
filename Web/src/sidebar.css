@@ -1,0 +1,95 @@
+/* The one sidebar from 760 wide (#151), as the window's (#145): Activity, the projects folding
+   open on their sessions and workflows, the hosts' state at the foot; then the chat. Every rule
+   is under .with-sidebar, so it outweighs the three-column rules in app.css. */
+
+.columns.with-sidebar { grid-template-columns: 300px minmax(0, 1fr); }
+.files-open .columns.with-sidebar { grid-template-columns: 300px minmax(0, 1fr) 420px; }
+.with-sidebar .chat, .with-sidebar .files { grid-column: 2; grid-row: 1; }
+.files-open .with-sidebar .files { grid-column: 3; }
+
+/* Below 1440 the files pane lies over the chat; below 1200 the sidebar narrows. */
+@media (max-width: 1439px) {
+  .files-open .columns.with-sidebar { grid-template-columns: 300px minmax(0, 1fr); }
+  .files-open .with-sidebar .files { grid-column: 2; z-index: 5; }
+}
+@media (max-width: 1199px) {
+  .columns.with-sidebar, .files-open .columns.with-sidebar { grid-template-columns: 260px minmax(0, 1fr); }
+}
+
+.with-sidebar .sidebar {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper-sidebar);
+  border-right: 1px solid var(--paper-rule);
+}
+.with-sidebar .sidebar-head { gap: 6px; border-bottom: none; padding: 0 10px; }
+.with-sidebar .sidebar .scroll { padding: 0 6px 8px; }
+.with-sidebar .sidebar .row { box-sizing: border-box; }
+/* A workflow's row says Off where it stands, as the window's does; Run Now is on its page. */
+.with-sidebar .sidebar .row.workflow .run-now { display: none; }
+.with-sidebar .sidebar-head-label { font-size: 11px; font-weight: 600; opacity: 0.5; margin: 12px 8px 4px; }
+
+/* Activity: a glyph, the page's name, and what it says at a glance on the right. */
+.with-sidebar .activity-row { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; padding: 4px 8px; }
+.with-sidebar .activity-row .title { font-weight: 400; }
+.with-sidebar .activity-row .glyph { display: inline-block; width: 18px; opacity: 0.5; text-align: center; }
+.with-sidebar .activity-row .detail { font-size: 11.5px; opacity: 0.6; font-variant-numeric: tabular-nums; text-align: right; }
+.with-sidebar .activity-row .detail .dot.failure { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--tint-failure); position: static; }
+.with-sidebar .activity-row .spending { display: inline-flex; flex-direction: column; align-items: flex-end; }
+.with-sidebar .activity-row .spending.close { color: var(--tint-failure); opacity: 1; }
+
+/* A project's row: the disclosure, the name and its counts, the Needs you dot. */
+.with-sidebar .row.project { grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; padding: 0 8px 0 0;
+  column-gap: 2px; }
+.with-sidebar .row.project .disclosure { border: none; background: none; padding: 0; width: 16px; font-size: 12px;
+  opacity: 0.55; line-height: 1; }
+.with-sidebar .row.project .pick { display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
+  border: none; background: none; padding: 4px 0; text-align: left; font: inherit; color: inherit; }
+.with-sidebar .row.project .title { font-weight: 500; max-width: 100%; }
+.with-sidebar .row.project .subtitle { font-size: 11.5px; }
+.with-sidebar .row.project .dot { grid-column: 3; grid-row: 1; }
+.with-sidebar .project-fold.greyed .row, .with-sidebar .project-fold.greyed .subhead { opacity: 0.55; }
+
+/* What folds under a project sits in from it, as the window's outline does. */
+.with-sidebar .fold-body { padding-left: 12px; margin-bottom: 6px; }
+.with-sidebar .fold-body .subhead { margin: 8px 8px 1px; }
+.with-sidebar .fold-body .hint { padding: 2px 8px; font-size: 12px; }
+.with-sidebar .fold-body .session { padding: 5px 8px; }
+.with-sidebar details.archived > summary { list-style: none; }
+.with-sidebar details.archived > summary::before { content: "›"; display: inline-block; width: 12px; opacity: 0.7; }
+.with-sidebar details.archived[open] > summary::before { content: "⌄"; }
+
+/* A row the keys or the list landed on. */
+.with-sidebar .sidebar :is(.row.session, .row.activity-row, summary):focus-visible,
+.with-sidebar .sidebar .row:has(> .pick:focus-visible) { outline: 2px solid var(--tint-link, #2f6fd1); outline-offset: -2px; }
+.with-sidebar .sidebar .pick:focus-visible { outline: none; }
+
+.with-sidebar .sidebar-foot { border-top: 1px solid var(--paper-rule); }
+.with-sidebar .sidebar-foot .identity { border-top: none; }
+.with-sidebar .sidebar-foot .host-down { padding: 8px 12px 0; }
+.with-sidebar .foot-line { margin: 0; padding: 8px 12px 0; font-size: 12px; opacity: 0.7; }
+
+/* Nothing chosen: what the sidebar is for, and its keys. */
+.with-sidebar .nothing-chosen { display: flex; flex-direction: column; text-align: center; padding: 0 24px; gap: 4px; }
+.with-sidebar .nothing-chosen p { max-width: 380px; }
+.with-sidebar .nothing-chosen .glyph { font-size: 34px; opacity: 0.6; }
+.with-sidebar .nothing-chosen h2 { font-size: 14px; margin: 4px 0 2px; }
+.with-sidebar .nothing-chosen p { margin: 4px 0; line-height: 1.45; }
+
+/* An Activity page in the chat's place. */
+.with-sidebar .activity-body { max-width: 760px; padding: 8px 12px; }
+.with-sidebar .activity-body ul { list-style: none; margin: 0; padding: 0; }
+.with-sidebar .activity-body li { padding: 6px 0; border-bottom: 1px solid var(--paper-rule); }
+.with-sidebar .event-list li { display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 8px; }
+.with-sidebar .event-list .when { font-size: 12px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+.with-sidebar .event-list .body { display: flex; flex-direction: column; gap: 2px; }
+.with-sidebar .runtime-list li.out .strong { color: var(--tint-failure); }
+.with-sidebar .spending-today { font-size: 20px; margin: 8px 0 4px; }
+.with-sidebar .activity-body .close { color: var(--tint-failure); opacity: 1; }
+
+/* A row's context menu, where it was opened. */
+.context-menu { position: fixed; top: 0; left: 0; display: flex; flex-direction: column; }
+.context-menu button { text-align: left; border: none; background: none; padding: 5px 10px; border-radius: var(--radius-control); }
+.context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: var(--paper-selection); outline: none; }

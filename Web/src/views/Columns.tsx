@@ -1,8 +1,10 @@
-// The Mac window's layout in a tab (071 US2, US6; frames A–D): projects under host headings,
-// the chosen project's sessions, and the chosen session's chat with the prompt at its foot.
-// Widths decide how many columns show (styles in app.css): three from 1200, the files pane as
-// a fourth from 1440; from 760 the projects fold into a menu; below 760 one column at a time.
-import { useSignal } from "@preact/signals";
+// The Mac window's layout in a tab (071 US2, US6; #151). From 760 wide, as the window since #145:
+// one sidebar (Activity, the projects folding open on their sessions, the hosts' state at its
+// foot), then the chat, or a project's Dashboard, a workflow, an Activity page, or help text with
+// nothing chosen; the files pane a third column from 1440, over the chat below that. Below 760,
+// one column at a time, as the iPhone Remote drills: projects under host headings, a project's
+// sessions, the chat (web: by design).
+import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { actDoing, hostStateWords, type Store } from "../model/store";
 import { agentsIn, counts, folderKey, headings, projectSubtitle, showsUnread } from "../model/groups";
@@ -23,11 +25,20 @@ import { Resources } from "./Resources";
 import { WorkflowPage } from "./WorkflowPage";
 import { DashboardPage, DashboardRow } from "./Dashboard";
 import { workflowSummary } from "../model/workflows";
+import { Sidebar } from "./Sidebar";
+import { ActivityPageView } from "./Activity";
+import { ContextMenu } from "./ContextMenu";
+
+/** Wide enough for the one sidebar beside the chat: 760 and up. */
+const sidebarQuery = globalThis.matchMedia?.("(min-width: 760px)");
+const sidebarFits = signal(sidebarQuery?.matches ?? true);
+sidebarQuery?.addEventListener("change", (e) => (sidebarFits.value = e.matches));
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
   const down = session.state.value.kind === "down";
   // Which single column a narrow window shows: the deepest one the route names.
+  const wide = sidebarFits.value;
   const depth = r.session || r.workflow || r.dashboard || r.compose ? "chat" : r.project ? "sessions" : "projects";
   const project = r.host && r.project
     ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
@@ -48,10 +59,13 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}
       <Problem store={store} />
-      <div class="columns" aria-busy={down}>
-        <ProjectsColumn session={session} store={store} />
-        <SessionsColumn store={store} linkDown={down} />
-        {r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
+      <div class={`columns${wide ? " with-sidebar" : ""}`} aria-busy={down}>
+        {wide ? <Sidebar session={session} store={store} linkDown={down} /> : <>
+          <ProjectsColumn session={session} store={store} />
+          <SessionsColumn store={store} linkDown={down} />
+        </>}
+        {wide && r.activity ? <ActivityPageView store={store} page={r.activity} />
+          : r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
           : r.host && r.project && project && r.workflow ? (
             <WorkflowPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
@@ -60,11 +74,24 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
               down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.project && project ? (
             <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
-          ) : <section class="chat empty" aria-label="Chat"><p>Choose a project.</p></section>}
+          ) : wide ? <NothingChosen /> : <section class="chat empty" aria-label="Chat"><p>Choose a project.</p></section>}
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
       </div>
       <NewProjectDialog store={store} />
+      <ContextMenu />
     </div>
+  );
+}
+
+/** With nothing chosen, what the sidebar is for and its keys, in the window's words (#145). */
+function NothingChosen() {
+  return (
+    <section class="chat empty nothing-chosen" aria-label="Nothing selected">
+      <span class="glyph" aria-hidden="true">◧</span>
+      <h2>Nothing selected</h2>
+      <p>Pick a session on the left to read it, or a project to see its Dashboard. New Session in a project’s menu starts one there.</p>
+      <p>↑ and ↓ move through the list, → and ← unfold and fold a project.</p>
+    </section>
   );
 }
 

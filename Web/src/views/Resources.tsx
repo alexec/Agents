@@ -24,7 +24,7 @@ export function heldWords(state: ResourceState): string {
   return holds.length > 0 ? "Held" : "Free";
 }
 
-export function Resources({ store, host }: { store: Store; host: string }) {
+export function Resources({ store, host, open }: { store: Store; host: string; open?: boolean }) {
   const snapshot = store.leases.value[host];
   if (!snapshot) return null;
   const declared = snapshot.resources.filter((r) => r.declared);
@@ -46,7 +46,7 @@ export function Resources({ store, host }: { store: Store; host: string }) {
     );
   };
   return (
-    <details class="resources">
+    <details class="resources" open={open}>
       <summary class="subhead">Resources <span class="count">{declared.length + busy.length}</span></summary>
       <ul>{declared.map(row)}{busy.map(row)}</ul>
       <p class="hint">Declared on the Mac, in Settings ▸ Resources. Agents lease one whenever its description applies.</p>

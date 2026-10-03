@@ -7,7 +7,7 @@ import type {
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot,
-  DashboardChangedNotification, DashboardSnapshot, DashboardSummary,
+  DashboardChangedNotification, DashboardSnapshot, DashboardSummary, CostState, EventsPage,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -788,4 +788,18 @@ export class Store extends Work {
     return this.act("agents/start", request, host);
   }
 
+  /** The newest page of each host's events, for the sidebar's Events row and page (#151). */
+  readonly events = signal<Record<string, EventsPage>>({});
+  /** Each host's day of spending and its limits, for Spending (#151). */
+  readonly costs = signal<Record<string, CostState>>({});
+
+  async loadEvents(host: string, limit = 50): Promise<void> {
+    const page = await this.link.call("events/list", { limit }, host).catch(() => null);
+    if (page) this.events.value = { ...this.events.value, [host]: page };
+  }
+
+  async loadCost(host: string): Promise<void> {
+    const state = await this.link.call("cost/state", {}, host).catch(() => null);
+    if (state) this.costs.value = { ...this.costs.value, [host]: state };
+  }
 }

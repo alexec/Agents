@@ -1,9 +1,16 @@
 // Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
-// /w/<workflow> for a workflow's page in the chat's place (#98).
+// /w/<workflow> for a workflow's page in the chat's place (#98), or #/a/<page> for an Activity page
+// of the sidebar (#151): events, resources, runtimes or spending.
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
 import { signal } from "@preact/signals";
 
+export type ActivityPage = "events" | "resources" | "runtimes" | "spending";
+
+export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "spending"];
+
 export interface Route {
+  /** An Activity page (#151): about all the work rather than one project. */
+  activity?: ActivityPage | undefined;
   host?: string | undefined;
   /** The project's folder URL, as the host writes it. */
   project?: string | undefined;
@@ -31,6 +38,7 @@ export function parseRoute(hash: string): Route {
       case "d": route.dashboard = value === "1"; break;
       case "f": route.files = value === "1"; break;
       case "n": route.compose = value === "1"; break;
+      case "a": if ((activityPages as readonly string[]).includes(value)) route.activity = value as ActivityPage; break;
     }
   }
   return route;
@@ -38,6 +46,7 @@ export function parseRoute(hash: string): Route {
 
 export function routeHash(route: Route): string {
   const parts: string[] = [];
+  if (route.activity) return "#/a/" + route.activity;
   if (route.host) parts.push("h", route.host);
   if (route.host && route.project) parts.push("p", route.project);
   if (route.host && route.project && route.session) parts.push("s", route.session);

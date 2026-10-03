@@ -1,5 +1,6 @@
 /* The web remote's styles: the Paper palette, then the page. */
 @import "./theme/paper.css";
+@import "./sidebar.css";
 
 html,
 body {

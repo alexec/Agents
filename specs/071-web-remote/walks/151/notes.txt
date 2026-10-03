@@ -1,0 +1,26 @@
+activity: ["ϟ Events Last 12:22","⚿ Resources","▣ Runtimes","$ Spending"]
+projects folded: ["› Agents Needs you · 1 unread","› infra-tools Needs you","› website 1 unread","› build-box:api-server Needs you · 1 unread"]
+projects unfolded: ["⌄ Agents","› infra-tools Needs you","› website 1 unread","⌄ build-box:api-server"]
+subheads: ["Needs you 2","Done 3 · 1 unread","Paused 1","Archived sessions 2","Workflows 2","Needs you 1","Done 1 · 1 unread","Archived sessions 1"]
+session: #/h/mac/p/file%3A%2F%2F%2Ftmp%2Frun-151%2Fw%2FAgents/s/4F6EC6FD-0025-4F6C-8711-7F36EAA5F719
+project: #/h/mac/p/file%3A%2F%2F%2Ftmp%2Frun-151%2Fw%2FAgents/d/1; lit: ["⌄"]
+after reload: ["Agents (open)","infra-tools","website","build-box:api-server (open)"]
+archived: "Archived sessions 2 ■ Old spike: Metal terminal 56m ■ Retire the old aliases 1h"
+workflow: #/h/mac/p/file%3A%2F%2F%2Ftmp%2Frun-151%2Fw%2FAgents/w/nightly-check
+events: #/a/events · "Events What happened 12:22 You locked the screen. build-box 12:22 You locked the screen. This Mac"
+resources: #/a/resources · "Resources This Mac build-box"
+runtimes: #/a/runtimes · "Runtimes This Mac Claude Available Grok Available Copilot Available Cursor Available Codex Not installed Gemini Not installed Antigravity Not installed OpenCode"
+spending: #/a/spending · "Spending Today $0.00 build-box Nothing spent today This Mac Nothing spent today Limits are set on the Mac."
+↓×5: ["⚿ Resources #/a/resources","▣ Runtimes #/a/runtimes","$ Spending #/a/spending","Agents #/h/mac/p/file%3A%2F%2F%2Ftmp%2Frun-151%2Fw%2FAgents/d/1","! #/h/mac/p/file%3A%2F%2F%2Ftmp%2Frun-151%2Fw%2FAgents/s/4F6EC6FD-0025-4F6C-8711-7F36EAA5F719"]
+← then →: expanded false then true
+↓ into Agents: ! #/h/mac/p/file%3A%2F%2F%2Ftmp%2Frun-151%2Fw%2FAgents/s/4F6EC6FD-0025-4F6C-8711-7F36EAA5F719
+← from a session: Agents
+session menu: ["Park","Mark as Unread","Archive"]
+after Mark as Unread: ["Done 3 · 2 unread","Done 1 · 1 unread"]
+project menu: ["Dashboard","New Session"]
+New Session: #/h/mac/p/file%3A%2F%2F%2Ftmp%2Frun-151%2Fw%2Fwebsite/n/1
+1600×900: ["sidebar","chat"]
+1000×800: ["sidebar","chat"]
+760×800: ["sidebar","chat"]
+390×844: ["projects"]
+errors on the page: 0

@@ -51,6 +51,9 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
             onChange={(e) => (showsHidden.value = (e.currentTarget as HTMLInputElement).checked)} />
           Show Hidden Tiles{hiddenCount > 0 ? ` (${hiddenCount})` : ""}
         </label>
+        {/* Starting an agent, from the project's own page (#151), as the window's toolbar has it. */}
+        <button class="icon" aria-label="New session" title="Start a new session in this project" disabled={down}
+          onClick={() => go({ host, project: folder, compose: true })}>✎</button>
       </header>
       <div class="scroll">
         <div class="dashboard-body">
