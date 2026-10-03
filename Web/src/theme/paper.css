@@ -34,6 +34,9 @@
 
   /* The system's own fonts; nothing is loaded from anywhere (FR-034). */
   --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  /* What a person reads at length, the chat's turns: New York, as the window's Paper type
+     scale has it (Shared/UI/TypeScale.swift), where the system has a serif. */
+  --font-reading: ui-serif, "New York", Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 

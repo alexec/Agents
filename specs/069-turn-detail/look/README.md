@@ -77,6 +77,8 @@ for someone who asks for it. Nobody is sent to it by a click any more.
 5. **The report is the last line of every finished turn.** It is drawn as the app's note, not as
    the agent talking, the same pair the row in the list shows (FR-015).
 6. **A step line opens itself.** It has no chevron: the margin is a run of plain lines (#112).
+   The open steps sit in the turn's own margin, with no rule beside them and no indent, and the
+   steps row has no chevron either (#148).
    On the Mac the line brightens under the pointer.
    An open call shows its input, then its output, clipped to 12 lines with "Show all".
 7. **Nothing closes a turn that someone opened.** A new turn starts at the default level. The one

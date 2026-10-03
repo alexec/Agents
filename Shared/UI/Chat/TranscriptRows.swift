@@ -76,13 +76,9 @@ struct TurnView: View, Equatable {
                 if isWaitingForEntries {
                     ProgressView().controlSize(.small)
                 } else {
-                    // Under a thin rule, one indent in, as the look has them.
+                    // In the turn's own margin: no rule and no indent (#148).
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(steps) { StepRow(item: $0, isOpen: detail == .details) }
-                    }
-                    .padding(.leading, 14)
-                    .overlay(alignment: .leading) {
-                        Rectangle().fill(.quaternary).frame(width: 2).padding(.leading, 5)
                     }
                     ForEach(outcome) { StepRow(item: $0, isOpen: false) }
                 }
@@ -117,29 +113,25 @@ private struct StepsControl: View {
 
     var body: some View {
         Button(action: toggle) {
-            HStack(spacing: 5) {
-                Image(systemName: isOpen ? "chevron.down" : "chevron.right")
-                    .imageScale(.small)
-                    .frame(width: 10)
-                Text(words)
-            }
-            .appText(.fine)
-            .foregroundStyle(isHovering ? .primary : .secondary)
-            .padding(.horizontal, 8)
-            #if os(iOS)
-            .frame(minHeight: 32)
-            #else
-            .padding(.vertical, 3)
-            #endif
-            .background {
-                // A finger has no hover, so on the phone the edge is always there.
+            // The words alone, with no chevron in front of them (#148).
+            Text(words)
+                .appText(.fine)
+                .foregroundStyle(isHovering ? .primary : .secondary)
+                .padding(.horizontal, 8)
                 #if os(iOS)
-                Capsule().strokeBorder(.quaternary)
+                .frame(minHeight: 32)
                 #else
-                Capsule().strokeBorder(.quaternary).opacity(isHovering ? 1 : 0)
+                .padding(.vertical, 3)
                 #endif
-            }
-            .contentShape(Capsule())
+                .background {
+                    // A finger has no hover, so on the phone the edge is always there.
+                    #if os(iOS)
+                    Capsule().strokeBorder(.quaternary)
+                    #else
+                    Capsule().strokeBorder(.quaternary).opacity(isHovering ? 1 : 0)
+                    #endif
+                }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }

@@ -1,0 +1,8 @@
+— turn
+outcome: {"control":"7 steps","controlLeft":576,"turnLeft":576,"stepsLeft":null,"stepsRule":null,"lines":["Read README.md, list the files in this folder, then write no","7 steps","I wrote notes.md, which says this is a scratch project with ","Complete Wrote notes.md with two lines: \"Work\" is a scratch "]}
+shot after-turn-outcome.png
+steps: {"control":"Hide steps","controlLeft":576,"turnLeft":576,"stepsLeft":576,"stepsRule":"0px","lines":["Read README.md, list the files in this folder, then write no","Hide steps","Read file List files in project folder Tool Search Mcp Agent","I wrote notes.md, which says this is a scratch project with ","Complete Wrote notes.md with two lines: \"Work\" is a scratch "]}
+shot after-turn-steps.png
+details: {"control":"Hide steps","controlLeft":576,"turnLeft":576,"stepsLeft":576,"stepsRule":"0px","lines":["Read README.md, list the files in this folder, then write no","Hide steps","Read file 1 # Work 2 3 A scratch project. README.md:1 Argume","I wrote notes.md, which says this is a scratch project with ","Complete Wrote notes.md with two lines: \"Work\" is a scratch "]}
+shot after-turn-details.png
+errors: []

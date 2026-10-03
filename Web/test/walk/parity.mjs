@@ -100,6 +100,31 @@ for (const scene of scenes) {
       say(`opened: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".turn button.call-line[aria-expanded=true]")].map((b) => b.textContent)`))}`);
       await shot("margin");
       await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "outcome"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    } else if (scene === "turn") {
+      // #148: one turn at each level, beside the window: the ask, the steps control, the steps
+      // (no chevron, no rule, no indent) and the outcome. Takes the first session.
+      await openProject();
+      await page.eval(`document.querySelector(".sessions .row.session .pick, .sessions .row.session")?.click()`);
+      await page.waitFor(`document.querySelector(".chat .turn")`, 30_000);
+      for (const level of ["outcome", "steps", "details"]) {
+        await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = ${JSON.stringify(level)}; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+        await sleep(500);
+        say(`${level}: ${JSON.stringify(await page.eval(`(() => {
+          const turn = [...document.querySelectorAll(".chat .turn")].pop();
+          const control = turn?.querySelector(".steps-control");
+          const steps = turn?.querySelector(".steps");
+          const left = (el) => el ? Math.round(el.getBoundingClientRect().left) : null;
+          return {
+            control: control?.textContent.trim() ?? null,
+            controlLeft: left(control), turnLeft: left(turn),
+            stepsLeft: left(steps?.firstElementChild),
+            stepsRule: steps ? getComputedStyle(steps).borderLeftWidth : null,
+            lines: [...(turn?.children ?? [])].map((el) => el.innerText.replace(/\\s+/g, " ").trim().slice(0, 60)),
+          };
+        })()`))}`);
+        await shot(`turn-${level}`);
+      }
+      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "outcome"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
     } else if (scene === "workflow") {
       // #98 triggers, next run, last fired; #100 Enabled switch and Turn Off/On.
       await openProject();

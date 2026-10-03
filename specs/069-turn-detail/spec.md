@@ -42,7 +42,7 @@ Each turn is drawn at one of three levels. The chat no longer cycles through the
   last agent message as the reply. A running turn with no trailing message has none: its latest
   step is the live line. The report is drawn last. A permission choice is a step, not an outcome.
 - **FR-003** A turn with steps has one control between the ask and the outcome. It reads
-  "N steps" when closed and "Hide steps" when open, with a chevron. N counts each tool call and
+  "N steps" when closed and "Hide steps" when open: the words alone, with no chevron (#148). N counts each tool call and
   each other step line. Thinking is not counted. A turn with no steps has no control.
 - **FR-004** The control is the only thing that opens or closes a turn. Message text is never a
   tap target, so it can be selected.

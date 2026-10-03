@@ -139,8 +139,8 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
           {(call.locations ?? []).length > 0 && (
             <p class="locations">{(call.locations ?? []).map((l) => `${l.path.split("/").pop()}${l.line ? `:${l.line}` : ""}`).join("  ")}</p>
           )}
-          {call.rawInput !== undefined && <div><p class="quiet">Argument</p><pre>{pretty(call.rawInput)}</pre></div>}
-          {call.rawOutput !== undefined && <div><p class="quiet">Return</p><pre>{pretty(call.rawOutput)}</pre></div>}
+          {call.rawInput !== undefined && <div><p class="faint">Argument</p><pre>{pretty(call.rawInput)}</pre></div>}
+          {call.rawOutput !== undefined && <div><p class="faint">Return</p><pre>{pretty(call.rawOutput)}</pre></div>}
         </div>
       )}
     </div>
@@ -331,7 +331,7 @@ export function TurnView({ turn, detail, fetched, isLive, background, toggle, lo
       {stepCount !== 0 && (
         <button class="steps-control" aria-expanded={open} onClick={toggle}
           title={open ? "Hide this turn's steps" : "Show every step of this turn"}>
-          <span aria-hidden="true">{open ? "▾" : "▸"}</span> {stepsWords(stepCount, open)}
+          {stepsWords(stepCount, open)}
         </button>
       )}
       {open && stepCount !== 0 ? (
