@@ -356,8 +356,13 @@ extension DaemonCore {
         saveArchiveIndex()
     }
 
+    /// Write `archive.json`, when the index changed since it was last written or read.
     func saveArchiveIndex() {
-        do { try archiveIndexStore.save(archiveIndex, now: now()) } catch {
+        guard archiveIndexChanged else { return }
+        do {
+            try archiveIndexStore.save(archiveIndex, now: now())
+            archiveIndexChanged = false
+        } catch {
             DaemonLog.shared.write("archive.json: could not write: \(error.localizedDescription)")
         }
     }

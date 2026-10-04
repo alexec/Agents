@@ -311,7 +311,12 @@ public actor DaemonCore {
     var retention = RetentionStore.File()
     var retentionIsLoaded = false
     /// Sizes and file dates of archived agents, written to `archive.json`.
-    var archiveIndex: [UUID: ArchiveIndex.Entry] = [:]
+    var archiveIndex: [UUID: ArchiveIndex.Entry] = [:] {
+        didSet { archiveIndexChanged = true }
+    }
+    /// Whether `archiveIndex` differs from what `archive.json` holds, so the hourly
+    /// check writes it only when something did change (#177).
+    var archiveIndexChanged = false
     /// Over the cap with nothing more that could go, as the last check found.
     var lastOverCap: OverCap?
     /// When each archived agent was last made whole to be read. Gone when it is slim again.
@@ -330,6 +335,10 @@ public actor DaemonCore {
     /// A write of `archive.json` waiting to happen, so a check that changes a hundred
     /// notes writes the index once.
     var indexSave: Task<Void, Never>?
+    /// A write of the day's spend waiting to happen, and the agents whose costs go with
+    /// it, so the several cost-bearing usage updates of a turn write once (#177).
+    var spendSave: Task<Void, Never>?
+    var spendSaveAgents: Set<UUID> = []
 
     // MARK: Dashboard (074)
 
@@ -1119,7 +1128,8 @@ public actor DaemonCore {
                 agents[agent.id] = agent
             }
         }
-        if archiveIndex != index { saveArchiveIndex() }
+        archiveIndexChanged = archiveIndex != index
+        saveArchiveIndex()
         // A record the rules forbid was brought to one they allow on the way in, and
         // the person is told so here, in the transcript, which is where this app
         // already explains itself.
@@ -1278,10 +1288,10 @@ public actor DaemonCore {
             let spentBefore = agent.costToDate
             if let cost = usage.cost { bank(cost, into: &agent, readBy: reader) }
             agents[agentID] = agent
-            // Money is written down as it is spent, not at the end of the turn. The
-            // ledger already has it; a daemon killed mid-turn must not come back with
-            // an agent that spent less than the day did.
-            if agent.costToDate != spentBefore { saveQuietly(agent) }
+            // Money is written down as it is spent, not at the end of the turn: within
+            // `spendSaveDelay`, the ledger first and the agent after, so a daemon killed
+            // mid-turn never comes back with an agent that spent more than the day did.
+            if agent.costToDate != spentBefore { saveSpendSoon(with: agentID) }
             // Usage arrives several times a turn, so it is broadcast on its own rather
             // than as a whole agent, and the record is written at the end of the turn.
             broadcast(DaemonAPI.Notification.agentUsage,
@@ -1448,6 +1458,7 @@ public actor DaemonCore {
         // A clone cut short is deleted on the next start, which is the same whether it
         // was stopped here or the daemon simply died (027 FR-011).
         for clone in clones.values { clone.process?.terminate() }
+        flushSpend()
         workflowTicker?.cancel()
         workflowTicker = nil
         for (_, task) in workflowRescans { task.cancel() }

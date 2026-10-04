@@ -129,6 +129,30 @@ struct TurnUsageTests {
         #expect(today["USD"] == 0.25, "and the day is counted the same way, once")
     }
 
+    /// Costs on usage updates are held and written together, at most `spendSaveDelay`
+    /// later: the day and the agent, in that order (#177). Updates can still be arriving
+    /// as the turn's ending is handled, so the end alone is not the bound.
+    @Test func usageCostsAreOnDiskByTheEndOfTheTurn() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.updates = (1...20).map { step in
+            ["sessionUpdate": "usage_update", "used": .int(step * 100), "size": 1000,
+             "cost": ["amount": .double(Double(step) / 100), "currency": "USD"]]
+        }
+        let core = try core(FakeLauncher(script: script), locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+
+        await eventually("the day is on disk") {
+            SpendLedger(locations: locations).total(on: Date())["USD"] == 0.2
+        }
+        await eventually("the record has it too") {
+            let record = try? StoreCoding.decoder.decode(Agent.self, from: Data(contentsOf: locations.record(id)))
+            return record?.costToDate["USD"] == 0.2
+        }
+    }
+
     @Test func aRuntimeThatReportsNothingShowsNothing() async throws {
         let (locations, work) = try temporary()
         // Grok sends neither usage updates nor a usage block.

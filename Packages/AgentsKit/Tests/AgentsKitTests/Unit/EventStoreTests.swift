@@ -50,6 +50,40 @@ struct EventStoreTests {
         #expect(EventStore(locations: locations).load().events.map(\.position) == [1])
     }
 
+    /// A daemon stopped mid-write leaves a fragment with no newline. The next daemon's
+    /// first append ends it first, so the event after the crash is kept (#177).
+    @Test func theFirstEventAfterATornLineIsKept() throws {
+        let locations = temporary()
+        EventStore(locations: locations).append(.event(event(1)))
+        let handle = try FileHandle(forWritingTo: locations.events)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(#"{"event":{"position":2,"na"#.utf8))
+        try handle.close()
+
+        let restarted = EventStore(locations: locations)
+        #expect(restarted.load().events.map(\.position) == [1])
+        restarted.append(.event(event(3)))
+        restarted.append(.event(event(4)))
+        #expect(EventStore(locations: locations).load().events.map(\.position) == [1, 3, 4])
+        let text = try String(contentsOf: locations.events, encoding: .utf8)
+        #expect(text.hasSuffix("\n"))
+        #expect(text.split(separator: "\n").count == 4, "the fragment stays a line of its own")
+    }
+
+    /// Every line goes in one write at the end of the file, so two stores appending
+    /// (a rewrite's handle and the next append, or two daemons by mistake) never
+    /// interleave inside a line.
+    @Test func linesFromTwoWritersStayWhole() {
+        let locations = temporary()
+        let first = EventStore(locations: locations)
+        let second = EventStore(locations: locations)
+        for position in stride(from: 1, through: 200, by: 2) {
+            first.append(.event(event(EventPosition(position))))
+            second.append(.event(event(EventPosition(position + 1))))
+        }
+        #expect(EventStore(locations: locations).load().events.count == 200)
+    }
+
     @Test func aRewriteKeepsCountsAndConsequences() {
         let locations = temporary()
         let store = EventStore(locations: locations)

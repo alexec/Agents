@@ -122,6 +122,27 @@ struct SlimAgentTests {
         #expect(await again.agent(archived.id)?.title == "from the record")
     }
 
+    /// The hourly check writes `archive.json` only when the index changed: on a big
+    /// archive it is megabytes a time (#177).
+    @Test func theHourlyCheckLeavesAnUnchangedIndexAlone() async throws {
+        let (locations, work) = try temporary()
+        let archived = agent(work, state: .archived)
+        let live = agent(work, state: .finished, title: "live")
+        let core = try await core(locations, seeded: [archived, live])
+        await core.checkRetention()
+        // Gone from disk, so any write at all would show.
+        try FileManager.default.removeItem(at: locations.archiveIndex)
+
+        await core.checkRetention()
+        await core.checkRetention()
+        #expect(!FileManager.default.fileExists(atPath: locations.archiveIndex.path),
+                "nothing changed, so nothing was written")
+
+        try await core.archive(live.id)
+        await core.checkRetention()
+        #expect(ArchiveIndex(locations: locations).load()?[live.id] != nil, "a change is written")
+    }
+
     @Test func aRecordNewerThanItsEntryWins() async throws {
         let (locations, work) = try temporary()
         let archived = agent(work, state: .archived, title: "old title")
