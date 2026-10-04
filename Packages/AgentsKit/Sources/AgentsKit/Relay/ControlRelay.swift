@@ -176,7 +176,7 @@ public final class ControlRelay: @unchecked Sendable {
             default:
                 return
             }
-        case .open, .message, .close:
+        case .open, .message, .close, .fanOut:
             // A relay runs nothing for a client, and a channel the control plane opened
             // by mistake is left unanswered rather than closed: closing it would end the
             // client's whole connection.

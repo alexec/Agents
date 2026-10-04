@@ -52,6 +52,12 @@ public enum ControlJoin {
         }
         let key = try ControlAuth.hostKey(privateKey: privateKey, peer: membership.controlKey, host: host)
         let credentials = ControlAuth.Credentials(identity: .host(host), key: key, kind: "host", controlKey: membership.controlKey)
-        return { try await ControlCodeUse.dialEach(book, as: credentials, dial: nio) }
+        // The uplink carries what every client of this host hears, so it may queue more.
+        let uplink: ControlCodeUse.Dial = { url, pin in
+            let socket = try await ControlDial.connect(url, pin: pin)
+            socket.outboundLimit = WebSocketLineTransport.uplinkOutboundLimit
+            return socket
+        }
+        return { try await ControlCodeUse.dialEach(book, as: credentials, dial: uplink) }
     }
 }

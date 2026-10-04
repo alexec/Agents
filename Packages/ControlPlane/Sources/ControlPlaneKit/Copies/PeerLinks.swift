@@ -189,12 +189,15 @@ public actor CopyMesh {
                 case .open(let channel, let open): await router.openFromPeer(link.peer, host: host, channel: channel, open)
                 case .message(let channel, let message): await router.fromPeer(link.peer, host: host, channel: channel, message: message)
                 case .close(let channel): await router.closeFromPeer(link.peer, host: host, channel: channel)
+                // Only a host fans out, and only to the control plane: a peer's is ignored.
+                case .fanOut: break
                 }
             } else if let proxy = proxies[host], proxy.peer == link.peer {
                 // The holder answering on this copy's stream.
                 switch hostFrame {
                 case .message(let channel, let message): proxy.deliver(ControlWire.channel(channel, message: message))
                 case .close(let channel): proxy.deliver(ControlWire.close(channel))
+                case .fanOut(let channels, let message): proxy.deliver(ControlWire.fanOut(channels, message: message))
                 case .open: break
                 }
             }

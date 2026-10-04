@@ -15,6 +15,11 @@
   trusted certificate normally, or the `pin` from their code or config (research R6). A pin is
   mandatory when the certificate is not publicly trusted.
 - **Keep-alive.** WebSocket ping every 20 s. Two missed pongs close the socket.
+- **Backpressure (#167).** Each end holds at most 8 MB for the other to read (32 MB on a host's
+  uplink). A write past that, or bytes waiting 10 s with none sent, closes the socket with code
+  4008 `too slow`; the other end reconnects and reads everything afresh. What arrives is read
+  only while the reader keeps up: past 4 MB unread the socket stops being read until it is down
+  to 1 MB, so TCP pushes back on the sender.
 - **Size.** A message is at most 64 MB (`LineSplitter`'s cap).
 
 ## The key exchange (research R6)
@@ -91,7 +96,14 @@ The legacy bare line goes to the home host only while a moved set-up still has o
 {"c":3,"m":{…}}
 {"c":3,"close":true}
 {"c":0,"m":{…}}          // host/hello, attention/need, control/ping
+{"f":[3,4,9],"m":{…}}    // host → control: one notification for channels 3, 4 and 9 (#167)
 ```
+
+`fanOut` in an `open` (`"fanOut":true`) says the control plane reads `f` frames. A host then
+says each broadcast once, naming every channel opened that way that should hear it (the host's
+own filter, per connection, as before), and the control plane copies it to each. Only
+notifications go this way. A control plane that leaves `fanOut` out is written to channel by
+channel, as before. Between copies, a holder hands a peer its part channel by channel.
 
 `relayed` is new: the host is told the channel came through the relay. It has no away limits
 of its own today; the Remote keeps a relayed prompt's attachments under a record's size (046).

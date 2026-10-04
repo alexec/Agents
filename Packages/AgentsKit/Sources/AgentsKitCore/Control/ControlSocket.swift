@@ -38,19 +38,12 @@ public final class PrefixReader: LineTransport, @unchecked Sendable {
 
     public func write(line: String) throws { try base.write(line: line) }
 
+    /// Pulled a line at a time as the reader asks, not drained into a buffer of its own: a
+    /// reader that falls behind leaves the lines in the transport, which can then push back
+    /// on the sender (#167).
     public func lines() -> AsyncThrowingStream<String, any Error> {
         let iterator = self.iterator
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    while let line = try await iterator.inner.next() { continuation.yield(line) }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
+        return AsyncThrowingStream(unfolding: { try await iterator.inner.next() })
     }
 
     public func close() { base.close() }

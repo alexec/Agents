@@ -36,6 +36,33 @@ public final class DaemonServer: @unchecked Sendable {
 
     public typealias Handler = @Sendable (ConnectionContext, String, JSONValue?) async -> Result<JSONValue, JSONRPCError>
 
+    /// How a connection carried on a control-plane uplink hears broadcasts (#167): with the
+    /// others on the same uplink, in one frame naming every channel that should hear it,
+    /// which the control plane copies to each. Without one, a notification crossed the
+    /// uplink, and the control plane's router, once per client.
+    public struct FanOutRoute: Sendable {
+        /// Which uplink: connections with the same one share a frame.
+        public var uplink: ObjectIdentifier
+        public var channel: Int
+        /// The uplink's own queue, so its frames go up in the order the daemon said them.
+        public var queue: DispatchQueue
+        /// Writes one frame for `channels`.
+        public var send: @Sendable ([Int], String) throws -> Void
+
+        public init(uplink: ObjectIdentifier, channel: Int, queue: DispatchQueue,
+                    send: @escaping @Sendable ([Int], String) throws -> Void) {
+            self.uplink = uplink
+            self.channel = channel
+            self.queue = queue
+            self.send = send
+        }
+    }
+
+    /// The most a connection's notifications may queue before it is given up on (#167). A
+    /// client that reads, slowly, never blocks a write for `sendWait`, so without this its
+    /// backlog had no end.
+    public static let backlogLimit = 8 << 20
+
     /// One connection's identity, held by the server for the connection's life. It
     /// starts as a window and becomes a device only through `surface/identify`, which
     /// the server reads before the request reaches the daemon — so the daemon never
@@ -108,13 +135,16 @@ public final class DaemonServer: @unchecked Sendable {
     /// A connection that has gone, by id. What is known about where its person was
     /// goes with it: gone is more truthful than stale (021).
     private let onDisconnected: @Sendable (UUID) -> Void
+    private let backlogLimit: Int
 
     public init(url: URL,
                 onConnectionCountChanged: @escaping @Sendable (Int) -> Void = { _ in },
                 onDisconnected: @escaping @Sendable (UUID) -> Void = { _ in },
                 roles: RolePolicy = .open,
+                backlogLimit: Int = DaemonServer.backlogLimit,
                 handler: @escaping Handler) {
         self.url = url
+        self.backlogLimit = backlogLimit
         self.handler = handler
         self.roles = roles
         self.onConnectionCountChanged = onConnectionCountChanged
@@ -233,15 +263,17 @@ public final class DaemonServer: @unchecked Sendable {
     /// make one.
     ///
     /// `ended` is called once the connection is gone, from either end.
-    public func acceptVirtual(_ transport: any LineTransport, device: UUID?,
+    ///
+    /// `fanOut`, when the control plane reads fan-out frames: how broadcasts reach it.
+    public func acceptVirtual(_ transport: any LineTransport, device: UUID?, fanOut: FanOutRoute? = nil,
                               ended: @escaping @Sendable () -> Void = {}) {
         let identity = ConnectionIdentity(peer: nil, role: .control)
         if let device { _ = identity.bindDevice(device) }
         DaemonLog.shared.write("uplink: a channel opened for \(device.map { "device \($0.uuidString)" } ?? "a window")")
-        serve(transport, identity: identity, ended: ended)
+        serve(transport, identity: identity, fanOut: fanOut, ended: ended)
     }
 
-    private func serve(_ transport: any LineTransport, identity: ConnectionIdentity,
+    private func serve(_ transport: any LineTransport, identity: ConnectionIdentity, fanOut: FanOutRoute? = nil,
                        ended: @escaping @Sendable () -> Void = {}) {
         let handler = self.handler
         let connection = JSONRPCConnection(transport: transport) { method, params in
@@ -291,7 +323,7 @@ public final class DaemonServer: @unchecked Sendable {
             return await handler(identity.context, method, params)
         }
         connections.add(connection, queue: DispatchQueue(label: "com.alexecollins.agents.broadcast.\(identity.id)"),
-                        identity: identity)
+                        identity: identity, fanOut: fanOut)
         onConnectionCountChanged(connections.count)
         Task {
             await connection.start()
@@ -365,13 +397,40 @@ public final class DaemonServer: @unchecked Sendable {
     /// the order the daemon said them.
     public func broadcast(_ method: String, _ params: JSONValue?,
                           to wanted: @escaping @Sendable (ConnectionContext) -> Bool) {
-        encoding.async { [connections] in
-            let targets = connections.allAddressed.filter { $0.3.hearsNotifications && wanted($0.2) }
+        encoding.async { [connections, backlogLimit] in
+            let targets = connections.allAddressed.filter { $0.role.hearsNotifications && wanted($0.context) }
             guard !targets.isEmpty,
                   let line = try? JSONRPCCodec.encode(.notification(method: method, params: params))
             else { return }
-            for (connection, queue, _, _) in targets {
-                queue.async {
+            // Those on a control-plane uplink: one frame per uplink, naming who hears it (#167).
+            var routed: [ObjectIdentifier: (FanOutRoute, [Int], [JSONRPCConnection])] = [:]
+            for target in targets {
+                guard let route = target.fanOut else { continue }
+                routed[route.uplink, default: (route, [], [])].1.append(route.channel)
+                routed[route.uplink]?.2.append(target.connection)
+            }
+            for (route, channels, carried) in routed.values {
+                route.queue.async {
+                    do {
+                        try route.send(channels.sorted(), line)
+                    } catch {
+                        // The uplink is gone or gave up: every channel on it has missed this.
+                        for connection in carried { Task { await connection.close() } }
+                    }
+                }
+            }
+            let size = line.utf8.count
+            for target in targets where target.fanOut == nil {
+                let connection = target.connection
+                // A reader that has fallen this far behind is closed rather than queued for
+                // without end; it reconnects and reads everything afresh (#167).
+                guard connections.reserve(size, for: connection, limit: backlogLimit) else {
+                    DaemonLog.shared.write("socket: closing a connection \(backlogLimit >> 20) MB behind")
+                    Task { await connection.close() }
+                    continue
+                }
+                target.queue.async {
+                    defer { connections.release(size, for: connection) }
                     do {
                         try connection.notify(line: line)
                     } catch {
@@ -391,8 +450,8 @@ public final class DaemonServer: @unchecked Sendable {
     /// End the connections `wanted` picks. The other end sees its connection go, as it
     /// would if the daemon had quit, and a bridge takes the device's link down with it.
     public func closeConnections(where wanted: @escaping @Sendable (ConnectionContext) -> Bool) {
-        for (connection, _, context, _) in connections.allAddressed where wanted(context) {
-            Task { await connection.close() }
+        for target in connections.allAddressed where wanted(target.context) {
+            Task { await target.connection.close() }
         }
     }
 
@@ -408,6 +467,9 @@ public final class DaemonServer: @unchecked Sendable {
     }
 
     public var connectionCount: Int { connections.count }
+
+    /// Bytes queued for each connection and not yet written, for tests (#167).
+    var backlogs: [Int] { connections.backlogs }
 
     public func stop() {
         guard stopped.set() else { return }
@@ -425,44 +487,78 @@ private struct ClaimedDevice: Decodable {
 }
 
 final class ConnectionSet: @unchecked Sendable {
+    struct Addressed {
+        var connection: JSONRPCConnection
+        var queue: DispatchQueue
+        var context: DaemonServer.ConnectionContext
+        var role: ConnectionRole
+        var fanOut: DaemonServer.FanOutRoute?
+    }
+
+    private struct Entry {
+        var connection: JSONRPCConnection
+        /// The queue its notifications go out on, in order.
+        var queue: DispatchQueue
+        /// Who it is, read as it is sent to: a window becomes a device when it says so,
+        /// after it was added here.
+        var identity: DaemonServer.ConnectionIdentity
+        var fanOut: DaemonServer.FanOutRoute?
+        /// Bytes queued for it and not yet written (#167).
+        var backlog = 0
+    }
+
     private let lock = NSLock()
-    private var connections: [ObjectIdentifier: JSONRPCConnection] = [:]
-    /// The queue each connection's notifications go out on, in order.
-    private var queues: [ObjectIdentifier: DispatchQueue] = [:]
-    /// Who each connection is, read as it is sent to: a window becomes a device when it
-    /// says so, after it was added here.
-    private var identities: [ObjectIdentifier: DaemonServer.ConnectionIdentity] = [:]
+    private var entries: [ObjectIdentifier: Entry] = [:]
 
     func add(_ connection: JSONRPCConnection, queue: DispatchQueue,
-             identity: DaemonServer.ConnectionIdentity) {
+             identity: DaemonServer.ConnectionIdentity, fanOut: DaemonServer.FanOutRoute? = nil) {
         lock.lock(); defer { lock.unlock() }
-        connections[ObjectIdentifier(connection)] = connection
-        queues[ObjectIdentifier(connection)] = queue
-        identities[ObjectIdentifier(connection)] = identity
+        entries[ObjectIdentifier(connection)] = Entry(connection: connection, queue: queue, identity: identity, fanOut: fanOut)
     }
 
     func remove(_ connection: JSONRPCConnection) {
         lock.lock(); defer { lock.unlock() }
-        connections.removeValue(forKey: ObjectIdentifier(connection))
-        queues.removeValue(forKey: ObjectIdentifier(connection))
-        identities.removeValue(forKey: ObjectIdentifier(connection))
+        entries.removeValue(forKey: ObjectIdentifier(connection))
     }
 
-    var allAddressed: [(JSONRPCConnection, DispatchQueue, DaemonServer.ConnectionContext, ConnectionRole)] {
+    /// Counts `size` more bytes queued for `connection`, or says no once that would take a
+    /// backlog already waiting past `limit`. A single line larger than it still goes to a
+    /// connection with nothing waiting.
+    func reserve(_ size: Int, for connection: JSONRPCConnection, limit: Int) -> Bool {
         lock.lock(); defer { lock.unlock() }
-        return connections.compactMap { key, connection in
-            guard let queue = queues[key], let identity = identities[key] else { return nil }
-            return (connection, queue, identity.context, identity.role)
+        let key = ObjectIdentifier(connection)
+        guard let backlog = entries[key]?.backlog else { return false }
+        if backlog > 0, backlog + size > limit { return false }
+        entries[key]?.backlog = backlog + size
+        return true
+    }
+
+    func release(_ size: Int, for connection: JSONRPCConnection) {
+        lock.lock(); defer { lock.unlock() }
+        entries[ObjectIdentifier(connection)]?.backlog -= size
+    }
+
+    /// Bytes waiting for each connection, for tests.
+    var backlogs: [Int] {
+        lock.lock(); defer { lock.unlock() }
+        return entries.values.map(\.backlog)
+    }
+
+    var allAddressed: [Addressed] {
+        lock.lock(); defer { lock.unlock() }
+        return entries.values.map {
+            Addressed(connection: $0.connection, queue: $0.queue, context: $0.identity.context,
+                      role: $0.identity.role, fanOut: $0.fanOut)
         }
     }
 
     var all: [JSONRPCConnection] {
         lock.lock(); defer { lock.unlock() }
-        return Array(connections.values)
+        return entries.values.map(\.connection)
     }
 
     var count: Int {
         lock.lock(); defer { lock.unlock() }
-        return connections.count
+        return entries.count
     }
 }
