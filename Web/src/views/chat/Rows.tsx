@@ -59,6 +59,7 @@ const stopWords: Partial<Record<EndedReason, string>> = {
   unrecognised: "Stopped for a reason we do not know",
   costLimit: "Reached its cost limit",
   sandboxFailed: "Its sandbox could not start",
+  imported: "Imported from another set-up, so not run here",
 };
 
 /** StateLine's words. */

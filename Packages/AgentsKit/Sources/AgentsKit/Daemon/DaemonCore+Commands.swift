@@ -317,6 +317,7 @@ extension DaemonCore {
                           worktree: placed?.worktree,
                           startRequestID: request.requestID)
         agent.labels = initialLabels
+        agent.madeInRoot = rootID
         agent.sandboxOverride = request.sandbox
         agent.startedByWorkflow = workflow?.id
         agent.startedByRun = workflow?.run
@@ -332,6 +333,9 @@ extension DaemonCore {
         }
         agents[agent.id] = agent
         live[agent.id] = session
+        // A session made this minute is nobody else's; claimed so no other daemon on
+        // this Mac picks it up from a copy of this record while it is live (#228).
+        _ = sessionClaims.claim(agent.id, runtimeID: agent.runtimeID, sessionID: sessionID)
         // What it started with, so the pool can tell whether it may be reused (#183).
         launchPrints[agent.id] = launchPrint(for: agent)
         lentPrints[agent.id] = Self.lentPrint((try? launchEnvironment(for: agent.runtimeID)) ?? [:])
@@ -419,6 +423,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.folderGone,
                                message: "\(cwd.path) is not there any more.")
         }
+        try refuseOutsideRoot(cwd)
         // Before the runtime reads the folder, so a folder that became a project by an
         // agent running in it has the layout by the first turn.
         layOutOnce(cwd)
@@ -556,6 +561,8 @@ extension DaemonCore {
     /// runtime's, because a `session/prompt` sent mid-turn means something different
     /// to each of the three and none of that belongs in the window.
     public func prompt(_ request: DaemonAPI.PromptRequest) async throws {
+        // Not kept at all for a record this daemon will never run (#228).
+        try refuseToRun(request.agentID)
         // Before the words are kept: queued for a folder that is not there, they would
         // wait for ever, and the bar that sent them would have let them go (#119).
         try await requireFolder(request.agentID)
@@ -601,6 +608,8 @@ extension DaemonCore {
         guard var agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
+        // A wake, a pick-up or a workflow's words reach here without `prompt` (#228).
+        try refuseToRun(request.agentID)
         // Everything goes on the queue, even when it is going straight out again.
         // That is what keeps the order the order it was typed in: a prompt sent while
         // three are waiting joins the back of them rather than jumping the lot.
@@ -1034,6 +1043,8 @@ extension DaemonCore {
 
     private func endLaunch(_ agentID: UUID, token: UUID) {
         if launching[agentID]?.token == token { launching.removeValue(forKey: agentID) }
+        // A start that failed holds no session, so it holds no claim on one (#228).
+        if live[agentID] == nil, launching[agentID] == nil { sessionClaims.release(agentID) }
     }
 
     private func launchSession(for agent: Agent, quiet: Bool) async throws -> ACPSession {
@@ -1045,10 +1056,17 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: notYetInstalled(runtime) ?? "\(runtime.name) is not installed any more.")
         }
+        // A copied record, or a folder outside a scratch daemon's root, is never run (#228).
+        try refuseToRun(agent.id)
         // Its folder gone is said, not worked around: starting it in the project
         // folder instead would put its work somewhere nobody asked for (030 FR-017).
         // The person can choose that, as Continue in the project folder (#119).
         try await requireFolder(agent.id)
+        // Before a process exists: the conversation may be live under another daemon
+        // on this Mac, and two daemons driving one session is two agents in one folder.
+        if let sessionID = agent.runtimeSessionID {
+            try claimSession(agent.id, runtimeID: agent.runtimeID, sessionID: sessionID)
+        }
         // Before anything is said or started: wanting a credential leaves the agent as it
         // was, and the window lends one and asks again (043).
         let lent = try launchEnvironment(for: runtime.id)
@@ -1188,7 +1206,10 @@ extension DaemonCore {
         guard var updated = agents[agent.id] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
-        if let newSessionID { updated.runtimeSessionID = newSessionID }
+        if let newSessionID {
+            updated.runtimeSessionID = newSessionID
+            _ = sessionClaims.claim(agent.id, runtimeID: agent.runtimeID, sessionID: newSessionID)
+        }
         if !refreshed.isEmpty { updated.advertisedOptions = refreshed }
         if !commands.isEmpty { updated.availableCommands = commands }
         // What it offers in this folder, for the next form, and for Continue with's

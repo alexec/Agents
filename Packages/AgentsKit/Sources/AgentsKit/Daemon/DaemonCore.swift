@@ -203,6 +203,14 @@ public actor DaemonCore {
     /// Runtimes kept running between turns, ready for the reply (#183). Each is in `live`
     /// too; being here is what makes it idle rather than work. See `DaemonCore+WarmPool`.
     var warm: [UUID: WarmPool.Entry] = [:]
+    /// This root's id, read at `loadFromDisk` (#228). Every record made here carries it;
+    /// one that does not came from somewhere else. See `DaemonCore+Imports`.
+    var rootID: String?
+    /// The runtime sessions this daemon holds live, each under a lock every daemon on
+    /// the Mac sees once `agentsd` points it at the shared folder (#228). None until then.
+    var sessionClaims = SessionClaims(folder: nil)
+    /// The only folder a scratch daemon runs agents in, or nil for anywhere (#228).
+    var confinedTo: URL?
     /// What each live runtime was started with, to compare with what its next turn would
     /// start with before reusing it.
     var launchPrints: [UUID: Int] = [:]
@@ -1237,6 +1245,9 @@ public actor DaemonCore {
                 agents[agent.id] = agent
             }
         }
+        // Before anything reads a state off them: a record copied from another root is
+        // stopped here, so recovery never takes it for work the last daemon held (#228).
+        await stampOrImport()
         archiveIndexChanged = archiveIndex != index
         saveArchiveIndex()
         // A record the rules forbid was brought to one they allow on the way in, and
@@ -1540,6 +1551,7 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) -> Task<Void, Never>? {
         let draining = eventTasks.removeValue(forKey: agentID)
         live.removeValue(forKey: agentID)
+        sessionClaims.release(agentID)
         launchPrints.removeValue(forKey: agentID)
         lentPrints.removeValue(forKey: agentID)
         // A warm runtime that went by any other door than `releaseWarm`: its process

@@ -34,6 +34,7 @@ export const Failure = {
   folderGone: -32004,
   folderInTheWay: -32025,
   hostOffline: -32090,
+  importedAgent: -32096,
   lastOperator: -32092,
   leaseRefused: -32035,
   needsSignIn: -32007,
@@ -54,6 +55,7 @@ export const Failure = {
   notPermitted: -32045,
   notSupported: -32009,
   notYours: -32027,
+  outsideScratchRoot: -32098,
   pinRefused: -32061,
   projectHasLiveAgents: -32013,
   retireRefused: -32051,
@@ -61,6 +63,7 @@ export const Failure = {
   runtimeWillNotStart: -32002,
   sandboxWillNotStart: -32061,
   sessionGone: -32003,
+  sessionLiveElsewhere: -32097,
   shellNotLive: -32011,
   shellWillNotStart: -32010,
   signInWanted: -32070,
@@ -145,6 +148,7 @@ export interface Agent {
   pendingSandboxFailure?: SandboxFailureRecord;
   missingFolder?: MissingFolder;
   listsLeftOut?: boolean;
+  madeInRoot?: string;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -655,7 +659,7 @@ export type ElicitationSchemaPropertyKind =
 
 export interface Empty {}
 
-export type EndedReason = "endTurn" | "maxTokens" | "maxTurnRequests" | "refusal" | "cancelled" | "processDied" | "daemonGone" | "costLimit" | "unrecognised" | "stoppedByAgent" | "signInRefused" | "runtimeError" | "allowanceSpent" | "rateLimited" | "sandboxFailed";
+export type EndedReason = "endTurn" | "maxTokens" | "maxTurnRequests" | "refusal" | "cancelled" | "processDied" | "daemonGone" | "costLimit" | "unrecognised" | "stoppedByAgent" | "signInRefused" | "runtimeError" | "allowanceSpent" | "rateLimited" | "sandboxFailed" | "imported";
 
 export interface EntryNotification {
   agentID: UUID;
@@ -1997,7 +2001,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "madeInRoot"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },

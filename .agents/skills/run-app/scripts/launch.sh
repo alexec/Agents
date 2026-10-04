@@ -55,6 +55,27 @@ elif [ -e "$ROOT" ]; then
   exit 1
 fi
 
+# Never a copy of the real root's agents (#228): a scratch host resumes any record that
+# looks live, with its real runtime session, in its real folder. Seed synthetic ones
+# (.agents/reviews/robustness-performance/tools/rp-seed.py, scripts/seed-archived.swift).
+REAL_ROOT="$HOME/Library/Application Support/Agents"
+if [ -d "$ROOT/agents" ]; then
+  # By id: a record whose folder name is one of the real root's agents.
+  copied="$( [ -d "$REAL_ROOT/agents" ] && cd "$ROOT/agents" && for id in *; do [ -e "$REAL_ROOT/agents/$id" ] && echo "$id"; done | head -3 || true)"
+  # By stamp: a record made in the real root carries its root id.
+  if [ -z "$copied" ] && [ -f "$REAL_ROOT/root-id.json" ]; then
+    real_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$REAL_ROOT/root-id.json" 2>/dev/null || true)"
+    if [ -n "$real_id" ]; then
+      copied="$(grep -ls "\"madeInRoot\" *: *\"$real_id\"" "$ROOT"/agents/*/agent.json 2>/dev/null | head -3 || true)"
+    fi
+  fi
+  if [ -n "$copied" ]; then
+    echo "refusing: $ROOT/agents holds records copied from the real root ($REAL_ROOT), e.g. $(echo $copied)." >&2
+    echo "Seed synthetic agents instead (.agents/reviews/robustness-performance/tools/rp-seed.py); never copy real records." >&2
+    exit 1
+  fi
+fi
+
 if [ "$BUILD" = 1 ]; then
   echo "building…" >&2
   # One after the other: the schemes share SwiftPM state. Through the shared build cache

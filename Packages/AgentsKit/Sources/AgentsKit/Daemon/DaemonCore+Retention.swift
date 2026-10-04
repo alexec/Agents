@@ -191,6 +191,7 @@ extension DaemonCore {
     /// agent was stopped (FR-027). What unarchiving needs is on the record.
     func dropLiveState(for id: UUID) {
         live.removeValue(forKey: id)
+        sessionClaims.release(id)
         warm.removeValue(forKey: id)
         launchPrints.removeValue(forKey: id)
         lentPrints.removeValue(forKey: id)

@@ -106,6 +106,10 @@ public struct StoreLocations: Sendable {
     public var socket: URL { root.appendingPathComponent("daemon.sock") }
     public var lock: URL { root.appendingPathComponent("daemon.lock") }
     public var log: URL { root.appendingPathComponent("daemon.log") }
+    /// Which root this is (#228): an id made the first time a daemon starts here, and
+    /// the path it was made at, so a whole root copied elsewhere is a new root rather
+    /// than the old one. Every agent record is stamped with the id.
+    public var rootIdentity: URL { root.appendingPathComponent("root-id.json") }
     /// The links the app placed in the personal home, so one the person removed is not
     /// put back (054, FR-009). Per root, like everything else the daemon remembers.
     public var personalLayout: URL { root.appendingPathComponent("personal-layout.json") }
