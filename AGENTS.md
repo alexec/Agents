@@ -7,6 +7,12 @@
 - **For a task a skill covers:** USE the skill in `.agents/skills/`.
 - **When a task calls for a specialist perspective:** ADOPT a persona from `.agents/personas/`.
 
-## Keeping the web page in step
+## Keeping the three clients in step
 
-- **A change to the window's or the Remote's UI** says, in its commit, what the web page (`Web/`) does about it: the same change in the same branch, a parity issue filed, or `web: by design` with the reason. The table of where the page stands is `specs/071-web-remote/walks/parity.md`.
+- **Three clients draw the same product:** the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). `Shared/UI` is drawn by both the window and the Remote.
+- **A change to any client's UI** (`App/Sources`, `Remote/Sources`, `Shared/UI` or `Web/src`) says, in its commit, what **each of the other two** does about it, one line each:
+  - the same change in this branch: `remote: same`;
+  - a parity issue filed: `web: #NNN`;
+  - left out on purpose: `mac: by design (no swipe on Mac)`.
+- **For example,** a Mac sidebar change ends with `remote: #226` and `web: same`; a web-only fix ends with `mac: same, remote: same` when both already do it. A change to docs only says `mac: docs only, remote: docs only, web: docs only`.
+- **The table of where each client stands** is `specs/071-web-remote/walks/parity.md` (Mac / Remote / web, a row per screen and feature). A parity line that changes a row updates it in the same branch.

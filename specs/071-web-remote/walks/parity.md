@@ -1,4 +1,342 @@
-# Parity walk: the page beside the window (#110)
+# Parity: the Mac window, the Remote and the web page (#233)
+
+**Date:** 2026-10-04, at main 28884102.
+
+**What it is:** where each of the three clients stands, a row per screen and feature. The three are the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). Every parity line in a commit (AGENTS.md, "Keeping the three clients in step") updates the row it changes.
+
+**How it was made:** by reading the code, not by a walk. The session that wrote it ran no builds and no tests while #234 had the machine. Rows that earlier walks covered keep their facts; their record is under [History](#history-the-page-beside-the-window-110) below. A row read from code alone may be wrong in a detail; a walk that finds one corrects the row.
+
+**Paths:** `A/` = `App/Sources`, `R/` = `Remote/Sources`, `S/` = `Shared/UI` (drawn by both the window and the Remote), `W/` = `Web/src`, `K/` = `Packages/AgentsKit/Sources/AgentsKitCore`.
+
+**Verdicts:**
+- **same**: the three do the same thing (look may differ by platform).
+- **by design**: one leaves it out or does it differently on purpose, and why.
+- **delta**: they differ and shouldn't; the issue, and the side to change.
+
+## Counts
+
+Of 204 rows: **55 same**, **35 by design**, **114 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
+
+| Screen | Same | By design | Delta |
+|---|---|---|---|
+| Sidebar and project list | 2 | 2 | 13 |
+| Session rows and states | 8 | 2 | 13 |
+| Chat turns and turn detail | 4 | 3 | 15 |
+| Prompt bar and queued prompts | 3 | 2 | 15 |
+| Question and permission cards | 3 | 2 | 10 |
+| Start sheet and new project | 6 | 5 | 11 |
+| Worktrees and Files | 5 | 6 | 10 |
+| Dashboard and pins | 8 | 0 | 6 |
+| Workflows page | 6 | 1 | 7 |
+| Settings and Project Settings | 1 | 6 | 0 |
+| Pool, runtimes and spending | 2 | 1 | 7 |
+| Events and resources | 1 | 1 | 3 |
+| Notifications and badges | 1 | 1 | 2 |
+| Disk strip | 1 | 1 | 1 |
+| Hosts, connection and pairing | 3 | 2 | 1 |
+| MCP Apps views | 1 | 0 | 0 |
+
+The deltas are tracked by 33 issues:
+- **Already open:** #226 (the Remote's one sidebar), #235 (the page's one sidebar at phone width), #223 (`store/notes` on the Remote and the page).
+- **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249.
+- **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #258, #259, #260, #261, #262.
+- **The window to change, or more than one side:** #263, #264, #265, #266.
+- **Alex to decide** (one client only, nothing says whether that is meant): #267.
+
+## Sidebar and project list
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| One sidebar: Activity, projects folding open on their sessions and workflows, `host:Project` names | `A/Projects/ProjectListView.swift:48-96` | Its own project list, then a project page of cards, under host headings: `R/Projects/ProjectListView.swift:18-27`, `R/Projects/ProjectPageView.swift` | From 760 px, as the window: `W/views/Sidebar.tsx:38-104` (#151). Below, one column at a time | **delta**: Remote #226; web at phone width #235 |
+| Project order | Last activity, newest first; this Mac's, then each server's: `K/Client/AgentsModel.swift:635`, `A/Projects/ProjectListView.swift:41-45` | Last activity, within host sections | **By name** within each host: `W/views/Sidebar.tsx:42-48` | **delta**: web #250 |
+| Project row subtitle | Needs you (· N unread), else working / unread, else *N complete* / stopped: `A/Projects/ProjectRow.swift:75-96` | No complete / stopped fallback: `R/Projects/ProjectListView.swift:143-151` | As the window: `W/model/groups.ts:176-188` | **delta**: Remote #226 |
+| Project row menu | Dashboard, New Session, Project Settings…, Archive, Show in Finder: `A/Projects/ProjectListView.swift:511-542` | None: the row is a button | Dashboard, New Session: `W/views/Sidebar.tsx:197-201` | Web: **by design** (Settings, Archive and Finder are the Mac's, #151). Remote: **delta** #226 |
+| Archived projects fold, Bring Back | `A/Projects/ProjectListView.swift:87-95, 596-623` | None | None (`W/model/store.ts:779` asks without archived) | **delta**: decide, #267 |
+| Activity rows | Events, Resources, Runtimes, Spending at the top, no icons (#155): `A/Projects/ProjectListView.swift:54-59` | Events, Spending, Resources after the projects, with icons; no Runtimes row: `R/Projects/ProjectListView.swift:32-41` | As the window: `W/views/Activity.tsx:95-131` | **delta**: Remote #226 |
+| Session groups and their folds, counts and tint when folded (#181) | `A/Projects/ProjectListView.swift:356-397` | The same rules on the project page: `R/Projects/ProjectPageView.swift:94-124` | `W/views/Sidebar.tsx:230-263` | **same** (where the Remote draws them: #226) |
+| Group order: by start, newest first (#182) | `ProjectShelf` | `ProjectShelf` | `W/model/groups.ts` (`byStart`), held to `Fixtures/web/groups/panels.json` | **same** |
+| Pinned sessions (#180) | Pinned group; order by drag: `A/Projects/ProjectListView.swift:383-390` | Move Up / Down in the long press: `R/Projects/AgentCard.swift:209-218` | Move Up / Down in the row menu: `W/views/Sidebar.tsx:339-348` | **by design** (drag on the window; menus where there's no drag) |
+| "No sessions yet" | Only with no live session at all, pinned included: `A/Projects/ProjectListView.swift:319, 452` | n/a | Also under a Pinned group when every live session is pinned: `W/views/Sidebar.tsx:177-179, 264` | **delta**: web #250 |
+| Archived sessions fold | *Archived sessions*, 50, *Show all N* while searching: `A/Projects/ProjectListView.swift:401-441` | *Archived*, 10 at a time: `R/Projects/ProjectPageView.swift:207-234` | As the window: `W/views/Sidebar.tsx:265-283` | **delta**: Remote #226 |
+| Workflows and Archived workflows folds | Siblings: `A/Projects/ProjectWorkRows.swift:33-55` | `R/Projects/WorkflowsSection.swift` | Archived nested inside Workflows: `W/views/Sidebar.tsx:284-314` | **delta**: web #250 |
+| Search (#176) | After a 150 ms pause, every project, capped pages per host, *More matches…*: `A/Projects/ProjectListView.swift:106-120` | One project's page: `R/Projects/ProjectPageView.swift:34, 53-57` | As the window (#193): `W/views/Sidebar.tsx:52-68` | **delta**: Remote #226 |
+| Sidebar foot: host notices | *Connecting…*, or the host-down notice with Try Again; *X is offline*: `A/Projects/ProjectListView.swift:551-577` | *offline* on the host heading | *This Mac's host isn't answering* even while only connecting: `W/views/Sidebar.tsx:74, 108-117` | **delta**: web #250 (connecting). Try Again on the page: **by design** (#83, nothing of its own to redial) |
+| Files the host couldn't read (`store/notes`, #205) | Sidebar foot: `A/Projects/ProjectListView.swift:580-587` | None | None | **delta**: #223 |
+| Keeping this Mac awake | Wake row: `A/Projects/ProjectListView.swift:745-809` | None | None | **by design** (the Mac's setting; the page isn't told the wake state, #151) |
+| Forget this client | None (the window is paired by its Mac) | Only when the control plane refuses it: `R/Link/ControlPlaneLink.swift:70-75` | *Forget This Browser…*: `W/views/Sidebar.tsx:118-128` | **delta**: decide, #267 |
+
+## Session rows and states
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Status shape and tint | `A/AgentList/AgentRow.swift:294-348` | The same shape: `R/Projects/AgentCard.swift:274-284` | Ported: `W/model/status.ts:44-92` | **same** |
+| Spoken status words | `StatusShape.words` (*Unread ·*, *Waiting for an allowance*) | Its own `StatusIcon.words`: `R/Projects/AgentCard.swift:330-345` | `W/model/status.ts` | **delta**: Remote #241 |
+| Coming back after a restart | Spinner and words: `A/AgentList/AgentRow.swift:60, 277` | `R/Projects/AgentCard.swift:68, 270` | Never: `isComingBack` not passed, `W/views/SessionRow.tsx:16` | **delta**: web #251 |
+| Unread mark (#70) | Dot, semibold: `A/AgentList/AgentRow.swift:76-83` | `R/Projects/AgentCard.swift:80-89` | `W/views/SessionRow.tsx:74-75` | **same** |
+| Report line, title owning its line (#68) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx:69-92` | **same** |
+| Started-by mark (workflow, agent) | `A/AgentList/AgentRow.swift:84-208` | Agent yes, workflow no: `R/Projects/AgentCard.swift:90-168` | None | **delta**: Remote #241, web #251 |
+| Background line | `A/AgentList/AgentRow.swift` | None | `W/views/SessionRow.tsx:69-92` | **delta**: Remote #241 |
+| Lease mark | `A/AgentList/AgentRow.swift:153` | `R/Projects/AgentCard.swift:145` | None | **delta**: web #251 |
+| Event-wait line, retirement note | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | None | **delta**: web #251 |
+| Block lines (#152, #157) | Under the report: `A/AgentList/AgentRow.swift` | The same | Same words: `W/model/block.ts`, held to `Fixtures/web/block/lines.json` | **same** |
+| Carry on | Row button and row menu: `A/AgentList/AgentRow.swift:189-216` | Long press: `R/Projects/AgentCard.swift:180-187` | Chat strip only, not the row menu: `W/views/SessionMenu.tsx:16-44` | **delta**: web #250 (menu). The row button: **by design** (the page's row is itself a button, #157) |
+| Park line | `S/ParkWords.swift` on the row | The same | `W/views/SessionRow.tsx:40-66` | **same** |
+| Worktree badge | ⑂ name, struck when gone, help *branch — path*: `A/AgentList/AgentRow.swift:361-386` | Never struck: `R/Projects/AgentCard.swift:105-114` | Struck; help the branch only: `W/views/SessionRow.tsx:84`, `W/app.css:561` | **delta**: Remote #241, web #251 |
+| Folder is missing (#119) | On the row | On the row | On the row | **same** |
+| Labels | Every chip: `A/AgentList/AgentRow.swift:138-148` | Two, then *+N*: `R/Projects/AgentCard.swift:22-45` | Every chip: `W/views/SessionRow.tsx:85` | **by design** (phone width) |
+| Last-activity time in the corner | None | None | *5m*, *3h*, *2d*: `W/views/SessionRow.tsx:93` | **delta**: decide, #267 |
+| In flight, "telling …" (#87) | The host's name: `A/Permission/AnswerRecipient.swift:6-9` | *your Mac*, hard-coded: `R/Projects/AgentCard.swift:122` and four more | `store.recipient(host)`: `W/model/store.ts:1111-1113` | **delta**: Remote #239 |
+| One action at a time, held while telling (#87) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx` | **same** |
+| Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268` | No Stop, no Bring Back on an archived card, no Branch: `R/Projects/AgentCard.swift:179-222` | Stop, Park / Unpark, Mark, Pin, Bring Back / Archive, Move: `W/views/SessionMenu.tsx:16-44` | **delta**: Remote #241 (Stop, Bring Back); Branch #267. Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
+| Swipe | Pin; Archive, or Bring Back when archived: `A/Projects/ProjectListView.swift:487-506` | Pin; Archive; nothing on an archived card: `R/Projects/AgentCard.swift:223-234` | None | **delta**: Remote #241. Web: **by design** (no swipe) |
+| Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
+| Mark Read / Unread reaches the agent's host | Per host | The home host always: `R/RemoteModel.swift:2451-2461` | Per host: `W/views/SessionMenu.tsx:78` | **delta**: Remote #238 |
+| Rename | None | None | None | **same** |
+
+## Chat turns and turn detail
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Outcome / Steps / Details, and the chooser (069) | View ▸ Turns: `A/Commands/AgentsCommands.swift:113` | ··· ▸ Turns show: `R/Chat/RemoteChatView.swift:265` | A select in the chat's head, kept: `W/views/Chat.tsx:29-37, 193` | **same** |
+| Concise turn: prompt, *7 steps*, reply, report; no chevron (#148) | `S/Chat/TranscriptRows.swift:38-158` | Shared | `W/views/chat/Rows.tsx:345-399` (walked, #148) | **same** |
+| An open call: diff, Argument, Return (#153) | `S/Chat/TranscriptRows.swift:572-675` | Shared | `W/views/chat/Rows.tsx:128-187`; drops non-text content (`:165-167`) | **delta** (minor): web #252 |
+| Show in Changes under an edit (#153) | `A/Chat/ChatView.swift:82-88` | Hidden: `showEdit` not passed, `R/Chat/RemoteChatView.swift:221-240` | `W/views/Chat.tsx:76-79` | **delta**: Remote #242 |
+| A location in a call | Opens in the Mac's editor: `A/Chat/ChatView.swift:74` | Opens in Files at the line: `R/Chat/RemoteChatView.swift:222-228` | Opens in Files: `W/views/Chat.tsx:72-75` | **by design** (only the Mac has an editor) |
+| Terminal output in a call | `S/Chat/ChatBlocks.swift:151` | Shared | *shown in the Mac window*: `W/views/chat/Rows.tsx:166` | **by design** (no terminal on the page) |
+| Markdown: code colour, task lists | `S/Page/MarkdownText.swift:24, 204`, `S/Code/CodeBlockText.swift` | Shared | No colour, no checkboxes: `W/render/markdown.ts:89-93` | **delta**: web #252 |
+| Pictures in messages | `S/Chat/ChatBlocks.swift:40-51` | Shared | *[image]*: `W/views/chat/Rows.tsx:40` | **delta**: web #252 |
+| Plan; a withdrawn plan | `S/Chat/ChatBlocks.swift:177-223` | Shared, plus a current-plan strip: `R/Chat/PlanView.swift:13-69` | Withdrawn ignored: `W/views/chat/Rows.tsx:87-96` | **delta**: web #252; the plan strip #267 |
+| Switch note and handoff | `S/Chat/SwitchNote.swift:7-24` | Shared | Headline only: `W/views/chat/Rows.tsx:198-212` | **delta**: web #252 |
+| Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Only on news, *New messages ↓*: `W/views/Chat.tsx:221` | **delta**: web #252 |
+| First open: the last 12 turns, earlier ones at the top (#90, #91) | `A/AppModel.swift:2577, 2602` | The default, 50: `R/RemoteModel.swift:2124` | 12: `W/model/store.ts:27, 962` | **delta**: Remote #242 |
+| Coming back after a restart, in the chat | `S/Chat/ChatTranscript.swift:135-136` | Shared | Only *Working*: `W/views/Chat.tsx:216-218` | **delta**: web #251 |
+| A retired agent | `S/Retired/RetiredAgentPage.swift` with Started by: `A/ContentView.swift:106-108` | No Started by: `R/RemoteApp.swift:96` | *New session*, prompt off: `W/views/Chat.tsx:191, 225` | **delta**: Remote #242, web #253 |
+| Background work over the prompt, its ending line | Stop, Steps, Output: `S/Chat/BackgroundRows.swift:13-45, 228-262`, `A/Sidebar/BackgroundPane.swift` | Stop and Steps: `R/Chat/PromptBar.swift:54-63` | Names only; no Stop, no Steps: `W/views/Chat.tsx:309-328` | **delta**: web #253 |
+| Sandbox failure card (064) | `S/Chat/SandboxFailureCard.swift:19-68` | Shared: `R/Chat/RemoteChatView.swift:238-252` | Title and details only, no answers: `W/views/chat/Rows.tsx:294-302` | **delta**: web #253 |
+| Park line in the chat | `A/Chat/ChatView.swift:141-145` | At the chat's head: `R/Chat/RemoteChatView.swift:89-95` | Row only | **delta**: web #253 |
+| Block strip (#157) | Park line and Carry on: `A/Chat/ChatView.swift:134-161` | Carry on in the toolbar: `R/Chat/RemoteChatView.swift:144-154` | Wait lines and Carry on: `W/views/BlockStrip.tsx:7-17` | **delta**: decide, #267 (wait lines in the chat on the page only) |
+| Folder is missing strip, refused send (#119) | `A/Chat/MissingFolderStrip.swift` | `R/Chat/RemoteMissingFolderStrip.swift`, alert `R/RemoteApp.swift:135-151` | `W/views/MissingFolder.tsx:30-55` (inline notice) | **same** |
+| Who is asking, on a card (#121) | `askerLine` | `askerLine` | `W/model/asker.ts`, held to `Fixtures/web/asker/line.json` | **same** |
+| Crowd mark on an empty chat | `A/Chat/CrowdMark.swift` | None | None | **by design** (decoration of the window's empty chat) |
+| Context meter | `A/Chat/ContextMeter.swift:15` | Its own copy: `R/Chat/RemoteChatView.swift:289-343` | None | **delta**: web #254 |
+
+## Prompt bar and queued prompts
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Layout (#108) | `A/Chat/PromptBar.swift` | `R/Chat/PromptBar.swift` | `W/views/Prompt.tsx` (walked, `walks/108/`) | **same** (each to its width) |
+| The bar's head: place, labels, runtime | `A/Chat/PromptBar.swift:246-269, 353-363` | Labels at the chat's head; no place, no runtime: `R/Chat/RemoteChatView.swift:78-83` | `W/views/Chat.tsx:230-271` | **delta**: Remote #242 |
+| Moving a session to another place (053) | Worktree capsule: `A/Chat/PromptBar.swift:1185-1261` | None | Names the place, can't move: `W/views/Chat.tsx:249-264` | **by design** (moving is the window's) |
+| Model and effort | One `ModelPill`: `S/Chat/ModelPill.swift` | One `ModelPill` | A pill each: `W/views/PromptMenus.tsx:44-63` | **delta**: web #254 (or record by design) |
+| No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | Nothing: `W/views/PromptMenus.tsx:48` | **delta**: web #254 |
+| Sandbox capsule | `S/Chat/SandboxCapsule.swift`, `A/Chat/PromptBar.swift:854-878` | `R/Chat/PromptBar.swift:498-505` | None | **delta**: web #254 |
+| Lease and event-wait capsules | `S/Chat/LeaseRow.swift`, `S/Chat/WaitCapsule.swift` | The same, the wait without ✕ (`WaitCapsule.swift:9-10`) | None | **delta**: web #254 |
+| Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | None | **delta**: web #254 |
+| Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | *Reply…*: `W/views/Chat.tsx:225` | **delta**: web #254 |
+| Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | Always *↑ Send*; Stop in ···: `W/views/Prompt.tsx:173-176` | **delta**: web #254 |
+| Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | *your Mac*: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **delta**: Remote #239 |
+| Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |
+| Attachments | Picker, drag, paste: `A/Chat/PromptBar.swift:455-463` | `R/Chat/PromptBar.swift:214` | Picker, drop, paste: `W/views/Prompt.tsx:122-171` | **same** |
+| Dictation (#69) | `S/Chat/Dictation.swift` | Shared | None | **by design** (071) |
+| Slash commands | `S/Chat/CommandList.swift` | Shared | None | **delta**: web #255 |
+| @ file mentions | `A/Chat/PromptBar.swift:644-690` | `R/Chat/PromptBar.swift:418-454` | None | **delta**: web #255 |
+| Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | None | **delta**: web #254. Placeholder against chip: **by design** (touch) |
+| Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Memory only, lost on reload: `W/model/store.ts:1009` | **delta**: web #254 |
+| Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | Sent to the home host: `R/RemoteModel.swift:2441-2447` | `W/views/Chat.tsx:50, 229` | **delta**: Remote #238 |
+| The bar on an archived chat | Shown: *Say what next, and this comes back* | Hidden: `R/Chat/RemoteChatView.swift:202` | Shown | **delta**: Remote #242 |
+
+## Question and permission cards
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Where they show | Together, over the prompt: `A/Chat/ChatView.swift:172-196` | A form hidden while any permission waits: `R/Chat/RemoteChatView.swift:184-200` | Together: `W/views/Cards.tsx:122-133` | **delta**: Remote #243 |
+| Asker line and title (#121) | `A/Elicitation/ElicitationView.swift:28-34` | `R/Elicitation/ElicitationSheet.swift:28-42` | `W/views/Cards.tsx:117-120` | **same** |
+| One-tap single choice | One property only: `A/Elicitation/ElicitationView.swift:37, 303-333` | Also with the optional Other box: `R/Elicitation/ElicitationSheet.swift:79-141` | The window's rule | **by design** (one tap on a phone; `ElicitationSheet.swift:79-89`) |
+| Multi-page forms | *1/3*: `A/Elicitation/ElicitationView.swift:89-150` | *Question 1 of 3*: `R/Elicitation/FormPages.swift:50-55` | *1/3*: `W/views/Cards.tsx:209-218` | **same** |
+| Date, date-time, email, URL fields | Plain text: `A/Elicitation/ElicitationView.swift:437` | DatePicker, keyboards: `R/Elicitation/FormPages.swift:125-133, 329-357` | Text or number: `W/views/Cards.tsx:416-426` | **delta**: Mac and web #265 |
+| A field's problem in place | Under every field | Under every part | Text and number only: `W/views/Cards.tsx:387-428` | **delta**: web #256 |
+| Held while sending (#86) | The answer bright, *telling* the host | *telling your Mac*: `R/Elicitation/ElicitationSheet.swift:183-195` | The host's name: `W/views/Cards.tsx:96-116` | **delta**: Remote #239. Buttons replaced on the Remote: **by design** (layout) |
+| Greyed while the host is down (#83) | `A/Chat/ChatView.swift:179-193` | The Mac link only: `R/Elicitation/ElicitationSheet.swift:70`, `R/Permission/PermissionSheet.swift:126` | `W/views/Chat.tsx:45-46` | **delta**: Remote #239 |
+| Decline; a link question | *No thanks*; *Gave up*: `A/Elicitation/ElicitationView.swift:46-62` | *No thanks* for both: `R/Elicitation/ElicitationSheet.swift:154` | As the window: `W/views/Cards.tsx:277-285` | **delta**: Remote #243 |
+| Answered elsewhere | Disappears | Disappears | 4 s, *Answered on another device.*: `W/views/Cards.tsx:35-38, 78-84` | **delta**: #266 |
+| Keyboard answers | ⌘1…9, Return: `A/Elicitation/ElicitationView.swift:528-540` | n/a | None | **delta**: web #256 |
+| Permission options | `A/Permission/PermissionView.swift:41-48` | `R/Permission/PermissionSheet.swift:110-127` | `W/views/Cards.tsx:176-184` | **same** |
+| What the call will do | Title and kind: `A/Permission/PermissionView.swift:78-81` | Plus the diffs and content: `R/Permission/PermissionSheet.swift:66-106` | Title and kind; *switch_mode* on a plan: `W/views/Cards.tsx:173-174` | **delta**: #266 (diff); web #256 (kind) |
+| Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file only: `R/Permission/PermissionSheet.swift:89-91` | No plan: `W/views/Cards.tsx:166-188` | **delta**: Remote #243, web #256 |
+| A server key ask | `A/Chat/TokenAskCard.swift`, `A/Hosts/Lending.swift:79-87` | None | None | **by design** (the key is lent from the Mac's Keychain); what the others see: #267 |
+
+## Start sheet and new project
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Its shape | A bar on the project: `A/Chat/PromptBar.swift:242-347` | A sheet: `R/StartAgent/StartAgentView.swift:25-46` | A bar: `W/views/NewAgent.tsx:154-210` | **by design** |
+| Runtimes listed by name (#154) | `RuntimeCatalog.sortedByName` | The same | `W/model/runtimes.ts` | **same** |
+| Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | Always, from the Mac's one list: `R/StartAgent/ChoiceRows.swift:57-129`, `R/RemoteModel.swift:682` | Startable only, flat: `W/views/NewAgent.tsx:45, 193-201` | **delta**: web #257; Remote per host #240 |
+| Default runtime | The kept form's, else Claude: `A/Chat/PromptBar.swift:1109-1117` | The latest agent's, else Claude: `K/Client/AgentsModel.swift:1079-1086` | The latest agent's: `W/views/NewAgent.tsx:46-51` | **delta**: #264 |
+| A model out of the pool (#140) | In the chooser | In the menu row | A line under the menus | **by design** (#140) |
+| Model, effort, permission | `A/Chat/PromptBar.swift:788-887` | `R/StartAgent/ChoiceRows.swift:22-50, 186-290` | Pills: `W/views/NewAgent.tsx:203-206` | **same** |
+| Sandbox choice, and *Start without sandbox* | `A/Chat/PromptBar.swift:854-878, 952-974` | The choice; words, no button: `R/RemoteModel.swift:613-618` | Neither | **delta**: Remote #244, web #257 |
+| Options that fail to load | Retry: `A/Chat/PromptBar.swift:745-751` | *Try again*: `R/StartAgent/ChoiceRows.swift:28-33` | Words only: `W/views/NewAgent.tsx:150` | **delta**: web #257 |
+| Labels (tag input) | `S/LabelTagField.swift` | Shared | `W/views/Labels.tsx` | **same** |
+| Where it runs | Folder; new worktree (or why not); worktrees, missing ones off, *· N agents*; on a branch: `A/Chat/PromptBar.swift:1129-1178` | The same, with git status: `R/StartAgent/ChoiceRows.swift:133-182` | No branches, no why-not, missing ones hidden: `W/views/NewAgent.tsx:66-70, 170-185` | **delta**: web #257 |
+| Reach: extra folders | `A/StartAgent/AgentReachView.swift` | None | Typed paths: `W/views/Reach.tsx` | **delta**: Remote #244 |
+| Reach: MCP servers | `A/StartAgent/AgentReachView.swift` | None | *chosen in the window* | **by design** (the window's) |
+| The project's host offline | Send off: `A/Chat/PromptBar.swift:365-372` | The Mac link only: `R/StartAgent/StartAgentView.swift:88-90` | Off: `W/views/NewAgent.tsx:144-146` | **delta**: Remote #239 |
+| Starting, in flight (#87) | Words held, *Starting — telling …* | Spinner, *telling your Mac* | Held: `W/views/Prompt.tsx:92-120` | **same** (apart from #239) |
+| Attachments, refused before sending | `A/Chat/AttachmentStrip.swift` | `R/StartAgent/PhoneAttachments.swift` | `W/model/attachments.ts` | **same** |
+| The form kept between starts | Text, attachments, folder, runtime, reach, options: `A/Chat/DraftKeeper.swift:125-170` | Text and attachments | Text only: `W/views/NewAgent.tsx:60-71` | **delta**: Remote #244, web #257 |
+| Prewarm on typing (#183) | Yes | To the home host | Yes | **delta**: Remote #238 |
+| Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | None | `W/views/NewProject.tsx:34-260` | **delta**: Remote #244 |
+| Add Server… | `A/Control/ControlAddServerSheet.swift` | None | None | **by design** (installs over ssh from the Mac) |
+| Add Folder on this Mac: Finder drag, the clipboard's URL | Yes | n/a | Browses the host instead | **by design** (#115: no drag from Finder, no clipboard read) |
+| No projects yet | Words and buttons, or *No agent runtime found*: `A/Projects/ProjectListView.swift:81-84, 636-655` | A spinner that never ends: `R/Projects/ProjectListView.swift:52-54` | *No projects yet* only: `W/views/NewProject.tsx:85-103` | **delta**: Remote #244, web #257 |
+| Continue in the project folder (#119, 065) | `A/AppModel.swift:2944-2958` | `R/RemoteModel.swift:2387-2407` | `W/model/store.ts:1088-1091` | **same** |
+
+## Worktrees and Files
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Worktree list, Remove…, Clean up | Project Settings ▸ Worktrees: `A/Projects/WorktreeRow.swift` | None | None | **by design** (Project Settings are the Mac's) |
+| Recreate a removed worktree (#119) | `A/Chat/MissingFolderStrip.swift:29-35` | `R/Chat/RemoteMissingFolderStrip.swift:24-26` | `W/views/MissingFolder.tsx:22-23` | **same** |
+| Files: a tree, or a folder at a time (#133) | A tree: `A/Sidebar/FilesPane.swift:292-375` | A folder at a time: `R/Panes/FilesPane.swift:103-260` | A tree from 760 px: `W/views/files/Tree.tsx:25` | **by design** (phone width). The iPad: #267 |
+| Change marks in Files (#63) | Square, +N −M, folder totals: `A/Sidebar/FilesPane.swift:420-474` | A touched dot only: `R/Panes/FilesPane.swift:248-252` | `W/views/FilesPane.tsx:50-115` | **delta**: Remote #245 |
+| Changes: tree, squares, total (#63) | `A/Sidebar/ChangesPane.swift:93-199` | No Changes pane: `R/Panes/PaneState.swift:10-11` | `W/views/Changes.tsx:69-143` | **delta**: Remote #245 |
+| Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | n/a | None | **delta**: web #259 |
+| Diff view | Edits / Whole file, Previous / Next, Open in Files, changed words marked: `A/Sidebar/ChangeFileView.swift` | The agent's edits only: `R/Chat/ChangesView.swift` | Chosen by itself, no controls: `W/views/Changes.tsx:47-67` | **delta**: web #259, Remote #245 |
+| An open file follows the disk | `A/Sidebar/FilesPane.swift:94-99` | `R/Panes/FilesPane.swift:75-77` | Read once: `W/views/files/FileView.tsx:55-64` | **delta**: web #258 |
+| Code with line numbers | `S/Page/FileLines.swift` | Shared | No numbers: `W/views/files/FileView.tsx:37-48` | **delta**: web #258 |
+| Markdown in Files | The live page in place: `A/Sidebar/FilesPane.swift:480-514` | To the Page pane: `R/Panes/PaneState.swift:67-70` | Rendered, *Open as Page*: `W/views/FilesPane.tsx:38-40` | **delta**: web #258 |
+| Pictures, zoom | `A/Sidebar/ImageFile.swift:68-84` | Pinch: `R/Panes/FilesPane.swift:378-474` | No zoom: `W/views/files/FileView.tsx:26-34` | **delta**: web #258 |
+| Pictures inside a Markdown page | `S/Page/MarkdownText.swift:144, 214` | Shared | *[image: alt]*: `W/render/markdown.ts:98-101` | **delta**: web #258 |
+| HTML file (#67) | Page / Source, scripts off: `A/Sidebar/FilesPane.swift:232-261` | The same: `R/Panes/FilesPane.swift:140-165` | Source: `W/views/files/FileView.tsx:83-90` | **by design** (071 FR-031, Trusted Types) |
+| Back finds where it was (#66) | `A/Sidebar/FilesPane.swift:76-86` | `R/Panes/FilesPane.swift:47-57` | `W/views/FilesPane.tsx:36, 60-65` | **same** |
+| A folder ends on its contents or a sentence (#62); stale reads dropped (#89) | Yes | Yes | Yes | **same** |
+| Writing a file: the live Markdown page only | `A/Sidebar/FilesPane.swift:501-506` | `R/Panes/PagePane.swift` | `W/views/LiveDocument.tsx` | **same** |
+| Search in files | None | None | None | **same** |
+| Exchanged documents | `A/Sidebar/ArtifactsPane.swift` | `R/Chat/DocumentView.swift` | None | **delta**: web #258 |
+| Terminal | Tabs (055): `A/Sidebar/TerminalPane.swift` | One shell: `R/Panes/TerminalPane.swift` | None | Web: **by design** (071). The Remote's one shell: #267 |
+| Browser pane | `A/Sidebar/BrowserPane.swift` | None (FR-030) | None | **by design** (local servers only listen on the Mac) |
+| Open in another app, Show in Finder | `A/Sidebar/OpenElsewhere.swift` | *It can't be shown here.* | *It can't be shown here.* | **by design** |
+
+## Dashboard and pins
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Dashboard row and page (#122) | `A/Dashboard/DashboardPage.swift` | `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx` | **same** |
+| Tile kinds, sparklines, greying when stale | `S/Dashboard/TileCard.swift` | Shared | `W/views/Dashboard.tsx:259-305` | **same** |
+| Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | None | All but *Greyed after*: `W/views/Dashboard.tsx:356-381` | **delta**: Remote #246; web #246 |
+| Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Hide and Remove; nothing brings one back: `R/Dashboard/DashboardPage.swift:70-74, 187-193` | `W/views/Dashboard.tsx:75-79, 241-244` | **delta**: Remote #246 |
+| Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items; no section moves: `R/Dashboard/DashboardPage.swift:198-223` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **delta**: Remote #246 (section moves). No drag on the Remote: **by design** |
+| Update now (#146) | `A/Dashboard/DashboardPage.swift:98-136` | In the toolbar: `R/Dashboard/DashboardPage.swift:103-158` | `W/views/Dashboard.tsx:137-169` | **same** |
+| *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | None | `W/views/Dashboard.tsx:87-88` | **delta**: Remote #246 |
+| A store file set aside, said (#171); the footer sentence (#127) | `A/Dashboard/DashboardPage.swift:24-29, 47-50` | `R/Dashboard/DashboardPage.swift:65-69, 88-92` | `W/views/Dashboard.tsx:90, 129` | **same** |
+| Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
+| A pinned Markdown page, live | `A/Dashboard/PinnedPage.swift:104-106` | `R/Dashboard/PinnedPage.swift:100-131` | `W/views/Pins.tsx:111-133` | **same** |
+| A pinned HTML page | Page / Source: `A/Dashboard/PinnedPage.swift:54-61` | Page only: `R/Dashboard/PinnedPage.swift:94-99` | Source: `W/views/Pins.tsx:139-142` | **delta**: Remote #245. Web: **by design** (Trusted Types) |
+| Pin from the Files bar | Any Markdown or HTML file: `A/Sidebar/FilesPane.swift:192-230` | None | The Page tab; not HTML under Files: `W/views/FilesPane.tsx:139, 157-173` | **delta**: Remote #245, web #258 |
+| A missing pin | `A/Dashboard/PinnedPage.swift:85-99` | `R/Dashboard/PinnedPage.swift:83-92` | `W/views/Pins.tsx:125-131` | **same** |
+| A page tile | `A/Dashboard/PinnedPage.swift:222-273` | `R/Dashboard/PinnedPage.swift:158-215` | `W/views/Dashboard.tsx:330-354` | **same** (HTML as source on the page: **by design**) |
+
+## Workflows page
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Status card (#142) | `A/Projects/WorkflowPage.swift:225-273`, `S/WorkflowStatus.swift` | `R/Projects/WorkflowPage.swift:120-165` | `W/views/WorkflowPage.tsx:83-95` | **same** |
+| An unreadable workflow file | Its text under *The file is below*: `A/Projects/WorkflowPage.swift:211-218` | *The file is below*, and nothing: `R/Projects/WorkflowPage.swift:79-90` | *Fix its file*: `W/model/workflows.ts:541` | **delta**: Remote #247 |
+| Triggers, next runs, last ran (#98, #99) | `A/Projects/WorkflowPage.swift:285-452` | The soonest run only | `W/views/WorkflowPage.tsx:109-150` | **delta**: Remote #247 |
+| An event trigger's words | Its catalogue meaning | n/a | The event's name: `W/model/workflows.ts:70-75` | **delta**: web #260 |
+| Recent runs | Asked of the host, archived included, Show more: `A/Projects/WorkflowPage.swift:848-879` | The same: `R/Projects/WorkflowPage.swift:547-567` | Loaded ones, up to 6: `W/views/WorkflowPage.tsx:47-49, 153` | **delta**: web #260 |
+| Enabled switch, in the file (#100, #125) | `A/Projects/WorkflowPage.swift:177-186` | `R/Projects/WorkflowPage.swift:194-196` | `W/views/WorkflowPage.tsx:71-75` | **same** |
+| Approve | Page and row menu: `A/Projects/ProjectWorkRows.swift:166-168` | Page; the row says *on the Mac*: `R/Projects/WorkflowsSection.swift:76-78, 149-150` | Page: `W/views/WorkflowPage.tsx:64-68` | **delta**: Remote #247, web #260 |
+| Archive and Bring Back | Page, row menu, swipe | Toolbar, long press | Page: `W/views/WorkflowPage.tsx:58-78`; not the row | **delta**: web #260 |
+| Run Now | Page and row menu | Page and long press | Page and the row | **same** |
+| The row's second line | Summary | Next run and last outcome: `R/Projects/WorkflowsSection.swift:142-162` | Summary | **by design** (the card has room) |
+| Settings: runtime, permission, model, effort, labels (#162) | `A/Projects/WorkflowPage.swift:479-592` | A row each: `R/Projects/WorkflowPage.swift:291-512` | Pills: `W/views/WorkflowSettings.tsx:44-139` | **same** |
+| Cooldown | A menu: `A/Projects/WorkflowPage.swift:310-339` | A sentence when set: `R/Projects/WorkflowPage.swift:132-134` | A menu: `W/views/WorkflowSettings.tsx:142-157` | **delta**: Remote #247 |
+| An unreadable file locks the settings (#179) | `S/WorkflowStatus.swift:144` | `R/Projects/WorkflowPage.swift:296, 333, 510` | `W/views/WorkflowPage.tsx:44` | **same** |
+| Writing a workflow | None (the author's) | None | None | **same** |
+
+## Settings and Project Settings
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Settings (General, Appearance, Agent Runtimes, Shared, Limits, Resources, Control plane) | `A/Settings/SettingsWindow.swift` | None | None | **by design** (the Mac's) |
+| Project Settings (helper limits, disk lines, MCP, plugins, skills, worktrees; #64, #97, #126, #195) | `A/Projects/ProjectSettingsSheet.swift` | None | None | **by design** |
+| Add an MCP server, a skill, plugins (059) | `A/Catalog/` | None | None | **by design** |
+| Light and dark | System / Light / Dark: `A/Settings/AppearanceSettingsView.swift` | The system's | `prefers-color-scheme`: `W/theme/paper.css:48` | **by design** (a setting) |
+| The accent (#156) | AccentColor | AccentColor | `--accent`, the same values | **same** |
+| What agents call you (#121) | Settings ▸ General | None | None | **by design** |
+| Warm pool size (#183) | Settings ▸ General | None | None | **by design** |
+
+## Pool, runtimes and spending
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Runtimes page: availability, pool note (#140) | `A/Runtimes/RuntimesView.swift:73-122` | `R/Projects/RuntimesView.swift:61-77` | `W/views/Activity.tsx:166-180` | **same** |
+| Allowance readings | Yes | Yes | None: never asked | **delta**: web #261 |
+| Mark available | Button: `A/Runtimes/RuntimesView.swift:88-93` | Swipe: `R/Projects/RuntimesView.swift:23-28` | None | **delta**: web #261 |
+| *N out* in Activity | Allowances out: `A/Runtimes/RuntimesView.swift:131-133` | `anyOut`: `R/Projects/RuntimesView.swift:89` | Pool notes: `W/views/Activity.tsx:58-60` | **delta**: web #261 |
+| Assess a runtime (#47) | Settings ▸ Agent Runtimes | *Assess in…* | None | **by design** (#47) |
+| Spending: all time, project shares | `A/Spending/SpendingView.swift:31-39` | `R/Projects/TotalsView.swift:31-42` | Today per host only: `W/views/Activity.tsx:226-246` | **delta**: web #261 |
+| Today, in Activity | This Mac and every server: `A/Projects/ProjectListView.swift:719-722` | This Mac only: `R/Projects/ProjectListView.swift:189-191` | Every host: `W/views/Activity.tsx:26-32` | **delta**: Remote #248 |
+| Close to full | 0.85: `K/Model/Usage.swift:35` | The same | 0.8: `W/views/Activity.tsx:48-52` | **delta**: web #261 |
+| Daily limit read-outs | Settings ▸ Limits: `A/Settings/CostSettingsView.swift` | *Today X of limit*, *limit reached*; no per-agent line: `R/Projects/TotalsView.swift:96-121` | Daily and per-agent; no *limit reached*: `W/views/Activity.tsx:236-239` | **delta**: Remote #248, web #261. The setting: **by design** |
+| A store file set aside, said (#171) | `A/Spending/SpendingView.swift:26-30` | `R/Projects/TotalsView.swift:26-30` | `W/views/Activity.tsx:240` | **same** |
+
+## Events and resources
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Events ▸ Waiting now | Openable, with ✕: `A/Events/EventsView.swift:58-61, 281-325` | None: `R/Events/EventsListView.swift:31-58` | Titles only: `W/views/Activity.tsx:195-202` | **delta**: Remote #248, web #262 |
+| Event rows: consequences, name, scope, days, Show older | `S/Events/EventRow.swift`, `A/Events/EventsView.swift:89, 161-173` | Shared (no kind filter) | A flat list: `W/views/Activity.tsx:203-221` | **delta**: web #262 |
+| A workflow in a consequence | A link: `A/Events/EventsView.swift:151` | Plain text: `R/Events/EventsListView.swift:8-10, 45-46` | n/a | **delta**: Remote #248 |
+| Resources, counted holders (#116) | `A/Resources/ResourcesView.swift` | Read-only: `R/Resources/ResourcesListView.swift` | Read-only: `W/views/Resources.tsx` | **same** (reading) |
+| Declaring resources, ending leases (#116) | Settings ▸ Resources, the Resources page | None | None | **by design** (the Mac's) |
+
+## Notifications and badges
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Notifications | `A/Notifications/MacNotifier.swift:37-79` | Local and push: `R/Notifications/DeviceNotifier.swift:34-98` | None: `W/presence.ts:5` | **by design** (071: the page takes no notices) |
+| The needs-you count | Dock badge: `A/ContentView.swift:267-268` | No icon badge, though it asks for one: `R/Notifications/DeviceNotifier.swift:116, 130` | The tab's title: `W/presence.ts:16-30` | **delta**: Remote #249 |
+| Presence: watching and active | Every host; *watching* to the owner: `A/AppModel.swift:2531-2549` | The home host only: `R/RemoteModel.swift:1586-1591` | One host: `W/presence.ts:39-42` | **delta**: Remote and web #238 |
+| Unread counts on project rows and folds (#70) | Yes | Yes | Yes | **same** |
+
+## Disk strip
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| The strip while a volume is low or critical (#195, #196) | `A/Sidebar/DiskStrip.swift` | Under the connection banner: `R/StaleBanner.swift:83-104` | `W/views/DiskStrip.tsx`, words held to `Fixtures/web/disk/lines.json` | **same** (words) |
+| A server's disk | A server's `disk/changed` replaces the Mac's, unnamed: `A/AppModel.swift:2040-2076`, `K/Client/AgentsModel.swift:481-482` | This Mac's only | Per host, a server's named: `W/views/DiskStrip.tsx:6-23` | **delta**: Mac and Remote #263 |
+| Low and Critical settings | Project Settings | None | None | **by design** |
+
+## Hosts, connection and pairing
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| A down host over a chat (#83) | `A/Chat/OfflineStrip.swift:9-50`, with Try Again | Nothing for a server: `R/StaleBanner.swift:22-37` covers the Mac link only | `W/views/OfflineStrip.tsx`, no button | **delta**: Remote #239. No button on the page: **by design** |
+| The control plane away | `A/Sidebar/ControlAwayStrip.swift` | `R/StaleBanner.swift` | `W/views/Banner.tsx` | **same** |
+| Reconnect on wake and network change (#82) | `A/WakeAndNetwork.swift` | Yes (its hangs are #208, not parity) | Yes, and the `online` event | **same** |
+| A refused write said in words (#88) | `storage/writeFailed` | `storage/writeFailed`: `R/RemoteModel.swift` | `storage/writeFailed` (unit-tested) | **same** |
+| Hosts and servers | Settings ▸ Control plane: `A/Control/ControlSettingsView.swift:247-269` | Host headings | Names in the sidebar, the foot | **by design** (managing hosts is the Mac's) |
+| Pairing | Shows the codes: `A/Control/ControlClientsPane.swift` | Scans: `R/Link/PairingView.swift` | Pastes, or `#code=`: `W/views/Pairing.tsx`, `W/pairLink.ts` | **by design** (#105, #109, #111) |
+
+## MCP Apps views
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| `ui://` views (#187–#191) | Not built | Not built | Not built | **same** (planned for all three in #187) |
+
+## Live sync
+
+#233 asks whether "not in sync" also means one client showing stale state after another acts. From the code:
+- **#238:** the Remote sends Mark Read / Unread and presence for a server's agent to the Mac. A session opened on the phone may stay unread on its server, and so in the other clients.
+- **#263:** a server's disk state overwrites the window's.
+- Catch-up and lean changes are #203, #175 and #208; this audit found nothing more there.
+
+## History: the page beside the window (#110)
+
+The record of the walks that brought the page level with the window, from 2026-10-01 to #233. It is kept for its facts and shots; the table above is where each client stands now. Two of its rows have moved on since: the window locks a workflow's settings when its file can't be read, so #179 is done on all three; and the page now has Archive and Bring Back on the workflow page (`W/views/WorkflowPage.tsx:58-78`), though not in the row's menu (#260).
 
 **Date:** 2026-10-01
 
@@ -17,7 +355,7 @@
 
 **Window screenshots:** taken on 2026-10-02 once the Mac was unlocked, of the same scratch window, by window id and over AX (no clicks or keys). They are in `walks/parity/window/`. Rows the window shots don't cover point to the window's own walk for that change.
 
-## Key
+### Key
 
 - **has**: the page does what the window does.
 - **partly**: the page does some of it; the rest is said.
@@ -25,7 +363,7 @@
 - **by design**: the page leaves it out on purpose (071 spec), and still does.
 - **n/a**: nothing for the page to do.
 
-## The issue's table
+### The issue's table
 
 | Change | Issue | Before | Now | Page shots | Window | Notes |
 |---|---|---|---|---|---|---|
@@ -45,7 +383,7 @@
 | Queued prompts look | #95 | n/a | n/a | — | — | #95 has not landed. Queued rows read "Waiting its turn" with Send now and ×. |
 | Prompt bar layout | #108 | has | has | `walks/108/` | `walks/108/window-*.png` | `bar.mjs` re-run on this branch: every control where #108 put it, no problems at 1440 or 390. |
 
-## Also merged since 2026-09-29
+### Also merged since 2026-09-29
 
 | Change | Issue | Before | Now | Page shots | Window | Notes |
 |---|---|---|---|---|---|---|
@@ -76,7 +414,7 @@
 | An agent whose folder has gone: Folder is missing on the row, a strip over the chat, a refused send with the ways on (2026-10-02) | #119 | lacks (a send failed with the host's words and nothing else) | **has** | `119/119-web-strip-1440.png`, `119/119-web-refused-1440.png`, `119/119-web-successor-1440.png` | `119/window-strip.png`, `119/window-recreated.png`, `119/window-successor.png` | Walked on `/tmp/run-f119` (a real Claude agent in a worktree, parked, the worktree removed with `git worktree remove`), in headless Chrome (`Web/test/walk/foldergone.mjs`) and the window by window id. Both say *Folder is missing* on the row and over the chat with the path, refuse a send with *This agent's folder isn't there any more (…). It was a worktree, and may have been removed after merging.*, keep the words in the prompt, and offer Continue in the project folder, Recreate the worktree (while its branch is kept) and Archive. Continue carries what was typed. The window's refused-send alert was proved over the socket (-32004 with these words, nothing queued, still parked) but not drawn: an AX-set prompt never reaches SwiftUI's binding, and typing needed the front window while Alex was at the keyboard. |
 | Who is asking, at the head of every question and permission card: title and runtime, and a helper's starter (2026-10-02) | #121 | lacks (a subagent's name only) | **has** | `121/121-web-asker.png` | `121/window-asker.png` | Walked on `/tmp/run-i121` with a real Claude agent asking through `ask_form` after the briefing named it and the person ("Alex, should the new file Claude (this agent)…"), in headless Chrome (the `asker` scene of `parity.mjs`) and the window by window id. Both head the card with *Asked by “…” (Claude)*; the words are pinned for the page by `Fixtures/web/asker/line.json` (titled, a helper with its starter, a starter gone, untitled, a subagent). The Remote's sheets use the same `AgentsModel.askerLine` (built, not looked at). **web: by design** for Settings ▸ General ▸ What agents call you: it is the Mac's, as on the Remote. |
 
-## Since this walk
+### Since this walk
 
 | Change | Issue | Page | Notes |
 |---|---|---|---|
@@ -104,8 +442,9 @@
 | Each session group and Workflows fold at their heading, like the Archived folds, kept across visits; folded, a group still says its count and unread, and a folded Needs you keeps its count in the attention tint; a search unfolds them (2026-10-03) | #181 | lacks (plain headings) | **has** | `<details>` per group in `Web/src/views/Sidebar.tsx`; the folds are kept in localStorage as a *closed* set (`agents.sidebar.folded`), so groups start open. ←/→ on a heading fold it on the page; the window's headings aren't rows of its list, so there they fold by click. The Remote folds the same groups and Workflows, kept on the device. |
 | Pinned sessions: a Pinned group under the pinned pages, kept on top whatever their state, still showing state, unread and Needs you and still counted; Pin / Unpin in the row's menu and the Session menu (Mac), the card's long press and swipe (Remote), the row menu and ··· (page); `pin_session` for an agent's own session; in `.agents/pins.json` with the pages; archiving unpins (2026-10-03) | #180 | lacks | **partly** | The page has the Pinned group (folding, kept in localStorage), Pin / Unpin in the row's menu and the chat's ···, and its order from `pins/changed`. **Difference:** the window re-orders pinned sessions by drag; the page and the Remote by Move Up / Move Down in a pinned row's menu, as the Remote does pinned pages. |
 | Low disk space: a strip across the top of the window while a volume is low or critical, with how much is free and the largest worktrees; Project Settings ▸ Low / Critical disk space (2026-10-03) | #195, #196 | lacks | **has** (the setting: by design) | `walks/196/web-disk-{critical,low}.png` | not shot (#195's own walk) | Since #196 the page and the Remote draw the window's strip from the same `disk/state`, asked on connect, and `disk/changed`, replaced whole: one row a volume, the dot `--tint-failure` when critical and `--tint-attention` when low, at the top of the page above the columns, and on the Remote under the connection banner on every screen (not while it is stale or unpaired). The words are `DiskAlarm.line`'s, ported in `Web/src/model/disk.ts` and held to `Fixtures/web/disk/lines.json`, which Swift writes (including printf's round-half-to-even on an exact quarter, 12.25 GB → *12.2 GB*). A server's rows are prefixed with its name. Walked 2026-10-04 on `/tmp/run-d196` in headless Chrome (the `disk` scene of `parity.mjs`, which writes #195's `disk-free-override`): *Macintosh HD is almost full: 1.5 GB free. Agents’ commands will start failing.*, then *Macintosh HD is running low: 12.0 GB free (2%).*, gone once the override was removed, and back on a fresh load from `disk/state`. The Remote is built for the generic simulator; its look on the iPhone and iPad is Alex's. **web: by design:** the Low / Critical disk space setting, as Project Settings and helper limits are (below); the Remote doesn't have it either. |
+| Sidebar search waits for a pause in the typing, shows 10 archived matches a fold then "Show all N", and asks each host for a capped page with "More matches…"; a Dashboard drop is sent one at a time, newest last, and a stale fetch can't undo it (2026-10-03) | #176 | **has**, #193 | The page filters once the typing pauses 150 ms, shows a fold's first 10 archived matches and *Show all N*, and asks each online host for a capped page (`agents/list` with `query`, `limit` 200, `lean`), with *More matches…* asking with the list cursor where a page came back full; a reply for words no longer asked is dropped, and what a search brought in is let go when it ends or changes. The search no longer lists a page of every project's archived sessions. The Dashboard keeps its order with `Web/src/model/dashboardOrderSync.ts`, the window's `DashboardOrderSync` ported, with its tests and the 200 seeded interleavings (`Web/test/dashboard-order-sync.test.mjs`). Walked in headless Chrome (`Web/test/walk/search193.mjs`) on a scratch root with 480 archived agents in two projects: no filtering between keys at 100 ms a key; 170 + 30 matches, 10 a fold; More matches… brought 200 more; two drops 30 ms apart left the page and the host on the second. Shots and readings: `walks/193/`. |
 
-## Left out by design
+### Left out by design
 
 - Settings, Project Settings, helper limits and the disk space lines (#195).
 - The terminal.
@@ -114,7 +453,7 @@
 - Declaring, editing and removing resources, and ending leases (#116): the Mac's.
 - Starting a runtime assessment (#47): it lives in Settings ▸ Agent Runtimes and on the Remote's Runtimes page, neither of which the page has.
 
-## Counts
+### Counts
 
 Of the rows above, the page lacked or partly had 12 before this branch. All 12 are closed:
 #87, #98, #100, #83 (page side), #88, #101, the sessions column, #63 (Changes), #63 (Files), #66, #82, #90.
@@ -123,6 +462,5 @@ The window's shots found two more, both closed: answer cards held while their ho
 
 What is still different, and why:
 - **#83, "said at once":** neither the window nor the page hears a paused host for about a minute. Both learn of it from the control plane, which is #106's lane.
-- **Event trigger words:** the page says an event's name, not the window's catalogue meaning. Its filters read as the window's since 073.
+- **Event trigger words (#260):** the page says an event's name, not the window's catalogue meaning. Its filters read as the window's since 073.
 - **The window's Try Again for its host:** nothing on the page to redial.
-| Sidebar search waits for a pause in the typing, shows 10 archived matches a fold then "Show all N", and asks each host for a capped page with "More matches…"; a Dashboard drop is sent one at a time, newest last, and a stale fetch can't undo it (2026-10-03) | #176 | **has**, #193 | The page filters once the typing pauses 150 ms, shows a fold's first 10 archived matches and *Show all N*, and asks each online host for a capped page (`agents/list` with `query`, `limit` 200, `lean`), with *More matches…* asking with the list cursor where a page came back full; a reply for words no longer asked is dropped, and what a search brought in is let go when it ends or changes. The search no longer lists a page of every project's archived sessions. The Dashboard keeps its order with `Web/src/model/dashboardOrderSync.ts`, the window's `DashboardOrderSync` ported, with its tests and the 200 seeded interleavings (`Web/test/dashboard-order-sync.test.mjs`). Walked in headless Chrome (`Web/test/walk/search193.mjs`) on a scratch root with 480 archived agents in two projects: no filtering between keys at 100 ms a key; 170 + 30 matches, 10 a fold; More matches… brought 200 more; two drops 30 ms apart left the page and the host on the second. Shots and readings: `walks/193/`. |
