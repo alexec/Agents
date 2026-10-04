@@ -1,4 +1,5 @@
 import Foundation
+import AgentsKitCore
 
 /// `~/.agents/secrets.env` (060, contracts/secrets-env.md): KEY=value lines, mode 0600.
 /// Values never leave this type except when filling a session's servers.
@@ -36,10 +37,29 @@ struct SecretsEnv: Equatable, Sendable {
 
     var isSet: (String) -> Bool { { value(of: $0) != nil } }
 
+    /// A `secrets.env` that is there and could not be read (not allowed, a read error that
+    /// did not pass, bytes that are not UTF-8). Nothing is written over it (#205): every
+    /// other secret in it would go, and they are in no git history.
+    struct Unreadable: Error, Equatable {
+        var path: String
+        var message: String {
+            "secrets.env could not be read, so nothing was written to it and the secrets in it are kept. Check its permissions and contents at \(path), then try again."
+        }
+    }
+
+    /// What is set, for reading only: an unreadable file reads as nothing set. A write
+    /// goes through `loadForChange`.
     static func load(from url: URL) -> SecretsEnv {
-        guard let data = try? Data(contentsOf: url),
+        (try? loadForChange(from: url)) ?? SecretsEnv(lines: [])
+    }
+
+    /// What is set, to change and save. A missing file is empty; one that is there and
+    /// does not read is refused, after one more try for a passing error.
+    static func loadForChange(from url: URL) throws -> SecretsEnv {
+        guard FileManager.default.fileExists(atPath: url.path) else { return SecretsEnv(lines: []) }
+        guard let data = (try? Data(contentsOf: url)) ?? (try? Data(contentsOf: url)),
               let text = String(data: data, encoding: .utf8) else {
-            return SecretsEnv(lines: [])
+            throw Unreadable(path: url.path)
         }
         return parse(text)
     }
@@ -96,16 +116,11 @@ struct SecretsEnv: Equatable, Sendable {
         return out
     }
 
-    /// Write atomically and set mode 0600.
+    /// Write whole, mode 0600 from the moment the file is made: a synced temporary file
+    /// renamed over the old one, so a crash leaves the old secrets or the new, never none,
+    /// and no copy is ever readable by others (#205).
     func save(to url: URL) throws {
-        let fm = FileManager.default
-        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let data = Data(text().utf8)
-        let tmp = url.appendingPathExtension("part")
-        try data.write(to: tmp, options: .atomic)
-        if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
-        try fm.moveItem(at: tmp, to: url)
-        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        try StoreCoding.writeAtomically(Data(text().utf8), to: url, permissions: 0o600)
     }
 
     /// Replace `${NAME}` in a string. Returns nil when a name is missing.

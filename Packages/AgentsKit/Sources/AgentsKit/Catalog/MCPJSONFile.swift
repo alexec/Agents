@@ -1,4 +1,5 @@
 import Foundation
+import AgentsKitCore
 
 /// Splice one server into `mcp.json` without disturbing hand-written siblings (060, R5,
 /// contracts/mcp-json.md). Uses `OrderedJSON` so key order is kept.
@@ -38,8 +39,13 @@ enum MCPJSONFile {
     }
 
     static func loadOrEmpty(at url: URL) throws -> OrderedJSON {
-        guard let data = try? Data(contentsOf: url) else {
+        guard FileManager.default.fileExists(atPath: url.path) else {
             return .object([("mcpServers", .object([]))])
+        }
+        // One that is there and does not read (after a second try) is refused, never
+        // taken as empty: the next write would drop every hand-written server (#205).
+        guard let data = (try? Data(contentsOf: url)) ?? (try? Data(contentsOf: url)) else {
+            throw Problem(message: "mcp.json could not be read.")
         }
         if data.allSatisfy({ [0x20, 0x09, 0x0A, 0x0D].contains($0) }) {
             return .object([("mcpServers", .object([]))])
@@ -53,14 +59,11 @@ enum MCPJSONFile {
         return root
     }
 
+    /// Whole and synced, renamed over the old one (never removed first), keeping the
+    /// file's own permissions when it had some.
     private static func write(_ root: OrderedJSON, to url: URL) throws {
-        let fm = FileManager.default
-        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let text = root.stringified() + "\n"
-        let tmp = url.appendingPathExtension("part")
-        try Data(text.utf8).write(to: tmp, options: .atomic)
-        if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
-        try fm.moveItem(at: tmp, to: url)
+        let mode = (try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions]) as? Int
+        try StoreCoding.writeAtomically(Data((root.stringified() + "\n").utf8), to: url, permissions: mode)
     }
 }
 
