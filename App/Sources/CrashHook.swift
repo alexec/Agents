@@ -116,6 +116,12 @@ enum CrashHook {
         pending = kept
         os_unfair_lock_unlock(&lock)
         if let old { free(old.path); free(old.note) }
+        // One AppKit catches and goes on from can leave a view half-updated, the window
+        // still running and no longer answering clicks (#237). Its reason, which AppKit's
+        // own log line redacts, goes to the log and to the next hang's file.
+        let said = "\(exception.name.rawValue): \((exception.reason ?? "").prefix(400))"
+        log.error("exception \(said, privacy: .public)")
+        HangWatchdog.note("exception \(said)")
     }
 
     /// Writes the last exception kept, once, and says whether it did. Safe in a signal

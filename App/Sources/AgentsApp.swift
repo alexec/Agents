@@ -16,6 +16,8 @@ struct AgentsApp: App {
     init() {
         // Before anything can throw: the next layout crash names its view (#76).
         CrashHook.install()
+        // And the next hang names its stack (#237).
+        HangReporter.install()
     }
 
     var body: some Scene {
