@@ -6,21 +6,20 @@ extension DaemonCore {
     // MARK: branch.moved (R9)
 
     /// Watch a project's `.git` for branch tips moving. Called wherever a project's
-    /// workflows are adopted, which is everywhere a project becomes live.
+    /// workflows are adopted, which is everywhere a project becomes live. The project's
+    /// one watch hears it (#173).
     func watchBranches(in folder: URL) {
         let folder = Project.standardize(folder)
-        guard branchWatchers[folder] == nil, Self.isDirectory(folder.appending(path: ".git")) else { return }
-        branchWatchers[folder] = FolderWatch(root: folder) { [weak self] changed in
-            guard changed.contains(where: Self.isBranchPath) else { return }
-            Task { await self?.scheduleBranchCheck(in: folder) }
-        }
+        guard !branchFolders.contains(folder), Self.isDirectory(folder.appending(path: ".git")) else { return }
+        branchFolders.insert(folder)
+        watchProject(folder)
         // Seed what the tips are now, so the first move after this is a move.
         scheduleBranchCheck(in: folder, after: .zero)
     }
 
-    func stopWatchingAllBranches() {
-        for (_, watch) in branchWatchers { watch.stop() }
-        branchWatchers.removeAll()
+    func stopWatchingBranches(in folder: URL) {
+        branchFolders.remove(folder)
+        branchChecks.removeValue(forKey: folder)?.cancel()
     }
 
     /// Whether a changed path is a branch tip or what a worktree has checked out.

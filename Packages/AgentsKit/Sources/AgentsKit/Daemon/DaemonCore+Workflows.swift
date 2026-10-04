@@ -68,10 +68,10 @@ extension DaemonCore {
     /// workflow.
     func adoptWorkflows(in folder: URL) {
         let standardized = Project.standardize(folder)
-        guard workflowWatchers[standardized] == nil else { return }
+        guard projectWatches[standardized] == nil else { return }
         guard Self.isDirectory(standardized) else { return }
         loadWorkflows(in: standardized)
-        watchWorkflows(in: standardized)
+        watchProject(standardized)
         watchBranches(in: standardized)
         let held = workflows[standardized]?.values ?? [:].values
         guard !held.isEmpty else { return }
@@ -86,36 +86,104 @@ extension DaemonCore {
     }
 
 
-    /// One watcher per project, rooted at the project rather than at its workflow
-    /// folder.
+    /// One watch per project, rooted at the project rather than at its workflow
+    /// folder, and the only one the project has (#173): workflows, the Dashboard,
+    /// `project.json`, pins and branch tips all come through it.
     ///
     /// Watching the leaf would be cheaper per event and wrong at the only boundary that
     /// matters: FSEvents on a path that does not exist reports nothing, so the first
     /// workflow anybody ever adds to a project — the exact moment this has to work —
-    /// would go unnoticed. Watching the root and filtering costs a string comparison on
-    /// paths we were handed anyway.
-    func watchWorkflows(in folder: URL) {
+    /// would go unnoticed. Watching the root costs nothing for the folders left out:
+    /// worktrees and build output are dropped by FSEvents before they wake us.
+    func watchProject(_ folder: URL) {
         let standardized = Project.standardize(folder)
-        guard workflowWatchers[standardized] == nil, Self.isDirectory(standardized) else { return }
-        workflowWatchers[standardized] = FolderWatch(root: standardized) { [weak self] changed in
-            // Pinned pages and page tiles (#159) can be anywhere in the project.
-            Task { await self?.pinFilesChanged(changed, in: standardized) }
-            guard changed.contains(where: { $0.path.contains("/.agents") }) else { return }
-            Task {
-                await self?.scheduleWorkflowRescan(in: standardized)
-                // The same watch sees the Dashboard's tile files change by hand or by a pull (074).
-                await self?.dashboardFilesChanged(changed, in: standardized)
-                // And the project's own settings file (#126).
-                await self?.projectConfigFilesChanged(changed, in: standardized)
+        guard projectWatches[standardized] == nil, Self.isDirectory(standardized) else { return }
+        let excluded = projectWatchExclusions(standardized)
+        projectWatchExclusions[standardized] = excluded
+        // FSEvents reports the real path (`/private/tmp/…`); everything here compares
+        // against the standardised one (`/tmp/…`), so the reports are put in its spelling.
+        let root = standardized.path
+        let real = FolderWatch.realPath(root)
+        projectWatches[standardized] = FolderWatch(root: standardized, excluding: excluded) { [weak self] changed in
+            let kept = changed.compactMap { url -> URL? in
+                var path = url.path
+                if real != root, path == real || path.hasPrefix(real + "/") { path = root + path.dropFirst(real.count) }
+                // FSEvents has dropped these already; a stray one does not hop over.
+                guard !excluded.contains(where: { path == $0.path || path.hasPrefix($0.path + "/") }) else { return nil }
+                return URL(filePath: path)
+            }
+            guard !kept.isEmpty else { return }
+            Task { await self?.projectFilesChanged(kept, in: standardized) }
+        }
+    }
+
+    /// Folders under a project whose changes nobody here reads: lane worktrees, git's
+    /// objects, and build output and packages at the top and one level down (#173).
+    /// One holding a pinned page or a page tile stays watched, so the page stays live.
+    /// FSEvents takes eight; the worktrees always come first.
+    func projectWatchExclusions(_ folder: URL) -> [URL] {
+        let pages = pagePaths(folder)
+        func holdsAPage(_ relative: String) -> Bool {
+            pages.contains { $0 == relative || $0.hasPrefix(relative + "/") }
+        }
+        var found = [".agents/worktrees", ".git/objects"]
+        let children = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        for name in Self.buildOutputNames where !found.contains(name) && children.contains(name) {
+            found.append(name)
+        }
+        for child in children.sorted() where !child.hasPrefix(".") && Self.isDirectory(folder.appending(path: child)) {
+            for name in Self.buildOutputNames
+            where Self.isDirectory(folder.appending(path: "\(child)/\(name)")) {
+                found.append("\(child)/\(name)")
             }
         }
+        // Not there yet, but where a first build at the top would put its output.
+        for name in Self.buildOutputNames where !found.contains(name) { found.append(name) }
+        return found.filter { !holdsAPage($0) }.prefix(FolderWatch.maximumExclusions)
+            .map { folder.appending(path: $0, directoryHint: .isDirectory).standardizedFileURL }
+    }
+
+    static let buildOutputNames = ["node_modules", ".build", "build", "DerivedData", "target", "dist"]
+
+    /// A pin or page tile came or went: if the folders left out of the watch should
+    /// change with it, the watch starts again without them.
+    func refreshProjectWatchIfNeeded(_ folder: URL) {
+        let standardized = Project.standardize(folder)
+        guard let current = projectWatchExclusions[standardized],
+              projectWatchExclusions(standardized) != current else { return }
+        projectWatches.removeValue(forKey: standardized)?.stop()
+        watchProject(standardized)
+    }
+
+    /// Something changed under a project, worktrees and build output already left out.
+    func projectFilesChanged(_ changed: [URL], in folder: URL) {
+        projectWatchWakes += 1
+        // Pinned pages and page tiles (#159) can be anywhere in the project.
+        pinFilesChanged(changed, in: folder)
+        if branchFolders.contains(folder), changed.contains(where: Self.isBranchPath) {
+            scheduleBranchCheck(in: folder)
+        }
+        let agents = folder.appending(path: ".agents").path
+        let own = changed.filter { $0.path == agents || $0.path.hasPrefix(agents + "/") }
+        guard !own.isEmpty else { return }
+        let workflowsFolder = WorkflowFile.folder(in: folder).path
+        if own.contains(where: { $0.path == agents || $0.path.hasPrefix(workflowsFolder) }) {
+            scheduleWorkflowRescan(in: folder)
+        }
+        // A pin or page tile may have moved into a folder the watch leaves out.
+        refreshProjectWatchIfNeeded(folder)
+        // The Dashboard's tile files, changed by hand or by a pull (074).
+        dashboardFilesChanged(own, in: folder)
+        // And the project's own settings file (#126).
+        projectConfigFilesChanged(own, in: folder)
     }
 
     /// Stop watching everything. Called as the daemon goes.
     func stopWatchingAllWorkflows() {
-        for (_, watch) in workflowWatchers { watch.stop() }
-        workflowWatchers.removeAll()
-        stopWatchingAllBranches()
+        for (_, watch) in projectWatches { watch.stop() }
+        projectWatches.removeAll()
+        projectWatchExclusions.removeAll()
+        for folder in branchFolders { stopWatchingBranches(in: folder) }
     }
 
     /// Let a project's workflows go: an archived project's do not fire.
@@ -139,15 +207,20 @@ extension DaemonCore {
         // `passRetained`, so the only thing that releases it is `stop()` — dropping the
         // reference leaks the stream, and enough of those exhaust the process. This is
         // the same call `FilesPane` makes in `onDisappear`, and for the same reason.
-        workflowWatchers.removeValue(forKey: standardized)?.stop()
+        projectWatches.removeValue(forKey: standardized)?.stop()
+        projectWatchExclusions.removeValue(forKey: standardized)
         workflowRescans.removeValue(forKey: standardized)?.cancel()
+        // The branches went with the watch; an archived project's moves are not raised.
+        stopWatchingBranches(in: standardized)
     }
 
     /// A rescan, shortly. FSEvents has already collapsed a burst; this collapses what
-    /// is left, so a build that touches `.agents` forty times re-reads one small
-    /// directory once.
+    /// is left, so forty writes to the workflow folder re-read it once.
+    ///
+    /// Not pushed back by each change: a rescan already waiting takes the new one with
+    /// it, so an edit is read within the quarter second however busy the folder (#173).
     func scheduleWorkflowRescan(in folder: URL) {
-        workflowRescans[folder]?.cancel()
+        guard workflowRescans[folder] == nil else { return }
         workflowRescans[folder] = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }

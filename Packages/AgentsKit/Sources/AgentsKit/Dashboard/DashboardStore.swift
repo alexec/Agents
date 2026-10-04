@@ -24,6 +24,9 @@ final class DashboardStore: @unchecked Sendable {
     let root: URL
     private var states: [URL: DashboardState] = [:]
     private var pointCache: [String: [TilePoint]] = [:]
+    /// Each cached history file's modification date as read or written here, so the
+    /// watch hearing this store's own write does not throw the points away (#173).
+    private var pointStamps: [String: Date] = [:]
 
     init(locations: StoreLocations) {
         root = locations.root.appendingPathComponent("dashboards", isDirectory: true)
@@ -171,7 +174,12 @@ final class DashboardStore: @unchecked Sendable {
             }
         }
         pointCache[key] = out
+        pointStamps[key] = Self.modified(pointsFile(project, id))
         return out
+    }
+
+    private static func modified(_ url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
     }
 
     private static func readPoints(_ url: URL) -> [TilePoint] {
@@ -196,8 +204,10 @@ final class DashboardStore: @unchecked Sendable {
     }
 
     func rewritePoints(_ all: [TilePoint], for id: String, in project: URL) {
-        pointCache[Self.key(project) + "/" + id] = all
+        let key = Self.key(project) + "/" + id
+        pointCache[key] = all
         try? writePoints(all, for: id, in: project)
+        pointStamps[key] = Self.modified(pointsFile(project, id))
     }
 
     /// The file for `all`, whole, and only when its bytes change; none for no points.
@@ -220,10 +230,19 @@ final class DashboardStore: @unchecked Sendable {
         try? FileManager.default.removeItem(at: hostPointsFile(project, id))
     }
 
-    /// Read every point again: the history files changed outside the app, by a pull or
-    /// by hand.
+    /// Read the points again whose history file changed outside this store, by a pull
+    /// or by hand. A file as this store last left it keeps its points: that is the watch
+    /// hearing our own write (#173).
     func forgetPoints(_ project: URL) {
-        pointCache = pointCache.filter { !$0.key.hasPrefix(Self.key(project) + "/") }
+        let prefix = Self.key(project) + "/"
+        for key in pointCache.keys where key.hasPrefix(prefix) {
+            let id = String(key.dropFirst(prefix.count))
+            guard let stamp = pointStamps[key], stamp == Self.modified(pointsFile(project, id)) else {
+                pointCache.removeValue(forKey: key)
+                pointStamps.removeValue(forKey: key)
+                continue
+            }
+        }
     }
 
     /// The project's history, in bytes (FR-021).

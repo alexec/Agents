@@ -82,6 +82,6 @@ struct BranchEventTests {
         let deadline = ContinuousClock.now.advanced(by: max(.seconds(15), Eventually.timeout))
         while ContinuousClock.now < deadline, await moved(core).isEmpty { try await Task.sleep(for: .milliseconds(100)) }
         #expect(await moved(core).count == 1)
-        await core.stopWatchingAllBranches()
+        await core.stopWatchingAllWorkflows()
     }
 }

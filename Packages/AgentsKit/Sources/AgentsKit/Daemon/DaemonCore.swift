@@ -340,8 +340,9 @@ public actor DaemonCore {
     /// Events raised before the workflows were read, held for their new-style triggers
     /// until `startWorkflows`, as `deferredLifecycleEvents` holds today's (042).
     var deferredEventsForWorkflows: [Event] = []
-    /// Each project's `.git`, watched for branch tips moving (042 R9).
-    var branchWatchers: [URL: FolderWatch] = [:]
+    /// The projects whose `.git` is looked at for branch tips moving (042 R9), through
+    /// the project's one watch (#173).
+    var branchFolders: Set<URL> = []
     /// The one pending look at each project's branch tips, so a rebase is one look.
     var branchChecks: [URL: Task<Void, Never>] = [:]
     /// What says the Mac slept, woke, or was left (042 R10). Nil until started.
@@ -444,9 +445,16 @@ public actor DaemonCore {
     /// Every project's workflows, by folder and then by id. Read from disk, kept here
     /// so a tick does not touch the file system once per workflow per fifteen seconds.
     var workflows: [URL: [String: Workflow]] = [:]
-    /// One watcher per live project. What makes a file written by hand appear without
-    /// the app being restarted.
-    var workflowWatchers: [URL: FolderWatch] = [:]
+    /// One watch per live project, for its workflows, Dashboard, settings, pins and
+    /// branches alike (#173). What makes a file written by hand appear without the app
+    /// being restarted.
+    var projectWatches: [URL: FolderWatch] = [:]
+    /// The folders each project's watch leaves out, so a pin moving into one can
+    /// restart it without them.
+    var projectWatchExclusions: [URL: [URL]] = [:]
+    /// How many times a project's watch has woken the daemon, for the tests: a build in
+    /// a worktree must not (#173).
+    var projectWatchWakes = 0
     /// Rescans waiting out their debounce, by project folder.
     var workflowRescans: [URL: Task<Void, Never>] = [:]
     /// The runs in flight, by `Workflow.id`. This is what a second fire collides with,

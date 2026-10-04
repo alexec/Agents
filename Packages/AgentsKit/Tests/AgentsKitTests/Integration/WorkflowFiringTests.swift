@@ -593,13 +593,19 @@ struct WorkflowAdoptionTests {
         let (locations, root) = try temporary()
         let work = try project(root)
         try write("say-hello", in: work)
+        // A repository, so its branches are watched too.
+        try FileManager.default.createDirectory(at: work.appending(path: ".git/refs/heads"),
+                                                withIntermediateDirectories: true)
         let core = try await core(locations)
         _ = try await core.addProject(work)
         #expect(await core.allWorkflows(in: work).count == 1)
+        #expect(await core.branchFolders == [work])
 
         _ = try await core.archiveProject(work)
 
         #expect(await core.isWatchingWorkflows(in: work) == false)
+        // Its branches with it: the one watch is gone, and no move is looked for (#173).
+        #expect(await core.branchFolders.isEmpty)
 
         // And the point of it: nothing fires for a project somebody has put away.
         var when = DateComponents()
@@ -650,10 +656,10 @@ struct WorkflowAdoptionTests {
 extension DaemonCore {
     /// What a test asks instead of reaching into the watcher dictionary.
     func isWatchingWorkflows(in folder: URL) -> Bool {
-        workflowWatchers[Project.standardize(folder)] != nil
+        projectWatches[Project.standardize(folder)] != nil
     }
 
     func watchedWorkflowFolders() -> [URL] {
-        workflowWatchers.keys.sorted { $0.path < $1.path }
+        projectWatches.keys.sorted { $0.path < $1.path }
     }
 }

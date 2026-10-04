@@ -19,8 +19,15 @@ public final class FolderWatch: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.alexecollins.agents.folderwatch")
     private let onChange: @Sendable ([URL]) -> Void
 
-    /// - Parameter onChange: the directories that changed, on an arbitrary queue.
-    public init(root: URL, onChange: @escaping @Sendable ([URL]) -> Void) {
+    /// FSEvents takes at most this many paths to leave out of a stream.
+    public static let maximumExclusions = 8
+
+    /// - Parameters:
+    ///   - excluding: folders under `root` whose changes are never reported, such as build
+    ///     output (#173). Dropped by FSEvents itself, so a build there does not wake us.
+    ///     Only the first `maximumExclusions` count.
+    ///   - onChange: the directories that changed, on an arbitrary queue.
+    public init(root: URL, excluding: [URL] = [], onChange: @escaping @Sendable ([URL]) -> Void) {
         self.onChange = onChange
 
         let info = Unmanaged.passRetained(self).toOpaque()
@@ -71,17 +78,35 @@ public final class FolderWatch: @unchecked Sendable {
             //
             // FileEvents would give us paths rather than directories and take the
             // coalescing away with them. Directory granularity is the point.
+            //
+            // No WatchRoot: it opens a descriptor on the root and on every folder above
+            // it, to hear the root move — 16 per project at 50 projects under /tmp (#173),
+            // for a move nobody here acts on.
             FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes
-                                     | kFSEventStreamCreateFlagNoDefer
-                                     | kFSEventStreamCreateFlagWatchRoot))
+                                     | kFSEventStreamCreateFlagNoDefer))
 
         guard let stream else {
             // Nothing to release: the context's retain never happened.
             Unmanaged<FolderWatch>.fromOpaque(info).release()
             return
         }
+        // In the spelling FSEvents compares against, which is the real one: an exclusion
+        // under `/tmp` would never match the `/private/tmp` it reports.
+        let real = Self.realPath(root.path)
+        let excluded = excluding.prefix(Self.maximumExclusions).map { url in
+            url.path.hasPrefix(root.path + "/") ? real + url.path.dropFirst(root.path.count) : url.path
+        }
+        if !excluded.isEmpty { FSEventStreamSetExclusionPaths(stream, excluded as CFArray) }
         FSEventStreamSetDispatchQueue(stream, queue)
         FSEventStreamStart(stream)
+    }
+
+    /// The path with every link resolved, `/private` and all, as FSEvents reports it.
+    /// Foundation's own `resolvingSymlinksInPath` takes `/private` back off.
+    public static func realPath(_ path: String) -> String {
+        guard let resolved = realpath(path, nil) else { return path }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 
     /// Started watching successfully. False when the folder could not be watched, which
