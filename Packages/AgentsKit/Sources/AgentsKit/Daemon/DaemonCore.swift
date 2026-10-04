@@ -178,8 +178,9 @@ public actor DaemonCore {
     var moveNotes: [UUID: String] = [:]
     /// Each agent's reported edits, folded from its transcript the first time the
     /// Changes pane asks and caught up on every ask after (035). Not persisted: the
-    /// transcript is the record, and folding it again costs one read.
-    var reportedChanges: [UUID: HeldChanges] = [:]
+    /// transcript is the record, and folding it again costs one read. Every edit's old
+    /// and new text is in a fold, so only the agents read latest keep one (#210).
+    var reportedChanges = LRUCache<UUID, HeldChanges>(limit: 8)
     /// One folder watch per watched root, shared by every connection watching under
     /// it, and who is watching what (034). Nothing here outlives its connection.
     var fileWatches: [URL: FolderWatch] = [:]

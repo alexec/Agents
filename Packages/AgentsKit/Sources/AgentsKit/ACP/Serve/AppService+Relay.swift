@@ -125,9 +125,9 @@ extension AppService {
         } sessions: { call in
             // Only ever the caller's own project: the daemon takes it from the token (065).
             switch call {
-            case .list:
+            case .list(let limit, let after):
                 return await send(DaemonAPI.Method.agentsListSessions,
-                                  DaemonAPI.ListSessionsRequest(token: token),
+                                  DaemonAPI.ListSessionsRequest(token: token, limit: limit, after: after),
                                   fallback: "There are no sessions in this project.")
             case .read(let session):
                 return await send(DaemonAPI.Method.agentsReadSession,

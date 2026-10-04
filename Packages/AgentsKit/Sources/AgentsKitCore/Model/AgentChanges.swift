@@ -229,11 +229,14 @@ public struct ChangesList: Codable, Hashable, Sendable {
     public var git: GitView
     /// Whether this runtime has reported any diff in this agent.
     public var reportsEdits: Bool
+    /// Files changed beyond those listed; nil when all are (#210).
+    public var more: Int?
 
-    public init(files: [ChangedFile], git: GitView, reportsEdits: Bool) {
+    public init(files: [ChangedFile], git: GitView, reportsEdits: Bool, more: Int? = nil) {
         self.files = files
         self.git = git
         self.reportsEdits = reportsEdits
+        self.more = more
     }
 }
 

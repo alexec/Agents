@@ -139,6 +139,10 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
           </li>
         ))}
       </ul>
+      {/* The daemon names at most 500 files and counts the rest (#210), as the window says. */}
+      {(list.value.more ?? 0) > 0 && (
+        <p class="quiet small">{list.value.more === 1 ? "and 1 more file" : `and ${list.value.more} more files`}</p>
+      )}
     </div>
   );
 }

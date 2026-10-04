@@ -204,7 +204,7 @@ extension DaemonCore {
     /// For the tests: an entry in each of the maps archiving must let go of.
     func fillLiveState(for id: UUID) {
         artifactEdits[id] = []
-        reportedChanges[id] = HeldChanges()
+        reportedChanges.set(HeldChanges(), for: id)
         shellWatchers[id] = [UUID()]
         interrupted[id] = .running
         resuming.insert(id)

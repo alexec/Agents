@@ -323,6 +323,7 @@ export interface ChangesList {
   files: ChangedFile[];
   git: GitView;
   reportsEdits: boolean;
+  more?: number;
 }
 
 export interface ChangesListRequest {
@@ -2013,7 +2014,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
-  ChangesList: { required: ["files", "git", "reportsEdits"], optional: [] },
+  ChangesList: { required: ["files", "git", "reportsEdits"], optional: ["more"] },
   ChangesListRequest: { required: ["agentID"], optional: [] },
   CloneNotification: { required: ["clone", "finished"], optional: [] },
   CloneRequest: { required: ["url"], optional: [] },
