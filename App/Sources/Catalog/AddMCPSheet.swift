@@ -64,7 +64,7 @@ struct AddMCPSheet: View {
                                     Text(result.title).fontWeight(.semibold)
                                     if result.known {
                                         Text("known").appText(.fine).padding(.horizontal, 6)
-                                            .background(Color.accentColor.opacity(0.15), in: Capsule())
+                                            .background(Paper.accent.opacity(0.15), in: Capsule())
                                     }
                                     Text(result.publisher.label).appText(.fine).foregroundStyle(.secondary)
                                     Spacer()

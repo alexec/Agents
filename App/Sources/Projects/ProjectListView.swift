@@ -47,10 +47,10 @@ struct ProjectListView: View {
             // titles, no icons (#155): a sidebar list draws a `Label`'s title in its own
             // style, so with icons they did not match the project names below.
             Section("Activity") {
-                EventsRow().font(.body).sidebarInk(.events).tag(SidebarItem.events)
-                ResourcesRow().font(.body).sidebarInk(.resources).tag(SidebarItem.resources)
-                RuntimesRow().font(.body).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
-                SpendingRow(selection: $selection).font(.body).sidebarInk(.spending).tag(SidebarItem.spending)
+                EventsRow().appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
+                ResourcesRow().appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
+                RuntimesRow().appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
+                SpendingRow(selection: $selection).appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
             }
 
             Section("Projects") {
@@ -62,18 +62,18 @@ struct ProjectListView: View {
                 }
                 // Where the project will be once it is one (027).
                 ForEach(model.clones) { clone in
-                    CloningRow(clone: clone).font(.body)
+                    CloningRow(clone: clone).appText(.supporting)
                 }
                 if model.projects.isEmpty, model.clones.isEmpty, model.hasLoadedProjects, model.isConnected {
                     EmptyProjectList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
-                        .font(.body)
+                        .appText(.supporting)
                 }
             }
 
             if !model.archivedProjects.isEmpty, query.isEmpty {
                 Section(isExpanded: $showsArchived) {
                     ForEach(model.archivedProjects, id: \.key) { summary in
-                        ArchivedProjectRow(summary: summary).font(.body)
+                        ArchivedProjectRow(summary: summary).appText(.supporting)
                     }
                 } header: {
                     Text("Archived projects")
@@ -84,7 +84,8 @@ struct ProjectListView: View {
         .focused($listFocused)
         .environment(\.sidebarPicks, SidebarPicks(items: picked, listFocused: listFocused))
         // Rows as tall as their lines (#104). Small also makes the sidebar's own text
-        // small, so each row says `.font(.body)` to keep the size it was read at.
+        // small, so each row says `.appText(.supporting)` to keep the size it was read at,
+        // the size of the session titles beside it.
         .environment(\.sidebarRowSize, .small)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
@@ -297,7 +298,7 @@ private struct ProjectFold: View {
                 ProjectWorkflowRows(project: key, query: query, folds: folds)
             } label: {
                 ProjectRow(summary: summary, label: label, isFolded: !isOpen)
-                    .font(.body)
+                    .appText(.supporting)
                     // As tall as its one or two lines and a little air (#104).
                     .listRowInsets(.vertical, 3)
                     // Last known, not current: the server is not answering (037).
@@ -720,7 +721,7 @@ private struct GoneProjectRows: View {
                 Button("Remove") { model.hosts.forgetGoneProject(host, path: path) }
                     .controlSize(.small)
             }
-            .font(.body)
+            .appText(.supporting)
             .help(path)
         }
     }

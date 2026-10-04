@@ -120,7 +120,7 @@ struct PromptBar: View {
                 // On its way (#87): a start can take seconds, making a worktree and a
                 // runtime, and a send to a slow host as long.
                 if agent == nil, model.isStarting {
-                    Telling(host: recipient, doing: "Starting")
+                    Telling(host: recipient, doing: AgentState.startingLabel)
                 } else if agent != nil, sending > 0, sendingIsSlow {
                     Telling(host: recipient, doing: "Sending")
                 }

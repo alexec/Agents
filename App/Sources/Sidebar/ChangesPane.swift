@@ -151,7 +151,7 @@ struct ChangesPane: View {
                     .listRowBackground(Group {
                         if case .file(let file) = line.node, file.path == state.changesMarked {
                             RoundedRectangle(cornerRadius: 5)
-                                .fill(Color.accentColor.opacity(0.18))
+                                .fill(Paper.accent.opacity(0.18))
                                 .padding(.horizontal, 10)
                         }
                     })

@@ -86,7 +86,7 @@ struct StartAgentView: View {
             // In words as well as the spinner, as the Mac's bar says it (#87): a
             // worktree and a runtime to start can take seconds.
             if model.isStarting {
-                Telling(host: "your Mac", doing: "Starting")
+                Telling(host: "your Mac", doing: AgentState.startingLabel)
             }
             // The chat's prompt bar: one raised card holding the words, attach, and send
             // in ink, so starting an agent and talking to one look like the same act.

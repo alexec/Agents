@@ -49,7 +49,7 @@ private struct PinnedPageRow: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .font(.body)
+        .appText(.supporting)
         .padding(.vertical, 2)
         .listRowInsets(.vertical, 2)
         .help(pin.path)

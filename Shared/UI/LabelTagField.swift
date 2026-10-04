@@ -119,15 +119,15 @@ struct LabelTagField: View {
         .padding(.vertical, 3)
         .background(chipFill(label, isChosen: isChosen))
         .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Color.accentColor.opacity(isChosen ? 1 : 0.5)))
+        .overlay(Capsule().strokeBorder(Paper.accent.opacity(isChosen ? 1 : 0.5)))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label.value), \(label.owner.rawValue) label")
         .accessibilityAction(named: "Remove") { remove(label.value) }
     }
 
     private func chipFill(_ label: SessionLabel, isChosen: Bool) -> Color {
-        if isChosen { return Color.accentColor.opacity(0.35) }
-        return label.owner == .person ? Color.accentColor.opacity(0.16) : Color.clear
+        if isChosen { return Paper.accent.opacity(0.35) }
+        return label.owner == .person ? Paper.accent.opacity(0.16) : Color.clear
     }
 
     private var cursorAtStart: Bool {
@@ -193,9 +193,9 @@ struct LabelChip: View {
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .background(label.owner == .person ? Color.accentColor.opacity(0.16) : Color.clear)
+            .background(label.owner == .person ? Paper.accent.opacity(0.16) : Color.clear)
             .clipShape(Capsule())
-            .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.5)))
+            .overlay(Capsule().strokeBorder(Paper.accent.opacity(0.5)))
             .accessibilityLabel("\(label.value), \(label.owner.rawValue) label")
     }
 }

@@ -107,7 +107,7 @@ struct PinnedPage: View {
             case .html where showsSource:
                 ScrollView {
                     Text(text)
-                        .font(.system(.body, design: .monospaced))
+                        .appText(.code)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(16)

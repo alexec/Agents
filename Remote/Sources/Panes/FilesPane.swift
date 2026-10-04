@@ -196,7 +196,7 @@ struct FilesPane: View {
                         let isMarked = !entry.isDirectory && state.place.marked == FileTree.key(entry.url)
                         row(entry, touched: touched.contains(entry.url))
                             // The file last open, so Back shows where it is (#66).
-                            .listRowBackground(Paper.raised.overlay(isMarked ? Color.accentColor.opacity(0.15) : .clear))
+                            .listRowBackground(Paper.raised.overlay(isMarked ? Paper.accent.opacity(0.15) : .clear))
                             .accessibilityAddTraits(isMarked ? .isSelected : [])
                     }
                     if listing.isTruncated {

@@ -35,6 +35,9 @@ enum Paper {
     static let wash = Color(light: 0xECE7DB, dark: 0x2F2C28)
     static let rule = Color(light: 0xE2DCCF, dark: 0x3A3733)
     static let ink = Color(light: 0x1F1D1A, dark: 0xECE7DC)
+    /// The violet, from the asset catalogue rather than a hex here, so a control and
+    /// the system's own focus rings and selections agree. The one place a view reaches it.
+    static let accent = Color.accentColor
 
     /// Corner radii: control (chips, rail), card (rows, wells).
     enum Radius {
@@ -235,7 +238,7 @@ struct PaperProminentButtonStyle: ButtonStyle {
             // Inside `.paper`'s hairline rather than out to where it is drawn. The same
             // outer size filled edge to edge reads a size larger than a button whose
             // edge is a line, and send sat beside two of those looking wider than them.
-            .background(Color.accentColor.opacity(configuration.isPressed ? 0.8 : 1),
+            .background(Paper.accent.opacity(configuration.isPressed ? 0.8 : 1),
                         in: Capsule().inset(by: 1))
             .overlay(Capsule().strokeBorder(Paper.rule, lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.4)
