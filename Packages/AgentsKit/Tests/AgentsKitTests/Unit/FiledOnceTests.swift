@@ -87,6 +87,63 @@ struct FiledOnceTests {
         #expect(model.agent(unread.id) == nil)
     }
 
+    /// Each change moves one agent in place (#165): after many of every kind, the shelves
+    /// still say what a scan of everything says, and the list of everything is in order.
+    @Test func shelvesKeptChangeByChangeAgreeWithAScan() throws {
+        struct Dice: RandomNumberGenerator {
+            var state: UInt64
+            mutating func next() -> UInt64 {
+                state &+= 0x9E37_79B9_7F4A_7C15
+                var z = state
+                z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+                z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+                return z ^ (z >> 31)
+            }
+        }
+        var dice = Dice(state: 165)
+        let model = AgentsModel()
+        var ids: [UUID] = []
+        for step in 0..<500 {
+            let roll = Int.random(in: 0..<12, using: &dice)
+            if ids.isEmpty || roll < 3 {
+                let made = agent([api, web].randomElement(using: &dice)!, AgentState.allCases.randomElement(using: &dice)!,
+                                 at: Double(Int.random(in: 0..<50, using: &dice)),
+                                 host: Bool.random(using: &dice) ? .mac : devbox)
+                ids.append(made.id)
+                model.upsert(made)
+            } else if roll == 3 {
+                model.apply(DaemonAPI.Notification.agentRemoved,
+                            try JSONValue.encoding(DaemonAPI.AgentRemovedNotification(
+                                agentID: ids.remove(at: Int.random(in: 0..<ids.count, using: &dice)))))
+            } else if roll == 4 {
+                let id = ids.randomElement(using: &dice)!
+                if Bool.random(using: &dice) {
+                    model.apply(DaemonAPI.Notification.agentShowFile,
+                                try JSONValue.encoding(DaemonAPI.ShowFileNotification(agentID: id, file: ShownFile(path: "/tmp/a"))))
+                } else {
+                    _ = model.takeFileToShow(for: id)
+                }
+            } else {
+                var changed = try #require(model.agent(ids.randomElement(using: &dice)!))
+                switch Int.random(in: 0..<5, using: &dice) {
+                case 0: changed.state = AgentState.allCases.randomElement(using: &dice)!
+                case 1: changed.lastActivityAt = t0.addingTimeInterval(Double(Int.random(in: 0..<50, using: &dice)))
+                case 2: changed.parking = Bool.random(using: &dice)
+                    ? .parked(at: t0.addingTimeInterval(Double(Int.random(in: 0..<5, using: &dice)))) : nil
+                case 3: changed.isUnread.toggle()
+                default: changed.cwd = [api, web].randomElement(using: &dice)!
+                }
+                model.upsert(changed)
+            }
+            expectAgreement(model, "step \(step)")
+            let order = model.agents.map(\.id)
+            #expect(order == model.agents.sorted { a, b in
+                a.lastActivityAt != b.lastActivityAt ? a.lastActivityAt > b.lastActivityAt : a.id.uuidString < b.id.uuidString
+            }.map(\.id), "step \(step)")
+            #expect(model.agentCount == ids.count)
+        }
+    }
+
     @Test func takingAListMergesKeepsListsAndSortsOnce() {
         let model = AgentsModel()
         var held = agent(api, .finished, at: 0)

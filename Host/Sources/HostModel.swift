@@ -196,12 +196,10 @@ final class HostModel {
         guard !hostRefused else { return }
         do {
             let listed = try await client.call(DaemonAPI.Method.projectsList, [String: String](), returning: JSONValue.self)
-            let agents = try await client.call(DaemonAPI.Method.agentsList, ["includeArchived": false, "lean": true],
-                                               returning: JSONValue.self)
+            // Every live agent, a page at a time (#164).
+            let agents = try await client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
             if case .array(let all) = listed { projects = all.count }
-            if case .array(let all) = agents {
-                working = all.filter { $0["state"]?.stringValue == AgentState.running.rawValue }.count
-            }
+            working = agents.filter { $0.state == .running }.count
         } catch {
             switch HostLinkPolicy.failure(error) {
             case .refused:

@@ -72,7 +72,7 @@ private struct ResourceListRow: View {
     }
 
     private func name(_ id: UUID) -> String {
-        LeaseWords.agentName(model.work.agents.first { $0.id == id }?.title)
+        LeaseWords.agentName(model.work.agent(id)?.title)
     }
 }
 

@@ -237,7 +237,7 @@ struct ContentView: View {
                     Task { await model.continueInProject(ask.agentID, text: ask.text, attachments: ask.attachments) }
                 }
                 .keyboardShortcut(.defaultAction)
-                if model.agents.first(where: { $0.id == ask.agentID })?.mayRecreateWorktree == true {
+                if model.work.agent(ask.agentID)?.mayRecreateWorktree == true {
                     Button(MissingFolderWords.recreateWorktree) { Task { await model.recreateWorktree(ask.agentID) } }
                 }
                 Button(MissingFolderWords.archive) { Task { await model.archive(ask.agentID) } }

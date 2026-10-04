@@ -28,7 +28,7 @@ extension DaemonCore {
     /// the heartbeat, so a worktree removed by hand shows on its row within a tick. A stat
     /// each; git is asked only when a worktree's folder has newly gone.
     func noteMissingFolders() async {
-        for agent in agents.values where agent.state != .archived {
+        for agent in agents.live.values {
             let gone = !Self.isDirectory(agent.cwd)
             guard gone != (agent.missingFolder != nil) else { continue }
             await noteFolder(of: agent.id)

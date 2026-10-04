@@ -54,8 +54,10 @@ struct AgentsListNarrowingTests {
 
         // What the phone asks for at connect: nothing archived.
         #expect(Set(await ids(.init(includeArchived: false))) == [live.id, run.id])
-        // Everything, as the Mac and an older phone ask.
-        #expect(await ids(.init()).count == 6)
+        // Everything, as an older window asks: the live agents (#164). Archived ones come
+        // a project at a time, or by search.
+        #expect(Set(await ids(.init())) == [live.id, run.id])
+        #expect(Set(await ids(.init(query: "seed"))).count == 6)
         // One project's Archived section, newest first, a page at a time.
         #expect(await ids(.init(archivedOnly: true, folder: one)) == [newest.id, middle.id, oldest.id])
         #expect(await ids(.init(archivedOnly: true, folder: one, limit: 2)) == [newest.id, middle.id])

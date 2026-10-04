@@ -44,8 +44,8 @@ extension DaemonCore {
         // An agent waiting on events (042). Nothing but a running daemon can hear its
         // event, and a daemon that goes takes the Mac's wake, a branch moving
         // and every other agent's news with it.
-        if agents.values.contains(where: { $0.eventWait?.isOpen == true }) { return true }
-        return agents.values.contains { $0.state.holdsRuntime }
+        if agents.withEventWait.contains(where: { agents[$0]?.eventWait?.isOpen == true }) { return true }
+        return agents.holdingRuntime > 0
     }
 
     public var shouldExit: Bool {

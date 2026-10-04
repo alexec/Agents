@@ -185,7 +185,7 @@ struct PromptBar: View {
         }
         .onAppear { prepare() }
         .onChange(of: model.availableRuntimes.map(\.id)) { prepare() }
-        .onChange(of: model.agents.count) { prepare() }
+        .onChange(of: model.work.agentCount) { prepare() }
         .modifier(KeepsDrafts(text: $text, attachments: $attachments,
                               lostSomething: $draftLostSomething, key: draftKey))
     }

@@ -296,7 +296,8 @@ extension DaemonCore {
     /// 052 is after the #58 cut-off (051). The
     /// chat stays where it ended; the note it already has says why.
     func clearAllowanceWaitsLeftFromBefore() {
-        for (id, agent) in agents where agent.allowanceWait != nil {
+        for agent in agents.values where agent.allowanceWait != nil {
+            let id = agent.id
             var cleared = agent
             cleared.allowanceWait = nil
             if cleared.state == .stopped, cleared.endedReason == nil { cleared.endedReason = .allowanceSpent }

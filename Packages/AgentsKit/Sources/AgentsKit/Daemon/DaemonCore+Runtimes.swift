@@ -38,7 +38,7 @@ extension DaemonCore {
     /// Sign out, after saying which agents it stops. Those agents are mid-conversation,
     /// so this is not a quiet thing to do.
     public func logOut(runtimeID: String) async throws -> [UUID] {
-        let stopped = agents.values.filter { $0.runtimeID == runtimeID && $0.state.holdsRuntime }.map(\.id)
+        let stopped = agents.live.values.filter { $0.runtimeID == runtimeID && $0.state.holdsRuntime }.map(\.id)
         for id in stopped { try? await stop(id) }
         let (session, _) = try await handshakeOnly(runtimeID: runtimeID)
         defer { Task { await session.end(gracePeriod: .seconds(2)) } }

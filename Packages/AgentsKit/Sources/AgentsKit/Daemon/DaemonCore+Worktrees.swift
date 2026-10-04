@@ -205,7 +205,7 @@ extension DaemonCore {
         let hasCommit = await GitWorktrees.hasCommit(in: project)
         let entries = (try? await GitWorktrees.list(in: project)) ?? []
         let here = Project.standardize(repository.toplevel)
-        let working = agents.values.filter { $0.state != .archived }
+        let working = Array(agents.live.values)
         var summaries = entries.filter { !$0.isBare }.map { entry -> DaemonAPI.WorktreeSummary in
             let root = Self.canonical(entry.path)
             let inside = root.path + "/"

@@ -984,9 +984,7 @@ final class RemoteModel {
                                                     returning: [DaemonAPI.ProjectSummary].self) {
                 work.replaceProjects(projects, from: id)
             }
-            if let agents = try? await other.call(DaemonAPI.Method.agentsList,
-                                                  DaemonAPI.ListRequest(includeArchived: false, lean: true),
-                                                  returning: [Agent].self) {
+            if let agents = try? await other.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true)) {
                 work.replaceAgents(agents, from: id)
             }
             let notes = other.notifications()
@@ -1376,9 +1374,9 @@ final class RemoteModel {
     private func refreshAgents() async {
         // Lean: no card or row reads the option and command lists, which were nearly all of
         // each record (#107). The open chat's come with `loadWholeAgent`.
-        guard let listed = try? await client.call(DaemonAPI.Method.agentsList,
-                                                  DaemonAPI.ListRequest(includeArchived: false, lean: true),
-                                                  returning: [Agent].self) else { return }
+        // A page at a time (#164): a host answers at most a page of them at once.
+        guard let listed = try? await client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
+        else { return }
         let live = Set(listed.map(\.id))
         // Only this host's: another host's agents come from that host (058, US4).
         work.replaceAgents(listed + work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) },

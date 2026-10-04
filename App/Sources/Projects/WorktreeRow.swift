@@ -145,7 +145,7 @@ struct WorktreeRow: View {
     private func message(_ check: DaemonAPI.RemovalCheck) -> String {
         if !check.blockedBy.isEmpty {
             let names = check.blockedBy.map { id in
-                model.agents.first { $0.id == id }?.title ?? "An agent"
+                model.work.agent(id)?.title ?? "An agent"
             }
             return "Still working here: \(names.joined(separator: ", ")). Archive them first."
         }

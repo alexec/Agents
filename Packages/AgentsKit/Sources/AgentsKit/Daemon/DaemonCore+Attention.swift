@@ -99,7 +99,8 @@ extension DaemonCore {
             found.append(need(.elicitation(id), for: agent, kind: .elicitation,
                               wanted: "Asks: \(pending.request.title)", now: now))
         }
-        for agent in agents.values where agent.state == .finished && inALiveProject(agent) {
+        // Live agents only: an archived one is never finished (#164).
+        for agent in agents.live.values where agent.state == .finished && inALiveProject(agent) {
             guard let report = agent.report, report.outcome.needsAPerson else { continue }
             // Looked at already. The agent still wants an answer, and still says so under
             // Needs attention, but telling the person again is only noise: the same

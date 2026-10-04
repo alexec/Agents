@@ -31,7 +31,7 @@ extension DaemonCore {
     /// `retention/state`.
     public func retentionState() -> DaemonAPI.RetentionState {
         loadRetentionIfNeeded()
-        let archived = agents.values.filter { $0.state == .archived }
+        let archived = agents.archived.values
         return DaemonAPI.RetentionState(settings: retention.settings,
                                         archivedCount: archived.count,
                                         archivedBytes: archived.reduce(0) { $0 + size(of: $1.id) },
@@ -70,7 +70,10 @@ extension DaemonCore {
     /// Every tombstone in each project, for the project summaries.
     func tombstonesByProject() -> [URL: [Tombstone]] {
         loadRetentionIfNeeded()
-        return Dictionary(grouping: retired.values) { Project.standardize($0.project) }
+        if let tombstoneIndex { return tombstoneIndex }
+        let index = Dictionary(grouping: retired.values) { Project.standardize($0.project) }
+        tombstoneIndex = index
+        return index
     }
 
     // MARK: Settings
@@ -131,9 +134,8 @@ extension DaemonCore {
         var asked = Set<UUID>()
         while true {
             let decision = RetentionPlan.decide(archived: archived, holds: holds, settings: settings, saneNow: saneNow)
-            let fresh = archived.filter { candidate in
-                !asked.contains(candidate.id) && decision.retire.contains { $0.id == candidate.id }
-            }
+            let retiring = Set(decision.retire.map(\.id))
+            let fresh = archived.filter { !asked.contains($0.id) && retiring.contains($0.id) }
             if fresh.isEmpty { return decision }
             asked.formUnion(fresh.map(\.id))
             holds.merge(await self.holds(for: fresh)) { $1 }
@@ -181,7 +183,7 @@ extension DaemonCore {
     /// Slim again every archived agent nobody has read for ten minutes (FR-025).
     func slimIdle() {
         let watched = Set(presences.values.compactMap(\.watching))
-        for (id, agent) in agents where agent.state == .archived && !agent.isSlim && !watched.contains(id) {
+        for (id, agent) in agents.archived where !agent.isSlim && !watched.contains(id) {
             if let read = lastWhole[id], now().timeIntervalSince(read) < Self.letGoAfter { continue }
             agents[id] = agent.slimmed()
             lastWhole.removeValue(forKey: id)
@@ -309,19 +311,28 @@ extension DaemonCore {
 
     /// Every archived agent, as the rules see it.
     func candidates() -> [RetentionPlan.Candidate] {
-        agents.values.filter { $0.state == .archived }.map { agent in
+        agents.archived.values.map { agent in
             RetentionPlan.Candidate(id: agent.id, archivedAt: agent.archivedAt ?? now(),
                                     lastActivityAt: agent.lastActivityAt, sizeOnDisk: size(of: agent.id))
         }
     }
 
     /// Put each archived agent's note on its record, and only where it changed.
+    ///
+    /// Each project is told once at the end rather than once per agent: a settings change
+    /// can note thousands (#164).
     func noteRetirements(_ notes: [UUID: Retirement]) {
-        for agent in agents.values where agent.state == .archived && agent.retirement != notes[agent.id] {
+        let noting = agents.archived.values.filter { $0.retirement != notes[$0.id] }
+        guard !noting.isEmpty else { return }
+        heldProjectChanges = []
+        for agent in noting {
             var noted = agent
             noted.retirement = notes[agent.id]
             changed(noted)
         }
+        let held = heldProjectChanges ?? []
+        heldProjectChanges = nil
+        for folder in held { projectChanged(forAgentIn: folder) }
     }
 
     func saveArchiveIndexSoon() {

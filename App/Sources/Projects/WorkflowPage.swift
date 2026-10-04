@@ -68,6 +68,18 @@ struct WorkflowPage: View {
             model.openWorkflow = nil
         }
         .onChange(of: workflowID) { shownRuns = Self.runsAtFirst }
+        // Its runs, archived ones too, asked of the host: the window holds only the live
+        // agents (#165). One more than shown, so Show more knows there is more.
+        .task(id: RunsWanted(workflowID: workflowID, shown: shownRuns)) {
+            guard let workflow = summary?.workflow else { return }
+            await model.loadRuns(of: workflow.workflowID, in: workflow.folder,
+                                 on: model.selectedProjectHost, limit: shownRuns + 1)
+        }
+    }
+
+    private struct RunsWanted: Hashable {
+        var workflowID: Workflow.ID
+        var shown: Int
     }
 
     @ViewBuilder
@@ -538,7 +550,7 @@ struct WorkflowPage: View {
     @ViewBuilder
     private func standingAgent(_ summary: WorkflowSummary) -> some View {
         if let id = summary.standingAgentID,
-           let kept = model.agents.first(where: { $0.id == id && $0.archivedAt == nil }) {
+           let kept = model.work.agent(id), kept.archivedAt == nil {
             Button {
                 model.openWorkflow = nil
                 model.selection = kept.id
@@ -836,8 +848,8 @@ struct WorkflowPage: View {
     private func history(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
         let folder = Project.standardize(workflow.folder)
-        let started = model.agents
-            .filter { $0.projectFolder == folder && $0.startedByWorkflow == workflow.workflowID }
+        let started = model.work.agents(inFolder: folder)
+            .filter { $0.startedByWorkflow == workflow.workflowID }
             .sorted { $0.createdAt > $1.createdAt }
         return VStack(alignment: .leading, spacing: 8) {
             sectionTitle("History")

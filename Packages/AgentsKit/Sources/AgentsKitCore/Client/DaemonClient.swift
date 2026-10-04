@@ -181,6 +181,23 @@ public actor DaemonClient {
         try await call(method, params).decode(T.self)
     }
 
+    /// Every agent `request` asks for, a page at a time (#164): the host answers at most
+    /// `ListRequest.maximumLimit` at once. Pages until one comes back short; capped at
+    /// `pages`, so a list that keeps growing under it still ends.
+    public func listAgents(_ request: DaemonAPI.ListRequest, pages: Int = 20) async throws -> [Agent] {
+        var asking: DaemonAPI.ListRequest? = request
+        var listed: [Agent] = []
+        var seen = Set<UUID>()
+        for _ in 0..<pages {
+            guard let page = asking else { break }
+            let got = try await call(DaemonAPI.Method.agentsList, page, returning: [Agent].self)
+            // An agent that moved between pages can come twice; the first copy is kept.
+            listed += got.filter { seen.insert($0.id).inserted }
+            asking = page.next(after: got)
+        }
+        return listed
+    }
+
     public nonisolated func notifications() -> AsyncStream<(method: String, params: JSONValue?)> {
         AsyncStream { continuation in
             Task {

@@ -17,9 +17,13 @@ import Observation
 @MainActor
 @Observable
 public final class AgentsModel {
-    public private(set) var agents: [Agent] = [] {
-        didSet { bucketsRevision &+= 1 }
-    }
+    /// Every agent held, newest activity first. Read by pages about all the work; a
+    /// sidebar fold or a row reads its project's `shelf` or its agent instead, so one
+    /// agent changing does not redraw them all (#165).
+    public private(set) var agents: [Agent] = []
+    /// How many agents are held: moves only when one comes or goes, for a view that
+    /// wants to know that and not every change to every one of them.
+    public private(set) var agentCount = 0
     public private(set) var projects: [DaemonAPI.ProjectSummary] = []
     public private(set) var permissions: [PermissionRequest] = []
     public private(set) var elicitations: [ElicitationRequest] = []
@@ -111,12 +115,17 @@ public final class AgentsModel {
     /// When to look at trimming next. Not every entry past the mark: a page that could
     /// not be trimmed (too few rows) would otherwise be measured again for every chunk.
     @ObservationIgnored private var nextTrimAt = entriesTrimmedAt
-    /// Each agent's folder in the form projects compare by, worked out once.
-    ///
-    /// `Project.standardize` resolves symlinks, which is the file system being asked
-    /// about every component of the path. An agent's folder never changes, and every
-    /// project row asks for every agent's on every redraw, so it is asked once.
-    @ObservationIgnored private var folders: [UUID: URL] = [:]
+    /// Each agent by id, and where it was filed: its folder and group as they were.
+    @ObservationIgnored private var byID: [UUID: Agent] = [:]
+    @ObservationIgnored private var filedAs: [UUID: (folder: URL, host: HostID, group: AgentGroup)] = [:]
+    /// Each project's agents, by folder and host, and again by folder alone (#165).
+    @ObservationIgnored private var shelves: [ShelfKey: ProjectShelf] = [:]
+    @ObservationIgnored private var folderShelves: [URL: ProjectShelf] = [:]
+    /// One per agent a view has looked up by id.
+    @ObservationIgnored private var cells: [UUID: AgentCell] = [:]
+    /// Every agent's title by id, and a count that moves only when one of them does.
+    @ObservationIgnored private var titles: [UUID: String] = [:]
+    private var titlesRevision = 0
 
     /// Which agent's transcript is in hand. Entries for anything else are not ours to
     /// keep: the reader is not looking at them and the next selection reloads anyway.
@@ -132,19 +141,7 @@ public final class AgentsModel {
     /// Files an agent has asked be put in front of the user, one per agent, newest
     /// winning. Held rather than acted on, because the client hearing this may be
     /// showing another conversation.
-    public private(set) var filesToShow: [UUID: ShownFile] = [:] {
-        didSet { bucketsRevision &+= 1 }
-    }
-
-    /// Every agent held, filed once by project folder and group (#135).
-    ///
-    /// The Sessions column, the project rows and the menus ask for one project's group
-    /// many times a redraw, and asking used to be a pass over every agent ever held,
-    /// archived ones included. They are filed again only after `agents` or
-    /// `filesToShow` has changed, and only when something next asks.
-    @ObservationIgnored private var bucketsRevision = 0
-    @ObservationIgnored private var buckets = AgentBuckets()
-    @ObservationIgnored private var bucketsBuiltAt = -1
+    public private(set) var filesToShow: [UUID: ShownFile] = [:]
 
     /// Chats the daemon is queueing to pick back up after a restart, held only while
     /// it is doing it. Not on any record: the queue lives and dies with the daemon
@@ -414,8 +411,9 @@ public final class AgentsModel {
             }
 
         case .usage(let notification):
-            if let index = agents.firstIndex(where: { $0.id == notification.agentID }) {
-                agents[index].usage = notification.usage
+            if var agent = byID[notification.agentID] {
+                agent.usage = notification.usage
+                file(agent)
             }
 
         case .workflowChanged(let summary):
@@ -454,7 +452,7 @@ public final class AgentsModel {
         case .agentRemoved(let notification):
             // Retired (051). Out of every list; a chat that was showing it finds no
             // agent and shows what is left of it instead.
-            agents.removeAll { $0.id == notification.agentID }
+            unfile(notification.agentID)
             permissions.removeAll { $0.agentID == notification.agentID }
             elicitations.removeAll { $0.agentID == notification.agentID }
 
@@ -473,6 +471,8 @@ public final class AgentsModel {
 
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
+            // Its group can move with it: a file to look at is wanting eyes.
+            if let agent = byID[notification.agentID] { file(agent) }
 
         case .resuming(let notification):
             if notification.isResuming {
@@ -504,13 +504,10 @@ public final class AgentsModel {
 
     // MARK: Filing what arrives
 
+    /// One agent, new or changed, moved to where it now goes: in `agents`, in its
+    /// project's shelf, in its own cell. Nothing else is filed again (#165).
     public func upsert(_ agent: Agent) {
-        if let index = agents.firstIndex(where: { $0.id == agent.id }) {
-            agents[index] = agent
-        } else {
-            agents.append(agent)
-        }
-        agents.sort { $0.lastActivityAt > $1.lastActivityAt }
+        file(agent)
     }
 
     public func upsert(_ summary: WorkflowSummary) {
@@ -598,8 +595,7 @@ public final class AgentsModel {
     }
 
     public func replaceAgents(_ listed: [Agent]) {
-        let held = Dictionary(agents.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        agents = listed.map { $0.keepingLists(of: held[$0.id]) }.sorted { $0.lastActivityAt > $1.lastActivityAt }
+        refile(listed.map { $0.keepingLists(of: byID[$0.id]) })
     }
 
     /// Agents from a list that is not all of them (a project's archived ones, a workflow's
@@ -610,17 +606,14 @@ public final class AgentsModel {
     /// was a search and a sort of everything held for each one listed (#136).
     public func takeListed(_ listed: [Agent]) {
         guard !listed.isEmpty else { return }
-        var merged = agents
-        var at = Dictionary(merged.indices.map { (merged[$0].id, $0) }, uniquingKeysWith: { first, _ in first })
-        for agent in listed {
-            if let index = at[agent.id] {
-                merged[index] = agent.keepingLists(of: merged[index])
-            } else {
-                at[agent.id] = merged.count
-                merged.append(agent)
-            }
+        // A few, one at a time; many, filed again in one go.
+        if listed.count <= 8 {
+            for agent in listed { file(agent.keepingLists(of: byID[agent.id])) }
+            return
         }
-        agents = merged.sorted { $0.lastActivityAt > $1.lastActivityAt }
+        var merged = byID
+        for agent in listed { merged[agent.id] = agent.keepingLists(of: merged[agent.id]) }
+        refile(Array(merged.values))
     }
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
@@ -631,10 +624,9 @@ public final class AgentsModel {
     /// a server re-listing after a reconnect must not take the Mac's away (037).
     public func replaceAgents(_ listed: [Agent], from host: HostID) {
         // A lean list (#107) keeps the lists already held for an agent: the open chat's menus.
-        let held = Dictionary(agents.filter { $0.host == host }.map { ($0.id, $0) },
-                              uniquingKeysWith: { first, _ in first })
+        let held = byID.filter { $0.value.host == host }
         let stamped = listed.map { var agent = $0.keepingLists(of: held[$0.id]); agent.host = host; return agent }
-        agents = (agents.filter { $0.host != host } + stamped).sorted { $0.lastActivityAt > $1.lastActivityAt }
+        refile(byID.values.filter { $0.host != host } + stamped)
     }
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary], from host: HostID) {
@@ -734,9 +726,11 @@ public final class AgentsModel {
     }
 
     /// Every agent's title by id, for naming whoever holds what another is waiting for.
+    /// Kept as titles change, and read through a count that moves only when one does, so
+    /// every row asking is not redrawn by every change (#165).
     public var agentTitles: [UUID: String] {
-        Dictionary(agents.compactMap { agent in agent.title.map { (agent.id, $0) } },
-                   uniquingKeysWith: { first, _ in first })
+        _ = titlesRevision
+        return titles
     }
     public func replaceRememberedModes(_ modes: DaemonAPI.RememberedModes) { rememberedModes = modes }
 
@@ -910,7 +904,9 @@ public final class AgentsModel {
     /// Taken out once it has been acted on. This is "look at this now", and a client
     /// opened tomorrow has missed it.
     public func takeFileToShow(for agentID: UUID) -> ShownFile? {
-        filesToShow.removeValue(forKey: agentID)
+        let taken = filesToShow.removeValue(forKey: agentID)
+        if taken != nil, let agent = byID[agentID] { file(agent) }
+        return taken
     }
 
     /// Everything the daemon said was on its way back when we connected. A window
@@ -1017,9 +1013,14 @@ public final class AgentsModel {
 
     // MARK: Reading it back
 
+    /// One agent by id, read through its own cell: a view asking is redrawn when this
+    /// agent changes and no other (#165).
     public func agent(_ id: UUID?) -> Agent? {
         guard let id else { return nil }
-        return filed().byID[id]
+        if let cell = cells[id] { return cell.agent }
+        let cell = AgentCell(byID[id])
+        cells[id] = cell
+        return cell.agent
     }
 
     /// Which runtime a new agent gets when nobody has said.
@@ -1055,29 +1056,48 @@ public final class AgentsModel {
         return projects.first { $0.host == key.host && $0.folder == key.folder }
     }
 
+    /// A project's shelf on one host: its agents by group, and its numbers (#165). A fold
+    /// that reads it is redrawn by its own project's changes only.
+    public func shelf(_ key: ProjectKey?) -> ProjectShelf {
+        guard let key else { return ProjectShelf() }
+        let wanted = ShelfKey(folder: Project.standardize(key.folder), host: key.host)
+        if let shelf = shelves[wanted] { return shelf }
+        let shelf = ProjectShelf()
+        shelves[wanted] = shelf
+        return shelf
+    }
+
+    /// The same by folder alone, whichever host it is on: what the phone asks.
+    public func shelf(_ folder: URL?) -> ProjectShelf {
+        guard let folder else { return ProjectShelf() }
+        let wanted = Project.standardize(folder)
+        if let shelf = folderShelves[wanted] { return shelf }
+        let shelf = ProjectShelf()
+        folderShelves[wanted] = shelf
+        return shelf
+    }
+
     public func agents(in key: ProjectKey?, group: AgentGroup) -> [Agent] {
-        guard let key else { return [] }
-        return filed().byKey[AgentBuckets.Key(folder: standardized(key.folder), host: key.host)]?[group] ?? []
+        guard key != nil else { return [] }
+        return shelf(key).groups[group] ?? []
     }
 
     public func counts(in key: ProjectKey?) -> [AgentGroup: Int] {
-        guard let key else { return [:] }
-        let groups = filed().byKey[AgentBuckets.Key(folder: standardized(key.folder), host: key.host)] ?? [:]
-        return groups.mapValues(\.count)
+        guard key != nil else { return [:] }
+        return shelf(key).counts
     }
 
     public func unreadCount(in key: ProjectKey?) -> Int {
-        guard let key else { return 0 }
-        let groups = filed().byKey[AgentBuckets.Key(folder: standardized(key.folder), host: key.host)] ?? [:]
-        return groups.values.reduce(0) { $0 + $1.count(where: \.showsUnread) }
+        guard key != nil else { return 0 }
+        return shelf(key).unread
     }
 
     /// What the Dock badge counts for one project: every session under Needs you, and
     /// every finished one nobody has opened, each once (#70). Unread left Needs you, so
     /// it is added back here: a new finish still raises the badge.
     public func attentionCount(in key: ProjectKey?) -> Int {
-        guard let key else { return 0 }
-        return Self.attention(in: filed().byKey[AgentBuckets.Key(folder: standardized(key.folder), host: key.host)])
+        guard key != nil else { return 0 }
+        return shelf(key).attention
     }
 
     /// Needs you, Blocked from an older daemon, or unread: what the badge and the widget
@@ -1099,63 +1119,113 @@ public final class AgentsModel {
     /// Parked, most recently parked first (040, FR-003).
     ///
     /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading
-    /// another client would not. Filtered from what is already held, so the archived
-    /// list's "show more" is a number in a view rather than a fetch.
+    /// another client would not.
     ///
     /// The folder is standardised on the way in, because an agent's `cwd` is whatever
     /// it was started with and a project's folder is the resolved form. Comparing them
     /// raw is how a project ends up looking empty while its agents are plainly running.
     public func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
-        guard let folder else { return [] }
-        return filed().byFolder[standardized(folder)]?[group] ?? []
+        guard folder != nil else { return [] }
+        return shelf(folder).groups[group] ?? []
     }
 
-    /// The buckets for what is held now, filed again if `agents` or `filesToShow` has
-    /// changed since they were. Both are read every time, so a view asking is still
-    /// redrawn when either changes.
-    private func filed() -> AgentBuckets {
-        let held = agents
-        _ = filesToShow
-        guard bucketsBuiltAt != bucketsRevision else { return buckets }
-        var built = AgentBuckets()
-        for agent in held {
-            if built.byID[agent.id] == nil { built.byID[agent.id] = agent }
-            let folder = projectFolder(of: agent)
+    /// Every agent of one project held, whatever its group.
+    public func agents(inFolder folder: URL?) -> [Agent] {
+        guard folder != nil else { return [] }
+        return shelf(folder).groups.values.flatMap { $0 }
+    }
+
+    // MARK: Filing (#165)
+
+    /// One agent into its place everywhere, out of where it was.
+    private func file(_ agent: Agent) {
+        let old = byID[agent.id]
+        let folder = agent.projectFolder
+        let group = group(of: agent)
+        byID[agent.id] = agent
+        // The list of everything: out of its old place, into its new one.
+        var all = agents
+        if let old {
+            let at = ProjectShelf.place(of: old, in: all, group: .finished)
+            if at < all.count, all[at].id == old.id { all.remove(at: at) } else { all.removeAll { $0.id == old.id } }
+        }
+        all.insert(agent, at: ProjectShelf.place(of: agent, in: all, group: .finished))
+        agents = all
+        if old == nil { agentCount = byID.count }
+        // Its shelves: in place when it stays where it was, moved when not.
+        let was = filedAs[agent.id]
+        let key = ShelfKey(folder: folder, host: agent.host)
+        if let old, let was, was.folder == folder, was.host == agent.host, was.group == group {
+            for shelf in [shelves[key], folderShelves[folder]].compactMap({ $0 }) {
+                if shelf.replace(old, with: agent, in: group) { continue }
+                shelf.remove(old, from: group)
+                shelf.insert(agent, in: group)
+            }
+        } else {
+            if let old, let was {
+                shelves[ShelfKey(folder: was.folder, host: was.host)]?.remove(old, from: was.group)
+                folderShelves[was.folder]?.remove(old, from: was.group)
+            }
+            shelf(ProjectKey(host: agent.host, folder: folder)).insert(agent, in: group)
+            shelf(folder).insert(agent, in: group)
+        }
+        filedAs[agent.id] = (folder, agent.host, group)
+        cells[agent.id]?.agent = agent
+        if titles[agent.id] != agent.title {
+            titles[agent.id] = agent.title
+            titlesRevision &+= 1
+        }
+    }
+
+    /// Agents let go of without being gone: an Archived fold closed, a search ended
+    /// (#165). The host still has them, and lists them again when asked.
+    public func forget(_ ids: some Sequence<UUID>) {
+        for id in ids { unfile(id) }
+    }
+
+    /// One agent out of everything (retired, 051).
+    private func unfile(_ id: UUID) {
+        guard let old = byID.removeValue(forKey: id) else { return }
+        agents.removeAll { $0.id == id }
+        agentCount = byID.count
+        if let was = filedAs.removeValue(forKey: id) {
+            shelves[ShelfKey(folder: was.folder, host: was.host)]?.remove(old, from: was.group)
+            folderShelves[was.folder]?.remove(old, from: was.group)
+        }
+        cells[id]?.agent = nil
+        if titles.removeValue(forKey: id) != nil { titlesRevision &+= 1 }
+    }
+
+    /// Everything filed again from a list: what a connect, a host's re-list or a big
+    /// page does, once, rather than a change at a time.
+    private func refile(_ held: [Agent]) {
+        var unique: [UUID: Agent] = [:]
+        for agent in held where unique[agent.id] == nil { unique[agent.id] = agent }
+        byID = unique
+        agents = unique.values.sorted(by: ProjectShelf.byActivity)
+        agentCount = unique.count
+        filedAs = [:]
+        var byKey: [ShelfKey: [AgentGroup: [Agent]]] = [:]
+        var byFolder: [URL: [AgentGroup: [Agent]]] = [:]
+        for agent in agents {
+            let folder = agent.projectFolder
             let group = group(of: agent)
-            built.byFolder[folder, default: [:]][group, default: []].append(agent)
-            built.byKey[AgentBuckets.Key(folder: folder, host: agent.host), default: [:]][group, default: []].append(agent)
+            filedAs[agent.id] = (folder, agent.host, group)
+            byKey[ShelfKey(folder: folder, host: agent.host), default: [:]][group, default: []].append(agent)
+            byFolder[folder, default: [:]][group, default: []].append(agent)
         }
-        // Parked reads most recently parked first (040, FR-003); the rest keep the
-        // newest-activity order `agents` is held in.
-        let parkedFirst: (Agent, Agent) -> Bool = {
-            ($0.parking?.parkedAt ?? .distantPast) > ($1.parking?.parkedAt ?? .distantPast)
+        for (key, groups) in byKey { byKey[key] = groups.sortingParked() }
+        for (folder, groups) in byFolder { byFolder[folder] = groups.sortingParked() }
+        for (key, shelf) in shelves where byKey[key] == nil { shelf.replaceAll([:]) }
+        for (key, groups) in byKey { shelf(ProjectKey(host: key.host, folder: key.folder)).replaceAll(groups) }
+        for (folder, shelf) in folderShelves where byFolder[folder] == nil { shelf.replaceAll([:]) }
+        for (folder, groups) in byFolder { shelf(folder).replaceAll(groups) }
+        for (id, cell) in cells where cell.agent != unique[id] { cell.agent = unique[id] }
+        let titles = unique.compactMapValues(\.title)
+        if titles != self.titles {
+            self.titles = titles
+            titlesRevision &+= 1
         }
-        for folder in built.byFolder.keys { built.byFolder[folder]?[.parked]?.sort(by: parkedFirst) }
-        for key in built.byKey.keys { built.byKey[key]?[.parked]?.sort(by: parkedFirst) }
-        buckets = built
-        bucketsBuiltAt = bucketsRevision
-        // A project's folder is resolved once per change rather than once per ask:
-        // `Project.standardize` asks the file system about every component of the path.
-        wantedFolders = [:]
-        return built
-    }
-
-    @ObservationIgnored private var wantedFolders: [URL: URL] = [:]
-
-    /// A project's folder as agents are filed under it, remembered until the next filing.
-    private func standardized(_ folder: URL) -> URL {
-        if let known = wantedFolders[folder] { return known }
-        let standardized = Project.standardize(folder)
-        wantedFolders[folder] = standardized
-        return standardized
-    }
-
-    /// The agent's folder as projects compare it, remembered after the first ask.
-    private func projectFolder(of agent: Agent) -> URL {
-        if let known = folders[agent.id] { return known }
-        let standardized = agent.projectFolder
-        folders[agent.id] = standardized
-        return standardized
     }
 
     /// Where an agent sits, counting a file it has asked the person to look at.
@@ -1181,32 +1251,22 @@ public final class AgentsModel {
     /// the way the check it replaced never did: a stopped agent that once asked to be
     /// looked at is under Stopped, and wants nobody (FR-008, FR-011, FR-012).
     public func counts(in folder: URL?) -> [AgentGroup: Int] {
-        guard let folder else { return [:] }
-        return (filed().byFolder[standardized(folder)] ?? [:]).mapValues(\.count)
+        guard folder != nil else { return [:] }
+        return shelf(folder).counts
     }
 
     /// How many finished conversations in this project nobody has looked at since,
     /// whichever group they are under. The number a project row shows in place of
     /// "complete": a complete chat that has been read is not news.
     public func unreadCount(in folder: URL?) -> Int {
-        guard let folder else { return 0 }
-        let groups = filed().byFolder[standardized(folder)] ?? [:]
-        return groups.values.reduce(0) { $0 + $1.count(where: \.showsUnread) }
+        guard folder != nil else { return 0 }
+        return shelf(folder).unread
     }
 
     /// `attentionCount(in:)` by folder alone, as the phone and the widget ask.
     public func attentionCount(in folder: URL?) -> Int {
-        guard let folder else { return 0 }
-        return Self.attention(in: filed().byFolder[standardized(folder)])
-    }
-
-    /// `wantsALook` counted over one project's buckets: every agent under Needs you or
-    /// Blocked, and the unread ones under the rest.
-    private static func attention(in groups: [AgentGroup: [Agent]]?) -> Int {
-        (groups ?? [:]).reduce(0) { total, bucket in
-            total + (bucket.key == .needsAttention || bucket.key == .blocked
-                ? bucket.value.count : bucket.value.count(where: \.showsUnread))
-        }
+        guard folder != nil else { return 0 }
+        return shelf(folder).attention
     }
 
     /// The question this agent is blocked on, if it still is.
@@ -1226,18 +1286,19 @@ public final class AgentsModel {
     }
 }
 
-/// `AgentsModel`'s agents filed by project folder (standardized) and group, and again
-/// by folder and host, each list in the order `agents(in:group:)` returns.
-private struct AgentBuckets {
-    struct Key: Hashable {
-        var folder: URL
-        var host: HostID
-    }
+/// Where a project's shelf is kept: its folder, standardized, and its host.
+private struct ShelfKey: Hashable {
+    var folder: URL
+    var host: HostID
+}
 
-    /// The first agent held with each id, as `agents.first { $0.id == id }` finds it.
-    var byID: [UUID: Agent] = [:]
-    var byFolder: [URL: [AgentGroup: [Agent]]] = [:]
-    var byKey: [Key: [AgentGroup: [Agent]]] = [:]
+private extension Dictionary where Key == AgentGroup, Value == [Agent] {
+    /// Parked reads most recently parked first; the rest are already newest first.
+    func sortingParked() -> Self {
+        var sorted = self
+        if let parked = sorted[.parked] { sorted[.parked] = parked.sorted(by: ProjectShelf.order(.parked)) }
+        return sorted
+    }
 }
 
 /// The events an Events page shows, and the same cut into days (#137).

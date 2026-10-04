@@ -992,8 +992,9 @@ struct DaemonSlashCommandTests {
                 ($0.id, $0.availableCommands.map(\.name))
             })
         }
-        #expect(await commands(.init())[archived] == ["review", "add-dir"])
-        let phone = await commands(.init(archivedCommands: false))
+        // One project's list, which is where archived agents come from (#164).
+        #expect(await commands(.init(folder: work))[archived] == ["review", "add-dir"])
+        let phone = await commands(.init(archivedCommands: false, folder: work))
         #expect(phone[kept] == ["review", "add-dir"])
         #expect(phone[archived] == [])
         #expect(await core.agent(archived)?.availableCommands.count == 2, "only the reply is trimmed")

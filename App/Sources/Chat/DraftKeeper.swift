@@ -174,7 +174,7 @@ struct KeepsDrafts: ViewModifier {
             }
             .onChange(of: text) { keeper.note(text, attachments, for: key) }
             .onChange(of: attachments) { keeper.note(text, attachments, for: key) }
-            .onChange(of: model.agents.count) { keeper.sweep(agents: model.agents) }
+            .onChange(of: model.work.agentCount) { keeper.sweep(agents: model.agents) }
             .onChange(of: model.draftCwd) { keeper.noteStartForm(from: model) }
             .onChange(of: model.draftRuntimeID) { keeper.noteStartForm(from: model) }
             .onChange(of: model.draftFolders) { keeper.noteStartForm(from: model) }
