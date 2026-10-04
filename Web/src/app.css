@@ -358,6 +358,8 @@ button.link.reading:hover { text-decoration: underline; }
 .locations { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0; }
 .locations > * { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note { display: flex; flex-direction: column; gap: 3px; }
+.sandbox-failure p { margin: 0; }
+.sandbox-failure .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 .note.switch {
   padding: 10px 12px;
   border-radius: var(--radius-card);
@@ -433,6 +435,9 @@ button.link.reading:hover { text-decoration: underline; }
 .background li { display: flex; gap: 6px; opacity: 0.75; }
 .background .noun { font-weight: 500; }
 .background .age { margin-left: auto; font-variant-numeric: tabular-nums; }
+.background li { align-items: baseline; }
+.background li.stopping { opacity: 0.5; }
+.background .stop { font-size: 11px; padding: 0 8px; }
 
 /* Cards above the prompt: a question or a permission, answered here or elsewhere. */
 .cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
@@ -962,3 +967,10 @@ button.plain:hover { opacity: 1; }
 .view-ask .buttons { display: flex; gap: 8px; margin: 0; }
 .view-context { font-size: 12px; }
 .view-box[hidden] { display: none !important; }
+/* A retired agent's page (051, #253): who it was, and nothing to do. */
+.retired-body { max-width: 620px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+.retired-body p { margin: 0; }
+.retired-body .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 4px 0 0; font-size: 13px; }
+.retired-body .facts dd { margin: 0; user-select: text; }
+/* A parked chat's line under its head (040, #253). */
+.park-strip { margin: 0; padding: 4px 16px; font-size: 12px; border-bottom: 1px solid var(--paper-rule); }

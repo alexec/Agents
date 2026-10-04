@@ -48,6 +48,14 @@ export function backgroundEnding(item: BackgroundItem): string {
   }
 }
 
+/** BackgroundEntryLine: the chat's line, a subagent or task starting or how it ended (#253). */
+export function backgroundEntryLine(item: BackgroundItem): string {
+  if (isRunning(item)) {
+    return item.kind === "subagent" ? `Started subagent “${item.name}” in the background` : `Started “${item.name}” in the background`;
+  }
+  return backgroundEnding(item);
+}
+
 /** How it ended, for a row still listed after it has; null while it runs. */
 export function backgroundEnded(item: BackgroundItem): string | null {
   switch (item.state) {

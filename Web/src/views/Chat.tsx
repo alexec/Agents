@@ -29,6 +29,7 @@ import { ViewLayerContext } from "./chat/AppView";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { BackToList } from "./BackToList";
 import { comingBackDescription } from "../model/status";
+import { parkLine } from "./SessionRow";
 
 const detailKey = "agents.turnDetail";
 
@@ -57,6 +58,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const timer = setTimeout(() => store.prewarm(host, session, "opened"), 1500);
     return () => clearTimeout(timer);
   }, [host, session]);
+  // Not held: perhaps retired, and then its page says who it was (051, #253).
+  useEffect(() => { if (!store.agent(host, session)) void store.lookUpRetired(host, session); }, [host, session]);
   const level = useSignal<TurnDetail>(defaultDetail.value);
   /** Turns opened or closed by hand, kept until the chat is left. */
   const chosen = useSignal<Record<string, TurnDetail>>({});
@@ -85,8 +88,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         setPane(session, { tab: "changes", changed: diff.path });
         showPane();
       },
+      // Answered only while the agent waits on it, and while its host answers (#253).
+      waitingSandbox: agent?.pendingSandboxFailure,
+      answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,
     };
-  }, [session]);
+  }, [session, agent?.pendingSandboxFailure, down]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const chatColumn = useRef<HTMLElement>(null);
@@ -233,6 +239,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {hostDown && <OfflineStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
+      {/* Why a parked chat is parked, and since when, as the window's strip says it (040, #253). */}
+      {agent && parkLine(agent) && <p class="park-strip quiet" role="status">{parkLine(agent)}</p>}
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
@@ -262,7 +270,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         </button>
       )}
       <footer class="foot">
-        <BackgroundRows agent={agent} />
+        <BackgroundRows store={store} host={host} agent={agent} disabled={down} />
         <Cards store={store} host={host} session={session} down={down} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder="Reply…" disabled={down || !agent}
           recipient={store.recipient(host)}
@@ -347,8 +355,11 @@ function Queued({ store, host, agent, disabled }: { store: Store; host: string; 
   );
 }
 
-/** What the agent left running, over the prompt (057). Stopping one is US3. */
-function BackgroundRows({ agent }: { agent: Agent | undefined }) {
+/**
+ * What the agent left running, over the prompt (057): Stop on what the runtime can stop, and a
+ * subagent says it stops with the agent, as BackgroundItemRow (#253).
+ */
+function BackgroundRows({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
   const now = useSignal(toWireDate(new Date()));
   const items = (agent?.background ?? []).filter(isRunning);
   useEffect(() => {
@@ -360,9 +371,16 @@ function BackgroundRows({ agent }: { agent: Agent | undefined }) {
   return (
     <ul class="background" aria-label="In the background">
       {items.map((item) => (
-        <li key={item.id} title={item.command ?? item.detail ?? item.name}>
+        <li key={item.id} title={item.command ?? item.detail ?? item.name} class={item.isStopping ? "stopping" : undefined}>
           <span class="noun">{backgroundNoun(item)}</span> {item.name}
-          <span class="age">{backgroundEnded(item) ?? backgroundAge(item, now.value)}</span>
+          <span class="age">{item.isStopping ? "Stopping…" : backgroundEnded(item) ?? backgroundAge(item, now.value)}</span>
+          {item.canStop ? (
+            <button class="stop" disabled={disabled || item.isStopping} aria-label={`Stop ${item.name}`}
+              title={`Stop ${item.name}, and nothing else the agent is doing`}
+              onClick={() => agent && void store.stopBackground(host, agent.id, item.id)}>Stop</button>
+          ) : item.kind === "subagent" && (
+            <span class="faint" title="Neither Claude nor Codex can stop one subagent alone. Stop the agent to stop it.">stops with the agent</span>
+          )}
         </li>
       ))}
     </ul>

@@ -3,7 +3,7 @@
 // (research R7). Nothing here decides anything; the hosts do.
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, Tombstone, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
@@ -176,6 +176,8 @@ export class Work {
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
   /** Each host's resources and who holds them (036, #116): read-only on the page. */
   readonly leases = signal<Record<string, LeaseSnapshot>>({});
+  /** Retired agents a link led to, by `host|id`: who they were, for the retired page (051, #253). */
+  readonly tombstones = signal<Record<string, Tombstone>>({});
   /** Each host's chats it is bringing back by itself after a restart: Coming back (#251). */
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
@@ -1199,6 +1201,24 @@ export class Store extends Work {
 
   async unqueue(host: string, agentID: string, promptID: string): Promise<void> {
     await this.act("agents/unqueue", { agentID: agentID as UUID, promptID: promptID as UUID }, host);
+  }
+
+  /** Who an agent was, when it is not held and may have been retired; nothing when it wasn't. */
+  async lookUpRetired(host: string, agentID: string): Promise<void> {
+    if (this.tombstones.peek()[`${host}|${agentID}`]) return;
+    const found = await this.link.call("agents/retired", { ids: [agentID as UUID] }, host).catch(() => null);
+    const gone = found?.find((t) => t.id === agentID);
+    if (gone) this.tombstones.value = { ...this.tombstones.value, [`${host}|${agentID}`]: gone };
+  }
+
+  /** One task an agent left running, and nothing else it is doing (057, #253). */
+  async stopBackground(host: string, agentID: string, itemID: string): Promise<void> {
+    await this.act("agents/stopBackground", { agentID: agentID as UUID, itemID }, host);
+  }
+
+  /** A runtime's sandbox that could not start (064, #253): Continue without it, or Keep stopped. */
+  async answerSandbox(host: string, agentID: string, carryOn: boolean): Promise<void> {
+    await this.act("agents/answerSandbox", { agentID: agentID as UUID, carryOn }, host);
   }
 
   async perform(host: string, agentID: string,

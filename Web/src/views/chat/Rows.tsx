@@ -6,11 +6,11 @@ import { createContext } from "preact";
 import { useContext, useEffect } from "preact/hooks";
 import type {
   AgentState, BackgroundItem, ContentBlock, EndedReason, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
-  SwitchRecord, TranscriptEntry, WorkReport,
+  SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
 import { Lines } from "../Changes";
-import { backgroundEnding } from "../../model/background";
+import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, startingLabel } from "../../model/status";
 import {
@@ -19,6 +19,7 @@ import {
 import { Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
 import { switchNote } from "../../model/switchNote";
+import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { memo } from "../../render/memo";
 
 /** How much of a turn is drawn (TurnDetail). */
@@ -126,6 +127,9 @@ function ReportLine({ report }: { report: WorkReport }) {
 export interface CallActions {
   open: (location: ToolCallLocation) => void;
   showEdit: (diff: Extract<ToolCallContent, { type: "diff" }>, toolCallID: string | undefined) => void;
+  /** The sandbox failure the open agent waits on an answer to (Agent.pendingSandboxFailure, #253). */
+  waitingSandbox?: SandboxFailureRecord | undefined;
+  answerSandbox?: ((carryOn: boolean) => Promise<void>) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -224,6 +228,38 @@ function SwitchNote({ record }: { record: SwitchRecord }) {
   );
 }
 
+/**
+ * SandboxFailureCard (064, #253): what happened, what Continue without sandbox would change, and
+ * the two answers while the card waits. An answered or superseded card keeps saying what happened.
+ */
+function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
+  const actions = useContext(CallActionsContext);
+  const sending = useSignal(false);
+  const waiting = actions?.answerSandbox !== undefined && actions.waitingSandbox !== undefined
+    && JSON.stringify(actions.waitingSandbox) === JSON.stringify(record);
+  const words = sandboxCard(record);
+  const answer = (carryOn: boolean) => {
+    sending.value = true;
+    void actions!.answerSandbox!(carryOn).finally(() => (sending.value = false));
+  };
+  return (
+    <div class={`note switch sandbox-failure${waiting ? " waiting" : ""}`} role={waiting ? "alert" : undefined}>
+      <p class="strong">{words.title}</p>
+      <p>{words.body}</p>
+      {record.detail && <details><summary class="quiet">Show error details</summary><pre>{record.detail}</pre></details>}
+      {(waiting || !record.recoveryOffered) && <p class="quiet">{words.offer}</p>}
+      {waiting && (
+        <p class="answers">
+          <button disabled={sending.value} onClick={() => answer(false)}>{keepStopped}</button>
+          {record.recoveryOffered && (
+            <button class="prominent" disabled={sending.value} onClick={() => answer(true)}>{continueWithout}</button>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** One entry, drawn as its kind is (EntryRow). */
 export function EntryRow({ entry }: { entry: TranscriptEntry }) {
   switch (kindOf(entry)) {
@@ -304,15 +340,8 @@ export function EntryRow({ entry }: { entry: TranscriptEntry }) {
       return <p class="quiet">{fields(entry, "runtimeNote")!._0}</p>;
     case "poolSwitch":
       return <SwitchNote record={fields(entry, "poolSwitch")!._0} />;
-    case "sandboxFailure": {
-      const record = fields(entry, "sandboxFailure")!._0;
-      return (
-        <div class="note switch">
-          <p class="strong">Its sandbox could not start</p>
-          <details><summary class="quiet">Show error details</summary><pre>{record.detail}</pre></details>
-        </div>
-      );
-    }
+    case "sandboxFailure":
+      return <SandboxFailureCard record={fields(entry, "sandboxFailure")!._0} />;
     case "settingsChanged": {
       const record = fields(entry, "settingsChanged")!._0;
       const carried = record.carried.flatMap((s) => (typeof s.to === "string" ? [`${s.name} ${s.to}`] : []));
@@ -329,8 +358,11 @@ export function EntryRow({ entry }: { entry: TranscriptEntry }) {
     }
     case "appView":
       return <AppView call={fields(entry, "appView")!._0} />;
-    case "background":
-      return <p class="quiet">{backgroundEnding(fields(entry, "background")!._0)}</p>;
+    case "background": {
+      // As the window's line: how it started or ended, a failure in the failure tint (#253).
+      const item = fields(entry, "background")!._0;
+      return <p class={item.state === "failed" ? "failure" : "quiet"}>{backgroundEntryLine(item)}</p>;
+    }
     default:
       // Written by a newer build: kept in the record, drawn as nothing.
       return null;
