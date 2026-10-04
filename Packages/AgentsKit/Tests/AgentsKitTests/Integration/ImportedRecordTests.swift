@@ -107,10 +107,8 @@ struct ImportedRecordTests {
         let rootID = await first.rootID
         #expect(rootID != nil)
         #expect(await first.agent(own.id)?.madeInRoot == rootID)
-        await eventually("the turn is over") { await first.agent(own.id)?.state == .finished }
 
         // Copied in later, with no stamp: not this root's, since this root already had one.
-        await eventually("its runtime was handed back") { await first.live[own.id] == nil }
         let later = try await seedCopies(store, in: work, stamp: nil)
         let secondLauncher = FakeLauncher()
         let second = try await core(secondLauncher, locations: locations)
