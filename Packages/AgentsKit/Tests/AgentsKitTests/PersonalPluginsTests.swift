@@ -75,14 +75,15 @@ struct PersonalPluginsTests {
         let meta = await core.sessionMeta(runtimeID: "grok", cwd: work)
         #expect(meta?["pluginDirs"]?.arrayValue?.compactMap(\.stringValue) == [project.path, personal.path])
 
-        let grok = await core.sessionServers(runtimeID: "grok", chosen: [], token: "t", managesAgents: true,
-                                             cwd: work, capabilities: nil)
+        let http = ACP.MCPCapabilities(http: true, sse: false)
+        let grok = try await core.sessionServers(runtimeID: "grok", chosen: [], token: "t", managesAgents: true,
+                                                 cwd: work, capabilities: http)
         #expect(grok.map(\.name) == ["agents", "plover-mcp"])
         #expect(grok.last?.transport == .stdio(command: "\(personal.path)/run", args: ["x"], env: [:]))
 
         for runtime in ["claude", "codex", "cursor"] {
-            let servers = await core.sessionServers(runtimeID: runtime, chosen: [], token: "t", managesAgents: true,
-                                                    cwd: work, capabilities: nil)
+            let servers = try await core.sessionServers(runtimeID: runtime, chosen: [], token: "t",
+                                                        managesAgents: true, cwd: work, capabilities: http)
             #expect(servers.map(\.name) == ["agents"], "\(runtime)")
         }
     }

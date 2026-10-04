@@ -48,25 +48,15 @@ extension DaemonCore {
         return answer
     }
 
-    /// A token speaks for its agent only from inside that agent's runtime.
+    /// A token speaks for its agent only through the app's own MCP endpoint (#185).
     ///
-    /// The token is in the helper's environment, which every process of this account
-    /// can still read on a shared host. So a call carrying one has to come from a
-    /// process the agent's own runtime started — the helper, through `npx` or a shell
-    /// at most — or it is turned away as if the token meant nothing. A token nobody
-    /// holds is left for the method to refuse in its own words.
-    ///
-    /// For a runtime that takes its stdio servers through the bridge (Copilot, 054), the
-    /// helper is this daemon's child, started for the token's route only on a request that
-    /// carried the route's bearer, which only the runtime holds. That counts the same.
+    /// The endpoint calls `handle` from inside this process, so `peer` is nil. A call
+    /// carrying a live token over the socket comes from no runtime the daemon handed it
+    /// to, since none is told the socket any more, and is turned away as if the token meant
+    /// nothing. A token nobody holds is left for the method to refuse in its own words.
     func tokenRefusal(_ params: JSONValue?, peer: Int32?) async -> JSONRPCError? {
-        guard let peer, let token = params?["token"]?.stringValue,
-              let agentID = appTokens[token] else { return nil }
-        if let runtime = await live[agentID]?.processIdentifier, PeerCredentials.descends(peer, from: runtime) {
-            return nil
-        }
-        if isBridged(peer, token: token) { return nil }
-        DaemonLog.shared.write("refused a token call from pid \(peer): not started by that agent's runtime")
+        guard let peer, let token = params?["token"]?.stringValue, appTokens[token] != nil else { return nil }
+        DaemonLog.shared.write("refused a token call from pid \(peer) over the socket")
         return JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                             message: "That conversation is not open to this process, so nothing was done.")
     }

@@ -5,7 +5,7 @@ import Testing
 
 /// Opt-in, against the real runtimes:
 ///
-///     AGENTS_LIVE=1 AGENTS_MCP_HELPER=<path to agentsd> swift test --filter Live
+///     AGENTS_LIVE=1 swift test --filter Live
 ///
 /// The one question a fake cannot answer. Nothing in ACP or MCP makes a runtime call a
 /// tool at the end of a turn, so whether an ending is ever accounted for comes down to
@@ -23,8 +23,7 @@ import Testing
 // Serialised: three runtimes at once is three models and three sets of output
 // interleaved, which is a report nobody can read.
 @Suite("Live: whether a runtime says how it went", .serialized,
-       .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"
-                && ProcessInfo.processInfo.environment["AGENTS_MCP_HELPER"] != nil),
+       .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"),
        .timeLimit(.minutes(10)))
 struct OutcomeReportLiveTests {
     /// A daemon of its own, on its own socket, so this never touches the real one.

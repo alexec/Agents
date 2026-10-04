@@ -11,8 +11,8 @@ import Foundation
 public enum ConnectionRole: String, Sendable, Hashable {
     /// The app or the bridge, as their code signatures say: everything.
     case control
-    /// The `agentsd mcp` helper a runtime starts for its agent: that agent's tools,
-    /// each call carrying the agent's token.
+    /// An agent's call to the app's own tools, through the daemon's MCP endpoint (#185):
+    /// that agent's tools, each call carrying the agent's token.
     case agent
     /// A phone, an iPad or a browser, carried by the bridge on the LAN link or the relay,
     /// or opened for one by the control plane: everything a window may (#111). What sets

@@ -154,6 +154,15 @@ public actor DaemonCore {
     /// (054, research R11). It listens only once a session needs it.
     let bridge = MCPBridge()
     #endif
+    /// The app's own `agents` MCP server, served here over loopback http to every
+    /// runtime (#185). It listens only once a session needs it.
+    lazy var appTools = AppToolsEndpoint { [weak self] method, params in
+        guard let self else {
+            return .failure(JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
+                                         message: "The app is not running, so nothing was shown."))
+        }
+        return await self.appToolCall(method: method, params: params)
+    }
     /// Agents whose next prompt carries the `Briefing`: the few things about this app
     /// an agent is told in words. Set when a conversation starts, and again only if a
     /// runtime loses one and we have to begin a new one — the briefing lives in the
@@ -1436,6 +1445,7 @@ public actor DaemonCore {
         #if canImport(Network) && canImport(Security)
         bridge.stopAll()
         #endif
+        appTools.stop()
 
         // Two different things, both going. The agent's terminals are 003's and are
         // killed because the agent owning them is stopping. The user's shells are this

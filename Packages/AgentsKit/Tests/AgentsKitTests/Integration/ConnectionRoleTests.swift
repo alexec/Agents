@@ -372,18 +372,19 @@ struct ConnectionRoleTests {
         #expect(policy.summary.hasPrefix("not signed by a team"))
     }
 
-    /// Every method `agentsd mcp` relays is one an agent's connection may call. A tool
-    /// relayed and not allowed is a tool the agent is offered and always refused —
-    /// `park_agent` was, with "agents/parkHelper is not open to this connection" (#64).
-    /// Read from the sources, since the helper is an executable no test can import.
+    /// Every method the app's tools relay is one an agent's call may make. A tool relayed
+    /// and not allowed is a tool the agent is offered and always refused — `park_agent`
+    /// was, with "agents/parkHelper is not open to this connection" (#64). Read from the
+    /// sources, so a tool added to the relay without opening its method fails here.
     @Test func everyMethodTheHelperRelaysIsOpenToIt() throws {
         let package = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
-        let helper = try String(contentsOf: package.appending(path: "../../Daemon/Sources/main.swift"), encoding: .utf8)
+        let helper = try String(contentsOf: package.appending(path: "Sources/AgentsKit/ACP/Serve/AppService+Relay.swift"),
+                                encoding: .utf8)
         let roles = try String(contentsOf: package.appending(path: "Sources/AgentsKitCore/Daemon/ConnectionRole.swift"),
                                encoding: .utf8)
         let allowed = roles.components(separatedBy: "public static let pairingMethods")[0]
-        let relayed = helper.matches(of: /relay\(DaemonAPI\.Method\.(\w+)/).map { String($0.output.1) }
+        let relayed = helper.matches(of: /send\(DaemonAPI\.Method\.(\w+)/).map { String($0.output.1) }
         #expect(relayed.count >= 16)
         for name in Set(relayed) {
             #expect(allowed.contains("DaemonAPI.Method.\(name),"), "\(name) is relayed but not open to an agent")

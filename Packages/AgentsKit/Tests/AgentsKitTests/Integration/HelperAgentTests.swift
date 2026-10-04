@@ -519,14 +519,22 @@ struct HelperAgentTests {
         let launcher = FakeLauncher()
         let core = try await makeCore(locations, launcher)
         let (_, token) = try await caller(core, in: work)
-        let callerArgs = await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue?
-            .first?["args"]?.arrayValue?.compactMap(\.stringValue) ?? []
-        #expect(!callerArgs.contains(DaemonCore.noAgentToolsFlag), "the person's agent has them")
+        let callerTools = await eventuallySome("the lead listed its tools") {
+            await launcher.lastAgent?.newSessionAppTools
+        } ?? []
+        #expect(callerTools.contains(AppTool.startAgent), "the person's agent has them")
 
         let helper = try await start(core, token)
-        let madeArgs = await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue?
-            .first?["args"]?.arrayValue?.compactMap(\.stringValue) ?? []
-        #expect(madeArgs.contains(DaemonCore.noAgentToolsFlag))
+        // Listed over http as its session is made, which is after `start_agent` answers.
+        let madeTools = await eventuallySome("the helper listed its tools") { () async -> [String]? in
+            guard let session = await core.agent(helper)?.runtimeSessionID else { return nil }
+            for agent in launcher.allAgents where await agent.sessionID == session {
+                return await agent.newSessionAppTools
+            }
+            return nil
+        } ?? []
+        #expect(madeTools.contains(AppTool.finishTurn))
+        #expect(!madeTools.contains(AppTool.startAgent))
 
         _ = await eventually("the helper's turn ended and its runtime went") {
             let settled = await core.agent(helper)?.state.holdsRuntime == false
@@ -538,16 +546,16 @@ struct HelperAgentTests {
         // assumed to be the newest: the lead is picked back up too, to be asked how
         // its work went, and under load that can land after this.
         let sessionID = await core.agent(helper)?.runtimeSessionID
-        let resumedArgs = await eventuallySome("it was picked back up") { () async -> [String]? in
+        let resumedTools = await eventuallySome("it was picked back up") { () async -> [String]? in
             for agent in launcher.allAgents.reversed() {
                 guard let params = await agent.continuedSessionParams,
                       params["sessionId"]?.stringValue == sessionID else { continue }
-                return params["mcpServers"]?.arrayValue?.first?["args"]?.arrayValue?
-                    .compactMap(\.stringValue)
+                return await agent.continuedSessionAppTools
             }
             return nil
         } ?? []
-        #expect(resumedArgs.contains(DaemonCore.noAgentToolsFlag), "\(resumedArgs)")
+        #expect(resumedTools.contains(AppTool.finishTurn), "\(resumedTools)")
+        #expect(!resumedTools.contains(AppTool.startAgent), "\(resumedTools)")
     }
 
     @Test func aWorkflowsAgentMayStartOne() async throws {

@@ -110,7 +110,8 @@ launchctl print gui/$(id -u)/com.alexecollins.agentshost.daemon | grep -E 'state
 
 # Everything it owns
 ls ~/Library/Application\ Support/Agents/
-#   daemon.sock   agents' own tools connect here (agentsd mcp)
+#   daemon.sock   the window, Agents Host and the Remote's bridge connect here
+#                 (agents' own tools are served on a loopback http port instead)
 #   daemon.lock   flock, held by the one daemon
 #   daemon.log    what it has been doing
 #   agents/<uuid>/agent.json        the record, written whole on every change

@@ -15,7 +15,9 @@ import Foundation
 /// `list_my_agents` (028) — and are offered only to an agent the person or a workflow started.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
-/// JSON-RPC over a pipe, which is what `JSONRPCConnection` already does for ACP.
+/// JSON-RPC, which the daemon's loopback endpoint hands it one request at a time
+/// (`AppToolsEndpoint`, #185). A transport is still taken, for tests that talk to it
+/// over a pipe.
 public actor AppService {
     /// The one call that ends a turn (023): how it went, and what to ask next. A
     /// runtime may prefix it — the Claude adapter shows it as
@@ -163,7 +165,7 @@ public actor AppService {
     /// Where those go.
     public typealias SessionsSink = @Sendable (SessionCall) async -> Outcome
 
-    private let connection: JSONRPCConnection
+    private let connection: JSONRPCConnection?
     private let finishSink: FinishSink
     private let fileSink: FileSink
     private let askFormSink: AskFormSink
@@ -182,7 +184,7 @@ public actor AppService {
     private let movesItself: Bool
     private let box = ServiceBox()
 
-    public init(transport: any LineTransport,
+    public init(transport: (any LineTransport)?,
                 managesAgents: Bool = true,
                 movesItself: Bool = true,
                 finishTurn: @escaping FinishSink = { _, _, _, _, _ in
@@ -222,19 +224,22 @@ public actor AppService {
         self.dashboardSink = dashboard
         self.managesAgents = managesAgents
         self.movesItself = movesItself
-        self.connection = JSONRPCConnection(transport: transport) { method, params in
-            await box.handle(method: method, params: params)
+        self.connection = transport.map { transport in
+            JSONRPCConnection(transport: transport) { method, params in
+                await box.handle(method: method, params: params)
+            }
         }
-        Task { await self.attach() }
+        if connection != nil { Task { await self.attach() } }
     }
 
     private func attach() async {
         box.attach(self)
-        await connection.start()
+        await connection?.start()
     }
 
-    /// Answer until the runtime closes the pipe, which it does when its session ends.
+    /// Answer until the other end closes the pipe. Returns at once without one.
     public func run() async {
+        guard let connection else { return }
         for await _ in connection.incomingNotifications() {
             // `notifications/initialized` and whatever else a client sends. None of it
             // needs an answer; draining the stream is what keeps this task alive.
@@ -242,9 +247,12 @@ public actor AppService {
     }
 
     public func close() async {
-        await connection.close()
+        await connection?.close()
     }
 
+    /// One request, answered: what the endpoint calls for each POST, and the pipe for
+    /// each line. Anything not here (`server/discover`, which Claude and Copilot send
+    /// before `initialize`, #186) is -32601, and the client carries on.
     func handle(method: String, params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
         switch method {
         case "initialize":

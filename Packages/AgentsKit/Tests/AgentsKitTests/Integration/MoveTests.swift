@@ -113,14 +113,15 @@ struct MoveTests {
         }
     }
 
-    /// Every argument the app's tool server was started with, across every session made
-    /// or picked up, so a later runtime (the question about a silent turn) is counted too.
-    private func serverArguments(_ launcher: FakeLauncher) async -> [String] {
-        var all: [String] = []
+    /// `finish_turn`'s arguments as each runtime listed them over the app's server (#185),
+    /// across every session made or picked up, so a later runtime (the question about a
+    /// silent turn) is counted too.
+    private func finishTurnSchemas(_ launcher: FakeLauncher) async -> [[String]] {
+        var all: [[String]] = []
         for runtime in launcher.allAgents {
-            for params in [await runtime.newSessionParams, await runtime.continuedSessionParams] {
-                let servers = params?["mcpServers"]?.arrayValue ?? []
-                all += servers.compactMap { $0["args"]?.arrayValue?.compactMap(\.stringValue) }.flatMap { $0 }
+            for tools in [await runtime.newSessionAppToolList, await runtime.continuedSessionAppToolList] {
+                guard let finish = tools?.first(where: { $0["name"]?.stringValue == AppTool.finishTurn }) else { continue }
+                all.append(finish["inputSchema"]?["properties"]?.objectValue.map { Array($0.keys) } ?? [])
             }
         }
         return all
@@ -592,7 +593,10 @@ struct MoveTests {
         let repo = try await repository()
         let core = try await makeCore(repo, FakeLauncher())
         let id = try await idleAgent(core, repo)
-        let started = try #require(await core.agent(id)?.startingPoint)
+        // Taken beside the start, not in it: under load it can land after the agent is idle.
+        let started = try #require(await eventuallySome("the starting point was taken") {
+            await core.agent(id)?.startingPoint
+        })
         _ = try await personMove(core, id, .newWorktree(name: "measured"))
         let agent = try #require(await core.agent(id))
         let root = try #require(agent.worktree?.root)
@@ -804,8 +808,8 @@ struct MoveTests {
         #expect(error?.message.contains("can't carry its conversation into another folder") == true)
         #expect(await core.agent(id)?.cwd == repo.project)
         #expect(worktreesMade(repo).isEmpty)
-        let args = await serverArguments(launcher)
-        #expect(args.contains(DaemonCore.noMoveToolsFlag))
+        let schemas = await finishTurnSchemas(launcher)
+        #expect(!schemas.isEmpty && schemas.allSatisfy { !$0.contains("worktree") })
     }
 
     @Test func anAgentOnARuntimeThatCarriesItsConversationIsOfferedTheTools() async throws {
@@ -813,8 +817,8 @@ struct MoveTests {
         let launcher = FakeLauncher()
         let core = try await makeCore(repo, launcher)
         _ = try await idleAgent(core, repo, runtime: "claude")
-        let args = await serverArguments(launcher)
-        #expect(!args.contains(DaemonCore.noMoveToolsFlag))
+        let schemas = await finishTurnSchemas(launcher)
+        #expect(!schemas.isEmpty && schemas.allSatisfy { $0.contains("worktree") })
     }
 
     // MARK: The terminal (T037)

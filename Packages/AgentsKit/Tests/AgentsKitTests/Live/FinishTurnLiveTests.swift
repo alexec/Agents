@@ -5,7 +5,7 @@ import Testing
 
 /// Opt-in, against the real runtimes:
 ///
-///     AGENTS_LIVE=1 AGENTS_MCP_HELPER=<path to agentsd> swift test --filter FinishTurnLiveTests
+///     AGENTS_LIVE=1 swift test --filter FinishTurnLiveTests
 ///
 /// The one question a fake cannot answer: whether a runtime, told once in the
 /// briefing, ends its turns with the one call. `OutcomeReportLiveTests` asked it of
@@ -14,8 +14,7 @@ import Testing
 ///
 /// A failure here is news about someone else's software, not a bug in this one.
 @Suite("Live: whether a runtime ends its turns", .serialized,
-       .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"
-                && ProcessInfo.processInfo.environment["AGENTS_MCP_HELPER"] != nil),
+       .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"),
        .timeLimit(.minutes(10)))
 struct FinishTurnLiveTests {
     /// A daemon of its own, on its own socket, so this never touches the real one.
@@ -93,7 +92,9 @@ struct FinishTurnLiveTests {
     /// the runtime, the call comes back down our socket, and both halves land. Asked
     /// for outright, so this is about the plumbing rather than whether a model felt
     /// like it.
-    @Test(arguments: ["claude", "grok"])
+    /// Every runtime, since the app's tools reach each of them over http alone (#185):
+    /// a runtime that cannot take them fails here rather than in someone's turn.
+    @Test(arguments: ["claude", "codex", "copilot", "cursor", "gemini", "grok", "opencode", "antigravity"])
     func askedOutrightItCallsIt(runtimeID: String) async throws {
         guard installed(runtimeID) else { return }
         let agent = try await run(runtimeID, asking: """

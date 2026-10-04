@@ -8,8 +8,8 @@ import Security
 /// from the client (054, research R11).
 ///
 /// Copilot refuses every stdio server an ACP client sends ("Rejecting non-http/sse MCP
-/// server … from client", R9), the app's own `agents` server included. So for Copilot each
-/// one is swapped for a route here: `http://127.0.0.1:<port>/mcp/<route>` with a bearer of its
+/// server … from client", R9). The app's own `agents` server is http already (#185), so
+/// only the person's own stdio servers come here: for Copilot each one is swapped for a route here: `http://127.0.0.1:<port>/mcp/<route>` with a bearer of its
 /// own. The bridge starts the server on the route's first request, exactly as the runtime
 /// would have, and passes JSON-RPC lines between the two.
 ///
@@ -77,16 +77,6 @@ final class MCPBridge: @unchecked Sendable {
         for route in ended {
             route.process?.end(reason: "The agent's session has ended.")
             log("bridge: route \(route.id.prefix(6)) for \(route.name) ended (session over)")
-        }
-    }
-
-    /// The processes running for a token's routes. Each was started only by a request
-    /// carrying its route's bearer, which only the agent's runtime was given, so they speak
-    /// for that agent as a helper the runtime started itself would.
-    func processIdentifiers(for token: String) -> [Int32] {
-        lock.withLock {
-            routes.values.filter { $0.token == token }
-                .compactMap { $0.process?.isRunning == true ? $0.process?.processIdentifier : nil }
         }
     }
 
