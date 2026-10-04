@@ -48,7 +48,8 @@ struct ReconnectTriggerTests {
     }
 
     func backoff(_ clock: FakeClock) -> Backoff {
-        Backoff(first: .seconds(1), longest: .seconds(30)) { try await clock.sleep($0) }
+        // Jitter at its most, so each wait is the whole of it: the spread is ReconnectScheduleTests'.
+        Backoff(first: .seconds(1), longest: .seconds(30), sleep: { try await clock.sleep($0) }, jitter: { 1 })
     }
 
     @Test func waitsDoubleUpToTheLongest() async {

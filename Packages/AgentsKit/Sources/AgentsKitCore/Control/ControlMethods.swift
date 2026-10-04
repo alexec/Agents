@@ -107,29 +107,37 @@ public actor ControlMethods: ControlHandling {
     ///
     /// `lastSeen` is written at most hourly (R4): a connect is not a write.
     public func admit(_ client: ClientRecord) async throws {
+        let said: Bool
         do {
-            try await admitOnce(client)
+            said = try await admitOnce(client)
         } catch StoreError.conflict {
             try await records.load()
-            try await admitOnce(client)
+            said = try await admitOnce(client)
         }
+        // A connect is said once, by the router, as the client's link changing; this says
+        // only a client that is new or renamed (#172). An hourly `lastSeen` is not news.
+        guard said else { return }
         let changed = await records.clients
         Task { await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
                                               ["client": .string(client.id.uuidString)]) }
         Task { await hooks.clientsChanged(changed) }
     }
 
-    private func admitOnce(_ client: ClientRecord) async throws {
+    /// Whether the client is new or renamed.
+    private func admitOnce(_ client: ClientRecord) async throws -> Bool {
         if var known = await records.client(client.id) {
             let stale = known.lastSeen.map { Date().timeIntervalSince($0) > 3600 } ?? true
-            guard stale || known.name != client.name else { return }
+            let renamed = known.name != client.name
+            guard stale || renamed else { return false }
             known.lastSeen = Date()
             known.name = client.name
             try await records.save(known)
+            return renamed
         } else {
             var fresh = client
             fresh.lastSeen = fresh.lastSeen ?? Date()
             try await records.save(fresh)
+            return true
         }
     }
 
@@ -338,7 +346,8 @@ public actor ControlMethods: ControlHandling {
             return [:]
         case DaemonAPI.Method.hostHello:
             let hello = try Self.require(params, as: DaemonAPI.HostHello.self)
-            var record = await records.host(host) ?? HostRecord(id: host, name: hello.name ?? host.rawValue)
+            let known = await records.host(host)
+            var record = known ?? HostRecord(id: host, name: hello.name ?? host.rawValue)
             record.version = hello.version
             record.platform = hello.platform
             record.machineID = hello.machineID
@@ -347,7 +356,10 @@ public actor ControlMethods: ControlHandling {
             // only by an operator (`hosts/setRelay`). A host's own hello never makes it a
             // relay: one that runs agents would otherwise hear every host's headlines and
             // hold every device's notices (T102).
-            try await enroll(record)
+            // Written, and said, only when the hello changed something: the uplink coming up
+            // has already been said, by the router, as the host going online (#172).
+            var changed = record != known
+            if changed { try await enroll(record) }
             // The home host is where a device's plain connection goes: the host on the
             // control plane's own machine, or, on a control plane with none (servers only,
             // like the review demo), the first host to join until one on its machine does.
@@ -359,10 +371,13 @@ public actor ControlMethods: ControlHandling {
                 if home == nil || (onThisMachine && home != host && !homeIsHere) {
                     try await setHomeHost(host)
                     await router?.setHomeHost(host)
+                    changed = true
                 }
             }
-            await router?.broadcastControl(DaemonAPI.Notification.controlHostChanged,
-                                           ControlRouter.describe(host, .online))
+            if changed {
+                await router?.broadcastControl(DaemonAPI.Notification.controlHostChanged,
+                                               ControlRouter.describe(host, .online))
+            }
             if record.relay == true { await hooks.relayChanged(host) }
             return [:]
         case DaemonAPI.Method.attentionNeed:

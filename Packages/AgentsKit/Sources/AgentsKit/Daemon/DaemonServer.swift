@@ -162,7 +162,9 @@ public final class DaemonServer: @unchecked Sendable {
         // Only this account may connect. Connecting takes write permission on the
         // socket, and `bind` made it with whatever the umask left.
         chmod(path, 0o600)
-        guard listen(listenFD, 16) == 0 else {
+        // The kernel's most, not 16: after a restart every helper, the bridge, the window and
+        // Agents Host dial at once, and a burst of 200 had 111 refused (#172).
+        guard listen(listenFD, SOMAXCONN) == 0 else {
             close(listenFD)
             throw DaemonServerError.cannotListen(errno: errno)
         }

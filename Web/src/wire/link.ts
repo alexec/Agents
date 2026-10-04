@@ -48,13 +48,26 @@ export interface LinkOptions {
   origin: string;
   keys: KeyStore;
   open?: (url: string) => SocketLike;
-  /** Seconds before each retry; the last repeats. Jitter up to 20% is added. */
+  /** Seconds before each retry; the last repeats. Each is taken between half and all of
+   * it at random, as every other client does (#172). */
   backoff?: number[];
+  /** How long, in ms, a connection must last before the next loss starts from the first step. */
+  healthyAfter?: number;
   /** How often to check the socket, and how long to wait for the answer. */
   heartbeat?: { every: number; within: number };
   random?: () => number;
   /** The exchange; the real one unless a test stands in for it. */
   authenticate?: (socket: LineSocket, record: KeyRecord, origin: string) => Promise<Admitted>;
+}
+
+/**
+ * Milliseconds before retry number `attempt` (from 0): the step, doubling to the last, taken
+ * between half and all of it by `random` (0 to 1), as the apps' `ReconnectSchedule` does, so
+ * that pages that lost the control plane together don't come back in step (#172).
+ */
+export function retryDelay(steps: number[], attempt: number, random: number): number {
+  const step = steps[Math.min(attempt, steps.length - 1)]!;
+  return step * 1000 * (0.5 + 0.5 * Math.min(Math.max(random, 0), 1));
 }
 
 /** Close code the control plane sends a forgotten client (contracts/browser-auth.md). */
@@ -117,6 +130,7 @@ export class Link {
   private socket: SocketLike | null = null;
   private stopped = true;
   private attempt = 0;
+  private openedAt: number | null = null;
   private retry: ReturnType<typeof setTimeout> | null = null;
   private beat: ReturnType<typeof setInterval> | null = null;
   private nextID = 1;
@@ -127,7 +141,8 @@ export class Link {
 
   constructor(options: LinkOptions) {
     this.options = {
-      backoff: [1, 2, 4, 8, 10],
+      backoff: [1, 2, 4, 8, 16, 30],
+      healthyAfter: 10_000,
       heartbeat: { every: 5_000, within: 3_000 },
       random: Math.random,
       authenticate: connect,
@@ -230,7 +245,7 @@ export class Link {
       try {
         const admitted = await this.options.authenticate(lines, record, this.options.origin);
         authed = true;
-        this.attempt = 0;
+        this.openedAt = Date.now();
         log("link.open");
         this.set({ kind: "open", name: admitted.name });
         this.startHeartbeat();
@@ -322,10 +337,12 @@ export class Link {
       this.set({ kind: "down", since: Date.now() });
     }
     if (this.stopped) return;
-    const steps = this.options.backoff;
-    const base = steps[Math.min(this.attempt, steps.length - 1)]!;
+    // Back to the first step only after a connection that lasted: one the control plane
+    // takes and drops at once does not make the page dial every second (#172).
+    if (this.openedAt !== null && Date.now() - this.openedAt >= this.options.healthyAfter) this.attempt = 0;
+    this.openedAt = null;
+    const delay = retryDelay(this.options.backoff, this.attempt, this.options.random());
     this.attempt++;
-    const delay = base * 1000 * (1 + 0.2 * this.options.random());
     this.retry = setTimeout(() => void this.dial(), delay);
   }
 

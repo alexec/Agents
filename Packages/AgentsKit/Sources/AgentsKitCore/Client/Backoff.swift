@@ -11,6 +11,13 @@ import Foundation
 /// again. A nudge while a try is in flight does not start another beside it; it is kept,
 /// and the wait after that try is skipped, because the try may have been doomed by the
 /// very change the nudge is about.
+///
+/// Each wait is taken between half and all of its length at random (#172), by the same
+/// `ReconnectSchedule` Agents Host's link waits by (#168): a host restart drops every
+/// client at once, and without the spread they all came back in step. And a connection
+/// is only trusted to reset the wait once it has lasted `healthyAfter`: one the far end
+/// takes and drops at once (a host that is still starting, a control plane that admits
+/// and then refuses) used to start every round from a second again.
 public final class Backoff: @unchecked Sendable {
     public typealias Sleep = @Sendable (Duration) async throws -> Void
 
@@ -26,11 +33,16 @@ public final class Backoff: @unchecked Sendable {
 
     public let first: Duration
     public let longest: Duration
+    /// How long a connection must last before a later loss starts from `first` again.
+    public let healthyAfter: Duration
     private let sleep: Sleep
+    private let jitter: @Sendable () -> Double
+    private let now: @Sendable () -> ContinuousClock.Instant
     private let lock = NSLock()
     private var next: Duration
     private var state = State.idle
     private var nudgedDuringTry = false
+    private var connectedAt: ContinuousClock.Instant?
 
     private enum State {
         case idle
@@ -39,19 +51,38 @@ public final class Backoff: @unchecked Sendable {
     }
 
     public init(first: Duration = .seconds(1), longest: Duration = .seconds(30),
-                sleep: @escaping Sleep = { try await Task.sleep(for: $0) }) {
+                healthyAfter: Duration = .seconds(10),
+                sleep: @escaping Sleep = { try await Task.sleep(for: $0) },
+                jitter: @escaping @Sendable () -> Double = ReconnectSchedule.randomJitter,
+                now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }) {
         self.first = first
         self.longest = longest
+        self.healthyAfter = healthyAfter
         self.next = first
+        self.jitter = jitter
+        self.now = now
         self.sleep = sleep
     }
 
-    /// How long the next wait will be.
+    public var schedule: ReconnectSchedule { ReconnectSchedule(first: first, longest: longest) }
+
+    /// How long the next wait will be, before jitter: it is slept between half and all of it.
     public var nextWait: Duration { lock.withLock { next } }
 
-    /// A try is starting.
+    /// A try is starting. After a connection that lasted `healthyAfter`, from `first`.
     public func trying() {
-        lock.withLock { state = .trying }
+        lock.withLock {
+            endConnection()
+            state = .trying
+        }
+    }
+
+    /// Under the lock: the connection `connected()` noted is over, and if it lasted, the
+    /// waits start again from the first.
+    private func endConnection() {
+        guard let connectedAt else { return }
+        if now() - connectedAt >= healthyAfter { next = first }
+        self.connectedAt = nil
     }
 
     /// Wait before the next try: the current wait, then double it for the one after.
@@ -63,8 +94,9 @@ public final class Backoff: @unchecked Sendable {
                 state = .trying
                 return nil
             }
+            endConnection()
             let sleep = self.sleep
-            let duration = next
+            let duration = ReconnectSchedule.jittered(next, jitter())
             let nap = Task<Void, Never> { try? await sleep(duration) }
             state = .waiting(nap, cutShort: false)
             return nap
@@ -75,17 +107,28 @@ public final class Backoff: @unchecked Sendable {
             if case .waiting(_, true) = state {
                 next = first
             } else {
-                next = min(next * 2, longest)
+                next = schedule.doubled(next)
             }
             state = .trying
         }
     }
 
-    /// Connected, or no longer going back: the next loss starts from the first wait.
+    /// No longer going back: the next loss starts from the first wait.
     public func settle() {
         lock.withLock {
             next = first
             nudgedDuringTry = false
+            connectedAt = nil
+            state = .idle
+        }
+    }
+
+    /// Connected. The next loss starts from the first wait if this connection lasted
+    /// `healthyAfter`, and from where the waits had got to if it did not.
+    public func connected() {
+        lock.withLock {
+            nudgedDuringTry = false
+            connectedAt = now()
             state = .idle
         }
     }
