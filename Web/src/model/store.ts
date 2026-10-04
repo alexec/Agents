@@ -1,7 +1,7 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
-import { batch, signal } from "@preact/signals";
+import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
@@ -15,9 +15,10 @@ import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe } from "./errors";
 import { log } from "../log";
-import { folderKey } from "./groups";
-import { DisplayBuilder, type Item } from "./turns";
+import { folderKey, projectFolder, projectView, type ProjectView } from "./groups";
+import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
+import { blockLines, openBlock } from "./block";
 
 export { folderKey } from "./groups";
 
@@ -26,6 +27,22 @@ const openingTurns = 12;
 
 /** How many entries heard as they happened are kept to lay over a page that arrives late. */
 const heardSincePageLimit = 1_000;
+
+/**
+ * How many entries a followed chat keeps, as the window's (AgentsModel.entriesKept): trimmed at
+ * the front once a further page has piled up past it, and never below `itemsKept` rows (#170).
+ */
+const entriesKept = 600;
+const entriesTrimmedAt = 800;
+const itemsKept = 100;
+/** How many finished turns a followed chat keeps above its entries; earlier ones come back as the top is reached. */
+const turnsKept = 100;
+
+/** How long `files/changed` has to be quiet before the panes read the folders again. */
+const filesSettle = 250;
+
+/** How many archived sessions an open Archived fold lists: as many as it shows (#170). */
+export const archivedPage = 50;
 
 type ByHost<T> = Record<string, T[]>;
 
@@ -46,6 +63,18 @@ export function keepingLists(listed: Agent, held: Agent | undefined): Agent {
 
 function newestFirst(agents: Agent[]): Agent[] {
   return agents.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+}
+
+function sameAgents(a: readonly Agent[], b: readonly Agent[]): boolean {
+  return a.length === b.length && a.every((agent, index) => agent === b[index]);
+}
+
+/** A stored turn as the chat draws it, made once per summary held. */
+const storedTurns = new WeakMap<TurnSummary, ChatTurn>();
+function storedTurnOf(summary: TurnSummary): ChatTurn {
+  let turn = storedTurns.get(summary);
+  if (!turn) storedTurns.set(summary, turn = storedTurn(summary));
+  return turn;
 }
 
 /**
@@ -79,6 +108,23 @@ export class Work {
   readonly items = signal<Item[]>([]);
   /** The finished turns before `entries`, as stored. `entries` start at `openTurnStart`. */
   readonly turns = signal<TurnSummary[]>([]);
+
+  /**
+   * The chat's turns, stored then heard, each the same object until something in it changes,
+   * so an entry redraws the one turn it landed in (#170).
+   */
+  readonly chatTurns: ReadonlySignal<ChatTurn[]> = computed(() => {
+    this.heardTurns = keepingTurns(turns(this.items.value), this.heardTurns);
+    return [...this.turns.value.map(storedTurnOf), ...this.heardTurns];
+  });
+  private heardTurns: ChatTurn[] = [];
+
+  /**
+   * Whether the chat is following the end, as the chat says. The page is trimmed at the front
+   * only while it is: rows somebody scrolled up to read are never taken from under them.
+   */
+  isFollowingEnd = true;
+  private nextTrimAt = entriesTrimmedAt;
   readonly firstTurn = signal(0);
   readonly openTurnStart = signal(0);
   readonly firstEntryIndex = signal(0);
@@ -133,6 +179,7 @@ export class Work {
     this.problem.value = this.problemsWaiting.shift() ?? null;
   }
 
+  private filesSettling = new Map<string, { folders: Set<string>; timer: ReturnType<typeof setTimeout> }>();
   private display = new DisplayBuilder();
   private entryIDs = new Set<string>();
   private heardSincePage: TranscriptEntry[] = [];
@@ -213,8 +260,15 @@ export class Work {
         return true;
       }
       case "files/changed": {
+        // A build writes hundreds of files in a burst: the panes read again once it settles (#170).
         const note = params as FilesChangedNotification;
-        this.filesChanged.value = { host, agentID: note.agentID, folders: note.folders, at: Date.now() };
+        const key = `${host}|${note.agentID}`;
+        const folders = new Set([...(this.filesSettling.get(key)?.folders ?? []), ...note.folders]);
+        clearTimeout(this.filesSettling.get(key)?.timer);
+        this.filesSettling.set(key, { folders, timer: setTimeout(() => {
+          this.filesSettling.delete(key);
+          this.filesChanged.value = { host, agentID: note.agentID, folders: [...folders], at: Date.now() };
+        }, filesSettle) });
         return true;
       }
       case "storage/writeFailed":
@@ -230,8 +284,10 @@ export class Work {
         return true;
       case "agent/removed": {
         const { agentID } = params as AgentRemovedNotification;
+        const held = this.agents.value[host] ?? [];
+        const gone = held.find((a) => a.id === agentID);
         batch(() => {
-          this.agents.value = { ...this.agents.value, [host]: (this.agents.value[host] ?? []).filter((a) => a.id !== agentID) };
+          if (gone) this.setAgents(host, held.filter((a) => a !== gone), [projectFolder(gone)]);
           this.permissions.value = { ...this.permissions.value,
             [host]: (this.permissions.value[host] ?? []).filter((p) => p.agentID !== agentID) };
           this.elicitations.value = { ...this.elicitations.value,
@@ -250,23 +306,109 @@ export class Work {
     this.projects.value = { ...this.projects.value, [host]: [...list, summary] };
   }
 
+  /**
+   * One agent as it is now, put where its activity sorts it. Only its project's list, and the
+   * one it left if it moved, are made again (#170).
+   */
   upsertAgent(agent: Agent, host: string): void {
-    const list = (this.agents.value[host] ?? []).filter((a) => a.id !== agent.id);
-    this.agents.value = { ...this.agents.value, [host]: newestFirst([...list, agent]) };
+    const list = [...(this.agents.value[host] ?? [])];
+    const at = list.findIndex((a) => a.id === agent.id);
+    const was = at >= 0 ? list.splice(at, 1)[0] : undefined;
+    // Newest first, after any as new: where a stable sort of the list with it last puts it.
+    let into = 0;
+    while (into < list.length && list[into]!.lastActivityAt >= agent.lastActivityAt) into++;
+    list.splice(into, 0, agent);
+    this.setAgents(host, list, was ? [projectFolder(was), projectFolder(agent)] : [projectFolder(agent)]);
   }
 
   /** One host's agents as it just listed them; every other host's are left alone. */
   replaceAgents(listed: Agent[], host: string): void {
     const held = new Map((this.agents.value[host] ?? []).map((a) => [a.id, a]));
-    this.agents.value = { ...this.agents.value, [host]: newestFirst(listed.map((a) => keepingLists(a, held.get(a.id)))) };
+    this.setAgents(host, newestFirst(listed.map((a) => keepingLists(a, held.get(a.id)))));
   }
 
   /** Archived agents of one project, listed when the fold opens, added beside the live ones. */
   addAgents(listed: Agent[], host: string): void {
     const held = new Map((this.agents.value[host] ?? []).map((a) => [a.id, a]));
-    const kept = [...held.values()].filter((a) => !listed.some((l) => l.id === a.id));
-    this.agents.value = { ...this.agents.value,
-      [host]: newestFirst([...kept, ...listed.map((a) => keepingLists(a, held.get(a.id)))]) };
+    const incoming = new Set(listed.map((l) => l.id));
+    const kept = [...held.values()].filter((a) => !incoming.has(a.id));
+    this.setAgents(host, newestFirst([...kept, ...listed.map((a) => keepingLists(a, held.get(a.id)))]),
+      listed.map(projectFolder));
+  }
+
+  /**
+   * One project's archived agents let go, when its Archived fold closes: the page holds the live
+   * agents and a page of archived ones per open fold, no more (#170). The open session stays.
+   */
+  dropArchived(host: string, folder: string): void {
+    const key = folderKey(folder);
+    const watching = this.watching.value;
+    const held = this.agents.value[host] ?? [];
+    const kept = held.filter((a) => a.state !== "archived" || projectFolder(a) !== key
+      || (watching?.host === host && watching.session === a.id));
+    if (kept.length !== held.length) this.setAgents(host, kept, [key]);
+  }
+
+  /** Each project's agents by `host|folder`, kept as each change lands: one change redraws one project (#170). */
+  private slices = new Map<string, Signal<Agent[]>>();
+  private views = new Map<string, ReadonlySignal<ProjectView>>();
+  private byID = new Map<string, ReadonlySignal<Agent | undefined>>();
+
+  /**
+   * Every write to a host's agents. `touched` names the projects that changed; without it every
+   * project of the host is worked out again, and only those whose agents differ are told.
+   */
+  protected setAgents(host: string, list: Agent[], touched?: readonly string[]): void {
+    const prefix = `${host}|`;
+    batch(() => {
+      this.agents.value = { ...this.agents.value, [host]: list };
+      if (touched) {
+        for (const folder of new Set(touched)) {
+          const slice = this.slices.get(prefix + folder);
+          if (slice) slice.value = list.filter((a) => projectFolder(a) === folder);
+        }
+        return;
+      }
+      const grouped = new Map<string, Agent[]>();
+      for (const agent of list) {
+        const folder = projectFolder(agent);
+        const group = grouped.get(folder);
+        if (group) group.push(agent); else grouped.set(folder, [agent]);
+      }
+      for (const [name, slice] of this.slices) {
+        if (!name.startsWith(prefix)) continue;
+        const next = grouped.get(name.slice(prefix.length)) ?? [];
+        if (!sameAgents(slice.peek(), next)) slice.value = next;
+      }
+    });
+  }
+
+  private slice(host: string, folder: string): Signal<Agent[]> {
+    const name = `${host}|${folder}`;
+    let slice = this.slices.get(name);
+    if (!slice) {
+      slice = signal((this.agents.peek()[host] ?? []).filter((a) => projectFolder(a) === folder));
+      this.slices.set(name, slice);
+    }
+    return slice;
+  }
+
+  /** One project's agents, newest first: what reads them is redrawn only when they change. */
+  projectAgents(host: string, folder: string): Agent[] {
+    return this.slice(host, folderKey(folder)).value;
+  }
+
+  /** One project's headings, archived sessions, subtitle and counts, worked out once per change to it. */
+  projectView(host: string, folder: string): ProjectView {
+    const key = folderKey(folder);
+    const name = `${host}|${key}`;
+    let view = this.views.get(name);
+    if (!view) {
+      const slice = this.slice(host, key);
+      view = computed(() => projectView(slice.value, key));
+      this.views.set(name, view);
+    }
+    return view.value;
   }
 
   /** Which conversation's entries are kept. A change clears the page. */
@@ -297,9 +439,52 @@ export class Work {
     if (this.entryIDs.has(note.entry.id)) return;
     this.entryIDs.add(note.entry.id);
     this.display.add(note.entry);
+    const entries = [...this.entries.value, note.entry];
     batch(() => {
-      this.entries.value = [...this.entries.value, note.entry];
+      if (this.isFollowingEnd && entries.length > this.nextTrimAt) return this.trimFront(entries);
+      this.entries.value = entries;
       this.items.value = this.display.items;
+    });
+  }
+
+  /**
+   * The oldest entries let go, down to `entriesKept`, while the chat follows the end (the
+   * window's trimFront). Cut where a row begins, so every row left is the row it was; what went
+   * is only marked as there, and reaching the top pages it back in as any earlier page comes.
+   */
+  private trimFront(entries: TranscriptEntry[]): void {
+    const items = this.display.items;
+    const position = new Map<string, number>();
+    entries.forEach((entry, index) => { if (!position.has(entry.id)) position.set(entry.id, index); });
+    const starts = items.flatMap((item) => position.get(item.id) ?? []);
+    const latest = starts.length > itemsKept ? starts[starts.length - itemsKept]! : 0;
+    const wanted = starts.find((start) => start >= entries.length - entriesKept) ?? latest;
+    const cut = Math.min(wanted, latest);
+    if (cut <= 0) {
+      this.entries.value = entries;
+      this.items.value = items;
+      this.nextTrimAt = entries.length + entriesTrimmedAt - entriesKept;
+      return;
+    }
+    const kept = entries.slice(cut);
+    this.firstEntryIndex.value += cut;
+    this.hasMoreBefore.value = true;
+    this.refold(kept);
+    this.nextTrimAt = Math.max(entriesTrimmedAt, kept.length + entriesTrimmedAt - entriesKept);
+  }
+
+  /**
+   * The chat says whether it follows the end. Back at the end, the finished turns above the
+   * entries are let go down to `turnsKept`: a long scroll up holds no more than it read (#170).
+   */
+  setFollowingEnd(following: boolean): void {
+    this.isFollowingEnd = following;
+    const held = this.turns.value;
+    if (!following || held.length <= turnsKept + openingTurns) return;
+    const cut = held.length - turnsKept;
+    batch(() => {
+      this.turns.value = held.slice(cut);
+      this.firstTurn.value += cut;
     });
   }
 
@@ -359,6 +544,7 @@ export class Work {
     for (const entry of entries) this.display.add(entry);
     this.entries.value = entries;
     this.items.value = this.display.items;
+    this.nextTrimAt = entriesTrimmedAt;
   }
 
   /** Whether anything at all of the conversation comes before what is in hand. */
@@ -387,8 +573,25 @@ export class Work {
     return this.hosts.value.find((h) => h.id === host)?.state === "online";
   }
 
+  /** One agent: what reads it is redrawn when it changes, not when any agent on its host does (#170). */
   agent(host: string, session: string): Agent | undefined {
-    return (this.agents.value[host] ?? []).find((a) => a.id === session);
+    const name = `${host}|${session}`;
+    let found = this.byID.get(name);
+    if (!found) {
+      // A few are read at a time (the open chat, its panes); the rest are let go.
+      if (this.byID.size >= 64) this.byID.clear();
+      found = computed(() => (this.agents.value[host] ?? []).find((a) => a.id === session));
+      this.byID.set(name, found);
+    }
+    return found.value;
+  }
+
+  /**
+   * What a blocked agent waits on, as its row says it. Only an agent with an open block reads
+   * its host's other agents, for their titles; any other row is not redrawn by them (#170).
+   */
+  waitsOf(host: string, agent: Agent): string[] {
+    return openBlock(agent) ? blockLines(agent, this.agents.value[host] ?? []) : [];
   }
 
   permissionsFor(host: string, session: string): PermissionRequest[] {
@@ -427,7 +630,7 @@ export class Store extends Work {
     super();
     link.onNotification((method, params, host) => {
       if (method === "control/hostChanged") {
-        void this.load();
+        this.hostChanged(params);
         return;
       }
       if (host) this.apply(method, params, host);
@@ -440,14 +643,90 @@ export class Store extends Work {
   /**
    * Everything again, on every connection, in the window's order (refreshEverything): agents,
    * then projects, then the cards and the open conversation at once. No cursors on the wire.
+   * One at a time: asked again while running, it runs once more after.
    */
-  async load(): Promise<void> {
-    this.archivedLoaded.clear();
+  load(): Promise<void> {
+    return this.once("*", async () => {
+      const hosts = await this.link.call("hosts/list", {});
+      this.takeHosts(hosts);
+      await Promise.all(hosts.filter((host) => host.state === "online").map((host) => this.loadHost(host.id)));
+      const watching = this.watching.value;
+      if (watching) await this.loadTranscript(watching.host, watching.session);
+    });
+  }
+
+  /** What is running, by host or "*" for everything, and whether it was asked for again meanwhile. */
+  private running = new Map<string, { done: Promise<void>; again: boolean }>();
+
+  /** Runs `work` for `key` unless it is running already; then once more when it ends, however often asked. */
+  private once(key: string, work: () => Promise<void>): Promise<void> {
+    const now = this.running.get(key);
+    if (now) {
+      now.again = true;
+      return now.done;
+    }
+    const entry = { done: Promise.resolve(), again: false };
+    entry.done = (async () => {
+      try {
+        do {
+          entry.again = false;
+          await work().catch(() => {});
+        } while (entry.again);
+      } finally {
+        this.running.delete(key);
+      }
+    })();
+    this.running.set(key, entry);
+    return entry.done;
+  }
+
+  private settling = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /**
+   * One host came, went or changed (`control/hostChanged`): the hosts are listed again, and that
+   * host's data alone loaded once it is online, a quarter of a second after the last word about
+   * it (the control plane says it twice per connect). A control plane naming no host loads all (#170).
+   */
+  private hostChanged(params: unknown): void {
+    const host = (params as { host?: unknown } | null)?.host;
+    if (typeof host !== "string") {
+      void this.load();
+      return;
+    }
+    clearTimeout(this.settling.get(host));
+    this.settling.set(host, setTimeout(() => {
+      this.settling.delete(host);
+      void this.once(host, () => this.reloadHost(host));
+    }, 250));
+  }
+
+  private async reloadHost(host: string): Promise<void> {
     const hosts = await this.link.call("hosts/list", {});
     this.takeHosts(hosts);
-    await Promise.all(hosts.filter((host) => host.state === "online").map((host) => this.loadHost(host.id)));
+    const now = hosts.find((h) => h.id === host);
+    if (!now) return this.forgetHost(host);
+    if (now.state !== "online") return;
+    await this.loadHost(host);
     const watching = this.watching.value;
-    if (watching) await this.loadTranscript(watching.host, watching.session);
+    if (watching?.host === host) await this.loadTranscript(host, watching.session);
+  }
+
+  /** A host removed: what was held of it goes with it. */
+  private forgetHost(host: string): void {
+    const without = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => key !== host));
+    const notOf = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => !key.startsWith(`${host}|`)));
+    batch(() => {
+      this.setAgents(host, []);
+      this.agents.value = without(this.agents.value);
+      this.projects.value = without(this.projects.value);
+      this.clones.value = without(this.clones.value);
+      this.permissions.value = without(this.permissions.value);
+      this.elicitations.value = without(this.elicitations.value);
+      this.workflows.value = notOf(this.workflows.value);
+      this.dashboardSummaries.value = notOf(this.dashboardSummaries.value);
+      this.pins.value = notOf(this.pins.value);
+    });
+    for (const key of [...this.archivedLoaded]) if (key.startsWith(`${host}|`)) this.archivedLoaded.delete(key);
   }
 
   private async loadHost(host: string): Promise<void> {
@@ -461,6 +740,16 @@ export class Store extends Work {
     const agents = await this.link.call("agents/list",
       { includeArchived: false, archivedCommands: false, archivedOnly: false, lean: true }, host).catch(failed("agents/list"));
     if (agents) this.replaceAgents(agents, host);
+    // The Archived folds that were open are listed again rather than left empty by the live list,
+    // and the workflows and Dashboards on screen asked again: they may have changed meanwhile.
+    const prefix = `${host}|`;
+    const reopened = [...this.archivedLoaded].filter((key) => key.startsWith(prefix));
+    for (const key of reopened) {
+      this.archivedLoaded.delete(key);
+      void this.loadArchived(host, key.slice(prefix.length));
+    }
+    for (const key of Object.keys(this.workflows.value)) if (key.startsWith(prefix)) void this.loadWorkflows(host, key.slice(prefix.length));
+    for (const key of Object.keys(this.dashboards.value)) if (key.startsWith(prefix)) void this.loadDashboard(host, key.slice(prefix.length));
     const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
     const clones = await this.link.call("projects/clones", {}, host).catch(failed("projects/clones"));
@@ -499,15 +788,21 @@ export class Store extends Work {
     if (listed) this.workflows.value = { ...this.workflows.value, [`${host}|${folderKey(folder)}`]: listed };
   }
 
-  /** One project's archived sessions, asked for when its fold opens. */
+  /** One project's newest archived sessions, a page of them, asked for when its fold opens (#170). */
   async loadArchived(host: string, folder: string): Promise<void> {
     const key = `${host}|${folderKey(folder)}`;
     if (this.archivedLoaded.has(key)) return;
     this.archivedLoaded.add(key);
     const listed = await this.link.call("agents/list", {
-      includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never, lean: true,
+      includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never, lean: true, limit: archivedPage,
     }, host).catch(() => null);
-    if (listed) this.addAgents(listed, host);
+    if (listed && this.archivedLoaded.has(key)) this.addAgents(listed, host);
+  }
+
+  /** Its fold closed: the project's archived sessions are let go, and listed again when it opens. */
+  unloadArchived(host: string, folder: string): void {
+    this.archivedLoaded.delete(`${host}|${folderKey(folder)}`);
+    this.dropArchived(host, folder);
   }
 
   async openSession(host: string, session: string): Promise<void> {

@@ -7,7 +7,7 @@
 // here as in the window (#162), what the workflow is (name, triggers, prompt, agent mode) is not.
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import { folderKey, projectFolder } from "../model/groups";
+import { folderKey } from "../model/groups";
 import {
   cooldownSentence, labelsNote, agentModeWords, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   triggerSummary, workflowSummary,
@@ -15,7 +15,6 @@ import {
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { SessionRow } from "./SessionRow";
-import { blockLines } from "../model/block";
 import { CooldownMenu, RuntimeRow, WorkflowSettingsForm } from "./WorkflowSettings";
 
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
@@ -38,15 +37,15 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === id)?.runtime.name;
   const status = workflowStatusLines(summary);
   const standing = workflow.mode === "standing" && summary.standingAgentID
-    ? (store.agents.value[host] ?? []).find((a) => a.id === summary.standingAgentID && a.archivedAt === undefined) : undefined;
+    ? [store.agent(host, summary.standingAgentID)].find((a) => a !== undefined && a.archivedAt === undefined) : undefined;
   const cooldown = cooldownSentence(summary);
   const unknown = unknownLines(workflow);
   // A file that could not be read has no settings to show, so a change would write the empty ones.
   const locked = down || workflow.problem !== undefined;
   const change = (what: Parameters<Store["setWorkflowSettings"]>[2]) =>
     void store.setWorkflowSettings(host, summary, what).then((refusal) => { problem.value = refusal ? { workflowID, text: refusal } : null; });
-  const runs = (store.agents.value[host] ?? [])
-    .filter((a) => a.startedByWorkflow === workflowID && projectFolder(a) === folderKey(folder))
+  const runs = store.projectAgents(host, folder)
+    .filter((a) => a.startedByWorkflow === workflowID)
     .sort((a, b) => b.createdAt - a.createdAt);
   return (
     <section class="chat workflow-page" aria-label="Workflow">
@@ -153,7 +152,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           {runs.length === 0 && <p class="hint">Nothing has run yet.</p>}
           {runs.slice(0, 6).map((agent) => (
             <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
-              waits={blockLines(agent, store.agents.value[host] ?? [])} />
+              waits={store.waitsOf(host, agent)} />
           ))}
         </div>
       </div>

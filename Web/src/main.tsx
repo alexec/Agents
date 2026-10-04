@@ -13,7 +13,8 @@ startPresence(store);
 const root = document.getElementById("app");
 if (root) render(<App session={session} store={store} />, root);
 session.start(linkedCode);
-// A tab coming back into view tries again at once (contracts/browser-auth.md, "Closing").
+// A tab coming back into view tries again at once (contracts/browser-auth.md, "Closing"), or checks
+// a link that stayed up while its heartbeat rested (#170).
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") session.link.retryNow();
 });

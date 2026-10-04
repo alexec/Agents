@@ -6,6 +6,7 @@
 // itself (the CSP says so too). A link opens in a new tab, and only http, https and mailto links
 // are links at all.
 import MarkdownIt, { type Token } from "markdown-it";
+import { memo } from "./memo";
 import { h, type ComponentChildren } from "preact";
 
 const parser = new MarkdownIt({ html: false, linkify: true, typographer: false, breaks: false });
@@ -113,7 +114,7 @@ export function renderMarkdown(source: string): ComponentChildren[] {
   return build(parser.parse(source, {}));
 }
 
-/** A message's text, drawn. */
-export function Markdown({ text }: { text: string }): ComponentChildren {
+/** A message's text, drawn; parsed again only when the text changes (#170). */
+export const Markdown = memo(function Markdown({ text }: { text: string }): ComponentChildren {
   return h("div", { class: "markdown" }, ...renderMarkdown(text));
-}
+});

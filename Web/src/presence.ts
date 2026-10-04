@@ -6,19 +6,20 @@
 // `(N) Agents` when N sessions need the person, counted as the window counts its Dock badge.
 import { effect } from "@preact/signals";
 import type { Store } from "./model/store";
-import { attentionCount } from "./model/groups";
 
 const settle = 500;
 
-/** Sessions wanting a look across live projects (needsPersonCount): Needs you, Blocked and unread. */
+/**
+ * Sessions wanting a look across live projects (needsPersonCount): Needs you, Blocked and unread.
+ * Each project's count is worked out once per change to that project's agents (#170).
+ */
 export function needsPersonCount(store: Store): number {
   let total = 0;
   for (const [host, projects] of Object.entries(store.projects.value)) {
-    const agents = store.agents.value[host] ?? [];
     for (const project of projects) {
       if (project.project.archivedAt !== undefined) continue;
       // Needs you, Blocked and unread finishes, as the Dock badge counts (#70).
-      total += attentionCount(agents, project.project.folder);
+      total += store.projectView(host, project.project.folder).attention;
     }
   }
   return total;

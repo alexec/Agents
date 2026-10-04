@@ -12,7 +12,7 @@ function clock(at: number): string {
 }
 
 function holderName(store: Store, host: string, id: string): string {
-  const title = (store.agents.value[host] ?? []).find((a) => a.id === id)?.title?.trim();
+  const title = store.agent(host, id)?.title?.trim();
   return title ? `“${title}”` : "another agent";
 }
 

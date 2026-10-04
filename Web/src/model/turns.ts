@@ -360,6 +360,24 @@ export function storedTurn(summary: TurnSummary): ChatTurn {
   };
 }
 
+/**
+ * `next`, with each turn that has not changed since `previous` the very object it was, so a
+ * chat redraws only the turn an entry landed in (#170). A turn is unchanged when its ask and
+ * every one of its items are the same objects: the fold keeps an item as it was until it grows.
+ */
+export function keepingTurns(next: readonly ChatTurn[], previous: readonly ChatTurn[]): ChatTurn[] {
+  if (!previous.length) return [...next];
+  const held = new Map(previous.map((turn) => [turn.id, turn]));
+  return next.map((turn) => {
+    const was = held.get(turn.id);
+    return was && was.ask === turn.ask && sameItems(was.items, turn.items) ? was : turn;
+  });
+}
+
+function sameItems(a: readonly Item[], b: readonly Item[]): boolean {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+
 export function isSummaryOnly(turn: ChatTurn): boolean {
   return turn.items.length === 0 && turn.range !== undefined;
 }

@@ -31,6 +31,9 @@ export class LinkDown extends Error {
   }
 }
 
+/** No answer within the call's time (#170): one hung host must not hold up everything waiting on it. */
+export class CallTimedOut extends LinkDown {}
+
 /** What a browser WebSocket gives; a fake one in the tests. */
 export interface SocketLike {
   send(data: string): void;
@@ -53,6 +56,12 @@ export interface LinkOptions {
   /** How often to check the socket, and how long to wait for the answer. */
   heartbeat?: { every: number; within: number };
   random?: () => number;
+  /** How long a call waits for its answer before it is given up (#170). */
+  callTimeout?: number;
+  /** How long the link has to stay up before a drop starts the backoff from the first step again. */
+  stableAfter?: number;
+  /** Whether the tab is out of sight: no retries and no heartbeat then; retryNow on its return (#170). */
+  hidden?: () => boolean;
   /** The exchange; the real one unless a test stands in for it. */
   authenticate?: (socket: LineSocket, record: KeyRecord, origin: string) => Promise<Admitted>;
 }
@@ -119,6 +128,7 @@ export class Link {
   private attempt = 0;
   private retry: ReturnType<typeof setTimeout> | null = null;
   private beat: ReturnType<typeof setInterval> | null = null;
+  private stable: ReturnType<typeof setTimeout> | null = null;
   private nextID = 1;
   private pending = new Map<number, Pending>();
   private stateListeners = new Set<(state: LinkState) => void>();
@@ -130,6 +140,9 @@ export class Link {
       backoff: [1, 2, 4, 8, 10],
       heartbeat: { every: 5_000, within: 3_000 },
       random: Math.random,
+      callTimeout: 30_000,
+      stableAfter: 30_000,
+      hidden: () => globalThis.document?.visibilityState === "hidden",
       authenticate: connect,
       open: (url) => new WebSocket(url) as unknown as SocketLike,
       ...options,
@@ -164,8 +177,12 @@ export class Link {
     this.socket = null;
   }
 
-  /** Try again now: the tab came back into view, or the person asked. */
+  /**
+   * Try again now: the tab came back into view, or the person asked. A link that stayed up
+   * while the tab was hidden is checked at once, its heartbeat having rested meanwhile.
+   */
   retryNow(): void {
+    if (!this.stopped && this.state.kind === "open") return this.check();
     if (this.stopped || this.state.kind !== "down") return;
     if (this.retry) clearTimeout(this.retry);
     this.retry = null;
@@ -180,7 +197,16 @@ export class Link {
     const route = targetOf(method) === "host" ? host ?? "mac" : null;
     const line = route !== null ? JSON.stringify({ h: route, m: message }) : JSON.stringify({ m: message });
     return new Promise<Result<M>>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject, route });
+      const timer = setTimeout(() => {
+        if (!this.pending.delete(id)) return;
+        log("call.timedOut");
+        reject(new CallTimedOut());
+      }, this.options.callTimeout);
+      this.pending.set(id, {
+        resolve: (value) => { clearTimeout(timer); resolve(value as Result<M>); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+        route,
+      });
       this.socket?.send(line);
     });
   }
@@ -188,8 +214,10 @@ export class Link {
   private clearTimers(): void {
     if (this.retry) clearTimeout(this.retry);
     if (this.beat) clearInterval(this.beat);
+    if (this.stable) clearTimeout(this.stable);
     this.retry = null;
     this.beat = null;
+    this.stable = null;
   }
 
   private async dial(): Promise<void> {
@@ -230,7 +258,9 @@ export class Link {
       try {
         const admitted = await this.options.authenticate(lines, record, this.options.origin);
         authed = true;
-        this.attempt = 0;
+        // Back to the first step only once it has stayed up: a link that drops straight after
+        // each sign-in would otherwise redial, and reload everything, every second (#170).
+        this.stable = setTimeout(() => (this.attempt = 0), this.options.stableAfter);
         log("link.open");
         this.set({ kind: "open", name: admitted.name });
         this.startHeartbeat();
@@ -293,21 +323,25 @@ export class Link {
   }
 
   private startHeartbeat(): void {
-    const { every, within } = this.options.heartbeat;
     this.beat = setInterval(() => {
-      const socket = this.socket;
-      if (!socket) return;
-      // A hung control plane never answers the close handshake either, so the page counts
-      // the link down at once rather than waiting for the browser's own timeout.
-      const timer = setTimeout(() => {
-        if (this.socket !== socket) return;
-        this.socket = null;
-        socket.close(4000, "no answer");
-        this.failPending();
-        this.down();
-      }, within);
-      this.call("control/status", {} as Params<"control/status">).then(() => clearTimeout(timer), () => {});
-    }, every);
+      if (!this.options.hidden()) this.check();
+    }, this.options.heartbeat.every);
+  }
+
+  /** One heartbeat: the control plane answers within its time, or the link is counted down. */
+  private check(): void {
+    const socket = this.socket;
+    if (!socket) return;
+    // A hung control plane never answers the close handshake either, so the page counts
+    // the link down at once rather than waiting for the browser's own timeout.
+    const timer = setTimeout(() => {
+      if (this.socket !== socket) return;
+      this.socket = null;
+      socket.close(4000, "no answer");
+      this.failPending();
+      this.down();
+    }, this.options.heartbeat.within);
+    this.call("control/status", {} as Params<"control/status">).then(() => clearTimeout(timer), () => {});
   }
 
   private failPending(): void {
@@ -321,7 +355,8 @@ export class Link {
       log("link.down");
       this.set({ kind: "down", since: Date.now() });
     }
-    if (this.stopped) return;
+    // Out of sight it waits: the tab's return calls retryNow (#170).
+    if (this.stopped || this.options.hidden()) return;
     const steps = this.options.backoff;
     const base = steps[Math.min(this.attempt, steps.length - 1)]!;
     this.attempt++;

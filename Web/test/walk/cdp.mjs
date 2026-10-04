@@ -83,6 +83,8 @@ function makePage(send, sessionId, targetId, listen) {
 
   const page = {
     console, requests, errors, frames, targetId,
+    /** Any DevTools method on this page, for what the helpers below don't cover. */
+    cdp: call,
 
     async start(width, height) {
       listen((message) => {

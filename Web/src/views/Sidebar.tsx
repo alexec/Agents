@@ -7,9 +7,9 @@
 // window's selection does; → unfolds a project and ← folds it, or steps out to its project from
 // a row under it. The menu key, Shift-F10 or a right click opens a row's menu.
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import { actDoing, type Store } from "../model/store";
-import { agentsIn, folderKey, headings, projectSubtitle, showsUnread } from "../model/groups";
+import { folderKey, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { parseQuery, queryMatches } from "../model/labels";
 import { workflowSummary } from "../model/workflows";
@@ -20,10 +20,10 @@ import { ActivityRows } from "./Activity";
 import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { SessionRow } from "./SessionRow";
-import { blockLines } from "../model/block";
 import { sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
+import { memo } from "../render/memo";
 
 /** Enough archived sessions to find last week's, as the window shows. */
 const archivedShown = 50;
@@ -110,9 +110,10 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
 /**
  * One project: its row, and folded under it its sessions, Needs you first, then its workflows,
  * each kind's archived ones folded once more at its foot. A search unfolds every project with
- * something that matches and hides the rest.
+ * something that matches and hides the rest. It reads its own project's agents alone, so a change
+ * to an agent draws one fold again, and a folded one reads nothing of its sessions (#170).
  */
-function ProjectFold({ store, host, project, query, linkDown }: {
+const ProjectFold = memo(function ProjectFold({ store, host, project, query, linkDown }: {
   store: Store; host: ControlHost; project: ProjectSummary; query: string; linkDown: boolean;
 }) {
   const r = route.value;
@@ -125,18 +126,22 @@ function ProjectFold({ store, host, project, query, linkDown }: {
   useEffect(() => {
     if (unfolded && store.hostIsOnline(host.id)) void store.loadWorkflows(host.id, folder);
   }, [unfolded, host.id, folder]);
+  // Archived sessions are held while their fold is open, a page of them, and let go when it closes.
+  const archivedWasShown = useRef(false);
   useEffect(() => {
     if (showsArchived && store.hostIsOnline(host.id)) void store.loadArchived(host.id, folder);
+    if (!showsArchived && archivedWasShown.current) store.unloadArchived(host.id, folder);
+    archivedWasShown.current = showsArchived;
   }, [showsArchived, host.id, folder]);
 
-  const agents: Agent[] = store.agents.value[host.id] ?? [];
+  const view = store.projectView(host.id, folder);
   const parsed = parseQuery(query);
   const matching = (list: Agent[]) => (searching ? list.filter((a) => queryMatches(parsed, a)) : list);
-  const groups = headings(agents, folder).map((h) => ({ ...h, agents: matching(h.agents) })).filter((h) => h.agents.length > 0);
-  const archived = matching(agentsIn(agents, folder, "archived"));
+  const groups = !unfolded ? [] : view.headings.map((h) => ({ ...h, agents: matching(h.agents) })).filter((h) => h.agents.length > 0);
+  const archived = !unfolded ? [] : matching(view.archived);
   const runtimeName = (id: string) => (store.runtimes.value[host.id] ?? []).find((s) => s.runtime.id === id)?.runtime.name;
   // A search narrows workflows by name and what they are; one asking for a label leaves them out.
-  const allWorkflows = (store.workflows.value[`${host.id}|${folderKey(folder)}`] ?? [])
+  const allWorkflows = (unfolded ? store.workflows.value[`${host.id}|${folderKey(folder)}`] ?? [] : [])
     .filter((w) => !searching || parsed.label === null && (!parsed.text
       || [w.workflow.name, workflowSummary(w.workflow, runtimeName)].some((t) => t.toLowerCase().includes(parsed.text.toLowerCase()))))
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
@@ -147,32 +152,17 @@ function ProjectFold({ store, host, project, query, linkDown }: {
 
   const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder)
     && !!r.dashboard;
-  const needs = agentsIn(agents, folder, "needsAttention").length > 0;
-  const subtitle = !project.exists ? "Folder is missing" : projectSubtitle(agents, folder);
+  const needs = view.needsYou;
+  const subtitle = !project.exists ? "Folder is missing" : view.subtitle;
   const fold = (open: boolean) => folds.set(host.id, folder, open);
-  const pick = (agent: Agent) => go({ host: host.id, project: folder, session: agent.id });
-  const going = (agent: Agent) => {
-    const act = store.onItsWay.value[agent.id];
-    return act && typeof act === "string" ? { doing: actDoing(act), recipient: store.recipient(host.id) } : undefined;
-  };
   const projectMenu: MenuItem[] = [
     { label: "Dashboard", run: () => go({ host: host.id, project: folder, dashboard: true }) },
     { label: "New Session", disabled: down, help: "Start a new session in this project",
       run: () => go({ host: host.id, project: folder, compose: true }) },
   ];
-  const sessionMenu = (agent: Agent): MenuItem[] => sessionActions(agent).map(({ action, label: words, help }) => ({
-    label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
-    run: () => {
-      if (action === "markRead" || action === "markUnread") void store.setUnread(host.id, agent.id, action === "markUnread");
-      else void store.perform(host.id, agent.id, action);
-    },
-  }));
   const row = (agent: Agent) => (
-    <div class="nav-item" key={agent.id} onContextMenu={(e) => openContextMenu(e, sessionMenu(agent))}
-      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, sessionMenu(agent)); }}>
-      <SessionRow agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)}
-        waits={blockLines(agent, store.agents.value[host.id] ?? [])} />
-    </div>
+    <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
+      chosen={r.session === agent.id} down={down} />
   );
   return (
     <div class={`project-fold${down && !linkDown ? " greyed" : ""}`} role="group" aria-label={label}
@@ -254,7 +244,32 @@ function ProjectFold({ store, host, project, query, linkDown }: {
       )}
     </div>
   );
-}
+});
+
+/**
+ * One session's row under its project, drawn again only when the agent, whether it is chosen, or
+ * its host's state changes, or something is on its way to it: not when its neighbours change.
+ */
+const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down }: {
+  store: Store; host: string; folder: string; agent: Agent; chosen: boolean; down: boolean;
+}) {
+  const act = store.onItsWay.value[agent.id];
+  const going = act && typeof act === "string" ? { doing: actDoing(act), recipient: store.recipient(host) } : undefined;
+  const menu = (): MenuItem[] => sessionActions(agent).map(({ action, label: words, help }) => ({
+    label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
+    run: () => {
+      if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
+      else void store.perform(host, agent.id, action);
+    },
+  }));
+  return (
+    <div class="nav-item" onContextMenu={(e) => openContextMenu(e, menu())}
+      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }}>
+      <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
+        waits={store.waitsOf(host, agent)} />
+    </div>
+  );
+});
 
 /** The folder as a person reads it, for the row's tooltip. */
 function folderPath(folder: string): string {

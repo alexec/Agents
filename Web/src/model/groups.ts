@@ -175,3 +175,25 @@ export function unreadCount(agents: readonly Agent[], folder: string): number {
   const wanted = folderKey(folder);
   return agents.filter((a) => projectFolder(a) === wanted && a.state === "finished" && a.isUnread === true).length;
 }
+
+/** What one project's row and fold draw from its agents, worked out once per change to them (#170). */
+export interface ProjectView {
+  headings: Heading[];
+  archived: Agent[];
+  needsYou: boolean;
+  /** Needs you, Blocked and unread: what the tab's title counts. */
+  attention: number;
+  subtitle: string | null;
+}
+
+/** One project's view, from that project's agents alone. */
+export function projectView(agents: readonly Agent[], folder: string): ProjectView {
+  const shown = headings(agents, folder);
+  return {
+    headings: shown,
+    archived: agentsIn(agents, folder, "archived"),
+    needsYou: shown.some((h) => h.group === "needsAttention"),
+    attention: attentionCount(agents, folder),
+    subtitle: projectSubtitle(agents, folder),
+  };
+}

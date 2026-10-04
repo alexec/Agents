@@ -8,7 +8,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../model/background";
-import { display, isPersonsAsk, isWorking, storedTurn, turns, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
 import type { Agent } from "../protocol/generated";
 import { go, replace, route } from "../route";
@@ -53,8 +53,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const fetched = useSignal<Record<string, Item[]>>({});
   const newBelow = useSignal(false);
 
-  const rows: ChatTurn[] = [...store.turns.value.map(storedTurn), ...turns(store.items.value)];
-  const background = agent?.background ?? [];
+  // Each turn the same object until an entry lands in it, so only that one is drawn again (#170).
+  const rows: ChatTurn[] = store.chatTurns.value;
+  // What a call's line asks of the background is only whether its call still runs: the list
+  // changes when that does, and not with every other change to the agent.
+  const allBackground = agent?.background;
+  const runningCalls = (allBackground ?? []).filter(isRunning).map((item) => item.toolCallID ?? "").join(" ");
+  const background = useMemo(() => (allBackground ?? []).filter(isRunning), [runningCalls]);
   const live = agent ? isWorking(agent.state) : false;
 
   // What an open call's links do here (the window's ChatActions): a file it touched opens in the
@@ -75,6 +80,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
 
   const scroller = useRef<HTMLDivElement>(null);
   const following = useRef(true);
+  /** Following the end or not, told to the store: it trims the chat's front only while following. */
+  const follow = (on: boolean) => {
+    if (following.current === on) return;
+    following.current = on;
+    store.setFollowingEnd(on);
+  };
   const loadingEarlier = useRef(false);
   const settled = useRef(false);
 
@@ -84,6 +95,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     chosen.value = {};
     fetched.value = {};
     following.current = true;
+    store.setFollowingEnd(true);
     newBelow.value = false;
     settled.current = false;
     const timer = setTimeout(() => (settled.current = true), 400);
@@ -126,9 +138,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const el = event.currentTarget as HTMLDivElement;
     const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (!loadingEarlier.current) {
-      if (fromBottom > leftTheEnd) following.current = false;
+      if (fromBottom > leftTheEnd) follow(false);
       if (fromBottom < atTheEnd) {
-        following.current = true;
+        follow(true);
         newBelow.value = false;
       }
     }
@@ -137,7 +149,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
 
   const toEnd = () => {
     const el = scroller.current;
-    following.current = true;
+    follow(true);
     newBelow.value = false;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   };
@@ -153,6 +165,15 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const items = display(await store.turnEntries(host, session, turn.range));
     fetched.value = { ...fetched.value, [turn.id]: items[0] && isPersonsAsk(items[0]) ? items.slice(1) : items };
   };
+
+  // The same two for every turn, for as long as the chat is open, so a turn's props change only
+  // when the turn does; each calls the latest of the functions above.
+  const latest = useRef({ toggle, loadDetail });
+  latest.current = { toggle, loadDetail };
+  const turnActions = useMemo(() => ({
+    toggle: (turn: ChatTurn) => latest.current.toggle(turn),
+    loadDetail: (turn: ChatTurn) => void latest.current.loadDetail(turn),
+  }), []);
 
   const choose = (detail: TurnDetail) => {
     level.value = detail;
@@ -187,7 +208,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {rows.map((turn, index) => (
           <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value} fetched={fetched.value[turn.id]}
             isLive={index === rows.length - 1 && live} background={background}
-            toggle={() => toggle(turn)} loadDetail={() => void loadDetail(turn)} />
+            toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} />
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
         {agent && (agent.state === "running" || agent.state === "starting") && (

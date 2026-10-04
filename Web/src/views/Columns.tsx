@@ -7,7 +7,7 @@
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { actDoing, hostStateWords, type Store } from "../model/store";
-import { agentsIn, counts, folderKey, headings, projectSubtitle, showsUnread } from "../model/groups";
+import { folderKey, showsUnread } from "../model/groups";
 import { parseQuery, queryMatches } from "../model/labels";
 import type { Agent, ControlHost, ProjectSummary } from "../protocol/generated";
 import { go, replace, route } from "../route";
@@ -20,7 +20,6 @@ import { CloningRows, EmptyProjects, NewProjectDialog, NewProjectItems, NewProje
 import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { SessionRow } from "./SessionRow";
-import { blockLines } from "../model/block";
 import { WorkflowRow } from "./WorkflowRow";
 import { Resources } from "./Resources";
 import { WorkflowPage } from "./WorkflowPage";
@@ -109,11 +108,6 @@ function projectsOf(store: Store, host: ControlHost): ProjectSummary[] {
   return [...(store.projects.value[host.id] ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** How many of a project's sessions need the person, by the page's own grouping (FR-009). */
-function needsYou(store: Store, host: string, folder: string): number {
-  return counts(store.agents.value[host] ?? [], folder).needsAttention ?? 0;
-}
-
 function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
   const r = route.value;
   return (
@@ -133,14 +127,14 @@ function ProjectList({ store, onPick }: { store: Store; onPick?: () => void }) {
             {projectsOf(store, host).map((project) => {
               const folder = project.project.folder;
               const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);
-              const needs = needsYou(store, host.id, folder);
-              const subtitle = projectSubtitle(store.agents.value[host.id] ?? [], folder);
+              const needs = store.projectView(host.id, folder).needsYou;
+              const subtitle = store.projectView(host.id, folder).subtitle;
               return (
                 <button key={folder} class={`row project${chosen ? " chosen" : ""}`} aria-current={chosen}
                   onClick={() => { go({ host: host.id, project: folder }); onPick?.(); }}>
                   <span class="title">{project.name}</span>
                   {subtitle && <span class="subtitle">{subtitle}</span>}
-                  {needs > 0 && <span class="dot" aria-label="Needs you" />}
+                  {needs && <span class="dot" aria-label="Needs you" />}
                 </button>
               );
             })}
@@ -192,17 +186,20 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
   useEffect(() => {
     showsArchived.value = false;
     if (host && folder) void store.loadWorkflows(host, folder);
+    // The archived sessions listed for this project are let go when it is left (#170).
+    return () => { if (host && folder) store.unloadArchived(host, folder); };
   }, [host, folder]);
   const project = host && folder
     ? (store.projects.value[host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(folder))
     : undefined;
-  const agents: Agent[] = host ? store.agents.value[host] ?? [] : [];
+  // Only the chosen project's agents are read: a change elsewhere does not draw this again (#170).
+  const view = host && folder ? store.projectView(host, folder) : undefined;
   const query = parseQuery(search.value);
   const matching = (list: Agent[]) => (search.value.trim() ? list.filter((a) => queryMatches(query, a)) : list);
-  const groups = folder ? headings(agents, folder).map((h) => ({ ...h, agents: matching(h.agents) }))
+  const groups = view ? view.headings.map((h) => ({ ...h, agents: matching(h.agents) }))
     .filter((h) => h.agents.length > 0) : [];
   const liveCount = groups.reduce((total, h) => total + h.agents.length, 0);
-  const archived = folder ? matching(agentsIn(agents, folder, "archived")) : [];
+  const archived = view ? matching(view.archived) : [];
   // A search narrows workflows by name and what they are; one asking for a label leaves them out
   // (SessionLabelQuery.matches(_: WorkflowSummary)).
   const runtimeName = (id: string) => (host ? store.runtimes.value[host] ?? [] : []).find((r) => r.runtime.id === id)?.runtime.name;
@@ -219,8 +216,10 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
   };
   const pickWorkflow = (id: string) => go({ host, project: folder, workflow: id });
   const openArchived = (open: boolean) => {
+    if (showsArchived.value === open) return;
     showsArchived.value = open;
     if (open && host && folder) void store.loadArchived(host, folder);
+    else if (host && folder) store.unloadArchived(host, folder);
   };
   return (
     // Greyed while its host is down, as the window's rows are (#83): what they show is what it last said.
@@ -271,7 +270,7 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
                 </h3>
                 {group.agents.map((agent) => (
                   <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)}
-                  waits={blockLines(agent, agents)} />
+                  waits={host ? store.waitsOf(host, agent) : []} />
                 ))}
               </div>
             ))}
@@ -286,7 +285,7 @@ function SessionsColumn({ store, linkDown }: { store: Store; linkDown: boolean }
               <summary class="subhead">Archived sessions{showsArchived.value && <span class="count"> {archived.length}</span>}</summary>
               {(search.value ? archived : archived.slice(0, archivedShown)).map((agent) => (
                 <SessionRow key={agent.id} agent={agent} chosen={r.session === agent.id} onPick={() => pick(agent)} going={going(agent)}
-                  waits={blockLines(agent, agents)} />
+                  waits={host ? store.waitsOf(host, agent) : []} />
               ))}
               {showsArchived.value && project.retiredCount > 0 && !search.value && (
                 <p class="hint">{project.retiredCount === 1 ? "1 older agent has been retired."

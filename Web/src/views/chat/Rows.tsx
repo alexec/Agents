@@ -17,6 +17,7 @@ import {
   callLine, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
 import { Markdown } from "../../render/markdown";
+import { memo } from "../../render/memo";
 
 /** How much of a turn is drawn (TurnDetail). */
 export type TurnDetail = "outcome" | "steps" | "details";
@@ -347,11 +348,17 @@ function stepsWords(count: number | undefined, open: boolean): string {
   return count === 1 ? "1 step" : `${count} steps`;
 }
 
-/** One turn: the ask, the control into its steps, and its outcome (TurnView). */
-export function TurnView({ turn, detail, fetched, isLive, background, toggle, loadDetail }: {
+/**
+ * One turn: the ask, the control into its steps, and its outcome (TurnView). Drawn again only
+ * when one of its props changes: the chat keeps a turn the same object until an entry lands in
+ * it, and hands every turn the same `toggle` and `loadDetail` (#170).
+ */
+export const TurnView = memo(function TurnView({ turn, detail, fetched, isLive, background, toggle: toggleTurn, loadDetail: loadTurn }: {
   turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; isLive: boolean;
-  background: readonly BackgroundItem[]; toggle: () => void; loadDetail: () => void;
+  background: readonly BackgroundItem[]; toggle: (turn: ChatTurn) => void; loadDetail: (turn: ChatTurn) => void;
 }) {
+  const toggle = () => toggleTurn(turn);
+  const loadDetail = () => loadTurn(turn);
   const waiting = isSummaryOnly(turn) && fetched === undefined;
   const items = isSummaryOnly(turn) ? fetched ?? [] : turn.items;
   const parts = waiting ? undefined : turnParts(items, isLive);
@@ -389,4 +396,4 @@ export function TurnView({ turn, detail, fetched, isLive, background, toggle, lo
       )}
     </article>
   );
-}
+});
