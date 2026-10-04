@@ -144,10 +144,21 @@ public actor MemoryStore: ControlStore {
 /// SHA-256 of the file. A write takes an advisory lock on `<key>.lock`, compares, writes
 /// a temporary file, syncs it, and renames it into place. Folders shared over NFS are not
 /// supported: advisory locks there cannot be trusted.
+///
+/// Listing is paid for by what changed (#174), not by the size of the store: it walks only
+/// the folder the prefix names, and keeps each folder's modification time and each file's
+/// inode, size and modification time with its tag. A folder whose time is unchanged is
+/// taken as it was; in one that changed, only files whose stamp changed are read and
+/// hashed again. Every write renames a new file into place, which changes its folder's
+/// time; a file edited in place by hand is seen at the next write beside it.
 public struct FolderStore: ControlStore {
     public let root: URL
+    let index = FolderIndex()
 
     public init(root: URL) { self.root = root }
+
+    /// Files read and hashed by listing since this store was made: for the tests.
+    public var hashedByListing: Int { index.hashed }
 
     public func get(_ key: String) async throws -> StoredObject? {
         let file = try url(key)
@@ -187,37 +198,112 @@ public struct FolderStore: ControlStore {
             try? FileManager.default.removeItem(at: temporary)
             throw StoreError.unavailable("cannot move \(key) into place: errno \(errno)")
         }
-        return Self.etag(data)
+        let etag = Self.etag(data)
+        // Known already, so the next listing need not read it back.
+        if let stamp = StoreStamp(file.path) { index.know(key, stamp: stamp, etag: etag) }
+        return etag
     }
 
     public func delete(_ key: String) async throws {
         let file = try url(key)
         try? FileManager.default.removeItem(at: file)
         try? FileManager.default.removeItem(atPath: file.path + ".lock")
+        index.forget(key)
     }
 
     public func list(prefix: String) async throws -> [StoredKey] {
-        Self.walk(root, prefix: prefix)
+        // The folder the prefix names, or the one it ends in: `v1/clients/` walks
+        // `v1/clients`, `v1/codes/ab` walks `v1/codes` and keeps the keys starting `ab`.
+        let folder = prefix.split(separator: "/", omittingEmptySubsequences: true)
+            .dropLast(prefix.hasSuffix("/") || prefix.isEmpty ? 0 : 1).joined(separator: "/")
+        var keys: [StoredKey] = []
+        walk(folder, into: &keys)
+        return keys.filter { $0.key.hasPrefix(prefix) }.sorted { $0.key < $1.key }
     }
 
-    /// Synchronous, because a directory enumerator cannot be iterated from async code.
-    private static func walk(_ root: URL, prefix: String) -> [StoredKey] {
-        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey]) else {
-            return []
+    /// Files left behind by a copy that stopped mid-write, and probes it never deleted:
+    /// temporary files, probe keys and locks with no key beside them, all older than
+    /// `before`. Returns how many went. Run by the sweep (#174), never on a hot path: it
+    /// visits every folder.
+    public func removeLeftovers(before: Date) -> Int {
+        var removed = 0
+        guard let walker = FileManager.default.enumerator(atPath: root.path) else { return 0 }
+        let cutoff = before.timeIntervalSince1970
+        while let relative = walker.nextObject() as? String {
+            let path = root.appendingPathComponent(relative).path
+            guard let stamp = StoreStamp(path), stamp.isFile, stamp.modified < cutoff else { continue }
+            let name = (relative as NSString).lastPathComponent
+            let leftover: Bool
+            if name.hasPrefix("."), name.hasSuffix(".tmp") {
+                leftover = true
+            } else if relative.hasPrefix("probe/") {
+                leftover = true
+            } else if name.hasSuffix(".lock") {
+                // Only a lock nobody holds: one held is a write under way.
+                guard !FileManager.default.fileExists(atPath: String(path.dropLast(".lock".count))) else { continue }
+                let fd = open(path, O_RDWR)
+                guard fd >= 0 else { continue }
+                defer { close(fd) }
+                leftover = flock(fd, LOCK_EX | LOCK_NB) == 0
+            } else {
+                leftover = false
+            }
+            if leftover, unlink(path) == 0 {
+                removed += 1
+                index.forget(relative)
+            }
         }
-        let base = root.resolvingSymlinksInPath().path + "/"
-        var keys: [StoredKey] = []
-        while let file = walker.nextObject() as? URL {
-            let path = file.resolvingSymlinksInPath().path
-            guard path.hasPrefix(base), !file.lastPathComponent.hasPrefix("."),
-                  !path.hasSuffix(".lock"),
-                  (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { continue }
-            let key = String(path.dropFirst(base.count))
-            guard key.hasPrefix(prefix), let data = try? Data(contentsOf: file) else { continue }
-            keys.append(StoredKey(key: key, etag: etag(data)))
-        }
-        return keys.sorted { $0.key < $1.key }
+        return removed
     }
+
+    /// One folder and those under it, from what is known where nothing changed.
+    private func walk(_ folder: String, into keys: inout [StoredKey]) {
+        let path = folder.isEmpty ? root.path : root.appendingPathComponent(folder).path
+        // The root may be a link (a temporary folder is); nothing under it is followed.
+        guard let stamp = StoreStamp(path, following: folder.isEmpty), stamp.isDirectory else {
+            index.forgetFolder(folder)
+            return
+        }
+        let listing: FolderIndex.Listing
+        if let known = index.listing(folder), known.stamp == stamp, known.settled {
+            listing = known
+        } else {
+            listing = scan(folder, path: path, stamp: stamp)
+        }
+        for (name, etag) in listing.files { keys.append(StoredKey(key: Self.join(folder, name), etag: etag)) }
+        for name in listing.folders { walk(Self.join(folder, name), into: &keys) }
+    }
+
+    /// A folder that changed: its entries again, and a file read only if its stamp moved.
+    private func scan(_ folder: String, path: String, stamp: StoreStamp) -> FolderIndex.Listing {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
+        var files: [(String, String)] = [], folders: [String] = []
+        for name in names.sorted() where !name.hasPrefix(".") && !name.hasSuffix(".lock") {
+            let key = Self.join(folder, name)
+            let file = path + "/" + name
+            // Not followed: a link could lead out of the store.
+            guard let entry = StoreStamp(file) else { continue }
+            if entry.isDirectory {
+                folders.append(name)
+            } else if entry.isFile {
+                if let etag = index.etag(key, stamp: entry) {
+                    files.append((name, etag))
+                } else if let data = FileManager.default.contents(atPath: file) {
+                    let etag = Self.etag(data)
+                    index.know(key, stamp: entry, etag: etag, hashed: true)
+                    files.append((name, etag))
+                }
+            }
+        }
+        // A folder changed within the clock's grain of now could change again with the
+        // same time; it is scanned again next time rather than trusted.
+        let settled = stamp.modified < Date().timeIntervalSince1970 - 2
+        let listing = FolderIndex.Listing(stamp: stamp, settled: settled, files: files, folders: folders)
+        index.keep(folder, listing)
+        return listing
+    }
+
+    private static func join(_ folder: String, _ name: String) -> String { folder.isEmpty ? name : folder + "/" + name }
 
     /// A key names a file under the root and nothing else: no `..`, no absolute path.
     private func url(_ key: String) throws -> URL {
@@ -230,6 +316,98 @@ public struct FolderStore: ControlStore {
     }
 
     static func etag(_ data: Data) -> String { "\"\(ControlAgreement.sha256(data).hexString)\"" }
+}
+
+/// What a file or folder is, as `lstat` says: enough to tell it changed without reading it.
+struct StoreStamp: Equatable, Sendable {
+    var inode: UInt64
+    var size: Int64
+    var seconds: Int
+    var nanoseconds: Int
+    var isDirectory: Bool
+    var isFile: Bool
+
+    var modified: TimeInterval { TimeInterval(seconds) + TimeInterval(nanoseconds) / 1e9 }
+
+    init?(_ path: String, following: Bool = false) {
+        var info = stat()
+        guard (following ? stat(path, &info) : lstat(path, &info)) == 0 else { return nil }
+        #if canImport(Darwin)
+        let time = info.st_mtimespec
+        #else
+        let time = info.st_mtim
+        #endif
+        inode = UInt64(info.st_ino)
+        size = Int64(info.st_size)
+        seconds = Int(time.tv_sec)
+        nanoseconds = Int(time.tv_nsec)
+        let kind = info.st_mode & S_IFMT
+        isDirectory = kind == S_IFDIR
+        isFile = kind == S_IFREG
+    }
+}
+
+/// What a folder store knows of its files between listings (#174), by folder. Shared by
+/// every copy of the struct; guarded by a lock, since listing is synchronous file work.
+final class FolderIndex: @unchecked Sendable {
+    struct Listing {
+        var stamp: StoreStamp
+        /// Changed long enough ago that the same time means the same entries.
+        var settled: Bool
+        var files: [(String, String)]
+        var folders: [String]
+    }
+
+    private let lock = NSLock()
+    private var files: [String: [String: (stamp: StoreStamp, etag: String)]] = [:]
+    private var folders: [String: Listing] = [:]
+    private var hashCount = 0
+
+    var hashed: Int { lock.withLock { hashCount } }
+
+    private static func split(_ key: String) -> (String, String) {
+        guard let slash = key.lastIndex(of: "/") else { return ("", key) }
+        return (String(key[..<slash]), String(key[key.index(after: slash)...]))
+    }
+
+    func etag(_ key: String, stamp: StoreStamp) -> String? {
+        let (folder, name) = Self.split(key)
+        return lock.withLock { files[folder]?[name].flatMap { $0.stamp == stamp ? $0.etag : nil } }
+    }
+
+    func know(_ key: String, stamp: StoreStamp, etag: String, hashed: Bool = false) {
+        let (folder, name) = Self.split(key)
+        lock.withLock {
+            files[folder, default: [:]][name] = (stamp, etag)
+            if hashed { hashCount += 1 }
+        }
+    }
+
+    func forget(_ key: String) {
+        let (folder, name) = Self.split(key)
+        _ = lock.withLock { files[folder]?.removeValue(forKey: name) }
+    }
+
+    func listing(_ folder: String) -> Listing? { lock.withLock { folders[folder] } }
+
+    /// A folder scanned again: files no longer in it are forgotten.
+    func keep(_ folder: String, _ listing: Listing) {
+        let present = Set(listing.files.map(\.0))
+        lock.withLock {
+            folders[folder] = listing
+            files[folder] = files[folder]?.filter { present.contains($0.key) }
+        }
+    }
+
+    /// A folder that is gone, and everything under it.
+    func forgetFolder(_ folder: String) {
+        let inside = folder + "/"
+        lock.withLock {
+            guard folders[folder] != nil || files[folder] != nil else { return }
+            folders = folders.filter { $0.key != folder && !$0.key.hasPrefix(inside) }
+            files = files.filter { $0.key != folder && !$0.key.hasPrefix(inside) }
+        }
+    }
 }
 
 extension Data {

@@ -33,11 +33,13 @@ public actor ControlRecords {
     // MARK: Reading
 
     /// Everything, from the store. At start-up, and as the backstop every 15 s (R4): only
-    /// objects whose tag changed are read again.
+    /// objects whose tag changed are read again, each found by its key (#174).
     public func load() async throws {
+        let listed = try await store.list(prefix: Self.clientsPrefix)
+        let heldClients = Dictionary(clientsHeld.values.map { (Self.clientKey($0.record.id), $0) }, uniquingKeysWith: { a, _ in a })
         var clients: [UUID: Held<ClientRecord>] = [:]
-        for entry in try await store.list(prefix: Self.clientsPrefix) {
-            if let held = clientsHeld.values.first(where: { Self.clientKey($0.record.id) == entry.key && $0.etag == entry.etag }) {
+        for entry in listed {
+            if let held = heldClients[entry.key], held.etag == entry.etag {
                 clients[held.record.id] = held
                 continue
             }
@@ -45,11 +47,14 @@ public actor ControlRecords {
             guard let object = try await store.get(entry.key),
                   let record = try? Self.decoder.decode(ClientRecord.self, from: object.data) else { continue }
             if record.forgotten == true { tombstones[entry.key] = object.etag; continue }
+            tombstones[entry.key] = nil
             clients[record.id] = Held(record: record, etag: object.etag)
         }
+        let listedHosts = try await store.list(prefix: Self.hostsPrefix)
+        let heldHosts = Dictionary(hostsHeld.values.map { (Self.hostKey($0.record.id), $0) }, uniquingKeysWith: { a, _ in a })
         var hosts: [HostID: Held<HostRecord>] = [:]
-        for entry in try await store.list(prefix: Self.hostsPrefix) {
-            if let held = hostsHeld.values.first(where: { Self.hostKey($0.record.id) == entry.key && $0.etag == entry.etag }) {
+        for entry in listedHosts {
+            if let held = heldHosts[entry.key], held.etag == entry.etag {
                 hosts[held.record.id] = held
                 continue
             }
@@ -57,15 +62,22 @@ public actor ControlRecords {
             guard let object = try await store.get(entry.key),
                   let record = try? Self.decoder.decode(HostRecord.self, from: object.data) else { continue }
             if record.forgotten == true { tombstones[entry.key] = object.etag; continue }
+            tombstones[entry.key] = nil
             hosts[record.id] = Held(record: record, etag: object.etag)
         }
         clientsHeld = clients
         hostsHeld = hosts
+        // A tombstone the sweep deleted is no longer one.
+        let present = Set(listed.map(\.key)).union(listedHosts.map(\.key))
+        tombstones = tombstones.filter { present.contains($0.key) }
         if let object = try await store.get(Self.settingsKey),
            let settings = try? Self.decoder.decode(ControlSettings.self, from: object.data) {
             settingsHeld = Held(record: settings, etag: object.etag)
         }
     }
+
+    /// The keys of every tombstone read, for the sweep (#174).
+    public var tombstoneKeys: [String] { tombstones.keys.sorted() }
 
     public var clients: [ClientRecord] { clientsHeld.values.map(\.record).sorted { $0.paired < $1.paired } }
     public var hosts: [HostRecord] { hostsHeld.values.map(\.record).sorted { $0.id.rawValue < $1.id.rawValue } }
@@ -158,6 +170,7 @@ public actor ControlRecords {
         guard let held = clientsHeld[id] else { return }
         var tombstone = held.record
         tombstone.forgotten = true
+        tombstone.forgottenAt = Date()
         tombstone.rev += 1
         let etag = try await store.put(Self.clientKey(id), try Self.encoder.encode(tombstone), when: .matching(held.etag))
         tombstones[Self.clientKey(id)] = etag
@@ -198,6 +211,7 @@ public actor ControlRecords {
         guard let held = hostsHeld[id] else { return false }
         var tombstone = held.record
         tombstone.forgotten = true
+        tombstone.forgottenAt = Date()
         tombstone.rev += 1
         let etag = try await store.put(Self.hostKey(id), try Self.encoder.encode(tombstone), when: .matching(held.etag))
         tombstones[Self.hostKey(id)] = etag

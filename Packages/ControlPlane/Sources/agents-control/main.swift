@@ -16,6 +16,7 @@ import Musl
 //   agents-control serve … [--web DIR] [--web-port N] [--no-web]
 //   agents-control serve … [--host-root DIR]    this Mac's host's root: its join in control/status (#113)
 //   agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding (AGENTS_CONTROL_FORWARDING=0)
+//   agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB to FILE.previous.log (#174)
 //   agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
 //   agents-control move --from ROOT     an old set-up's devices into this store, once (T084)
@@ -48,8 +49,17 @@ let arguments = Array(CommandLine.arguments.dropFirst())
 let environment = ProcessInfo.processInfo.environment
 
 func fail(_ message: String) -> Never {
-    FileHandle.standardError.write(Data("agents-control: \(message)\n".utf8))
+    if ControlLog.shared.isTaken {
+        ControlLog.shared.write("agents-control: \(message)")
+    } else {
+        FileHandle.standardError.write(Data("agents-control: \(message)\n".utf8))
+    }
     exit(1)
+}
+
+/// A line for whoever started it: into the log when serving with one, else to stdout.
+func say(_ line: String) {
+    if ControlLog.shared.isTaken { ControlLog.shared.write("agents-control: \(line)") } else { print(line) }
 }
 
 func value(_ flag: String) -> String? {
@@ -118,7 +128,11 @@ func web() -> ControlService.Configuration.Web? {
 
 func serve() async {
     // Beside the rest of what it says, in control.log, rather than in the system log (#93).
-    WireLog.sink = { FileHandle.standardError.write(Data("agents-control: \($0)\n".utf8)) }
+    // Stamped and rolled (#174): Agents Host names control.log with --log.
+    if let file = value("--log") {
+        ControlLog.shared.take(URL(fileURLWithPath: (file as NSString).expandingTildeInPath))
+    }
+    WireLog.sink = { ControlLog.shared.write("agents-control: \($0)") }
     let homePort = value("--port").flatMap(Int.init) ?? 8791
     let text = environment["AGENTS_CONTROL_URL"] ?? home.map { _ in "https://\(localHost()):\(homePort)" }
     guard let text, let url = URL(string: text) else {
@@ -178,13 +192,13 @@ func serve() async {
                 }
             }
         }
-        if let pin { print("pin \(pin)") }
+        if let pin { say("pin \(pin)") }
         #if canImport(dnssd)
         // Found by the window on this network (frame K2). Not for a walk that must stay
         // out of sight: --no-bonjour.
         let advertiser = home != nil && !arguments.contains("--no-bonjour")
             ? Advertiser(name: name, port: listening, pin: pin) : nil
-        if advertiser != nil { print("advertised as \(name)") }
+        if advertiser != nil { say("advertised as \(name)") }
         defer { _ = advertiser }
         #else
         _ = listening

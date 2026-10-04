@@ -58,6 +58,8 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     public var rev: Int
     /// Forgotten: kept as a tombstone, read as absent (rule 11).
     public var forgotten: Bool?
+    /// When it was forgotten: the sweep deletes the tombstone seven days on (#174).
+    public var forgottenAt: Date?
     /// The newest list of endpoints it has said it holds (R16); nil from a build that
     /// keeps none.
     public var knownEpoch: Int?
@@ -78,7 +80,7 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, kind, publicKey, grant, paired, lastSeen, mayNotify, owner, rev, forgotten, knownEpoch
+        case id, name, kind, publicKey, grant, paired, lastSeen, mayNotify, owner, rev, forgotten, forgottenAt, knownEpoch
     }
 
     /// A record's `grant`, `device` or `operator`, is not read: every client may do
@@ -95,6 +97,7 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
         owner = try c.decodeIfPresent(PersonID.self, forKey: .owner)
         rev = try c.decode(Int.self, forKey: .rev)
         forgotten = try c.decodeIfPresent(Bool.self, forKey: .forgotten)
+        forgottenAt = try c.decodeIfPresent(Date.self, forKey: .forgottenAt)
         knownEpoch = try c.decodeIfPresent(Int.self, forKey: .knownEpoch)
     }
 
@@ -113,6 +116,7 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(owner, forKey: .owner)
         try c.encode(rev, forKey: .rev)
         try c.encodeIfPresent(forgotten, forKey: .forgotten)
+        try c.encodeIfPresent(forgottenAt, forKey: .forgottenAt)
         try c.encodeIfPresent(knownEpoch, forKey: .knownEpoch)
     }
 
@@ -174,6 +178,8 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     public var rev: Int
     /// Removed: kept as a tombstone, read as absent.
     public var forgotten: Bool?
+    /// As `ClientRecord.forgottenAt`.
+    public var forgottenAt: Date?
     /// As `ClientRecord.knownEpoch`.
     public var knownEpoch: Int?
 
