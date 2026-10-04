@@ -62,6 +62,32 @@ struct EventWorkflowTests {
         #expect(await started(core, by: "catch-up").count == 1, "once")
     }
 
+    /// A run no agent set off is told the event, details and all: a clean-up on
+    /// `mac.disk_low` reads its level there (#199).
+    @Test func aNewAgentIsToldTheEventThatStartedIt() async throws {
+        let (locations, work) = try temporary()
+        try write("  - mac.disk_low", as: "free-disk-space", in: work)
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+
+        await core.raise(EventDraft(name: "mac.disk_low", scope: .mac, sentence: "Macintosh HD is almost full: 1 GB free.",
+                                    details: ["level": "critical", "volume": "Macintosh HD"]))
+        try await eventually("the workflow started an agent") { await started(core, by: "free-disk-space").count == 1 }
+        let agent = try #require(await started(core, by: "free-disk-space").first)
+        var prompt: String?
+        try await eventually("the prompt is on the record") {
+            let page = try await core.transcript(.init(agentID: agent.id, before: nil, limit: 50))
+            prompt = page.entries.lazy.compactMap { entry -> String? in
+                if case .userMessage(let text, _, _) = entry.kind { return text }
+                return nil
+            }.first
+            return prompt != nil
+        }
+        #expect(prompt?.hasPrefix("Do it.") == true)
+        #expect(prompt?.contains("because of the event mac.disk_low: Macintosh HD is almost full: 1 GB free.") == true)
+        #expect(prompt?.contains("Its details are level: critical; volume: Macintosh HD.") == true)
+    }
+
     @Test func aCustomEventResumesItsPublisherInTriggeringMode() async throws {
         let (locations, work) = try temporary()
         try write("  - custom.release_ready", mode: "triggering", as: "release", in: work)

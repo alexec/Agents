@@ -89,6 +89,10 @@ agent: new
 Write up what the agent that set this off changed, for the release notes.
 ```
 
+A `new` or `standing` run set off by an event no agent is behind, such as `mac.disk_low`,
+is told the event at the end of its prompt: its sentence and every detail, so the agent can
+act on `level: critical` without looking it up.
+
 Every agent event carries the agent's `labels`, `runtime` and `started_by`, so
 `agent.failed` with `runtime: [gemini, grok]` runs on a Gemini or Grok agent's failure.
 The values each detail takes are on [Events](events.md).

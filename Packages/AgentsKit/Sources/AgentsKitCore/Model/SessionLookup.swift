@@ -54,14 +54,23 @@ public enum SessionLookup {
         return .refused(missing(value))
     }
 
-    /// What `list_sessions` says: a line for each session, the caller's marked.
-    public static func list(in project: URL, agents: some Sequence<Agent>, caller: UUID?) -> String {
+    /// What `list_sessions` says: a line for each session, the caller's marked. Its
+    /// worktree and the resources it holds are said too, so the clean-up workflow (#199)
+    /// can tell whose build output a folder is and leave a working or leasing one alone.
+    public static func list(in project: URL, agents: some Sequence<Agent>, caller: UUID?,
+                            holding: [UUID: [String]] = [:]) -> String {
         let all = sessions(in: project, agents: agents)
         guard !all.isEmpty else { return "There are no sessions in this project." }
         let lines = all.map { agent -> String in
             let name = (agent.title.map { "\u{201C}\($0)\u{201D}" } ?? "Untitled") + (agent.id == caller ? " (you)" : "")
             var line = "- \(agent.id.uuidString): \(name) — \(PoolWords.runtimeName(agent.runtimeID)), "
                 + "\(status(of: agent)), last active \(when(agent.lastActivityAt))."
+            if let worktree = agent.worktree {
+                line += " Worktree: \(worktree.root.path)" + (worktree.branch.map { " on \($0)" } ?? "") + "."
+            }
+            if let held = holding[agent.id], !held.isEmpty {
+                line += " Holding: " + held.joined(separator: ", ") + "."
+            }
             if let said = agent.report?.message { line += " Last said: \(said)" }
             line += labels(of: agent)
             return line

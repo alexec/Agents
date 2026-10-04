@@ -151,6 +151,21 @@ struct SessionLookupTests {
         #expect(text.components(separatedBy: "Last said:").count == 2)
     }
 
+    /// The clean-up workflow (#199) ties a worktree to its session, and leaves one whose
+    /// session holds a lease alone, from these two.
+    @Test func eachListedSessionSaysItsWorktreeAndWhatItHolds() {
+        var built = agent("Build it", in: URL(filePath: "/work/api/.agents/worktrees/build-it"))
+        built.worktree = AgentWorktree(name: "build-it", root: URL(filePath: "/work/api/.agents/worktrees/build-it"),
+                                       branch: "agents/build-it", project: project, base: "main", madeByApp: true)
+        let plain = agent("In the folder", minutesAgo: 5)
+        let text = SessionLookup.list(in: project, agents: [built, plain], caller: nil,
+                                      holding: [built.id: ["build", "screen"]])
+        #expect(text.contains("Worktree: /work/api/.agents/worktrees/build-it on agents/build-it. Holding: build, screen."))
+        let plainLine = text.split(separator: "\n").first { $0.contains(plain.id.uuidString) } ?? ""
+        #expect(!plainLine.contains("Worktree:"))
+        #expect(!plainLine.contains("Holding:"))
+    }
+
     @Test func aSpentAllowanceIsSaidInTheStatus() {
         let spent = Agent(runtimeID: "claude", cwd: project, title: "Ran out", state: .stopped,
                           endedReason: .allowanceSpent)

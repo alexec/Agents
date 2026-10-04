@@ -1373,7 +1373,8 @@ public actor AppService {
         "title": "List the sessions in this project",
         "description": """
             Every session in this project, most recent first, yours included: each one's \
-            id, title, runtime, status, labels with owners, and what it last said. Use it to find a session \
+            id, title, runtime, status, worktree and branch, the resources it holds, labels with owners, \
+            and what it last said. Use it to find a session \
             the person asks you to continue, then read it with read_session.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],

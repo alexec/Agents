@@ -90,6 +90,21 @@ struct SessionToolsTests {
         #expect(!text.contains("Theirs"))
     }
 
+    /// The clean-up workflow (#199) leaves alone a worktree whose session holds a lease.
+    @Test func aSessionHoldingALeaseSaysSo() async throws {
+        let (locations, root) = try temporary()
+        let api = try project(root)
+        let core = try await makeCore(locations)
+        let holder = try await session(core, in: api, title: "Building")
+        let caller = try await session(core, in: api, title: nil, prompt: "Clean up")
+        _ = try await core.lease(.init(token: await token(core, holder), name: "build", minutes: 5, wait: false))
+
+        let lines = try await list(core, caller).split(separator: "\n")
+        let held = lines.first { $0.contains(holder.uuidString) } ?? ""
+        #expect(held.contains("Holding: build."))
+        #expect(!(lines.first { $0.contains(caller.uuidString) } ?? "").contains("Holding:"))
+    }
+
     // MARK: Reading
 
     @Test func aSessionIsReadByTitleAndLeftAsItWas() async throws {

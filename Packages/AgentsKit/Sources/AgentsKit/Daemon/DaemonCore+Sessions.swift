@@ -35,9 +35,16 @@ extension DaemonCore {
         return agent
     }
 
-    public func listSessions(_ request: DaemonAPI.ListSessionsRequest) throws -> String {
+    public func listSessions(_ request: DaemonAPI.ListSessionsRequest) async throws -> String {
         let caller = try sessionCaller(token: request.token)
-        return SessionLookup.list(in: caller.projectFolder, agents: agents.inProject(caller.projectFolder), caller: caller.id)
+        await settle(loadLeasesIfNeeded())
+        let sessions = agents.inProject(caller.projectFolder)
+        var holding: [UUID: [String]] = [:]
+        for agent in sessions {
+            let held = leaseBook.held(by: agent.id).map(\.resource.key)
+            if !held.isEmpty { holding[agent.id] = held }
+        }
+        return SessionLookup.list(in: caller.projectFolder, agents: sessions, caller: caller.id, holding: holding)
     }
 
     /// The history, or the sentence saying why not. A refusal is a normal result the

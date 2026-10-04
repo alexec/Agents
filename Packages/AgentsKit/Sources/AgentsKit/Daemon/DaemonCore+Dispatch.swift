@@ -855,7 +855,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.agentsListSessions:
                 let request = try require(params, as: DaemonAPI.ListSessionsRequest.self)
-                return .success(["note": .string(try listSessions(request))])
+                return .success(["note": .string(try await listSessions(request))])
 
             case DaemonAPI.Method.agentsReadSession:
                 let request = try require(params, as: DaemonAPI.ReadSessionRequest.self)
