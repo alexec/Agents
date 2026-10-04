@@ -1833,6 +1833,11 @@ final class RemoteModel {
         work.replaceWorkflows(listed)
     }
 
+    /// One of a view's calls (#187), to the Mac.
+    func viewCall(_ method: String, _ params: JSONValue) async throws -> JSONValue {
+        try await client.call(method, params)
+    }
+
     // MARK: Pinned pages (#159)
 
     func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }

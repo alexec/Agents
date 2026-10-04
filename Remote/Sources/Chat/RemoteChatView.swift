@@ -16,6 +16,9 @@ struct RemoteChatView: View {
     @State private var subagentOnScreen: String?
     /// The level every turn starts at, chosen from the ··· menu (069).
     @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
+    @Environment(\.openURL) private var openURL
+    /// The open chat's views (#187), torn down when another chat opens.
+    @State private var views = AppViewStore()
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -70,6 +73,16 @@ struct RemoteChatView: View {
                 }
         )
         .environment(\.chatActions, actions)
+        .environment(\.appViewStore, views)
+        .environment(\.appViewActions, agent.map(appViewActions))
+        // A view full screen is drawn in the chat's place, as on the Mac (#187).
+        .overlay {
+            if let id = views.fullscreen, let host = views.existing(id) {
+                AppViewFullscreen(host: host)
+            }
+        }
+        .onChange(of: agent?.id) { views.tearDownAll(reason: "The conversation was closed.") }
+        .onDisappear { views.tearDownAll(reason: "The conversation was closed.") }
         .navigationTitle(agent?.title ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -238,6 +251,16 @@ struct RemoteChatView: View {
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
             keepStopped: sandboxAnswer(carryOn: false),
             waitingSandbox: waitingSandbox)
+    }
+
+    /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's
+    /// own send, and the browser.
+    private func appViewActions(_ agent: Agent) -> AppViewActions {
+        AppViewActions(
+            agentID: agent.id,
+            call: { [model] method, params in try await model.viewCall(method, params) },
+            send: { [model] text in await model.send(text, to: agent.id) },
+            openLink: { [openURL] url in openURL(url) })
     }
 
     /// The open agent's sandbox card, while it waits (064).

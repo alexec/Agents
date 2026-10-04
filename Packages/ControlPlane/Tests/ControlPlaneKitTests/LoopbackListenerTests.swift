@@ -15,6 +15,8 @@ struct LoopbackListenerTests {
     static let files = WebFiles(files: [
         "/index.html": .init(data: Data("<!doctype html>".utf8), contentType: "text/html; charset=utf-8"),
         "/app.js": .init(data: Data("export{}".utf8), contentType: "text/javascript; charset=utf-8"),
+        "/sandbox.html": .init(data: Data("<!doctype html>".utf8), contentType: "text/html; charset=utf-8"),
+        "/sandbox.js": .init(data: Data("void 0".utf8), contentType: "text/javascript; charset=utf-8"),
     ])
     let gate = LoopbackGate(port: port, files: files)
 
@@ -45,6 +47,46 @@ struct LoopbackListenerTests {
         #expect(status(head("/v1/connect", host: "evil.test:8899", origin: "http://localhost:8899", upgrade: true))
             == .misdirectedRequest)
         #expect(status(head("/", host: "LOCALHOST:8899")) == .ok)
+    }
+
+    // MARK: The views' sandbox proxy (#187)
+
+    /// Another origin than the page's, as MCP Apps has it: at the address, never at the name.
+    @Test func theSandboxProxyIsServedOnlyAtItsOwnOrigin() {
+        #expect(gate.judge(head("/sandbox.html?csp=e30", host: "127.0.0.1:8899"))
+            == .reply(.ok, path: "/sandbox.html", location: nil))
+        #expect(gate.judge(head("/sandbox.js", host: "127.0.0.1:8899")) == .reply(.ok, path: "/sandbox.js", location: nil))
+        #expect(status(head("/sandbox.html")) == .notFound)
+        #expect(status(head("/sandbox.js")) == .notFound)
+        #expect(status(head("/sandbox.html", host: "[::1]:8899")) == .notFound)
+        #expect(status(head("/sandbox.html", host: "127.0.0.1:8899", upgrade: true)) == .notFound)
+        // Everything else at the address still goes to the name.
+        #expect(gate.judge(head("/", host: "127.0.0.1:8899"))
+            == .reply(.permanentRedirect, path: nil, location: "http://localhost:8899/"))
+    }
+
+    /// The proxy is drawn under the view's own policy, never wider than an origin each, and
+    /// framed by the page alone.
+    @Test func theProxysPolicyIsTheViewsOwn() {
+        func csp(_ query: String) -> String {
+            let reply = gate.reply(head("/sandbox.html" + query, host: "127.0.0.1:8899"))
+            #expect(!reply.headers.contains { $0.0 == "X-Frame-Options" })
+            return reply.headers.first { $0.0 == "Content-Security-Policy" }?.1 ?? ""
+        }
+        let strict = csp("")
+        #expect(strict == AppViewPolicy.strict.header + "; frame-ancestors http://localhost:8899")
+        #expect(strict.contains("connect-src 'none'"))
+        let declared = Data(#"{"connectDomains":["https://api.example.com","*"],"frameDomains":["https://a.b"]}"#.utf8)
+            .base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let wide = csp("?csp=" + declared)
+        #expect(wide.contains("connect-src https://api.example.com;"))
+        #expect(wide.contains("frame-src https://a.b;"))
+        #expect(!wide.contains(" *"))
+        #expect(csp("?csp=%%%not-base64") == strict)
+        // The page may frame the proxy and nothing else.
+        let page = gate.headers.first { $0.0 == "Content-Security-Policy" }?.1 ?? ""
+        #expect(page.contains("frame-src http://127.0.0.1:8899;"))
     }
 
     // MARK: 2. Method
@@ -127,9 +169,10 @@ struct LoopbackListenerTests {
         #expect(csp.contains("trusted-types 'none'"))
         #expect(!csp.contains("unsafe"))
         // FR-030, clause by clause: own-origin scripts, styles, fonts and images (and blob: and
-        // data: pictures), no frames either way, no plugins, no form posting, no base to move.
+        // data: pictures), no frames but the views' sandbox proxy (#187) and none around the page,
+        // no plugins, no form posting, no base to move.
         for clause in ["script-src 'self';", "style-src 'self';", "font-src 'self';", "img-src 'self' blob: data:;",
-                       "frame-ancestors 'none';", "frame-src 'none';", "object-src 'none';", "form-action 'none';",
+                       "frame-ancestors 'none';", "frame-src http://127.0.0.1:8899;", "object-src 'none';", "form-action 'none';",
                        "base-uri 'none';"] {
             #expect(csp.contains(clause), "CSP lacks \(clause)")
         }

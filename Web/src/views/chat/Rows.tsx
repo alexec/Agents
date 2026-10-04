@@ -17,6 +17,7 @@ import {
   callLine, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
 import { Markdown } from "../../render/markdown";
+import { AppView } from "./AppView";
 import { memo } from "../../render/memo";
 
 /** How much of a turn is drawn (TurnDetail). */
@@ -315,6 +316,8 @@ export function EntryRow({ entry }: { entry: TranscriptEntry }) {
         </details>
       );
     }
+    case "appView":
+      return <AppView call={fields(entry, "appView")!._0} />;
     case "background":
       return <p class="quiet">{backgroundEnding(fields(entry, "background")!._0)}</p>;
     default:

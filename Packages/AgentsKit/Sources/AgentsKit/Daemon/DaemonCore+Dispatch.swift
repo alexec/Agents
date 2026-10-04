@@ -742,6 +742,28 @@ extension DaemonCore {
                 try arrangeSessionPins(request)
                 return .success([:])
 
+            case DaemonAPI.Method.viewsToolCall:
+                let request = try require(params, as: DaemonAPI.ViewToolCallRequest.self)
+                return .success(try await viewToolCall(request))
+
+            case DaemonAPI.Method.viewsRead:
+                let request = try require(params, as: DaemonAPI.ViewReadRequest.self)
+                return .success(try JSONValue.encoding(try readView(request)))
+
+            case DaemonAPI.Method.viewsCall:
+                let request = try require(params, as: DaemonAPI.ViewCallRequest.self)
+                return .success(try await callFromView(request))
+
+            case DaemonAPI.Method.viewsLog:
+                let request = try require(params, as: DaemonAPI.ViewLogRequest.self)
+                logFromView(request)
+                return .success([:])
+
+            case DaemonAPI.Method.viewsContext:
+                let request = try require(params, as: DaemonAPI.ViewContextRequest.self)
+                try keepViewContext(request)
+                return .success([:])
+
             case DaemonAPI.Method.pinsRead:
                 let request = try require(params, as: DaemonAPI.PinReadRequest.self)
                 return .success(try JSONValue.encoding(try readPage(request)))

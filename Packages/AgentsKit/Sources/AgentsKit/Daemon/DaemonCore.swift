@@ -144,6 +144,14 @@ public actor DaemonCore {
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
     var appTokens: [String: UUID] = [:]
+    /// Calls of a tool with a view not yet answered, by agent and call (#187), so stopping
+    /// the turn can say each was cancelled.
+    var runningViews: [UUID: [UUID: AppViewCall]] = [:]
+    /// The test view's count, by agent (#187).
+    var viewCounts: [UUID: Int] = [:]
+    /// What each view last asked the agent to know (`ui/update-model-context`), by agent
+    /// and view, as the words told with the person's next message. Memory only.
+    var viewContexts: [UUID: [UUID: String]] = [:]
     /// The one `codex plugin add/remove` pass running, which a second Codex start waits
     /// on rather than running its own (054, R12).
     var codexPluginSync: Task<Void, Never>?

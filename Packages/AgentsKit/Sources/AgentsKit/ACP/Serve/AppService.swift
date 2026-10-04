@@ -175,6 +175,9 @@ public actor AppService {
     private let eventsSink: EventsSink
     private let sessionsSink: SessionsSink
     private let dashboardSink: DashboardSink
+    private let viewToolSink: ViewToolSink
+    /// Whether the test view and its tools are offered (#187).
+    private let offersTestView: Bool
     /// Whether the agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
@@ -211,7 +214,11 @@ public actor AppService {
                 },
                 dashboard: @escaping DashboardSink = { _ in
                     .refused("This app has no Dashboard.")
-                }) {
+                },
+                viewTool: @escaping ViewToolSink = { _, _ in
+                    .failure("This app draws no views.")
+                },
+                offersTestView: Bool = AppViewCatalog.offersTestView) {
         let box = self.box
         self.finishSink = finishTurn
         self.fileSink = showFile
@@ -222,6 +229,8 @@ public actor AppService {
         self.eventsSink = events
         self.sessionsSink = sessions
         self.dashboardSink = dashboard
+        self.viewToolSink = viewTool
+        self.offersTestView = offersTestView
         self.managesAgents = managesAgents
         self.movesItself = movesItself
         self.connection = transport.map { transport in
@@ -259,7 +268,7 @@ public actor AppService {
             let asked = params?["protocolVersion"]?.stringValue
             return .success([
                 "protocolVersion": .string(asked ?? Self.protocolVersion),
-                "capabilities": ["tools": ["listChanged": false]],
+                "capabilities": ["tools": ["listChanged": false], "resources": ["listChanged": false]],
                 "serverInfo": ["name": "agents", "version": "1.0.0"],
             ])
 
@@ -267,7 +276,20 @@ public actor AppService {
             return .success([:])
 
         case "tools/list":
-            return .success(["tools": .array(Self.tools(managesAgents: managesAgents, movesItself: movesItself))])
+            // A view's tools too (#187), but never one only a view may call: no runtime
+            // filters by `visibility`, so what the model is not to see is not listed.
+            let views = AppViewCatalog.tools(testView: offersTestView).filter(\.forModel).map(\.definition)
+            return .success(["tools": .array(Self.tools(managesAgents: managesAgents, movesItself: movesItself) + views)])
+
+        case "resources/list":
+            return .success(["resources": .array(AppViewCatalog.resources(testView: offersTestView).map(Self.listed))])
+
+        case "resources/read":
+            let uri = params?["uri"]?.stringValue ?? ""
+            guard let resource = AppViewCatalog.resource(uri, testView: offersTestView) else {
+                return .failure(JSONRPCError(code: JSONRPCError.invalidParams, message: "No resource at \(uri)."))
+            }
+            return .success(["contents": [Self.contents(resource)]])
 
         case "tools/call":
             let name = params?["name"]?.stringValue ?? ""
@@ -332,6 +354,17 @@ public actor AppService {
                         """, isError: true))
                 }
                 return .success(Self.reply(await finishSink(raw, message, prompts, title, words)))
+            }
+
+            if let tool = AppViewCatalog.tool(named: name, testView: offersTestView) {
+                guard tool.forModel else {
+                    return .success(Self.reply("Nothing was done: \(tool.name) is for the view, not for you.",
+                                               isError: true))
+                }
+                switch await viewToolSink(tool.name, arguments) {
+                case .success(let result): return .success(result)
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                }
             }
 
             if name.hasSuffix(Self.showFileToolName) {

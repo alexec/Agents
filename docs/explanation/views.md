@@ -1,0 +1,77 @@
+---
+diataxis: explanation
+description: How the app draws a tool's ui:// view (MCP Apps) on the Mac, the iPhone and iPad, and the web page, what a view may reach, and what its messages do in Agents.
+---
+
+# Views in a conversation
+
+A tool can come with a view of its own: a small page, drawn in the conversation where the
+tool was called, that shows the result better than text could and that you can work with.
+This is MCP Apps ([SEP-1865, 2026-01-26](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)):
+a tool names a `ui://` resource, the resource is HTML, and the view talks to the app over
+`postMessage` in JSON-RPC.
+
+For now the app draws views only for its own `agents` server. Third-party servers' views
+come later.
+
+## Where a view comes from
+
+No runtime tells the app that a tool has a view (the #186 probe): none passes a tool's
+`_meta` on, and Claude replaces a result's text with its `structuredContent`. So the app
+does not ask the runtime. The `agents` server is the app's own daemon, which sees every call
+of its tools. When an agent calls a tool that has a view, the daemon writes the view into the
+conversation twice: once as the call arrives, with its input, and once when it is answered,
+with the whole result. If the turn is stopped first, the second entry says the call was
+cancelled. Every client draws the view from those entries, so a view looks the same whichever
+runtime called the tool.
+
+A view is drawn where its call began, at every turn level, like a reply.
+
+## What a view may reach
+
+Each view is drawn under a policy built from what its server declared in the resource's
+`_meta.ui.csp`, and nothing else:
+
+- **Nothing undeclared.** With nothing declared, a view has no network at all, and can load
+  pictures, styles, fonts and scripts only from itself and `data:`. A declared entry is kept
+  only if it is a plain origin, such as `https://api.example.com` or `https://*.cdn.example.net`.
+  Anything wider (`*`, `https:`, a keyword, a path) is dropped, and the drop is logged.
+- **No frames or plugins.** No frames unless frames were declared, never `<object>`, no
+  form posting, and no moving the page's base.
+- **Nothing of the app's.** A view runs in a sandboxed frame with an origin of its own and no
+  storage that outlasts it. It cannot read the app's cookies, storage or tokens, and it
+  cannot navigate anywhere. It opens a link only by asking.
+- **Logged.** The daemon's log has each view's policy as it is read, every log line the view
+  sends, and any tool a view asked for and was refused.
+
+How each client enforces it:
+
+| Client | How the view is held |
+|---|---|
+| Mac, iPhone, iPad | A web view of its own with nothing kept. The view is in a `sandbox="allow-scripts"` frame inside a page of the app's. The policy is on that page and again at the top of the view. A WebKit content-blocking list blocks every load except the declared origins. The bridge runs in a script world of the app's own, which the view cannot see. |
+| Web page | The spec's sandbox proxy. The page is at `localhost`; the proxy is served only at `127.0.0.1` on the same port, so it has a different origin. The proxy is drawn under the view's own policy (the control plane rebuilds that policy from the domains in its address, using the same rules) and can be framed only by the page. It holds the view in a `sandbox="allow-scripts"` frame of its own. |
+
+## What its messages do in Agents
+
+| Message | What the app does |
+|---|---|
+| `ui/initialize` | Answers with the host's context: theme, `platform` (`desktop` on the Mac, `mobile` on the Remote, `web` on the page), container size, locale, time zone, safe-area insets, and the app's colours and fonts as the spec's CSS variables, in `light-dark()`. |
+| `ui/notifications/initialized` | Sends `tool-input` with the call's arguments, and then `tool-result` or `tool-cancelled` once the call has one. |
+| `tools/call` | Calls the tool on the `agents` server for the conversation the view is in. Only a tool whose `visibility` includes `app` can be called this way. A tool that only a view may call is never offered to the agent. |
+| `resources/read` | Reads a `ui://` resource of the same server. |
+| `ui/open-link` | Opens an `http`, `https` or `mailto` link in your browser. Any other kind of link is refused. |
+| `ui/message` | **Asks you first.** Under the view: "The view asks to send this as your message", with **Send** and **Don't Send**. Send sends it as your own prompt, exactly as if you had typed it. A view never speaks for you without you. |
+| `ui/update-model-context` | Keeps what the view said, and tells the agent with **your next message**: before your words, not in your bubble, in the same way the app tells an agent that a wait ended. Only the last context from each view is kept, and it is used once. A line under the view says what the agent will be told, with **Don't Tell** to take it back. It is kept in memory only, so a daemon restart forgets it. |
+| `ui/request-display-mode` | `inline` or `fullscreen`. Full screen draws the same view in the chat's place, as a pinned page opens, with **Back to the chat**. You can also go full screen from the button beside the view's name. |
+| `ui/notifications/size-changed` | The view's height in the chat, up to 640 points. |
+| `notifications/message` | A line in the daemon's log. |
+| `ui/resource-teardown` | Sent before a view goes: when you open another conversation, or when more than eight views are open in one chat. The app waits up to two seconds for the answer. |
+
+## The test view
+
+The `agents` server has a test view, `ui://agents/test-view`, for proving all of this on
+every device. An agent can draw it with `show_test_view`. Its **Count** button calls
+`test_view_count`, which only a view may call. Inside, the view tries to reach `example.com`,
+which it never declared, and says in the view and in the daemon's log that it was blocked.
+It is offered to agents only when the daemon is started with `AGENTS_TEST_VIEWS=1`, so the
+agents you work with are not handed a tool for testing the app.

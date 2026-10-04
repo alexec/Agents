@@ -670,6 +670,11 @@ final class AppModel {
         client(for: host(ofAgent: id))
     }
 
+    /// One of a view's calls (#187), to the host its conversation is on.
+    func viewCall(_ agentID: UUID, _ method: String, _ params: JSONValue) async throws -> JSONValue {
+        try await client(forAgent: agentID).call(method, params)
+    }
+
     /// Where a new agent, a draft, a worktree or a session list for the selected
     /// project goes: that project's host.
     private var selectedHostClient: DaemonClient { client(for: selectedProjectHost) }

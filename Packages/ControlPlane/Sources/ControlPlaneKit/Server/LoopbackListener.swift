@@ -80,6 +80,12 @@ public struct LoopbackGate: Sendable {
 
     public var origin: String { Loopback.origin(port: port) }
 
+    /// The sandbox proxy's origin (#187, MCP Apps): the same listener at the address rather than
+    /// the name, so another origin than the page's, as the spec has it for a web page. Only the
+    /// proxy's two files are served there; everything else at it goes to the name, as before.
+    public var proxyOrigin: String { "http://127.0.0.1:\(port)" }
+    static let proxyPaths: Set<String> = ["/sandbox.html", "/sandbox.js"]
+
     public enum Verdict: Equatable, Sendable {
         case upgrade
         case reply(HTTPResponseStatus, path: String?, location: String?)
@@ -89,7 +95,7 @@ public struct LoopbackGate: Sendable {
     public var headers: [(String, String)] {
         [("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; "
             + "font-src 'self'; connect-src ws://localhost:\(port); base-uri 'none'; form-action 'none'; "
-            + "frame-ancestors 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; manifest-src 'none'; "
+            + "frame-ancestors 'none'; frame-src \(proxyOrigin); object-src 'none'; worker-src 'none'; manifest-src 'none'; "
             + "require-trusted-types-for 'script'; trusted-types 'none'"),
          ("X-Content-Type-Options", "nosniff"),
          ("Referrer-Policy", "no-referrer"),
@@ -110,6 +116,13 @@ public struct LoopbackGate: Sendable {
         guard head.method == .GET else { return .reply(.methodNotAllowed, path: nil, location: nil) }
         let path = head.uri.split(separator: "?", maxSplits: 1).first.map(String.init) ?? "/"
         let upgrading = head.headers[canonicalForm: "upgrade"].contains { $0.lowercased() == "websocket" }
+        // The sandbox proxy (#187): at its own origin only, never at the page's.
+        if Self.proxyPaths.contains(path) {
+            guard host == "127.0.0.1:\(port)", !upgrading, files.files[path] != nil else {
+                return .reply(.notFound, path: nil, location: nil)
+            }
+            return .reply(.ok, path: path, location: nil)
+        }
         // 3. One origin, so one key: the addresses go to the name.
         if host != canonical {
             if upgrading { return .reply(.misdirectedRequest, path: nil, location: nil) }
@@ -132,6 +145,12 @@ public struct LoopbackGate: Sendable {
         case .upgrade:
             // Reached only if the upgrade itself failed after the gate let it through.
             return PlainReply(.badRequest, Data(), contentType: "text/plain", headers: headers)
+        case .reply(let status, let path, _) where path.map(Self.proxyPaths.contains) == true:
+            let headers = proxyHeaders(head)
+            if let path, let file = files.files[path] {
+                return PlainReply(status, file.data, contentType: file.contentType, headers: headers)
+            }
+            return PlainReply(status, Data(), contentType: "text/plain; charset=utf-8", headers: headers)
         case .reply(let status, let path, let location):
             var headers = self.headers
             if let location { headers.append(("Location", location)) }
@@ -140,6 +159,30 @@ public struct LoopbackGate: Sendable {
             }
             return PlainReply(status, Data(), contentType: "text/plain; charset=utf-8", headers: headers)
         }
+    }
+}
+
+extension LoopbackGate {
+    /// The proxy's headers: the view's own policy, built here again from the domains in the
+    /// address (`?csp=`, base64url JSON) by the same `AppViewPolicy` that narrowed them, so an
+    /// address written by hand can allow no more than an origin each; framed by the page alone.
+    func proxyHeaders(_ head: HTTPRequestHead) -> [(String, String)] {
+        let policy = AppViewPolicy(csp: Self.domains(in: head.uri))
+        return [("Content-Security-Policy", policy.header + "; frame-ancestors \(origin)"),
+                ("X-Content-Type-Options", "nosniff"),
+                ("Referrer-Policy", "no-referrer"),
+                ("Cross-Origin-Resource-Policy", "same-origin"),
+                ("Cache-Control", "no-store")]
+    }
+
+    /// The `csp` query's domains, or nothing: the strict default.
+    static func domains(in uri: String) -> JSONValue? {
+        guard let query = URLComponents(string: uri)?.queryItems?.first(where: { $0.name == "csp" })?.value,
+              query.count <= 8192 else { return nil }
+        var text = query.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while text.count % 4 != 0 { text += "=" }
+        guard let data = Data(base64Encoded: text) else { return nil }
+        return try? JSONValue.parse(data)
     }
 }
 

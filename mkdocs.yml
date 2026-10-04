@@ -111,6 +111,7 @@ nav:
       - explanation/control-plane.md
       - explanation/window-and-daemon.md
       - explanation/scoped-tools.md
+      - explanation/views.md
       - explanation/projects-hosts-worktrees.md
       - explanation/leases.md
       - explanation/phone-and-ipad.md

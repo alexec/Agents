@@ -953,3 +953,25 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .page-tile-body { max-height: 300px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 80%, transparent);
   mask-image: linear-gradient(#000 80%, transparent); }
 pre.page-tile-body { white-space: pre-wrap; font-size: 11px; margin: 0; }
+
+/* A tool's view in the chat (#187): the row holds its place; the frame is in the layer. */
+.transcript { position: relative; }
+.view-layer { position: absolute; top: 0; left: 0; width: 100%; height: 0; overflow: visible; z-index: 1; }
+.view-box { background: var(--paper-ground); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; }
+.view-box iframe { display: block; border: 0; width: 100%; height: 100%; background: transparent; }
+.view-box .view-bar { display: none; }
+.view-box.full { z-index: 20; border: none; border-radius: 0; display: flex; flex-direction: column; }
+.view-box.full .view-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: 40px; padding: 0 16px; border-bottom: 1px solid var(--paper-rule); font-size: 13px; flex: none; }
+.view-box.full iframe { flex: 1; height: auto; }
+.app-view { display: flex; flex-direction: column; gap: 6px; }
+.app-view .view-caption { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 12px; }
+.app-view .view-caption button { margin-left: auto; }
+.app-view .view-slot { width: 100%; }
+button.plain { background: none; border: none; padding: 0; color: inherit; opacity: 0.65; font: inherit; }
+button.plain:hover { opacity: 1; }
+.view-ask { background: var(--paper-well); border-radius: var(--radius-card); padding: 10px; }
+.view-ask p { margin: 0 0 6px; }
+.view-ask .buttons { display: flex; gap: 8px; margin: 0; }
+.view-context { font-size: 12px; }
+.view-box[hidden] { display: none !important; }

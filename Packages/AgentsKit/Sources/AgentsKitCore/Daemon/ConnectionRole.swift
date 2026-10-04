@@ -62,6 +62,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.pinsMovePin,
         DaemonAPI.Method.pinsPinSessionTool,
         DaemonAPI.Method.agentsMoveSelf,
+        DaemonAPI.Method.viewsToolCall,
     ]).union(strangerMethods)
 
     /// Announcing, and finding out a daemon is answering.
