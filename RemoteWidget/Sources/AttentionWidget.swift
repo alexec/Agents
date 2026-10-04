@@ -8,10 +8,11 @@ import WidgetKit
 /// (FR-014); it reads `AttentionSnapshot` from the pair's shared storage on this device,
 /// which the app writes whenever its own count changes (FR-016).
 ///
-/// Two layouts and no others (FR-002): a small one that is the number, and a medium one
-/// that is the number and the newest few sessions, each row a `Link` into that
-/// conversation. Lock Screen and StandBy are out of scope, and the reasons are in the
-/// spec's Out of Scope.
+/// The Home screen's sizes and no others (FR-002): a small one that is the number, a
+/// medium one that is the number and the newest few sessions, each row a `Link` into that
+/// conversation, and a large one (and the iPad's extra large) with more of them and more of
+/// each (#192). Lock Screen and StandBy are out of scope, and the reasons are in 068's
+/// Out of Scope.
 @main
 struct AttentionWidgetBundle: WidgetBundle {
     var body: some Widget { AttentionWidget() }
@@ -27,6 +28,6 @@ struct AttentionWidget: Widget {
         }
         .configurationDisplayName("Needs you")
         .description("How many agent sessions are waiting for you.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
     }
 }

@@ -53,8 +53,10 @@ struct AttentionEntry: TimelineEntry {
     var isEmpty: Bool { snapshot?.total == 0 }
     var isUnknown: Bool { snapshot == nil }
     var count: Int { snapshot?.total ?? 0 }
-    var leftover: Int { snapshot?.leftover ?? 0 }
-    var sessions: [AttentionSnapshotSession] { snapshot?.sessions ?? [] }
+
+    /// The rows a size draws, newest first, and how many waiting are left undrawn there.
+    func rows(for size: AttentionSnapshot.Size) -> [AttentionSnapshotSession] { snapshot?.rows(for: size) ?? [] }
+    func leftover(for size: AttentionSnapshot.Size) -> Int { snapshot?.leftover(for: size) ?? 0 }
 
     /// FR-017: past a few minutes old, the number is not presented as current.
     func age(as now: Date = Date()) -> Date? {
