@@ -294,7 +294,12 @@ public actor DaemonCore {
     var retention = RetentionStore.File()
     var retentionIsLoaded = false
     /// Sizes and file dates of archived agents, written to `archive.json`.
-    var archiveIndex: [UUID: ArchiveIndex.Entry] = [:]
+    var archiveIndex: [UUID: ArchiveIndex.Entry] = [:] {
+        didSet { archiveIndexChanged = true }
+    }
+    /// Whether `archiveIndex` differs from what `archive.json` holds, so the hourly
+    /// check writes it only when something did change (#177).
+    var archiveIndexChanged = false
     /// Over the cap with nothing more that could go, as the last check found.
     var lastOverCap: OverCap?
     /// When each archived agent was last made whole to be read. Gone when it is slim again.
@@ -1102,7 +1107,8 @@ public actor DaemonCore {
                 agents[agent.id] = agent
             }
         }
-        if archiveIndex != index { saveArchiveIndex() }
+        archiveIndexChanged = archiveIndex != index
+        saveArchiveIndex()
         // A record the rules forbid was brought to one they allow on the way in, and
         // the person is told so here, in the transcript, which is where this app
         // already explains itself.
