@@ -112,13 +112,29 @@ export function projectFolder(agent: Agent): string {
   return folderKey(agent.worktree?.project ?? agent.cwd);
 }
 
-/** AgentsModel.agents(in:group:): newest activity first, or under Parked most recently parked first. */
+/** ProjectShelf.byActivity: newest activity first, then by id. */
+function byActivity(a: Agent, b: Agent): number {
+  return b.lastActivityAt - a.lastActivityAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+/**
+ * ProjectShelf.byStart: newest started first, then by id (#182). A working agent's activity
+ * changes with every line, so a live group ordered by it shuffled; when it started never changes.
+ */
+export function byStart(a: Agent, b: Agent): number {
+  return b.createdAt - a.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+/**
+ * AgentsModel.agents(in:group:): newest started first; under Parked most recently parked first;
+ * under Archived newest activity first, as the host pages them.
+ */
 export function agentsIn(agents: readonly Agent[], folder: string, group: AgentGroup): Agent[] {
   const wanted = folderKey(folder);
-  const found = agents.filter((agent) => projectFolder(agent) === wanted && groupOf(agent) === group)
-    .sort((a, b) => b.lastActivityAt - a.lastActivityAt);
-  if (group !== "parked") return found;
-  return found.sort((a, b) => (parkedAt(b) ?? -Infinity) - (parkedAt(a) ?? -Infinity));
+  const found = agents.filter((agent) => projectFolder(agent) === wanted && groupOf(agent) === group);
+  if (group === "archived") return found.sort(byActivity);
+  if (group !== "parked") return found.sort(byStart);
+  return found.sort((a, b) => (parkedAt(b) ?? -Infinity) - (parkedAt(a) ?? -Infinity) || byStart(a, b));
 }
 
 /** The column's headings in order, empty ones left out. */

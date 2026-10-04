@@ -1115,7 +1115,7 @@ public final class AgentsModel {
         return projects.first { $0.folder == folder }
     }
 
-    /// The agents of one project, in one group, newest activity first — or, under
+    /// The agents of one project, in one group, newest started first (#182) — or, under
     /// Parked, most recently parked first (040, FR-003).
     ///
     /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading
@@ -1146,10 +1146,10 @@ public final class AgentsModel {
         // The list of everything: out of its old place, into its new one.
         var all = agents
         if let old {
-            let at = ProjectShelf.place(of: old, in: all, group: .finished)
+            let at = ProjectShelf.place(of: old, in: all, by: ProjectShelf.byActivity)
             if at < all.count, all[at].id == old.id { all.remove(at: at) } else { all.removeAll { $0.id == old.id } }
         }
-        all.insert(agent, at: ProjectShelf.place(of: agent, in: all, group: .finished))
+        all.insert(agent, at: ProjectShelf.place(of: agent, in: all, by: ProjectShelf.byActivity))
         agents = all
         if old == nil { agentCount = byID.count }
         // Its shelves: in place when it stays where it was, moved when not.
@@ -1214,8 +1214,8 @@ public final class AgentsModel {
             byKey[ShelfKey(folder: folder, host: agent.host), default: [:]][group, default: []].append(agent)
             byFolder[folder, default: [:]][group, default: []].append(agent)
         }
-        for (key, groups) in byKey { byKey[key] = groups.sortingParked() }
-        for (folder, groups) in byFolder { byFolder[folder] = groups.sortingParked() }
+        for (key, groups) in byKey { byKey[key] = groups.sortedInGroupOrder() }
+        for (folder, groups) in byFolder { byFolder[folder] = groups.sortedInGroupOrder() }
         for (key, shelf) in shelves where byKey[key] == nil { shelf.replaceAll([:]) }
         for (key, groups) in byKey { shelf(ProjectKey(host: key.host, folder: key.folder)).replaceAll(groups) }
         for (folder, shelf) in folderShelves where byFolder[folder] == nil { shelf.replaceAll([:]) }
@@ -1293,10 +1293,13 @@ private struct ShelfKey: Hashable {
 }
 
 private extension Dictionary where Key == AgentGroup, Value == [Agent] {
-    /// Parked reads most recently parked first; the rest are already newest first.
-    func sortingParked() -> Self {
+    /// Each group in its own order: filed from a list newest activity first, Archived
+    /// is already, and the rest are not (#182).
+    func sortedInGroupOrder() -> Self {
         var sorted = self
-        if let parked = sorted[.parked] { sorted[.parked] = parked.sorted(by: ProjectShelf.order(.parked)) }
+        for (group, agents) in sorted where group != .archived {
+            sorted[group] = agents.sorted(by: ProjectShelf.order(group))
+        }
         return sorted
     }
 }

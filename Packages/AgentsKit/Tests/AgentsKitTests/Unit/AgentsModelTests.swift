@@ -44,6 +44,33 @@ struct AgentsModelTests {
         #expect(model.agents.first?.id == new.id)
     }
 
+    /// A working agent's activity moves with every line, and a click brings a fresh copy
+    /// of it: ordered by activity, the rows of Working swapped places (#182). A group is
+    /// in the order its agents started, so only a change of group moves a row.
+    @Test func aGroupKeepsItsOrderWhileItsAgentsWork() throws {
+        let model = AgentsModel()
+        var older = agent(at: Date(timeIntervalSinceNow: -60))
+        older.createdAt = Date(timeIntervalSinceNow: -600)
+        var newer = agent(at: Date(timeIntervalSinceNow: -120))
+        newer.createdAt = Date(timeIntervalSinceNow: -300)
+        model.replaceAgents([older, newer])
+        #expect(model.agents(in: folder, group: .running).map(\.id) == [newer.id, older.id], "newest started first")
+
+        older.lastActivityAt = Date()
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(older))
+        #expect(model.agents(in: folder, group: .running).map(\.id) == [newer.id, older.id], "a line written moves nothing")
+        #expect(model.agents.first?.id == older.id, "everything held is still newest activity first")
+
+        newer.lastActivityAt = Date().addingTimeInterval(1)
+        model.replaceAgents([older, newer])
+        #expect(model.agents(in: folder, group: .running).map(\.id) == [newer.id, older.id], "nor does a fresh list")
+
+        older.state = .waitingOnUser
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(older))
+        #expect(model.agents(in: folder, group: .running).map(\.id) == [newer.id], "a change of group does")
+        #expect(model.agents(in: folder, group: .needsAttention).map(\.id) == [older.id])
+    }
+
     /// A withdrawal carries no request, and a client that read it as "nothing to do"
     /// would leave the question on screen for somebody to answer a second time. Without
     /// a request identity, every question for that agent goes — the legacy shape.

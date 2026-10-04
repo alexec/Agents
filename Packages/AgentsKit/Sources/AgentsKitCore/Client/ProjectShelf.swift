@@ -16,8 +16,8 @@ import Observation
 @MainActor
 @Observable
 public final class ProjectShelf {
-    /// Each group's agents, newest activity first; Parked, most recently parked first
-    /// (040, FR-003).
+    /// Each group's agents, newest started first (#182); Parked, most recently parked
+    /// first (040, FR-003); Archived, newest activity first, as the host pages them.
     public private(set) var groups: [AgentGroup: [Agent]] = [:]
     /// How many agents are in each group, by the client's own grouping.
     public private(set) var counts: [AgentGroup: Int] = [:]
@@ -90,18 +90,35 @@ public final class ProjectShelf {
     // MARK: Order
 
     /// Newest activity first, then by id, so two agents with the same moment are always
-    /// in the same order.
+    /// in the same order. The order of everything held, and of Archived, which the host
+    /// pages in it (#165) and whose activity no longer moves.
     nonisolated static func byActivity(_ a: Agent, _ b: Agent) -> Bool {
         if a.lastActivityAt != b.lastActivityAt { return a.lastActivityAt > b.lastActivityAt }
         return a.id.uuidString < b.id.uuidString
     }
 
-    /// Parked reads most recently parked first; the rest, newest activity first.
+    /// Newest started first, then by id (#182): what a live group's rows are in. A
+    /// working agent's activity changes with every line it writes, so ordered by it the
+    /// rows of Working swapped places whenever a fresh copy of one arrived, as a click
+    /// brings. Started never changes, so a row moves only when its group does.
+    nonisolated public static func byStart(_ a: Agent, _ b: Agent) -> Bool {
+        if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+        return a.id.uuidString < b.id.uuidString
+    }
+
+    /// Parked reads most recently parked first; Archived, newest activity first; the
+    /// rest, newest started first.
     nonisolated static func order(_ group: AgentGroup) -> (Agent, Agent) -> Bool {
-        guard group == .parked else { return byActivity }
-        return { a, b in
-            let at = a.parking?.parkedAt ?? .distantPast, bt = b.parking?.parkedAt ?? .distantPast
-            return at != bt ? at > bt : byActivity(a, b)
+        switch group {
+        case .archived:
+            return byActivity
+        case .parked:
+            return { a, b in
+                let at = a.parking?.parkedAt ?? .distantPast, bt = b.parking?.parkedAt ?? .distantPast
+                return at != bt ? at > bt : byStart(a, b)
+            }
+        default:
+            return byStart
         }
     }
 
@@ -116,7 +133,11 @@ public final class ProjectShelf {
 
     /// Where `agent` goes in `list`, which is in the group's order.
     static func place(of agent: Agent, in list: [Agent], group: AgentGroup) -> Int {
-        let before = order(group)
+        place(of: agent, in: list, by: order(group))
+    }
+
+    /// Where `agent` goes in `list`, which is in the order `before` says.
+    static func place(of agent: Agent, in list: [Agent], by before: (Agent, Agent) -> Bool) -> Int {
         var low = 0, high = list.count
         while low < high {
             let mid = (low + high) / 2
