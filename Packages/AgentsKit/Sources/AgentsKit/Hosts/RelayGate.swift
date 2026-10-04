@@ -29,6 +29,11 @@ public final class RelayGate: @unchecked Sendable {
     private let describeOwner: @Sendable (_ clientPort: UInt16, _ gatePort: UInt16) -> String
     private let lock = NSLock()
     private var closed = false
+    /// Connections being piped now. A sign-in relay sees a handful; past `mostAtOnce` a new
+    /// one is closed unread rather than given two more threads (#201).
+    private var live = 0
+    static let mostAtOnce = 32
+    private var notices = RepeatedNotice()
 
     /// Listen on `127.0.0.1` on a free port, piping to the Unix socket at `target`.
     /// `ownerCheck` is `/proc/net/tcp` by default; tests give their own.
@@ -84,6 +89,7 @@ public final class RelayGate: @unchecked Sendable {
     private var isClosed: Bool { lock.lock(); defer { lock.unlock() }; return closed }
 
     private func acceptLoop() {
+        let failures = AcceptFailures(name: "relay gate")
         while !isClosed {
             var peer = sockaddr_in()
             var length = socklen_t(MemoryLayout<sockaddr_in>.size)
@@ -91,13 +97,21 @@ public final class RelayGate: @unchecked Sendable {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { accept(listener, $0, &length) }
             }
             guard client >= 0 else {
-                if isClosed { return }
+                // Waited out rather than spun on (#201).
+                let error = errno
+                if isClosed || failures.after(error, listener: listener) == .stop { return }
+                continue
+            }
+            failures.accepted()
+            guard startOne() else {
+                POSIX.close(client)
                 continue
             }
             let clientPort = UInt16(bigEndian: peer.sin_port)
             guard ownerCheck(clientPort, port) else {
                 DaemonLog.shared.write("relay gate: refused a connection from port \(clientPort) (\(describeOwner(clientPort, port)), not uid \(getuid()))")
                 POSIX.close(client)
+                endOne()
                 continue
             }
             let upstream = POSIX.unixStreamSocket()
@@ -111,17 +125,46 @@ public final class RelayGate: @unchecked Sendable {
                 DaemonLog.shared.write("relay gate: the Mac's relay is not reachable at \(target)")
                 if upstream >= 0 { POSIX.close(upstream) }
                 POSIX.close(client)
+                endOne()
                 continue
             }
-            Self.pipe(client, upstream)
+            setCloseOnExec(upstream)
+            Self.pipe(client, upstream) { [weak self] in self?.endOne() }
         }
     }
 
-    /// Copy both ways until either side closes, then close both.
-    private static func pipe(_ a: Int32, _ b: Int32) {
-        let done = DispatchGroup()
+    /// Room for one more connection, counted; false when there is none.
+    private func startOne() -> Bool {
+        let (room, say) = lock.withLock { () -> (Bool, RepeatedNotice.Say?) in
+            guard live < Self.mostAtOnce else {
+                return (false, notices.note("full", at: Date()))
+            }
+            live += 1
+            return (true, nil)
+        }
+        switch say {
+        case .first?:
+            DaemonLog.shared.write("relay gate: \(Self.mostAtOnce) connections already open; closed a new one unread (again within the hour is counted, not logged)")
+        case .again(let times, _)?:
+            DaemonLog.shared.write("relay gate: \(Self.mostAtOnce) connections already open; closed \(times) more unread")
+        case nil:
+            break
+        }
+        return room
+    }
+
+    private func endOne() {
+        lock.withLock { live -= 1 }
+    }
+
+    /// How many connections are being piped, for tests.
+    var liveConnections: Int { lock.withLock { live } }
+
+    /// Copy both ways until either side closes, then close both. Two threads, one each
+    /// way; whichever finishes second closes both and says so.
+    private static func pipe(_ a: Int32, _ b: Int32, ended: @escaping @Sendable () -> Void) {
+        let remaining = Remaining(2)
         for (from, to) in [(a, b), (b, a)] {
-            done.enter()
             let thread = Thread {
                 var buffer = [UInt8](repeating: 0, count: 65536)
                 while true {
@@ -136,15 +179,24 @@ public final class RelayGate: @unchecked Sendable {
                     if sent < n { break }
                 }
                 shutdown(to, Int32(SHUT_WR))
-                done.leave()
+                if remaining.finishOne() {
+                    POSIX.close(a)
+                    POSIX.close(b)
+                    ended()
+                }
             }
+            thread.name = "relay-gate-pipe"
             thread.start()
         }
-        Thread {
-            done.wait()
-            POSIX.close(a)
-            POSIX.close(b)
-        }.start()
+    }
+
+    /// A count down shared by a connection's two threads.
+    private final class Remaining: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count: Int
+        init(_ count: Int) { self.count = count }
+        /// True for the one that brings it to zero.
+        func finishOne() -> Bool { lock.withLock { count -= 1; return count == 0 } }
     }
 
     private static func tcpSocket() -> Int32 {
@@ -169,44 +221,73 @@ public final class RelayGate: @unchecked Sendable {
     /// The owner from `/proc/net/tcp`, or from `/proc/net/tcp6` for a client that reached
     /// 127.0.0.1 from an IPv6 socket (its ends then read as `::ffff:127.0.0.1`).
     static func ownerOnServer(clientPort: UInt16, gatePort: UInt16) -> UInt32? {
+        let ends = Ends(clientPort: clientPort, gatePort: gatePort)
         for file in ["/proc/net/tcp", "/proc/net/tcp6"] {
-            guard let text = readToEnd(file) else { continue }
-            if let owner = owner(of: clientPort, connectedTo: gatePort, in: text) { return owner }
+            var found: UInt32?
+            eachLine(of: file) { line in
+                found = ends.owner(on: line)
+                return found == nil
+            }
+            if let found { return found }
         }
         return nil
     }
 
-    /// A `/proc` file read until the kernel says it is done. Its size reads as 0, and a
-    /// read by size stops after the first page: a busy server's table runs longer than that.
-    static func readToEnd(_ path: String) -> String? {
-        let fd = open(path, O_RDONLY)
-        guard fd >= 0 else { return nil }
+    /// Each line of a `/proc` file, read until the kernel says it is done or `body` says
+    /// stop. Its size reads as 0, and a read by size stops after the first page: a busy
+    /// server's table runs longer than that. Line by line, so the gate holds one chunk of
+    /// the table at a time and stops at the entry it wants, not the whole table per
+    /// connection (#201).
+    static func eachLine(of path: String, _ body: (Substring) -> Bool) {
+        let fd = open(path, O_RDONLY | O_CLOEXEC)
+        guard fd >= 0 else { return }
         defer { POSIX.close(fd) }
-        var data = Data()
+        var pending = [UInt8]()
         var buffer = [UInt8](repeating: 0, count: 16384)
         while true {
             let n = buffer.withUnsafeMutableBytes { POSIX.read(fd, $0.baseAddress, 16384) }
-            if n < 0 { return nil }
-            if n == 0 { break }
-            data.append(contentsOf: buffer[0..<n])
+            if n <= 0 { break }
+            pending.append(contentsOf: buffer[0..<n])
+            var start = 0
+            while let newline = pending[start...].firstIndex(of: 0x0A) {
+                let line = String(decoding: pending[start..<newline], as: UTF8.self)
+                if !body(Substring(line)) { return }
+                start = newline + 1
+            }
+            pending.removeFirst(start)
         }
-        return String(decoding: data, as: UTF8.self)
+        if !pending.isEmpty { _ = body(Substring(String(decoding: pending, as: UTF8.self))) }
     }
 
     /// The `uid` column of the entry whose local end is `127.0.0.1:clientPort` and whose
     /// remote end is `127.0.0.1:gatePort`, in `/proc/net/tcp`'s format.
     static func owner(of clientPort: UInt16, connectedTo gatePort: UInt16, in table: String) -> UInt32? {
-        // IPv4 `0100007F:PORT`, or IPv6 with a v4-mapped loopback, `…FFFF00000100007F:PORT`.
-        let local = String(format: "0100007F:%04X", clientPort)
-        let remote = String(format: "0100007F:%04X", gatePort)
+        let ends = Ends(clientPort: clientPort, gatePort: gatePort)
         for line in table.split(separator: "\n").dropFirst() {
+            if let owner = ends.owner(on: line) { return owner }
+        }
+        return nil
+    }
+
+    /// One connection's two ends as `/proc/net/tcp` writes them.
+    private struct Ends {
+        // IPv4 `0100007F:PORT`, or IPv6 with a v4-mapped loopback, `…FFFF00000100007F:PORT`.
+        let local: String
+        let remote: String
+
+        init(clientPort: UInt16, gatePort: UInt16) {
+            local = String(format: "0100007F:%04X", clientPort)
+            remote = String(format: "0100007F:%04X", gatePort)
+        }
+
+        /// The `uid` column when `line` is this connection's entry. The header never is.
+        func owner(on line: Substring) -> UInt32? {
             let fields = line.split(separator: " ", omittingEmptySubsequences: true)
             guard fields.count > 7, fields[1].hasSuffix(local), fields[2].hasSuffix(remote),
-                  fields[1].count == local.count || fields[1].hasSuffix("FFFF0000" + local) else { continue }
+                  fields[1].count == local.count || fields[1].hasSuffix("FFFF0000" + local) else { return nil }
             // A client that has already closed (TIME_WAIT) reads as uid 0 and is refused.
             return UInt32(fields[7])
         }
-        return nil
     }
 }
 

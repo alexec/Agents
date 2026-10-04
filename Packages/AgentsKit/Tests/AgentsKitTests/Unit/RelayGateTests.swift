@@ -30,12 +30,24 @@ struct RelayGateTests {
         #expect(RelayGate.owner(of: 0xD4F4, connectedTo: 0x4B21, in: Self.table) == nil)
     }
 
-    @Test func aLongFileIsReadToItsEnd() throws {
+    @Test func aLongFileIsReadToItsEndALineAtATime() throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("tcp-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: file) }
-        let text = String(repeating: "x", count: 20000) + "end"
-        try Data(text.utf8).write(to: file)
-        #expect(RelayGate.readToEnd(file.path) == text)
+        let lines = (0..<2000).map { "line \($0) " + String(repeating: "x", count: 40) }
+        try Data((lines.joined(separator: "\n") + "\nend").utf8).write(to: file)
+        var seen: [String] = []
+        RelayGate.eachLine(of: file.path) { seen.append(String($0)); return true }
+        #expect(seen == lines + ["end"])
+    }
+
+    /// The gate stops at the entry it wants rather than reading the rest of the table (#201).
+    @Test func readingStopsWhenTheLineIsFound() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("tcp-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data((0..<5000).map { "line \($0)" }.joined(separator: "\n").utf8).write(to: file)
+        var seen = 0
+        RelayGate.eachLine(of: file.path) { _ in seen += 1; return seen < 3 }
+        #expect(seen == 3)
     }
 
     @Test func onlyTheSameAccountIsLetThrough() {
@@ -63,6 +75,12 @@ struct RelayGateTests {
         let shut = try RelayGate(target: socketPath, ownerCheck: { _, _ in false })
         defer { shut.close() }
         #expect(try Self.roundTrip(port: shut.port, "hello") == "")
+
+        // Both connections are let go once they end, through and refused alike (#201).
+        let deadline = Date().addingTimeInterval(5)
+        while open.liveConnections + shut.liveConnections > 0, Date() < deadline { usleep(20_000) }
+        #expect(open.liveConnections == 0)
+        #expect(shut.liveConnections == 0)
     }
 
     static func roundTrip(port: UInt16, _ text: String) throws -> String {
