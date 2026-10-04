@@ -329,6 +329,8 @@ extension DaemonCore {
         }
         agents[agent.id] = agent
         live[agent.id] = session
+        // What it started with, so the pool can tell whether it may be reused (#183).
+        launchPrints[agent.id] = launchPrint(for: agent)
         // Where its changes will be measured from (035), asked for beside the start
         // rather than inside it: a start waits for nothing it does not need, and git
         // answers in milliseconds where a runtime takes seconds to make its first edit.
@@ -944,8 +946,51 @@ extension DaemonCore {
     ///
     /// This is picking an agent up: same agent, same folder, same conversation, with a
     /// new process behind it and possibly a new runtime session recorded against it.
-    func liveSession(for agent: Agent) async throws -> ACPSession {
-        if let existing = live[agent.id] { return existing }
+    ///
+    /// A runtime kept warm since its last turn (#183) is used as it is, straight to
+    /// `session/prompt`, unless what this turn would start with has changed since. One
+    /// being started already, by a prewarm or another caller, is waited for rather than
+    /// started twice. `quiet` is a prewarm: nothing is said in the conversation, and a
+    /// failure is only logged, for the prompt that follows to meet and say.
+    func liveSession(for agent: Agent, quiet: Bool = false) async throws -> ACPSession {
+        if let existing = live[agent.id] {
+            guard warm[agent.id] != nil else { return existing }
+            if let changed = warmMismatch(agent) {
+                await releaseWarm(agent.id, because: changed)
+            } else if let entry = warm.removeValue(forKey: agent.id) {
+                DaemonLog.shared.write("warm pool: reused \(agent.id), warm for \(Int(now().timeIntervalSince(entry.since)))s")
+                return existing
+            }
+        }
+        if let running = launching[agent.id] {
+            do {
+                return try await running.task.value
+            } catch where running.quiet && !quiet {
+                // A prewarm's failure is said by nobody; this start says it.
+                if let existing = live[agent.id] { return existing }
+            }
+        }
+        let token = UUID()
+        let task = Task { [weak self] () throws -> ACPSession in
+            guard let self else { throw CancellationError() }
+            do {
+                let session = try await self.launchSession(for: agent, quiet: quiet)
+                await self.endLaunch(agent.id, token: token)
+                return session
+            } catch {
+                await self.endLaunch(agent.id, token: token)
+                throw error
+            }
+        }
+        launching[agent.id] = (task, quiet, token)
+        return try await task.value
+    }
+
+    private func endLaunch(_ agentID: UUID, token: UUID) {
+        if launching[agentID]?.token == token { launching.removeValue(forKey: agentID) }
+    }
+
+    private func launchSession(for agent: Agent, quiet: Bool) async throws -> ACPSession {
         guard let runtime = RuntimeCatalog.runtime(id: agent.runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "There is no runtime called \(agent.runtimeID).")
@@ -961,7 +1006,11 @@ extension DaemonCore {
         // Before anything is said or started: wanting a credential leaves the agent as it
         // was, and the window lends one and asks again (043).
         let lent = try launchEnvironment(for: runtime.id)
-        await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
+        if quiet {
+            DaemonLog.shared.write("warm pool: starting \(runtime.id) for \(agent.id) ahead of a prompt")
+        } else {
+            await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
+        }
         // Before the runtime starts, since Codex reads its plugins as it does (054, R12).
         await syncCodexPlugins(before: agent.runtimeID)
         linkGeminiProjectPlugins(runtimeID: agent.runtimeID, cwd: agent.cwd)
@@ -976,13 +1025,21 @@ extension DaemonCore {
                 }
             }
         } catch {
-            runtimeFailed(agentID: agent.id)
+            if !quiet { runtimeFailed(agentID: agent.id) }
             throw error
         }
         await hearAuthStatus(from: session, runtimeID: runtime.id)
         do {
-            return try await connect(session, runtime: runtime, for: agent, sandbox: sandbox)
+            let connected = try await connect(session, runtime: runtime, for: agent, sandbox: sandbox, quiet: quiet)
+            launchPrints[agent.id] = launchPrint(for: agents[agent.id] ?? agent)
+            return connected
         } catch {
+            if quiet {
+                dropAppTokens(for: agent.id)
+                await session.end(gracePeriod: .seconds(1))
+                DaemonLog.shared.write("warm pool: \(runtime.id) for \(agent.id) did not start ahead of a prompt: \(error)")
+                throw error
+            }
             // Its sandbox first (064), read while the process's last words are to hand.
             let sandboxFailure = isSandboxHang(error)
                 ? SandboxWords.cardBody(runtimeID: runtime.id, name: runtime.name, hang: true)
@@ -1017,7 +1074,8 @@ extension DaemonCore {
     }
 
     private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent,
-                         sandbox: (choice: SandboxChoice, reason: String?)) async throws -> ACPSession {
+                         sandbox: (choice: SandboxChoice, reason: String?),
+                         quiet: Bool) async throws -> ACPSession {
         let handshake = try await initializeWatchingForHang(session, runtimeID: agent.runtimeID, choice: sandbox.choice)
         // Picked back up with what `~/.agents` holds now, not what it held at the start (054).
         reconcileHome()
@@ -1046,7 +1104,7 @@ extension DaemonCore {
                                                   additionalDirectories: agent.additionalDirectories,
                                                   mcpServers: servers,
                                                   meta: meta)
-                await record(.runtimeNote(RuntimeNote.pickedBackUp), for: agent.id)
+                if !quiet { await record(.runtimeNote(RuntimeNote.pickedBackUp), for: agent.id) }
             } catch where Self.signInReason(error) == nil && !(error is RuntimeDidNotAnswer) {
                 // The runtime no longer has it. The agent is not lost: it carries on as
                 // the same agent, with our transcript, in a new runtime session.
@@ -1106,6 +1164,8 @@ extension DaemonCore {
                    from: PromptOrigin = .person, session: ACPSession,
                    unlessStoppedSince stopsBefore: Int? = nil, requeue: QueuedPrompt? = nil,
                    preface: String? = nil, recorded: Bool = true) async {
+        // A runtime with a turn is work, not warm (#183), whoever handed it over.
+        warm.removeValue(forKey: agentID)
         let blocks = blocks ?? [.text(text)]
         // Whatever was suggested has been answered now, by being taken or by being
         // typed past. Either way it is about the turn before this one.
@@ -1335,9 +1395,11 @@ extension DaemonCore {
             }
         }
         await move(agentID, on: .turnEnded(reason))
-        // A finished agent's process is let go: every runtime hands the session back,
-        // so holding one open buys nothing and works against the daemon's exit rule.
-        await releaseRuntime(for: agentID)
+        // A finished agent's runtime joins the warm pool, if the person is likely to
+        // reply soon, so the reply is not a cold start (#183). Otherwise, and on a move
+        // asked for in this turn, it is let go as it always was: idle, it is not work,
+        // and never counts against the daemon's exit rule or keeps the Mac awake.
+        await keepWarmOrRelease(agentID)
         // A move asked for in this turn is made now, between the runtime going and the
         // next one starting, and before the stop below is heard: a stopped turn still
         // moves, it just does not carry on by itself (053).
@@ -1713,6 +1775,7 @@ extension DaemonCore {
                 : "The \(count) messages you queued were not sent, \(because). They are still waiting."),
                          for: agentID)
         }
+        await releaseWarm(agentID, because: "stopped")
         await releaseRuntime(for: agentID)
         await settle(leaseEvents)
     }
@@ -1738,6 +1801,8 @@ extension DaemonCore {
         // Before the stop, which would give them back as "stopped": an archived
         // agent's transcript should say it let go because it was archived (036).
         let leaseEvents = dropLeases(for: agentID, ending: .holderArchived)
+        // A finished agent holds no turn to stop, but may hold a warm runtime (#183).
+        await releaseWarm(agentID, because: "archived")
         if agent.state.holdsRuntime { try await stop(agentID, by: cause) }
         await settle(leaseEvents)
         switch cause {
@@ -1805,6 +1870,8 @@ extension DaemonCore {
         }
         changed(agent)
         if agent.parking?.isParked == true {
+            // Put down is not expecting a reply (#183).
+            if warm[agentID] != nil { Task { await self.releaseWarm(agentID, because: "parked") } }
             raiseAgentEvent("agent.parked", agentID, sentence: "was parked.",
                             details: agent.report.map { ["outcome": $0.outcome.rawValue] } ?? [:])
         }

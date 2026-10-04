@@ -427,6 +427,8 @@ extension DaemonCore {
                     if request.from == .person {
                         await self.unparkQuietly(request.agentID)
                         await self.dropAfterTurnAsk(request.agentID)
+                        // How quickly they reply here, for the warm pool (#183).
+                        await self.notePersonPrompt(request.agentID)
                     }
                     try await self.prompt(request)
                     return [:]
@@ -501,6 +503,11 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsRecreateWorktree:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
                 return .success(try JSONValue.encoding(try await recreateWorktree(request.agentID)))
+
+            case DaemonAPI.Method.agentsPrewarm:
+                let request = try require(params, as: DaemonAPI.PrewarmRequest.self)
+                try prewarm(request)
+                return .success([:])
 
             case DaemonAPI.Method.agentsSetUnread:
                 let request = try require(params, as: DaemonAPI.SetUnreadRequest.self)

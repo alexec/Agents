@@ -10,12 +10,18 @@ public struct WakeSettings: Codable, Hashable, Sendable {
     public var keepsAwake: Bool
     /// Whole hours after the last agent stops, from none to eight.
     public var graceHours: Int
+    /// How many finished sessions keep their runtime running, ready for a reply (#183).
+    /// Beside the hold because it is the same kind of choice: what this Mac spends on
+    /// agents between turns. A warm runtime never holds the Mac awake.
+    public var warmRuntimes: Int
 
     public static let hours = 0...8
+    public static let warmRange = 0...8
 
-    public init(keepsAwake: Bool = true, graceHours: Int = 1) {
+    public init(keepsAwake: Bool = true, graceHours: Int = 1, warmRuntimes: Int = 3) {
         self.keepsAwake = keepsAwake
         self.graceHours = Self.clamp(graceHours)
+        self.warmRuntimes = min(max(warmRuntimes, Self.warmRange.lowerBound), Self.warmRange.upperBound)
     }
 
     /// The grace as a duration. Zero is the hold ending when the work does.
@@ -29,6 +35,8 @@ public struct WakeSettings: Codable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         keepsAwake = (try? c.decode(Bool.self, forKey: .keepsAwake)) ?? true
         graceHours = Self.clamp((try? c.decode(Int.self, forKey: .graceHours)) ?? 1)
+        let warm = (try? c.decode(Int.self, forKey: .warmRuntimes)) ?? 3
+        warmRuntimes = min(max(warm, Self.warmRange.lowerBound), Self.warmRange.upperBound)
     }
 }
 

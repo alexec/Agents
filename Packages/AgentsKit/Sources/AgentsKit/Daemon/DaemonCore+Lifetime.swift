@@ -18,7 +18,10 @@ extension DaemonCore {
     /// both directions on purpose, because whoever finds only one of them will assume
     /// the other is a mistake (024 FR-003).
     public var isHoldingAgents: Bool {
-        if !live.isEmpty { return true }
+        // A runtime kept warm for a reply is idle, not work (#183): the daemon may go
+        // under it, and `shutDown` ends it. One being started is held for its seconds.
+        if live.keys.contains(where: { warm[$0] == nil }) { return true }
+        if !launching.isEmpty { return true }
         // An agent on its way back up after a restart has no runtime yet and is not in
         // any state that says it is busy. Exiting under one would abandon the work a
         // moment before picking it up again.

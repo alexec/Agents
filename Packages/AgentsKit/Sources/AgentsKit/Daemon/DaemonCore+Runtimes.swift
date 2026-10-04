@@ -40,6 +40,8 @@ extension DaemonCore {
     public func logOut(runtimeID: String) async throws -> [UUID] {
         let stopped = agents.live.values.filter { $0.runtimeID == runtimeID && $0.state.holdsRuntime }.map(\.id)
         for id in stopped { try? await stop(id) }
+        // A warm runtime is still signed in as before (#183).
+        await releaseWarm(runtimeID: runtimeID, because: "\(runtimeID) was signed out")
         let (session, _) = try await handshakeOnly(runtimeID: runtimeID)
         defer { Task { await session.end(gracePeriod: .seconds(2)) } }
         try await session.logOut()
@@ -52,6 +54,8 @@ extension DaemonCore {
         let (session, _) = try await handshakeOnly(runtimeID: runtimeID)
         defer { Task { await session.end(gracePeriod: .seconds(2)) } }
         try await session.setProvider(id: providerID)
+        // A warm runtime still answers through the provider before (#183).
+        await releaseWarm(runtimeID: runtimeID, because: "\(runtimeID) changed provider")
         var account = account(for: runtimeID)
         account.currentProviderID = providerID
         accounts[runtimeID] = account

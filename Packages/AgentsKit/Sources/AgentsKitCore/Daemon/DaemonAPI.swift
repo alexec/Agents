@@ -146,6 +146,10 @@ public enum DaemonAPI {
         /// Mark a finished chat unread, or read, from its row (#70). The person's word
         /// about their own attention, as parking is: no agent tool reaches it.
         public static let agentsSetUnread = "agents/setUnread"
+        /// Start a finished session's runtime ahead of a prompt, because a window opened it
+        /// or somebody is typing in its box (#183). Answers at once; the start goes on
+        /// behind, and a runtime nobody prompts goes as the warm pool decides.
+        public static let agentsPrewarm = "agents/prewarm"
         public static let agentsTranscript = "agents/transcript"
         /// The conversation's finished turns, each as its ask and its last block.
         public static let agentsTurns = "agents/turns"
@@ -785,6 +789,20 @@ public enum DaemonAPI {
             text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
             attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
             requestID = try c.decodeIfPresent(UUID.self, forKey: .requestID)
+        }
+    }
+
+    /// `agents/prewarm`: why a window thinks a prompt is coming (#183).
+    public struct PrewarmRequest: Codable, Sendable {
+        public enum Why: String, Codable, Sendable {
+            case opened
+            case typing
+        }
+        public var agentID: UUID
+        public var why: Why
+        public init(agentID: UUID, why: Why) {
+            self.agentID = agentID
+            self.why = why
         }
     }
 

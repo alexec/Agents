@@ -228,11 +228,14 @@ extension DaemonCore {
     @discardableResult
     public func setWakeSettings(_ settings: WakeSettings) -> WakeSettings {
         loadWakeSettingsIfNeeded()
-        wakeSettings = WakeSettings(keepsAwake: settings.keepsAwake, graceHours: settings.graceHours)
+        wakeSettings = WakeSettings(keepsAwake: settings.keepsAwake, graceHours: settings.graceHours,
+                                    warmRuntimes: settings.warmRuntimes)
         do { try wakeStore.save(wakeSettings) } catch {
             DaemonLog.shared.write("wake.json: could not write: \(error.localizedDescription)")
         }
         reviseWakefulness(readingPower: true)
+        // A smaller pool lets go of the lowest at once (#183).
+        Task { await self.reviseWarmPool() }
         return wakeSettings
     }
 

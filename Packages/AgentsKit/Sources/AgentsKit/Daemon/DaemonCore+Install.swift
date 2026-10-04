@@ -93,6 +93,8 @@ extension DaemonCore {
         if result.isAvailable {
             DaemonLog.shared.write("installed \(runtime.id)")
             installStates[runtime.id] = nil
+            // A warm runtime is the version before (#183).
+            Task { await self.releaseWarm(runtimeID: runtime.id, because: "\(runtime.id) was updated") }
             broadcast(DaemonAPI.Notification.runtimeChanged, status(of: runtime))
         } else {
             DaemonLog.shared.write("installing \(runtime.id) failed: \(result)")

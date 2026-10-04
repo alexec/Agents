@@ -190,6 +190,23 @@ public actor DaemonCore {
     /// Agents whose next queued prompt is already on its way to a runtime. See
     /// `sendNextQueued`: without this the same words can go twice.
     var sending: Set<UUID> = []
+    /// Runtimes kept running between turns, ready for the reply (#183). Each is in `live`
+    /// too; being here is what makes it idle rather than work. See `DaemonCore+WarmPool`.
+    var warm: [UUID: WarmPool.Entry] = [:]
+    /// What each live runtime was started with, to compare with what its next turn would
+    /// start with before reusing it.
+    var launchPrints: [UUID: Int] = [:]
+    /// Runtimes being started, which a second caller joins rather than starting another.
+    var launching: [UUID: (task: Task<ACPSession, any Error>, quiet: Bool, token: UUID)] = [:]
+    /// When each agent was last warmed on intent, so a window saying so on every
+    /// keystroke starts one runtime and not one per key.
+    var prewarmedAt: [UUID: Date] = [:]
+    /// The person's last few prompts to each conversation, for how quickly they reply.
+    var personPromptTimes: [UUID: [Date]] = [:]
+    /// Since when the person has been away from this Mac (idle or locked), if they are.
+    var personAwaySince: Date?
+    /// The one task re-scoring the pool while there is a pool.
+    var warmPoolTicker: Task<Void, Never>?
     /// How many times each agent has been stopped or archived. A start is a long
     /// await, and one that finds this moved while it waited was overtaken by the
     /// person saying stop: it hands its runtime back rather than beginning a turn.
@@ -1404,6 +1421,13 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) -> Task<Void, Never>? {
         let draining = eventTasks.removeValue(forKey: agentID)
         live.removeValue(forKey: agentID)
+        launchPrints.removeValue(forKey: agentID)
+        // A warm runtime that went by any other door than `releaseWarm`: its process
+        // died, or a move or a failure let it go. Forgotten quietly; the next prompt
+        // starts one as it always did (#183).
+        if warm.removeValue(forKey: agentID) != nil {
+            DaemonLog.shared.write("warm pool: \(agentID) let go (\(warm.count) warm)")
+        }
         // What it ran in the background went with it.
         endBackground(of: agentID)
         // A runtime's cost reading is let go by its own listener, once it has heard the
@@ -1446,6 +1470,9 @@ public actor DaemonCore {
         shells.shutDown()
         silenceWatch?.cancel()
         silenceWatch = nil
+        warmPoolTicker?.cancel()
+        warmPoolTicker = nil
+        warm.removeAll()
         for (_, task) in turnTasks { task.cancel() }
         for (_, session) in live { await session.end(gracePeriod: .seconds(2)) }
         // Waited on, not cancelled. Every session above has just been closed, which
@@ -1468,6 +1495,14 @@ public actor DaemonCore {
 /// it, which is what lets every test drive the real daemon.
 public protocol SessionLauncher: Sendable {
     func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession
+    /// Whether a runtime it started may be kept between turns (#183). Every real one may;
+    /// a test's fake says no unless the test is about the warm pool, so the many tests
+    /// written for a runtime let go at every turn's end keep describing that.
+    var keepsRuntimesWarm: Bool { get }
+}
+
+extension SessionLauncher {
+    public var keepsRuntimesWarm: Bool { true }
 }
 
 /// Two of the three places the app's tool scoping is applied are here: the arguments

@@ -197,6 +197,10 @@ extension DaemonCore {
     /// agent was stopped (FR-027). What unarchiving needs is on the record.
     func dropLiveState(for id: UUID) {
         live.removeValue(forKey: id)
+        warm.removeValue(forKey: id)
+        launchPrints.removeValue(forKey: id)
+        prewarmedAt.removeValue(forKey: id)
+        personPromptTimes.removeValue(forKey: id)
         eventTasks.removeValue(forKey: id)
         turnTasks.removeValue(forKey: id)
         endWatch(id)
@@ -222,6 +226,10 @@ extension DaemonCore {
     func liveStateKeys(for id: UUID) -> [String] {
         var held: [String] = []
         if live[id] != nil { held.append("live") }
+        if warm[id] != nil { held.append("warm") }
+        if launchPrints[id] != nil { held.append("launchPrints") }
+        if prewarmedAt[id] != nil { held.append("prewarmedAt") }
+        if personPromptTimes[id] != nil { held.append("personPromptTimes") }
         if eventTasks[id] != nil { held.append("eventTasks") }
         if turnTasks[id] != nil { held.append("turnTasks") }
         if finishedTurns[id] != nil { held.append("finishedTurns") }
