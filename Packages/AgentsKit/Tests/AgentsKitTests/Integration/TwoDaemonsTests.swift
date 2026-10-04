@@ -129,9 +129,9 @@ struct TwoDaemonsTests {
         await toFirst.close()
     }
 
-    /// The window tells its own daemon where to live. A daemon that read the ambient
-    /// environment instead would be the ordinary one wearing a branch's name.
-    @Test func theHelperIsToldTheRootRatherThanLeftToGuess() async throws {
+    /// An agent's tools are its own daemon's, at that daemon's own address: never the
+    /// ordinary one's, which a helper left to guess at the usual socket once was (#185).
+    @Test func theAppsToolsAreThisDaemonsOwn() async throws {
         let (locations, work) = try shortLocations()
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let launcher = FakeLauncher()
@@ -143,9 +143,7 @@ struct TwoDaemonsTests {
         _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let server = (await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? []).first
-        // ACP sends an environment as a list of name/value pairs, not as an object.
-        let named = (server?["env"]?.arrayValue ?? [])
-            .first { $0["name"]?.stringValue == StoreLocations.rootVariable }
-        #expect(named?["value"]?.stringValue == locations.root.path)
+        let port = try await core.appTools.start()
+        #expect(server?["url"]?.stringValue == "http://127.0.0.1:\(port)\(AppToolsEndpoint.path)")
     }
 }

@@ -241,6 +241,12 @@ personal servers on the agent (rejected: stale on resume, and secrets end up in 
 
 ## R11 — The Copilot bridge: stdio servers over loopback http (FR-018, Alex 2026-09-26)
 
+> **Since #185 (2026-10-03):** the app's own `agents` server no longer goes through the bridge,
+> or through any stdio helper. The daemon serves it itself to every runtime over loopback
+> streamable http (`AppToolsEndpoint`, `http://127.0.0.1:<port>/mcp/agents`, the session's token
+> as the bearer, revoked when the session ends), and `agentsd mcp` is gone. The bridge below
+> now carries only the person's own stdio servers, for Copilot.
+
 **Decision:** an `MCPBridge` actor inside `agentsd` (macOS only, `#if canImport(Network)`),
 started the first time a session needs it:
 

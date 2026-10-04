@@ -33,7 +33,7 @@ struct AppToolPermissionTests {
         let locations = StoreLocations(root: root)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: FakeLauncher())
-        #expect(await core.appServer(token: "t").name == AppTool.serverName)
+        #expect(try await core.appServer(token: "t").name == AppTool.serverName)
     }
 
     /// Through the daemon, as Antigravity asks it (R6b): a lease mid-turn is answered by the

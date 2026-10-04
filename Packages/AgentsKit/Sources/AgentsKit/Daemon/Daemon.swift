@@ -62,12 +62,9 @@ public final class Daemon: @unchecked Sendable {
         self.lock = lock
         DaemonLog.shared.setDestination(locations.log)
         WireLog.sink = { DaemonLog.shared.write($0) }
-        // Before any runtime starts, so every helper is started from the copy.
-        if let own = DaemonCore.ownExecutable,
-           let pinned = PinnedHelper.pin(own, in: locations.helpers) {
-            DaemonCore.pinnedHelper.path = pinned.path
-            DaemonLog.shared.write("helper: runtimes start \(pinned.path)")
-        }
+        // The copies of this binary runtimes were once told to start as the MCP helper. The
+        // daemon serves the app's tools itself now (#185), so nothing starts them.
+        try? FileManager.default.removeItem(at: locations.helpers)
         let store = try AgentStore(locations: locations)
         var discovery = discovery
         if serve, discovery.serverHome == nil { discovery.serverHome = ServerSignIn.home }

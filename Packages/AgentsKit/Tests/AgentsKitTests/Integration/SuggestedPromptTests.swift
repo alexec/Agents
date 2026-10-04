@@ -61,16 +61,15 @@ struct SuggestedPromptTests {
         let attached = servers(in: await launcher.lastAgent?.newSessionParams)
         #expect(attached.count == 1)
         #expect(attached.first?["name"]?.stringValue == "agents")
-        // Stdio, because it is the only transport every runtime takes: the acp
-        // transport is unstable and none of the three advertise it.
-        #expect(attached.first?["command"]?.stringValue != nil)
-        #expect(attached.first?["args"]?.arrayValue?.first?.stringValue == "mcp")
-        // Token is in the environment, not on argv (S7).
-        let args = attached.first?["args"]?.arrayValue?.compactMap(\.stringValue) ?? []
-        #expect(args == ["mcp"])
-        let env = attached.first?["env"]?.arrayValue ?? []
-        let token = env.first { $0["name"]?.stringValue == DaemonCore.mcpTokenVariable }?["value"]?.stringValue
-        #expect(token != nil && !(token?.isEmpty ?? true))
+        // Loopback http, served by the daemon itself, with the token as the bearer: no
+        // process is started for it, and the token is in no environment (#185, S7).
+        #expect(attached.first?["type"]?.stringValue == "http")
+        #expect(attached.first?["command"] == nil)
+        #expect(attached.first?["url"]?.stringValue?.hasPrefix("http://127.0.0.1:") == true)
+        #expect(attached.first?["url"]?.stringValue?.hasSuffix(AppToolsEndpoint.path) == true)
+        let token = MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
+        #expect(!token.isEmpty)
+        #expect(await core.appTools.granted(token) != nil)
     }
 
     /// The gap this found: servers the user attached were recorded against the agent

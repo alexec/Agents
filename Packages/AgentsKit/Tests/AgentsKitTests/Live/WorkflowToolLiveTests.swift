@@ -5,7 +5,7 @@ import Testing
 
 /// Opt-in, against the real runtimes:
 ///
-///     AGENTS_LIVE=1 AGENTS_MCP_HELPER=<path to agentsd> swift test --filter Live
+///     AGENTS_LIVE=1 swift test --filter Live
 ///
 /// The question a fake cannot answer. `manage_workflows` is offered to every agent and
 /// nothing in the prompt mentions it — deliberately, see `AppService.workflowTool` —
@@ -36,8 +36,7 @@ import Testing
 // Serialised: four runtimes at once is four models' output interleaved, which is a
 // report nobody can read.
 @Suite("Live: whether a runtime sets up a workflow when asked", .serialized,
-       .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"
-                && ProcessInfo.processInfo.environment["AGENTS_MCP_HELPER"] != nil),
+       .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"),
        .timeLimit(.minutes(10)))
 struct WorkflowToolLiveTests {
     /// A daemon of its own, on its own socket, so this never touches the real one.

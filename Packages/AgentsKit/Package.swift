@@ -54,6 +54,10 @@ let package = Package(
                 "AgentsKitCore",
                 "CShims",
                 "ControlDial",
+                // The app's own MCP server, served over loopback http (#185).
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
             ],
             swiftSettings: [.treatAllWarnings(as: .error)]),
         // Three one-line C wrappers the Linux build of `agentsd` needs, because Swift

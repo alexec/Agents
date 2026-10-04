@@ -3,68 +3,39 @@ import Foundation
 /// Where an agent's account of its turn, a file it wants looked at, and its say over
 /// the project's workflows come from.
 ///
-/// The app hands every session an MCP server of its own. It is not a process we start:
-/// the runtime starts it, the way it starts any stdio MCP server, by running the same
-/// helper binary the daemon is running with `mcp` after it. That helper does nothing
-/// but speak MCP on its stdin and pass what it hears back down the daemon's socket,
-/// which is why the whole of the decision-making is here and testable.
+/// The app hands every session an MCP server of its own. The daemon serves it itself,
+/// over loopback http (`AppToolsEndpoint`, #185): the runtime is given an address and a
+/// bearer, and every tool call arrives here as the method behind it, which is why the
+/// whole of the decision-making is here and testable.
 ///
 /// The token is what makes the call belong to an agent. It is minted per session,
-/// bound when the agent exists, and dropped when the session ends, so a helper left
-/// behind by a dead runtime cannot post into a conversation it is no longer part of.
-/// It rides in the helper's environment (`AGENTS_MCP_TOKEN`), not on its argv, so a
-/// casual `ps` on a shared host does not print it (security review S7).
+/// bound when the agent exists, and dropped when the session ends, at which point the
+/// endpoint refuses it too, so a runtime left behind cannot post into a conversation it
+/// is no longer part of. It is a bearer header on a loopback request, handed to the
+/// runtime in `session/new`, and never in any process's environment (security review S7).
 extension DaemonCore {
-    /// Environment key for the helper's token. Not on the command line (S7).
-    public static let mcpTokenVariable = "AGENTS_MCP_TOKEN"
-
     /// The MCP server every agent is given, beside whatever the user attached.
     ///
-    /// The helper is told where this daemon lives rather than left to work it out. A
-    /// helper that guesses at the usual place talks to whichever daemon happens to be
-    /// there, which is right in the app and wrong everywhere else, tests included.
-    ///
-    /// An agent another agent started is told to leave out the tools for starting,
-    /// stopping and archiving agents (028), so it is never offered what the daemon
-    /// would refuse it.
+    /// An agent another agent started is not offered the tools for starting, stopping
+    /// and archiving agents (028), so it is never offered what the daemon would refuse it.
     ///
     /// And an agent on a runtime that cannot carry its conversation into another folder is
     /// not offered the tools for moving itself (053).
-    func appServer(token: String, managesAgents: Bool = true, movesItself: Bool = true) -> MCPServer {
-        MCPServer(name: AppTool.serverName,
-                  transport: .stdio(command: Self.helperPath,
-                                    args: ["mcp"] + (managesAgents ? [] : [Self.noAgentToolsFlag])
-                                        + (movesItself ? [] : [Self.noMoveToolsFlag]),
-                                    env: [StoreLocations.rootVariable: locations.root.path,
-                                          Self.mcpTokenVariable: token]))
+    func appServer(token: String, managesAgents: Bool = true, movesItself: Bool = true) async throws -> MCPServer {
+        let port = try await appTools.start()
+        appTools.grant(token, .init(managesAgents: managesAgents, movesItself: movesItself))
+        return AppToolsEndpoint.server(port: port, token: token)
     }
 
-    /// What tells the helper to leave the agent tools out.
-    public static let noAgentToolsFlag = "--no-agent-tools"
-
-    /// What tells the helper to leave `finish_turn`'s move arguments out (053).
-    public static let noMoveToolsFlag = "--no-move-tools"
-
-    /// The binary the runtime is told to run. The daemon's own: one build, one signature,
-    /// and no second thing to install or keep in step. Its copy in the root once the
-    /// daemon has pinned one (`PinnedHelper`), so a rebuild cannot swap it.
-    ///
-    /// `AGENTS_MCP_HELPER` names it instead, for the live tests, which run inside a
-    /// test binary rather than inside the daemon.
-    static var helperPath: String {
-        if let named = ProcessInfo.processInfo.environment["AGENTS_MCP_HELPER"], !named.isEmpty {
-            return named
+    /// One of the app's tools, from the endpoint. As the helper's socket connection was: an
+    /// agent's, so nothing it asks for is taken as the person's, and nothing outside the
+    /// app's tools is answered.
+    func appToolCall(method: String, params: JSONValue) async -> Result<JSONValue, JSONRPCError> {
+        guard ConnectionRole.agent.allows(method) else {
+            return .failure(JSONRPCError(code: JSONRPCError.methodNotFound, message: "Not one of the app's tools."))
         }
-        return pinnedHelper.path ?? ownExecutable?.path ?? "agentsd"
+        return await handle(method: method, params: params, role: .agent)
     }
-
-    /// Where this process was started from.
-    static var ownExecutable: URL? {
-        ProcessInfo.processInfo.arguments.first.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
-    }
-
-    /// The copy the daemon pinned when it started, if it did. One daemon to a process.
-    static let pinnedHelper = PinnedHelperPath()
 
     func mintAppToken() -> String {
         UUID().uuidString
@@ -77,15 +48,22 @@ extension DaemonCore {
         // the old one rather than leaving it answerable.
         for (existing, id) in appTokens where id == agentID && existing != token {
             appTokens.removeValue(forKey: existing)
-            endBridgeRoutes(for: existing)
+            endAppTools(for: existing)
         }
         appTokens[token] = agentID
+    }
+
+    /// A token stops speaking for anyone: the endpoint refuses it and the bridge's routes
+    /// for it end.
+    func endAppTools(for token: String) {
+        appTools.revoke(token)
+        endBridgeRoutes(for: token)
     }
 
     func dropAppTokens(for agentID: UUID) {
         for (token, id) in appTokens where id == agentID {
             appTokens.removeValue(forKey: token)
-            endBridgeRoutes(for: token)
+            endAppTools(for: token)
         }
     }
 

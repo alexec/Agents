@@ -26,7 +26,8 @@ public struct SessionServers: Equatable, Sendable {
     /// The app's own first, then the agent's chosen servers, then the project's approved
     /// ones, then the person's, then (Grok only) the ones inside the person's plugins
     /// (060, R6). The first of a name is kept. An http or sse server the handshake does
-    /// not advertise is left out.
+    /// not advertise is left out, except the app's own, which is never left out (#185):
+    /// `sessionServers` refuses the session instead.
     public static func plan(app: MCPServer, chosen: [MCPServer],
                             project: [MCPServer] = [],
                             personal: Result<[MCPServer], PersonalDotAgents.MCPFileProblem>,
@@ -38,8 +39,9 @@ public struct SessionServers: Equatable, Sendable {
         case .success(let servers): mine = servers
         case .failure: mine = []; plan.dropped.append((PersonalDotAgents.mcpFile, .mcpFileProblem))
         }
-        var names = Set<String>()
-        for server in [app] + chosen + project + mine + pluginServers {
+        var names: Set<String> = [app.name]
+        plan.servers.append(app)
+        for server in chosen + project + mine + pluginServers {
             switch server.transport {
             case .http where !http:
                 plan.dropped.append((server.name, .transportNotAdvertised("http")))
@@ -108,7 +110,14 @@ extension DaemonCore {
     /// here, every time, so an edit reaches the next session without a restart, and
     /// nothing read from it is kept (R10, FR-023).
     func sessionServers(runtimeID: String, chosen: [MCPServer], token: String, managesAgents: Bool,
-                        cwd: URL, capabilities: ACP.MCPCapabilities?) async -> [MCPServer] {
+                        cwd: URL, capabilities: ACP.MCPCapabilities?) async throws -> [MCPServer] {
+        // The app's tools are served over http and nothing else (#185). A runtime that does
+        // not take it would run with none of them, which is worse than not running.
+        guard capabilities?.http == true else {
+            DaemonLog.shared.write("session servers: \(runtimeID) does not take http MCP servers; refused")
+            throw JSONRPCError(code: JSONRPCError.internalError,
+                               message: Self.noHTTPRefusal(RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID))
+        }
         let personalRaw = locations.personalHome.map { PersonalDotAgents.personalServers(home: $0) } ?? .success([])
         let secrets: SecretsEnv = {
             guard let home = locations.personalHome else { return SecretsEnv(lines: []) }
@@ -149,8 +158,8 @@ extension DaemonCore {
         }
         // Without the tools for moving folders for a runtime that forgets its conversation
         // in another folder (053).
-        let app = appServer(token: token, managesAgents: managesAgents,
-                            movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID))
+        let app = try await appServer(token: token, managesAgents: managesAgents,
+                                      movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID))
         let plan = SessionServers.plan(app: app, chosen: chosen, project: contribution.servers,
                                        personal: personal, pluginServers: pluginServers,
                                        http: capabilities?.http ?? false, sse: capabilities?.sse ?? false)
@@ -158,6 +167,11 @@ extension DaemonCore {
             DaemonLog.shared.write("session servers: \(name) left out of a \(runtimeID) session: \(reason)")
         }
         return await bridged(plan.servers, runtimeID: runtimeID, token: token, cwd: cwd)
+    }
+
+    static func noHTTPRefusal(_ runtime: String) -> String {
+        "\(runtime) doesn't say it takes MCP servers over http, so its agents would have none of the app's "
+            + "tools. Update \(runtime), or pick another runtime."
     }
 
     private static func logMissingSecret(_ item: (name: String, secrets: [String])) {
@@ -169,9 +183,9 @@ extension DaemonCore {
     /// each stdio server is swapped for a route on the bridge, which runs it and serves it
     /// over loopback http. Every other runtime gets the list as it is.
     ///
-    /// The app's own `agents` server is in the list too, so this is what gives a Copilot
-    /// agent the app's tools. A server the bridge cannot stand in for is left out and
-    /// logged by name; the session is still made.
+    /// The app's own `agents` server is http already (#185), so it goes through as it is;
+    /// only the person's stdio servers are bridged. A server the bridge cannot stand in for
+    /// is left out and logged by name; the session is still made.
     func bridged(_ servers: [MCPServer], runtimeID: String, token: String, cwd: URL) async -> [MCPServer] {
         guard PersonalDotAgents.rule(for: runtimeID)?.takesStdioServers == false else { return servers }
         #if canImport(Network) && canImport(Security)
@@ -186,15 +200,6 @@ extension DaemonCore {
         return bridged
         #else
         return servers
-        #endif
-    }
-
-    /// Whether `peer` is a server the bridge started for one of `token`'s routes.
-    func isBridged(_ peer: Int32, token: String) -> Bool {
-        #if canImport(Network) && canImport(Security)
-        bridge.processIdentifiers(for: token).contains { PeerCredentials.descends(peer, from: $0) }
-        #else
-        false
         #endif
     }
 

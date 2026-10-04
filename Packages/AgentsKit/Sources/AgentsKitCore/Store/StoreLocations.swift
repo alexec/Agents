@@ -112,8 +112,8 @@ public struct StoreLocations: Sendable {
     /// What the app installs for this daemon (048): `tools/<runtime>/<id>/`, with
     /// `current` pointing at the one in use. Per root, so a scratch copy installs its own.
     public var tools: URL { root.appendingPathComponent("tools", isDirectory: true) }
-    /// The daemon's own binary, copied here for runtimes to start as the MCP helper, so
-    /// a rebuild of the app beside a running daemon cannot swap it (`PinnedHelper`).
+    /// Where copies of the daemon's binary were kept for runtimes to start as the MCP
+    /// helper, until #185. Only named so a daemon starting can remove it.
     public var helpers: URL { root.appendingPathComponent("helpers", isDirectory: true) }
     public var agents: URL { root.appendingPathComponent("agents", isDirectory: true) }
     /// Every project we have been told about. One file, because the only things in it

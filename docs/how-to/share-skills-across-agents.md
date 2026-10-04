@@ -80,8 +80,8 @@ logged. **Settings ▸ Shared** lists them by name only.
 What each runtime does with them:
 
 - Copilot takes no server it would have to start itself, so the app runs those for it and
-  hands it each one over a local http address that only that agent can use. This is also
-  how Copilot agents get the app's own tools.
+  hands it each one over a local http address that only that agent can use. The app's own
+  tools reach every runtime over http already, Copilot included.
 - Codex takes no sse servers: those are left out for Codex agents.
 - If a runtime has a server of the same name in its own config, Codex and Copilot use their
   own, Claude and Grok use yours, and Cursor runs both.

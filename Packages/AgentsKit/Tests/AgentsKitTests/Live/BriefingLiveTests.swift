@@ -5,7 +5,7 @@ import Testing
 
 /// Opt-in, against the real runtimes:
 ///
-///     AGENTS_LIVE=1 AGENTS_MCP_HELPER=<path to agentsd> swift test --filter Live
+///     AGENTS_LIVE=1 swift test --filter Live
 ///
 /// The one question a fake cannot answer, and the reason this feature exists at all. A
 /// unit test can say the right words were sent; nothing in this repository can say
@@ -72,8 +72,7 @@ import Testing
 // Serialised: several runtimes at once is several models' output interleaved, which is a
 // report nobody can read.
 @Suite("Live: whether the briefing changes what an agent does", .serialized,
-       .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"
-                && ProcessInfo.processInfo.environment["AGENTS_MCP_HELPER"] != nil),
+       .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"),
        .timeLimit(.minutes(10)))
 struct BriefingLiveTests {
     /// A daemon of its own, on its own socket, so this never touches the real one.

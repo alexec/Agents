@@ -42,7 +42,9 @@ public enum EchoAgent {
             case "initialize":
                 return .success([
                     "protocolVersion": 1,
-                    "agentCapabilities": ["loadSession": false, "promptCapabilities": ["image": false]],
+                    "agentCapabilities": ["loadSession": false, "promptCapabilities": ["image": false],
+                                          // It takes none of them, but says it takes the app's (#185).
+                                          "mcpCapabilities": ["http": true]],
                     "agentInfo": ["name": "Demo", "version": "1.0"],
                     "authMethods": [],
                 ])

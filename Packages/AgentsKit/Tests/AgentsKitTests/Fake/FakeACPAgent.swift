@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 @testable import AgentsKit
 @testable import AgentsKitCore
 
@@ -162,6 +165,12 @@ actor FakeACPAgent {
     /// session rather than only what we recorded against the agent.
     private(set) var newSessionParams: JSONValue?
     private(set) var continuedSessionParams: JSONValue?
+    /// The app's tools as this runtime was offered them, listed over the app's own http
+    /// server while the session was being made, as a real runtime lists them (#185).
+    private(set) var newSessionAppToolList: [JSONValue]?
+    private(set) var continuedSessionAppToolList: [JSONValue]?
+    var newSessionAppTools: [String]? { newSessionAppToolList?.compactMap { $0["name"]?.stringValue } }
+    var continuedSessionAppTools: [String]? { continuedSessionAppToolList?.compactMap { $0["name"]?.stringValue } }
     /// What the client said it could do at the handshake.
     private(set) var clientCapabilities: JSONValue?
     /// Tasks announced and not yet ended, which is what Stop can reach.
@@ -251,6 +260,7 @@ actor FakeACPAgent {
 
         case ACP.Method.newSession:
             newSessionParams = params
+            newSessionAppToolList = await Self.appTools(in: params)
             if script.newSessionDelay > .zero { try? await Task.sleep(for: script.newSessionDelay) }
             if let error = script.newSessionError { return .failure(error) }
             var result: [String: JSONValue] = ["sessionId": .string(sessionID)]
@@ -284,12 +294,14 @@ actor FakeACPAgent {
 
         case ACP.Method.resumeSession:
             continuedSessionParams = params
+            continuedSessionAppToolList = await Self.appTools(in: params)
             if script.loadDelay > .zero { try? await Task.sleep(for: script.loadDelay) }
             if let error = script.sessionGoneError { return .failure(error) }
             return .success([:])
 
         case ACP.Method.loadSession:
             continuedSessionParams = params
+            continuedSessionAppToolList = await Self.appTools(in: params)
             if script.loadDelay > .zero { try? await Task.sleep(for: script.loadDelay) }
             if script.loadNeedsAuthenticate, !received.contains(ACP.Method.authenticate) {
                 return .failure(JSONRPCError(code: -32000, message: "Authentication required"))
@@ -541,6 +553,46 @@ actor FakeACPAgent {
          diffUpdate(id: id, path: path, oldText: nil, newText: newText),
          diffUpdate(id: id, path: path, oldText: oldText, newText: newText),
          status(id: id, ending)]
+    }
+}
+
+extension FakeACPAgent {
+    /// Its own, not `.shared`: hundreds of fakes run at once, each against its daemon's own
+    /// port, and none of them should wait behind another's connections.
+    private static let appToolsSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 10
+        configuration.httpMaximumConnectionsPerHost = 64
+        return URLSession(configuration: configuration)
+    }()
+
+    /// `initialize` then `tools/list` on the app's server among `params`' servers.
+    static func appTools(in params: JSONValue?) async -> [JSONValue]? {
+        let servers = params?["mcpServers"]?.arrayValue ?? []
+        guard let app = servers.first(where: { $0["name"]?.stringValue == AppTool.serverName }),
+              app["type"]?.stringValue == "http", let url = app["url"]?.stringValue.flatMap(URL.init(string:)) else {
+            return nil
+        }
+        let headers = (app["headers"]?.arrayValue ?? []).compactMap { header -> (String, String)? in
+            guard let name = header["name"]?.stringValue, let value = header["value"]?.stringValue else { return nil }
+            return (name, value)
+        }
+        func post(_ body: String, session: String?) async -> (HTTPURLResponse, Data)? {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.httpBody = Data(body.utf8)
+            for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+            request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
+            if let session { request.setValue(session, forHTTPHeaderField: "Mcp-Session-Id") }
+            guard let (data, response) = try? await appToolsSession.data(for: request),
+                  let http = response as? HTTPURLResponse else { return nil }
+            return (http, data)
+        }
+        guard let (opened, _) = await post(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#, session: nil),
+              let session = opened.value(forHTTPHeaderField: "Mcp-Session-Id"),
+              let (_, list) = await post(#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#, session: session),
+              let parsed = try? JSONValue.parse(list) else { return nil }
+        return parsed["result"]?["tools"]?.arrayValue
     }
 }
 

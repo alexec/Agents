@@ -8,8 +8,10 @@ description: Every tool the app gives an agent, what it does, and whether you ar
 
 The app gives every agent it starts a set of tools of its own, alongside the runtime's
 tools, on every runtime (see [Runtimes](runtimes.md)). This page lists them all, in the
-order an agent sees them. Copilot takes them over a local http address the app serves
-only to that agent, and uses its own follow-up suggestions instead of the app's.
+order an agent sees them. Every runtime takes them over a local http address the app
+serves on this computer only, with a key only that agent's session holds; the key stops
+working when the session ends. Copilot uses its own follow-up suggestions instead of the
+app's.
 
 The last column says whether you are asked before the tool runs. Where it says the app
 answers, the runtime's permission question is answered by the app and you do not see it.

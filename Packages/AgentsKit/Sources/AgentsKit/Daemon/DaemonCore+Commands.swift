@@ -429,6 +429,7 @@ extension DaemonCore {
         // the runtime failing, and the window answers it by lending one (043).
         let lent = try launchEnvironment(for: runtime.id)
         var launched: ACPSession?
+        var minted: String?
         do {
             let session = try LentEnvironment.$value.withValue(lent) {
                 try LaunchSandbox.$value.withValue(sandbox) {
@@ -443,9 +444,10 @@ extension DaemonCore {
             // then is "needs signing in", and the ways to sign in are in the handshake.
             noteAccount(runtimeID: runtimeID, from: handshake)
             let token = mintAppToken()
-            let servers = await sessionServers(runtimeID: runtimeID, chosen: mcpServers, token: token,
-                                               managesAgents: managesAgents, cwd: cwd,
-                                               capabilities: handshake.agentCapabilities?.mcpCapabilities)
+            minted = token
+            let servers = try await sessionServers(runtimeID: runtimeID, chosen: mcpServers, token: token,
+                                                   managesAgents: managesAgents, cwd: cwd,
+                                                   capabilities: handshake.agentCapabilities?.mcpCapabilities)
             let result = try await session.newSession(cwd: cwd,
                                                       mcpServers: servers,
                                                       meta: sessionMeta(runtimeID: runtimeID, cwd: cwd,
@@ -458,8 +460,10 @@ extension DaemonCore {
             let sandboxFailure = isSandboxHang(error)
                 ? SandboxWords.cardBody(runtimeID: runtimeID, name: runtime.name, hang: true)
                 : await sandboxStartFailure(runtimeID: runtimeID, error: error, session: launched)
-            // A runtime that would not make a session is still a running process.
+            // A runtime that would not make a session is still a running process, and the
+            // token it was handed speaks for nobody.
             await launched?.end(gracePeriod: .seconds(1))
+            if let minted { endAppTools(for: minted) }
             if let sandboxFailure {
                 throw Self.sandboxWillNotStart(runtime: runtime, detail: sandboxFailure)
             }
@@ -1110,9 +1114,9 @@ extension DaemonCore {
         // Picked back up as what it was: an agent another agent started still has no
         // tools for starting agents (028).
         bindAppToken(token, to: agent.id)
-        let servers = await sessionServers(runtimeID: agent.runtimeID, chosen: agent.mcpServers, token: token,
-                                           managesAgents: agent.startedByAgent == nil, cwd: agent.cwd,
-                                           capabilities: handshake.agentCapabilities?.mcpCapabilities)
+        let servers = try await sessionServers(runtimeID: agent.runtimeID, chosen: agent.mcpServers, token: token,
+                                               managesAgents: agent.startedByAgent == nil, cwd: agent.cwd,
+                                               capabilities: handshake.agentCapabilities?.mcpCapabilities)
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).
