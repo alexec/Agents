@@ -30,13 +30,50 @@ public extension LineTransport {
 /// these descriptors belong to processes that get killed: a blocking `read` returning
 /// -1 is a state to handle, and an exception thrown out of Foundation on a closed
 /// handle is not.
+///
+/// The reading thread owns the descriptor it reads (#209). `close` never closes it under
+/// that thread, which would leave it blocked in `read` on a number the process may since
+/// have handed to another runtime's pipe or a client's socket. It wakes the thread
+/// instead: a socket is shut down, which returns its `read` zero, and a pipe — which
+/// cannot be shut down — is read only once `poll` says so, beside a pipe of its own that
+/// `close` closes. The thread lets the descriptor go as it leaves.
 public final class FDTransport: LineTransport, @unchecked Sendable {
     private let readFD: Int32
     private let writeFD: Int32
-    private let writeLock = NSLock()
+    private let ends: Ends
     private let stream: AsyncThrowingStream<String, any Error>
     private let continuation: AsyncThrowingStream<String, any Error>.Continuation
-    private let closed = ManagedAtomicFlag()
+    private var closed: ManagedAtomicFlag { ends.closed }
+    /// The line `lines()` gives in place of one longer than this, or nil for no limit.
+    /// See `LineSplitter.cut`.
+    public let maximumLine: Int?
+
+    /// The longest line read from a runtime (#209). A tool result can be any size, and a
+    /// line is held whole, parsed, written to the transcript and sent to every window;
+    /// one past this is cut to a note instead.
+    public static let runtimeLineLimit = 16 << 20
+    /// The longest line read from a daemon.sock client (#209): a prompt with its largest
+    /// attachment (25 MB, base64) fits, as it does on the control plane's WebSocket.
+    public static let clientLineLimit = 64 << 20
+
+    /// What the reading thread and `close` share, so the thread holds no reference to the
+    /// transport and a transport dropped without closing still reaches `deinit`.
+    private final class Ends: @unchecked Sendable {
+        let closed = ManagedAtomicFlag()
+        let writeLock = NSLock()
+        /// A pipe's wake-up, read end and write end; -1 for a socket.
+        var wake: (read: Int32, write: Int32) = (-1, -1)
+        private let lock = NSLock()
+        /// A socket is read and written on the one descriptor, so it is closed only once
+        /// the thread has left and `close` has been called, whichever is last.
+        private var holders = 2
+
+        func letGoOfSocket(_ fd: Int32) {
+            let last = lock.withLock { holders -= 1; return holders == 0 }
+            guard last else { return }
+            writeLock.withLock { _ = POSIX.close(fd) }
+        }
+    }
 
     /// Writing to a pipe whose other end has gone raises `SIGPIPE`, and the default
     /// disposition for that is to kill the process. Every descriptor this class writes
@@ -48,28 +85,62 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
         signal(SIGPIPE, SIG_IGN)
     }()
 
-    public init(readFD: Int32, writeFD: Int32) {
+    public init(readFD: Int32, writeFD: Int32, maximumLine: Int? = nil) {
         _ = Self.ignoreBrokenPipes
         self.readFD = readFD
         self.writeFD = writeFD
+        self.maximumLine = maximumLine
+        self.ends = Ends()
+        if readFD != writeFD {
+            var wake: [Int32] = [-1, -1]
+            if pipe(&wake) == 0 {
+                for fd in wake { _ = fcntl(fd, F_SETFD, FD_CLOEXEC) }
+                ends.wake = (wake[0], wake[1])
+            }
+        }
         var c: AsyncThrowingStream<String, any Error>.Continuation!
         self.stream = AsyncThrowingStream { c = $0 }
         self.continuation = c
         startReading()
     }
 
-    public convenience init(socket fd: Int32) {
-        self.init(readFD: fd, writeFD: fd)
+    public convenience init(socket fd: Int32, maximumLine: Int? = nil) {
+        self.init(readFD: fd, writeFD: fd, maximumLine: maximumLine)
     }
 
     private func startReading() {
         let fd = readFD
+        let isSocket = readFD == writeFD
+        let ends = self.ends
         let continuation = self.continuation
+        let maximumLine = self.maximumLine
         let thread = Thread {
-            var splitter = LineSplitter()
+            var splitter = LineSplitter(maximumLine: maximumLine, cutsLongLines: true)
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+            defer {
+                if isSocket {
+                    ends.letGoOfSocket(fd)
+                } else {
+                    POSIX.close(fd)
+                    if ends.wake.read >= 0 { POSIX.close(ends.wake.read) }
+                }
+            }
             while true {
+                if !isSocket, ends.wake.read >= 0 {
+                    var fds = [pollfd(fd: fd, events: Int16(POLLIN), revents: 0),
+                               pollfd(fd: ends.wake.read, events: Int16(POLLIN), revents: 0)]
+                    let ready = poll(&fds, 2, -1)
+                    if ready < 0 {
+                        if errno == EINTR { continue }
+                        continuation.finish(throwing: JSONRPCTransportError.closed)
+                        return
+                    }
+                    // Closed: whatever the pipe still holds is nobody's now.
+                    if fds[1].revents != 0 { continuation.finish(); return }
+                }
                 let n = buffer.withUnsafeMutableBytes { POSIX.read(fd, $0.baseAddress, $0.count) }
+                // Read after a close is not ours to hand on.
+                if ends.closed.isSet { continuation.finish(); return }
                 if n > 0 {
                     buffer.withUnsafeBufferPointer { splitter.append(UnsafeBufferPointer(rebasing: $0[0..<n])) }
                     while let line = splitter.next() { continuation.yield(line) }
@@ -89,10 +160,12 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
     }
 
     public func write(line: String) throws {
-        guard !closed.isSet else { throw JSONRPCTransportError.closed }
         let data = Array((line + "\n").utf8)
-        writeLock.lock()
-        defer { writeLock.unlock() }
+        ends.writeLock.lock()
+        defer { ends.writeLock.unlock() }
+        // Asked under the lock `close` closes under, so a write never lands on a number
+        // given back a moment ago.
+        guard !closed.isSet else { throw JSONRPCTransportError.closed }
         var offset = 0
         while offset < data.count {
             let written = data[offset...].withUnsafeBufferPointer {
@@ -116,14 +189,16 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
     public func close() {
         guard closed.set() else { return }
         continuation.finish()
-        // A socket is shut down before it is closed. Closing alone does not wake a
-        // thread blocked in `read` on it, and that thread would then read again from a
-        // descriptor number the process may since have handed to something else.
-        // Shutting down returns it zero at once. A pipe is not a socket, and the call
-        // simply fails on one.
-        if writeFD == readFD { shutdown(readFD, SHUT_RDWR) }
-        POSIX.close(readFD)
-        if writeFD != readFD { POSIX.close(writeFD) }
+        if writeFD == readFD {
+            // Shutting a socket down returns the reading thread's `read` zero at once,
+            // and the last of the two to let go closes it.
+            shutdown(readFD, SHUT_RDWR)
+            ends.letGoOfSocket(readFD)
+        } else {
+            // The reading thread is woken by its pipe and closes `readFD` itself.
+            ends.writeLock.withLock { _ = POSIX.close(writeFD) }
+            if ends.wake.write >= 0 { POSIX.close(ends.wake.write) }
+        }
     }
 }
 
@@ -151,12 +226,43 @@ public struct LineSplitter {
     public let maximumLine: Int?
     /// A line ran past `maximumLine` without ending. Nothing after it can be trusted to
     /// start where a line starts, so the reader should give up on the connection.
+    /// Never set by a splitter that cuts long lines.
     public private(set) var overflowed = false
+    /// Whether a line past `maximumLine` is cut rather than given up on. See `cut`.
+    public let cutsLongLines: Bool
+    /// The line being cut: its first bytes, kept to say what it was, and its length so far.
+    private var cutting: (start: [UInt8], bytes: Int)?
+    /// Cut lines' stand-ins, to come out of `next` before anything read after them.
+    private var cuts: [String] = []
+    /// How much of a cut line is kept to say what it was.
+    static let cutStartKept = 512
 
     /// `maximumLine` is for a reader whose other end is not ours to trust: without it,
     /// a peer that never sends a newline is kept, byte by byte, for as long as it likes.
-    public init(maximumLine: Int? = nil) {
+    ///
+    /// `cutsLongLines` is for a peer that is ours but says whatever its tools say: a
+    /// runtime, or a window (#209). A line past the limit is not held; the rest of it is
+    /// skipped up to its newline, and `next` gives a stand-in for it in its place — a
+    /// `jsonrpc/lineCut` notification saying how long it was and how it began (see
+    /// `cut`). The lines after it are read as ever.
+    public init(maximumLine: Int? = nil, cutsLongLines: Bool = false) {
         self.maximumLine = maximumLine
+        self.cutsLongLines = cutsLongLines
+    }
+
+    /// The method a cut line's stand-in arrives under. Never sent by anybody: it is made
+    /// here, and `JSONRPCConnection` answers for the line it replaced.
+    public static let cutMethod = "jsonrpc/lineCut"
+
+    /// The stand-in for a line of `bytes` bytes that began with `start`.
+    public static func cut(start: [UInt8], bytes: Int, limit: Int) -> String {
+        let params: JSONValue = .object([
+            "bytes": .int(bytes),
+            "limit": .int(limit),
+            "start": .string(String(decoding: start, as: UTF8.self)),
+        ])
+        return (try? JSONRPCCodec.encode(.notification(method: cutMethod, params: params)))
+            ?? #"{"jsonrpc":"2.0","method":"\#(cutMethod)"}"#
     }
 
     public mutating func append(_ data: Data) {
@@ -164,6 +270,20 @@ public struct LineSplitter {
     }
 
     public mutating func append(_ bytes: UnsafeBufferPointer<UInt8>) {
+        var bytes = bytes
+        if cutting != nil {
+            // Skipped up to its newline; what follows the newline is read as ever.
+            guard let base = bytes.baseAddress, !bytes.isEmpty,
+                  let hit = memchr(base, Int32(UInt8(ascii: "\n")), bytes.count) else {
+                cutting!.bytes += bytes.count
+                return
+            }
+            let end = base.distance(to: hit.assumingMemoryBound(to: UInt8.self))
+            cutting!.bytes += end
+            cuts.append(Self.cut(start: cutting!.start, bytes: cutting!.bytes, limit: maximumLine ?? 0))
+            cutting = nil
+            bytes = UnsafeBufferPointer(rebasing: bytes[(end + 1)...])
+        }
         // Taken lines are dropped from the front only once they are most of the
         // buffer, so a burst of short lines does not shuffle the rest along each time.
         if start > 0, start >= pending.count / 2 {
@@ -174,7 +294,14 @@ public struct LineSplitter {
         guard !overflowed else { return }
         pending.append(contentsOf: bytes)
         if let maximumLine, pending.count - start > maximumLine, !hasNewline(from: searched) {
-            overflowed = true
+            if cutsLongLines {
+                // Nothing before `start` is waiting and nothing after it ends, so all of
+                // what is held is the one long line.
+                let kept = pending[start..<min(pending.count, start + Self.cutStartKept)]
+                cutting = (Array(kept), pending.count - start)
+            } else {
+                overflowed = true
+            }
             pending = []
             start = 0
             searched = 0
@@ -190,6 +317,7 @@ public struct LineSplitter {
     }
 
     public mutating func next() -> String? {
+        if !cuts.isEmpty { return cuts.removeFirst() }
         while true {
             let found: Int? = pending.withUnsafeBufferPointer { all in
                 let from = searched

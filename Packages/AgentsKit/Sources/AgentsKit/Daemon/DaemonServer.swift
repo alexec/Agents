@@ -249,7 +249,8 @@ public final class DaemonServer: @unchecked Sendable {
         // Everything that reaches this socket is a window on this Mac, until the bridge
         // exists to say otherwise: helpers and probes that connect here never report
         // presence, and a window that does is the Mac.
-        serve(FDTransport(socket: fd), identity: ConnectionIdentity(peer: peer, role: role))
+        serve(FDTransport(socket: fd, maximumLine: FDTransport.clientLineLimit),
+              identity: ConnectionIdentity(peer: peer, role: role))
     }
 
     /// `line` the first time, then how many more times it came, at most once an hour.

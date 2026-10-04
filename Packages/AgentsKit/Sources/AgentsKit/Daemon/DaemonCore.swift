@@ -1014,7 +1014,8 @@ public actor DaemonCore {
         if case .userMessage(_, _, .person) = kind { clearWaitingSandbox(agentID: agentID) }
         var bytes: Int?
         do {
-            bytes = try await store.append(entry, for: agentID)
+            // Held open only while a runtime is writing to it (#209).
+            bytes = try await store.append(entry, for: agentID, keepOpen: live[agentID] != nil)
         } catch {
             // The window still shows it; a restart would not. Said, so a full disk is
             // found out rather than as lines missing from a conversation (073, #88).
@@ -1625,6 +1626,12 @@ public actor DaemonCore {
         for (_, task) in eventTasks { await task.value }
         eventTasks.removeAll()
         live.removeAll()
+        // A daemon that got here was stopped, not taken down by what it was picking up:
+        // a ship or a quit does not count towards leaving a chat alone (#209).
+        for var agent in agents.values where agent.restartPickUps > 0 {
+            agent.restartPickUps = 0
+            changed(agent)
+        }
         // Every record written, in order, before the daemon goes.
         await saveTail?.value
         await store.closeAll()

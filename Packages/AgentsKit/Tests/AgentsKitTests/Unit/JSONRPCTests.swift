@@ -112,3 +112,73 @@ struct JSONRPCTests {
         await server.close()
     }
 }
+
+/// What a connection keeps of what it could not read, and how it answers for a line the
+/// transport cut (#209).
+@Suite("JSON-RPC lines it cannot read", .timeLimit(.minutes(1)))
+struct JSONRPCUnreadableLineTests {
+    /// A runtime printing banners to stdout prints them for as long as it lives.
+    @Test func onlyTheLastFewMalformedLinesAreKept() async throws {
+        let (mine, theirs) = PairedTransport.pair()
+        let client = JSONRPCConnection(transport: mine)
+        let server = JSONRPCConnection(transport: theirs) { _, _ in .success("fine") }
+        await client.start()
+        await server.start()
+
+        for i in 0..<100 { try theirs.write(line: "banner \(i) " + String(repeating: "=", count: 5_000)) }
+        #expect(try await client.call("anything").stringValue == "fine")
+        #expect(await client.malformedCount == 100)
+        let kept = await client.malformedLines
+        #expect(kept.count == JSONRPCConnection.malformedKept)
+        #expect(kept.last?.hasPrefix("banner 99 ") == true)
+        #expect(kept.allSatisfy { $0.utf8.count <= JSONRPCConnection.malformedLineKept })
+        await client.close()
+        await server.close()
+    }
+
+    /// A reply too long to read fails the call it answers, rather than leaving it waiting.
+    @Test func aCutReplyFailsItsCall() async throws {
+        let (mine, theirs) = PairedTransport.pair()
+        let client = JSONRPCConnection(transport: mine)
+        await client.start()
+        let call = Task { try await client.call("session/load") }
+        var requests = theirs.lines().makeAsyncIterator()
+        let request = try #require(try await requests.next())
+        let id = try #require(try JSONRPCCodec.decode(line: request).id)
+        guard case .number(let number) = id else { Issue.record("a numbered call"); return }
+        try theirs.write(line: LineSplitter.cut(start: Array(#"{"jsonrpc":"2.0","id":\#(number),"result":{"#.utf8),
+                                                bytes: 40 << 20, limit: 16 << 20))
+        await #expect(throws: JSONRPCError.self) { try await call.value }
+        await client.close()
+    }
+
+    /// A request too long to read is refused, so the far end is not left waiting either.
+    @Test func aCutRequestIsRefused() async throws {
+        let (mine, theirs) = PairedTransport.pair()
+        let client = JSONRPCConnection(transport: mine) { _, _ in .success("never asked") }
+        await client.start()
+        try theirs.write(line: LineSplitter.cut(
+            start: Array(#"{"jsonrpc":"2.0","id":"q1","method":"fs/write_text_file","params":{"id":5"#.utf8),
+            bytes: 40 << 20, limit: 16 << 20))
+        var replies = theirs.lines().makeAsyncIterator()
+        let reply = try JSONRPCCodec.decode(line: try #require(try await replies.next()))
+        guard case .failure(let id, _) = reply else { Issue.record("refused: \(reply)"); return }
+        #expect(id == .string("q1"))
+        await client.close()
+    }
+
+    /// Anything else is a notification, passed on as the cut, for whoever reads them.
+    @Test func aCutNotificationIsPassedOn() async throws {
+        let (mine, theirs) = PairedTransport.pair()
+        let client = JSONRPCConnection(transport: mine)
+        await client.start()
+        try theirs.write(line: LineSplitter.cut(
+            start: Array(#"{"jsonrpc":"2.0","method":"session/update","params":{"id":5"#.utf8),
+            bytes: 40 << 20, limit: 16 << 20))
+        var notifications = client.incomingNotifications().makeAsyncIterator()
+        let notification = try #require(await notifications.next())
+        #expect(notification.method == LineSplitter.cutMethod)
+        #expect(notification.params?["bytes"]?.intValue == 40 << 20)
+        await client.close()
+    }
+}

@@ -69,6 +69,18 @@ extension DaemonCore {
             // daemon took comes back, however many times it has been through this —
             // there is no "left alone" any more (Alex, 2026-09-21).
             guard let updated = agents[id], updated.mayBePickedUpAfterRestart else { continue }
+            // Except a chat whose last few pick-ups each went down with the daemon,
+            // and no turn of it finished in between (#209). That is the daemon dying
+            // while this chat is picked up, and launchd's KeepAlive starting it again
+            // only to pick the chat up again: a loop nobody is there to break. A
+            // daemon that shuts down cleanly — a ship, a quit — clears the count, so
+            // only crashes add up. It stays stopped, which is Needs attention, and says why; a message from
+            // the person picks it up as any stopped chat is picked up.
+            if updated.restartPickUps >= Self.pickUpsBeforeLeavingAlone {
+                await record(.runtimeNote(RuntimeNote.notPickedUpAgain(updated.restartPickUps)), for: id)
+                DaemonLog.shared.write("left agent \(id) stopped: \(updated.restartPickUps) pick-ups in a row went down with the daemon")
+                continue
+            }
             // What it was doing, kept for as long as it takes to tell it: an agent cut
             // off mid-turn and one cut off holding a question open have different
             // things to be told.
@@ -140,6 +152,10 @@ extension DaemonCore {
         }
     }
 
+    /// How many pick-ups in a row may go down with the daemon, no turn of the chat
+    /// finishing between them, before a restart leaves the chat stopped (#209).
+    static let pickUpsBeforeLeavingAlone = 3
+
     /// How many pick-ups may be starting a runtime at once.
     static let pickUpLanes = 2
     var pickUpLanes: Int { Self.pickUpLanes }
@@ -188,8 +204,8 @@ extension DaemonCore {
         let stillHasItsFirstWords = was == .starting && !agent.queuedPrompts.isEmpty
         let text = Self.wordsAboutTheRestart(was)
         // Counted before the words go, so a daemon killed part-way through starting a
-        // runtime has already recorded that it tried. The count is a record and not a
-        // guard: since the threshold went, every restart picks the chat up again.
+        // runtime has already recorded that it tried. `recover` reads it: a chat
+        // whose pick-ups keep taking the daemon down is left stopped (#209).
         agent.restartPickUps += 1
         changed(agent)
         do {

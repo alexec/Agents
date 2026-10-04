@@ -21,9 +21,15 @@ public actor JSONRPCConnection {
     private let notifications: AsyncStream<(method: String, params: JSONValue?)>
     private let notificationsContinuation: AsyncStream<(method: String, params: JSONValue?)>.Continuation
 
-    /// Lines that could not be decoded. Kept rather than dropped so a runtime sending
-    /// us something unexpected is a thing we can see rather than a silence.
+    /// Lines that could not be decoded: the last few, each cut short. Kept rather than
+    /// dropped so a runtime sending us something unexpected is a thing we can see rather
+    /// than a silence, and only the last few because a runtime printing banners to stdout
+    /// does so for as long as it lives (#209).
     public private(set) var malformedLines: [String] = []
+    /// Every line that could not be decoded, over the connection's life.
+    public private(set) var malformedCount = 0
+    static let malformedKept = 8
+    static let malformedLineKept = 1024
 
     public init(transport: any LineTransport, handler: @escaping RequestHandler = { method, _ in
         .failure(.methodNotFound(method))
@@ -88,7 +94,13 @@ public actor JSONRPCConnection {
         do {
             message = try JSONRPCCodec.decode(line: line)
         } catch {
-            malformedLines.append(line)
+            malformedCount += 1
+            malformedLines.append(String(decoding: line.utf8.prefix(Self.malformedLineKept), as: UTF8.self))
+            if malformedLines.count > Self.malformedKept { malformedLines.removeFirst() }
+            return
+        }
+        if case .notification(LineSplitter.cutMethod, let params) = message {
+            answerForCutLine(params)
             return
         }
         switch message {
@@ -121,6 +133,68 @@ public actor JSONRPCConnection {
                 }
             }
         }
+    }
+
+    /// A line the transport would not hold, too long to read (#209). What it was is
+    /// guessed from how it began: a reply to one of our calls fails that call, a request
+    /// is refused so the far end is not left waiting, and anything else — a notification
+    /// — goes on as the cut notification itself, for whoever reads them to note.
+    private func answerForCutLine(_ params: JSONValue?) {
+        let bytes = params?["bytes"]?.intValue ?? 0
+        let start = params?["start"]?.stringValue ?? ""
+        let (id, method) = Self.idAndMethod(beginning: start)
+        let error = JSONRPCError(code: JSONRPCError.invalidRequest,
+                                 message: "A message of \(bytes) bytes was too long to read.")
+        WireLog.write("json-rpc: cut a line of \(bytes) bytes (\(method ?? (id == nil ? "?" : "a reply")))")
+        switch (id, method) {
+        case (let id?, nil):
+            pending.removeValue(forKey: id)?.resume(throwing: error)
+        case (let id?, _?):
+            try? send(.failure(id: id, error: error))
+        case (nil, _):
+            notificationsContinuation.yield((LineSplitter.cutMethod, params))
+        }
+    }
+
+    /// The top-level `id` and `method` of a message, read from its first bytes: only those
+    /// before its `params`, `result` or `error`, where any other `id` would be nested.
+    static func idAndMethod(beginning start: String) -> (JSONRPCID?, String?) {
+        let body = ["\"params\"", "\"result\"", "\"error\""]
+            .compactMap { start.range(of: $0)?.lowerBound }.min()
+        let head = body.map { String(start[..<$0]) } ?? start
+        var id: JSONRPCID?
+        switch Self.value(of: "id", in: head) {
+        case let raw? where raw.hasPrefix("\""):
+            if let text = try? JSONDecoder().decode(String.self, from: Data(raw.utf8)) { id = .string(text) }
+        case let raw?:
+            if let number = Int(raw) { id = .number(number) }
+        case nil:
+            break
+        }
+        let method = Self.value(of: "method", in: head).flatMap {
+            try? JSONDecoder().decode(String.self, from: Data($0.utf8))
+        }
+        return (id, method)
+    }
+
+    /// The raw JSON of `key`'s value in `text` when it is a number or a string, as written.
+    private static func value(of key: String, in text: String) -> String? {
+        guard let found = text.range(of: "\"\(key)\"") else { return nil }
+        var rest = text[found.upperBound...].drop { $0 == " " || $0 == "\t" }
+        guard rest.first == ":" else { return nil }
+        rest = rest.dropFirst().drop { $0 == " " || $0 == "\t" }
+        if rest.first == "\"" {
+            var escaped = false
+            for index in rest.indices.dropFirst() {
+                let character = rest[index]
+                if escaped { escaped = false } else if character == "\\" { escaped = true } else if character == "\"" {
+                    return String(rest[...index])
+                }
+            }
+            return nil
+        }
+        let number = rest.prefix { $0 == "-" || $0.isNumber }
+        return number.isEmpty ? nil : String(number)
     }
 
     private func finish(with error: any Error) {
