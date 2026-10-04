@@ -451,6 +451,47 @@ struct AppServiceTests {
         await service.close()
     }
 
+    /// Too long is refused before the daemon is asked, with the sentence that says how
+    /// short (#184); the same call with fewer words then lands, so the turn is still
+    /// accounted for.
+    @Test func aLongMessageIsRefusedAndAShorterOneLands() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(finishTurn: finishing(box))
+        let long = String(repeating: "The fix is in and every test passes. ", count: 6)
+        for (outcome, refusal) in [("done", WorkReport.tooLong(.done)),
+                                   ("needs_answer", WorkReport.tooLong(.needsAnswer))] {
+            let result = try await client.call("tools/call", [
+                "name": .string(AppService.finishTurnToolName),
+                "arguments": ["outcome": .string(outcome), "message": .string(long)],
+            ])
+            #expect(result["isError"]?.boolValue == true)
+            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == refusal)
+        }
+        #expect(await box.calls == 0)
+
+        let retry = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Login works again."],
+        ])
+        #expect(retry["isError"]?.boolValue == false)
+        #expect(await box.calls == 1)
+        #expect(await box.message == "Login works again.")
+        await service.close()
+    }
+
+    @Test func theGuidanceAsksForOneShortSentenceWithExamples() {
+        let description = AppService.finishTurnTool["description"]?.stringValue ?? ""
+        #expect(description.contains("one short sentence"))
+        #expect(!description.contains("one or two sentences"))
+        let message = AppService.finishTurnTool["inputSchema"]?["properties"]?["message"]?["description"]?
+            .stringValue ?? ""
+        #expect(message.hasPrefix("One short sentence"))
+        for text in [description, message] {
+            #expect(text.contains("\"Login works again; the fix is on its branch, ready to merge.\""))
+            #expect(text.contains("AuthController.swift"))
+        }
+    }
+
     /// The chips ride along; their absence is not a fault. Left out or sent empty,
     /// the outcome still lands (FR-003).
     @Test func aFinishCallWithNoPromptsStillReachesTheSink() async throws {

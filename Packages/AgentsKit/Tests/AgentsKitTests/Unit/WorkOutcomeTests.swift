@@ -65,13 +65,41 @@ struct WorkOutcomeTests {
         #expect(WorkReport(outcome: .done, wire: "   \n\t ") == nil)
     }
 
-    /// Cut rather than refused: losing the outcome over one long sentence would be
-    /// worse than trimming it, which is the rule `SuggestedPrompt` already follows.
-    @Test("a message that runs long is cut, not refused")
-    func aLongMessageIsCut() {
-        let report = WorkReport(outcome: .stuck, wire: String(repeating: "a", count: 2_000))
-        #expect(report?.message.count == WorkReport.messageLimit)
-        #expect(WorkReport.messageLimit == 1_000)
+    /// Refused rather than cut (#184): the row gives the message one line, and an agent
+    /// sent back to rewrite learns what one cut short never would.
+    @Test("a message past the limit is refused, not cut")
+    func aLongMessageIsRefused() {
+        #expect(WorkReport.messageLimit == 200)
+        let atTheLimit = String(repeating: "a", count: WorkReport.messageLimit)
+        #expect(WorkReport(outcome: .done, wire: atTheLimit)?.message == atTheLimit)
+        #expect(!WorkReport.isTooLong(atTheLimit))
+        let over = atTheLimit + "a"
+        #expect(WorkReport(outcome: .done, wire: over) == nil)
+        #expect(WorkReport.isTooLong(over))
+        // What surrounds the words is not counted against them.
+        #expect(!WorkReport.isTooLong("  \n" + atTheLimit + "\n  "))
+    }
+
+    @Test("the refusal says how short, and sends a long question to the card")
+    func theRefusalSaysHowShort() {
+        let told = WorkReport.tooLong(.done)
+        #expect(told.hasPrefix("Nothing was recorded: keep it to one sentence under 200 characters"))
+        #expect(told.contains("Call this again"))
+        let asked = WorkReport.tooLong(.needsAnswer)
+        #expect(asked.hasPrefix("Nothing was recorded: keep the question to one sentence under 200"))
+        #expect(asked.contains("ask_form"))
+    }
+
+    /// The limit is on what arrives. A report kept before it came down still reads back
+    /// whole: nothing in the record is cut or rewritten.
+    @Test("a longer message already kept still reads back whole")
+    func anOldLongMessageStillDecodes() throws {
+        let long = String(repeating: "word ", count: 120).trimmingCharacters(in: .whitespaces)
+        let old = WorkReport(outcome: .done, message: long, at: Date(timeIntervalSince1970: 1))
+        let data = try JSONEncoder().encode(old)
+        let back = try JSONDecoder().decode(WorkReport.self, from: data)
+        #expect(back.message == long)
+        #expect(back.message.count > WorkReport.messageLimit)
     }
 
     @Test("the words are trimmed of what surrounds them")

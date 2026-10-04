@@ -284,6 +284,9 @@ public actor AppService {
                 guard !message.isEmpty else {
                     return .success(Self.reply(Self.noWords, isError: true))
                 }
+                guard !WorkReport.isTooLong(message) else {
+                    return .success(Self.reply(WorkReport.tooLong(WorkOutcome(wire: raw)), isError: true))
+                }
                 // The title names the conversation's goal, which outlasts a turn, so
                 // it is sent only when the goal changes: one left out, or that cleans
                 // to nothing, keeps the name the row already has.
@@ -806,10 +809,17 @@ public actor AppService {
             in the background stops with it, so never block on a command of your own: \
             wait for that in this turn.
 
-            The message is one or two sentences in your own words, and it is what the \
-            person reads on the row before they open anything — so write it for \
-            somebody who has not read the conversation. For needs_answer, the message \
-            is the question itself.
+            The message is one short sentence in your own words, ideally under about \
+            100 characters, and it is what the person reads on the row before they \
+            open anything — so write it for somebody who has not read the \
+            conversation: what happened and what it means for them, with no mechanism \
+            or file names. The detail belongs in your reply. "Login works again; the \
+            fix is on its branch, ready to merge." is a message. "Fixed the redirect \
+            in AuthController.swift by checking the session token before the cookie, \
+            which the middleware sets on every request, and added two tests." is not. \
+            One over 200 characters is sent back to be shortened. For needs_answer, \
+            the message is the question itself; a longer question goes on a question \
+            card, with your form tool.
 
             The title is the name on that row: a few words naming what the person \
             wants from this conversation — its goal, not the step you just took — \
@@ -873,8 +883,14 @@ public actor AppService {
                 "message": [
                     "type": "string",
                     "description": """
-                        One or two sentences, for somebody who has not read the \
-                        conversation. For needs_answer, the question itself.
+                        One short sentence, ideally under about 100 characters and \
+                        never over 200, for somebody who has not read the \
+                        conversation: what happened and what it means for them, with \
+                        no mechanism or file names. Like "Login works again; the fix \
+                        is on its branch, ready to merge.", not "Fixed the redirect in \
+                        AuthController.swift by checking the session token before the \
+                        cookie, and added two tests." For needs_answer, the question \
+                        itself.
                         """,
                 ],
                 "title": [

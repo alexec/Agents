@@ -213,7 +213,8 @@ extension DaemonCore {
 
     /// The refusals a report can meet, in the order it meets them, each a sentence the
     /// agent reads: a token that no longer speaks for an agent, a word that is not one
-    /// of the five, a question of the agent's own still outstanding, and no words.
+    /// of the five, a question of the agent's own still outstanding, too many words,
+    /// and no words.
     ///
     /// The one worth the words is the third. Claiming the work is settled while the
     /// app is holding a form or a permission for the person would tell them the
@@ -244,6 +245,11 @@ extension DaemonCore {
                                 answered, so this work is not over. Answer it first, or \
                                 let it be answered.
                                 """)
+        }
+        // Refused, not cut (#184): nothing is recorded, so the turn is still the
+        // agent's to account for, and the same call with fewer words lands.
+        guard !WorkReport.isTooLong(message) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: WorkReport.tooLong(outcome))
         }
         guard var report = WorkReport(outcome: outcome, wire: message) else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,

@@ -85,17 +85,43 @@ public enum WorkOutcome: String, Codable, Hashable, Sendable, CaseIterable {
 public struct WorkReport: Codable, Hashable, Sendable {
     public var outcome: WorkOutcome
     /// The agent's own sentence, which is what the row shows. Trimmed, never empty,
-    /// and cut rather than refused when it runs long.
+    /// and refused rather than cut when it runs long. A record written before the
+    /// limit came down keeps its longer words: the limit is on what arrives.
     public var message: String
     public var at: Date
     /// What a `blocked` report waits on, and whether that has cleared (039). Nil on
     /// every other outcome, and on a blocked report that named nothing and gave no time.
     public var block: Block?
 
-    /// The most of the agent's message the app keeps. Long enough for two sentences
-    /// written for somebody who has not read the conversation, and short enough that
-    /// the record does not become a second transcript.
-    public static let messageLimit = 1_000
+    /// The most an agent's message may be (#184). The row it is read on gives it one
+    /// line, so the guidance asks for under about 100 characters; this is the room
+    /// around that, and a message past it is sent back to be rewritten rather than
+    /// cut, which teaches the agent where cutting only hides it.
+    public static let messageLimit = 200
+
+    /// Whether these words, as an agent sent them, are too long to keep.
+    public static func isTooLong(_ message: String) -> Bool {
+        message.trimmingCharacters(in: .whitespacesAndNewlines).count > messageLimit
+    }
+
+    /// What an agent is told when its message is too long, by either door. For
+    /// needs_answer the message is the question, and a longer one belongs on the
+    /// question card, which can carry as much as it needs to.
+    public static func tooLong(_ outcome: WorkOutcome?) -> String {
+        guard outcome == .needsAnswer else {
+            return """
+                Nothing was recorded: keep it to one sentence under \(messageLimit) characters — \
+                what happened and what it means for the person, with no mechanism or file \
+                names. The detail belongs in your reply. Call this again with a shorter one.
+                """
+        }
+        return """
+            Nothing was recorded: keep the question to one sentence under \(messageLimit) \
+            characters. If it needs more than that, ask it with ask_form, which shows the \
+            person a question card and waits for the answer; otherwise call this again \
+            with a shorter one.
+            """
+    }
 
     public init(outcome: WorkOutcome, message: String, at: Date, block: Block? = nil) {
         self.outcome = outcome
@@ -134,14 +160,13 @@ public struct WorkReport: Codable, Hashable, Sendable {
     /// What an agent sent, made fit to keep.
     ///
     /// Empty after trimming is refused, because a status with no words is what the app
-    /// already had. Too long is cut rather than refused, in the manner of
-    /// `SuggestedPrompt.init(wire:)` — losing the outcome over one long sentence would
-    /// be worse than trimming it.
+    /// already had. Too long is refused too (#184), never cut: a message cut mid-word
+    /// says less than the agent meant, and the agent never learns to say less. Callers
+    /// check `isTooLong` first, to tell the agent which of the two it was.
     public init?(outcome: WorkOutcome, wire message: String, at: Date = Date(), block: Block? = nil) {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        self.init(outcome: outcome, message: String(trimmed.prefix(Self.messageLimit)), at: at,
-                  block: block)
+        guard !trimmed.isEmpty, trimmed.count <= Self.messageLimit else { return nil }
+        self.init(outcome: outcome, message: trimmed, at: at, block: block)
     }
 
     /// A blocked report whose block has not yet cleared: under Waiting when the app will
