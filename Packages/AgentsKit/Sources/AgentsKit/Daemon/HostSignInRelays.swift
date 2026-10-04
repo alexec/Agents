@@ -17,9 +17,13 @@ public final class HostSignInRelays: @unchecked Sendable {
     private let lock = NSLock()
     private var relays: [String: MacSignInRelay] = [:]
     private var sources: [String: any MacSignInSource] = [:]
+    /// `hosts/relay.log`, rolled at 1 MB and kept open (#211).
+    private let log = DaemonLog(limit: 1024 * 1024)
 
     public init(locations: StoreLocations) {
         self.locations = locations
+        try? FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
+        log.setDestination(locations.hostsFolder.appendingPathComponent("relay.log"))
     }
 
     /// This Mac's own sign-in for `runtimeID`, where its policy says it is kept.
@@ -99,17 +103,8 @@ public final class HostSignInRelays: @unchecked Sendable {
         return made
     }
 
-    private func write(_ line: String) {
-        let file = locations.hostsFolder.appendingPathComponent("relay.log")
-        let stamped = "\(Date().formatted(.iso8601)) \(line)\n"
-        if let handle = try? FileHandle(forWritingTo: file) {
-            handle.seekToEndOfFile()
-            handle.write(Data(stamped.utf8))
-            try? handle.close()
-        } else {
-            try? FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
-            try? Data(stamped.utf8).write(to: file)
-        }
+    func write(_ line: String) {
+        log.write(line)
     }
 }
 #endif

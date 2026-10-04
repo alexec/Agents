@@ -1,3 +1,4 @@
+import AgentsKitCore
 import Foundation
 import ObjectiveC
 import os
@@ -46,6 +47,9 @@ enum CrashHook {
 
     static func install(in crashes: URL = defaultFolder) {
         try? FileManager.default.createDirectory(at: crashes, withIntermediateDirectories: true) // store-ok: the window's own container
+        // The newest notes only: a window that crashes at every launch would otherwise
+        // write one each time, with no end (#211).
+        DiskSweep.keepNewest(DiskSweep.crashNotesKept, named: "crash-", in: crashes)
         folder = crashes
         let warning = """
             This exception was thrown more than \(freshSeconds) seconds before the window died, \

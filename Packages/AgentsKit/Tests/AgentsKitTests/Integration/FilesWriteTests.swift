@@ -32,6 +32,24 @@ struct FilesWriteTests {
         #expect(try Data(contentsOf: URL(filePath: answer.path)) == bytes)
     }
 
+    /// Attachments are kept a month, then go as the next one comes (#211).
+    @Test func oldAttachmentsGoAsANewOneComes() async throws {
+        let (core, id, work) = try await agent()
+        let folder = work.appendingPathComponent(".agents/attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let old = folder.appendingPathComponent("0000-old.png")
+        let recent = folder.appendingPathComponent("0000-recent.png")
+        for (file, age) in [(old, DiskSweep.attachmentAge + 86_400), (recent, 86_400)] {
+            try Data("x".utf8).write(to: file)
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: file.path)
+        }
+        let answer = try await write(core, .init(agentID: id, name: "new.txt", data: Data("y".utf8))).get()
+            .decode(DaemonAPI.FilesWriteResponse.self)
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        #expect(FileManager.default.fileExists(atPath: recent.path))
+        #expect(FileManager.default.fileExists(atPath: answer.path))
+    }
+
     @Test func aNameCannotClimbOut() async throws {
         let (core, id, work) = try await agent()
         let answer = try await write(core, .init(agentID: id, name: "../../escape.txt", data: Data("x".utf8))).get()

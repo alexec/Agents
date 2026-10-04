@@ -415,6 +415,10 @@ extension DaemonCore {
         raiseAgentEvent("agent.retired", id, sentence: "was retired and its conversation deleted.",
                         details: ["because": because.rawValue])
         await removeWorktreeIfDone(archiving: id)
+        if let root = agent.worktree?.root, FileManager.default.fileExists(atPath: root.path) {
+            // The tombstone keeps where it is, and list_sessions names it from there (#211).
+            DaemonLog.shared.write("retired \(id) and left its worktree \(root.path)")
+        }
         do {
             try await store.deleteRetired(id)
         } catch {

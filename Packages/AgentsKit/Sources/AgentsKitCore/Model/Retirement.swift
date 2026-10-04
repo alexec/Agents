@@ -99,12 +99,16 @@ public struct Tombstone: Codable, Hashable, Sendable, Identifiable {
     public var startedByAgent: UUID?
     public var worktreeName: String?
     public var worktreeBranch: String?
+    /// Where its worktree was, so one retiring could not remove (something not committed
+    /// in it, often build output) is still named by something (#211): `list_sessions`
+    /// lists it while the folder is there, for the clean-up workflow (#199).
+    public var worktreeRoot: URL?
     public var retiredBecause: RetiredBecause
 
     enum CodingKeys: String, CodingKey {
         case id, title, project, runtimeID, createdAt, lastActivityAt, archivedAt, retiredAt
         case endedReason, archivedReason, costToDate, startedByWorkflow, startedByRun
-        case startedByAgent, worktreeName, worktreeBranch, retiredBecause
+        case startedByAgent, worktreeName, worktreeBranch, worktreeRoot, retiredBecause
     }
 
     public init(from agent: Agent, retiredAt: Date, because: RetiredBecause) {
@@ -125,6 +129,7 @@ public struct Tombstone: Codable, Hashable, Sendable, Identifiable {
         startedByAgent = agent.startedByAgent
         worktreeName = agent.worktree?.name
         worktreeBranch = agent.worktree?.branch
+        worktreeRoot = agent.worktree?.root
         retiredBecause = because
     }
 }
