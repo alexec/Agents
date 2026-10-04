@@ -1,5 +1,6 @@
 #if canImport(Network) && canImport(Security)
 import Foundation
+import AgentsKitCore
 
 /// Claude's own sign-in on this Mac (056, research R5): the Keychain item `claude` keeps,
 /// read the way `claude` writes it, with `/usr/bin/security`, so no prompt is raised. The
@@ -155,23 +156,15 @@ public final class ClaudeKeychainSignIn: MacSignInSource, @unchecked Sendable {
     }
 
     /// `security find-generic-password -s <service> -w`: 44 is "no such item".
+    /// Ten seconds, then stopped: a read waiting on a SecurityAgent prompt nobody is
+    /// there to answer must not hold the thread that asked (#207).
     static func readKeychain(service: String) throws -> Data {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        process.arguments = ["find-generic-password", "-s", service, "-w"]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        let done = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in done.signal() }
-        do { try process.run() } catch { throw MacSignInFailure.unreadable }
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        if done.wait(timeout: .now() + 10) == .timedOut {
-            process.terminate()
-            throw MacSignInFailure.unreadable
-        }
-        switch process.terminationStatus {
-        case 0: return data
+        let outcome = ChildProcess.runBlocking(URL(fileURLWithPath: "/usr/bin/security"),
+                                               ["find-generic-password", "-s", service, "-w"],
+                                               deadline: .seconds(10), outputLimit: 1024 * 1024)
+        guard outcome.failure == nil, !outcome.timedOut else { throw MacSignInFailure.unreadable }
+        switch outcome.status {
+        case 0: return outcome.output
         case 44: throw MacSignInFailure.notSignedIn
         default: throw MacSignInFailure.unreadable
         }

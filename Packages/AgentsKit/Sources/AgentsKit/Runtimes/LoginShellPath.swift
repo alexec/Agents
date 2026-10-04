@@ -1,4 +1,5 @@
 import Foundation
+import AgentsKitCore
 
 /// The PATH the user's shell has, which is not the PATH this app inherits.
 ///
@@ -43,26 +44,20 @@ public enum LoginShellPath {
 
     /// A login shell, not an interactive one. `-i` runs the user's interactive
     /// configuration, which can prompt, print, or sit waiting, and a runtime list is
-    /// not worth hanging the app for.
+    /// not worth hanging the app for. A login profile can still hang (a network mount,
+    /// a tool that waits): five seconds, then the fallbacks alone (#207). The daemon's
+    /// first git call waits on this.
     private static func readFromLoginShell() -> [String]? {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: shell)
-        process.arguments = ["-lc", "printf %s \"$PATH\""]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-        let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
-        process.waitUntilExit()
-        let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        let outcome = ChildProcess.runBlocking(URL(fileURLWithPath: shell), ["-lc", "printf %s \"$PATH\""],
+                                               deadline: loginShellDeadline, outputLimit: 64 * 1024)
+        guard outcome.status == 0 else { return nil }
+        let text = outcome.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
         return text.split(separator: ":").map(String.init)
     }
+
+    static let loginShellDeadline: Duration = .seconds(5)
 
     public static let testSearchPathsVariable = "AGENTS_TEST_SEARCH_PATHS"
 

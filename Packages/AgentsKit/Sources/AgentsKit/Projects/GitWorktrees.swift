@@ -91,7 +91,8 @@ public enum GitWorktrees {
     /// Every local branch, then every remote one with no local branch of its name, most
     /// recently committed to first. A remote's `HEAD` is a pointer, not a branch.
     public static func branches(in folder: URL) async throws -> [DaemonAPI.BranchSummary] {
-        let refs = try await git(["for-each-ref", "--sort=-committerdate", "--format=%(refname)",
+        // The most recent thousand are plenty for a list that shows two hundred (#207).
+        let refs = try await git(["for-each-ref", "--sort=-committerdate", "--count=1000", "--format=%(refname)",
                                   "refs/heads", "refs/remotes"], in: folder)
         return parseBranches(refs, remotes: try await git(["remote"], in: folder)
             .split(separator: "\n").map(String.init))
@@ -120,11 +121,15 @@ public enum GitWorktrees {
         return result
     }
 
-    /// Lines of `git status --porcelain`: what is changed and not committed.
+    /// Lines of `git status --porcelain`: what is changed and not committed. At most
+    /// `statusCountLimit` bytes of it are kept (#207): an untracked tree of build output
+    /// is counted as far as that goes, never held whole, so a large count is a floor.
     public static func statusCount(in folder: URL) async throws -> Int {
-        try await git(["status", "--porcelain"], in: folder)
+        try await git(["status", "--porcelain"], in: folder, outputLimit: statusCountLimit)
             .split(separator: "\n").count
     }
+
+    static let statusCountLimit = 256 * 1024
 
     /// The lines of `git status --porcelain` themselves: `XY path`, with `??` for a file
     /// git does not track. Ignored files are not in it.
@@ -260,25 +265,67 @@ public enum GitWorktrees {
 
     // MARK: Running
 
+    /// How long a change to a repository's worktrees may take before it is stopped
+    /// (#207). A checkout of a large tree takes a while; one still going after this has
+    /// hung (an LFS smudge on a dead network, a filter waiting on a prompt), and every
+    /// later worktree change in that project waits behind it.
+    static let addDeadline: Duration = .seconds(120)
+    /// Removing deletes the worktree's files, build output and all.
+    static let removeDeadline: Duration = .seconds(300)
+
+    /// A shorter deadline for every call made under it, for a test.
+    @TaskLocal static var deadlineOverride: Duration?
+
+    static func deadline(for arguments: [String]) -> Duration {
+        if let deadlineOverride { return deadlineOverride }
+        guard arguments.first == "worktree" else { return GitProcess.readDeadline }
+        switch arguments.dropFirst().first {
+        case "add": return addDeadline
+        case "remove": return removeDeadline
+        default: return GitProcess.readDeadline
+        }
+    }
+
     /// Run git in `folder`, and give back what it printed, trimmed, or throw what it
     /// said when it failed.
+    ///
+    /// Every call runs with `GIT_OPTIONAL_LOCKS=0` (#207): the daemon reads lanes other
+    /// agents are committing in, and a `status` that refreshed their index took
+    /// `index.lock` under them and woke the project's watch. The commands here that
+    /// write (`worktree add`, `branch -d`) take the locks they need regardless.
     @discardableResult
-    static func git(_ arguments: [String], in folder: URL) async throws -> String {
+    static func git(_ arguments: [String], in folder: URL,
+                    outputLimit: Int = GitProcess.defaultOutputLimit) async throws -> String {
         let outcome: GitProcess.Outcome
+        let deadline = deadline(for: arguments)
+        let make = { @Sendable () throws -> GitProcess in
+            let git = try GitProcess(arguments, in: folder, environment: GitChanges.readOnly)
+            git.deadline = deadline
+            git.outputLimit = outputLimit
+            return git
+        }
         do {
             // Changing a repository's worktrees is one at a time per folder. Two agents
             // started from the same words at once both ran `git worktree add`, and git
             // takes its own locks as it goes: under load one of the two came back
-            // refused, and its agent was never made. Reading is not held up.
+            // refused, and its agent was never made. Reading is not held up. Each change
+            // has a deadline, so one that hangs frees the queue when it is stopped.
             if arguments.first == "worktree", arguments.dropFirst().first != "list" {
                 outcome = try await changingWorktrees.run(folder.standardizedFileURL.path) {
-                    try await GitProcess(arguments, in: folder).run()
+                    try await make().run()
                 }
             } else {
-                outcome = try await GitProcess(arguments, in: folder).run()
+                outcome = try await make().run()
             }
         } catch GitProcess.LaunchError.notInstalled {
             throw Failure(message: "Git is not installed on this Mac.")
+        }
+        if outcome.timedOut {
+            let command = "git " + arguments.prefix(2).joined(separator: " ")
+            DaemonLog.shared.write("\(command) in \(folder.path) stopped after \(GitProcess.said(deadline)): \(outcome.errors)")
+            throw Failure(message: "\(command) was stopped after \(GitProcess.said(deadline)) with no end in sight, so "
+                + "nothing else waits on it now."
+                + (arguments.first == "worktree" ? " If it left a half-made worktree, `git worktree prune` clears it." : ""))
         }
         guard outcome.succeeded else {
             let said = outcome.errors.trimmingCharacters(in: .whitespacesAndNewlines)

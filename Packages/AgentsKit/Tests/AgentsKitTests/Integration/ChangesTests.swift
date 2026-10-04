@@ -177,6 +177,32 @@ struct ChangesTests {
         return (core, id, work, head, a, b)
     }
 
+    /// Kept while a folder watch covers the agent's folder, and cleared by any change
+    /// the watch sees (#207). Without a watch every ask is answered fresh, as above.
+    @Test func aWatchedFolderKeepsItsAnswerUntilSomethingChanges() async throws {
+        let (core, id, work, _, a, b) = try await agentInRepository()
+        let phone = UUID()
+        try await core.watchFiles(.init(agentID: id, folder: work.path), connection: phone)
+        defer { Task { await core.connectionEnded(phone) } }
+
+        // Events from the setup's own writes may still arrive and clear it; once they
+        // have, a second ask is the first answer.
+        await eventually("the second ask was the first answer") {
+            _ = try? await core.changesList(.init(agentID: id))
+            guard let made = await core.reportedChanges[id]?.answer?.madeAt else { return false }
+            try? await Task.sleep(for: .milliseconds(200))
+            _ = try? await core.changesList(.init(agentID: id))
+            return await core.reportedChanges[id]?.answer?.madeAt == made
+        }
+
+        let c = try write("let c = 1\n", to: "c.swift", in: work)
+        let listed = await eventuallySome("the new file is listed") {
+            let list = try? await core.changesList(.init(agentID: id))
+            return list?.files.count == 3 ? list : nil
+        }
+        #expect(listed?.files.map(\.path) == [a, b, c])
+    }
+
     @Test func gitFillsInWhatTheRuntimeDidNotReport() async throws {
         let (core, id, work, head, a, b) = try await agentInRepository()
 
