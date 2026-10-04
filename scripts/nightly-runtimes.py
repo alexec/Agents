@@ -314,7 +314,7 @@ def fail_all(record, rids, step, ok, output):
 
 def xcodebuild(tree):
     return sh(["/bin/zsh", "-c",
-               "xcodegen generate >/dev/null && xcodebuild -scheme AgentsHost -destination 'platform=macOS' "
+               "xcodegen generate >/dev/null && scripts/build-cache.sh xcodebuild -scheme AgentsHost -destination 'platform=macOS' "
                "-configuration Debug -derivedDataPath build/DD -skipPackagePluginValidation build"],
               cwd=tree, timeout=3600)
 
@@ -324,7 +324,7 @@ NOT_RUN = "(the runtime tests did not build or run)"
 
 def runtime_tests(tree):
     """(exit status, output, the names of the tests that failed)."""
-    status, out = sh(["swift", "test", "--package-path", "Packages/AgentsKit", "--filter", RUNTIME_TESTS],
+    status, out = sh(["scripts/build-cache.sh", "swift", "test", "--package-path", "Packages/AgentsKit", "--filter", RUNTIME_TESTS],
                      cwd=tree, timeout=3600)
     failed = set(re.findall(r"✘ Test (\S+?)\(.*?\) failed", out))
     failed |= set(re.findall(r"Test Case '-\[\S+ (\S+)\]' failed", out))

@@ -37,6 +37,10 @@ MAIN=$(dirname "$common")
 
 # Each check is a name, a lease size in minutes and a command run in the wave worktree.
 XFLAGS="-skipPackagePluginValidation -skipMacroValidation"
+# The shared build cache (#234), this copy's own: a bisect probe at a commit from before it
+# existed still builds through it.
+CACHED="$(cd "$(dirname "$0")/../../../.." && pwd)/scripts/build-cache.sh"
+[ -x "$CACHED" ] || CACHED=$MAIN/scripts/build-cache.sh
 check_minutes() {
 	case $1 in
 	build-host | build-store) echo 30 ;;
@@ -50,15 +54,15 @@ check_minutes() {
 check_command() { # name [filter]
 	case $1 in
 	# build/DD, as run-app's launch.sh builds, so the smoke check after them is incremental.
-	build-host) echo "xcodegen generate >/dev/null && xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
-	build-store) echo "xcodegen generate >/dev/null && xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
-	build-remote) echo "xcodegen generate >/dev/null && xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD-sim $XFLAGS build" ;;
+	build-host) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
+	build-store) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
+	build-remote) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD-sim $XFLAGS build" ;;
 	# What CI's web job runs: check, tests, and a rebuild that must change nothing.
 	web) echo "scripts/web.sh build && git diff --exit-code --stat -- Web/dist Web/src/protocol/generated.ts && cd Web && npm run check && npm test" ;;
-	test-agentskit) echo "swift test --package-path Packages/AgentsKit${2:+ --filter '$2'}" ;;
-	test-codetext) echo "swift test --package-path Packages/CodeText${2:+ --filter '$2'}" ;;
-	test-controlplane) echo "swift test --package-path Packages/ControlPlane" ;;
-	test-webtypes) echo "swift test --package-path Packages/WebTypes" ;;
+	test-agentskit) echo "$CACHED swift test --package-path Packages/AgentsKit${2:+ --filter '$2'}" ;;
+	test-codetext) echo "$CACHED swift test --package-path Packages/CodeText${2:+ --filter '$2'}" ;;
+	test-controlplane) echo "$CACHED swift test --package-path Packages/ControlPlane" ;;
+	test-webtypes) echo "$CACHED swift test --package-path Packages/WebTypes" ;;
 	smoke) echo "smoke" ;;
 	*) die "no check called $1" ;;
 	esac

@@ -40,8 +40,8 @@ test)
 	exec npm test
 	;;
 check)
-	swift run --package-path Packages/WebTypes agents-webtypes --root "$root" --check
-	swift test --package-path Packages/AgentsKit --filter 'WebDistManifestTests|ControlAgreementVectorTests'
+	scripts/build-cache.sh swift run --package-path Packages/WebTypes agents-webtypes --root "$root" --check
+	scripts/build-cache.sh swift test --package-path Packages/AgentsKit --filter 'WebDistManifestTests|ControlAgreementVectorTests'
 	if have_node; then
 		# What is on disk now, then what this source builds: they must be the same bytes.
 		before=$(find Web/dist Web/src/protocol/generated.ts -type f -exec shasum -a 256 {} + | sort)

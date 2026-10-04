@@ -169,17 +169,17 @@ run() { # name, then the command; quiet unless it fails
 XFLAGS=(-skipPackagePluginValidation -skipMacroValidation)
 if (( BUILD )); then
   # Sequential on purpose: the schemes share SwiftPM state. Each Mac app has build data
-  # of its own.
+  # of its own; packages and compiled outputs come from the shared build cache.
   run xcodegen xcodegen generate
   if (( MAC )); then
     # The Linux hosts a server is given, which Agents Host carries and its control plane
     # serves: gitignored build outputs, so stale until rebuilt here.
     (( LINUX )) && run build-linux scripts/build-linux-agentsd.sh
-    run build-host xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
-    run build-window xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-store $XFLAGS build
+    run build-host scripts/build-cache.sh xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
+    run build-window scripts/build-cache.sh xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-store $XFLAGS build
   fi
   if (( DEVICES )); then
-    run build-ios xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DD-ios -allowProvisioningUpdates $XFLAGS build
+    run build-ios scripts/build-cache.sh xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DD-ios -allowProvisioningUpdates $XFLAGS build
   fi
 fi
 

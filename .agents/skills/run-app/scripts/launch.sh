@@ -57,11 +57,12 @@ fi
 
 if [ "$BUILD" = 1 ]; then
   echo "building…" >&2
-  # One after the other: the schemes share SwiftPM state.
+  # One after the other: the schemes share SwiftPM state. Through the shared build cache
+  # (scripts/build-cache.sh), so a fresh worktree reuses what other builds compiled.
   ( cd "$REPO" && xcodegen generate >/dev/null \
-    && xcodebuild -scheme AgentsHost -destination 'platform=macOS' -configuration Debug \
+    && scripts/build-cache.sh xcodebuild -scheme AgentsHost -destination 'platform=macOS' -configuration Debug \
          -derivedDataPath build/DD -skipPackagePluginValidation build \
-    && xcodebuild -scheme AgentsStore -destination 'platform=macOS' -configuration Debug \
+    && scripts/build-cache.sh xcodebuild -scheme AgentsStore -destination 'platform=macOS' -configuration Debug \
          -derivedDataPath build/DD -skipPackagePluginValidation build ) >/tmp/run-$SLUG-build.log 2>&1 \
     || { echo "build failed — tail /tmp/run-$SLUG-build.log" >&2; tail -30 /tmp/run-$SLUG-build.log >&2; exit 1; }
 fi

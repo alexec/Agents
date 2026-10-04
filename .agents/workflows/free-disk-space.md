@@ -91,6 +91,14 @@ done
 A folder git ignores and tracks nothing in is build output, by the project's own
 `.gitignore`: deleting it loses nothing a build cannot make again. Anything else is kept.
 
+Then bound the build cache every worktree shares (#234). It is outside every worktree,
+everything in it can be fetched or compiled again, and the script leaves it alone while
+any build is running:
+
+```sh
+scripts/build-cache.sh prune --max-gb 30    # at the critical level: --max-gb 10
+```
+
 ## 4. Remove archived worktrees (critical only)
 
 At the critical level only, for each archived path `W` that passed step 2.4 and step 3:
