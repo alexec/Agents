@@ -60,6 +60,8 @@ struct ConsistencyTests {
     /// A control is not a state; the next one that earns a colour is written down
     /// here rather than hidden.
     private static let colourAllowList: [(file: String, contains: String, why: String)] = [
+        (file: "Shared/UI/Paper.swift", contains: "static let accent = Color.accentColor",
+         why: "the theme's accent, the icon's violet (#156): links, focus, a picked control; views say `Paper.accent`"),
         (file: "Shared/UI/Chat/TranscriptRows.swift", contains: "foregroundStyle(Color.accentColor)",
          why: "a file a tool call touched, drawn on a phone as the system draws a link (FR-006b, 033)"),
         (file: "Shared/UI/Page/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",

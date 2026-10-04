@@ -457,7 +457,7 @@ private struct SessionSidebarRow: View {
                     SwipeAction(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
                         await model.setPinned(agent, !pinned)
                     }
-                    .tint(.accentColor)
+                    .tint(Paper.accent)
                 }
             }
             // The list's own swipe, in place of the cards' hand-built one.

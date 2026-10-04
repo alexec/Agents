@@ -222,7 +222,7 @@ struct AgentCard: View {
         }
         .swipeActions(edge: .leading) {
             if agent.state != .archived {
-                pinButton.tint(.accentColor)
+                pinButton.tint(Paper.accent)
             }
         }
         // As a row in Mail: a swipe uncovers Archive, and a long one archives. The page

@@ -35,6 +35,9 @@ enum Paper {
     static let wash = Color(light: 0xECE7DB, dark: 0x2F2C28)
     static let rule = Color(light: 0xE2DCCF, dark: 0x3A3733)
     static let ink = Color(light: 0x1F1D1A, dark: 0xECE7DC)
+    /// The violet, from the asset catalogue rather than a hex here, so a control and
+    /// the system's own focus rings and selections agree. The one place a view reaches it.
+    static let accent = Color.accentColor
 
     /// Corner radii: control (chips, rail), card (rows, wells).
     enum Radius {
