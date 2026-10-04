@@ -911,7 +911,26 @@ extension DaemonCore {
 
     private func decode<T: Decodable>(_ params: JSONValue?, as type: T.Type) throws -> T? {
         guard let params, !params.isNull else { return nil }
-        return try params.decode(T.self)
+        do {
+            return try params.decode(T.self)
+        } catch let error as DecodingError {
+            // A limit of 1.5 or "ten" is the caller's mistake, said as one (#200).
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: Self.words(error, for: type))
+        }
+    }
+
+    /// Which field of a request would not read, and why, in a line.
+    static func words<T>(_ error: DecodingError, for type: T.Type) -> String {
+        let (path, why): ([any CodingKey], String) = switch error {
+        case .typeMismatch(let expected, let context):
+            (context.codingPath, expected == Int.self ? "is not a whole number" : "is not a \(expected)")
+        case .valueNotFound(_, let context): (context.codingPath, "is missing")
+        case .keyNotFound(let key, let context): (context.codingPath + [key], "is missing")
+        case .dataCorrupted(let context): (context.codingPath, "does not read: " + context.debugDescription.trimmingCharacters(in: CharacterSet(charactersIn: ".")))
+        @unknown default: ([], "does not read")
+        }
+        let field = path.map(\.stringValue).joined(separator: ".")
+        return field.isEmpty ? "\(type) \(why)." : "\(type): \(field) \(why)."
     }
 
     private func require<T: Decodable>(_ params: JSONValue?, as type: T.Type) throws -> T {

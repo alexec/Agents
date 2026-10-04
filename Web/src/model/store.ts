@@ -25,6 +25,9 @@ export { folderKey } from "./groups";
 /** How many finished turns a chat opens with, as the window's (#90). */
 const openingTurns = 12;
 
+/** The most entries a host gives in one `agents/transcript` answer (TranscriptRequest.limitCeiling, #200). */
+const transcriptCeiling = 1_000;
+
 /** How many entries heard as they happened are kept to lay over a page that arrives late. */
 const heardSincePageLimit = 1_000;
 
@@ -878,10 +881,11 @@ export class Store extends Work {
     if (page && this.watching.value === watching) this.prepend(page);
   }
 
-  /** Every entry of a finished turn, for the chat to open it. */
+  /** A finished turn's entries, for the chat to open it: the last page of them when the turn is
+   * longer than a host gives in one answer (#200). */
   async turnEntries(host: string, session: string, range: { start: number; end: number }): Promise<TranscriptEntry[]> {
     const page = await this.link.call("agents/transcript", {
-      agentID: session as never, before: range.end, limit: range.end - range.start, from: range.start,
+      agentID: session as never, before: range.end, limit: Math.min(range.end - range.start, transcriptCeiling), from: range.start,
     }, host).catch(() => null);
     return page?.entries ?? [];
   }

@@ -1204,6 +1204,10 @@ public enum DaemonAPI {
     }
 
     public struct TranscriptRequest: Codable, Sendable {
+        /// The most entries one page carries, whatever is asked for (#200). A turn longer
+        /// than this is read a page at a time.
+        public static let limitCeiling = 1_000
+
         public var agentID: UUID
         public var before: Int?
         public var limit: Int
@@ -1225,9 +1229,23 @@ public enum DaemonAPI {
             limit = try c.decodeIfPresent(Int.self, forKey: .limit) ?? 200
             from = try c.decodeIfPresent(Int.self, forKey: .from)
         }
+
+        /// The request as a host answers it (#200): a negative limit or position is
+        /// refused, and a limit past the ceiling is cut to it. A limit of zero is an
+        /// empty page.
+        public func bounded() throws -> TranscriptRequest {
+            var bounded = self
+            bounded.limit = try DaemonAPI.boundedLimit(limit, ceiling: Self.limitCeiling)
+            try DaemonAPI.requireNotNegative(before, named: "before")
+            try DaemonAPI.requireNotNegative(from, named: "from")
+            return bounded
+        }
     }
 
     public struct TurnsRequest: Codable, Sendable {
+        /// The most turns one page carries, whatever is asked for (#200).
+        public static let limitCeiling = 200
+
         public var agentID: UUID
         /// Turns before this one, by its position among the finished turns.
         public var before: Int?
@@ -1245,6 +1263,27 @@ public enum DaemonAPI {
             before = try c.decodeIfPresent(Int.self, forKey: .before)
             limit = try c.decodeIfPresent(Int.self, forKey: .limit) ?? 50
         }
+
+        /// The request as a host answers it (#200), as `TranscriptRequest.bounded()`.
+        public func bounded() throws -> TurnsRequest {
+            var bounded = self
+            bounded.limit = try DaemonAPI.boundedLimit(limit, ceiling: Self.limitCeiling)
+            try DaemonAPI.requireNotNegative(before, named: "before")
+            return bounded
+        }
+    }
+
+    /// A page's limit as a host takes it (#200): never negative, never past `ceiling`.
+    static func boundedLimit(_ limit: Int, ceiling: Int) throws -> Int {
+        try requireNotNegative(limit, named: "limit")
+        return min(limit, ceiling)
+    }
+
+    /// One position or limit in a request, refused in words when it is below zero (#200).
+    static func requireNotNegative(_ value: Int?, named name: String) throws {
+        guard let value, value < 0 else { return }
+        throw JSONRPCError(code: JSONRPCError.invalidParams,
+                           message: "\(name) must be 0 or more, not \(value).")
     }
 
     // MARK: Cost

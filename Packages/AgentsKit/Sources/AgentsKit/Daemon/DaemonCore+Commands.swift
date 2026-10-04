@@ -2032,6 +2032,8 @@ extension DaemonCore {
     }
 
     public func transcript(_ request: DaemonAPI.TranscriptRequest) async throws -> TranscriptPage {
+        // Any client can send any number: nonsense is refused, a huge page is cut (#200).
+        let request = try request.bounded()
         // Deleted with the rest of it (051): say so rather than show an empty page.
         if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
             throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
@@ -2049,6 +2051,7 @@ extension DaemonCore {
 
     /// The finished turns, as the chat shows them until one is opened.
     public func turns(_ request: DaemonAPI.TurnsRequest) async throws -> TurnsPage {
+        let request = try request.bounded()
         if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
             throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
                                message: RetirementWords.retiredSentence(tombstone))

@@ -2031,10 +2031,12 @@ final class RemoteModel {
         work.replaceTranscript(with: page)
     }
 
-    /// Every entry of a finished turn, for the chat to open it.
+    /// A finished turn's entries, for the chat to open it: the last page of them when
+    /// the turn is longer than a host gives in one answer (#200).
     func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
         let request = DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
-                                                  limit: range.count, from: range.lowerBound)
+                                                  limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
+                                                  from: range.lowerBound)
         let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
                                                         returning: TranscriptPage.self)
         return page?.entries ?? []

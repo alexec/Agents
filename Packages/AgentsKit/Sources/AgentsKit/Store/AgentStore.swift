@@ -387,8 +387,10 @@ public actor AgentStore {
         let starts = turns.starts(total: index.count)
         let closed = max(0, starts.count - 1)
 
-        let end = min(before ?? closed, closed)
-        let start = max(0, end - limit)
+        // Never a backwards range, whatever is asked: Swift traps on one, and that
+        // took the host down with every agent on it (#200).
+        let end = max(0, min(before ?? closed, closed))
+        let start = end - min(max(0, limit), end)
         try make((start..<end).filter { $0 >= turns.known.count && turns.later[$0] == nil },
                  in: &turns, starts: starts, reader, index)
         var page: [TurnSummary] = []
@@ -532,6 +534,9 @@ public actor AgentStore {
                       _ reader: TranscriptReader, _ index: TranscriptReader.Index) throws {
         guard let first = positions.first, let last = positions.last else { return }
         let entries = try reader.entries(index, lines: starts[first]..<starts[last + 1])
+        // The transcript went (its agent deleted) or shrank while turns were being made in
+        // the background: nothing to make, rather than slicing past what was read (#200).
+        guard entries.count == starts[last + 1] - starts[first] else { throw TranscriptReader.Shrunk() }
         for position in positions {
             let lines = (starts[position] - starts[first])..<(starts[position + 1] - starts[first])
             var summary = TurnSummary.of(entries[lines].compactMap { $0 }, start: starts[position])

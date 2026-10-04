@@ -2554,12 +2554,14 @@ final class AppModel {
         await whole
     }
 
-    /// Every entry of a finished turn, for the chat to open it.
+    /// A finished turn's entries, for the chat to open it: the last page of them when
+    /// the turn is longer than a host gives in one answer (#200).
     func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
         let page = try? await client(forAgent: agentID).call(
             DaemonAPI.Method.agentsTranscript,
             DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
-                                        limit: range.count, from: range.lowerBound),
+                                        limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
+                                        from: range.lowerBound),
             returning: TranscriptPage.self)
         return page?.entries ?? []
     }
