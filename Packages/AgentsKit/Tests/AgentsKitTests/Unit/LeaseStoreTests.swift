@@ -39,6 +39,6 @@ struct LeaseStoreTests {
         #expect(LeaseStore(locations: locations).load().isEmpty)
         #expect(!FileManager.default.fileExists(atPath: locations.leases.path))
         let aside = try FileManager.default.contentsOfDirectory(atPath: locations.root.path)
-        #expect(aside.contains { $0.hasPrefix("leases.json.unreadable") })
+        #expect(aside.contains { $0.hasPrefix("leases.json.corrupt-") })
     }
 }

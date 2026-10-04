@@ -237,6 +237,7 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
             Daily limit {money(state.limits.daily.amount, state.limits.daily.currency)} · {headroom(state)}</p>}
           {state.limits.perAgent && <p class="quiet small">
             Each agent up to {money(state.limits.perAgent.amount, state.limits.perAgent.currency)}</p>}
+          {state.note && <p class="quiet small">⚠︎ {state.note}</p>}
         </section>
       ))}
       <p class="hint">Limits are set on the Mac.</p>

@@ -88,8 +88,7 @@ public final class EventStore: @unchecked Sendable {
         if unreadable > 0 && log.events.isEmpty {
             try? handle?.close()
             handle = nil
-            StoreCoding.setAside(locations.events)
-            DaemonLog.shared.write("events.jsonl could not be read; set aside, starting with no events")
+            StoreFile.setAside(locations.events, meaning: "starting with no events")
             return EventLog()
         }
         if unreadable > 0 {
@@ -130,7 +129,7 @@ public final class EventStore: @unchecked Sendable {
             try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
             try? handle?.close()
             handle = nil
-            try data.write(to: locations.events, options: .atomic)
+            try StoreFile.write(data, to: locations.events)
         } catch {
             DaemonLog.shared.write("events.jsonl: could not rewrite: \(error.localizedDescription)")
         }
@@ -150,19 +149,13 @@ public final class EventStore: @unchecked Sendable {
     // MARK: The sources' memory
 
     public func loadState() -> EventState {
-        guard let data = try? Data(contentsOf: locations.eventState) else { return EventState() }
-        guard let state = try? StoreCoding.decoder.decode(EventState.self, from: data) else {
-            StoreCoding.setAside(locations.eventState)
-            DaemonLog.shared.write("events-state.json could not be read; set aside, starting afresh")
-            return EventState()
-        }
-        return state
+        return StoreFile.load(EventState.self, at: locations.eventState, empty: EventState(), meaning: "starting afresh")
     }
 
     public func saveState(_ state: EventState) {
         do {
             try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-            try StoreCoding.encoder.encode(state).write(to: locations.eventState, options: .atomic)
+            try StoreFile.write(StoreCoding.encoder.encode(state), to: locations.eventState)
         } catch {
             DaemonLog.shared.write("events-state.json: could not save: \(error.localizedDescription)")
         }

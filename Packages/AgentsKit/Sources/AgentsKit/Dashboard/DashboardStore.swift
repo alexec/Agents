@@ -80,13 +80,14 @@ final class DashboardStore: @unchecked Sendable {
         let data = try tile.fileData()
         let url = Self.tileFile(project, id)
         if let old = try? Data(contentsOf: url), old == data { return (Self.hash(data), false) }
-        try FileManager.default.createDirectory(at: Self.tilesFolder(project), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        try StoreFile.write(data, to: url)
         return (Self.hash(data), true)
     }
 
-    func deleteFile(_ id: String, in project: URL) {
-        try? FileManager.default.removeItem(at: Self.tileFile(project, id))
+    func deleteFile(_ id: String, in project: URL) throws {
+        let url = Self.tileFile(project, id)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 
     // MARK: The order (#147)
@@ -95,10 +96,23 @@ final class DashboardStore: @unchecked Sendable {
         tilesFolder(project).appendingPathComponent(DashboardOrder.fileName)
     }
 
-    /// Nil when nobody has moved a tile, or the file does not read.
+    /// Nil when nobody has moved a tile. One that does not read (a merge's conflict
+    /// markers, say) is set aside as `_order.json.corrupt-<time>` rather than written
+    /// over by the next move (#171); the tiles show in the order they were made, and the
+    /// Dashboard says so (`notes`).
     func readOrder(_ project: URL) -> DashboardOrder? {
-        guard let data = try? Data(contentsOf: Self.orderFile(project)) else { return nil }
-        return try? JSONDecoder().decode(DashboardOrder.self, from: data)
+        if case .read(let order) = StoreFile.read(DashboardOrder.self, at: Self.orderFile(project), decoder: JSONDecoder(),
+                                                  meaning: "the tiles show in the order they were made") {
+            return order
+        }
+        return nil
+    }
+
+    /// What the Dashboard says about its files set aside in this run, or nil.
+    func notes(_ project: URL) -> String? {
+        let notes = SetAsideNotes.shared.notes(under: Self.tilesFolder(project))
+            + SetAsideNotes.shared.notes(under: folder(for: project))
+        return notes.isEmpty ? nil : notes.joined(separator: " ")
     }
 
     /// Write the order whole, or remove the file when it lists nothing. Unchanged bytes
@@ -114,8 +128,7 @@ final class DashboardStore: @unchecked Sendable {
         var data = try encoder.encode(order)
         data.append(0x0A)
         if let old = try? Data(contentsOf: url), old == data { return }
-        try FileManager.default.createDirectory(at: Self.tilesFolder(project), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        try StoreFile.write(data, to: url)
     }
 
     // MARK: The host's state
@@ -127,18 +140,24 @@ final class DashboardStore: @unchecked Sendable {
     func state(_ project: URL) -> DashboardState {
         if let known = states[project] { return known }
         let url = folder(for: project).appendingPathComponent("state.json")
-        let loaded = (try? Data(contentsOf: url)).flatMap { try? StoreCoding.decoder.decode(DashboardState.self, from: $0) }
-            ?? DashboardState(folder: project.path)
+        let loaded = StoreFile.load(DashboardState.self, at: url, empty: DashboardState(folder: project.path),
+                                    meaning: "every tile's made and set times start again")
         states[project] = loaded
         return loaded
     }
 
-    func save(_ state: DashboardState, for project: URL) {
+    /// Kept in memory whatever happens; answers what went wrong writing it, for the
+    /// agent's reply, or nil. Never swallowed (#171).
+    @discardableResult
+    func save(_ state: DashboardState, for project: URL) -> String? {
         states[project] = state
-        let folder = folder(for: project)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        if let data = try? StoreCoding.encoder.encode(state) {
-            try? data.write(to: folder.appendingPathComponent("state.json"), options: .atomic)
+        do {
+            try StoreFile.write(try StoreCoding.encoder.encode(state),
+                                to: folder(for: project).appendingPathComponent("state.json"))
+            return nil
+        } catch {
+            DaemonLog.shared.write("dashboard: state.json for \(project.path) could not be written: \(error)")
+            return "This host's note of when tiles were set could not be written: \(error.localizedDescription)"
         }
     }
 
@@ -174,12 +193,28 @@ final class DashboardStore: @unchecked Sendable {
         return out
     }
 
+    /// A line that does not read costs that line, but never silently (#171): the whole
+    /// file is kept as `<id>.jsonl.corrupt-<time>` before the next write drops it. A
+    /// torn last line, a crash mid-append, is only dropped.
     private static func readPoints(_ url: URL) -> [TilePoint] {
         guard let data = try? Data(contentsOf: url) else { return [] }
-        return data.split(separator: UInt8(ascii: "\n")).compactMap { line in
-            (try? JSONDecoder().decode(PointLine.self, from: Data(line)))
-                .map { TilePoint(at: Date(timeIntervalSince1970: $0.t), value: $0.v) }
+        let lines = data.split(separator: UInt8(ascii: "\n"))
+        var unreadable = 0
+        let points = lines.enumerated().compactMap { index, line -> TilePoint? in
+            guard let point = try? JSONDecoder().decode(PointLine.self, from: Data(line)) else {
+                if index != lines.count - 1 { unreadable += 1 }
+                return nil
+            }
+            return TilePoint(at: Date(timeIntervalSince1970: point.t), value: point.v)
         }
+        if unreadable > 0 {
+            let aside = StoreCoding.asideName(for: url)
+            if (try? FileManager.default.copyItem(at: url, to: aside)) != nil {
+                DaemonLog.shared.write("dashboard: \(unreadable) lines of \(url.lastPathComponent) could not be read; the whole file is kept as \(aside.lastPathComponent)")
+                SetAsideNotes.shared.add(url, aside: aside, partly: true)
+            }
+        }
+        return points
     }
 
     /// Record a point (#127). Nothing is written for a value equal to the last kept: the
@@ -187,17 +222,19 @@ final class DashboardStore: @unchecked Sendable {
     /// if its bytes changed, so a second set in the same hour replaces that hour's point.
     /// Returns whether a point was added.
     @discardableResult
-    func record(_ value: Double, at: Date, for id: String, in project: URL) -> Bool {
+    func record(_ value: Double, at: Date, for id: String, in project: URL) throws -> Bool {
         var all = points(project, id)
         if all.last?.value == value { return false }
         all.append(TilePoint(at: at, value: value))
-        rewritePoints(Self.compacted(all, now: at), for: id, in: project)
+        try rewritePoints(Self.compacted(all, now: at), for: id, in: project)
         return true
     }
 
-    func rewritePoints(_ all: [TilePoint], for id: String, in project: URL) {
+    /// The cache holds what was meant, the file what could be written; a failure is the
+    /// caller's to say.
+    func rewritePoints(_ all: [TilePoint], for id: String, in project: URL) throws {
         pointCache[Self.key(project) + "/" + id] = all
-        try? writePoints(all, for: id, in: project)
+        try writePoints(all, for: id, in: project)
     }
 
     /// The file for `all`, whole, and only when its bytes change; none for no points.
@@ -210,14 +247,15 @@ final class DashboardStore: @unchecked Sendable {
         var data = Data()
         for point in all { data.append(Self.line(point)) }
         if let old = try? Data(contentsOf: url), old == data { return }
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        try StoreFile.write(data, to: url)
     }
 
-    func deletePoints(_ id: String, in project: URL) {
+    func deletePoints(_ id: String, in project: URL) throws {
         pointCache.removeValue(forKey: Self.key(project) + "/" + id)
-        try? FileManager.default.removeItem(at: pointsFile(project, id))
-        try? FileManager.default.removeItem(at: hostPointsFile(project, id))
+        for url in [pointsFile(project, id), hostPointsFile(project, id)]
+        where FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
     }
 
     /// Read every point again: the history files changed outside the app, by a pull or
@@ -253,7 +291,13 @@ final class DashboardStore: @unchecked Sendable {
         for id in ids.sorted() where TileLimits.isValidID(id) {
             let all = points(project, id)
             let folded = Self.compacted(all, now: now)
-            if folded != all { rewritePoints(folded, for: id, in: project) }
+            if folded != all {
+                do {
+                    try rewritePoints(folded, for: id, in: project)
+                } catch {
+                    DaemonLog.shared.write("dashboard: \(id)'s history could not be folded in \(project.path): \(error)")
+                }
+            }
         }
     }
 
@@ -298,13 +342,23 @@ final class DashboardStore: @unchecked Sendable {
         try? FileManager.default.removeItem(at: folder(for: project))
     }
 
-    /// Moving a project carries its history to the new folder's key (FR-022).
+    /// Moving a project carries its history to the new folder's key (FR-022). What was
+    /// already at the new key is replaced only once the move can be made, so a failure
+    /// leaves both where they were (#171).
     func moveHistory(from old: URL, to new: URL) {
         let source = folder(for: old), target = folder(for: new)
         guard FileManager.default.fileExists(atPath: source.path), source != target else { return }
-        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try? FileManager.default.removeItem(at: target)
-        try? FileManager.default.moveItem(at: source, to: target)
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: target.path) {
+                _ = try FileManager.default.replaceItemAt(target, withItemAt: source)
+            } else {
+                try FileManager.default.moveItem(at: source, to: target)
+            }
+        } catch {
+            DaemonLog.shared.write("dashboard: the history for \(old.path) could not move to \(new.path): \(error)")
+            return
+        }
         states.removeValue(forKey: old)
         states.removeValue(forKey: new)
         pointCache = pointCache.filter { !$0.key.hasPrefix(Self.key(old) + "/") }

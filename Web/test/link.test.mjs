@@ -124,15 +124,44 @@ test("close code 4403 is forgotten: the key goes and nothing redials", async () 
   assert.equal(net.made.length, 1);
 });
 
-test("refused as forgotten or unknown is forgotten too", async () => {
-  for (const reason of ["forgotten", "unknown"]) {
-    const net = sockets();
-    const keys = paired();
-    const l = link(keys, net, { authenticate: async () => { throw new w.Refused(reason); } });
-    const states = await opened(l);
-    assert.equal(states.at(-1), "forgotten", reason);
-    assert.equal(keys.record, null);
-  }
+test("refused as forgotten is forgotten too", async () => {
+  const net = sockets();
+  const keys = paired();
+  const l = link(keys, net, { authenticate: async () => { throw new w.Refused("forgotten"); } });
+  const states = await opened(l);
+  assert.equal(states.at(-1), "forgotten");
+  assert.equal(keys.record, null);
+});
+
+test("unknown for a moment keeps the key and dials again (#171)", async () => {
+  const net = sockets();
+  const keys = paired();
+  let refusals = 1;
+  const l = link(keys, net, { authenticate: async () => {
+    if (refusals-- > 0) throw new w.Refused("unknown");
+    return { name: "test" };
+  } });
+  await opened(l);
+  await wait(60);
+  assert.notEqual(keys.record, null);
+  assert.ok(net.made.length >= 2, "it dialled again");
+  assert.equal(l.state.kind, "open");
+  l.stop();
+});
+
+test("unknown that lasts past the patience is forgotten", async () => {
+  const net = sockets();
+  const keys = paired();
+  let clock = 0;
+  const l = link(keys, net, { patience: 1_000, now: () => clock,
+    authenticate: async () => { clock += 600; throw new w.Refused("unknown"); } });
+  const states = [];
+  l.onState((state) => states.push(state.kind));
+  l.start();
+  await wait(120);
+  assert.equal(states.at(-1), "forgotten");
+  assert.equal(keys.record, null);
+  assert.ok(net.made.length >= 3, "it tried again before believing it");
 });
 
 test("another control plane on this port keeps the key and says so", async () => {

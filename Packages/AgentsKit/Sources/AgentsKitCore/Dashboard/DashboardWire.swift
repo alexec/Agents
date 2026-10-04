@@ -122,14 +122,18 @@ public struct DashboardSnapshot: Codable, Sendable, Hashable {
     public var update: DashboardUpdate?
     /// Where a person or an agent has put the tiles (#147); nil when nobody has moved one.
     public var order: DashboardOrder?
+    /// A file of this Dashboard's that could not be read and was set aside in this run
+    /// (#171), said where the Dashboard shows; nil when every one read.
+    public var note: String?
 
     public init(folder: URL, tiles: [TileView], now: Date, update: DashboardUpdate? = nil,
-                order: DashboardOrder? = nil) {
+                order: DashboardOrder? = nil, note: String? = nil) {
         self.folder = folder
         self.tiles = tiles
         self.now = now
         self.update = update
         self.order = order
+        self.note = note
     }
 }
 

@@ -87,6 +87,7 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
           <p class="quiet">{projectName}{Number.isFinite(newest) && snapshot
             ? ` · updated ${agoWords(snapshot.now - newest)}` : " · kept by its agents"}</p>
           {snapshot?.update && <UpdateLine host={host} folder={folder} update={snapshot.update} />}
+          {snapshot?.note && <p class="quiet small">⚠︎ {snapshot.note}</p>}
           {!snapshot && <p class="hint">Loading…</p>}
           {snapshot && groups.length === 0 && (
             <p class="hint">{hiddenCount > 0 ? "Every tile is hidden. Show Hidden Tiles brings them back."

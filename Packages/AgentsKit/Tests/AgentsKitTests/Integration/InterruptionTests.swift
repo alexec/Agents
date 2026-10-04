@@ -204,7 +204,7 @@ struct InterruptionTests {
         try limits.save(CostLimits(daily: Cost(amount: 3, currency: "USD")))
 
         let kept = try FileManager.default.contentsOfDirectory(atPath: locations.root.path)
-            .filter { $0.hasPrefix(locations.limits.lastPathComponent + ".unreadable-") }
+            .filter { $0.hasPrefix(locations.limits.lastPathComponent + ".corrupt-") }
         #expect(kept.count == 1, "what was there is set aside, not lost")
     }
 }

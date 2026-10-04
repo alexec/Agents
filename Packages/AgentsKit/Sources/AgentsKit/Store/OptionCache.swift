@@ -59,17 +59,14 @@ public struct OptionCache: Sendable {
     }
 
     public func load() -> [String: Entry] {
-        guard let data = try? Data(contentsOf: locations.optionCache),
-              let entries = try? StoreCoding.decoder.decode([String: Entry].self, from: data) else {
-            return [:]
-        }
-        return entries
+        StoreFile.load([String: Entry].self, at: locations.optionCache, empty: [:],
+                       meaning: "every runtime's options are asked for afresh")
     }
 
     public func save(_ entries: [String: Entry]) throws {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         let kept = entries.sorted { $0.value.savedAt > $1.value.savedAt }.prefix(Self.limit)
         let data = try StoreCoding.encoder.encode([String: Entry](uniqueKeysWithValues: kept.map { ($0.key, $0.value) }))
-        try data.write(to: locations.optionCache, options: .atomic)
+        try StoreFile.write(data, to: locations.optionCache)
     }
 }

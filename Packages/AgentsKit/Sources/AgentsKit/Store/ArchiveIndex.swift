@@ -49,7 +49,7 @@ public struct ArchiveIndex: Sendable {
         guard let data = try? Data(contentsOf: locations.archiveIndex) else { return nil }
         guard let file = try? StoreCoding.decoder.decode(File.self, from: data), file.version == 1 else {
             DaemonLog.shared.write("archive.json could not be read; every archived record will be read once")
-            StoreCoding.setAside(locations.archiveIndex)
+            StoreFile.setAside(locations.archiveIndex, meaning: "rebuilding the archive index")
             return nil
         }
         return Dictionary(file.entries.map { ($0.agent.id, $0) }, uniquingKeysWith: { _, newer in newer })
@@ -57,7 +57,7 @@ public struct ArchiveIndex: Sendable {
 
     public func save(_ entries: [UUID: Entry], now: Date = Date()) throws {
         let file = File(writtenAt: now, entries: entries.values.sorted { $0.agent.id.uuidString < $1.agent.id.uuidString })
-        try StoreCoding.encoder.encode(file).write(to: locations.archiveIndex, options: .atomic)
+        try StoreFile.write(StoreCoding.encoder.encode(file), to: locations.archiveIndex)
     }
 
     /// The allocated size of everything in an agent's folder, in bytes.

@@ -43,13 +43,11 @@ public struct ModeStore: Sendable {
     }
 
     private func raw() -> [String: JSONValue] {
-        guard let data = try? Data(contentsOf: locations.modes),
-              let file = try? StoreCoding.decoder.decode([String: JSONValue].self, from: data) else { return [:] }
-        return file
+        StoreFile.load([String: JSONValue].self, at: locations.modes, empty: [:],
+                       meaning: "every runtime starts in its own default mode")
     }
 
     private func write(_ file: [String: JSONValue]) throws {
-        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try StoreCoding.encoder.encode(file).write(to: locations.modes, options: .atomic)
+        try StoreFile.write(try StoreCoding.encoder.encode(file), to: locations.modes)
     }
 }

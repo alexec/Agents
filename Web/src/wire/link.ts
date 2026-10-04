@@ -53,6 +53,10 @@ export interface LinkOptions {
   /** How often to check the socket, and how long to wait for the answer. */
   heartbeat?: { every: number; within: number };
   random?: () => number;
+  /** How long `unknown` has to keep coming back, with no connection between, before the
+   * key is let go: the Swift clients' RefusalPatience (#81, #171). Milliseconds. */
+  patience?: number;
+  now?: () => number;
   /** The exchange; the real one unless a test stands in for it. */
   authenticate?: (socket: LineSocket, record: KeyRecord, origin: string) => Promise<Admitted>;
 }
@@ -117,6 +121,8 @@ export class Link {
   private socket: SocketLike | null = null;
   private stopped = true;
   private attempt = 0;
+  /** When `unknown` was first heard since the last connection, or null. */
+  private firstUnknown: number | null = null;
   private retry: ReturnType<typeof setTimeout> | null = null;
   private beat: ReturnType<typeof setInterval> | null = null;
   private nextID = 1;
@@ -130,6 +136,8 @@ export class Link {
       backoff: [1, 2, 4, 8, 10],
       heartbeat: { every: 5_000, within: 3_000 },
       random: Math.random,
+      patience: 120_000,
+      now: Date.now,
       authenticate: connect,
       open: (url) => new WebSocket(url) as unknown as SocketLike,
       ...options,
@@ -231,11 +239,12 @@ export class Link {
         const admitted = await this.options.authenticate(lines, record, this.options.origin);
         authed = true;
         this.attempt = 0;
+        this.firstUnknown = null;
         log("link.open");
         this.set({ kind: "open", name: admitted.name });
         this.startHeartbeat();
       } catch (error) {
-        if (error instanceof Refused && (error.reason === "forgotten" || error.reason === "unknown")) {
+        if (error instanceof Refused && (error.reason === "forgotten" || this.unknownLasted(error.reason))) {
           log("link.refused", error.reason);
           this.socket = null;
           socket.close(1000, "");
@@ -327,6 +336,19 @@ export class Link {
     this.attempt++;
     const delay = base * 1000 * (1 + 0.2 * this.options.random());
     this.retry = setTimeout(() => void this.dial(), delay);
+  }
+
+  /** `forgotten` is a person's decision and final; `unknown` is final only once it has
+   * lasted (#171): a control plane starting, or a record it could not read for a moment,
+   * says it too, and a page that let its key go then had to be paired again. */
+  private unknownLasted(reason: string): boolean {
+    if (reason !== "unknown") return false;
+    const now = this.options.now();
+    if (this.firstUnknown === null) {
+      this.firstUnknown = now;
+      return false;
+    }
+    return now - this.firstUnknown >= this.options.patience;
   }
 
   private async forgotten(): Promise<void> {

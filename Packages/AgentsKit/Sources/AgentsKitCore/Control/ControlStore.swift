@@ -151,8 +151,16 @@ public struct FolderStore: ControlStore {
 
     public func get(_ key: String) async throws -> StoredObject? {
         let file = try url(key)
-        guard let data = try? Data(contentsOf: file) else { return nil }
-        return StoredObject(data: data, etag: Self.etag(data))
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        // There and not readable (EIO, EACCES) is not absent (#171): absent would have
+        // the member forgotten, and a browser delete its key.
+        do {
+            let data = try Data(contentsOf: file)
+            return StoredObject(data: data, etag: Self.etag(data))
+        } catch {
+            guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+            throw StoreError.unavailable("cannot read \(key): \(error.localizedDescription)")
+        }
     }
 
     public func put(_ key: String, _ data: Data, when: StoreCondition) async throws -> String {

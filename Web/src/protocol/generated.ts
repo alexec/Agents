@@ -460,6 +460,7 @@ export interface CostState {
   limits: CostLimits;
   today: Record<string, number>;
   day: string;
+  note?: string;
 }
 
 export interface DashboardChangedNotification {
@@ -486,6 +487,7 @@ export interface DashboardSnapshot {
   now: WireDate;
   update?: DashboardUpdate;
   order?: DashboardOrder;
+  note?: string;
 }
 
 export interface DashboardSummary {
@@ -1954,12 +1956,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
-  CostState: { required: ["limits", "today", "day"], optional: [] },
+  CostState: { required: ["limits", "today", "day"], optional: ["note"] },
   DashboardChangedNotification: { required: ["folder", "summary"], optional: [] },
   DashboardOrder: { required: ["sections"], optional: [] },
   DashboardOrderSection: { required: ["tiles"], optional: ["title"] },
   DashboardRequest: { required: ["folder"], optional: [] },
-  DashboardSnapshot: { required: ["folder", "tiles", "now"], optional: ["update", "order"] },
+  DashboardSnapshot: { required: ["folder", "tiles", "now"], optional: ["update", "order", "note"] },
   DashboardSummary: { required: ["folder", "tiles", "bad", "line"], optional: [] },
   DashboardUpdate: { required: ["name", "isRunning", "lastFailed"], optional: ["workflowID", "agentID", "lastStartedAt", "blocked"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },

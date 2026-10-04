@@ -18,19 +18,13 @@ public struct LeaseStore: Sendable {
     }
 
     public func load() -> LeaseBook {
-        guard let data = try? Data(contentsOf: locations.leases) else { return LeaseBook() }
-        guard let book = try? StoreCoding.decoder.decode(LeaseBook.self, from: data) else {
-            StoreCoding.setAside(locations.leases)
-            DaemonLog.shared.write("leases.json could not be read; set aside, starting with no leases")
-            return LeaseBook()
-        }
-        return book
+        return StoreFile.load(LeaseBook.self, at: locations.leases, empty: LeaseBook(), meaning: "starting with no leases")
     }
 
     public func save(_ book: LeaseBook) throws {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         let data = try StoreCoding.encoder.encode(book)
-        try data.write(to: locations.leases, options: .atomic)
+        try StoreFile.write(data, to: locations.leases)
     }
 }
 
@@ -45,18 +39,12 @@ public struct DeclaredResourceStore: Sendable {
     }
 
     public func load() -> [DeclaredResource] {
-        guard let data = try? Data(contentsOf: locations.declaredResources) else { return [] }
-        guard let list = try? StoreCoding.decoder.decode([DeclaredResource].self, from: data) else {
-            StoreCoding.setAside(locations.declaredResources)
-            DaemonLog.shared.write("resources.json could not be read; set aside, nothing declared")
-            return []
-        }
-        return list
+        return StoreFile.load([DeclaredResource].self, at: locations.declaredResources, empty: [], meaning: "nothing declared")
     }
 
     public func save(_ list: [DeclaredResource]) throws {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         let data = try StoreCoding.encoder.encode(list)
-        try data.write(to: locations.declaredResources, options: .atomic)
+        try StoreFile.write(data, to: locations.declaredResources)
     }
 }

@@ -106,7 +106,8 @@ public struct AttentionRecords: Codable, Hashable, Sendable {
 /// **The daemon is the only writer.** Deliberately dumb — every rule about what may be
 /// *acted* on lives in `AttentionRecords.pruned(knownDevices:now:)`, which is pure.
 ///
-/// A missing or unreadable file is no notes at all, and the daemon starts anyway. What
+/// A missing file is no notes at all, and the daemon starts anyway; an unreadable one is
+/// set aside first (#171), so it is never the only copy written over. What
 /// that costs is what every daemon before this file cost: an outstanding need is raised
 /// afresh, and the person may be told about it a second time. That is the failure this
 /// exists to make rare, and it is never made worse by losing it.
@@ -118,19 +119,18 @@ public struct AttentionStore: Sendable {
     }
 
     public func load() -> AttentionRecords {
-        guard let data = try? Data(contentsOf: locations.attention),
-              let records = try? StoreCoding.decoder.decode(AttentionRecords.self, from: data) else {
-            return AttentionRecords()
-        }
-        return records
+        StoreFile.load(AttentionRecords.self, at: locations.attention, empty: AttentionRecords(),
+                       meaning: "starting with no notes of what was raised")
     }
 
     /// Never throws. A note that cannot be written is a notification that may repeat,
     /// which is not worth taking the daemon down for — the same position `WorkflowStore`
-    /// takes about a pause it could not save.
+    /// takes about a pause it could not save. It is logged, not swallowed.
     public func save(_ records: AttentionRecords) {
-        guard let data = try? StoreCoding.encoder.encode(records) else { return }
-        try? FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try? data.write(to: locations.attention, options: .atomic)
+        do {
+            try StoreFile.write(try StoreCoding.encoder.encode(records), to: locations.attention)
+        } catch {
+            DaemonLog.shared.write("store: attention.json could not be written: \(error)")
+        }
     }
 }

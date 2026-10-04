@@ -40,6 +40,11 @@ struct CostSettingsView: View {
                     await model.setCostLimits(daily: .some(limit))
                 }
                 if let state = model.costState { today(state) }
+                // The ledger or the limits set aside as unreadable (#171).
+                if let note = model.costState?.note {
+                    Label(note, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("The most a day may spend")
             } footer: {

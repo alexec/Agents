@@ -17,14 +17,10 @@ public struct HostStore: Sendable {
     /// by the next save: the servers in it are the person's, and a build that can read
     /// it may still want them.
     public func load() -> HostList {
-        guard let data = try? Data(contentsOf: file) else { return HostList() }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        guard let hosts = try? decoder.decode(HostList.self, from: data) else {
-            StoreCoding.setAside(file)
-            return HostList()
-        }
-        return hosts
+        return StoreFile.load(HostList.self, at: file, empty: HostList(), decoder: decoder,
+                              meaning: "starting with no servers")
     }
 
     public func save(_ hosts: HostList) throws {
@@ -33,6 +29,6 @@ public struct HostStore: Sendable {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(hosts).write(to: file, options: .atomic)
+        try StoreFile.write(encoder.encode(hosts), to: file)
     }
 }

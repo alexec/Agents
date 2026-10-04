@@ -79,7 +79,11 @@ extension DaemonCore {
             let left = DashboardOrder(sections: order.sections.map {
                 DashboardOrder.Section(title: $0.title, tiles: $0.tiles.filter { $0 != check.id })
             }).cleaned()
-            try? dashboardStore.writeOrder(left, in: project)
+            do {
+                try dashboardStore.writeOrder(left, in: project)
+            } catch {
+                notes.append("Its old place in the Dashboard's order could not be taken out of _order.json: \(error.localizedDescription)")
+            }
         }
         if existing == nil { record.made = state.tiles[check.id]?.made ?? at }
         record.set = at
@@ -92,13 +96,18 @@ extension DaemonCore {
                 + "posting has put it back. If it is no longer wanted, stop keeping it with remove_tile.")
         }
         state.removals = state.removals.filter { at.timeIntervalSince($0.value.at) < TileLimits.removalKept }
-        dashboardStore.save(state, for: project)
+        if let problem = dashboardStore.save(state, for: project) { notes.append(problem) }
         if let number = tile.number {
-            let kept = dashboardStore.record(number.value, at: at, for: check.id, in: project)
-            let count = dashboardStore.points(project, check.id).count
-            notes.append(kept
-                ? "Recorded a point in .agents/dashboard/history/\(check.id).jsonl (\(count) kept)."
-                : "The trend already ends at this value, so no point was added (\(count) kept).")
+            do {
+                let kept = try dashboardStore.record(number.value, at: at, for: check.id, in: project)
+                let count = dashboardStore.points(project, check.id).count
+                notes.append(kept
+                    ? "Recorded a point in .agents/dashboard/history/\(check.id).jsonl (\(count) kept)."
+                    : "The trend already ends at this value, so no point was added (\(count) kept).")
+            } catch {
+                notes.append("The point could not be written to .agents/dashboard/history/\(check.id).jsonl: "
+                    + "\(error.localizedDescription). The tile shows it until the daemon restarts.")
+            }
         }
         if tile.isHidden {
             notes.append("The person has hidden this tile; it is kept up to date out of sight.")
@@ -122,7 +131,7 @@ extension DaemonCore {
         if let held = found.tile?.keeper, held != tileKeeper(for: caller) {
             throw dashboardRefusal("Nothing was removed: \"\(id)\" is kept by \(keeperWords(held, in: project)).")
         }
-        forgetTile(id, in: project)
+        try forgetTile(id, in: project)
         dashboardChanged(project)
         return "Removed \"\(id)\" and its history from the Dashboard."
     }
@@ -250,7 +259,8 @@ extension DaemonCore {
         }
         return DashboardSnapshot(folder: project, tiles: DashboardModel.ordered(tiles), now: at,
                                  update: withUpdate ? dashboardUpdate(project) : nil,
-                                 order: dashboardStore.readOrder(project))
+                                 order: dashboardStore.readOrder(project),
+                                 note: dashboardStore.notes(project))
     }
 
     public func dashboardSummaries() -> [DashboardSummary] {
@@ -304,7 +314,7 @@ extension DaemonCore {
         guard dashboardStore.read(project, request.id) != nil else {
             throw dashboardRefusal("This Dashboard has no tile \"\(request.id)\".")
         }
-        forgetTile(request.id, in: project)
+        try forgetTile(request.id, in: project)
         var state = dashboardStore.state(project)
         state.removals[request.id] = DashboardState.Removal(at: now(), by: DashboardWords.person(surface))
         dashboardStore.save(state, for: project)
@@ -362,13 +372,23 @@ extension DaemonCore {
 
     // MARK: Inside
 
-    private func forgetTile(_ id: String, in project: URL) {
-        dashboardStore.deleteFile(id, in: project)
-        dashboardStore.deletePoints(id, in: project)
+    /// Throws when the tile's file or history could not be removed, so nobody is told it
+    /// went when it did not (#171).
+    private func forgetTile(_ id: String, in project: URL) throws {
+        do {
+            try dashboardStore.deleteFile(id, in: project)
+            try dashboardStore.deletePoints(id, in: project)
+        } catch {
+            throw dashboardRefusal("\"\(id)\" could not be removed from \(project.path)/.agents/dashboard: \(error.localizedDescription)")
+        }
         if let order = dashboardStore.readOrder(project), order.tiles.contains(id) {
-            try? dashboardStore.writeOrder(DashboardOrder(sections: order.sections.map {
-                DashboardOrder.Section(title: $0.title, tiles: $0.tiles.filter { $0 != id })
-            }).cleaned(), in: project)
+            do {
+                try dashboardStore.writeOrder(DashboardOrder(sections: order.sections.map {
+                    DashboardOrder.Section(title: $0.title, tiles: $0.tiles.filter { $0 != id })
+                }).cleaned(), in: project)
+            } catch {
+                DaemonLog.shared.write("dashboard: \(id) could not be taken out of _order.json in \(project.path): \(error)")
+            }
         }
         var state = dashboardStore.state(project)
         state.tiles.removeValue(forKey: id)

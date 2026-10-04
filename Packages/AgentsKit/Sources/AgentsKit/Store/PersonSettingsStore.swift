@@ -9,16 +9,11 @@ public struct PersonSettingsStore: Sendable {
     public init(locations: StoreLocations) { root = locations.root }
 
     public func load() -> PersonSettings {
-        guard let data = try? Data(contentsOf: file) else { return .init() }
-        guard let settings = try? StoreCoding.decoder.decode(PersonSettings.self, from: data) else {
-            StoreCoding.setAside(file)
-            return .init()
-        }
-        return settings
+        return StoreFile.load(PersonSettings.self, at: file, empty: .init(), meaning: "every setting at its default")
     }
 
     public func save(_ settings: PersonSettings) throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try StoreCoding.encoder.encode(settings).write(to: file, options: .atomic)
+        try StoreFile.write(StoreCoding.encoder.encode(settings), to: file)
     }
 }

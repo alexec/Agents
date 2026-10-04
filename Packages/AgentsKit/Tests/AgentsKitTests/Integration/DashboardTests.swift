@@ -526,6 +526,67 @@ struct DashboardTests {
         }
     }
 
+    // MARK: #171
+
+    private func asides(_ url: URL) -> [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)) ?? [])
+            .filter { $0.hasPrefix(url.lastPathComponent + ".corrupt-") }
+    }
+
+    @Test func anUnreadableOrderIsSetAsideNotWrittenOver() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        for id in ["a", "b"] { _ = try await set(s, "Lead", status(id)) }
+        let orderFile = s.project.appendingPathComponent(".agents/dashboard/_order.json")
+        let conflicted = Data("<<<<<<< HEAD\n{\"sections\":[]}\n=======\n>>>>>>> theirs\n".utf8)
+        try conflicted.write(to: orderFile)
+
+        let snapshot = await s.core.dashboardSnapshot(s.project)
+        #expect(snapshot.order == nil, "the tiles show in the order they were made")
+        #expect(snapshot.tiles.count == 2, "the Dashboard keeps working")
+        #expect(snapshot.note?.contains("_order.json could not be read") == true, "the page says so")
+        let kept = asides(orderFile)
+        #expect(kept.count == 1)
+        #expect(try Data(contentsOf: orderFile.deletingLastPathComponent().appendingPathComponent(kept[0])) == conflicted)
+
+        // The next arrange writes a whole, readable file, and the set-aside copy stays.
+        try await s.core.arrangeDashboard(.init(folder: s.project, order: DashboardOrder(sections: [
+            .init(title: nil, tiles: ["b", "a"]),
+        ])))
+        #expect(try JSONDecoder().decode(DashboardOrder.self, from: Data(contentsOf: orderFile)).tiles == ["b", "a"])
+        #expect(asides(orderFile).count == 1)
+        #expect(Self.temporaries(in: orderFile.deletingLastPathComponent()).isEmpty)
+    }
+
+    @Test func aHistoryLineThatDoesNotReadIsKeptInACopy() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        _ = try await set(s, "Lead", number("bugs", 4))
+        let history = s.project.appendingPathComponent(".agents/dashboard/history/bugs.jsonl")
+        var data = try Data(contentsOf: history)
+        data.append(Data("not a point\n{\"t\":1800000060,\"v\":5}\n".utf8))
+        try data.write(to: history)
+        await s.core.dashboardFilesChanged([history], in: s.project)
+
+        let tile = try #require(await s.core.dashboardSnapshot(s.project).tiles.first)
+        #expect(tile.recent.map(\.value) == [4, 5], "the lines that read are kept")
+        #expect(asides(history).count == 1, "the whole file is kept before a write drops the bad line")
+        #expect(await s.core.dashboardSnapshot(s.project).note?.contains("bugs.jsonl") == true)
+    }
+
+    @Test func anUnreadableHostStateIsSetAside() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        let state = s.locations.root.appendingPathComponent("dashboards/\(DashboardStore.key(s.project))/state.json")
+        try FileManager.default.createDirectory(at: state.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{\"folder\":".utf8).write(to: state)
+        let answer = try await set(s, "Lead", status("a"))
+        #expect(answer.contains("Set \"a\""))
+        #expect(asides(state).count == 1)
+        #expect(try StoreCoding.decoder.decode(DashboardState.self, from: Data(contentsOf: state)).tiles["a"] != nil)
+    }
+
+    static func temporaries(in folder: URL) -> [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { $0.hasSuffix(".tmp") }
+    }
+
     @Test func tileIDsMayNotStartWithAnUnderscore() {
         #expect(!TileLimits.isValidID("_order"))
         #expect(TileLimits.isValidID("open_bugs"))

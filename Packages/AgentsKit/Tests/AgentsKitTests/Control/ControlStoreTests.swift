@@ -166,3 +166,55 @@ struct ControlCodeVersion2Tests {
         #expect(ControlCode(text: badPin.text) == nil)
     }
 }
+
+/// A record or file the store cannot read is not "absent" (#171).
+@Suite("Unreadable control records")
+struct UnreadableControlRecordsTests {
+    // MARK: #171
+
+    @Test func aFileThatIsThereAndCannotBeReadIsNotAbsent() async throws {
+        let (store, root) = ControlStoreTests.folder()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600],
+                                                   ofItemAtPath: root.appendingPathComponent("v1/clients/a.json").path)
+            try? FileManager.default.removeItem(at: root)
+        }
+        _ = try await store.put("v1/clients/a.json", Data("one".utf8), when: .absent)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000],
+                                              ofItemAtPath: root.appendingPathComponent("v1/clients/a.json").path)
+        await #expect(throws: (any Error).self) { _ = try await store.get("v1/clients/a.json") }
+        #expect(try await store.get("v1/clients/missing.json") == nil)
+    }
+
+    @Test func anUnreadableClientRecordIsNeitherKnownNorForgotten() async throws {
+        let store = MemoryStore()
+        let records = ControlRecords(store: store)
+        let kept = ClientRecord(id: UUID(), name: "Phone", kind: .iPhone, publicKey: Data([1]), paired: Date())
+        try await records.save(kept)
+        let never = UUID()
+        _ = try await store.put(ControlRecords.clientKey(never), Data(#"{"id":"#.utf8), when: .absent)
+        try await records.load()
+        #expect(await records.client(never) == nil)
+        #expect(await records.isUnreadable(never))
+        #expect(await !records.wasForgotten(never))
+
+        // A record held from before is kept while its file cannot be read.
+        let etag = try #require(try await store.get(ControlRecords.clientKey(kept.id))?.etag)
+        _ = try await store.put(ControlRecords.clientKey(kept.id), Data("garbage".utf8), when: .matching(etag))
+        try await records.load()
+        #expect(await records.client(kept.id)?.name == "Phone")
+    }
+
+    @Test func settingsThatCannotBeReadAreNotMadeAgain() async throws {
+        let store = MemoryStore()
+        let torn = Data(#"{"name":"#.utf8)
+        _ = try await store.put(ControlRecords.settingsKey, torn, when: .absent)
+        let records = ControlRecords(store: store)
+        await #expect {
+            _ = try await records.settings(orMake: { ControlSettings(name: "Studio", machineID: "m") })
+        } throws: { error in
+            "\(error)".contains("v1/control.json can")
+        }
+        #expect(try await store.get(ControlRecords.settingsKey)?.data == torn)
+    }
+}
