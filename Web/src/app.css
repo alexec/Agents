@@ -504,6 +504,14 @@ button.link.reading:hover { text-decoration: underline; }
 
 .prompt-field { display: flex; align-items: flex-end; gap: 8px; }
 
+/* The runtime's commands and the host's files, over the field (CommandList, MentionList; #255). */
+.completions { list-style: none; margin: 0 0 8px; padding: 6px; max-height: 220px; overflow-y: auto;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: 0 2px 8px var(--paper-shadow); }
+.completions li { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px; border-radius: 7px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; }
+.completions li > :last-child { overflow: hidden; text-overflow: ellipsis; }
+.completions li.chosen { background: var(--paper-wash); }
+
 .prompt textarea {
   flex: 1;
   min-width: 0;

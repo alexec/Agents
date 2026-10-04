@@ -610,6 +610,33 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: completions/
+
+    @Test func completions() throws {
+        let commands: JSONValue = .array(["review", "compact", "init", "pr-comments", "Release-Notes"]
+            .map { .object(["name": .string($0)]) })
+        let typed = ["", "/", "/re", "/RE", "fix the /co", "a/b", "/re view", "path/to/re", "@", "@Prompt", "mail me@x.y",
+                     "see @Web/src", "@a b", "/init and @fo", "two / slashes /in"]
+        let cases = typed.map { text in
+            Case(name: text.isEmpty ? "empty" : text, input: .object(["text": .string(text), "commands": commands]))
+        }
+        try pin("completions/typed.json", cases) { input in
+            let text = input["text"]!.stringValue!
+            let offered = try input["commands"]!.decode([SlashCommand].self)
+            let command = SlashCommand.query(in: text)
+            let mention = FileMention.query(in: text)
+            let matching = command.map { SlashCommand.matching($0.term, in: offered) } ?? []
+            let file = FileMention(url: URL(filePath: "/fixture/project/Web/src/Prompt.tsx"), relativePath: "Web/src/Prompt.tsx")
+            return .object([
+                "command": command.map { .string($0.term) } ?? .null,
+                "matching": .array(matching.map { .string($0.name) }),
+                "completedCommand": command.flatMap { query in matching.first.map { .string($0.completing(query, in: text)) } } ?? .null,
+                "mention": mention.map { .string($0.term) } ?? .null,
+                "completedMention": mention.map { .string(file.completing($0, in: text)) } ?? .null,
+            ])
+        }
+    }
+
     // MARK: reducer/
 
     static func notify(_ method: String, _ params: some Encodable) throws -> JSONValue {

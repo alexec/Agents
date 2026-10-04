@@ -7,20 +7,28 @@
 // Laid out as the window's PromptBar (#108): where it works and its labels above the input on the
 // left, the runtime above on the right, attach and send inside the input, and the runtime's
 // menus under it.
+//
+// A `/` at the start of a word lists the runtime's commands, and an `@` the files the host finds
+// under the agent's folders (#255), over the field as the window's CommandList and MentionList:
+// arrows move, Return or Tab takes one, Escape puts the list away for that word.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import type { ACPPromptCapabilities, Attachment, SuggestedPrompt } from "../protocol/generated";
+import type { ACPPromptCapabilities, Attachment, FileMentionDTO, SlashCommand, SuggestedPrompt, UUID } from "../protocol/generated";
 import { sendHelp, sendLabel, stopHelp } from "../model/promptWords";
 import type { Store } from "../model/store";
 import { attach, refusal, totalRefusal } from "../model/attachments";
 import { Telling } from "./Telling";
+import { commandQuery, completeCommand, completeMention, fileName, fileURL, matchingCommands, mentionQuery } from "../model/completions";
 
 /** A send usually lands before anyone could read a word; words only for one still going after this. */
 const slowSend = 400;
 
+/** A word typed quickly is one question to the host, not six, as the Remote's. */
+const mentionPause = 150;
+
 export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
-  stop, queues = false, suggestion }: {
+  stop, queues = false, suggestion, commands = [], findFiles }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -48,6 +56,10 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   queues?: boolean;
   /** What the agent offers to be asked next (031). */
   suggestion?: SuggestedPrompt | undefined;
+  /** What the runtime takes after a slash: the agent's, or the new session's draft's. */
+  commands?: readonly SlashCommand[] | undefined;
+  /** Files under the agent's folders matching what follows an `@`, found by its host. */
+  findFiles?: ((term: string) => Promise<FileMentionDTO[]>) | undefined;
 }) {
   const kept = store.drafts.get(draftKey);
   const text = useSignal(kept?.text ?? "");
@@ -58,13 +70,44 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   const picker = useRef<HTMLInputElement>(null);
   // Escape puts the suggestion away until the agent offers another.
   const dismissed = useSignal<string | null>(null);
-  const offered = suggestion && dismissed.value !== suggestion.id && text.value === "" ? suggestion : undefined;
+  const mentions = useSignal<FileMentionDTO[]>([]);
+  const selected = useSignal(0);
+  // The word whose list Escape put away; typing on brings it back.
+  const putAway = useSignal<string | null>(null);
+  const search = useRef(0);
+
+  const command = commandQuery(text.value);
+  const matching = command ? matchingCommands(command.term, commands) : [];
+  const mention = mentionQuery(text.value);
+  const listing: "commands" | "mentions" | null =
+    command && matching.length && putAway.value !== `/${command.term}` ? "commands"
+    : mention && mentions.value.length && putAway.value !== `@${mention.term}` ? "mentions"
+    : null;
+  const offered = !listing && suggestion && dismissed.value !== suggestion.id && text.value === "" ? suggestion : undefined;
+
+  useEffect(() => {
+    const turn = ++search.current;
+    const term = mention?.term ?? "";
+    if (!findFiles || !term) {
+      mentions.value = [];
+      return;
+    }
+    const timer = setTimeout(() => {
+      void findFiles(term).then((found) => {
+        if (search.current === turn) mentions.value = found;
+      }, () => {
+        if (search.current === turn) mentions.value = [];
+      });
+    }, mentionPause);
+    return () => clearTimeout(timer);
+  }, [mention?.term, findFiles]);
 
   useEffect(() => {
     const draft = store.drafts.get(draftKey);
     text.value = draft?.text ?? "";
     attachments.value = draft?.attachments ?? [];
     said.value = null;
+    putAway.value = null;
   }, [draftKey]);
 
   const keep = () => store.drafts.set(draftKey, { text: text.value, attachments: attachments.value });
@@ -81,6 +124,29 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
     }
     keep();
   };
+
+  /** Takes the chosen command or file into the field; a file goes with the words as the host's own path. */
+  const accept = (index: number) => {
+    if (listing === "commands" && command) {
+      const chosen = matching[index];
+      if (chosen) text.value = completeCommand(text.value, command, chosen);
+    } else if (listing === "mentions" && mention) {
+      const chosen = mentions.value[index];
+      if (!chosen) return;
+      const name = fileName(chosen.path);
+      text.value = completeMention(text.value, mention, name);
+      attachments.value = [...attachments.value, {
+        id: crypto.randomUUID().toUpperCase() as UUID,
+        block: { type: "resource_link", uri: fileURL(chosen.path), name },
+        displayName: name,
+      }];
+      mentions.value = [];
+    }
+    selected.value = 0;
+    keep();
+  };
+  const listLength = listing === "commands" ? matching.length : listing === "mentions" ? mentions.value.length : 0;
+  const chosenIndex = Math.min(selected.value, Math.max(0, listLength - 1));
 
   const tooMuch = totalRefusal(attachments.value);
   const refused = attachments.value.map((a) => refusal(a, capabilities)).find((r) => r !== null) ?? null;
@@ -153,16 +219,60 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
             })}
           </ul>
         )}
+        {listing === "commands" && (
+          <ul class="completions" role="listbox" aria-label="Commands">
+            {matching.map((c, i) => (
+              <li key={c.name} role="option" aria-selected={i === chosenIndex} class={i === chosenIndex ? "chosen" : ""}
+                ref={(el) => { if (el && i === chosenIndex) el.scrollIntoView({ block: "nearest" }); }}
+                onMouseDown={(e) => { e.preventDefault(); accept(i); }}>
+                <code>/{c.name}</code>
+                {c.inputHint && <code class="quiet">{c.inputHint}</code>}
+                {c.description && <span class="quiet small">{c.description}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {listing === "mentions" && (
+          <ul class="completions" role="listbox" aria-label="Files">
+            {mentions.value.map((m, i) => (
+              <li key={m.path} role="option" aria-selected={i === chosenIndex} class={i === chosenIndex ? "chosen" : ""}
+                ref={(el) => { if (el && i === chosenIndex) el.scrollIntoView({ block: "nearest" }); }}
+                onMouseDown={(e) => { e.preventDefault(); accept(i); }}>
+                <span>{fileName(m.path)}</span>
+                <span class="quiet small">{m.relativePath}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <div class="prompt-field">
           {/* Never disabled: what is typed while the link is down is kept and sent once it's back (US7). */}
           <textarea aria-label="Prompt" placeholder={offered ? `${offered.prompt}  (Tab)` : placeholder} rows={2} value={text.value}
             readOnly={starting && sending.value}
             onInput={(e) => {
               text.value = (e.currentTarget as HTMLTextAreaElement).value;
+              selected.value = 0;
               keep();
               if (text.value) onTyping?.();
             }}
             onKeyDown={(e) => {
+              if (listing && !e.isComposing) {
+                // While the list is up, Return takes the command rather than sending a half-typed one.
+                if ((e.key === "Enter" && !e.shiftKey) || (e.key === "Tab" && !e.shiftKey)) {
+                  e.preventDefault();
+                  accept(chosenIndex);
+                  return;
+                }
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  selected.value = Math.max(0, Math.min(listLength - 1, chosenIndex + (e.key === "ArrowDown" ? 1 : -1)));
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  putAway.value = listing === "commands" ? `/${command?.term}` : `@${mention?.term}`;
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
                 void submit();

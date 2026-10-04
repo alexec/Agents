@@ -7,7 +7,7 @@
 // `agents/draftOptions`.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import type { Attachment, ConfigOption, JSONValue, StartRequest, UUID, WorktreeSummary } from "../protocol/generated";
+import type { Attachment, ConfigOption, JSONValue, SlashCommand, StartRequest, UUID, WorktreeSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn, choices, same } from "../model/options";
 import { folderKey } from "../model/groups";
@@ -25,6 +25,8 @@ type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: s
 interface Form {
   draftID?: string;
   options: ConfigOption[];
+  /** What the draft runtime takes after a slash (#255). */
+  commands?: SlashCommand[];
   chosen: Record<string, JSONValue>;
   state: "loading" | "ready" | { failed: string };
 }
@@ -91,7 +93,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       const mode = modeOption(options);
       const value = mode ? modeStartsOn(store.rememberedModes.value[host]?.[chosenRuntime], mode) : undefined;
       if (mode && value !== undefined) chosen[mode.id] = value;
-      form.value = { draftID: answer.draftID, options, chosen, state: "ready" };
+      form.value = { draftID: answer.draftID, options, commands: answer.commands, chosen, state: "ready" };
     });
     return () => {
       current = false;
@@ -109,7 +111,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       return;
     }
     const options = drawable(undefined, correction.options);
-    form.value = { ...form.peek(), options, chosen: keep(options, form.peek().chosen), state: "ready" };
+    form.value = { ...form.peek(), options, commands: correction.commands, chosen: keep(options, form.peek().chosen), state: "ready" };
   }, [correction]);
 
   const capabilities = chosenRuntime ? store.account(host, chosenRuntime)?.promptCapabilities : undefined;
@@ -165,7 +167,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       <footer class="foot">
         <Prompt store={store} draftKey={`new|${host}|${folderKey(folder)}`} placeholder="What should it do?"
           capabilities={capabilities} disabled={down || !chosenRuntime || !store.hostIsOnline(host)} send={start}
-          recipient={store.recipient(host)} starting
+          recipient={store.recipient(host)} starting commands={form.value.commands}
           where={(
             <>
               {isRepository.value && (

@@ -8,7 +8,7 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest,
+  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest, FileMentionDTO,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -1481,6 +1481,11 @@ export class Store extends Work {
     } catch (error) {
       return { failure: describe(error) };
     }
+  }
+
+  /** Files under the agent's folders for an `@` (#255): the host walks its own disk, as for the Remote. */
+  async mentions(host: string, agentID: string, term: string): Promise<FileMentionDTO[]> {
+    return this.link.call("files/mention", { agentID: agentID as UUID, term }, host).catch(() => []);
   }
 
   discardDraft(host: string, draftID: string): void {

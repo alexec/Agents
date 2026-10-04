@@ -60,6 +60,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const timer = setTimeout(() => store.prewarm(host, session, "opened"), 1500);
     return () => clearTimeout(timer);
   }, [host, session]);
+  // One search per session, so the prompt's file search is not started afresh on every render.
+  const findFiles = useMemo(() => (term: string) => store.mentions(host, session, term), [host, session]);
   // Not held: perhaps retired, and then its page says who it was (051, #253).
   useEffect(() => { if (!store.agent(host, session)) void store.lookUpRetired(host, session); }, [host, session]);
   const level = useSignal<TurnDetail>(defaultDetail.value);
@@ -282,6 +284,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
           send={(text, attachments) => store.prompt(host, session, text, attachments)}
           onTyping={() => store.prewarm(host, session, "typing")}
+          commands={agent?.availableCommands}
+          findFiles={agent ? findFiles : undefined}
           where={agent && (
             <>
               <Place store={store} host={host} agent={agent} />
