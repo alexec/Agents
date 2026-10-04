@@ -26,3 +26,13 @@ test("runtimes: a new agent gets the default when it can start, else the first",
   assert.equal(r.firstChoice([status("codex", "Codex"), status("gemini", "Gemini")]), "codex");
   assert.equal(r.firstChoice([]), undefined);
 });
+
+for (const { name, input, expected } of (await import("./fixtures.mjs")).cases("runtimes/reasons.json")) {
+  test(`runtimes: why it cannot start, ${name}`, () => assert.equal(r.unavailableReason(input), expected));
+}
+
+test("runtimes: a chooser's runs are available, out and cannot start", () => {
+  const out = { ...status("grok", "Grok"), isOut: true };
+  const got = r.runtimeRuns([status("claude", "Claude"), out, status("codex", "Codex", false)]);
+  assert.deepEqual([got.available, got.out, got.cannot].map((run) => run.map((s) => s.runtime.id)), [["claude"], ["grok"], ["codex"]]);
+});

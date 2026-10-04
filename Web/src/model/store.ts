@@ -8,7 +8,7 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest, FileMentionDTO,
+  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest, FileMentionDTO, SandboxChoice,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -23,6 +23,14 @@ import { DashboardOrderSync } from "./dashboardOrderSync";
 import { Drafts } from "./drafts";
 
 export { folderKey } from "./groups";
+
+/** DaemonAPI.SandboxWillNotStart, a start's refusal when its runtime's sandbox will not start, with its sentence. */
+export interface SandboxWillNotStart { runtimeID: string; detail: string; offOffered: boolean; message: string }
+
+function isSandboxRefusal(data: unknown): data is Omit<SandboxWillNotStart, "message"> {
+  const d = data as Partial<SandboxWillNotStart> | null | undefined;
+  return typeof d?.runtimeID === "string" && typeof d.detail === "string" && typeof d.offOffered === "boolean";
+}
 
 /** How many finished turns a chat opens with, as the window's (#90). */
 const openingTurns = 12;
@@ -1079,6 +1087,8 @@ export class Store extends Work {
 
   /** Each runtime and what each says it can take, by host. */
   readonly runtimes = signal<Record<string, RuntimeStatus[]>>({});
+  /** Each host's sandbox default per runtime (SandboxSettings); absent means its runtime decides. */
+  readonly sandboxDefaults = signal<Record<string, Record<string, SandboxChoice>>>({});
   readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
   /** A choice made on a menu that the host hasn't confirmed, by agent then option. */
   readonly pendingOptions = signal<Record<string, Record<string, JSONValue>>>({});
@@ -1123,12 +1133,15 @@ export class Store extends Work {
 
   /** What runs on a host, and what each runtime takes; asked once a connection. */
   async loadRuntimes(host: string): Promise<void> {
-    const [runtimes, accounts, modes] = await Promise.all([
+    const [runtimes, accounts, modes, sandbox] = await Promise.all([
       this.link.call("runtimes/list", {}, host).catch(() => null),
       this.link.call("runtimes/accounts", {}, host).catch(() => null),
       this.link.call("modes/remembered", {}, host).catch(() => null),
+      // A host on an older build is not asked by the page: every runtime then follows its own.
+      this.link.call("sandbox/state", {}, host).catch(() => null),
     ]);
     batch(() => {
+      if (sandbox) this.sandboxDefaults.value = { ...this.sandboxDefaults.value, [host]: sandbox.defaults };
       if (runtimes) this.runtimes.value = { ...this.runtimes.value, [host]: sortedRuntimes(runtimes) };
       if (accounts) this.accounts.value = { ...this.accounts.value, [host]: accounts };
       if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
@@ -1492,9 +1505,21 @@ export class Store extends Work {
     void this.link.call("agents/discardDraft", { draftID: draftID as UUID }, host).catch(() => {});
   }
 
-  /** Starts an agent; answers its id, or null with `problem` saying why. */
-  async start(host: string, request: StartRequest): Promise<string | null> {
-    return this.act("agents/start", request, host);
+  /**
+   * Starts an agent; answers its id, or null with `problem` saying why. A runtime whose sandbox
+   * will not start (064) answers what it said instead, for the form to offer Start without sandbox.
+   */
+  async start(host: string, request: StartRequest): Promise<string | SandboxWillNotStart | null> {
+    try {
+      return await this.link.call("agents/start", request, host);
+    } catch (error) {
+      if (error instanceof CallFailed && error.code === Failure.sandboxWillNotStart && isSandboxRefusal(error.data)) {
+        return { ...error.data, message: error.message };
+      }
+      log("call.failed", error instanceof CallFailed ? error.code : undefined);
+      this.say(describe(error));
+      return null;
+    }
   }
 
   /** The newest page of each host's events, for the sidebar's Events row and page (#151). */

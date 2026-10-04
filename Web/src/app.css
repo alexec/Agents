@@ -622,6 +622,11 @@ button.link.reading:hover { text-decoration: underline; }
 .prompt.off { opacity: 0.6; }
 .menus { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .menus .spacer { flex: 1; }
+/* A new session's sandbox would not start (064, #257): what it said, and the way on. */
+.sandbox-refusal { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 6px; border-radius: 8px;
+  background: color-mix(in srgb, var(--tint-attention) 7%, transparent); }
+.sandbox-refusal > div { flex: 1; min-width: 0; }
+.sandbox-refusal p { margin: 0; }
 .menus-right { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
 .pill {
   position: relative;

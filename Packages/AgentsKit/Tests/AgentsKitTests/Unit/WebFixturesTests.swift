@@ -663,6 +663,62 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: sandbox/
+
+    @Test func sandbox() throws {
+        let runtimes = SandboxCatalog.entries.map(\.runtimeID) + ["unknown"]
+        let cases = runtimes.flatMap { id in
+            [nil, "agent-full-access", "read-only"].map { mode in
+                Case(name: "\(id) \(mode ?? "no mode")",
+                     input: .object(["runtimeID": .string(id), "codexMode": mode.map(JSONValue.string) ?? .null]))
+            }
+        }
+        let all: [SandboxChoice] = [.runtime, .on, .off]
+        try pin("sandbox/choices.json", cases) { input in
+            let id = input["runtimeID"]!.stringValue!
+            let mode = input["codexMode"]?.stringValue
+            let name = RuntimeCatalog.runtime(id: id)?.name ?? id
+            return .object([
+                "choices": .array(SandboxCatalog.choices(for: id).map { .string($0.rawValue) }),
+                "why": SandboxCatalog.entry(for: id)?.why.map(JSONValue.string) ?? .null,
+                "states": .object(Dictionary(uniqueKeysWithValues: all.map {
+                    ($0.rawValue, JSONValue.string(SandboxWords.state(SandboxCatalog.state(runtimeID: id, choice: $0, codexMode: mode))))
+                })),
+                "words": .object(Dictionary(uniqueKeysWithValues: all.map {
+                    ($0.rawValue, JSONValue.string(SandboxWords.choice($0, runtimeID: id)))
+                })),
+                "defaults": .object(Dictionary(uniqueKeysWithValues: all.map {
+                    ($0.rawValue, JSONValue.string(SandboxWords.override(nil, runtimeDefault: $0, runtimeID: id)))
+                })),
+                "explanations": .object(Dictionary(uniqueKeysWithValues: all.map {
+                    ($0.rawValue, JSONValue.string(SandboxWords.explanation($0, runtimeID: id, name: name)))
+                })),
+            ])
+        }
+    }
+
+    // MARK: runtimes/
+
+    @Test func runtimeReasons() throws {
+        let availabilities: [(String, RuntimeAvailability)] = [
+            ("available", .available(path: "/bin/claude", supportsResume: true)),
+            ("missing", .missing(lookedIn: ["/a", "/b", "/c", "/d", "/e"])),
+            ("signed out with a command", .needsSignIn(authMethods: [], fixCommand: "claude login")),
+            ("signed out", .needsSignIn(authMethods: [], fixCommand: nil)),
+            ("failed", .failed(reason: "It crashed.")),
+            ("installing with progress", .installing(progress: "40%")),
+            ("installing", .installing(progress: nil)),
+            ("install failed", .installFailed(reason: "The download failed.")),
+        ]
+        let cases = try availabilities.map { name, availability in
+            Case(name: name, input: try Self.encode(RuntimeStatus(runtime: RuntimeCatalog.claude, availability: availability,
+                                                                  checkedAt: Self.base)))
+        }
+        try pin("runtimes/reasons.json", cases) { input in
+            try input.decode(RuntimeStatus.self).unavailableReason.map(JSONValue.string) ?? .null
+        }
+    }
+
     // MARK: reducer/
 
     static func notify(_ method: String, _ params: some Encodable) throws -> JSONValue {

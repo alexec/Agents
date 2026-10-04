@@ -50,6 +50,8 @@ public extension DaemonAPI {
                 Row(Method.agentsDiscardDraft, params: DiscardDraftRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.runtimesList, params: Empty.self, result: [RuntimeStatus].self, kind: .hostRequest),
                 Row(Method.runtimesAccounts, params: Empty.self, result: [RuntimeAccount].self, kind: .hostRequest),
+                // Each runtime's sandbox default, for the new session's "Use runtime default (…)" (#257).
+                Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
                 Row(Method.optionsRemembered, params: RememberedOptionsRequest.self, result: [ConfigOption].self,
                     kind: .hostRequest),
                 Row(Method.modesRemembered, params: Empty.self, result: RememberedModes.self, kind: .hostRequest),
