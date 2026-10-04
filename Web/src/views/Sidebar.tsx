@@ -9,7 +9,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { actDoing, type Store } from "../model/store";
-import { folderKey, showsUnread } from "../model/groups";
+import { folderKey, groupOf, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { parseQuery, queryMatches } from "../model/labels";
 import { workflowSummary } from "../model/workflows";
@@ -20,7 +20,7 @@ import { ActivityRows } from "./Activity";
 import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { SessionRow } from "./SessionRow";
-import { sessionActions } from "./SessionMenu";
+import { runSessionAction, sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
 import { memo } from "../render/memo";
@@ -153,6 +153,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   // Every match on show, past the first few; a new search shows the few again.
   const showsAllMatches = useSignal(false);
   useEffect(() => { showsAllMatches.value = false; }, [query]);
+  const showsWorkflows = searching || folds.isOpen(host.id, folder, "workflows");
   useEffect(() => {
     if (unfolded && store.hostIsOnline(host.id)) void store.loadWorkflows(host.id, folder);
   }, [unfolded, host.id, folder]);
@@ -168,7 +169,14 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   // The matcher is made once per fold, not per row.
   const parsed = parseQuery(query);
   const matching = (list: Agent[]) => (searching ? list.filter((a) => queryMatches(parsed, a)) : list);
-  const groups = !unfolded ? [] : view.headings.map((h) => ({ ...h, agents: matching(h.agents) })).filter((h) => h.agents.length > 0);
+  // The pinned sessions (#180), held and not archived, in their order; they leave their groups.
+  const pinnedIDs = store.sessionPinsIn(host.id, folder);
+  const live = view.headings.flatMap((h) => h.agents);
+  const pinned = !unfolded ? [] : matching(pinnedIDs.flatMap((id) => live.filter((a) => a.id === id)));
+  const showsPinned = searching || folds.isOpen(host.id, folder, "pinned");
+  const groups = !unfolded ? [] : view.headings
+    .map((h) => ({ ...h, agents: matching(pinnedIDs.length ? h.agents.filter((a) => !pinnedIDs.includes(a.id)) : h.agents) }))
+    .filter((h) => h.agents.length > 0);
   const archived = !unfolded ? [] : matching(view.archived);
   const runtimeName = (id: string) => (store.runtimes.value[host.id] ?? []).find((s) => s.runtime.id === id)?.runtime.name;
   // A search narrows workflows by name and what they are; one asking for a label leaves them out.
@@ -218,15 +226,41 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
             <PinnedPageRows store={store} host={host.id} folder={folder} down={down}
               chosen={r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder) ? r.page : undefined} />
           )}
-          {groups.map((group) => (
-            <div class="group" key={group.group} role="group" aria-label={group.title}>
-              <h3 class={`subhead${group.group === "needsAttention" ? " needs" : ""}`}>
-                {group.title} <span class="count">{group.agents.length}</span>
-                {group.agents.some(showsUnread) && <span class="count"> · {group.agents.filter(showsUnread).length} unread</span>}
-              </h3>
-              {group.agents.map(row)}
-            </div>
-          ))}
+          {/* Then the pinned sessions (#180), whatever their state, moved by their menus' Move Up and Down. */}
+          {pinned.length > 0 && (
+            <details class="group pinned" role="group" aria-label="Pinned" open={showsPinned}
+              onToggle={(e) => {
+                const now = (e.currentTarget as HTMLDetailsElement).open;
+                if (!searching && now !== showsPinned) folds.set(host.id, folder, now, "pinned");
+              }}>
+              <summary class={`subhead${pinned.some((a) => groupOf(a) === "needsAttention") ? " needs" : ""}`} data-fold="pinned">
+                Pinned <span class="count">{pinned.length}</span>
+                {pinned.some(showsUnread) && <span class="count"> · {pinned.filter(showsUnread).length} unread</span>}
+              </summary>
+              {showsPinned && pinned.map((agent) => (
+                <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
+                  chosen={r.session === agent.id} down={down} pinnedAt={searching ? undefined : pinnedIDs} />
+              ))}
+            </details>
+          )}
+          {/* Each group folds at its heading, as the window's do (#181); a search shows every match. */}
+          {groups.map((group) => {
+            const fold = `group.${group.group}` as const;
+            const open = searching || folds.isOpen(host.id, folder, fold);
+            return (
+              <details class="group" key={group.group} role="group" aria-label={group.title} open={open}
+                onToggle={(e) => {
+                  const now = (e.currentTarget as HTMLDetailsElement).open;
+                  if (!searching && now !== open) folds.set(host.id, folder, now, fold);
+                }}>
+                <summary class={`subhead${group.group === "needsAttention" ? " needs" : ""}`} data-fold={fold}>
+                  {group.title} <span class="count">{group.agents.length}</span>
+                  {group.agents.some(showsUnread) && <span class="count"> · {group.agents.filter(showsUnread).length} unread</span>}
+                </summary>
+                {open && group.agents.map(row)}
+              </details>
+            );
+          })}
           {!searching && groups.length === 0 && <p class="hint">No sessions yet</p>}
           {(archived.length > 0 || (project.counts.archived ?? 0) > 0 || project.retiredCount > 0) && (
             <details class="archived" open={showsArchived}
@@ -248,9 +282,13 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
             </details>
           )}
           {(workflows.length > 0 || archivedWorkflows.length > 0) && (
-            <div class="group" role="group" aria-label="Workflows">
-              <h3 class="subhead">Workflows <span class="count">{workflows.length}</span></h3>
-              {workflows.map((summary) => (
+            <details class="group" role="group" aria-label="Workflows" open={showsWorkflows}
+              onToggle={(e) => {
+                const now = (e.currentTarget as HTMLDetailsElement).open;
+                if (!searching && now !== showsWorkflows) folds.set(host.id, folder, now, "workflows");
+              }}>
+              <summary class="subhead" data-fold="workflows">Workflows <span class="count">{workflows.length}</span></summary>
+              {showsWorkflows && workflows.map((summary) => (
                 <div class="nav-item" key={summary.workflow.workflowID}>
                   <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
                     chosen={r.workflow === summary.workflow.workflowID}
@@ -272,7 +310,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
                   ))}
                 </details>
               )}
-            </div>
+            </details>
           )}
         </div>
       )}
@@ -284,18 +322,30 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
  * One session's row under its project, drawn again only when the agent, whether it is chosen, or
  * its host's state changes, or something is on its way to it: not when its neighbours change.
  */
-const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down }: {
+const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down, pinnedAt }: {
   store: Store; host: string; folder: string; agent: Agent; chosen: boolean; down: boolean;
+  /** Under Pinned: the whole pinned order, for its Move Up and Move Down (#180). */
+  pinnedAt?: string[] | undefined;
 }) {
   const act = store.onItsWay.value[agent.id];
   const going = act && typeof act === "string" ? { doing: actDoing(act), recipient: store.recipient(host) } : undefined;
-  const menu = (): MenuItem[] => sessionActions(agent).map(({ action, label: words, help }) => ({
-    label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
-    run: () => {
-      if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
-      else void store.perform(host, agent.id, action);
-    },
-  }));
+  const move = (by: number) => {
+    const ids = [...(pinnedAt ?? [])];
+    const at = ids.indexOf(agent.id);
+    if (at < 0 || at + by < 0 || at + by >= ids.length) return;
+    [ids[at], ids[at + by]] = [ids[at + by]!, ids[at]!];
+    void store.arrangeSessionPins(host, folder, ids);
+  };
+  const menu = (): MenuItem[] => [
+    ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id)).map(({ action, label: words, help }) => ({
+      label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
+      run: () => runSessionAction(store, host, agent, action),
+    })),
+    ...(pinnedAt ? [
+      { label: "Move Up", disabled: down || pinnedAt[0] === agent.id, run: () => move(-1) },
+      { label: "Move Down", disabled: down || pinnedAt[pinnedAt.length - 1] === agent.id, run: () => move(1) },
+    ] : []),
+  ];
   return (
     <div class="nav-item" onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }}>
@@ -317,7 +367,7 @@ function folderPath(folder: string): string {
 /** Every row the keys move through, in the order shown. */
 function navRows(list: HTMLElement): HTMLElement[] {
   return [...list.querySelectorAll<HTMLElement>(
-    ".activity .row, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, details.archived > summary",
+    ".activity .row, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, details.archived > summary, details.group > summary",
   )].filter((el) => el.offsetParent !== null);
 }
 

@@ -3,6 +3,7 @@ import AgentsKitCore
 
 /// A project's pinned pages (#159): the agents' `pin_page`, `unpin_page` and `move_pin`,
 /// the person's Pin, Unpin and drag, and the pages themselves, read for every screen.
+/// And its pinned sessions (#180): `pin_session`, and the person's Pin, Unpin and drag.
 ///
 /// The pins are one file in the project folder, `.agents/pins.json`, written whole and
 /// only here, inside the actor, never in a worktree; nothing is committed. As the
@@ -105,7 +106,8 @@ extension DaemonCore {
         allProjects(includeArchived: false).compactMap { project in
             let folder = Project.standardize(project.folder)
             let pins = pinViews(folder)
-            return pins.isEmpty ? nil : ProjectPins(folder: folder, pins: pins)
+            let sessions = readPins(folder).sessionPins.map(\.session)
+            return pins.isEmpty && sessions.isEmpty ? nil : ProjectPins(folder: folder, pins: pins, sessions: sessions)
         }
     }
 
@@ -181,6 +183,111 @@ extension DaemonCore {
         }
     }
 
+    // MARK: Pinned sessions (#180)
+
+    /// `pin_session`: the caller pins its own session at the top of its project, or, with
+    /// `pinned: false`, unpins it if it was the one that pinned it.
+    public func pinSessionTool(_ request: DaemonAPI.PinToolRequest) throws -> String {
+        let caller = try pinCaller(request.token)
+        let project = caller.projectFolder
+        try requireFolder(project)
+        let arguments = request.arguments
+        let wantsPinned = arguments["pinned"]?.boolValue ?? true
+        let position = pinText(arguments, "position")
+        if let position, position != "first", position != "last" {
+            throw pinRefusal((wantsPinned ? "Nothing was pinned: " : "Nothing was unpinned: ") + "`position` is first or last.")
+        }
+        var file = readPins(project)
+        let index = file.sessionPins.firstIndex { $0.session == caller.id }
+        if wantsPinned {
+            if index != nil { return "This session was already pinned.\n\n" + sessionPinsWords(project, for: caller) }
+            try pinSession(caller.id, first: position == "first", by: .agent(caller.id), in: project,
+                           lead: "Nothing was pinned: ")
+            return "Pinned this session at the top of its project, in .agents/pins.json in the project folder.\n\n"
+                + sessionPinsWords(project, for: caller)
+        }
+        guard let index else { return "This session was not pinned.\n\n" + sessionPinsWords(project, for: caller) }
+        guard file.sessionPins[index].pinnedBy == .agent(caller.id) else {
+            throw pinRefusal("Nothing was unpinned: this session was pinned by the person. Only the person, or "
+                + "whoever pinned it, can unpin it.")
+        }
+        file.sessionPins.remove(at: index)
+        try writePins(file, in: project)
+        return "Unpinned this session.\n\n" + sessionPinsWords(project, for: caller)
+    }
+
+    /// Pin, from any client: any session of the project that is not archived.
+    public func pinSessionByPerson(_ request: DaemonAPI.PinSessionRequest) throws {
+        let project = try knownPinProject(request.folder)
+        let lead = "Nothing was pinned: "
+        guard let agent = agents[request.agentID], Project.standardize(agent.projectFolder) == project else {
+            throw pinRefusal(lead + "that session is not in this project.")
+        }
+        guard agent.state != .archived else { throw pinRefusal(lead + "an archived session can't be pinned.") }
+        guard !readPins(project).sessionPins.contains(where: { $0.session == request.agentID }) else { return }
+        try pinSession(request.agentID, first: false, by: .thePerson, in: project, lead: lead)
+    }
+
+    /// Unpin, from any client: any pinned session, whoever pinned it.
+    public func unpinSessionByPerson(_ request: DaemonAPI.PinSessionRequest) throws {
+        let project = try knownPinProject(request.folder)
+        var file = readPins(project)
+        guard file.sessionPins.contains(where: { $0.session == request.agentID }) else { return }
+        file.sessionPins.removeAll { $0.session == request.agentID }
+        try writePins(file, in: project)
+    }
+
+    /// A drop or a Move item among the pinned sessions: the whole order, as for pages.
+    public func arrangeSessionPins(_ request: DaemonAPI.PinArrangeSessionsRequest) throws {
+        let project = try knownPinProject(request.folder)
+        var file = readPins(project)
+        var placed: [SessionPinEntry] = []
+        for id in request.agentIDs {
+            if let entry = file.sessionPins.first(where: { $0.session == id }), !placed.contains(entry) {
+                placed.append(entry)
+            }
+        }
+        file.sessionPins = placed + file.sessionPins.filter { !placed.contains($0) }
+        try writePins(file, in: project)
+    }
+
+    /// Archiving a session unpins it; bringing it back does not pin it again.
+    func unpinArchived(_ agentID: UUID, in folder: URL) {
+        let project = Project.standardize(folder)
+        var file = readPins(project)
+        guard file.sessionPins.contains(where: { $0.session == agentID }) else { return }
+        file.sessionPins.removeAll { $0.session == agentID }
+        do {
+            try writePins(file, in: project)
+        } catch {
+            DaemonLog.shared.write("archived \(agentID) but could not unpin it: \(error)")
+        }
+    }
+
+    private func pinSession(_ id: UUID, first: Bool, by who: Pinner, in project: URL, lead: String) throws {
+        var file = readPins(project)
+        guard file.sessionPins.count < PinLimits.sessionsPerProject else {
+            throw pinRefusal(lead + "this project already has \(PinLimits.sessionsPerProject) pinned sessions, the most "
+                + "it can have. Unpin one first, or ask the person which to unpin.")
+        }
+        let entry = SessionPinEntry(session: id, pinnedBy: who)
+        if first { file.sessionPins.insert(entry, at: 0) } else { file.sessionPins.append(entry) }
+        try writePins(file, in: project)
+    }
+
+    /// The pinned sessions, numbered, for `pin_session`'s answer.
+    func sessionPinsWords(_ project: URL, for caller: Agent) -> String {
+        let entries = readPins(project).sessionPins
+        guard !entries.isEmpty else { return "This project has no pinned sessions." }
+        let lines = entries.enumerated().map { index, entry in
+            let name = entry.session == caller.id ? "this session"
+                : agents[entry.session].map { "\u{201C}\($0.title ?? "Untitled")\u{201D}" } ?? "a session not on this host"
+            return "\(index + 1). \(name)"
+        }
+        return (["Pinned sessions (\(entries.count) of \(PinLimits.sessionsPerProject)), at the top of the project:"]
+            + lines).joined(separator: "\n")
+    }
+
     // MARK: Changes
 
     /// Something changed under a project: its pins file, a pinned page or one beside it.
@@ -233,7 +340,9 @@ extension DaemonCore {
         pinBroadcasts[project] = nil
         let pins = pinViews(project)
         pinsSent[project] = pins
-        broadcast(DaemonAPI.Notification.pinsChanged, DaemonAPI.PinsChangedNotification(folder: project, pins: pins))
+        broadcast(DaemonAPI.Notification.pinsChanged,
+                  DaemonAPI.PinsChangedNotification(folder: project, pins: pins,
+                                                    sessions: readPins(project).sessionPins.map(\.session)))
     }
 
     func pagesChanged(_ project: URL, folders: Set<String>) {
@@ -302,7 +411,7 @@ extension DaemonCore {
     func writePins(_ file: PinsFile, in project: URL) throws {
         let url = Self.pinsFileURL(project)
         do {
-            if file.pins.isEmpty {
+            if file.pins.isEmpty, file.sessionPins.isEmpty {
                 try StoreFile.requireWritable(url)
                 if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
                     try FileManager.default.removeItem(at: url)

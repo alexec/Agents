@@ -158,6 +158,9 @@ extension AppService {
             case .movePin(let arguments):
                 return await send(DaemonAPI.Method.pinsMovePin,
                                   DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Moved.")
+            case .pinSession(let arguments):
+                return await send(DaemonAPI.Method.pinsPinSessionTool,
+                                  DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Pinned.")
             case .read:
                 return await send(DaemonAPI.Method.dashboardRead,
                                   DaemonAPI.DashboardTokenRequest(token: token),

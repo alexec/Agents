@@ -948,6 +948,11 @@ export interface PinArrangeRequest {
   paths: string[];
 }
 
+export interface PinArrangeSessionsRequest {
+  folder: URLString;
+  agentIDs: UUID[];
+}
+
 export type PinKind = "markdown" | "html";
 
 export interface PinPathRequest {
@@ -965,6 +970,11 @@ export interface PinRequest {
   folder: URLString;
   path: string;
   title?: string;
+}
+
+export interface PinSessionRequest {
+  folder: URLString;
+  agentID: UUID;
 }
 
 export interface PinView {
@@ -992,6 +1002,7 @@ export interface PinnerView {
 export interface PinsChangedNotification {
   folder: URLString;
   pins: PinView[];
+  sessions?: UUID[];
 }
 
 export interface Plan {
@@ -1039,6 +1050,7 @@ export interface Project {
 export interface ProjectPins {
   folder: URLString;
   pins: PinView[];
+  sessions?: UUID[];
 }
 
 export interface ProjectRequest {
@@ -1817,10 +1829,13 @@ export interface Methods {
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
   "pins/arrange": { params: PinArrangeRequest; result: Empty };
+  "pins/arrangeSessions": { params: PinArrangeSessionsRequest; result: Empty };
   "pins/list": { params: Empty; result: ProjectPins[] };
   "pins/pin": { params: PinRequest; result: PinView[] };
+  "pins/pinSession": { params: PinSessionRequest; result: Empty };
   "pins/read": { params: PinReadRequest; result: FileReading };
   "pins/unpin": { params: PinPathRequest; result: Empty };
+  "pins/unpinSession": { params: PinSessionRequest; result: Empty };
   "pins/write": { params: PinWriteRequest; result: Empty };
   "presence/report": { params: PresenceReport; result: Empty };
   "projects/add": { params: ProjectRequest; result: ProjectSummary };
@@ -1894,10 +1909,13 @@ export const MethodTarget = {
   "permissions/answer": "host",
   "permissions/pending": "host",
   "pins/arrange": "host",
+  "pins/arrangeSessions": "host",
   "pins/list": "host",
   "pins/pin": "host",
+  "pins/pinSession": "host",
   "pins/read": "host",
   "pins/unpin": "host",
+  "pins/unpinSession": "host",
   "pins/write": "host",
   "presence/report": "host",
   "projects/add": "host",
@@ -2039,19 +2057,21 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
+  PinArrangeSessionsRequest: { required: ["folder", "agentIDs"], optional: [] },
   PinPathRequest: { required: ["folder", "path"], optional: [] },
   PinReadRequest: { required: ["folder", "path"], optional: ["knownStamp"] },
   PinRequest: { required: ["folder", "path"], optional: ["title"] },
+  PinSessionRequest: { required: ["folder", "agentID"], optional: [] },
   PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: [] },
   PinWriteRequest: { required: ["folder", "path", "text"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
-  PinsChangedNotification: { required: ["folder", "pins"], optional: [] },
+  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify"] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace"] },
-  ProjectPins: { required: ["folder", "pins"], optional: [] },
+  ProjectPins: { required: ["folder", "pins"], optional: ["sessions"] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: [] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },

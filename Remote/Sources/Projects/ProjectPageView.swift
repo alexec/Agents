@@ -16,6 +16,8 @@ struct ProjectPageView: View {
     @State private var showsArchived = false
     @State private var archivedShown = pageSize
     @State private var query = ""
+    /// The groups folded on this device (#181), as the Mac keeps its own.
+    @AppStorage(FoldedGroups.key) private var folded = FoldedGroups()
     private static let pageSize = 10
     private var pageSize: Int { Self.pageSize }
 
@@ -89,12 +91,34 @@ struct ProjectPageView: View {
                     SectionHeading(title: "Sessions")
                 }
 
-                ForEach(AgentGroup.live, id: \.self) { group in
-                    ForEach(group.headings(matching(model.agents(group: group)))) { heading in
-                        GroupHeading(title: heading.title, count: heading.agents.count,
-                                     unread: heading.agents.filter(\.showsUnread).count)
-                        ForEach(heading.agents) { agent in
+                // Pinned first, whatever their state (#180); they leave their groups below.
+                let pinned = matching(pinnedAgents)
+                if !pinned.isEmpty {
+                    let isOpen = !query.isEmpty || !isFolded("pinned")
+                    DisclosureHeading(title: "Pinned", count: pinned.count,
+                                      unread: pinned.filter(\.showsUnread).count,
+                                      tint: !isOpen && pinned.contains { model.work.group(of: $0) == .needsAttention }
+                                          ? .attention : .none,
+                                      isOpen: Binding(get: { isOpen }, set: { setFolded("pinned", !$0) }))
+                    if isOpen {
+                        ForEach(pinned) { agent in
                             AgentCard(agent: agent)
+                        }
+                    }
+                }
+
+                ForEach(AgentGroup.live, id: \.self) { group in
+                    ForEach(group.headings(matching(unpinned(model.agents(group: group))))) { heading in
+                        // Each group folds at its heading (#181); a search shows every match.
+                        let isOpen = !query.isEmpty || !isFolded(group.rawValue)
+                        DisclosureHeading(title: heading.title, count: heading.agents.count,
+                                          unread: heading.agents.filter(\.showsUnread).count,
+                                          tint: !isOpen && group == .needsAttention ? .attention : .none,
+                                          isOpen: Binding(get: { isOpen }, set: { setFolded(group.rawValue, !$0) }))
+                        if isOpen {
+                            ForEach(heading.agents) { agent in
+                                AgentCard(agent: agent)
+                            }
                         }
                     }
                 }
@@ -130,6 +154,28 @@ struct ProjectPageView: View {
             await model.loadArchivedAgents(in: folder, limit: archivedShown)
         }
         .refreshable { await model.catchUp() }
+    }
+
+    private func isFolded(_ fold: String) -> Bool {
+        guard let folder = model.selectedProject else { return false }
+        return folded.contains(FoldedGroups.name(fold, in: folder))
+    }
+
+    private func setFolded(_ fold: String, _ isFolded: Bool) {
+        guard let folder = model.selectedProject else { return }
+        folded.set(FoldedGroups.name(fold, in: folder), folded: isFolded)
+    }
+
+    /// The project's pinned sessions held and not archived, in their order (#180).
+    private var pinnedAgents: [Agent] {
+        model.pinnedSessions(in: model.selectedProject).compactMap { model.work.agent($0) }
+            .filter { $0.state != .archived }
+    }
+
+    /// A group's sessions without the pinned, which are drawn in Pinned.
+    private func unpinned(_ agents: [Agent]) -> [Agent] {
+        let pinned = Set(model.pinnedSessions(in: model.selectedProject))
+        return pinned.isEmpty ? agents : agents.filter { !pinned.contains($0.id) }
     }
 
     private var isEmpty: Bool {
@@ -203,16 +249,43 @@ private struct MissingFolder: View {
 
 /// One of the page's parts — the sessions, the workflows — a step above the
 /// `GroupHeading`s inside them.
+///
+/// Given `isOpen`, it folds what is under it (#181), with a chevron and its count.
 struct SectionHeading: View {
     let title: String
+    var count: Int?
+    var isOpen: Binding<Bool>?
 
     var body: some View {
-        Text(title)
+        if let isOpen {
+            Button {
+                withAnimation(.snappy(duration: 0.18)) { isOpen.wrappedValue.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isOpen.wrappedValue ? "chevron.down" : "chevron.right")
+                        .appText(.fine)
+                    Text(title)
+                    if let count {
+                        Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             .appText(.reading).fontWeight(.semibold)
             .padding(.top, 18)
             .padding(.leading, 2)
-            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityAddTraits(.isHeader)
+            .accessibilityValue(isOpen.wrappedValue ? "Expanded" : "Collapsed")
+        } else {
+            Text(title)
+                .appText(.reading).fontWeight(.semibold)
+                .padding(.top, 18)
+                .padding(.leading, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+        }
     }
 }
 
@@ -220,6 +293,10 @@ struct SectionHeading: View {
 struct DisclosureHeading: View {
     let title: String
     let count: Int
+    /// How many under it are unread (#70), said folded or not (#181).
+    var unread = 0
+    /// Attention on a folded Needs you, so folding it never hides that somebody waits.
+    var tint: StateTint = .none
     @Binding var isOpen: Bool
 
     var body: some View {
@@ -232,7 +309,11 @@ struct DisclosureHeading: View {
                 Text(title)
                 Text("\(count)")
                     .monospacedDigit()
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(tint.style(or: .tertiary))
+                if unread > 0 {
+                    Text("· \(unread) unread")
+                        .monospacedDigit()
+                }
                 Spacer()
             }
             .contentShape(Rectangle())
@@ -278,4 +359,30 @@ private struct ArchivedAsk: Equatable {
     var isOpen: Bool
     var shown: Int
     var count: Int
+}
+
+/// Which groups of a project's page are folded on this device (#181): a session group by
+/// its name, or Workflows, each for one project. Groups start open, so only the folded
+/// are kept.
+struct FoldedGroups: RawRepresentable, Equatable {
+    static let key = "projects.foldedGroups"
+    private(set) var names: Set<String> = []
+
+    init() {}
+
+    init?(rawValue: String) {
+        names = Set(rawValue.split(separator: "\n").map(String.init))
+    }
+
+    var rawValue: String { names.sorted().joined(separator: "\n") }
+
+    static func name(_ fold: String, in folder: URL) -> String {
+        "\(fold):\(Project.standardize(folder).path)"
+    }
+
+    func contains(_ name: String) -> Bool { names.contains(name) }
+
+    mutating func set(_ name: String, folded: Bool) {
+        if folded { names.insert(name) } else { names.remove(name) }
+    }
 }

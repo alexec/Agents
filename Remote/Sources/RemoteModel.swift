@@ -1853,6 +1853,38 @@ final class RemoteModel {
         }
     }
 
+    // MARK: Pinned sessions (#180)
+
+    func pinnedSessions(in folder: URL?) -> [UUID] { work.pinnedSessions(in: folder) }
+
+    func isPinned(_ agent: Agent) -> Bool {
+        pinnedSessions(in: agent.projectFolder).contains(agent.id)
+    }
+
+    /// Pin or Unpin from a card's menu or swipe: shown at once, then the Mac told.
+    func setPinned(_ agent: Agent, _ pinned: Bool) async {
+        let folder = agent.projectFolder
+        let held = pinnedSessions(in: folder).filter { $0 != agent.id }
+        work.setSessionPins(pinned ? held + [agent.id] : held, in: folder)
+        do {
+            try await client.call(pinned ? DaemonAPI.Method.pinsPinSession : DaemonAPI.Method.pinsUnpinSession,
+                                  DaemonAPI.PinSessionRequest(folder: folder, agentID: agent.id))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// Move Up or Move Down among the pinned sessions: shown at once, the order sent once.
+    func arrangeSessionPins(_ ids: [UUID], in folder: URL) async {
+        work.setSessionPins(ids, in: folder)
+        do {
+            try await client.call(DaemonAPI.Method.pinsArrangeSessions,
+                                  DaemonAPI.PinArrangeSessionsRequest(folder: folder, agentIDs: ids))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     // MARK: The Dashboard (074)
 
     func refreshDashboardSummaries() async {

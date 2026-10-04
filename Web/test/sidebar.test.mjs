@@ -24,6 +24,24 @@ test("a fold is kept, and read back by the next visit", async () => {
   assert.equal(new Folds(storage).isOpen("mac", "file:///w/Agents"), false);
 });
 
+test("a session group and Workflows start open, and a fold of one is kept (#181)", async () => {
+  const { Folds } = await load("src/model/folds.ts");
+  const storage = new Memory();
+  const first = new Folds(storage);
+  assert.equal(first.isOpen("mac", "file:///w/a", "group.running"), true, "open until folded");
+  assert.equal(first.isOpen("mac", "file:///w/a", "workflows"), true);
+  first.set("mac", "file:///w/a", false, "group.running");
+  first.set("mac", "file:///w/a", false, "workflows");
+  const next = new Folds(storage);
+  assert.equal(next.isOpen("mac", "file:///w/a", "group.running"), false, "kept folded");
+  assert.equal(next.isOpen("mac", "file:///w/a", "group.finished"), true, "only that group");
+  assert.equal(next.isOpen("box", "file:///w/a", "workflows"), true, "only that host's");
+  assert.equal(next.isOpen("mac", "file:///w/a"), false, "the project's own fold is untouched");
+  next.set("mac", "file:///w/a", true, "group.running");
+  assert.equal(new Folds(storage).isOpen("mac", "file:///w/a", "group.running"), true);
+  assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folded")), ["workflows:mac|file:///w/a"]);
+});
+
 test("folds stored badly, or a storage that refuses, leave everything folded", async () => {
   const { Folds } = await load("src/model/folds.ts");
   const storage = new Memory();

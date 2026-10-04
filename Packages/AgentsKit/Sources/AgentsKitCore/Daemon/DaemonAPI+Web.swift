@@ -110,6 +110,11 @@ public extension DaemonAPI {
                 Row(Method.pinsUnpin, params: PinPathRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.pinsArrange, params: PinArrangeRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.pinsWrite, params: PinWriteRequest.self, result: Empty.self, kind: .hostRequest),
+                // Pin, Unpin and a drop among pinned sessions (#180), from every client alike.
+                Row(Method.pinsPinSession, params: PinSessionRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.pinsUnpinSession, params: PinSessionRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.pinsArrangeSessions, params: PinArrangeSessionsRequest.self, result: Empty.self,
+                    kind: .hostRequest),
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),

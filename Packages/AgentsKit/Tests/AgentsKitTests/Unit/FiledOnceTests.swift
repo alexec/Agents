@@ -25,8 +25,7 @@ struct FiledOnceTests {
         let found = model.agents.filter {
             $0.projectFolder == wanted && model.group(of: $0) == group && (host == nil || $0.host == host)
         }
-        guard group == .parked else { return found.map(\.id) }
-        return found.sorted { ($0.parking?.parkedAt ?? .distantPast) > ($1.parking?.parkedAt ?? .distantPast) }.map(\.id)
+        return found.sorted(by: ProjectShelf.order(group)).map(\.id)
     }
 
     private func expectAgreement(_ model: AgentsModel, _ note: Comment) {

@@ -63,9 +63,11 @@
 }
 .sidebar button.link.show-all:hover, .sidebar button.link.more-matches:hover { opacity: 0.9; }
 .with-sidebar .fold-body .session { padding: 5px 8px; }
-.with-sidebar details.archived > summary { list-style: none; }
-.with-sidebar details.archived > summary::before { content: "›"; display: inline-block; width: 12px; opacity: 0.7; }
-.with-sidebar details.archived[open] > summary::before { content: "⌄"; }
+.with-sidebar :is(details.archived, details.group) > summary { list-style: none; cursor: pointer; }
+.with-sidebar :is(details.archived, details.group) > summary::before { content: "›"; display: inline-block; width: 12px; opacity: 0.7; }
+.with-sidebar :is(details.archived, details.group)[open] > summary::before { content: "⌄"; }
+/* A folded Needs you keeps its count in the attention tint, so folding it hides nobody (#181). */
+.with-sidebar details.group:not([open]) > summary.needs .count:first-of-type { color: var(--tint-attention); opacity: 1; }
 
 /* A row the keys or the list landed on. */
 .with-sidebar .sidebar :is(.row.session, .row.activity-row, summary):focus-visible,

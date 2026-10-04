@@ -28,9 +28,15 @@ struct ProjectWorkflowRows: View {
         let workflows = matching.filter { !$0.isArchived }
         let archived = matching.filter(\.isArchived)
         if !matching.isEmpty {
-            SidebarSubheading(title: "Workflows", count: workflows.count)
-            ForEach(workflows) { summary in
-                WorkflowListRow(summary: summary, project: project)
+            // Folds as a session group does (#181); a search unfolds it to show what matched.
+            DisclosureGroup(isExpanded: Binding(
+                get: { !query.isEmpty || folds.isOpen(project, .workflows) },
+                set: { folds.set(project, .workflows, open: $0) })) {
+                ForEach(workflows) { summary in
+                    WorkflowListRow(summary: summary, project: project)
+                }
+            } label: {
+                SidebarSubheading(title: "Workflows", count: workflows.count)
             }
             if !archived.isEmpty {
                 DisclosureGroup(isExpanded: Binding(
@@ -50,15 +56,20 @@ struct ProjectWorkflowRows: View {
 /// A group within a project's fold: Needs you, Working, Workflows, Archived. With how
 /// many under it are unread (#70), so finished work is not missed now it sits in Done.
 /// One accessibility element, so VoiceOver reads it as one line.
+///
+/// Each folds (#181), and folded it still says its count and unread. A folded group of
+/// sessions that need a person keeps its count in the attention tint, so folding Needs
+/// you never hides that somebody is waiting.
 struct SidebarSubheading: View {
     let title: String
     let count: Int
     var unread: Int = 0
+    var tint: StateTint = .none
 
     var body: some View {
         HStack(spacing: 6) {
             Text(title)
-            Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+            Text("\(count)").monospacedDigit().foregroundStyle(tint.style(or: .tertiary))
             if unread > 0 {
                 Text("· \(unread) unread").monospacedDigit()
             }

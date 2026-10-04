@@ -308,4 +308,88 @@ struct PinsTests {
         #expect(StoreCoding.asides(of: url, in: StoreCoding.asideFolder(for: url, under: await s.core.locations.root)).count == 1,
                 "kept once")
     }
+
+    // MARK: Pinned sessions (#180)
+
+    private func pinSelf(_ s: Setup, _ who: String, _ arguments: JSONValue = [:]) async throws -> String {
+        try await s.core.pinSessionTool(DaemonAPI.PinToolRequest(token: s.tokens[who]!, arguments: arguments))
+    }
+
+    @Test func sessionsArePinnedBesideThePagesInTheSameFile() async throws {
+        let s = try await setUp([("Lead", false, nil), ("Intake", false, nil), ("Helper", true, nil)])
+        try write(s.project, "a.md")
+        _ = try await pin(s, "Lead", ["path": "a.md"])
+        let pagesOnly = try Data(contentsOf: s.project.appending(path: PinsFile.path))
+        #expect(!String(decoding: pagesOnly, as: UTF8.self).contains("sessions"), "a file of pages is as it was")
+
+        let said = try await pinSelf(s, "Lead")
+        #expect(said.hasPrefix("Pinned this session at the top of its project"))
+        try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: s.ids["Intake"]!))
+        // An agent in a worktree pins into the project folder's file.
+        _ = try await pinSelf(s, "Helper", ["position": "first"])
+        #expect(try pinsFile(s).sessionPins.map(\.session) == [s.ids["Helper"]!, s.ids["Lead"]!, s.ids["Intake"]!])
+        #expect(try pinsFile(s).pins.map(\.path) == ["a.md"], "the pages are untouched")
+        #expect(try pinsFile(s).sessionPins.first?.pinnedBy == .agent(s.ids["Helper"]!))
+        #expect(!FileManager.default.fileExists(atPath: s.tree.appending(path: PinsFile.path).path), "never in a worktree")
+
+        let listed = await s.core.pinsList()
+        #expect(listed.first?.sessions == [s.ids["Helper"]!, s.ids["Lead"]!, s.ids["Intake"]!])
+
+        try await s.core.arrangeSessionPins(DaemonAPI.PinArrangeSessionsRequest(
+            folder: s.project, agentIDs: [s.ids["Intake"]!, UUID(), s.ids["Lead"]!]))
+        #expect(try pinsFile(s).sessionPins.map(\.session) == [s.ids["Intake"]!, s.ids["Lead"]!, s.ids["Helper"]!])
+    }
+
+    @Test func anAgentUnpinsOnlyItsOwnSessionAndThePersonAny() async throws {
+        let s = try await setUp([("Lead", false, nil), ("Intake", false, nil)])
+        try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: s.ids["Lead"]!))
+        let refused = await refusal { try await pinSelf(s, "Lead", ["pinned": false]) }
+        #expect(refused?.contains("pinned by the person") == true)
+        _ = try await pinSelf(s, "Intake")
+        #expect(try await pinSelf(s, "Intake").hasPrefix("This session was already pinned."))
+        #expect(try await pinSelf(s, "Intake", ["pinned": false]).hasPrefix("Unpinned this session."))
+        try await s.core.unpinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: s.ids["Lead"]!))
+        // Nothing pinned at all takes the file with it.
+        #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
+    }
+
+    @Test func archivingUnpinsAndBringingBackDoesNotPinAgain() async throws {
+        let s = try await setUp([("Lead", false, nil), ("Intake", false, nil)])
+        try write(s.project, "a.md")
+        _ = try await pin(s, "Lead", ["path": "a.md"])
+        _ = try await pinSelf(s, "Lead")
+        _ = try await pinSelf(s, "Intake")
+        try await s.core.archive(s.ids["Lead"]!)
+        #expect(try pinsFile(s).sessionPins.map(\.session) == [s.ids["Intake"]!])
+        let archived = await refusal {
+            try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: s.ids["Lead"]!))
+        }
+        #expect(archived == "Nothing was pinned: an archived session can't be pinned.")
+        try await s.core.unarchive(s.ids["Lead"]!)
+        #expect(try pinsFile(s).sessionPins.map(\.session) == [s.ids["Intake"]!])
+    }
+
+    @Test func aSessionFromElsewhereIsRefusedAndTheLimitIsTen() async throws {
+        let names = (1...11).map { "Session \($0)" }
+        let s = try await setUp(names.map { ($0, false, nil) })
+        let elsewhere = await refusal {
+            try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: UUID()))
+        }
+        #expect(elsewhere == "Nothing was pinned: that session is not in this project.")
+        for name in names.prefix(10) { _ = try await pinSelf(s, name) }
+        let full = await refusal { try await pinSelf(s, names[10]) }
+        #expect(full?.contains("already has 10 pinned sessions") == true)
+    }
+
+    @Test func aSessionPinReadBackKeepsEachOnceAndUnderTheLimit() throws {
+        let one = UUID()
+        let raw = PinsFile(pins: [], sessions: [SessionPinEntry(session: one, pinnedBy: .thePerson),
+                                                SessionPinEntry(session: one, pinnedBy: .thePerson)]
+            + (0..<12).map { _ in SessionPinEntry(session: UUID(), pinnedBy: .thePerson) })
+        let read = try PinsFile.read(raw.fileData())
+        #expect(read.file.sessionPins.count == PinLimits.sessionsPerProject)
+        #expect(read.file.sessionPins.first?.session == one)
+        #expect(read.skipped == 4)
+    }
 }
+

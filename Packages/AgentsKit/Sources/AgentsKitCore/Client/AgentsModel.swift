@@ -50,6 +50,9 @@ public final class AgentsModel {
     /// Each project's pinned pages (#159), by its standardized folder: kept current by
     /// `pins/changed`, which carries them. A project with none is absent.
     public private(set) var pins: [URL: [PinView]] = [:]
+    /// Each project's pinned sessions (#180), by its standardized folder, in their order:
+    /// kept current by `pins/changed` as the pages are. A project with none is absent.
+    public private(set) var sessionPins: [URL: [UUID]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: Int] = [:]
@@ -445,6 +448,10 @@ public final class AgentsModel {
         case .pinsChanged(let notification):
             let folder = Project.standardize(notification.folder)
             pins[folder] = notification.pins.isEmpty ? nil : notification.pins
+            let sessions = notification.sessions ?? []
+            if sessionPins[folder] != (sessions.isEmpty ? nil : sessions) {
+                sessionPins[folder] = sessions.isEmpty ? nil : sessions
+            }
 
         case .pagesChanged(let notification):
             pageRevisions[Project.standardize(notification.folder), default: 0] += 1
@@ -580,7 +587,23 @@ public final class AgentsModel {
     }
 
     public func replacePins(_ listed: [ProjectPins]) {
-        pins = Dictionary(listed.map { (Project.standardize($0.folder), $0.pins) }, uniquingKeysWith: { $1 })
+        pins = Dictionary(listed.compactMap { $0.pins.isEmpty ? nil : (Project.standardize($0.folder), $0.pins) },
+                          uniquingKeysWith: { $1 })
+        let sessions = Dictionary(listed.compactMap { listed in
+            listed.sessions.map { (Project.standardize(listed.folder), $0) }
+        }, uniquingKeysWith: { $1 })
+        if sessionPins != sessions { sessionPins = sessions }
+    }
+
+    /// One project's pinned sessions (#180), in their order: ids, whether or not this
+    /// client holds them.
+    public func pinnedSessions(in folder: URL?) -> [UUID] {
+        folder.map { sessionPins[Project.standardize($0)] ?? [] } ?? []
+    }
+
+    /// A project's pinned sessions as a screen left them, before the host says so.
+    public func setSessionPins(_ ids: [UUID], in folder: URL) {
+        sessionPins[Project.standardize(folder)] = ids.isEmpty ? nil : ids
     }
 
     /// A project's pins as a screen left them, before the host says so: a drop, an Unpin.
@@ -1135,7 +1158,7 @@ public final class AgentsModel {
         return projects.first { $0.folder == folder }
     }
 
-    /// The agents of one project, in one group, newest activity first — or, under
+    /// The agents of one project, in one group, newest started first (#182) — or, under
     /// Parked, most recently parked first (040, FR-003).
     ///
     /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading
@@ -1166,10 +1189,10 @@ public final class AgentsModel {
         // The list of everything: out of its old place, into its new one.
         var all = agents
         if let old {
-            let at = ProjectShelf.place(of: old, in: all, group: .finished)
+            let at = ProjectShelf.place(of: old, in: all, by: ProjectShelf.byActivity)
             if at < all.count, all[at].id == old.id { all.remove(at: at) } else { all.removeAll { $0.id == old.id } }
         }
-        all.insert(agent, at: ProjectShelf.place(of: agent, in: all, group: .finished))
+        all.insert(agent, at: ProjectShelf.place(of: agent, in: all, by: ProjectShelf.byActivity))
         agents = all
         if old == nil { agentCount = byID.count }
         if let old, old.state != .archived, agent.state == .archived { archivals &+= 1 }
@@ -1235,8 +1258,8 @@ public final class AgentsModel {
             byKey[ShelfKey(folder: folder, host: agent.host), default: [:]][group, default: []].append(agent)
             byFolder[folder, default: [:]][group, default: []].append(agent)
         }
-        for (key, groups) in byKey { byKey[key] = groups.sortingParked() }
-        for (folder, groups) in byFolder { byFolder[folder] = groups.sortingParked() }
+        for (key, groups) in byKey { byKey[key] = groups.sortedInGroupOrder() }
+        for (folder, groups) in byFolder { byFolder[folder] = groups.sortedInGroupOrder() }
         for (key, shelf) in shelves where byKey[key] == nil { shelf.replaceAll([:]) }
         for (key, groups) in byKey { shelf(ProjectKey(host: key.host, folder: key.folder)).replaceAll(groups) }
         for (folder, shelf) in folderShelves where byFolder[folder] == nil { shelf.replaceAll([:]) }
@@ -1314,10 +1337,13 @@ private struct ShelfKey: Hashable {
 }
 
 private extension Dictionary where Key == AgentGroup, Value == [Agent] {
-    /// Parked reads most recently parked first; the rest are already newest first.
-    func sortingParked() -> Self {
+    /// Each group in its own order: filed from a list newest activity first, Archived
+    /// is already, and the rest are not (#182).
+    func sortedInGroupOrder() -> Self {
         var sorted = self
-        if let parked = sorted[.parked] { sorted[.parked] = parked.sorted(by: ProjectShelf.order(.parked)) }
+        for (group, agents) in sorted where group != .archived {
+            sorted[group] = agents.sorted(by: ProjectShelf.order(group))
+        }
         return sorted
     }
 }

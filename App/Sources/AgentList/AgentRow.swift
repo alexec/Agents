@@ -244,6 +244,8 @@ struct AgentRow: View {
                         }
                     }
                 }
+                // At the top of its project whatever its state, or back among the rest (#180).
+                PinSessionButton(agent: agent)
                 // Branching leaves the original alone and carries the history so far.
                 Button("Branch") { Task { await model.fork(agent.id) } }
                 if let action = agent.parkAction {
@@ -380,5 +382,20 @@ struct WorktreeBadge: View {
         let path = worktree.root.path(percentEncoded: false)
         let branch = worktree.branch ?? "detached"
         return isGone ? "\(branch) — \(path), which is not there any more" : "\(branch) — \(path)"
+    }
+}
+
+/// Pin or Unpin a session (#180): in its row's menu and the chat's.
+struct PinSessionButton: View {
+    @Environment(AppModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        let pinned = model.isPinned(agent)
+        Button(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
+            Task { await model.setPinned(agent, !pinned) }
+        }
+        .help(pinned ? "Put this session back among the others"
+                     : "Keep this session at the top of its project, whatever its state")
     }
 }

@@ -235,8 +235,10 @@ struct WebFixturesTests {
     @Test func panels() throws {
         let everyone = Self.agents.enumerated().map { index, entry in
             var agent = entry.1
-            // Spread out in time, not in the order listed, so the order is the rule's.
+            // Spread out in time, not in the order listed, so the order is the rule's: a
+            // live group by when it started (#182), Archived by its last activity.
             agent.lastActivityAt = Self.at(Double((index * 7) % 23))
+            agent.createdAt = Self.at(Double((index * 5) % 19) - 30)
             return agent
         }
         let elsewhere = Self.agent(99, .running, cwd: URL(filePath: "/fixture/other/"))

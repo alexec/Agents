@@ -31,3 +31,9 @@ test("parked, or parking when the turn ends, offers Unpark", () => {
 test("archived offers Bring Back, and no Park", () => {
   assert.deepEqual(labels("archived"), ["Bring Back"]);
 });
+
+test("given whether it is pinned, Pin or Unpin before Archive; never on archived (#180)", () => {
+  assert.deepEqual(sessionActions(agents["running"], false).map((a) => a.label), ["Stop", "Park", "Pin", "Archive"]);
+  assert.deepEqual(sessionActions(agents["done"], true).map((a) => a.label), ["Park", "Mark as Unread", "Unpin", "Archive"]);
+  assert.deepEqual(sessionActions(agents["archived"], true).map((a) => a.label), ["Bring Back"]);
+});

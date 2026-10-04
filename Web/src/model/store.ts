@@ -150,6 +150,8 @@ export class Work {
 
   /** Each project's pinned pages by `host|folder` (#159), kept by pins/changed. */
   readonly pins = signal<Record<string, PinView[]>>({});
+  /** Each project's pinned sessions by `host|folder` (#180), in their order, kept by pins/changed. */
+  readonly sessionPins = signal<Record<string, string[]>>({});
   /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
   readonly pageRevisions = signal<Record<string, number>>({});
 
@@ -246,6 +248,7 @@ export class Work {
       case "pins/changed": {
         const note = params as PinsChangedNotification;
         this.pins.value = { ...this.pins.value, [`${host}|${folderKey(note.folder)}`]: note.pins };
+        this.sessionPins.value = { ...this.sessionPins.value, [`${host}|${folderKey(note.folder)}`]: note.sessions ?? [] };
         return true;
       }
       case "pages/changed": {
@@ -732,6 +735,7 @@ export class Store extends Work {
       this.workflows.value = notOf(this.workflows.value);
       this.dashboardSummaries.value = notOf(this.dashboardSummaries.value);
       this.pins.value = notOf(this.pins.value);
+      this.sessionPins.value = notOf(this.sessionPins.value);
     });
     for (const key of [...this.archivedLoaded]) if (key.startsWith(`${host}|`)) this.archivedLoaded.delete(key);
     this.searched.delete(host);
@@ -778,8 +782,13 @@ export class Store extends Work {
     }).catch(failed("dashboard/summaries"));
     void this.link.call("pins/list", {}, host).then((listed) => {
       const held = Object.fromEntries(Object.entries(this.pins.value).filter(([key]) => !key.startsWith(`${host}|`)));
-      for (const project of listed) held[`${host}|${folderKey(project.folder)}`] = project.pins;
+      const sessions = Object.fromEntries(Object.entries(this.sessionPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
+      for (const project of listed) {
+        held[`${host}|${folderKey(project.folder)}`] = project.pins;
+        sessions[`${host}|${folderKey(project.folder)}`] = project.sessions ?? [];
+      }
       this.pins.value = held;
+      this.sessionPins.value = sessions;
     }).catch(failed("pins/list"));
     void this.link.call("leases/snapshot", {}, host).then((snapshot) => {
       this.leases.value = { ...this.leases.value, [host]: snapshot };
@@ -1176,6 +1185,27 @@ export class Store extends Work {
     const held = this.pinsIn(host, folder);
     this.pins.value = { ...this.pins.value, [key]: paths.flatMap((path) => held.filter((p) => p.path === path)) };
     await this.act("pins/arrange", { folder: folder as never, paths }, host);
+  }
+
+  // MARK: Pinned sessions (#180)
+
+  sessionPinsIn(host: string, folder: string): string[] {
+    return this.sessionPins.value[`${host}|${folderKey(folder)}`] ?? [];
+  }
+
+  /** Pin or Unpin from a session's menu: shown at once, then the host told. */
+  async setPinned(host: string, folder: string, agentID: string, pinned: boolean): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    const held = this.sessionPinsIn(host, folder).filter((id) => id !== agentID);
+    this.sessionPins.value = { ...this.sessionPins.value, [key]: pinned ? [...held, agentID] : held };
+    await this.act(pinned ? "pins/pinSession" : "pins/unpinSession",
+      { folder: folder as never, agentID: agentID as UUID }, host);
+  }
+
+  /** A Move item among the pinned sessions: shown at once, then the whole order sent once. */
+  async arrangeSessionPins(host: string, folder: string, ids: string[]): Promise<void> {
+    this.sessionPins.value = { ...this.sessionPins.value, [`${host}|${folderKey(folder)}`]: ids };
+    await this.act("pins/arrangeSessions", { folder: folder as never, agentIDs: ids as UUID[] }, host);
   }
 
   /** The order writes and fetches of each Dashboard, kept in step (#176, #193). */

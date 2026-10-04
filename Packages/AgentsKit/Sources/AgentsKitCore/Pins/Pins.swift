@@ -2,12 +2,25 @@ import Foundation
 
 // A project's pinned pages (#159): Markdown documents and HTML pages pinned under the
 // project, beside its Dashboard. specs/159-pinned-pages/README.md is the reference.
+// And its pinned sessions (#180), kept at the top of its sessions whatever their state.
 
 /// `<project>/.agents/pins.json`, as written: the pins in the order shown.
 public struct PinsFile: Codable, Sendable, Hashable {
     public var pins: [PinEntry]
+    /// The pinned sessions (#180), in the order shown. Absent when there are none, so a
+    /// file of pages alone is the same bytes it always was.
+    public var sessions: [SessionPinEntry]?
 
-    public init(pins: [PinEntry] = []) { self.pins = pins }
+    public init(pins: [PinEntry] = [], sessions: [SessionPinEntry] = []) {
+        self.pins = pins
+        self.sessions = sessions.isEmpty ? nil : sessions
+    }
+
+    /// The pinned sessions, none for a file without the key.
+    public var sessionPins: [SessionPinEntry] {
+        get { sessions ?? [] }
+        set { sessions = newValue.isEmpty ? nil : newValue }
+    }
 
     public static let path = ".agents/pins.json"
 
@@ -34,7 +47,31 @@ public struct PinsFile: Codable, Sendable, Hashable {
             clean.path = path
             kept.append(clean)
         }
-        return (PinsFile(pins: kept), raw.pins.count - kept.count)
+        var sessions: [SessionPinEntry] = []
+        for entry in raw.sessionPins where !sessions.contains(where: { $0.session == entry.session })
+            && sessions.count < PinLimits.sessionsPerProject {
+            sessions.append(entry)
+        }
+        return (PinsFile(pins: kept, sessions: sessions),
+                raw.pins.count - kept.count + raw.sessionPins.count - sessions.count)
+    }
+}
+
+/// One pinned session (#180): which, and who pinned it. Its id is a host's record, so a
+/// project carried to another host keeps entries that name nothing there; a screen
+/// shows only the ones it holds.
+public struct SessionPinEntry: Codable, Sendable, Hashable {
+    public var session: UUID
+    public var pinnedBy: Pinner
+
+    enum CodingKeys: String, CodingKey {
+        case session
+        case pinnedBy = "pinned_by"
+    }
+
+    public init(session: UUID, pinnedBy: Pinner) {
+        self.session = session
+        self.pinnedBy = pinnedBy
     }
 }
 
@@ -86,6 +123,8 @@ public enum PinKind: String, Codable, Sendable, Hashable {
 public enum PinLimits {
     /// Pins a project may hold, the Dashboard not counted (Alex, #159).
     public static let perProject = 10
+    /// Pinned sessions a project may hold, apart from its pages (#180).
+    public static let sessionsPerProject = 10
     public static let titleLength = 60
 }
 
@@ -190,9 +229,12 @@ public enum PinnerKind: String, Codable, Sendable, Hashable {
 public struct ProjectPins: Codable, Sendable, Hashable {
     public var folder: URL
     public var pins: [PinView]
+    /// Its pinned sessions in their order (#180). Nil from a host that has none to say.
+    public var sessions: [UUID]?
 
-    public init(folder: URL, pins: [PinView]) {
+    public init(folder: URL, pins: [PinView], sessions: [UUID] = []) {
         self.folder = folder
         self.pins = pins
+        self.sessions = sessions.isEmpty ? nil : sessions
     }
 }
