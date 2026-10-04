@@ -53,19 +53,27 @@ public actor DaemonClient {
             self.connection = connection
             return
         }
-        guard startIfNeeded else { throw ConnectError.couldNotConnect }
+        guard startIfNeeded, link.startsSomething else { throw ConnectError.couldNotConnect }
         try await link.start()
 
+        // Waiting for what was started to answer: from a tenth of a second, doubling to
+        // two, each spread by jitter, rather than every 100 ms for the whole timeout (#172).
         let deadline = ContinuousClock.now.advanced(by: timeout)
+        var wait = Self.startWait.first
         while ContinuousClock.now < deadline {
             if let connection = try? await open() {
                 self.connection = connection
                 return
             }
-            try? await Task.sleep(for: .milliseconds(100))
+            let left = deadline - ContinuousClock.now
+            try? await Task.sleep(for: min(ReconnectSchedule.jittered(wait, ReconnectSchedule.randomJitter()), left))
+            wait = Self.startWait.doubled(wait)
         }
         throw ConnectError.couldNotConnect
     }
+
+    /// The waits while something just started comes up.
+    static let startWait = ReconnectSchedule(first: .milliseconds(100), longest: .seconds(2))
 
     private func open() async throws -> JSONRPCConnection {
         let connection = JSONRPCConnection(transport: try await link.transport())

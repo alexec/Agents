@@ -200,6 +200,45 @@ test("retryNow dials at once when down", async () => {
 test("the page's own link notices a hang within 4 s and retries at most 4 s apart (US7)", async () => {
   const { loopbackTiming } = await load("src/session.ts");
   assert.ok(loopbackTiming.heartbeat.every + loopbackTiming.heartbeat.within <= 4_000);
-  // The retry delay is the step times up to 1.2.
-  assert.ok(Math.max(...loopbackTiming.backoff) * 1.2 <= 5);
+  // The retry delay is between half and all of the step.
+  assert.ok(Math.max(...loopbackTiming.backoff) <= 4);
+});
+
+test("each retry waits between half and all of its step, doubling to the last (#172)", () => {
+  const steps = [1, 2, 4, 8, 16, 30];
+  assert.deepEqual(steps.map((_, i) => w.retryDelay(steps, i, 1)), [1000, 2000, 4000, 8000, 16000, 30000]);
+  assert.deepEqual(steps.map((_, i) => w.retryDelay(steps, i, 0)), [500, 1000, 2000, 4000, 8000, 15000]);
+  assert.equal(w.retryDelay(steps, 40, 1), 30000, "the last step repeats");
+  assert.equal(w.retryDelay(steps, 0, 7), 1000, "random is clamped");
+  for (let i = 0; i < 50; i++) {
+    const delay = w.retryDelay(steps, 2, Math.random());
+    assert.ok(delay >= 2000 && delay <= 4000);
+  }
+});
+
+test("a connection dropped at once does not start the waits again from the first (#172)", async () => {
+  const net = sockets();
+  const l = link(paired(), net, { backoff: [0.01, 0.4], healthyAfter: 60_000 });
+  await opened(l);
+  net.made[0].drop();
+  await wait(30);
+  assert.equal(l.state.kind, "open", "the first retry is the first step");
+  net.made[1].drop();
+  await wait(30);
+  assert.equal(l.state.kind, "down", "dropped at once: the second step, not the first again");
+  assert.equal(net.made.length, 2);
+  l.stop();
+});
+
+test("a connection that lasted starts the waits again from the first (#172)", async () => {
+  const net = sockets();
+  const l = link(paired(), net, { backoff: [0.01, 0.4], healthyAfter: 0 });
+  await opened(l);
+  net.made[0].drop();
+  await wait(30);
+  net.made[1].drop();
+  await wait(30);
+  assert.equal(l.state.kind, "open");
+  assert.equal(net.made.length, 3);
+  l.stop();
 });

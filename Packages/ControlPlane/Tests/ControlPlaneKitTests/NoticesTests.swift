@@ -196,4 +196,54 @@ struct NoticesTests {
         #expect(gone.first?.headline == nil)
         #expect(await desk.heard(.withdraw(asked.id), presences: [:], devices: [phone]).isEmpty)
     }
+
+    /// A mailbox that is away for the first `failing` posts: iCloud unreachable.
+    actor AwayMailbox: Mailbox {
+        let inner = FakeMailbox()
+        var failing: Int
+        init(failing: Int) { self.failing = failing }
+        func setFailing(_ count: Int) { failing = count }
+        func post(_ item: MailboxItem) async throws {
+            if failing > 0 {
+                failing -= 1
+                throw URLError(.notConnectedToInternet)
+            }
+            try await inner.post(item)
+        }
+    }
+
+    /// A notice that did not post is kept and posted again, not dropped (#172); and a
+    /// withdrawal that comes meanwhile is what the phone ends up with, not the need.
+    @Test func aNoticeThatDidNotPostIsPostedAgain() async throws {
+        let running = try await base.start()
+        defer { Task { await running.service.stop() } }
+        let files = ControlRelay.Files(folder: FileManager.default.temporaryDirectory
+            .appendingPathComponent("relay-\(UUID().uuidString)", isDirectory: true))
+        let code = try #require(ControlCode(text: try await running.service.codes.issue(.host).text))
+        try await ControlRelay.enroll(code, files: files, name: "relay mac")
+        let mailbox = AwayMailbox(failing: 3)
+        let relay = try ControlRelay(files: files, name: "relay mac", channel: FakeRelayChannel(cloud: FakeRelayCloud()),
+                                     mailbox: mailbox,
+                                     retryBackoff: Backoff(first: .milliseconds(50), longest: .milliseconds(200)))
+        defer { relay.stop() }
+        let phone = UUID()
+        let key = ControlAgreement.generate()
+        let asked = need()
+
+        await relay.deliver(.init(needID: asked.id, device: phone, publicKey: key.publicKey, headline: asked.headline, alert: true))
+        #expect(relay.waitingToPost.count == 1, "kept, not dropped")
+        await eventually { await !mailbox.inner.waiting(for: phone).isEmpty }
+        #expect(await mailbox.inner.waiting(for: phone).first?.envelope != nil)
+        #expect(relay.waitingToPost.isEmpty)
+
+        // Away again: the need is said, then withdrawn, both failing; the withdrawal wins.
+        await mailbox.setFailing(2)
+        let later = need()
+        await relay.deliver(.init(needID: later.id, device: phone, publicKey: key.publicKey, headline: later.headline, alert: true))
+        await relay.deliver(.init(needID: later.id, device: phone))
+        await eventually { relay.waitingToPost.isEmpty }
+        let posted = await mailbox.inner.waiting(for: phone).first { $0.needID == later.id }
+        #expect(posted != nil && posted?.envelope == nil, "the phone holds the withdrawal")
+        #expect(await mailbox.inner.posted.filter { $0.needID == later.id }.count == 1, "the need itself never went")
+    }
 }

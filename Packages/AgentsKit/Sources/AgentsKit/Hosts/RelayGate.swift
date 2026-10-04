@@ -49,7 +49,7 @@ public final class RelayGate: @unchecked Sendable {
         let bound = withUnsafePointer(to: &address) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
         }
-        guard bound == 0, Darwin_or_Glibc_listen(fd, 16) == 0 else {
+        guard bound == 0, Darwin_or_Glibc_listen(fd, SOMAXCONN) == 0 else {
             let error = errno
             POSIX.close(fd)
             throw Failure.socket(error)

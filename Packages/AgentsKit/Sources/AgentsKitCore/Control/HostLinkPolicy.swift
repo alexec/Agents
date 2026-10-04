@@ -9,10 +9,12 @@ import Foundation
 /// log line. Now a refusal is not a loss: the connection is kept and the counts are not
 /// asked for again on it. Only a connection that fails is dropped, and dialled again
 /// after a wait that doubles from `first` to `longest`, with jitter so that nothing
-/// that lost the host at the same moment comes back in step.
+/// that lost the host at the same moment comes back in step: `ReconnectSchedule`, which
+/// every other client waits by too (#172).
 public struct HostLinkPolicy: Sendable, Equatable {
     public static let first: TimeInterval = 5
     public static let longest: TimeInterval = 300
+    public static let schedule = ReconnectSchedule(first: .seconds(first), longest: .seconds(longest))
 
     /// What a count that did not come back means.
     public enum Failure: Equatable, Sendable {
@@ -38,10 +40,11 @@ public struct HostLinkPolicy: Sendable, Equatable {
 
     /// A dial failed or a kept connection broke. `jitter`, from 0 to 1, picks the wait
     /// between half and all of the doubled one.
-    public mutating func failed(at now: Date, jitter: Double = .random(in: 0...1)) {
+    public mutating func failed(at now: Date, jitter: Double = ReconnectSchedule.randomJitter()) {
         failures += 1
-        let doubled = min(Self.first * pow(2, Double(failures - 1)), Self.longest)
-        notBefore = now.addingTimeInterval(doubled * (0.5 + 0.5 * min(max(jitter, 0), 1)))
+        let wait = ReconnectSchedule.jittered(Self.schedule.nominal(afterFailures: failures), jitter)
+        notBefore = now.addingTimeInterval(TimeInterval(wait.components.seconds)
+                                           + TimeInterval(wait.components.attoseconds) / 1e18)
     }
 
     /// Connected: a later loss starts from the first wait again.
