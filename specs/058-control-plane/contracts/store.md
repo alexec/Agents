@@ -52,6 +52,10 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
    - A `put` takes `flock` on `<key>.lock`, compares, writes a temporary file, `fsync`s it and
      renames it into place.
    - It is for one machine only.
+   - A listing walks only the folder its prefix names, and is paid for by what changed (#174):
+     a folder whose modification time is unchanged (and older than two seconds) is taken as
+     last listed, and in one that changed only files whose inode, size or time moved are
+     read and hashed again. Every put renames into place, which moves its folder's time.
 6. **The S3 backend.**
    - Plain HTTPS with SigV4, and path-style addressing if `AGENTS_STORE_PATH_STYLE=1` (MinIO).
    - Credentials come from the environment, the standard AWS files, or (in the host app) an
@@ -71,6 +75,15 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
     `.matching(etag)`: the record with `forgotten: true` and `rev` bumped. Readers treat a
     tombstone as absent, and any copy deletes tombstones older than seven days. Spent codes,
     expired codes and old events are deleted plainly, since a race there changes nothing.
+12. **What is kept, and for how long** (#174, `StoreSweep`). Every serving copy sweeps a minute
+    after it starts and then hourly, deleting at most 1,000 keys a sweep:
+    - `events/<day>/…`: seven days, by the day in the key;
+    - `codes/<id>.json` and its `.spent`: a day after the code expires (until then a late try
+      is refused as `expired`), and a `.spent` with no code at once;
+    - tombstones: seven days after `forgottenAt`; one written without it is given the time
+      of the sweep that finds it (`matching`), and goes seven days later;
+    - in a folder store, temporary files, `probe/` keys and unheld locks with no key, an hour
+      old.
 
 ## Copying a store
 

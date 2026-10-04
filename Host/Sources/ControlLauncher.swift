@@ -129,6 +129,9 @@ enum ControlLauncher {
             let log = open(paths.controlLog.path, O_WRONLY | O_CREAT | O_APPEND, 0o600)
             if log >= 0 { dup2(log, 1); dup2(log, 2); close(log) }
             var arguments = ["serve", "--home", paths.controlHome.path, "--port", String(paths.port)]
+            // Stamped and rolled by agents-control itself (#174); the descriptors above
+            // catch anything said before it takes the file.
+            arguments += ["--log", paths.controlLog.path]
             // This Mac's host's root: the window's Settings says how its join stands (#113).
             arguments += ["--host-root", paths.hostRoot.path]
             if paths.scratch, ProcessInfo.processInfo.environment["AGENTS_HOST_BONJOUR"] != "1" { arguments.append("--no-bonjour") }

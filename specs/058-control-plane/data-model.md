@@ -42,7 +42,7 @@ Only one exists now. The model is here so records can name their owner (FR-012).
 Rules:
 - At least one `operator` must exist for each owner (FR-016). This is checked on the version
   that was read, and a concurrent change gets `changedElsewhere`.
-- Forgetting writes a tombstone (`forgotten: true`, `rev` bumped) with `.matching`, then
+- Forgetting writes a tombstone (`forgotten: true`, `forgottenAt`, `rev` bumped) with `.matching`, then
   broadcasts `clientForgotten`. Removing a host does the same. Tombstones are read as absent,
   and deleted after seven days (contracts/store.md rule 11).
 

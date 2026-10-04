@@ -101,6 +101,9 @@ public final class ControlService: @unchecked Sendable {
     /// The loopback listener's port once it is up, or nil (071).
     public var webPort: Int? { loopback.port == 0 ? nil : loopback.port }
     private var refresher: Task<Void, Never>?
+    private var sweeper: Task<Void, Never>?
+    /// When the store was last read again to admit a member it didn't know (#174).
+    private let readAgainAt = DateBox()
     private let readiness = Readiness()
     let sockets = Sockets()
     /// What this copy has told its relay host for each need (T097).
@@ -135,7 +138,7 @@ public final class ControlService: @unchecked Sendable {
                      store: configuration.store, router: router, leases: leases,
                      log: { [sink = configuration.log] line in
                          let line = "agents-control[\(copy)]: \(line)"
-                         if let sink { sink(line) } else { FileHandle.standardError.write(Data((line + "\n").utf8)) }
+                         if let sink { sink(line) } else { ControlLog.shared.write(line) }
                      })
         }
         codes = ControlCodes(store: configuration.store, privateKey: configuration.privateKey,
@@ -212,6 +215,14 @@ public final class ControlService: @unchecked Sendable {
                 await self?.refresh()
             }
         }
+        // What is dead goes once an hour, the first a minute after start (#174).
+        sweeper = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(60))
+            while !Task.isCancelled {
+                await self?.sweep()
+                try? await Task.sleep(for: StoreSweep.every)
+            }
+        }
         let port = channel.localAddress?.port ?? configuration.port
         log("listening on \(configuration.bind):\(port) for \(configuration.url.absoluteString)\(phase.now == .receiving ? ", receiving a handover" : "")")
         if phase.now != .receiving { await mesh?.start() }
@@ -262,7 +273,8 @@ public final class ControlService: @unchecked Sendable {
 
         // Leases (T063): a host whose uplink ends here, or whose lease another copy took.
         let leases = self.leases, mesh = self.mesh, router = self.router
-        await router.onLocalHostEnded { host in
+        await router.onLocalHostEnded { [weak self] host in
+            self?.log("host \(host) disconnected")
             if let epoch = await leases.release(host) { await mesh?.released(host, epoch: epoch) }
         }
         await leases.onLost { [weak self] host, epoch in
@@ -285,7 +297,8 @@ public final class ControlService: @unchecked Sendable {
                 await self.mesh?.broadcast(PeerWire.link(client: client, relayed: relayed))
             }
         }
-        await router.onLinkChanged { client, relayed in
+        await router.onLinkChanged { [weak self] client, relayed in
+            if relayed == nil { self?.log("client \(client) disconnected") }
             Task { await mesh?.broadcast(PeerWire.link(client: client, relayed: relayed)) }
         }
 
@@ -295,6 +308,7 @@ public final class ControlService: @unchecked Sendable {
     /// clients and hosts redial another copy, or this one when it is back.
     public func stop() async {
         refresher?.cancel()
+        sweeper?.cancel()
         await leases.stop()
         await mesh?.stop()
         try? await server?.close()
@@ -315,6 +329,18 @@ public final class ControlService: @unchecked Sendable {
         } catch {
             await readiness.set(false)
             log("store: \(error)")
+        }
+    }
+
+    /// Old events, spent and expired codes, old tombstones and leftovers, out of the store
+    /// (#174). Only while serving: a receiving or forwarding copy leaves the store alone.
+    func sweep() async {
+        guard phase.now == .serving else { return }
+        do {
+            let report = try await StoreSweep(records: records).run()
+            if report.total + report.dated > 0 { log("store: swept; \(report)") }
+        } catch {
+            log("store: sweep stopped: \(error)")
         }
     }
 
@@ -593,6 +619,11 @@ public final class ControlService: @unchecked Sendable {
     /// The store read again for a member not in the records, or `unavailable` when it
     /// cannot be: not known yet is not the same as not a member.
     private func readAgain() async throws {
+        // Once a second at most (#174): an id nobody paired, tried again and again, costs one
+        // read. One that comes sooner is told to try again, never "unknown", which would
+        // have a device paired a moment ago at another copy forget its pairing.
+        if let last = readAgainAt.now, Date().timeIntervalSince(last) < 1 { throw ControlAuth.Refusal(.unavailable) }
+        readAgainAt.set(Date())
         do {
             try await methods.refresh()
         } catch {
@@ -777,7 +808,7 @@ public final class ControlService: @unchecked Sendable {
 
     func log(_ line: String) {
         let line = "agents-control[\(copyID)]: \(line)"
-        if let sink = configuration.log { sink(line) } else { FileHandle.standardError.write(Data((line + "\n").utf8)) }
+        if let sink = configuration.log { sink(line) } else { ControlLog.shared.write(line) }
     }
 }
 
