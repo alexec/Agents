@@ -33,4 +33,6 @@ public struct ServerLink: DaemonLink {
         guard await masterIsUp() else { throw HostProblem.offline }
         try await installer.startDaemon(extra: launchArguments())
     }
+
+    public var startsSomething: Bool { true }
 }

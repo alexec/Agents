@@ -50,7 +50,9 @@ final class AppModel {
     @ObservationIgnored private let backoff = Backoff()
     /// When this window last asked each session's host to warm it, and why (#183).
     @ObservationIgnored private var prewarmed: [String: Date] = [:]
-    @ObservationIgnored private let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(2))
+    /// The control plane's own client: from 2 s, doubling to a minute, not every 2 s for
+    /// ever (#172).
+    @ObservationIgnored private let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(60))
     @ObservationIgnored private let wakeAndNetwork = WakeAndNetwork()
     @ObservationIgnored private var checkingAfterWake = false
     private(set) var problem: String?
@@ -1669,7 +1671,8 @@ final class AppModel {
                     break
                 }
             }
-            if !Task.isCancelled { backoff.settle() }
+            // Back from the first wait only once this connection has lasted (#172).
+            if !Task.isCancelled { backoff.connected() }
             self?.reconnecting = nil
         }
         await reconnecting?.value
@@ -1885,10 +1888,11 @@ final class AppModel {
             while !Task.isCancelled {
                 backoff.trying()
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(3))) != nil {
-                    backoff.settle()
+                    backoff.connected()
                     self?.controlPlaneDidAnswer()
                     await self?.syncControlHosts(control)
                     for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
+                        self?.hostCameOnline(note.params)
                         await self?.syncControlHosts(control)
                     }
                     if !Task.isCancelled { self?.controlPlaneWent() }
@@ -1898,6 +1902,14 @@ final class AppModel {
                 await backoff.wait()
             }
         }
+    }
+
+    /// A host is back, said by the control plane: a window still waiting out its backoff
+    /// goes back now, rather than up to half a minute after the host returned (#172). One
+    /// dial each, when there is something to reach, in place of a dial every 100 ms.
+    private func hostCameOnline(_ params: JSONValue?) {
+        guard !isConnected, params?["state"]?.stringValue == "online" else { return }
+        backoff.nudge()
     }
 
     private func controlPlaneDidAnswer() {

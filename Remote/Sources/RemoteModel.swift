@@ -837,7 +837,8 @@ final class RemoteModel {
             // Cancelled by a pairing, which has already started the loop that replaces
             // this one; that one's handle is not this one's to clear.
             if !Task.isCancelled {
-                backoff.settle()
+                // Back from the first wait only once this connection has lasted (#172).
+                if self?.isConnected == true { backoff.connected() } else { backoff.settle() }
                 self?.finishedReconnecting()
             }
         }
@@ -847,7 +848,7 @@ final class RemoteModel {
     /// How long the loop waits before the next attempt, and the wait itself, which coming
     /// back to the app or a network change cuts short (#82); and the other hosts' watch's.
     @ObservationIgnored private let backoff = Backoff()
-    @ObservationIgnored private let otherHostsBackoff = Backoff(first: .seconds(5), longest: .seconds(5))
+    @ObservationIgnored private let otherHostsBackoff = Backoff(first: .seconds(5), longest: .seconds(60))
     @ObservationIgnored private var checkingConnection = false
     @ObservationIgnored private lazy var networkChanges = ReconnectTriggers { [weak self] reason in
         Task { @MainActor in await self?.goBackNow(reason) }
@@ -954,9 +955,11 @@ final class RemoteModel {
             while !Task.isCancelled {
                 backoff.trying()
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(5))) != nil {
-                    backoff.settle()
+                    backoff.connected()
                     await self.syncOtherHosts(control, link: link)
                     for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
+                        // A host back while this phone waits out its backoff: go back now (#172).
+                        if !self.isConnected, note.params?["state"]?.stringValue == "online" { self.backoff.nudge() }
                         await self.syncOtherHosts(control, link: link)
                     }
                 }

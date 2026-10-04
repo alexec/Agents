@@ -47,6 +47,13 @@ public final class ControlRelay: @unchecked Sendable {
     private let hello: DaemonAPI.HostHello
     private var mailboxReady = false
     private var carrying: [UUID: Data]?
+    /// The uplink's waits between dials, jittered and cut short by a wake or a network
+    /// change (#172), as `ControlUplink`'s are.
+    private let backoff: Backoff
+    /// Notices that did not post, and the waits between tries at them (#172).
+    private var pending = PendingPosts()
+    private let retryBackoff: Backoff
+    private var retrying: Task<Void, Never>?
 
     /// Enrol with a host code, once: what the relay keeps to dial again.
     @discardableResult
@@ -64,6 +71,8 @@ public final class ControlRelay: @unchecked Sendable {
 
     public init(files: Files, name: String, channel: any RelayChannel, mailbox: any Mailbox,
                 dial: @escaping Dial = { url, pin in try await ControlDial.connect(url, pin: pin) },
+                backoff: Backoff = Backoff(first: ControlUplink.firstWait, longest: ControlUplink.longestWait),
+                retryBackoff: Backoff = Backoff(first: .seconds(2), longest: .seconds(300)),
                 log: @escaping @Sendable (String) -> Void = { _ in }) throws {
         guard let membership = ControlMembership.load(files.membership), membership.host != nil, membership.url != nil else {
             throw Failure("this relay has not joined a control plane; give it a host code")
@@ -74,6 +83,8 @@ public final class ControlRelay: @unchecked Sendable {
         self.channel = channel
         self.mailbox = mailbox
         self.dial = dial
+        self.backoff = backoff
+        self.retryBackoff = retryBackoff
         self.log = log
         hello = Self.hello(name: name)
         core = RelayHostCore(channel: channel, key: try DeviceKey.software(privateKey: privateKey),
@@ -120,8 +131,8 @@ public final class ControlRelay: @unchecked Sendable {
     public func stop() {
         guard stopped.set() else { return }
         let (running, open) = lock.withLock { () -> ([Task<Void, Never>], (any LineTransport)?) in
-            defer { tasks = []; uplink = nil }
-            return (tasks, uplink)
+            defer { tasks = []; uplink = nil; retrying = nil }
+            return (tasks + (retrying.map { [$0] } ?? []), uplink)
         }
         for task in running { task.cancel() }
         open?.close()
@@ -129,12 +140,20 @@ public final class ControlRelay: @unchecked Sendable {
 
     // MARK: The uplink
 
+    /// The network changed or the Mac woke: a wait between dials ends now (#172, as #82
+    /// did for `ControlUplink`), and so does a wait before posting again.
+    @discardableResult
+    public func goBackNow() -> Backoff.Nudged {
+        retryBackoff.nudge()
+        return backoff.nudge()
+    }
+
     private func runUplink(_ hostDial: @escaping @Sendable () async throws -> any LineTransport) async {
-        var wait: Duration = ControlUplink.firstWait
         while !stopped.isSet && !Task.isCancelled {
+            backoff.trying()
             do {
                 let transport = try await hostDial()
-                wait = ControlUplink.firstWait
+                backoff.connected()
                 lock.withLock { uplink = transport }
                 let line = try JSONRPCCodec.encode(.request(id: .number(1), method: DaemonAPI.Method.hostHello,
                                                             params: try JSONValue.encoding(hello)))
@@ -150,8 +169,7 @@ public final class ControlRelay: @unchecked Sendable {
                 log("relay: could not reach the control plane: \(error)")
             }
             guard !stopped.isSet else { return }
-            try? await Task.sleep(for: wait)
-            wait = min(wait * 2, ControlUplink.longestWait)
+            await backoff.wait()
         }
     }
 
@@ -200,12 +218,56 @@ public final class ControlRelay: @unchecked Sendable {
         let item = MailboxItem(needID: delivery.needID, device: delivery.device, envelope: envelope,
                                alert: delivery.alert, postedAt: Date())
         do {
-            try await prepareMailbox()
-            try await mailbox.post(item)
+            try await post(item)
             log("relay: posted \(envelope == nil ? "a withdrawal" : "a need") for \(delivery.device)")
         } catch {
-            log("relay: posting failed: \(error)")
+            log("relay: posting failed, kept to post again: \(error)")
+            keepToPostAgain(item)
         }
+    }
+
+    /// Notices waiting to be posted again, for tests.
+    public var waitingToPost: [MailboxItem] { lock.withLock { pending.waiting } }
+
+    private func post(_ item: MailboxItem) async throws {
+        try await prepareMailbox()
+        try await mailbox.post(item)
+        lock.withLock { pending.posted(item) }
+    }
+
+    /// Kept, and one loop posts everything kept, waiting longer after each round that
+    /// failed, until nothing is left (#172).
+    private func keepToPostAgain(_ item: MailboxItem) {
+        let dropped = lock.withLock { () -> MailboxItem? in
+            let dropped = pending.keep(item)
+            if retrying == nil, !stopped.isSet { retrying = Task { [weak self] in await self?.postAgain() } }
+            return dropped
+        }
+        if let dropped { log("relay: too many notices waiting; let go of one for \(dropped.device)") }
+    }
+
+    private func postAgain() async {
+        let backoff = retryBackoff
+        backoff.trying()
+        while !Task.isCancelled, !stopped.isSet {
+            await backoff.wait()
+            for item in lock.withLock({ pending.waiting }) {
+                do {
+                    try await post(item)
+                    log("relay: posted again for \(item.device)")
+                } catch {
+                    log("relay: posting again failed: \(error)")
+                    break
+                }
+            }
+            let done = lock.withLock { () -> Bool in
+                guard pending.isEmpty else { return false }
+                retrying = nil
+                return true
+            }
+            if done { break }
+        }
+        backoff.settle()
     }
 
     private func prepareMailbox() async throws {

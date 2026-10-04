@@ -111,7 +111,7 @@ public final class TunnelSocket: @unchecked Sendable {
         let bound = withUnsafePointer(to: &address) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
         }
-        guard bound == 0, chmod(path, 0o600) == 0, listen(fd, 16) == 0 else {
+        guard bound == 0, chmod(path, 0o600) == 0, listen(fd, SOMAXCONN) == 0 else {
             _ = POSIX.close(fd)
             throw TunnelPipe.Failure("could not listen at \(path): \(errno)")
         }

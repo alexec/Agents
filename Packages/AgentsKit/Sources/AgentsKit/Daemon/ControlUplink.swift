@@ -9,7 +9,8 @@ import Foundation
 /// `host/hello` on every connect.
 ///
 /// Losing the uplink closes every channel and nothing else: agents carry on, and it
-/// dials again, waiting a second, then twice as long each time up to half a minute.
+/// dials again, waiting a second, then twice as long each time up to half a minute, each
+/// wait spread by jitter (#172).
 public final class ControlUplink: @unchecked Sendable {
     public typealias Dial = @Sendable () async throws -> any LineTransport
 
@@ -148,7 +149,9 @@ public final class ControlUplink: @unchecked Sendable {
             backoff.trying()
             do {
                 let transport = try await dial()
-                backoff.settle()
+                // An uplink the control plane drops at once is not a reason to come back
+                // in a second: only one that lasted resets the wait (#172).
+                backoff.connected()
                 lock.withLock { uplink = transport }
                 try? sayHello(on: transport)
                 DaemonLog.shared.write("uplink: connected to the control plane")

@@ -14,8 +14,16 @@ public protocol DaemonLink: Sendable {
     /// nothing to start does nothing, and the caller then times out — which is the
     /// honest answer for a Mac that is asleep.
     func start() async throws
+
+    /// Whether `start()` brings anything up that `connect` should then wait for. A link
+    /// with nothing to start (a control plane's route, the Remote's) is tried once: the
+    /// caller's own backoff decides when to try again. Waiting it out here was a dial
+    /// every 100 ms for 8 s, round after round: one window made 325 WebSocket upgrades
+    /// in 12 minutes while a host was down (#172).
+    var startsSomething: Bool { get }
 }
 
 public extension DaemonLink {
     func start() async throws {}
+    var startsSomething: Bool { false }
 }
