@@ -46,6 +46,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const down = linkDown || hostDown;
   const r = route.value;
   const agent = store.agent(host, session);
+  // Opened: its runtime starts now, so the reply does not wait for it (#183).
+  useEffect(() => { store.prewarm(host, session, "opened"); }, [host, session]);
   const project = r.project ? (store.projects.value[host] ?? []).find((p) => p.project.folder === r.project) : undefined;
   const level = useSignal<TurnDetail>(defaultDetail.value);
   /** Turns opened or closed by hand, kept until the chat is left. */
@@ -224,6 +226,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
           send={(text, attachments) => store.prompt(host, session, text, attachments)}
+          onTyping={() => store.prewarm(host, session, "typing")}
           where={agent && (
             <>
               <Place store={store} host={host} agent={agent} />

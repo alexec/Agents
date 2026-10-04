@@ -90,6 +90,8 @@ final class RemoteModel {
     /// This device's end of each agent's shell it has opened (034). The shell is the
     /// Mac's; these only know how to reach it.
     @ObservationIgnored private var shells: [UUID: ShellClient] = [:]
+    /// When this device last asked to warm each session, and why (#183).
+    @ObservationIgnored private var prewarmed: [String: Date] = [:]
 
     func shellClient(for agentID: UUID) -> ShellClient {
         if let existing = shells[agentID] { return existing }
@@ -2148,6 +2150,18 @@ final class RemoteModel {
     /// What is on its way to this agent, if anything: for the control that sent it to
     /// show, and the others to hold (#87).
     func acting(_ agentID: UUID) -> AgentAct? { work.acting[agentID] }
+
+    /// Ask the Mac to start a session's runtime ahead of a prompt (#183): the chat was
+    /// opened, or somebody is typing in it. Once per session and reason in a while,
+    /// however many keys; the Mac debounces too. Silent: nothing is said if it fails.
+    func prewarm(_ agentID: UUID, _ why: DaemonAPI.PrewarmRequest.Why) async {
+        guard !isStale, let agent = agent(agentID), agent.state == .finished || agent.state == .stopped else { return }
+        let key = "\(agentID) \(why.rawValue)"
+        if let last = prewarmed[key], Date().timeIntervalSince(last) < 15 { return }
+        prewarmed[key] = Date()
+        if prewarmed.count > 64 { prewarmed = prewarmed.filter { Date().timeIntervalSince($0.value) < 15 } }
+        _ = try? await client.call(DaemonAPI.Method.agentsPrewarm, DaemonAPI.PrewarmRequest(agentID: agentID, why: why))
+    }
 
     /// Mark as Unread / Mark as Read, from the card's menu (#70).
     func setUnread(_ agentID: UUID, _ unread: Bool) async {

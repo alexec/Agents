@@ -121,6 +121,8 @@ struct PromptBar: View {
         }
         .onAppear { restoreDraft() }
         .onChange(of: agent.id) { restoreDraft() }
+        // Opened: its runtime starts now, so the reply does not wait for it (#183).
+        .task(id: agent.id) { await model.prewarm(agent.id, .opened) }
         .onChange(of: text) {
             selectedCommand = 0
             selectedMention = 0
@@ -128,6 +130,8 @@ struct PromptBar: View {
             if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
             updateMentions()
             keepDraft()
+            // Typing is a prompt coming (#183).
+            if !text.isEmpty { Task { await model.prewarm(agent.id, .typing) } }
         }
         .onChange(of: attachments) { keepDraft() }
         // A new one is a new turn's worth, so it comes back from having been dismissed.

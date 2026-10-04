@@ -1183,6 +1183,27 @@ export class Store extends Work {
     return (await this.link.call("options/remembered", { runtimeID, cwd: folder as never }, host).catch(() => null)) ?? [];
   }
 
+  /** When this page last asked to warm each session, and why (#183). */
+  private readonly prewarmed = new Map<string, number>();
+
+  /**
+   * Ask a session's host to start its runtime ahead of a prompt (#183): it was opened, or
+   * somebody is typing in it. Once per session and reason in a while, however many keys;
+   * the host debounces too. Silent: an older host that does not know the call is not warmed.
+   */
+  prewarm(host: string, agentID: string, why: "opened" | "typing"): void {
+    const agent = this.agent(host, agentID);
+    if (!agent || (agent.state !== "finished" && agent.state !== "stopped")) return;
+    const key = `${host}|${agentID}|${why}`;
+    const now = Date.now();
+    if (now - (this.prewarmed.get(key) ?? 0) < 15_000) return;
+    this.prewarmed.set(key, now);
+    if (this.prewarmed.size > 64) {
+      for (const [k, at] of this.prewarmed) if (now - at >= 15_000) this.prewarmed.delete(k);
+    }
+    void this.link.call("agents/prewarm", { agentID: agentID as UUID, why }, host).catch(() => {});
+  }
+
   /** Mark as Unread / Mark as Read (#70). */
   async setUnread(host: string, agentID: string, unread: boolean): Promise<void> {
     await this.act("agents/setUnread", { agentID: agentID as UUID, unread }, host);

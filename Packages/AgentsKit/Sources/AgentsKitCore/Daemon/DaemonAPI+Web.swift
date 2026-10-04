@@ -89,6 +89,7 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.agentsRecreateWorktree, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetUnread, params: SetUnreadRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.agentsPrewarm, params: PrewarmRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnarchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSetLabels, params: SetLabelsRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetOption, params: SetOptionRequest.self, result: [ConfigOption].self, kind: .hostRequest),

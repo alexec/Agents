@@ -48,6 +48,8 @@ final class AppModel {
     /// Its wait, and the control plane watch's, both cut short by a wake or a network
     /// change (#82).
     @ObservationIgnored private let backoff = Backoff()
+    /// When this window last asked each session's host to warm it, and why (#183).
+    @ObservationIgnored private var prewarmed: [String: Date] = [:]
     @ObservationIgnored private let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(2))
     @ObservationIgnored private let wakeAndNetwork = WakeAndNetwork()
     @ObservationIgnored private var checkingAfterWake = false
@@ -3008,6 +3010,20 @@ final class AppModel {
     }
 
     /// Mark as Unread / Mark as Read, from the row's menu (#70).
+    /// Ask the session's host to start its runtime ahead of a prompt (#183): the session
+    /// was opened, or somebody is typing in its box. Once per session and reason in a
+    /// while, however many keys are pressed; the host debounces too. Silent either way:
+    /// an older host that does not know the call is simply not warmed.
+    func prewarm(_ id: UUID, _ why: DaemonAPI.PrewarmRequest.Why) async {
+        guard let agent = work.agent(id), agent.state == .finished || agent.state == .stopped else { return }
+        let key = "\(id) \(why.rawValue)"
+        if let last = prewarmed[key], Date().timeIntervalSince(last) < 15 { return }
+        prewarmed[key] = Date()
+        if prewarmed.count > 64 { prewarmed = prewarmed.filter { Date().timeIntervalSince($0.value) < 15 } }
+        _ = try? await client(forAgent: id).call(DaemonAPI.Method.agentsPrewarm,
+                                                 DaemonAPI.PrewarmRequest(agentID: id, why: why))
+    }
+
     func setUnread(_ id: UUID, _ unread: Bool) async {
         await attempt {
             try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetUnread,

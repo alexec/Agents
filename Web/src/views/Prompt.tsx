@@ -16,7 +16,7 @@ import { Telling } from "./Telling";
 /** A send usually lands before anyone could read a word; words only for one still going after this. */
 const slowSend = 400;
 
-export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, children }: {
+export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, onTyping, children }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -36,6 +36,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   runtime?: ComponentChildren;
   /** The menus, or what is said in their place: under the input. */
   children?: ComponentChildren;
+  /** Something was typed: a prompt is coming, so its runtime can start now (#183). */
+  onTyping?: () => void;
 }) {
   const kept = store.drafts.get(draftKey);
   const text = useSignal(kept?.text ?? "");
@@ -142,7 +144,11 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
           {/* Never disabled: what is typed while the link is down is kept and sent once it's back (US7). */}
           <textarea aria-label="Prompt" placeholder={placeholder} rows={2} value={text.value}
             readOnly={starting && sending.value}
-            onInput={(e) => { text.value = (e.currentTarget as HTMLTextAreaElement).value; keep(); }}
+            onInput={(e) => {
+              text.value = (e.currentTarget as HTMLTextAreaElement).value;
+              keep();
+              if (text.value) onTyping?.();
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();

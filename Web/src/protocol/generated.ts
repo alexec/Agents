@@ -1013,6 +1013,13 @@ export interface PresenceReport {
   mayNotify?: boolean;
 }
 
+export interface PrewarmRequest {
+  agentID: UUID;
+  why: PrewarmRequestWhy;
+}
+
+export type PrewarmRequestWhy = "opened" | "typing";
+
 export interface Project {
   folder: URLString;
   archivedAt?: WireDate;
@@ -1758,6 +1765,7 @@ export interface Methods {
   "agents/list": { params: ListRequest; result: Agent[] };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
   "agents/park": { params: AgentRequest; result: Empty };
+  "agents/prewarm": { params: PrewarmRequest; result: Empty };
   "agents/prompt": { params: PromptRequest; result: Empty };
   "agents/recreateWorktree": { params: AgentRequest; result: Agent };
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
@@ -1834,6 +1842,7 @@ export const MethodTarget = {
   "agents/list": "host",
   "agents/options": "host",
   "agents/park": "host",
+  "agents/prewarm": "host",
   "agents/prompt": "host",
   "agents/recreateWorktree": "host",
   "agents/sendNow": "host",
@@ -2032,6 +2041,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify"] },
+  PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits"] },
   ProjectPins: { required: ["folder", "pins"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },

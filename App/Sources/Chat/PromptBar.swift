@@ -171,6 +171,10 @@ struct PromptBar: View {
         // page's bar. The chat's own bar, on its way out, has no agent by then either,
         // so it is told apart by being the one whose folder is not fixed.
         .onChange(of: requests.wantsPromptFocus, initial: true) { takeFocusIfAsked() }
+        // Opened: its runtime starts now, so the reply does not wait for it (#183).
+        .task(id: agent?.id) {
+            if let id = agent?.id { await model.prewarm(id, .opened) }
+        }
         // Words offered from elsewhere on the page. They land in the field, focused
         // and unsent, the same as a suggestion taken with Tab.
         .onChange(of: model.offeredPrompt) {
@@ -444,6 +448,8 @@ struct PromptBar: View {
                     if dismissedCommandTerm != commandQuery?.term { dismissedCommandTerm = nil }
                     if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
                     updateMentions()
+                    // Typing is a prompt coming (#183).
+                    if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
                 }
 
             Button(action: chooseAttachment) {
