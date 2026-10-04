@@ -45,7 +45,7 @@ struct RuntimeDiesMidTurnTests {
     }
 
     private func eventually(_ what: String, _ check: () async -> Bool) async {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+        let deadline = ContinuousClock.now.advanced(by: Eventually.timeout)
         while ContinuousClock.now < deadline {
             if await check() { return }
             try? await Task.sleep(for: .milliseconds(50))

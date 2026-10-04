@@ -8,6 +8,10 @@ import Testing
 /// and `Shared/UI` are read from disk the way `MarkdownBlockTests` reads the specs.
 /// Each was proved to bite by putting a literal back and watching it fail (quickstart
 /// section 2); a regex that matches nothing is a green test that protects nothing.
+///
+/// Async, though nothing in them waits: a synchronous test runs on the main actor, and
+/// these scans held it for a minute on a loaded machine, past the time limit of every
+/// suite that needs it (#225).
 @Suite("The layout agrees with itself")
 struct ConsistencyTests {
     // MARK: Where the sources are
@@ -74,7 +78,7 @@ struct ConsistencyTests {
          why: "the window's first run outlines its usual choice, Set one up on this Mac, in the accent, as approved frame K does (058)"),
     ]
 
-    @Test func noCallSiteNamesAStateColourItself() throws {
+    @Test func noCallSiteNamesAStateColourItself() async throws {
         // `.red`, `.orange`, `.green` and the accent are the four things a call site
         // reached for before 018, and `StateTint` is now the only place that may.
         let literal = try Regex(#"\.(red|orange|green|accentColor)\b"#)
@@ -130,7 +134,7 @@ struct ConsistencyTests {
             || above.localizedCaseInsensitiveContains("decorative")
     }
 
-    @Test func noViewNamesAFontItself() throws {
+    @Test func noViewNamesAFontItself() async throws {
         var violations: [String] = []
         var read = 0
         for source in try Self.sources(under: Self.viewDirectories) {
@@ -157,7 +161,7 @@ struct ConsistencyTests {
             """)
     }
 
-    @Test func noTextIsPinnedToAPointSize() throws {
+    @Test func noTextIsPinnedToAPointSize() async throws {
         // FR-015: everything scales with the reader's text size. The fixed sizes left
         // are glyphs in capsules, wells and badges, and each says so on the line above.
         let pinned = try Regex(#"\.system\(size:"#)
@@ -181,7 +185,7 @@ struct ConsistencyTests {
     /// because the failure it guards is not a call site drifting — it is somebody
     /// adding a fifth step to avoid choosing between two that exist, which is how the
     /// app got to eight in the first place.
-    @Test func theScaleStaysFourStepsAndCode() throws {
+    @Test func theScaleStaysFourStepsAndCode() async throws {
         let definition = try Self.sources(under: ["Shared/UI"])
             .first { $0.path == Self.scaleDefinition }
         // The enum's own cases, not the switch labels that resolve them: a `case` line
@@ -226,7 +230,7 @@ struct ConsistencyTests {
     /// surface, is a margin standing in for the measure.
     private static let marginSize = 20
 
-    @Test func noChatSurfaceKeepsAGutterOfItsOwn() throws {
+    @Test func noChatSurfaceKeepsAGutterOfItsOwn() async throws {
         // A numeric literal at or above the margin size, or anything that is not a
         // literal at all — `Self.gutter` was how the project page kept its own copy.
         let padding = /\.padding\(\.horizontal,\s*([^)]+)\)/
@@ -267,7 +271,7 @@ struct ConsistencyTests {
     }
 
     /// The check above, against lines that must and must not trip it.
-    @Test func theStartingWordScanCatchesWhatItIsFor() {
+    @Test func theStartingWordScanCatchesWhatItIsFor() async {
         #expect(Self.spellsOutStarting(#"case .starting: return "Starting""#))
         #expect(Self.spellsOutStarting(#"    Text("Starting")"#))
         // The constant itself is the fix, not a violation.
@@ -286,7 +290,7 @@ struct ConsistencyTests {
     /// today — `AgentRow` says "Waiting for your answer" where its own accessibility
     /// label says "Waiting on you" — so there is no shared `AgentState.label` to point
     /// a wider check at. Unifying those is 018's argument, not 020's.
-    @Test func noCallSiteSpellsOutTheWordForAStartingAgent() throws {
+    @Test func noCallSiteSpellsOutTheWordForAStartingAgent() async throws {
         var violations: [String] = []
         var scanned = 0
         for source in try Self.sources(under: ["App/Sources", "Remote/Sources", "Shared/UI"]) {
@@ -330,7 +334,7 @@ struct ConsistencyTests {
     }
 
     /// Both checks, against lines that must and must not trip them.
-    @Test func theChatScansCatchWhatTheyAreFor() {
+    @Test func theChatScansCatchWhatTheyAreFor() async {
         #expect(Self.declaredType("private struct ToolRunRow: View {") == "ToolRunRow")
         #expect(Self.declaredType("struct EntryView: View {") == "EntryView")
         #expect(Self.declaredType("    let row = ToolRunRow(calls: [])") == nil)
@@ -342,7 +346,7 @@ struct ConsistencyTests {
         #expect(Self.sentences(#"// "Say what next, and it goes when this turn ends""#).isEmpty)
     }
 
-    @Test func thePhoneDrawsTheSharedChatRatherThanItsOwn() throws {
+    @Test func thePhoneDrawsTheSharedChatRatherThanItsOwn() async throws {
         var violations: [String] = []
         var scanned = 0
         for source in try Self.sources(under: ["Remote/Sources", "App/Sources"]) {
@@ -370,7 +374,7 @@ struct ConsistencyTests {
 
     /// The page is one page on the Mac and the phone. Two `MarkdownText`s drifted once;
     /// this is what stops two pages doing the same.
-    @Test func neitherAppHasAPageOfItsOwn() throws {
+    @Test func neitherAppHasAPageOfItsOwn() async throws {
         var violations: [String] = []
         var scanned = 0
         for source in try Self.sources(under: ["Remote/Sources", "App/Sources"]) {
@@ -393,7 +397,7 @@ struct ConsistencyTests {
     ///
     /// The chat folders only: a settings screen that happens to share a phrase with a
     /// phone screen is not what this is about.
-    @Test func noSentenceInTheChatIsWrittenTwice() throws {
+    @Test func noSentenceInTheChatIsWrittenTwice() async throws {
         func sentences(under directory: String) throws -> [String: String] {
             var found: [String: String] = [:]
             for source in try Self.sources(under: [directory]) {
@@ -448,7 +452,7 @@ struct ConsistencyTests {
         ("Remote", "Remote/Info.plist", ["Remote/Sources", "Shared/UI"]),
     ]
 
-    @Test func everyAppThatAsksForAProtectedResourceSaysWhyInItsOwnWords() throws {
+    @Test func everyAppThatAsksForAProtectedResourceSaysWhyInItsOwnWords() async throws {
         // XcodeGen writes each Info.plist from the properties in `project.yml`, so both
         // have to agree: a string in the plist and not in the yml is written straight
         // back out again on the next generate, and the app loses it where it matters.
@@ -501,7 +505,7 @@ struct ConsistencyTests {
         return protectedResources.filter { code.contains($0.call) }
     }
 
-    @Test func theProtectedResourceScanCatchesWhatItIsFor() {
+    @Test func theProtectedResourceScanCatchesWhatItIsFor() async {
         #expect(Self.resourcesAskedFor(in: "        await AVCaptureDevice.requestAccess(for: .audio)").map(\.key)
                 == ["NSMicrophoneUsageDescription"])
         #expect(Self.resourcesAskedFor(in: "        await AVCaptureDevice.requestAccess(for: .video)").map(\.key)

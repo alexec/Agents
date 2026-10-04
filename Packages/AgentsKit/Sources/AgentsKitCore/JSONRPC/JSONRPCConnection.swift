@@ -179,16 +179,20 @@ public actor JSONRPCConnection {
     /// Call the other side and wait for its answer: for ever, or for `timeout` and then
     /// `JSONRPCTimeout` (#166). The call is forgotten at the deadline, so an answer that
     /// comes after it is dropped like any reply nobody asked for.
+    ///
+    /// `waitingOut` is what the deadline waits on: the clock, unless a test says when the
+    /// deadline comes (#225).
     @discardableResult
     public func call(_ method: String, _ params: JSONValue? = nil,
-                     timeout: Duration? = nil) async throws -> JSONValue {
+                     timeout: Duration? = nil,
+                     waitingOut: (@Sendable (Duration) async -> Void)? = nil) async throws -> JSONValue {
         guard !closed.isSet else { throw JSONRPCTransportError.closed }
         guard readTask != nil else { throw JSONRPCTransportError.notStarted }
         nextID += 1
         let id = JSONRPCID.number(nextID)
         let timer = timeout.map { timeout in
             Task { [weak self] in
-                try? await Task.sleep(for: timeout)
+                if let waitingOut { await waitingOut(timeout) } else { try? await Task.sleep(for: timeout) }
                 guard !Task.isCancelled else { return }
                 await self?.expire(id, JSONRPCTimeout(method: method, after: timeout))
             }

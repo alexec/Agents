@@ -80,8 +80,10 @@ if [ $master = 1 ]; then
         # `wait` and not a foreground sleep: sh runs a trap only once the foreground
         # command returns, which made every -O exit take up to a second.
         # Its pid goes where a relay's would, so a master killed outright leaves
-        # nothing that the next master or FakeSSH.tearDown does not stop.
-        sleep 2147483647 &
+        # nothing that the next master or FakeSSH.tearDown does not stop. It names $ctl
+        # in its arguments, as the relay does, so tearDown can tell it from a process
+        # that was given the same pid later (#225).
+        /usr/bin/python3 -c 'import signal; signal.pause()' "$ctl" &
         sleeper=$!
         echo $sleeper > "$ctl.relay"
         trap 'kill $sleeper 2>/dev/null; rm -f "$ctl" "$ctl.relay"; exit 0' TERM INT

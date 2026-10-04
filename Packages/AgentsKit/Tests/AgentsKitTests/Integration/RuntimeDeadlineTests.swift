@@ -6,18 +6,35 @@ import Testing
 /// Runtimes that hang, in each place one can (#166): the handshake, a new conversation, a
 /// pick-up's load, and a turn that goes silent. Each is ended with its reason, and the
 /// others carry on meanwhile.
-@Suite("Runtime deadlines", .timeLimit(.minutes(1)))
+@Suite("Runtime deadlines", .timeLimit(.minutes(2)))
 struct RuntimeDeadlineTests {
-    /// Short enough for a test, long enough that a fake that does answer always does.
-    static let short = RuntimeDeadlines(handshake: .milliseconds(300), start: .milliseconds(300),
-                                        load: .milliseconds(300), silence: .milliseconds(400))
+    /// The phase a test is about given a moment, and every other a minute: a fake that
+    /// answers at once does not miss a deadline the test is not about, however loaded the
+    /// machine (#225).
+    static func short(_ phase: RuntimeDeadlines.Phase) -> RuntimeDeadlines {
+        var deadlines = patient
+        switch phase {
+        case .handshake: deadlines.handshake = .milliseconds(300)
+        case .start: deadlines.start = .milliseconds(300)
+        case .load: deadlines.load = .milliseconds(300)
+        case .turn: deadlines.silence = .milliseconds(400)
+        }
+        return deadlines
+    }
+
+    /// A minute for everything: never reached by a fake that answers.
+    static let patient = RuntimeDeadlines(handshake: .seconds(60), start: .seconds(60),
+                                          load: .seconds(60), silence: .seconds(60))
+
+    /// Longer than any test here: a fake that never answers, as far as the test can tell.
+    static let never = Duration.seconds(3600)
 
     // MARK: Starting
 
     @Test func aHandshakeThatNeverComesIsEndedWithItsReason() async throws {
         var script = FakeACPAgent.Script()
-        script.handshakeDelay = .seconds(30)
-        let (core, _, work) = try make(FakeLauncher(script: script, deadlines: Self.short))
+        script.handshakeDelay = Self.never
+        let (core, _, work) = try make(FakeLauncher(script: script, deadlines: Self.short(.handshake)))
         let error = await #expect(throws: JSONRPCError.self) {
             try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
         }
@@ -28,8 +45,8 @@ struct RuntimeDeadlineTests {
 
     @Test func aConversationThatNeverStartsIsEndedWithItsReason() async throws {
         var script = FakeACPAgent.Script()
-        script.newSessionDelay = .seconds(30)
-        let (core, _, work) = try make(FakeLauncher(script: script, deadlines: Self.short))
+        script.newSessionDelay = Self.never
+        let (core, _, work) = try make(FakeLauncher(script: script, deadlines: Self.short(.start)))
         let error = await #expect(throws: JSONRPCError.self) {
             try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
         }
@@ -41,8 +58,8 @@ struct RuntimeDeadlineTests {
     /// thrown away for a new one just because the runtime was slow.
     @Test func aPickUpWhoseLoadHangsIsEndedWithItsReason() async throws {
         var script = FakeACPAgent.Script()
-        script.loadDelay = .seconds(30)
-        let launcher = FakeLauncher(script: script, deadlines: Self.short)
+        script.loadDelay = Self.never
+        let launcher = FakeLauncher(script: script, deadlines: Self.short(.load))
         let (core, store, work) = try make(launcher)
         let hung = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s")
         try await store.save(hung)
@@ -63,9 +80,12 @@ struct RuntimeDeadlineTests {
     // MARK: A silent turn
 
     @Test func aTurnThatGoesSilentIsEndedWithItsReason() async throws {
+        // A turn that never ends by itself, however long the silence takes to be seen.
+        let gate = TurnGate()
+        defer { gate.open() }
         var script = FakeACPAgent.Script()
-        script.turnDelay = .seconds(30)
-        let (core, store, work) = try make(FakeLauncher(script: script, deadlines: Self.short))
+        script.gate = gate
+        let (core, store, work) = try make(FakeLauncher(script: script, deadlines: Self.short(.turn)))
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
 
         await eventually("it was ended") { await core.agent(id)?.state == .stopped }
@@ -78,14 +98,32 @@ struct RuntimeDeadlineTests {
     }
 
     /// A build, a test run, the app's own `wait_for_event`: quiet, and working.
+    ///
+    /// The watch is asked to look from an hour on, long past its minute, while the tool
+    /// call is open: the same look that ends a silent turn, with no race between the tool
+    /// call arriving and a short deadline on the clock (#225).
     @Test func aToolCallStillOpenIsNotSilence() async throws {
+        let gate = TurnGate()
+        defer { gate.open() }
         var script = FakeACPAgent.Script()
         script.updates = [["sessionUpdate": "tool_call", "toolCallId": "t1", "title": "Build",
                            "kind": "execute", "status": "in_progress"]]
-        script.delayAfterUpdates = .milliseconds(1500)
-        let (core, _, work) = try make(FakeLauncher(script: script, deadlines: Self.short))
+        script.gate = gate
+        let (core, _, work) = try make(FakeLauncher(script: script, deadlines: Self.patient))
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
 
+        await eventually("the tool call is open, and the turn quiet at the gate") {
+            guard gate.turnsArrived == 1 else { return false }
+            let entries = (try? await core.transcript(.init(agentID: id)).entries) ?? []
+            return entries.contains { if case .toolCall = $0.kind { true } else { false } }
+        }
+        let session = try #require(await core.live[id])
+        #expect(await session.silence(at: ContinuousClock.now.advanced(by: .seconds(3600))) == nil, "an open tool call is not silence")
+        _ = await core.lookForSilence(at: ContinuousClock.now.advanced(by: .seconds(3600)))
+        #expect(await core.agent(id)?.state.hasTurnInFlight == true, "still working after the watch looked")
+        #expect(await core.silencedTurns.isEmpty)
+
+        gate.open()
         await eventually("the turn ended by itself") { await core.agent(id)?.state.hasTurnInFlight == false }
         #expect(await core.agent(id)?.endedReason == .endTurn)
         #expect(await !self.notes(core, id).contains { $0.contains("said nothing") })
@@ -95,14 +133,21 @@ struct RuntimeDeadlineTests {
 
     /// The most recent chat hangs on its load and holds its lane; the other two come back
     /// through the other one meanwhile. Then it is let go at its deadline.
+    ///
+    /// The load deadline comes when the test says, not after three real seconds: on a busy
+    /// machine the other two can take longer than that to come back (#225).
     @Test func aHungPickUpDoesNotHoldUpTheOthers() async throws {
         var hangs = FakeACPAgent.Script()
-        hangs.loadDelay = .seconds(30)
+        hangs.loadDelay = Self.never
         var works = FakeACPAgent.Script()
         works.turnDelay = .milliseconds(100)
-        let deadlines = RuntimeDeadlines(handshake: .seconds(30), start: .seconds(30),
-                                         load: .seconds(3), silence: .seconds(30))
-        let launcher = FakeLauncher(script: works, then: [hangs], deadlines: deadlines)
+        let deadlines = RuntimeDeadlines(handshake: .seconds(60), start: .seconds(60),
+                                         load: .seconds(3), silence: .seconds(60))
+        let loadDeadline = TurnGate()
+        defer { loadDeadline.open() }
+        let launcher = FakeLauncher(script: works, then: [hangs], deadlines: deadlines) { phase, after in
+            if phase == .load { await loadDeadline.pass() } else { try? await Task.sleep(for: after) }
+        }
         let (core, store, work) = try make(launcher)
         let now = Date()
         let hung = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "h", lastActivityAt: now)
@@ -117,7 +162,10 @@ struct RuntimeDeadlineTests {
             let a = await core.agent(second.id)?.state, b = await core.agent(third.id)?.state
             return a == .finished && b == .finished
         }
-        #expect(await core.stillResuming() == [hung.id], "while the hung one still holds its lane")
+        // It cannot leave before its deadline, which has not come: waiting is only for the
+        // other two to be taken off the queue.
+        await eventually("while the hung one still holds its lane") { await core.stillResuming() == [hung.id] }
+        loadDeadline.open()
         await eventually("then it was let go with its reason") {
             await self.notes(core, hung.id).contains { $0.contains("did not pick its conversation back up in 3 seconds") }
         }
@@ -132,7 +180,7 @@ struct RuntimeDeadlineTests {
         let session = try ACPSession.launch(executable: URL(filePath: "/bin/sh"), arguments: ["-c", "sleep 60"],
                                             cwd: URL(filePath: "/tmp", directoryHint: .isDirectory),
                                             environment: [:],
-                                            launch: RuntimeLaunch(runtimeID: "fake", deadlines: Self.short))
+                                            launch: RuntimeLaunch(runtimeID: "fake", deadlines: Self.short(.handshake)))
         let process = try #require(await session.runtimeProcess)
         await #expect(throws: RuntimeDidNotAnswer(phase: .handshake, after: .milliseconds(300))) {
             try await session.initialize()
@@ -155,8 +203,9 @@ struct RuntimeDeadlineTests {
             try await connection.call("slow", nil, timeout: .milliseconds(50))
         }
         try await Task.sleep(for: .milliseconds(400))
-        // The connection is still good for the next call.
-        #expect(try await connection.call("slow", nil, timeout: .seconds(5)) == "late")
+        // The connection is still good for the next call: given long enough that only a
+        // broken connection misses it.
+        #expect(try await connection.call("slow", nil, timeout: .seconds(60)) == "late")
     }
 
     // MARK: Helpers
@@ -177,8 +226,10 @@ struct RuntimeDeadlineTests {
         return entries.compactMap { if case .runtimeNote(let text) = $0.kind { text } else { nil } }
     }
 
+    /// Generous, since it returns as soon as `check` holds: only a test that was going to
+    /// fail waits it out.
     private func eventually(_ what: String, _ check: () async -> Bool) async {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+        let deadline = ContinuousClock.now.advanced(by: .seconds(60))
         while ContinuousClock.now < deadline {
             if await check() { return }
             try? await Task.sleep(for: .milliseconds(50))

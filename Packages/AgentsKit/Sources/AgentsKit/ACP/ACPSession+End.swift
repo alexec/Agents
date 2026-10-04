@@ -1,25 +1,43 @@
 import Foundation
 
 /// Lets a process's exit reach the session that was made after it.
+///
+/// The process is running before the session exists, so it can say something on stderr
+/// and die in that moment: a runtime that refuses to start does exactly that, and a
+/// loaded machine widens the moment. What arrives before the handlers is kept and handed
+/// to them when they come, rather than dropped, which left the session's event stream
+/// open for good (#225).
 final class ExitRelay: @unchecked Sendable {
     private let lock = NSLock()
     private var handler: (@Sendable (Int32) -> Void)?
     private var errorHandler: (@Sendable (String) -> Void)?
+    private var earlyExit: Int32?
+    private var earlyErrors: [String] = []
 
     func setHandlers(exit: @escaping @Sendable (Int32) -> Void, error: @escaping @Sendable (String) -> Void) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
         handler = exit
         errorHandler = error
+        let errors = earlyErrors, status = earlyExit
+        earlyErrors = []
+        earlyExit = nil
+        lock.unlock()
+        for text in errors { error(text) }
+        if let status { exit(status) }
     }
 
     func exited(_ status: Int32) {
-        lock.lock(); let h = handler; lock.unlock()
-        h?(status)
+        lock.lock()
+        guard let h = handler else { earlyExit = status; lock.unlock(); return }
+        lock.unlock()
+        h(status)
     }
 
     func errored(_ text: String) {
-        lock.lock(); let h = errorHandler; lock.unlock()
-        h?(text)
+        lock.lock()
+        guard let h = errorHandler else { earlyErrors.append(text); lock.unlock(); return }
+        lock.unlock()
+        h(text)
     }
 }
 

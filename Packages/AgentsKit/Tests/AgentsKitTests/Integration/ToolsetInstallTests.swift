@@ -6,7 +6,7 @@ import Testing
 extension FakeSSHSuites {
     /// Putting Claude's toolset on a server (043, contracts/ssh.md §§ 1–4), against the fake
     /// ssh with a toolset small enough to install in a test.
-    @Suite("Installing Claude on a server")
+    @Suite("Installing Claude on a server", .timeLimit(.minutes(1)))
     struct ToolsetInstallTests {
         struct Setup {
             let fake: FakeSSH

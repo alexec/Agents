@@ -661,29 +661,38 @@ struct DaemonTests {
     @Test func theyAreStartedTwoAtATime() async throws {
         let (locations, work) = try temporary()
         let store = try AgentStore(locations: locations)
-        var script = FakeACPAgent.Script()
-        script.handshakeDelay = .milliseconds(200)
-        // Long enough that no turn ends while the four are still starting. A turn that
+        // Every turn held, so none ends while the four are still starting. A turn that
         // ends without saying how it went is asked, and that question starts a runtime
-        // of its own — which would land between two pick-ups and read as a short gap.
-        script.turnDelay = .seconds(2)
+        // of its own — which would land between two pick-ups and count as one.
+        let turns = TurnGate()
+        var script = FakeACPAgent.Script()
+        script.gate = turns
         for _ in 0..<4 {
             try await store.save(Agent(runtimeID: "grok", cwd: work, state: .running,
                                        runtimeSessionID: "s", lastActivityAt: Date()))
         }
 
-        let launcher = FakeLauncher(script: script)
-        let core = try core(launcher, locations: locations)
+        // And every runtime still starting until the test lets it, so "at once" is what
+        // the daemon did rather than how quick the machine was.
+        let launcher = HeldStartLauncher(script: script)
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: launcher)
+        defer { launcher.letAllStart(); turns.open() }
         await core.pickUpAfterRestart(await core.recover())
 
-        await eventually("all four were started") { launcher.launchCount == 4 }
-        let at = launcher.launches.map(\.at)
-        try #require(at.count == 4)
-        // The first two together, and each after that a handshake behind the one two
-        // before it: its lane was busy until then.
-        #expect(at[1] - at[0] < .milliseconds(150), "the first two started together")
-        #expect(zip(at.dropFirst(2), at).allSatisfy { $0 - $1 >= .milliseconds(150) },
-                "never more than two at once: \(launcher.gapsBetweenLaunches)")
+        await eventually("the first two were started together") { launcher.launchCount == 2 }
+        // Proving a third did not start: time passing is the assertion.
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(launcher.launchCount == 2, "never more than two at once")
+
+        // Each after that only once a lane is free.
+        launcher.letStart(0)
+        await eventually("the third once the first was up") { launcher.launchCount == 3 }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(launcher.launchCount == 3, "the fourth waits while two are still starting")
+
+        launcher.letStart(1)
+        await eventually("the fourth once the second was up") { launcher.launchCount == 4 }
     }
 
     /// No loop guard (Alex, 2026-09-21): a chat cut off on the very turn it was brought
@@ -887,10 +896,10 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
         await core.pickUpAfterRestart(await core.recover())
 
-        await eventually("both prompts went") {
-            guard let agent = await core.agent(wasRunning.id) else { return false }
-            return agent.queuedPrompts.isEmpty && agent.state != .running
-        }
+        // Settled, not only an empty queue: the second prompt leaves the queue as its
+        // runtime starts, and is on the record only once its turn begins. Three turns
+        // apiece starting a runtime, which a loaded machine takes its time over.
+        await settled(core, wasRunning.id, "both prompts went", within: Eventually.chain)
         let page = try await core.transcript(.init(agentID: wasRunning.id))
         let prompts = page.entries.compactMap { entry -> String? in
             guard case .userMessage(let text, _, _) = entry.kind else { return nil }

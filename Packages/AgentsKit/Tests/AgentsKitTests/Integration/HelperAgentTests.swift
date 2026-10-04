@@ -642,6 +642,14 @@ struct HelperAgentTests {
         return FakeLauncher(script: script)
     }
 
+    /// Turns held until the test opens the gate: for a test that needs them still going
+    /// at its end, which five seconds is not on a busy machine (#225).
+    private func heldTurns(_ gate: TurnGate) -> FakeLauncher {
+        var script = FakeACPAgent.Script()
+        script.gate = gate
+        return FakeLauncher(script: script)
+    }
+
     @Test func stoppingOneItStartedSaysWhoStoppedIt() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
@@ -744,7 +752,9 @@ struct HelperAgentTests {
     @Test func everyAgentThatIsNotItsOwnIsRefusedAndNothingMoves() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        let core = try await makeCore(locations, longTurns())
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
         let (lead, token) = try await caller(core, in: work)
         let (other, otherToken) = try await caller(core, in: work, title: "Other")
         let persons = other
@@ -789,12 +799,19 @@ struct HelperAgentTests {
 
     /// A helper of its own, finished and let go, so an archive is not undone by the
     /// outcome ask picking it back up.
+    ///
+    /// Past the ask's own turn, not only the ask: the flag goes up with the question on
+    /// the queue and the runtime still to start, and a busy machine leaves the helper
+    /// looking finished there for long enough to archive it under the question.
     private func settledHelper(_ core: DaemonCore, _ token: String, _ name: String) async throws -> UUID {
         let id = try await start(core, token, name)
         _ = await eventually("\(name) settled") {
-            let agent = await core.agent(id)
+            guard let agent = await core.agent(id) else { return false }
+            let turning = await core.turnTasks[id] != nil
+            let sending = await core.sending.contains(id)
             let released = await core.live[id] == nil
-            return agent?.outcomeAsked == true && agent?.state.holdsRuntime == false && released
+            return agent.outcomeAsked && !agent.state.holdsRuntime && agent.queuedPrompts.isEmpty
+                && !turning && !sending && released
         }
         return id
     }
@@ -850,7 +867,9 @@ struct HelperAgentTests {
     @Test func aHelperStillWorkingIsNotArchived() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        let core = try await makeCore(locations, longTurns())
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
         let (_, token) = try await caller(core, in: work)
         let helper = try await start(core, token, "Alpha")
         _ = await eventually("the helper is working") { await core.agent(helper)?.state == .running }

@@ -4,7 +4,7 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-@Suite("A program on a pseudo-terminal")
+@Suite("A program on a pseudo-terminal", .timeLimit(.minutes(1)))
 struct PTYTests {
     /// Collects output until the program exits, or until time runs out.
     private final class Collector: @unchecked Sendable {
@@ -67,11 +67,11 @@ struct PTYTests {
                           cols: cols,
                           onOutput: { collector.append($0) },
                           onExit: { collector.finish($0) })
-        _ = pty
         _ = await collector.waitForExit()
         if let saying {
             await eventually("the program's output reached us") { collector.text.contains(saying) }
         }
+        withExtendedLifetime(pty) {}
         return collector
     }
 
@@ -88,7 +88,7 @@ struct PTYTests {
         #expect(output.contains("40 120"))
     }
 
-    @Test(.flakyUnderLoad) func aProgramSeesATerminalOnItsOutput() async throws {
+    @Test func aProgramSeesATerminalOnItsOutput() async throws {
         let (output, _) = try await run("test -t 1 && echo yes || echo no", saying: "yes")
         #expect(output.contains("yes"))
     }

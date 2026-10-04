@@ -33,14 +33,20 @@ struct ConnectionRoleTests {
         return fd
     }
 
+    /// How long to wait for a line that is owed. Generous, because a loaded machine can
+    /// take many seconds to answer and no answer reads as "not refused"; it is only
+    /// waited out by a test that is failing, since a read returns with its line.
+    private static let answerWait: TimeInterval = 30
+
     /// One request, and the one line that answers it.
     private func ask(_ fd: Int32, _ method: String, _ params: String = "{}") async -> [String: Any]? {
+        send(fd, method, params)
+        return await readLine(fd, deadline: Date().addingTimeInterval(Self.answerWait))
+    }
+
+    private func send(_ fd: Int32, _ method: String, _ params: String = "{}") {
         let line = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\(method)\",\"params\":\(params)}\n"
         _ = line.withCString { Darwin.write(fd, $0, strlen($0)) }
-        // Five seconds, or `Eventually`'s longer wait on CI: a busy runner can take that
-        // long to answer, and no answer reads as "not refused".
-        let wait = max(5, Double(Eventually.timeout.components.seconds))
-        return await readLine(fd, deadline: Date().addingTimeInterval(wait))
     }
 
     /// Read off the pool: this blocks until the line or the deadline, and the daemon
@@ -207,7 +213,7 @@ struct ConnectionRoleTests {
         window.broadcast("agent/entry", ["secret": "for the window"])
         stranger.broadcast("agent/entry", ["secret": "for the window"])
 
-        #expect(await readLine(windowFD, deadline: Date().addingTimeInterval(max(5, Double(Eventually.timeout.components.seconds))))?["method"] as? String == "agent/entry")
+        #expect(await readLine(windowFD, deadline: Date().addingTimeInterval(Self.answerWait))?["method"] as? String == "agent/entry")
         #expect(await readLine(strangerFD, deadline: Date().addingTimeInterval(1)) == nil)
     }
 
@@ -264,8 +270,15 @@ struct ConnectionRoleTests {
 
         let fd = connect(path)
         defer { close(fd) }
-        #expect(errorCode(await ask(fd, DaemonAPI.Method.connectionBindDevice, "{\"id\":\"\(UUID().uuidString)\"}")) == nil)
-        let told = await readLine(fd, deadline: Date().addingTimeInterval(5))
+        // The answer and the news, in whichever order they come: the news is sent half a
+        // second after the binding, and on a loaded machine the answer can be later still.
+        send(fd, DaemonAPI.Method.connectionBindDevice, "{\"id\":\"\(UUID().uuidString)\"}")
+        var answer: [String: Any]?, told: [String: Any]?
+        let deadline = Date().addingTimeInterval(Self.answerWait)
+        while answer == nil || told == nil, let line = await readLine(fd, deadline: deadline) {
+            if line["id"] != nil { answer = line } else { told = line }
+        }
+        #expect(answer != nil && errorCode(answer) == nil)
         #expect(told?["method"] as? String == DaemonAPI.Notification.controlMoved)
         let params = try JSONSerialization.data(withJSONObject: told?["params"] ?? [:])
         #expect(try JSONDecoder().decode(DaemonAPI.ControlMoved.self, from: params) == moved)

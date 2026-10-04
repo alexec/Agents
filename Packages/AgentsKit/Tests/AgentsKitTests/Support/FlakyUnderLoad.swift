@@ -14,14 +14,13 @@ extension Trait where Self == ConditionTrait {
     /// Written on the same line as `@Test`: `scripts/flaky-tests.sh` finds them by that
     /// to build the filter for that step.
     ///
+    /// Not for a performance budget either: a test that measures work against the clock
+    /// is `.perfBudget` (PerfBudget.swift), and only `scripts/perf-tests.sh` holds it to
+    /// the budget (#225). The 50 ms reconcile, the megabyte diff, the 6,000-entry folder
+    /// and the 200-file changes list moved there.
+    ///
     /// Quarantined:
-    /// - BigContentTests.aMegabyteDiffIsReadQuickly — 500 ms.
-    /// - ChangesTests.twoHundredFilesAreQuickToList — 1 s / 500 ms; failed on the
-    ///   runner 2026-09-26.
-    /// - FilesPaneScaleTests.aFolderOfFiftyThousandEntriesListsQuickly — 2 s.
     /// - SSHMasterTests.aMasterThatDiesIsNoticedWithinASecond — 1 s.
-    /// - PersonalDotAgentsTests.a100SkillReconcileIsQuick — 50 ms, best of three (054
-    ///   SC-005); failed once in a full local run, 2026-09-26.
     /// - LinkChooserTests.aQuietDirectLinkLosesAfterTheWindow — 4 s; took 35 s on the
     ///   runner 2026-09-26, still choosing the relay.
     /// - AttentionTests.theSettlingPauseIsNotStartedAgainByARestart — a 2 s pause, 1.5 s
@@ -33,8 +32,6 @@ extension Trait where Self == ConditionTrait {
     /// - PoolSwitchTests.anotherChatOnTheSpentRuntimeMovesBeforeItsNextTurn — takes two
     ///   turns and waits up to 30 s for the first chat's report before the second starts;
     ///   the suite was still running at the 10-minute CI cutoff (2026-09-28).
-    /// - QuietLinkTests.aMacThatNeverAnswersIsNotConnectedTo — expected under 10 s,
-    ///   took 29 s on a loaded CI runner.
     ///
     /// Slow quarantine, run manually from `.github/workflows/slow-tests.yml`:
     /// - RelayCarryingTests.aReplyOfFiveMegabytesArrivesWhole — 62 s on the shared
@@ -44,12 +41,6 @@ extension Trait where Self == ConditionTrait {
     ///   shared runner before failing to observe the rebuilt server's connected state.
     /// - CredentialStoreTests.replacingKeepsOnlyTheNewOne — 45 s writing twice to the
     ///   real login Keychain in a completed CI run.
-
-    /// And one that is not a budget but a bug, here until it is fixed rather than hidden
-    /// by a longer wait:
-    /// - PTYTests.aProgramSeesATerminalOnItsOutput — under load the program exited and
-    ///   none of its output ever arrived (45 s, 2026-09-26). A pty whose child exits
-    ///   first can lose what it wrote.
     static var flakyUnderLoad: Self {
         let environment = ProcessInfo.processInfo.environment
         return .disabled(if: environment["CI"] != nil && environment["AGENTS_RUN_FLAKY"] != "1",

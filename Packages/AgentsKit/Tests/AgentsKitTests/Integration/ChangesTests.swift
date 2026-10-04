@@ -349,7 +349,7 @@ struct ChangesTests {
     /// Two hundred changed files: the list under a second, a file under half a second.
     /// Measured, and printed, so the numbers can be written down; the bounds are the
     /// spec's, with room for a loaded machine.
-    @Test(.flakyUnderLoad) func twoHundredFilesAreQuickToList() async throws {
+    @Test(.perfBudget) func twoHundredFilesAreQuickToList() async throws {
         let (locations, work) = try temporary()
         try repository(at: work)
         var updates: [JSONValue] = []
@@ -386,7 +386,7 @@ struct ChangesTests {
             file.append(clock.now - started)
         }
         print("SC-004 changes/list x200: \(listing)  changes/file whole: \(file)")
-        #expect(listing.min()! < .seconds(1))
-        #expect(file.min()! < .milliseconds(500))
+        PerfBudget.expect(listing.min()!, under: .seconds(1), "changes/list of 200 files")
+        PerfBudget.expect(file.min()!, under: .milliseconds(500), "changes/file whole")
     }
 }

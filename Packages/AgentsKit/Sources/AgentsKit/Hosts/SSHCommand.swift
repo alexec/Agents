@@ -107,6 +107,12 @@ public struct SSHCommand: Sendable {
     ///
     /// Ended on `terminationHandler`, never `waitUntilExit`, which hangs off the main
     /// thread (memory: waitUntilExit hangs off the main thread).
+    ///
+    /// Done once it has exited and both pipes are at their end, as `ChildProcess` is: the
+    /// pipe's last bytes can still be in a read when the exit is heard, and a busy
+    /// machine left them out, so `shasum` came back empty (#225). Something left running
+    /// in the background can hold a pipe open, so the ends are waited for only a few
+    /// seconds past the exit.
     public func run(_ arguments: [String], stdin: URL? = nil) async throws -> Output {
         let process = Process()
         process.executableURL = executable
@@ -118,36 +124,75 @@ public struct SSHCommand: Sendable {
         process.standardInput = try stdin.map { try FileHandle(forReadingFrom: $0) } ?? FileHandle.nullDevice
 
         let collected = Collected()
-        // Empty is the end of the pipe, reported again and again until the handler goes
-        // (#163), and the end of a pipe can come well before the process's exit.
-        for (pipe, path) in [(out, \Collected.out), (err, \Collected.err)] {
-            pipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                if data.isEmpty { handle.readabilityHandler = nil } else { collected.append(data, to: path) }
+        return try await withCheckedThrowingContinuation { continuation in
+            collected.continuation = continuation
+            // Empty is the end of the pipe, reported again and again until the handler goes
+            // (#163), and the end of a pipe can come well before the process's exit.
+            for (pipe, path) in [(out, \Collected.out), (err, \Collected.err)] {
+                pipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if data.isEmpty {
+                        handle.readabilityHandler = nil
+                        collected.ended(path)
+                    } else {
+                        collected.append(data, to: path)
+                    }
+                }
+            }
+            process.terminationHandler = { finished in
+                collected.exited(finished.terminationStatus)
+                DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                    out.fileHandleForReading.readabilityHandler = nil
+                    err.fileHandleForReading.readabilityHandler = nil
+                    collected.finish()
+                }
+            }
+            do {
+                try process.run()
+            } catch {
+                out.fileHandleForReading.readabilityHandler = nil
+                err.fileHandleForReading.readabilityHandler = nil
+                collected.fail(error)
             }
         }
-
-        let status: Int32 = try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { finished in continuation.resume(returning: finished.terminationStatus) }
-            do { try process.run() } catch { continuation.resume(throwing: error) }
-        }
-        out.fileHandleForReading.readabilityHandler = nil
-        err.fileHandleForReading.readabilityHandler = nil
-        collected.append(out.fileHandleForReading.readDataToEndOfFile(), to: \.out)
-        collected.append(err.fileHandleForReading.readDataToEndOfFile(), to: \.err)
-        return Output(status: status, stdout: collected.string(\.out), stderr: collected.string(\.err))
     }
 
+    /// What one run has read, behind a lock; resumes its caller exactly once.
     private final class Collected: @unchecked Sendable {
         private let lock = NSLock()
+        var continuation: CheckedContinuation<Output, Error>?
         var out = Data(), err = Data()
+        private var status: Int32?
+        private var ends: Set<KeyPath<Collected, Data>> = []
+
         func append(_ data: Data, to path: ReferenceWritableKeyPath<Collected, Data>) {
-            guard !data.isEmpty else { return }
-            lock.lock(); self[keyPath: path].append(data); lock.unlock()
+            lock.withLock { self[keyPath: path].append(data) }
         }
-        func string(_ path: KeyPath<Collected, Data>) -> String {
-            lock.lock(); defer { lock.unlock() }
-            return String(decoding: self[keyPath: path], as: UTF8.self)
+
+        func ended(_ path: KeyPath<Collected, Data>) {
+            if lock.withLock({ ends.insert(path); return ends.count == 2 && status != nil }) { finish() }
+        }
+
+        func exited(_ code: Int32) {
+            if lock.withLock({ status = code; return ends.count == 2 }) { finish() }
+        }
+
+        func finish() {
+            let done: (CheckedContinuation<Output, Error>, Output)? = lock.withLock {
+                guard let continuation, let status else { return nil }
+                self.continuation = nil
+                return (continuation, Output(status: status, stdout: String(decoding: out, as: UTF8.self),
+                                             stderr: String(decoding: err, as: UTF8.self)))
+            }
+            if let (continuation, output) = done { continuation.resume(returning: output) }
+        }
+
+        func fail(_ error: Error) {
+            let pending: CheckedContinuation<Output, Error>? = lock.withLock {
+                defer { continuation = nil }
+                return continuation
+            }
+            pending?.resume(throwing: error)
         }
     }
 

@@ -486,6 +486,9 @@ public actor DaemonCore {
     var endedForTheRuntime: Set<ObjectIdentifier> = []
     /// How long a runtime is given to end a turn after `finish_turn`. A test shortens it.
     var finishGrace = FinishGrace()
+    /// When the quiet after `finish_turn` has passed, for a test that says so rather than
+    /// racing the clock (#225); nil for the clock.
+    var finishQuietWait: (@Sendable () async -> Void)?
 
     // MARK: Client permission mode (061)
 

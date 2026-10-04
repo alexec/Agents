@@ -24,12 +24,17 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     /// The deadlines its sessions are given (#166): a test's milliseconds, or nil for the
     /// runtime's own.
     private let deadlines: RuntimeDeadlines?
+    /// When a deadline comes, for a test that says so rather than waiting on the clock
+    /// (#225); nil for the clock.
+    private let deadlineWait: (@Sendable (RuntimeDeadlines.Phase, Duration) async -> Void)?
     /// Off unless the test is about the warm pool (#183).
     let keepsRuntimesWarm: Bool
 
     init(script: FakeACPAgent.Script = .init(), then scripts: [FakeACPAgent.Script] = [],
          capabilities: ACP.ClientCapabilities = .none, deadlines: RuntimeDeadlines? = nil,
-         keepsRuntimesWarm: Bool = false) {
+         keepsRuntimesWarm: Bool = false,
+         deadlineWait: (@Sendable (RuntimeDeadlines.Phase, Duration) async -> Void)? = nil) {
+        self.deadlineWait = deadlineWait
         self.keepsRuntimesWarm = keepsRuntimesWarm
         self.defaultScript = script
         self.scripts = scripts
@@ -49,7 +54,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
         let session = ACPSession(transport: mine, capabilities: capabilities,
                                  launch: RuntimeLaunchCatalog.launch(for: runtime.id),
                                  authMethodBeforeContinuing: ToolPolicyCatalog.policy(for: runtime.id).authMethodBeforeContinuing,
-                                 deadlines: deadlines)
+                                 deadlines: deadlines, deadlineWait: deadlineWait)
         let agent = FakeACPAgent(script: script, transport: theirs)
         lock.lock()
         agents.append(agent)

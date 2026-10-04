@@ -11,6 +11,8 @@ struct ReconnectTriggerTests {
         private let lock = NSLock()
         private var naps: [Duration] = []
         private var endings: [CheckedContinuation<Void, Never>] = []
+        /// Tests waiting for a nap, told when one starts rather than spinning (#225).
+        private var watchers: [(count: Int, ready: CheckedContinuation<Void, Never>)] = []
         private(set) var now = Duration.zero
 
         var waits: [Duration] { lock.withLock { naps } }
@@ -19,12 +21,13 @@ struct ReconnectTriggerTests {
             lock.withLock { naps.append(duration) }
             await withTaskCancellationHandler {
                 await withCheckedContinuation { continuation in
-                    let cancelled = lock.withLock { () -> Bool in
-                        if Task.isCancelled { return true }
+                    let (cancelled, ready) = lock.withLock { () -> (Bool, [CheckedContinuation<Void, Never>]) in
+                        if Task.isCancelled { return (true, []) }
                         endings.append(continuation)
-                        return false
+                        return (false, takeReadyWatchers())
                     }
                     if cancelled { continuation.resume() }
+                    for watcher in ready { watcher.resume() }
                 }
             } onCancel: {
                 self.endAll()
@@ -43,7 +46,24 @@ struct ReconnectTriggerTests {
 
         /// Until a wait has started.
         func waitForNap(_ count: Int) async {
-            while lock.withLock({ naps.count < count || endings.isEmpty }) { await Task.yield() }
+            await withCheckedContinuation { (ready: CheckedContinuation<Void, Never>) in
+                let now = lock.withLock { () -> Bool in
+                    if napped(count) { return true }
+                    watchers.append((count, ready))
+                    return false
+                }
+                if now { ready.resume() }
+            }
+        }
+
+        /// Under the lock.
+        private func napped(_ count: Int) -> Bool { naps.count >= count && !endings.isEmpty }
+
+        /// Under the lock.
+        private func takeReadyWatchers() -> [CheckedContinuation<Void, Never>] {
+            let ready = watchers.filter { napped($0.count) }.map(\.ready)
+            watchers.removeAll { napped($0.count) }
+            return ready
         }
     }
 

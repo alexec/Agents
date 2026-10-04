@@ -12,7 +12,7 @@ import Testing
 /// The descriptors are found by what they are, not by number: the pipe ends this side
 /// held, by device and inode. Tests running beside this one open and close whatever
 /// they like, and a number can be handed to one of them the moment it is let go.
-@Suite("A runtime that dies")
+@Suite("A runtime that dies", .timeLimit(.minutes(1)))
 struct RuntimeExitTests {
     /// A runtime that says something on stderr and exits, mid-nothing.
     private static let dies = (URL(filePath: "/bin/sh"), ["-c", "echo going >&2; exit 3"])
@@ -60,7 +60,11 @@ struct RuntimeExitTests {
                                                 environment: [:])
             let process = try #require(await session.runtimeProcess)
             all.formUnion(Self.identities(of: process.heldDescriptors))
-            for await _ in session.eventStream() {}
+            // Bounded: a death the session never heard of used to hold the whole run
+            // here, the stream open for good (#225).
+            guard await finishes("the events of a runtime that died", {
+                for await _ in session.eventStream() {}
+            }) else { return }
         }
         try await eventually("all ten runtimes' pipes were closed") { Self.open(all) == 0 }
     }
@@ -86,7 +90,7 @@ struct RuntimeExitTests {
     }
 
     private func eventually(_ what: String, _ check: () async throws -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        let deadline = ContinuousClock.now.advanced(by: Eventually.timeout)
         while ContinuousClock.now < deadline {
             if try await check() { return }
             try await Task.sleep(for: .milliseconds(50))

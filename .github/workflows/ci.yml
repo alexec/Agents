@@ -5,7 +5,9 @@
 # stay off here: AGENTS_LIVE (+ AGENTS_MCP_HELPER) for real runtimes, AGENTS_BARE for
 # the bare ssh container. Tests that only fail under load are marked `.flakyUnderLoad`
 # (Packages/*/Tests/**/FlakyUnderLoad.swift lists each and why); GitHub sets CI, so the
-# main runs skip them; they run separately through slow-tests.yml.
+# main runs skip them; they run separately through slow-tests.yml. Wall-clock budgets
+# are `.perfBudget` (PerfBudget.swift): checked everywhere, but the budget is held only by
+# scripts/perf-tests.sh, slow-tests.yml's perf-tests job (#225).
 name: ci
 
 on:

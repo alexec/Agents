@@ -67,6 +67,13 @@ final class MCPBridge: @unchecked Sendable {
                                           headers: ["Authorization": "Bearer \(route.key)"]))
     }
 
+    /// How many requests the routes a session's token was given are waiting on: so a test
+    /// can know a call is in flight, rather than sleep until it probably is (#225).
+    func waitingCalls(for token: String) -> Int {
+        let held = lock.withLock { routes.values.filter { $0.token == token }.compactMap(\.process) }
+        return held.reduce(0) { $0 + $1.waitingCount }
+    }
+
     /// End every route a session's token was given, and stop what they started.
     func endRoutes(for token: String) {
         let ended = lock.withLock {
@@ -315,6 +322,8 @@ final class RouteProcess: @unchecked Sendable {
 
     var isRunning: Bool { lock.withLock { !ended } && process.isRunning }
     var processIdentifier: Int32 { process.processIdentifier }
+    /// How many requests are waiting for their answers.
+    var waitingCount: Int { lock.withLock { waiting.count } }
 
     /// Write one message; for a request, wait for the answer with the same `id`. Nil for a
     /// notification, which has no answer.

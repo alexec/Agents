@@ -139,6 +139,9 @@ public actor ACPSession {
     private let launch: RuntimeLaunch?
     /// How long it is given (#166): the launch's, unless whoever made the session said.
     public nonisolated let deadlines: RuntimeDeadlines
+    /// What a deadline waits on before it comes: the clock, unless a test decides when a
+    /// phase's deadline is reached (#225).
+    private let deadlineWait: (@Sendable (RuntimeDeadlines.Phase, Duration) async -> Void)?
     /// The agent's words in the turn under way, only while `launch` has a
     /// `turnErrorPrefix` to look for in them, and only the start of them.
     private var turnText = ""
@@ -222,9 +225,11 @@ public actor ACPSession {
                 capabilities: ACP.ClientCapabilities = .none,
                 launch: RuntimeLaunch? = nil,
                 authMethodBeforeContinuing: String? = nil,
-                deadlines: RuntimeDeadlines? = nil) {
+                deadlines: RuntimeDeadlines? = nil,
+                deadlineWait: (@Sendable (RuntimeDeadlines.Phase, Duration) async -> Void)? = nil) {
         let box = self.box
         self.deadlines = deadlines ?? launch?.deadlines ?? .standard
+        self.deadlineWait = deadlineWait
         self.program = program
         self.capabilities = capabilities
         self.launch = launch
@@ -248,8 +253,10 @@ public actor ACPSession {
     private func call(_ method: String, _ params: JSONValue?,
                       within phase: RuntimeDeadlines.Phase) async throws -> JSONValue {
         let after = deadlines[phase]
+        var wait: (@Sendable (Duration) async -> Void)?
+        if let deadlineWait { wait = { span in await deadlineWait(phase, span) } }
         do {
-            return try await connection.call(method, params, timeout: after)
+            return try await connection.call(method, params, timeout: after, waitingOut: wait)
         } catch is JSONRPCTimeout {
             throw RuntimeDidNotAnswer(phase: phase, after: after)
         }
@@ -799,9 +806,10 @@ public actor ACPSession {
 
     /// How long the turn under way has said nothing with nothing pending; nil when no turn
     /// is, or while a tool call is open or the app is answering one of its requests.
-    public func silence() -> Duration? {
+    /// Measured to `instant`, which is now unless a test looks from later (#225).
+    public func silence(at instant: ContinuousClock.Instant = .now) -> Duration? {
         guard turnInFlight, serving == 0, openToolCalls.isEmpty else { return nil }
-        return ContinuousClock.now - lastHeard
+        return instant - lastHeard
     }
 
     /// A tool call opening or closing, the agent's or a subagent's. One that never says it

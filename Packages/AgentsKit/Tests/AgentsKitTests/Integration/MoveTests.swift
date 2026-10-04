@@ -74,7 +74,7 @@ struct MoveTests {
     private func quiet(_ core: DaemonCore, _ id: UUID,
                        sourceLocation: SourceLocation = #_sourceLocation) async {
         var calm = 0
-        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        let deadline = ContinuousClock.now.advanced(by: Eventually.timeout)
         while calm < 5 {
             guard ContinuousClock.now < deadline else {
                 Issue.record("the agent never went quiet", sourceLocation: sourceLocation)
