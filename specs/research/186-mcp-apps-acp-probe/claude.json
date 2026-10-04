@@ -1,0 +1,286 @@
+{
+  "runtime": "claude",
+  "agentInfo": {
+    "name": "@agentclientprotocol/claude-agent-acp",
+    "title": "Claude Agent",
+    "version": "0.81.2"
+  },
+  "mcpCapabilities": {
+    "http": true,
+    "sse": true
+  },
+  "models": null,
+  "stopReason": "end_turn",
+  "answer": "I'll now call each weather tool once.Line 1: TEXT: kite-apps (Paris): {\"city\":\"Paris\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"} | heron-apps (Oslo): {\"city\":\"Oslo\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}\nLine 2: EXTRA: NONE (no additional fields such as structuredContent or _meta were shown for either result)",
+  "toolCalls": [
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "ToolSearch"
+        }
+      },
+      "toolCallId": "toolu_01S84PrMYBUBSosGt4TSjTcc",
+      "sessionUpdate": "tool_call",
+      "name": "ToolSearch",
+      "rawInput": {},
+      "status": "pending",
+      "title": "ToolSearch",
+      "kind": "other",
+      "content": []
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "ToolSearch"
+        }
+      },
+      "toolCallId": "toolu_01S84PrMYBUBSosGt4TSjTcc",
+      "sessionUpdate": "tool_call_update",
+      "rawInput": {
+        "query": "select:mcp__kite-apps__kite_apps_weather,mcp__heron-apps__heron_apps_weather"
+      },
+      "title": "ToolSearch",
+      "kind": "other"
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "ToolSearch"
+        }
+      },
+      "toolCallId": "toolu_01S84PrMYBUBSosGt4TSjTcc",
+      "sessionUpdate": "tool_call_update",
+      "rawInput": {
+        "query": "select:mcp__kite-apps__kite_apps_weather,mcp__heron-apps__heron_apps_weather",
+        "max_results": 5
+      },
+      "title": "ToolSearch",
+      "kind": "other",
+      "content": []
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolResponse": {
+            "matches": [
+              "mcp__kite-apps__kite_apps_weather",
+              "mcp__heron-apps__heron_apps_weather"
+            ],
+            "query": "select:mcp__kite-apps__kite_apps_weather,mcp__heron-apps__heron_apps_weather",
+            "total_deferred_tools": 23
+          },
+          "toolName": "ToolSearch"
+        }
+      },
+      "toolCallId": "toolu_01S84PrMYBUBSosGt4TSjTcc",
+      "sessionUpdate": "tool_call_update"
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "ToolSearch"
+        }
+      },
+      "toolCallId": "toolu_01S84PrMYBUBSosGt4TSjTcc",
+      "sessionUpdate": "tool_call_update",
+      "status": "completed",
+      "rawOutput": [
+        {
+          "type": "tool_reference",
+          "tool_name": "mcp__kite-apps__kite_apps_weather"
+        },
+        {
+          "type": "tool_reference",
+          "tool_name": "mcp__heron-apps__heron_apps_weather"
+        }
+      ],
+      "content": [
+        {
+          "type": "content",
+          "content": {
+            "type": "text",
+            "text": "Tool: mcp__kite-apps__kite_apps_weather"
+          }
+        },
+        {
+          "type": "content",
+          "content": {
+            "type": "text",
+            "text": "Tool: mcp__heron-apps__heron_apps_weather"
+          }
+        }
+      ]
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "mcp__kite-apps__kite_apps_weather"
+        }
+      },
+      "toolCallId": "toolu_01WZMPy8QiKs1YZVC9abq67B",
+      "sessionUpdate": "tool_call",
+      "name": "mcp__kite-apps__kite_apps_weather",
+      "rawInput": {},
+      "status": "pending",
+      "title": "mcp__kite-apps__kite_apps_weather",
+      "kind": "other",
+      "content": []
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "mcp__kite-apps__kite_apps_weather"
+        }
+      },
+      "toolCallId": "toolu_01WZMPy8QiKs1YZVC9abq67B",
+      "sessionUpdate": "tool_call_update",
+      "rawInput": {
+        "city": "Paris"
+      },
+      "title": "mcp__kite-apps__kite_apps_weather",
+      "kind": "other",
+      "content": []
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "mcp__heron-apps__heron_apps_weather"
+        }
+      },
+      "toolCallId": "toolu_01M95zeD8A2ubWx7pr2twyXF",
+      "sessionUpdate": "tool_call",
+      "name": "mcp__heron-apps__heron_apps_weather",
+      "rawInput": {},
+      "status": "pending",
+      "title": "mcp__heron-apps__heron_apps_weather",
+      "kind": "other",
+      "content": []
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolResponse": "{\"city\":\"Paris\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}",
+          "toolName": "mcp__kite-apps__kite_apps_weather"
+        }
+      },
+      "toolCallId": "toolu_01WZMPy8QiKs1YZVC9abq67B",
+      "sessionUpdate": "tool_call_update"
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "mcp__kite-apps__kite_apps_weather"
+        }
+      },
+      "toolCallId": "toolu_01WZMPy8QiKs1YZVC9abq67B",
+      "sessionUpdate": "tool_call_update",
+      "status": "completed",
+      "rawOutput": "{\"city\":\"Paris\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}",
+      "content": [
+        {
+          "type": "content",
+          "content": {
+            "type": "text",
+            "text": "{\"city\":\"Paris\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}"
+          }
+        }
+      ]
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "mcp__heron-apps__heron_apps_weather"
+        }
+      },
+      "toolCallId": "toolu_01M95zeD8A2ubWx7pr2twyXF",
+      "sessionUpdate": "tool_call_update",
+      "rawInput": {
+        "city": "Oslo"
+      },
+      "title": "mcp__heron-apps__heron_apps_weather",
+      "kind": "other",
+      "content": []
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolResponse": "{\"city\":\"Oslo\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}",
+          "toolName": "mcp__heron-apps__heron_apps_weather"
+        }
+      },
+      "toolCallId": "toolu_01M95zeD8A2ubWx7pr2twyXF",
+      "sessionUpdate": "tool_call_update"
+    },
+    {
+      "_meta": {
+        "claudeCode": {
+          "toolName": "mcp__heron-apps__heron_apps_weather"
+        }
+      },
+      "toolCallId": "toolu_01M95zeD8A2ubWx7pr2twyXF",
+      "sessionUpdate": "tool_call_update",
+      "status": "completed",
+      "rawOutput": "{\"city\":\"Oslo\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}",
+      "content": [
+        {
+          "type": "content",
+          "content": {
+            "type": "text",
+            "text": "{\"city\":\"Oslo\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}"
+          }
+        }
+      ]
+    }
+  ],
+  "mcpInitialize": {
+    "heron-apps": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+        "roots": {
+          "listChanged": true
+        },
+        "elicitation": {}
+      },
+      "clientInfo": {
+        "name": "claude-code",
+        "title": "Claude Code",
+        "version": "2.1.280",
+        "description": "Anthropic's agentic coding tool",
+        "websiteUrl": "https://claude.com/claude-code"
+      }
+    },
+    "kite-apps": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+        "roots": {
+          "listChanged": true
+        },
+        "elicitation": {}
+      },
+      "clientInfo": {
+        "name": "claude-code",
+        "title": "Claude Code",
+        "version": "2.1.280",
+        "description": "Anthropic's agentic coding tool",
+        "websiteUrl": "https://claude.com/claude-code"
+      }
+    }
+  },
+  "mcpMethods": {
+    "heron-apps": [
+      "initialize",
+      "notifications/initialized",
+      "tools/list",
+      "resources/list",
+      "tools/call"
+    ],
+    "kite-apps": [
+      "server/discover",
+      "initialize",
+      "notifications/initialized",
+      "tools/list",
+      "resources/list",
+      "tools/call"
+    ]
+  }
+}

@@ -10,6 +10,9 @@
 #   run.sh install-plugins  after setup-mcp: `codex plugin add` and `copilot plugin install`
 #   run.sh acp <runtime>    the same runtimes over ACP, as the app starts them: acp.py
 #   run.sh acp-all          every runtime, one after another, results in $P/log/<runtime>.json
+#   run.sh apps-setup       the #186 MCP Apps probe's own scratch home, /tmp/mcp-apps-probe
+#   run.sh apps <runtime>   claude | codex | copilot | opencode over ACP with an MCP Apps tool: apps.py
+#   run.sh apps-clean       delete the MCP Apps scratch home
 #
 # Links and candidate files for passes 2 and 3 are placed by hand under $P/home; see research.md.
 P=/tmp/dotagents-probe; H=$P/home
@@ -60,6 +63,17 @@ case $1 in
   acp-all)
     for r in claude grok copilot cursor codex gemini; do $0 acp $r > $P/log/$r.json 2>&1; sleep 3; done
     exit ;;
+  apps-setup)  # its own scratch home, so the 054 one is left as it is
+    A=/tmp/mcp-apps-probe; rm -rf $A; mkdir -p $A/home/.codex $A/home/Library $A/proj $A/log
+    cp $REAL/.codex/auth.json $A/home/.codex/
+    (cd $A/proj && git init -q .)
+    exit ;;
+  apps)
+    for v in ${(k)parameters[(I)CLAUDE*]} ANTHROPIC_BASE_URL; do unset $v; done
+    export CLAUDE_CODE_OAUTH_TOKEN=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['claudeAiOauth']['accessToken'])" 2>/dev/null)
+    export GH_TOKEN=$(gh auth token 2>/dev/null) PROBE_REAL_HOME=$REAL npm_config_cache=$REAL/.npm HOME=/tmp/mcp-apps-probe/home
+    exec python3 ${0:A:h}/apps.py $2 ;;
+  apps-clean) rm -rf /tmp/mcp-apps-probe; exit ;;
   clean) rm -rf $P; exit ;;
 esac
 
