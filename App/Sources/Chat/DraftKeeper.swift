@@ -23,6 +23,9 @@ final class DraftKeeper {
     /// encoding that per character would be the field lagging behind the fingers.
     private var waiting: [DraftKey: Draft] = [:]
     private var pause: Task<Void, Never>?
+    /// The agents with a draft kept, once the launch's sweep has said (#176). Nil until
+    /// then: an archived agent's draft waits for it rather than costing a pass of its own.
+    private var drafted: Set<UUID>?
 
     /// The start form as it was left, until every part of it has been put back.
     private var leftForm: StartDraft?
@@ -42,6 +45,14 @@ final class DraftKeeper {
         self.store = store
         leftForm = store.startDraft()
         leftChoices = leftForm?.chosen
+        // The one pass over the defaults, off the main thread: it reads every key the
+        // app's defaults hold and decodes each draft, to let go of the month-old ones.
+        Task.detached(priority: .utility) { [store] in
+            let started = ContinuousClock.now
+            let kept = store.sweep(archived: [], now: Date())
+            let took = ContinuousClock.now - started
+            await MainActor.run { DraftKeeper.shared.swept(kept, took: took) }
+        }
         // A quit inside the pause would otherwise lose the last few words typed.
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification,
                                                object: nil, queue: .main) { _ in
@@ -70,21 +81,36 @@ final class DraftKeeper {
     func clear(_ key: DraftKey) {
         waiting[key] = nil
         store.clear(key)
+        if case .agent(let id) = key { drafted?.remove(id) }
     }
 
     /// Everything waiting, written now: the bar is moving to another conversation, or
     /// the app is quitting.
     func flush() {
         pause?.cancel()
-        for (key, draft) in waiting { store.save(draft, for: key) }
+        for (key, draft) in waiting {
+            store.save(draft, for: key)
+            guard case .agent(let id) = key else { continue }
+            if draft.isEmpty { drafted?.remove(id) } else { drafted?.insert(id) }
+        }
         waiting = [:]
     }
 
+    private func swept(_ kept: Set<UUID>, took: Duration) {
+        // Anything typed while it ran is kept too.
+        drafted = kept.union(waiting.keys.compactMap { if case .agent(let id) = $0 { id } else { nil } })
+        Perf.measured("draft-sweep", took, "\(kept.count) drafts, off the main thread")
+    }
+
     /// Let go of the drafts that are over. Only an agent known to be archived costs its
-    /// draft — the list may not have arrived yet, and an absence is not evidence.
-    func sweep(agents: [Agent]) {
-        flush()
-        store.sweep(archived: Set(agents.filter { $0.state == .archived }.map(\.id)), now: Date())
+    /// draft — the list may not have arrived yet, and an absence is not evidence. Only the
+    /// agents with a draft are looked at, each by id (#176).
+    func sweep(agents: AgentsModel) {
+        guard let drafted, !drafted.isEmpty else { return }
+        let started = ContinuousClock.now
+        let over = drafted.filter { agents.agent($0)?.state == .archived }
+        for id in over { clear(.agent(id)) }
+        Perf.measured("draft-sweep", ContinuousClock.now - started, "\(drafted.count) drafts, \(over.count) archived")
     }
 
     // MARK: The start form
@@ -163,7 +189,7 @@ struct KeepsDrafts: ViewModifier {
         content
             .onAppear {
                 if text.isEmpty && attachments.isEmpty { take(key) }
-                keeper.sweep(agents: model.agents)
+                keeper.sweep(agents: model.work)
             }
             // Another conversation: what was typed here is kept against this one, and that
             // one's own comes back. Words meant for one agent never reach the next.
@@ -174,7 +200,9 @@ struct KeepsDrafts: ViewModifier {
             }
             .onChange(of: text) { keeper.note(text, attachments, for: key) }
             .onChange(of: attachments) { keeper.note(text, attachments, for: key) }
-            .onChange(of: model.work.agentCount) { keeper.sweep(agents: model.agents) }
+            // An agent archived here, or more of them arrived: only the drafts that exist are looked at.
+            .onChange(of: model.work.archivals) { keeper.sweep(agents: model.work) }
+            .onChange(of: model.work.agentCount) { keeper.sweep(agents: model.work) }
             .onChange(of: model.draftCwd) { keeper.noteStartForm(from: model) }
             .onChange(of: model.draftRuntimeID) { keeper.noteStartForm(from: model) }
             .onChange(of: model.draftFolders) { keeper.noteStartForm(from: model) }

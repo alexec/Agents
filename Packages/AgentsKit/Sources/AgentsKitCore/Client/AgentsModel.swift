@@ -24,6 +24,9 @@ public final class AgentsModel {
     /// How many agents are held: moves only when one comes or goes, for a view that
     /// wants to know that and not every change to every one of them.
     public private(set) var agentCount = 0
+    /// Moves each time an agent held here becomes archived: what lets the window let go
+    /// of that agent's draft without looking at everything (#176).
+    public private(set) var archivals = 0
     public private(set) var projects: [DaemonAPI.ProjectSummary] = []
     public private(set) var permissions: [PermissionRequest] = []
     public private(set) var elicitations: [ElicitationRequest] = []
@@ -1152,6 +1155,7 @@ public final class AgentsModel {
         all.insert(agent, at: ProjectShelf.place(of: agent, in: all, group: .finished))
         agents = all
         if old == nil { agentCount = byID.count }
+        if let old, old.state != .archived, agent.state == .archived { archivals &+= 1 }
         // Its shelves: in place when it stays where it was, moved when not.
         let was = filedAs[agent.id]
         let key = ShelfKey(folder: folder, host: agent.host)
