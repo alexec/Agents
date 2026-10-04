@@ -28,6 +28,7 @@ import { setPane } from "./files/paneState";
 import { ViewLayerContext } from "./chat/AppView";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { BackToList } from "./BackToList";
+import { comingBackDescription } from "../model/status";
 
 const detailKey = "agents.turnDetail";
 
@@ -244,7 +245,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} />
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
-        {agent && (agent.state === "running" || agent.state === "starting") && (
+        {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
+        {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
+          : agent && (agent.state === "running" || agent.state === "starting") && (
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
       </div>

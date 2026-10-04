@@ -20,7 +20,7 @@ import { browserName, type Session } from "../session";
 import { ActivityRows } from "./Activity";
 import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
-import { SessionRow } from "./SessionRow";
+import { rowExtras, SessionRow } from "./SessionRow";
 import { runSessionAction, sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
@@ -368,7 +368,7 @@ const SidebarSession = memo(function SidebarSession({ store, host, folder, agent
     <div class="nav-item" onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }}>
       <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
-        waits={store.waitsOf(host, agent)} />
+        waits={store.waitsOf(host, agent)} extras={rowExtras(store, host, agent)} />
     </div>
   );
 });

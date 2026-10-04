@@ -3,7 +3,7 @@
 // (research R7). Nothing here decides anything; the hosts do.
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
@@ -176,6 +176,8 @@ export class Work {
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
   /** Each host's resources and who holds them (036, #116): read-only on the page. */
   readonly leases = signal<Record<string, LeaseSnapshot>>({});
+  /** Each host's chats it is bringing back by itself after a restart: Coming back (#251). */
+  readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
   readonly disk = signal<Record<string, DiskState>>({});
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
@@ -301,6 +303,12 @@ export class Work {
         // writes. Said, as the window and the Remote say it (#88).
         this.say((params as WriteFailure).message);
         return true;
+      case "agent/resuming": {
+        const note = params as ResumingNotification;
+        const held = (this.resuming.value[host] ?? []).filter((id) => id !== note.agentID);
+        this.resuming.value = { ...this.resuming.value, [host]: note.isResuming ? [...held, note.agentID] : held };
+        return true;
+      }
       case "leases/changed":
         this.leases.value = { ...this.leases.value, [host]: params as LeaseSnapshot };
         return true;
@@ -650,6 +658,11 @@ export class Work {
     return openBlock(agent) ? blockLines(agent, this.agents.value[host] ?? []) : [];
   }
 
+  /** AgentsModel.isComingBack: whether the host is bringing this chat back by itself. */
+  isComingBack(host: string, agentID: string): boolean {
+    return (this.resuming.value[host] ?? []).includes(agentID);
+  }
+
   permissionsFor(host: string, session: string): PermissionRequest[] {
     return (this.permissions.value[host] ?? []).filter((p) => p.agentID === session);
   }
@@ -838,6 +851,10 @@ export class Store extends Work {
       this.pins.value = held;
       this.sessionPins.value = sessions;
     }).catch(failed("pins/list"));
+    // A host from before #251 doesn't answer, and nothing is said to be coming back.
+    void this.link.call("agents/resuming", {}, host).then((response) => {
+      this.resuming.value = { ...this.resuming.value, [host]: response.agentIDs };
+    }).catch(failed("agents/resuming"));
     void this.link.call("leases/snapshot", {}, host).then((snapshot) => {
       this.leases.value = { ...this.leases.value, [host]: snapshot };
     }).catch(failed("leases/snapshot"));

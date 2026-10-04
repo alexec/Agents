@@ -14,7 +14,7 @@ import {
 } from "../model/workflows";
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
-import { SessionRow } from "./SessionRow";
+import { rowExtras, SessionRow } from "./SessionRow";
 import { CooldownMenu, RuntimeRow, WorkflowSettingsForm } from "./WorkflowSettings";
 import { BackToList } from "./BackToList";
 
@@ -153,7 +153,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           {runs.length === 0 && <p class="hint">Nothing has run yet.</p>}
           {runs.slice(0, 6).map((agent) => (
             <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
-              waits={store.waitsOf(host, agent)} />
+              waits={store.waitsOf(host, agent)} extras={rowExtras(store, host, agent)} />
           ))}
         </div>
       </div>

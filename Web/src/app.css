@@ -679,6 +679,9 @@ button.remove:hover { opacity: 1; }
 /* Unread (#70): a grey dot and a heavier title; never the attention colour. */
 .session .title { font-weight: 400; }
 .session .title.unread { font-weight: 600; }
+/* Started by a workflow or another agent (028, #251): quiet, after the title, as the window's mark. */
+.session .title .started-by { margin-left: 5px; font-size: 11px; font-weight: 400; opacity: 0.45; }
+.working.coming-back { opacity: 0.65; padding: 4px 0; }
 .unread-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.5; margin-right: 6px; vertical-align: middle; }
 
 /* US4: the files pane's tabs, the browser, a file, the changes and a live page. */
