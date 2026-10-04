@@ -173,6 +173,32 @@ struct FolderWatchTests {
         #expect(changes.all.isEmpty)
     }
 
+    @Test func anExcludedFolderIsNeverReported() async throws {
+        // Build output under a project (#173): FSEvents drops it, so nothing wakes.
+        let root = try makeFolder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let output = root.appending(path: ".agents/worktrees/lane/.build")
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+
+        let changes = Changes()
+        // `root` is in Foundation's spelling (/var/…), as the daemon has it, while FSEvents
+        // reports and compares /private/var/….
+        let watch = FolderWatch(root: root, excluding: [root.appending(path: ".agents/worktrees")]) {
+            changes.record($0)
+        }
+        defer { watch.stop() }
+        await eventually("the stream is up") {
+            try? Data("x".utf8).write(to: root.appending(path: "warm-up.txt"))
+            return !changes.all.isEmpty
+        }
+        try await Task.sleep(for: .milliseconds(400))
+        changes.reset()
+
+        for index in 0..<200 { try Data("x".utf8).write(to: output.appending(path: "f\(index).o")) }
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(changes.all.isEmpty, "reported \(changes.all.map(\.path))")
+    }
+
     @Test func stoppingTwiceIsHarmless() throws {
         let root = try makeFolder()
         defer { try? FileManager.default.removeItem(at: root) }

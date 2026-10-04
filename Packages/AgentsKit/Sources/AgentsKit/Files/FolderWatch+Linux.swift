@@ -16,7 +16,12 @@ import Foundation
 public final class FolderWatch: @unchecked Sendable {
     public static let coalescingInterval: TimeInterval = 0.2
 
+    public static let maximumExclusions = 8
+
     private let fd: Int32
+    /// Folders never watched, nor anything below them (#173): a build there would take a
+    /// watch per output folder and wake us for every file.
+    private let excluded: [String]
     private let onChange: @Sendable ([URL]) -> Void
     private let lock = NSLock()
     private var directories: [Int32: String] = [:]
@@ -28,8 +33,9 @@ public final class FolderWatch: @unchecked Sendable {
     private static let mask = UInt32(IN_CREATE | IN_DELETE | IN_MODIFY | IN_MOVED_FROM | IN_MOVED_TO
                                      | IN_CLOSE_WRITE | IN_ATTRIB | IN_DELETE_SELF)
 
-    public init(root: URL, onChange: @escaping @Sendable ([URL]) -> Void) {
+    public init(root: URL, excluding: [URL] = [], onChange: @escaping @Sendable ([URL]) -> Void) {
         self.onChange = onChange
+        excluded = excluding.prefix(Self.maximumExclusions).map { $0.standardizedFileURL.path }
         fd = inotify_init1(Int32(IN_CLOEXEC))
         guard fd >= 0 else { return }
         addTree(root.path)
@@ -37,6 +43,13 @@ public final class FolderWatch: @unchecked Sendable {
         thread.name = "AgentsKit.FolderWatch"
         thread.stackSize = 256 * 1024
         thread.start()
+    }
+
+    /// The path with every link resolved, as the Mac's watch has it.
+    public static func realPath(_ path: String) -> String {
+        guard let resolved = realpath(path, nil) else { return path }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 
     public var isWatching: Bool {
@@ -57,15 +70,21 @@ public final class FolderWatch: @unchecked Sendable {
     /// A watch on `path` and on every directory below it. Hidden `.git` internals are
     /// watched like anything else: a commit is a change a pane may be showing.
     private func addTree(_ path: String) {
+        guard !isExcluded(path) else { return }
         add(path)
         guard let walker = FileManager.default.enumerator(atPath: path) else { return }
         while let relative = walker.nextObject() as? String {
             let full = (path as NSString).appendingPathComponent(relative)
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: full, isDirectory: &isDirectory), isDirectory.boolValue {
+                if isExcluded(full) { walker.skipDescendants(); continue }
                 add(full)
             }
         }
+    }
+
+    private func isExcluded(_ path: String) -> Bool {
+        excluded.contains { path == $0 || path.hasPrefix($0 + "/") }
     }
 
     private func add(_ path: String) {
