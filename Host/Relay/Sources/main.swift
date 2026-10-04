@@ -66,6 +66,13 @@ Task {
         let relay = try ControlRelay(files: files, name: name, channel: channel, mailbox: mailbox, log: log)
         await relay.start()
         log("relaying; key \(relay.publicKey.base64EncodedString().prefix(16))…")
+        // A network change dials now, not when the wait is up (#172, as #82 did for agentsd).
+        let triggers = ReconnectTriggers(queue: DispatchQueue(label: "relay.triggers")) { reason in
+            let nudged = relay.goBackNow()
+            if nudged != .idle { log("relay: \(reason.rawValue): dialling now (\(nudged))") }
+        }
+        triggers.start()
+        Stopping.triggers = triggers
         for signal in [SIGTERM, SIGINT] {
             Foundation.signal(signal, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: signal, queue: .main)
@@ -82,6 +89,9 @@ Task {
     }
 }
 
-enum Stopping { nonisolated(unsafe) static var sources: [any DispatchSourceSignal] = [] }
+enum Stopping {
+    nonisolated(unsafe) static var sources: [any DispatchSourceSignal] = []
+    nonisolated(unsafe) static var triggers: ReconnectTriggers?
+}
 
 dispatchMain()

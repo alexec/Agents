@@ -51,14 +51,16 @@ export interface LinkOptions {
   origin: string;
   keys: KeyStore;
   open?: (url: string) => SocketLike;
-  /** Seconds before each retry; the last repeats. Jitter up to 20% is added. */
+  /** Seconds before each retry; the last repeats. Each is taken between half and all of
+   * it at random, as every other client does (#172). */
   backoff?: number[];
   /** How often to check the socket, and how long to wait for the answer. */
   heartbeat?: { every: number; within: number };
   random?: () => number;
   /** How long a call waits for its answer before it is given up (#170). */
   callTimeout?: number;
-  /** How long the link has to stay up before a drop starts the backoff from the first step again. */
+  /** How long, in ms, the link has to stay up before a drop starts the backoff from the first
+   * step again (#170; #172's own reset was folded into this one). */
   stableAfter?: number;
   /** Whether the tab is out of sight: no retries and no heartbeat then; retryNow on its return (#170). */
   hidden?: () => boolean;
@@ -68,6 +70,16 @@ export interface LinkOptions {
   now?: () => number;
   /** The exchange; the real one unless a test stands in for it. */
   authenticate?: (socket: LineSocket, record: KeyRecord, origin: string) => Promise<Admitted>;
+}
+
+/**
+ * Milliseconds before retry number `attempt` (from 0): the step, doubling to the last, taken
+ * between half and all of it by `random` (0 to 1), as the apps' `ReconnectSchedule` does, so
+ * that pages that lost the control plane together don't come back in step (#172).
+ */
+export function retryDelay(steps: number[], attempt: number, random: number): number {
+  const step = steps[Math.min(attempt, steps.length - 1)]!;
+  return step * 1000 * (0.5 + 0.5 * Math.min(Math.max(random, 0), 1));
 }
 
 /** Close code the control plane sends a forgotten client (contracts/browser-auth.md). */
@@ -143,7 +155,7 @@ export class Link {
 
   constructor(options: LinkOptions) {
     this.options = {
-      backoff: [1, 2, 4, 8, 10],
+      backoff: [1, 2, 4, 8, 16, 30],
       heartbeat: { every: 5_000, within: 3_000 },
       random: Math.random,
       callTimeout: 30_000,
@@ -366,10 +378,8 @@ export class Link {
     }
     // Out of sight it waits: the tab's return calls retryNow (#170).
     if (this.stopped || this.options.hidden()) return;
-    const steps = this.options.backoff;
-    const base = steps[Math.min(this.attempt, steps.length - 1)]!;
+    const delay = retryDelay(this.options.backoff, this.attempt, this.options.random());
     this.attempt++;
-    const delay = base * 1000 * (1 + 0.2 * this.options.random());
     this.retry = setTimeout(() => void this.dial(), delay);
   }
 
