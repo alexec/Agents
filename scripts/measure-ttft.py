@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Time to first token on a scratch host (#183).
 
-    scripts/measure-ttft.py ROOT RUNTIME CASE [REPEATS] [--folder DIR]
+    scripts/measure-ttft.py ROOT RUNTIME CASE [REPEATS] [--folder DIR] [--lead SECONDS]
 
 CASE is one of:
   cold     the runtime let go first (parked and unparked), then the prompt
   pool     the prompt straight after the last turn ended, its runtime in the pool
-  open     let go, then agents/prewarm as a window opening the session, 6 s, the prompt
-  typing   let go, then agents/prewarm as typing, 2 s, the prompt
+  open     let go, then agents/prewarm as a window opening the session, the lead (6 s), the prompt
+  typing   let go, then agents/prewarm as typing, the lead (2 s), the prompt
 
 Starts one agent of RUNTIME in DIR (default ROOT/work), lets its first turn end, then
 times each prompt from `agents/prompt` to the first thing the runtime streams: text,
@@ -71,12 +71,14 @@ def let_go(client, agent_id):
 
 
 def main(argv):
-    args = [a for a in argv[1:] if not a.startswith("--")]
+    args = [a for i, a in enumerate(argv[1:], 1)
+            if not a.startswith("--") and argv[i - 1] not in ("--folder", "--lead")]
     root, runtime, case = args[0], args[1], args[2]
     repeats = int(args[3]) if len(args) > 3 else 3
     folder = os.path.join(root, "work")
     if "--folder" in argv:
         folder = argv[argv.index("--folder") + 1]
+    lead = float(argv[argv.index("--lead") + 1]) if "--lead" in argv else (6 if case == "open" else 2)
     client = Client(root)
     agent_id = client.call("agents/start", {"runtimeID": runtime, "cwd": "file://" + folder, "prompt": PROMPT})
     if isinstance(agent_id, dict):
@@ -89,7 +91,7 @@ def main(argv):
         prompt = lambda: client.call("agents/prompt", {"agentID": agent_id, "text": PROMPT})
         if case in ("open", "typing"):
             client.call("agents/prewarm", {"agentID": agent_id, "why": "opened" if case == "open" else "typing"})
-            time.sleep(6 if case == "open" else 2)
+            time.sleep(lead)
         elapsed = first_token(client, agent_id, prompt)
         times.append(elapsed)
         print(f"{runtime} {case}: {elapsed:.2f}s", flush=True)
