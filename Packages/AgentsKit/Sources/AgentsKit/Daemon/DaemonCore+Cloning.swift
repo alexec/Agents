@@ -76,6 +76,9 @@ extension DaemonCore {
             let url = cloneURLRewrite?(remote.url) ?? remote.url
             // `--` so nothing in the URL is ever read as an option.
             let git = try GitProcess(["clone", "--", url, staged.path])
+            // A clone can be big and slow, and the person can stop it; an hour is only
+            // so a clone that has hung (#207) does not hold its staging folder for ever.
+            git.deadline = .seconds(3600)
             clones[id]?.process = git
             outcome = try await git.run()
         } catch GitProcess.LaunchError.notInstalled {

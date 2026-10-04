@@ -108,7 +108,7 @@ extension DaemonCore {
             return nil
         }
         if written.lowercased() == "new" { return .new }
-        let listed = await listWorktrees(for: folder)
+        let listed = await listWorktrees(for: folder, withStatus: false)
         guard listed.isRepository else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAWorktree,
                                message: "this project is not a git repository, so it has no worktrees")

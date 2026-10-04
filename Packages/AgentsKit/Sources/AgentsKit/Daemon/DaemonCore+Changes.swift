@@ -87,10 +87,48 @@ extension DaemonCore {
     }
 
     /// The list, the fold it came from, and git's context when there is one.
+    ///
+    /// The last answer is given again while nothing it was made from has moved (#207):
+    /// the same transcript, the same folder and starting point, the same index and HEAD,
+    /// and no change under the agent's folder, which is only known while a folder watch
+    /// covers it (the Files pane's, which asks on every change it sees). Without one,
+    /// every ask is answered fresh: a file someone else wrote would otherwise be missed.
+    /// Each fresh answer is three git calls, a `cat-file` and a read of every changed file.
     func changes(of agent: Agent) async throws -> (list: ChangesList, fold: ReportedChanges, git: GitContext?) {
         let fold = try await reported(for: agent.id)
-        var files = Self.reportedFiles(fold, for: agent)
+        let through = reportedChanges[agent.id]?.through ?? 0
         let (context, view) = await gitContext(for: agent)
+        let key = ChangesAnswer.Key(through: through, cwd: agent.cwd, startingPoint: agent.startingPoint,
+                                    view: view, root: context?.root,
+                                    stamp: context.map { GitStamp.of($0.root) } ?? nil)
+        if let held = reportedChanges[agent.id]?.answer, held.key == key, isWatched(agent.cwd, for: agent.id),
+           now().timeIntervalSince(held.madeAt) < ChangesAnswer.lifetime {
+            return (held.list, fold, held.git)
+        }
+        let answer = try await freshChanges(of: agent, fold: fold, context: context, view: view)
+        if reportedChanges[agent.id]?.through == through {
+            reportedChanges[agent.id]?.answer = ChangesAnswer(key: key, list: answer.list, git: answer.git,
+                                                              madeAt: now())
+        }
+        return answer
+    }
+
+    /// Whether a folder watch for this agent covers `folder`: a change anywhere under it
+    /// then clears the agent's kept answer (`filesChanged`).
+    func isWatched(_ folder: URL, for agentID: UUID) -> Bool {
+        let path = folder.resolvingSymlinksInPath().path
+        return fileInterests.values.contains { interests in
+            interests.contains { interest in
+                guard interest.agentID == agentID else { return false }
+                let root = interest.root.resolvingSymlinksInPath().path
+                return root == path || Self.relative(path, to: root) != nil
+            }
+        }
+    }
+
+    private func freshChanges(of agent: Agent, fold: ReportedChanges, context: GitContext?,
+                              view: GitView) async throws -> (list: ChangesList, fold: ReportedChanges, git: GitContext?) {
+        var files = Self.reportedFiles(fold, for: agent)
         guard let context else {
             return (ChangesList(files: files, git: view, reportsEdits: fold.reportsEdits), fold, nil)
         }
@@ -201,10 +239,13 @@ extension DaemonCore {
         return files.filter { !renamedAway.contains($0.path) } + seen.sorted { $0.path < $1.path }
     }
 
-    /// Lines in an untracked file, or nil when it is binary or too big to read.
+    /// Lines in an untracked file, or nil when it is binary or too big to read. Its size
+    /// is asked first: a 2 GB untracked file is never read (#207).
     static func untrackedCount(_ path: String) -> Int? {
-        guard let data = FileManager.default.contents(atPath: path),
-              data.count <= firstLineReadLimit,
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              let size = attributes[.size] as? Int, size <= firstLineReadLimit,
+              let data = FileManager.default.contents(atPath: path),
               !data.prefix(8_000).contains(0) else { return nil }
         return ReportedEdit.lineCount(String(decoding: data, as: UTF8.self))
     }
@@ -299,4 +340,27 @@ extension DaemonCore {
 struct HeldChanges: Sendable {
     var fold = ReportedChanges()
     var through = 0
+    /// The last list made from it, while nothing it was made from has moved (#207).
+    var answer: ChangesAnswer?
+}
+
+/// One answer to `changes/list`, and what it was made from.
+struct ChangesAnswer: Sendable {
+    struct Key: Sendable, Equatable {
+        var through: Int
+        var cwd: URL
+        var startingPoint: StartingPoint?
+        var view: GitView
+        var root: URL?
+        var stamp: GitStamp?
+    }
+
+    /// However still everything has been: a change no watch or stamp sees (a file
+    /// ignored by git becoming not ignored) shows within this.
+    static let lifetime: TimeInterval = 30
+
+    var key: Key
+    var list: ChangesList
+    var git: DaemonCore.GitContext?
+    var madeAt: Date
 }

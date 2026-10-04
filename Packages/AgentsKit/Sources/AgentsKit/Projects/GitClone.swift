@@ -1,4 +1,5 @@
 import Foundation
+import AgentsKitCore
 
 /// The person's own `git`, run for the daemon with nobody at a keyboard (027).
 ///
@@ -19,6 +20,10 @@ public final class GitProcess: @unchecked Sendable {
         /// What it printed, as bytes: for output measured in bytes, as `cat-file
         /// --batch`'s is (035).
         public var data = Data()
+        /// It ran past its deadline and was stopped (#207). `status` is -1.
+        public var timedOut = false
+        /// It printed more than its caller keeps; `output` is the first part.
+        public var truncated = false
         public var succeeded: Bool { status == 0 }
     }
 
@@ -26,10 +31,20 @@ public final class GitProcess: @unchecked Sendable {
         case notInstalled
     }
 
+    /// How long one call may run before it is stopped (#207): long enough for any read
+    /// of a large repository, short enough that a hung one (an LFS smudge on a dead
+    /// network, an ssh that never answers) frees whatever waits behind it.
+    public static let readDeadline: Duration = .seconds(30)
+    /// What one call keeps of what it printed, unless its caller says otherwise.
+    public static let defaultOutputLimit = 16 * 1024 * 1024
+
     private let process = Process()
     /// What is written to its stdin, for the one command that reads a list there
     /// (`cat-file --batch`, 035). Nil is an empty stdin, as it always was.
     private let input: Data?
+    /// How long it may run, and how much of its output is kept (#207).
+    public var deadline: Duration = GitProcess.readDeadline
+    public var outputLimit: Int = GitProcess.defaultOutputLimit
 
     /// Where git is on the person's PATH, or nil when it is not installed.
     public static func executable() -> URL? {
@@ -89,64 +104,39 @@ public final class GitProcess: @unchecked Sendable {
         process.arguments = arguments
         if let folder { process.currentDirectoryURL = folder }
         process.environment = LoginShellPath.environment().merging(extra) { _, new in new }
-        process.standardInput = input == nil ? FileHandle.nullDevice : Pipe()
     }
 
-    /// Run to the end. Both pipes are drained while it runs, so a chatty git cannot
-    /// fill one and stall. Ended by the termination handler rather than
-    /// `waitUntilExit`, which on a dispatch thread can wait for ever on a git that has
-    /// already gone.
+    /// Run to the end, or to its deadline (#207): `ChildProcess` drains both pipes as
+    /// they fill, keeps at most `outputLimit` bytes, and stops it (TERM, then KILL) when
+    /// the deadline comes, so nothing waiting on it waits for ever.
     public func run() async throws -> Outcome {
-        let output = Pipe()
-        let errors = Pipe()
-        process.standardOutput = output
-        process.standardError = errors
-        let drained = Drained()
-        drained.group.enter()
-        process.terminationHandler = { _ in drained.group.leave() }
-        try process.run()
-        if let input, let stdin = process.standardInput as? Pipe {
-            // Written off this thread and closed, so a list longer than the pipe's
-            // buffer cannot stall git and this caller waiting on each other.
-            DispatchQueue.global().async {
-                try? stdin.fileHandleForWriting.write(contentsOf: input)
-                try? stdin.fileHandleForWriting.close()
-            }
+        let outcome = await ChildProcess.run(process, input: input, deadline: deadline,
+                                             outputLimit: outputLimit)
+        if let failure = outcome.failure {
+            throw CocoaError(.executableLoad, userInfo: [NSLocalizedDescriptionKey: failure])
         }
-        let process = self.process
-        return await withCheckedContinuation { continuation in
-            drained.group.enter()
-            DispatchQueue.global().async {
-                drained.output = (try? output.fileHandleForReading.readToEnd()) ?? Data()
-                drained.group.leave()
-            }
-            drained.group.enter()
-            DispatchQueue.global().async {
-                drained.errors = (try? errors.fileHandleForReading.readToEnd()) ?? Data()
-                drained.group.leave()
-            }
-            drained.group.notify(queue: .global()) {
-                continuation.resume(returning: Outcome(
-                    status: process.terminationStatus,
-                    output: String(decoding: drained.output, as: UTF8.self),
-                    errors: String(decoding: drained.errors, as: UTF8.self),
-                    data: drained.output))
-            }
+        var errors = String(decoding: outcome.errors, as: UTF8.self)
+        if outcome.timedOut {
+            let stopped = "Stopped after \(Self.said(deadline)) with no end in sight."
+            errors = errors.isEmpty ? stopped : stopped + "\n" + errors
         }
+        return Outcome(status: outcome.status,
+                       output: String(decoding: outcome.output, as: UTF8.self),
+                       errors: errors,
+                       data: outcome.output, timedOut: outcome.timedOut, truncated: outcome.truncated)
+    }
+
+    /// A deadline as said to a person: "30 seconds", "2 minutes".
+    static func said(_ duration: Duration) -> String {
+        let seconds = Int(duration.components.seconds)
+        if seconds >= 120, seconds % 60 == 0 { return "\(seconds / 60) minutes" }
+        return seconds == 1 ? "1 second" : "\(seconds) seconds"
     }
 
     /// Stop it. What it wrote is its caller's to delete.
     public func terminate() {
         if process.isRunning { process.terminate() }
     }
-}
-
-/// What the two pipes said, and whether git has gone. Each field is written once, on
-/// its own queue, before the group is left, and read only after it is empty.
-private final class Drained: @unchecked Sendable {
-    let group = DispatchGroup()
-    var output = Data()
-    var errors = Data()
 }
 
 extension GitProcess {

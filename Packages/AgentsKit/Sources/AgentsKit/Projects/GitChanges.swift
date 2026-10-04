@@ -21,7 +21,10 @@ public enum GitChanges {
     }
 
     /// One read-only git command, run in `folder`.
-    static func run(_ arguments: [String], in folder: URL, input: Data? = nil) async throws -> GitProcess.Outcome {
+    /// Its output is kept to `outputLimit` bytes, and it is stopped at GitProcess's read
+    /// deadline (#207); one that ran out of time says so.
+    static func run(_ arguments: [String], in folder: URL, input: Data? = nil,
+                    outputLimit: Int = GitProcess.defaultOutputLimit) async throws -> GitProcess.Outcome {
         let git: GitProcess
         do {
             git = try GitProcess(["-c", "core.quotepath=off"] + arguments, in: folder,
@@ -29,6 +32,7 @@ public enum GitChanges {
         } catch {
             throw Failure.notInstalled
         }
+        git.outputLimit = outputLimit
         let outcome = try await git.run()
         guard outcome.succeeded else {
             throw Failure.refused(outcome.errors.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -80,7 +84,8 @@ public enum GitChanges {
         let pathspec = ["--"] + (scope.map { [$0] } ?? [])
         async let numbers = run(["diff", "--numstat", "-z"] + diffFlags + [since] + pathspec, in: root)
         async let statuses = run(["diff", "--name-status", "-z"] + diffFlags + [since] + pathspec, in: root)
-        async let others = run(["ls-files", "--others", "--exclude-standard", "-z"] + pathspec, in: root)
+        async let others = run(["ls-files", "--others", "--exclude-standard", "-z"] + pathspec, in: root,
+                               outputLimit: untrackedListLimit)
         let counted = parseNumstat(try await numbers.data)
         let status = parseNameStatus(try await statuses.data)
         var changed = status.map { path, code, oldPath in
@@ -88,10 +93,23 @@ public enum GitChanges {
                     added: counted[path].flatMap { $0.added },
                     removed: counted[path].flatMap { $0.removed })
         }
-        for path in split(try await others.data) where !layout.contains(path) {
+        for path in untracked(try await others) where !layout.contains(path) {
             changed.append(Changed(path: path, status: "?", added: nil, removed: nil))
         }
         return changed
+    }
+
+    /// What of `ls-files --others` is listed (#207): an untracked tree of build output is
+    /// tens of thousands of paths, and a list of changes that long is read by nobody.
+    static let untrackedListLimit = 256 * 1024
+    static let untrackedLimit = 1_000
+
+    /// The untracked paths, at most `untrackedLimit`, and none cut short by the byte cap.
+    static func untracked(_ outcome: GitProcess.Outcome) -> [String] {
+        var paths = split(outcome.data)
+        // The record the cap cut through is not a path.
+        if outcome.truncated, outcome.data.last != 0, !paths.isEmpty { paths.removeLast() }
+        return Array(paths.prefix(untrackedLimit))
     }
 
     /// `--numstat -z`: `added\tremoved\tpath\0`, with `-` for both on a binary file. A
@@ -149,7 +167,10 @@ public enum GitChanges {
     static func texts(of paths: [String], at commit: String, in root: URL) async throws -> [String: String] {
         guard !paths.isEmpty else { return [:] }
         let request = paths.map { "\(commit):\($0)\n" }.joined()
-        let outcome = try await run(["cat-file", "--batch"], in: root, input: Data(request.utf8))
+        // Every file's text at once, so it is capped as a whole; a file the cap cut is
+        // read as far as it went, which only makes it look changed.
+        let outcome = try await run(["cat-file", "--batch"], in: root, input: Data(request.utf8),
+                                    outputLimit: 64 * 1024 * 1024)
         return parseBatch(outcome.data, paths: paths)
     }
 
@@ -179,19 +200,27 @@ public enum GitChanges {
     static func whole(of path: String, renamedFrom oldPath: String? = nil, since: String,
                       in root: URL) async throws -> [DiffLine]? {
         let paths = [oldPath, path].compactMap { $0 }
-        let outcome = try await run(["diff", "-U999999"] + diffFlags + [since, "--"] + paths, in: root)
+        let outcome = try await run(["diff", "-U999999"] + diffFlags + [since, "--"] + paths, in: root,
+                                    outputLimit: wholeLimit)
+        // Too big to show whole is shown as its edits, as binary is (#207).
+        if outcome.truncated { return nil }
         if outcome.output.contains("\nBinary files ") || outcome.output.hasPrefix("Binary files ") {
             return nil
         }
         let hunks = parseUnified(outcome.output)
         if hunks.isEmpty {
             // Nothing differs: the file as it is, every line context.
-            guard let text = try? String(contentsOf: root.appending(path: path), encoding: .utf8)
+            let url = root.appending(path: path)
+            guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size <= wholeLimit,
+                  let text = try? String(contentsOf: url, encoding: .utf8)
             else { return nil }
             return allLines(of: text, as: .context)
         }
         return hunks.flatMap(\.lines)
     }
+
+    /// The most of a file `whole` shows, in bytes of diff or of file.
+    static let wholeLimit = 8 * 1024 * 1024
 
     /// Every line of a text, as one kind: an untracked file is all added.
     static func allLines(of text: String, as kind: DiffLine.Kind) -> [DiffLine] {

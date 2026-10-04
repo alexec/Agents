@@ -111,8 +111,11 @@ struct GitHubSource: Sendable {
         try data.write(to: archive)
         let unpacked = work.appending(path: "unpacked")
         try FileManager.default.createDirectory(at: unpacked, withIntermediateDirectories: true)
-        let outcome = try await GitProcess(executable: URL(filePath: "/usr/bin/tar"),
-                                           arguments: ["-xzf", archive.path, "-C", unpacked.path]).run()
+        let tar = GitProcess(executable: URL(filePath: "/usr/bin/tar"),
+                             arguments: ["-xzf", archive.path, "-C", unpacked.path])
+        // 50 MB unpacks in seconds; one that has not in a minute is not going to (#207).
+        tar.deadline = .seconds(60)
+        let outcome = try await tar.run()
         guard outcome.succeeded else { throw DaemonAPI.CatalogError.unreachable(host: host(endpoints.codeload)) }
         let root = unpacked.appending(path: "\(repo)-\(commit)")
         var tree: [TreeEntry] = []

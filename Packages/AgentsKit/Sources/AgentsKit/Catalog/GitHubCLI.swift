@@ -30,10 +30,14 @@ public struct GitHubCLI: Sendable {
     /// A REST call.
     public func api(method: String, path: String, host: String) async throws -> Data {
         guard let gh = executable() else { throw Failure(said: "gh is not installed") }
-        let outcome = try await GitProcess(
+        let call = GitProcess(
             executable: gh, arguments: ["api", "--hostname", host, "-X", method, path],
-            environment: ["GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1", "NO_COLOR": "1"]).run()
-        if outcome.succeeded { return Data(outcome.output.utf8) }
+            environment: ["GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1", "NO_COLOR": "1"])
+        // As long as the URLSession path beside it waits, give or take (#207).
+        call.deadline = .seconds(20)
+        let outcome = try await call.run()
+        if outcome.truncated { throw Failure(said: "gh answered with more than \(call.outputLimit) bytes") }
+        if outcome.succeeded { return outcome.data }
         throw Failure(said: outcome.errors.split(separator: "\n").first.map(String.init) ?? "gh failed")
     }
 }

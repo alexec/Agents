@@ -199,12 +199,19 @@ extension DaemonCore {
     /// A folder's repository and every worktree of it, for the chooser and the project
     /// page. A folder in no repository is an answer too, not an error: it is what hides
     /// the chooser.
-    public func listWorktrees(for folder: URL) async -> DaemonAPI.WorktreesListResponse {
+    ///
+    /// `withStatus: false` is for a caller that needs only the names (a helper's
+    /// `worktree`): no git call per worktree at all (#207).
+    public func listWorktrees(for folder: URL, withStatus: Bool = true) async -> DaemonAPI.WorktreesListResponse {
         let project = Project.standardize(folder)
         guard let repository = await GitWorktrees.repository(of: project) else { return .notARepository }
-        let hasCommit = await GitWorktrees.hasCommit(in: project)
         let entries = (try? await GitWorktrees.list(in: project)) ?? []
         let here = Project.standardize(repository.toplevel)
+        // The checkout's own line of the list says what it is on, so neither needs a git
+        // call of its own (#207). A repository with no commit lists a HEAD of zeros.
+        let mine = entries.first { Self.canonicalPath($0.path) == Self.canonical(here).path }
+        let hasCommit = if let head = mine?.head { head.contains { $0 != "0" } }
+            else { await GitWorktrees.hasCommit(in: project) }
         let working = Array(agents.live.values)
         var summaries = entries.filter { !$0.isBare }.map { entry -> DaemonAPI.WorktreeSummary in
             let root = Self.canonical(entry.path)
@@ -227,13 +234,18 @@ extension DaemonCore {
                 madeByApp: Self.isMadeByApp(root, branch: entry.branch, in: repository),
                 agents: own.sorted { $0.createdAt < $1.createdAt }.map(\.id))
         }
-        let statuses = await Self.statuses(of: summaries, base: await GitWorktrees.base(in: project))
-        for index in summaries.indices { summaries[index].status = statuses[summaries[index].root] }
+        if withStatus {
+            let base: String? = if let mine, hasCommit { mine.branch ?? mine.head }
+                else { await GitWorktrees.base(in: project) }
+            let statuses = await Self.statuses(of: summaries, base: base, commonDir: repository.commonDir)
+            for index in summaries.indices { summaries[index].status = statuses[summaries[index].root] }
+        }
         // A branch checked out anywhere cannot be checked out again; its worktree is
         // already on the list.
         let checkedOut = Set(entries.compactMap(\.branch))
         let branches = hasCommit
-            ? ((try? await GitWorktrees.branches(in: project)) ?? []).filter { !checkedOut.contains($0.name) }
+            ? Array(((try? await GitWorktrees.branches(in: project)) ?? []).filter { !checkedOut.contains($0.name) }
+                .prefix(Self.listedBranchLimit))
             : []
         return DaemonAPI.WorktreesListResponse(
             isRepository: true, canMakeNew: hasCommit,
@@ -241,12 +253,40 @@ extension DaemonCore {
             worktrees: summaries, branches: branches)
     }
 
+    /// The most branches a list offers to make a worktree on, most recent first (#207).
+    static let listedBranchLimit = 200
+    /// The most worktrees a list works out a status for (#207): the project folder and
+    /// those with agents in them first. The rest are listed without one.
+    static let statusedWorktreeLimit = 12
+
     /// Each worktree's git status, worked out side by side: a project with a dozen
     /// worktrees shouldn't wait on three dozen git calls one after another.
-    static func statuses(of worktrees: [DaemonAPI.WorktreeSummary],
-                         base: String?) async -> [URL: DaemonAPI.WorktreeStatus] {
-        await withTaskGroup(of: (URL, DaemonAPI.WorktreeStatus?).self) { group in
-            for worktree in worktrees where worktree.exists {
+    ///
+    /// Bounded (#207): at most `statusedWorktreeLimit` worktrees, and a status worked out
+    /// before is given again while its worktree's HEAD, index and the refs it is counted
+    /// against are as they were, for `WorktreeStatusCache.lifetime` at most. Every chat
+    /// opened asks for this list.
+    static func statuses(of worktrees: [DaemonAPI.WorktreeSummary], base: String?,
+                         commonDir: URL? = nil) async -> [URL: DaemonAPI.WorktreeStatus] {
+        let shown = worktrees.filter(\.exists).enumerated()
+            .sorted { a, b in
+                let rank = { (w: DaemonAPI.WorktreeSummary) in w.isProjectFolder ? 0 : w.agents.isEmpty ? 2 : 1 }
+                return (rank(a.element), a.offset) < (rank(b.element), b.offset)
+            }
+            .prefix(statusedWorktreeLimit).map(\.element)
+        var result: [URL: DaemonAPI.WorktreeStatus] = [:]
+        var stale: [(DaemonAPI.WorktreeSummary, GitStamp?)] = []
+        for worktree in shown {
+            let stamp = WorktreeStatusCache.stamp(of: worktree.root, base: base, commonDir: commonDir)
+            if let held = WorktreeStatusCache.shared.status(of: worktree.root, stamp: stamp, base: base) {
+                result[worktree.root] = held
+            } else {
+                stale.append((worktree, stamp))
+            }
+        }
+        guard !stale.isEmpty else { return result }
+        return await withTaskGroup(of: (URL, DaemonAPI.WorktreeStatus?).self) { group in
+            for (worktree, stamp) in stale {
                 group.addTask {
                     let root = worktree.root
                     guard let uncommitted = try? await GitWorktrees.statusCount(in: root) else { return (root, nil) }
@@ -255,11 +295,12 @@ extension DaemonCore {
                     if !worktree.isProjectFolder, let branch = worktree.branch, let base, base != branch {
                         unmerged = await GitWorktrees.commitCount(from: base, to: branch, in: root)
                     }
-                    return (root, DaemonAPI.WorktreeStatus(uncommitted: uncommitted, ahead: tracking?.ahead,
-                                                           behind: tracking?.behind, unmerged: unmerged))
+                    let status = DaemonAPI.WorktreeStatus(uncommitted: uncommitted, ahead: tracking?.ahead,
+                                                          behind: tracking?.behind, unmerged: unmerged)
+                    WorktreeStatusCache.shared.keep(status, of: root, stamp: stamp, base: base)
+                    return (root, status)
                 }
             }
-            var result: [URL: DaemonAPI.WorktreeStatus] = [:]
             for await (root, status) in group { result[root] = status }
             return result
         }
@@ -591,5 +632,56 @@ extension DaemonCore {
 
     private func releaseWorktreeName(_ name: String, under folder: URL) {
         reservedWorktreeNames.remove(Self.canonicalPath(folder) + "/" + name)
+    }
+}
+
+/// Each worktree's last status and what it was worked out from (#207). Shared by every
+/// list, whoever asks; a worktree that has gone is dropped when the cache is next full.
+final class WorktreeStatusCache: @unchecked Sendable {
+    static let shared = WorktreeStatusCache()
+    /// Edits to tracked files and new untracked ones move no stamp, so a status is
+    /// worked out again after this however still the stamp has been.
+    static let lifetime: TimeInterval = 15
+    static let capacity = 256
+
+    private struct Held {
+        var stamp: GitStamp
+        var base: String?
+        var status: DaemonAPI.WorktreeStatus
+        var madeAt: Date
+    }
+
+    private let lock = NSLock()
+    private var held: [String: Held] = [:]
+
+    /// The worktree's own HEAD, index and log, and the refs its counts are made against:
+    /// its base, its packed refs and the last fetch.
+    static func stamp(of root: URL, base: String?, commonDir: URL?) -> GitStamp? {
+        var also = ["packed-refs", "FETCH_HEAD"]
+        if let base { also += ["refs/heads/\(base)", "logs/refs/heads/\(base)"] }
+        return GitStamp.of(root, commonDir: commonDir, also: also)
+    }
+
+    func status(of root: URL, stamp: GitStamp?, base: String?, now: Date = Date()) -> DaemonAPI.WorktreeStatus? {
+        guard let stamp else { return nil }
+        lock.lock(); defer { lock.unlock() }
+        guard let found = held[root.path], found.stamp == stamp, found.base == base,
+              now.timeIntervalSince(found.madeAt) < Self.lifetime else { return nil }
+        return found.status
+    }
+
+    func keep(_ status: DaemonAPI.WorktreeStatus, of root: URL, stamp: GitStamp?, base: String?, now: Date = Date()) {
+        guard let stamp else { return }
+        lock.lock(); defer { lock.unlock() }
+        if held.count >= Self.capacity {
+            held = held.filter { now.timeIntervalSince($0.value.madeAt) < Self.lifetime }
+            if held.count >= Self.capacity { held.removeAll() }
+        }
+        held[root.path] = Held(stamp: stamp, base: base, status: status, madeAt: now)
+    }
+
+    func forget(_ root: URL) {
+        lock.lock(); defer { lock.unlock() }
+        held[root.path] = nil
     }
 }
