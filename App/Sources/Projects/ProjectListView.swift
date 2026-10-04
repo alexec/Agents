@@ -20,6 +20,11 @@ struct ProjectListView: View {
     /// alike. Drives bulk Archive; `selection` is still the one thing the detail reads.
     @State private var picked: Set<SidebarItem> = []
     @State private var query = ""
+    /// What the folds filter by: the field's words once typing pauses, so a keystroke
+    /// costs the field and not a pass over every project (#176).
+    @State private var searched = ""
+    /// Projects whose every match is on show, past the first few (#176).
+    @State private var showingAllMatches: Set<ProjectKey> = []
     @FocusState private var searchFocused: Bool
     /// Whether the list itself has the keyboard: only then is a picked row filled with
     /// the accent rather than a grey wash (see `SidebarInk`).
@@ -55,7 +60,16 @@ struct ProjectListView: View {
 
             Section("Projects") {
                 ForEach(orderedProjects, id: \.key) { summary in
-                    ProjectFold(summary: summary, folds: folds, query: query)
+                    ProjectFold(summary: summary, folds: folds, query: searched,
+                                showsAllMatches: showingAllMatches.contains(summary.key),
+                                showAllMatches: { showingAllMatches.insert(summary.key) })
+                }
+                // A host had more matches than its page: the next page, on asking (#176).
+                if !searched.isEmpty, model.searchHasMore {
+                    Button("More matches…") { Task { await model.searchMore() } }
+                        .buttonStyle(.plain)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
                 }
                 ForEach(model.hosts.servers, id: \.self) { host in
                     GoneProjectRows(host: host)
@@ -70,7 +84,7 @@ struct ProjectListView: View {
                 }
             }
 
-            if !model.archivedProjects.isEmpty, query.isEmpty {
+            if !model.archivedProjects.isEmpty, searched.isEmpty {
                 Section(isExpanded: $showsArchived) {
                     ForEach(model.archivedProjects, id: \.key) { summary in
                         ArchivedProjectRow(summary: summary).font(.body)
@@ -89,12 +103,18 @@ struct ProjectListView: View {
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
         .searchable(text: $query, placement: .sidebar, prompt: "Search sessions and workflows")
-        // The archived sessions that match are the hosts' to find, a capped page each,
-        // after a pause in the typing (#165). The live ones are already here.
+        // After a pause in the typing (#176): the folds filter what is held, and the
+        // archived sessions that match are the hosts' to find, a capped page each (#165).
         .task(id: query) {
             let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !words.isEmpty { try? await Task.sleep(for: .milliseconds(250)) }
+            if !words.isEmpty { try? await Task.sleep(for: .milliseconds(150)) }
             guard !Task.isCancelled else { return }
+            if words != searched {
+                let timing = Perf.begin("search")
+                searched = words
+                showingAllMatches = []
+                Perf.endWhenDrawn(timing, "\(words.count) characters")
+            }
             await model.searchSessions(words)
         }
         .searchFocused($searchFocused)
@@ -260,7 +280,13 @@ private struct ProjectFold: View {
     @Environment(WindowRequests.self) private var requests
     let summary: DaemonAPI.ProjectSummary
     let folds: SidebarFolds
+    /// The search's words, already trimmed; empty when there is no search.
     let query: String
+    var showsAllMatches = false
+    var showAllMatches: () -> Void = {}
+
+    /// The most archived matches a fold shows before Show all (#176).
+    static let matchesShown = 10
 
     private var key: ProjectKey { summary.key }
 
@@ -318,7 +344,7 @@ private struct ProjectFold: View {
     }
 
     private var nameMatches: Bool {
-        label.localizedCaseInsensitiveContains(query.trimmingCharacters(in: .whitespacesAndNewlines))
+        label.localizedCaseInsensitiveContains(query)
     }
 
     private var hasWorkflowMatch: Bool {
@@ -338,8 +364,15 @@ private struct ProjectFold: View {
             DisclosureGroup(isExpanded: Binding(
                 get: { isOpen },
                 set: { folds.set(key, .archivedSessions, open: $0) })) {
-                ForEach(query.isEmpty ? Array(archived.prefix(AppModel.archivedShown)) : archived) { agent in
+                let cap = query.isEmpty ? AppModel.archivedShown : showsAllMatches ? archived.count : Self.matchesShown
+                ForEach(archived.prefix(cap)) { agent in
                     SessionSidebarRow(agent: agent)
+                }
+                if !query.isEmpty, archived.count > cap {
+                    Button("Show all \(archived.count)", action: showAllMatches)
+                        .buttonStyle(.plain)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
                 }
                 if let retiredLine {
                     Text(retiredLine)
@@ -374,8 +407,7 @@ private struct ProjectFold: View {
 
     private func sessionLists() -> SessionLists {
         var lists = SessionLists()
-        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matcher = words.isEmpty ? nil : SessionLabelQuery(words)
+        let matcher = query.isEmpty ? nil : SessionLabelQuery(query)
         let shelf = model.work.shelf(key)
         for group in AgentGroup.allCases {
             let held = shelf.groups[group] ?? []

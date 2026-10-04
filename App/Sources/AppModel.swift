@@ -757,29 +757,46 @@ final class AppModel {
         work.forget(held)
     }
 
-    /// The most a search brings back from each host.
+    /// The most a search brings back from each host, a page at a time.
     static let searchShown = 200
     /// Archived sessions a search brought in, let go when the search ends.
     @ObservationIgnored private var searched: Set<UUID> = []
+    /// The next page of matches, for each host whose last page was full (#176).
+    private var searchNext: [HostID: DaemonAPI.ListRequest] = [:]
+    /// Whether a host has more matches than it has sent: More matches… asks for them.
+    var searchHasMore: Bool { !searchNext.isEmpty }
 
     /// Ask every host for the sessions matching `words`, archived ones included, a capped
     /// page each (#165): the sidebar holds the live ones and filters those itself.
     func searchSessions(_ words: String) async {
         let earlier = searched.filter { $0 != selection }
         searched = []
+        searchNext = [:]
         guard !words.isEmpty else {
             work.forget(earlier.filter { work.agent($0)?.state == .archived && !isInOpenArchivedFold($0) })
             return
         }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [HostID] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
-        for host in hosts {
-            guard let found = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
-                                                                 returning: [Agent].self) else { continue }
-            let fresh = found.filter { $0.state == .archived && work.agent($0.id) == nil }.map(\.id)
-            searched.formUnion(fresh)
-            work.takeListed(found.filter { $0.state == .archived }.map { var agent = $0; agent.host = host; return agent })
-        }
+        for host in hosts { await search(request, on: host) }
+    }
+
+    /// The next page from each host that has more, newest first as the host lists them.
+    func searchMore() async {
+        let next = searchNext
+        searchNext = [:]
+        for (host, request) in next { await search(request, on: host) }
+    }
+
+    private func search(_ request: DaemonAPI.ListRequest, on host: HostID) async {
+        guard let found = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
+                                                             returning: [Agent].self) else { return }
+        // A search ended or changed while this was on its way: not what is asked now.
+        guard !Task.isCancelled else { return }
+        let fresh = found.filter { $0.state == .archived && work.agent($0.id) == nil }.map(\.id)
+        searched.formUnion(fresh)
+        work.takeListed(found.filter { $0.state == .archived }.map { var agent = $0; agent.host = host; return agent })
+        searchNext[host] = request.next(after: found)
     }
 
     /// Whether an archived session is on show in its project's open Archived fold.
