@@ -281,11 +281,7 @@ private struct ProjectFold: View {
                 }
                 ForEach(AgentGroup.live, id: \.self) { group in
                     ForEach(group.headings(lists.shown[group] ?? [])) { part in
-                        SidebarSubheading(title: part.title, count: part.agents.count,
-                                          unread: part.agents.filter(\.showsUnread).count)
-                        ForEach(part.agents) { agent in
-                            SessionSidebarRow(agent: agent)
-                        }
+                        sessionGroup(group, part, searching: searching)
                     }
                 }
                 if !searching, !lists.hasLive {
@@ -323,6 +319,23 @@ private struct ProjectFold: View {
 
     private var hasWorkflowMatch: Bool {
         model.workflows(in: key.folder).contains(where: SessionLabelQuery(query).matches)
+    }
+
+    /// One group of sessions, folding at its heading (#181). Open until folded; a search
+    /// unfolds it, so what matched is in sight.
+    private func sessionGroup(_ group: AgentGroup, _ part: AgentHeading, searching: Bool) -> some View {
+        let isOpen = searching || folds.isOpen(key, .group(group))
+        return DisclosureGroup(isExpanded: Binding(
+            get: { isOpen },
+            set: { folds.set(key, .group(group), open: $0) })) {
+            ForEach(part.agents) { agent in
+                SessionSidebarRow(agent: agent)
+            }
+        } label: {
+            SidebarSubheading(title: part.title, count: part.agents.count,
+                              unread: part.agents.filter(\.showsUnread).count,
+                              tint: !isOpen && group == .needsAttention ? .attention : .none)
+        }
     }
 
     /// Archived sessions, folded under the live ones, with what has been retired from

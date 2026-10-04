@@ -123,6 +123,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const unfolded = searching || folds.isOpen(host.id, folder);
   const down = linkDown || !store.hostIsOnline(host.id);
   const showsArchived = searching || folds.isOpen(host.id, folder, "archivedSessions");
+  const showsWorkflows = searching || folds.isOpen(host.id, folder, "workflows");
   useEffect(() => {
     if (unfolded && store.hostIsOnline(host.id)) void store.loadWorkflows(host.id, folder);
   }, [unfolded, host.id, folder]);
@@ -187,15 +188,24 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
             <PinnedPageRows store={store} host={host.id} folder={folder} down={down}
               chosen={r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder) ? r.page : undefined} />
           )}
-          {groups.map((group) => (
-            <div class="group" key={group.group} role="group" aria-label={group.title}>
-              <h3 class={`subhead${group.group === "needsAttention" ? " needs" : ""}`}>
-                {group.title} <span class="count">{group.agents.length}</span>
-                {group.agents.some(showsUnread) && <span class="count"> · {group.agents.filter(showsUnread).length} unread</span>}
-              </h3>
-              {group.agents.map(row)}
-            </div>
-          ))}
+          {/* Each group folds at its heading, as the window's do (#181); a search shows every match. */}
+          {groups.map((group) => {
+            const fold = `group.${group.group}` as const;
+            const open = searching || folds.isOpen(host.id, folder, fold);
+            return (
+              <details class="group" key={group.group} role="group" aria-label={group.title} open={open}
+                onToggle={(e) => {
+                  const now = (e.currentTarget as HTMLDetailsElement).open;
+                  if (!searching && now !== open) folds.set(host.id, folder, now, fold);
+                }}>
+                <summary class={`subhead${group.group === "needsAttention" ? " needs" : ""}`} data-fold={fold}>
+                  {group.title} <span class="count">{group.agents.length}</span>
+                  {group.agents.some(showsUnread) && <span class="count"> · {group.agents.filter(showsUnread).length} unread</span>}
+                </summary>
+                {open && group.agents.map(row)}
+              </details>
+            );
+          })}
           {!searching && groups.length === 0 && <p class="hint">No sessions yet</p>}
           {(archived.length > 0 || (project.counts.archived ?? 0) > 0 || project.retiredCount > 0) && (
             <details class="archived" open={showsArchived}
@@ -214,9 +224,13 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
             </details>
           )}
           {(workflows.length > 0 || archivedWorkflows.length > 0) && (
-            <div class="group" role="group" aria-label="Workflows">
-              <h3 class="subhead">Workflows <span class="count">{workflows.length}</span></h3>
-              {workflows.map((summary) => (
+            <details class="group" role="group" aria-label="Workflows" open={showsWorkflows}
+              onToggle={(e) => {
+                const now = (e.currentTarget as HTMLDetailsElement).open;
+                if (!searching && now !== showsWorkflows) folds.set(host.id, folder, now, "workflows");
+              }}>
+              <summary class="subhead" data-fold="workflows">Workflows <span class="count">{workflows.length}</span></summary>
+              {showsWorkflows && workflows.map((summary) => (
                 <div class="nav-item" key={summary.workflow.workflowID}>
                   <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
                     chosen={r.workflow === summary.workflow.workflowID}
@@ -238,7 +252,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
                   ))}
                 </details>
               )}
-            </div>
+            </details>
           )}
         </div>
       )}
@@ -283,7 +297,7 @@ function folderPath(folder: string): string {
 /** Every row the keys move through, in the order shown. */
 function navRows(list: HTMLElement): HTMLElement[] {
   return [...list.querySelectorAll<HTMLElement>(
-    ".activity .row, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, details.archived > summary",
+    ".activity .row, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, details.archived > summary, details.group > summary",
   )].filter((el) => el.offsetParent !== null);
 }
 

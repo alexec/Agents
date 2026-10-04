@@ -14,6 +14,8 @@ import SwiftUI
 struct WorkflowsSection: View {
     @Environment(RemoteModel.self) private var model
     @State private var showsArchived = false
+    /// Folded on this device, as a session group is (#181).
+    @AppStorage(FoldedGroups.key) private var folded = FoldedGroups()
 
     private var all: [WorkflowSummary] { model.workflows }
     private var live: [WorkflowSummary] { all.filter { !$0.isArchived } }
@@ -21,17 +23,24 @@ struct WorkflowsSection: View {
 
     var body: some View {
         if !all.isEmpty {
-            SectionHeading(title: "Workflows")
-            ForEach(live) { summary in
-                WorkflowRow(summary: summary)
+            let name = model.selectedProject.map { FoldedGroups.name("workflows", in: $0) }
+            let isOpen = name.map { !folded.contains($0) } ?? true
+            SectionHeading(title: "Workflows", count: live.count,
+                           isOpen: Binding(get: { isOpen }, set: { open in
+                               if let name { folded.set(name, folded: !open) }
+                           }))
+            if isOpen {
+                ForEach(live) { summary in
+                    WorkflowRow(summary: summary)
+                }
             }
-            if live.isEmpty, !archived.isEmpty {
+            if isOpen, live.isEmpty, !archived.isEmpty {
                 Text("All of this project's workflows are archived.")
                     .appText(.reading)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)
             }
-            if !archived.isEmpty {
+            if isOpen, !archived.isEmpty {
                 DisclosureHeading(title: "Archived", count: archived.count, isOpen: $showsArchived)
                 if showsArchived {
                     ForEach(archived) { summary in
