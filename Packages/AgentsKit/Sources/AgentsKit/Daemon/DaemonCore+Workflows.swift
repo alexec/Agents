@@ -610,7 +610,7 @@ extension DaemonCore {
         broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
 
         do {
-            let agentID = try await runAgent(for: workflow, run: run)
+            let agentID = try await runAgent(for: workflow, run: run, causingEvent: causingEvent)
             run.agentID = agentID
             workflowRuns[key] = run
             persistWorkflowRuns()
@@ -638,8 +638,9 @@ extension DaemonCore {
     }
 
     /// Which agent gets the prompt, and getting it to them.
-    private func runAgent(for workflow: Workflow, run: WorkflowRun) async throws -> UUID {
-        let prompt = promptText(for: workflow, run: run)
+    private func runAgent(for workflow: Workflow, run: WorkflowRun,
+                          causingEvent: EventPosition? = nil) async throws -> UUID {
+        let prompt = promptText(for: workflow, run: run, event: causingEvent.flatMap { eventLog.event(at: $0) })
 
         switch workflow.mode {
         case .triggering:
@@ -865,9 +866,18 @@ extension DaemonCore {
     /// a placeholder syntax is a language nobody asked to learn. What a lifecycle
     /// trigger adds is a sentence saying what happened, so an agent starting fresh has
     /// something to act on rather than being told to review a thing it cannot name.
-    private func promptText(for workflow: Workflow, run: WorkflowRun) -> String {
+    /// An event no agent set off says itself, details and all, so a workflow on
+    /// `mac.disk_low` knows whether it is low or critical (#199).
+    private func promptText(for workflow: Workflow, run: WorkflowRun, event: Event? = nil) -> String {
         guard let agentID = run.triggeringAgentID, let agent = agents[agentID] else {
-            return workflow.prompt
+            guard let event else { return workflow.prompt }
+            let details = event.details.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }
+            return """
+                \(workflow.prompt)
+
+                (You were started by the workflow "\(workflow.name)" because of the event \(event.name): \
+                \(event.sentence)\(details.isEmpty ? "" : " Its details are " + details.joined(separator: "; ") + ".")
+                """
         }
         let name = agent.title ?? "an untitled agent"
         let what: String
