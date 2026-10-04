@@ -65,26 +65,57 @@ enum Grammar {
         return try? String(contentsOf: url, encoding: .utf8)
     }
 
-    static func queryURL(for code: CodeLanguage) -> URL? {
-        Bundle.module.url(forResource: code.rawValue, withExtension: "scm", subdirectory: "Queries")
+    static func queryURL(for code: CodeLanguage, in bundle: Bundle? = resources) -> URL? {
+        bundle?.url(forResource: code.rawValue, withExtension: "scm", subdirectory: "Queries")
     }
 
-    private static let cache = QueryCache()
+    /// The bundle the queries are copied into, looked for once. Not `Bundle.module`: its
+    /// accessor traps when the bundle is not where it expects, and opening a code file took
+    /// the window down with it (#178). Without the bundle, code shows plain.
+    static let resources = resourceBundle(searching: resourceFolders)
+
+    static let resourceBundleName = "CodeText_CodeText.bundle"
+
+    /// Where the bundle sits: the Mac app's Resources, the iOS app's top level, or beside
+    /// the code that links this (a test bundle, a command-line build).
+    static var resourceFolders: [URL] {
+        let linked = Bundle(for: BundleFinder.self)
+        return [Bundle.main.resourceURL, Bundle.main.bundleURL,
+                linked.resourceURL, linked.bundleURL, linked.bundleURL.deletingLastPathComponent(),
+                Bundle.main.executableURL?.deletingLastPathComponent()]
+            .compactMap(\.self)
+    }
+
+    static func resourceBundle(searching folders: [URL]) -> Bundle? {
+        for folder in folders {
+            if let bundle = Bundle(url: folder.appendingPathComponent(resourceBundleName)) { return bundle }
+        }
+        log.error("\(resourceBundleName, privacy: .public) was not found in \(folders.map(\.path), privacy: .public); code shows plain")
+        return nil
+    }
+
+    private static let cache = QueryCache(bundle: resources)
     static let log = Logger(subsystem: "com.alexecollins.Agents", category: "CodeText")
 }
 
-private actor QueryCache {
+private final class BundleFinder {}
+
+actor QueryCache {
+    private let bundle: Bundle?
     private var compiled: [CodeLanguage: Query] = [:]
     /// Languages whose query would not compile: tried once, then shown plain, never retried.
     private var failed: Set<CodeLanguage> = []
 
+    init(bundle: Bundle?) { self.bundle = bundle }
+
     func query(for code: CodeLanguage) -> Query? {
         if let query = compiled[code] { return query }
-        guard !failed.contains(code), let language = Grammar.language(for: code) else {
+        // Without the bundle there is nothing to compile; that was logged once, when it was looked for.
+        guard bundle != nil, !failed.contains(code), let language = Grammar.language(for: code) else {
             return nil
         }
         do {
-            guard let url = Grammar.queryURL(for: code) else {
+            guard let url = Grammar.queryURL(for: code, in: bundle) else {
                 throw CocoaError(.fileNoSuchFile)
             }
             let query = try Query(language: language, data: Data(contentsOf: url))
