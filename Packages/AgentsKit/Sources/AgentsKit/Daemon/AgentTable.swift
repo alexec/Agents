@@ -24,6 +24,9 @@ struct AgentTable {
     private(set) var byFolder: [URL: Set<UUID>] = [:]
     /// The numbers a project's summary is made of, by folder. Only for folders with an agent.
     private(set) var tallies: [URL: ProjectTally] = [:]
+    /// Moves whenever a folder gains its first agent or loses its last, so the project
+    /// index knows when the set of folders is no longer what it was (#204).
+    private(set) var foldersVersion = 0
     /// Agents starting or running: what keeps the Mac awake (024).
     private(set) var inFlight = 0
     /// Agents with a wait on events, open or ended (042). A handful at most.
@@ -84,6 +87,7 @@ struct AgentTable {
         let folder = agent.projectFolder
         filedFolder[agent.id] = folder
         byFolder[folder, default: []].insert(agent.id)
+        if tallies[folder] == nil { foldersVersion += 1 }
         tallies[folder, default: ProjectTally()].add(agent)
         if agent.state == .starting || agent.state == .running { inFlight += 1 }
         if agent.state.holdsRuntime { holdingRuntime += 1 }
@@ -104,7 +108,7 @@ struct AgentTable {
 
     private mutating func settle(_ folder: URL) {
         guard let members = byFolder[folder] else {
-            tallies[folder] = nil
+            if tallies.removeValue(forKey: folder) != nil { foldersVersion += 1 }
             return
         }
         guard tallies[folder]?.isStale == true else { return }

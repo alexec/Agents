@@ -23,7 +23,9 @@ extension DaemonCore {
         guard !retentionIsLoaded else { return }
         retentionIsLoaded = true
         retention = retentionStore.load()
-        retired = retiredStore.loadAll()
+        retired = TombstoneTable(retiredStore.loadAll())
+        // A new table counts its folders from nothing: the index is made again.
+        projectIndexCache = nil
     }
 
     // MARK: Reading
@@ -65,15 +67,6 @@ extension DaemonCore {
             .sorted { $0.retiredAt > $1.retiredAt }
             .prefix(limit)
             .map { $0 }
-    }
-
-    /// Every tombstone in each project, for the project summaries.
-    func tombstonesByProject() -> [URL: [Tombstone]] {
-        loadRetentionIfNeeded()
-        if let tombstoneIndex { return tombstoneIndex }
-        let index = Dictionary(grouping: retired.values) { Project.standardize($0.project) }
-        tombstoneIndex = index
-        return index
     }
 
     // MARK: Settings

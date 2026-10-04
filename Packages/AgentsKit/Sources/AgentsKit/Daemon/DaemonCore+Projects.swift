@@ -11,13 +11,25 @@ import Foundation
 /// with nothing to migrate: their folder is already on their record. It is also what
 /// makes an agent arriving by a route nobody thought about — an adopted session, a
 /// fork — land in the right project without being told.
+/// Every project's folder and its name among the others, as `projectIndex` keeps them
+/// (#204), with what they were made from.
+struct ProjectIndex {
+    var folders: Set<URL>
+    var names: [URL: String]
+    /// `AgentTable.foldersVersion` and `TombstoneTable.foldersVersion` when made.
+    var agentFolders: Int
+    var tombstoneFolders: Int
+}
+
 extension DaemonCore {
     // MARK: Reading
 
-    /// Every project, named, stamped and counted, from each folder's tally (#164).
+    /// Every project, named, stamped and counted, from each folder's tally (#164), each
+    /// for the cost of one lookup in the kept index (#204).
     public func allProjects(includeArchived: Bool = true) -> [DaemonAPI.ProjectSummary] {
         let records = projectRecords()
-        var summaries = projectFolders().compactMap { summary(of: $0, records: records) }
+        let index = projectIndex()
+        var summaries = index.folders.compactMap { summary(of: $0, records: records, index: index) }
         if !includeArchived { summaries = summaries.filter { !$0.project.isArchived } }
         return summaries.sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
@@ -26,50 +38,93 @@ extension DaemonCore {
     /// And every folder a retired agent was in, so a project whose agents have all
     /// been retired keeps what it cost (051).
     func projectFolders() -> Set<URL> {
+        projectIndex().folders
+    }
+
+    /// Whether a folder is a project: a lookup, for a caller that needs nothing more.
+    func isProject(_ folder: URL) -> Bool {
+        projectIndex().folders.contains(Project.standardize(folder))
+    }
+
+    /// The folders and their names, made again only when the set of folders has moved
+    /// (#204): a folder gaining its first agent or losing its last, a record kept or
+    /// changed, a tombstone in a folder that had none. Until then every project-wide call
+    /// reads it as it is, rather than each project's summary making it again.
+    func projectIndex() -> ProjectIndex {
+        loadRetentionIfNeeded()
+        let records = projectRecords()
+        if let projectIndexCache, projectIndexCache.agentFolders == agents.foldersVersion,
+           projectIndexCache.tombstoneFolders == retired.foldersVersion {
+            return projectIndexCache
+        }
+        projectIndexBuilds += 1
         var folders = Set(agents.tallies.keys)
-        folders.formUnion(projectRecords().keys)
-        folders.formUnion(tombstonesByProject().keys)
-        return folders
+        folders.formUnion(records.keys)
+        folders.formUnion(retired.tallies.keys)
+        let names: [URL: String]
+        if let projectIndexCache, projectIndexCache.folders == folders {
+            names = projectIndexCache.names
+        } else {
+            names = ProjectNaming.displayNames(for: Array(folders))
+        }
+        let index = ProjectIndex(folders: folders, names: names, agentFolders: agents.foldersVersion,
+                                 tombstoneFolders: retired.foldersVersion)
+        projectIndexCache = index
+        return index
     }
 
     /// One project's summary from its tally, its record and its tombstones: the same
     /// thing `rebuiltProjects` says of it, for the cost of one project rather than every
-    /// agent there has ever been (#164). Nil when the folder is not a project.
-    func summary(of folder: URL, records: [URL: Project]) -> DaemonAPI.ProjectSummary? {
+    /// agent there has ever been (#164), and without looking at any other project (#204).
+    /// Nil when the folder is not a project.
+    func summary(of folder: URL, records: [URL: Project], index: ProjectIndex,
+                 freshExistence: Bool = false) -> DaemonAPI.ProjectSummary? {
         let tally = agents.tallies[folder]
-        let gone = tombstonesByProject()[folder] ?? []
-        guard tally != nil || records[folder] != nil || !gone.isEmpty else { return nil }
+        let gone = retired.tallies[folder]
+        guard tally != nil || records[folder] != nil || gone != nil else { return nil }
         var project = records[folder]
-            ?? Project(folder: folder, addedAt: tally?.oldestCreated ?? gone.map(\.createdAt).min() ?? Date())
+            ?? Project(folder: folder, addedAt: tally?.oldestCreated ?? gone?.oldestCreated ?? Date())
         var costToDate = tally?.costToDate ?? [:]
-        for tombstone in gone {
-            for (currency, amount) in tombstone.costToDate {
-                costToDate[currency, default: 0] += amount
-            }
+        for (currency, amount) in gone?.costToDate ?? [:] {
+            costToDate[currency, default: 0] += amount
         }
-        let newest = tally?.newestActivity ?? gone.map(\.lastActivityAt).max() ?? project.addedAt
+        let newest = tally?.newestActivity ?? gone?.newestActivity ?? project.addedAt
         project.helperLimits = configuredHelperLimits(in: project.folder)
         project.diskSpace = configuredDiskSpace(in: project.folder)
         var summary = DaemonAPI.ProjectSummary(
             project: project,
-            name: projectNames()[folder] ?? folder.lastPathComponent,
-            exists: Self.isDirectory(folder),
+            name: index.names[folder] ?? folder.lastPathComponent,
+            exists: folderExists(folder, fresh: freshExistence),
             lastActivityAt: newest,
             counts: tally?.counts ?? [:],
             costToDate: costToDate,
             unmeasuredAgents: tally?.unmeasured ?? 0)
-        summary.retiredCount = gone.count
+        summary.retiredCount = gone?.count ?? 0
         return summary
     }
 
-    /// Every project's name, disambiguated against the others, worked out again only
-    /// when the set of folders moves.
+    /// Every project's name, disambiguated against the others.
     func projectNames() -> [URL: String] {
-        let folders = projectFolders()
-        if let projectNamesCache, projectNamesCache.folders == folders { return projectNamesCache.names }
-        let names = ProjectNaming.displayNames(for: Array(folders))
-        projectNamesCache = (folders, names)
-        return names
+        projectIndex().names
+    }
+
+    /// How long a watched project folder's existence is believed without its watch
+    /// saying anything: a folder moved away whole is not heard by a watch rooted inside it.
+    static let folderExistenceFresh: TimeInterval = 30
+
+    /// Whether a project's folder is there (#204). A folder under a project watch is
+    /// looked at once and believed until the watch hears anything in it; any other, and
+    /// any single project's summary (`fresh`), is looked at each time, which is one stat.
+    func folderExists(_ folder: URL, fresh: Bool = false) -> Bool {
+        let at = now()
+        if !fresh, let seen = folderExistence[folder], at >= seen.at,
+           at.timeIntervalSince(seen.at) < Self.folderExistenceFresh {
+            return seen.exists
+        }
+        let exists = Self.isDirectory(folder)
+        if projectWatches[folder] != nil { folderExistence[folder] = (exists, at) }
+        else { folderExistence[folder] = nil }
+        return exists
     }
 
     /// Every project, counted the long way from every agent held: what the tallies are
@@ -77,7 +132,7 @@ extension DaemonCore {
     func rebuiltProjects(includeArchived: Bool = true) -> [DaemonAPI.ProjectSummary] {
         let records = projectRecords()
         let agentsByFolder = Dictionary(grouping: agents.values) { $0.projectFolder }
-        let retiredByFolder = tombstonesByProject()
+        let retiredByFolder = Dictionary(grouping: retired.values) { Project.standardize($0.project) }
 
         // The union: every folder an agent is in, and every folder we kept a record for.
         // And every folder a retired agent was in, so a project whose agents have all
@@ -149,7 +204,8 @@ extension DaemonCore {
 
     /// One project, or nil when that folder is not one.
     func projectSummary(for folder: URL) -> DaemonAPI.ProjectSummary? {
-        summary(of: Project.standardize(folder), records: projectRecords())
+        summary(of: Project.standardize(folder), records: projectRecords(), index: projectIndex(),
+                freshExistence: true)
     }
 
     /// The kept records, by folder.

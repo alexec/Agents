@@ -529,7 +529,7 @@ extension DaemonCore {
     /// A project this host has, by its folder: a screen's pin calls name one.
     private func knownPinProject(_ folder: URL) throws -> URL {
         let project = Project.standardize(folder)
-        guard allProjects(includeArchived: true).contains(where: { Project.standardize($0.folder) == project }) else {
+        guard isProject(project) else {
             throw pinRefusal("This host has no project at \(project.path).")
         }
         return project

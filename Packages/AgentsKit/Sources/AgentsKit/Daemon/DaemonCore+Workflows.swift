@@ -158,6 +158,8 @@ extension DaemonCore {
     /// Something changed under a project, worktrees and build output already left out.
     func projectFilesChanged(_ changed: [URL], in folder: URL) {
         projectWatchWakes += 1
+        // Whatever moved, the folder is looked at again before a list says it is there.
+        folderExistence[folder] = nil
         // Pinned pages and page tiles (#159) can be anywhere in the project.
         pinFilesChanged(changed, in: folder)
         if branchFolders.contains(folder), changed.contains(where: Self.isBranchPath) {
@@ -183,6 +185,8 @@ extension DaemonCore {
         for (_, watch) in projectWatches { watch.stop() }
         projectWatches.removeAll()
         projectWatchExclusions.removeAll()
+        folderExistence.removeAll()
+        dashboardSummaryCache.removeAll()
         for folder in branchFolders { stopWatchingBranches(in: folder) }
     }
 
@@ -209,6 +213,8 @@ extension DaemonCore {
         // the same call `FilesPane` makes in `onDisappear`, and for the same reason.
         projectWatches.removeValue(forKey: standardized)?.stop()
         projectWatchExclusions.removeValue(forKey: standardized)
+        folderExistence[standardized] = nil
+        dashboardSummaryCache[standardized] = nil
         workflowRescans.removeValue(forKey: standardized)?.cancel()
         // The branches went with the watch; an archived project's moves are not raised.
         stopWatchingBranches(in: standardized)

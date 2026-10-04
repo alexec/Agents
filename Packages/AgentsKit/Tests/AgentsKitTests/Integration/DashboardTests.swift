@@ -177,6 +177,29 @@ struct DashboardTests {
         #expect(!DashboardModel.isStale(snapshot.tiles[0], now: snapshot.now))
     }
 
+    @Test func aKeptSummaryMovesWhenATileGoesStaleOrItsFileChanges() async throws {
+        // Kept between calls (#204), so nothing has to be read again until it moves.
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        await s.core.adoptWorkflows(in: s.project)
+        _ = try await set(s, "Lead", ["id": "ci", "title": "CI", "type": "status", "level": "bad",
+                                      "line": "red", "stale_after_hours": 1])
+        #expect(await s.core.dashboardSummaries().first?.bad == 1)
+        #expect(await s.core.dashboardSummaryCache[s.project] != nil, "kept for a watched project")
+        // Stale with no file changing: what was kept no longer holds.
+        s.clock.advance(minutes: 61)
+        #expect(await s.core.dashboardSummaries().first?.bad == 0)
+        // A change by hand reaches it through the project's watch.
+        _ = try await set(s, "Lead", ["id": "ci", "title": "CI", "type": "status", "level": "bad",
+                                      "line": "red", "stale_after_hours": 1])
+        #expect(await s.core.dashboardSummaries().first?.bad == 1)
+        var tile = try TileFile.read(Data(contentsOf: file(s, "ci")))
+        tile.hidden = true
+        try tile.fileData().write(to: file(s, "ci"))
+        await s.core.projectFilesChanged([file(s, "ci").deletingLastPathComponent()], in: s.project)
+        #expect(await s.core.dashboardSummaries().first?.tiles == 0)
+        await s.core.stopWatchingAllWorkflows()
+    }
+
     // MARK: US3
 
     @Test func hidingSurvivesTheKeepersPostsAndShowBringsItBack() async throws {
