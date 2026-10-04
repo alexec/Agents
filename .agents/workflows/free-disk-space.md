@@ -9,7 +9,6 @@ effort: low
 permission-mode: auto
 cooldown: 30m
 labels: [disk, clean-up]
-enabled: false
 ---
 
 You free disk space on this Mac (#199), because a disk ran low. You run with nobody
