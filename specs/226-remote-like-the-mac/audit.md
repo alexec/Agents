@@ -35,7 +35,7 @@ The views stay separate for each platform.
 | Unread is a mark: a dot and a heavier title, plus an "N unread" count on the heading and project row (#70) | same |
 | Labels and worktree names on the row's second line (#68) | same |
 | Folds kept across launches, with projects and Archived starting folded and groups starting open | same rules. Each device keeps its own folds, because a fold records where one screen was left. |
-| Archived sessions: a page of 50 while the fold is open, the host's count on its heading, the retired line last (#165, 051) | same. The Remote's count needs the summary's archived count, which is #227's fix. |
+| Archived sessions: a page of 50 while the fold is open, the host's count on its heading, the retired line last (#165, 051) | same. The count on the heading is the host's, which reaches the Remote (#227 checked it and closed with no change). |
 | Search filters after a pause; an archived match shows the first 10 a fold, then Show all; one capped page is asked of the host (#176) | same, except More matches… is **to do** on the Remote. It asks the paired Mac only, not each server. |
 | A project row opens its Dashboard | same. New Session is in the Dashboard's toolbar, the row's long-press menu and its leading swipe. |
 | Context menus | **by design**: a long press gives the Mac's menu, and swipes do the common actions. Sessions swipe Pin/Unpin from the leading edge, and Archive (a long swipe), Bring Back and Mark as Read/Unread from the trailing edge. Workflows swipe Archive/Bring Back. |
@@ -124,7 +124,6 @@ The views stay separate for each platform.
 - **Folds:** fold a group, Pinned, Workflows and a project, then quit and relaunch. They
   should stay as you left them.
 - **Archived sessions:** open the fold on a project with archived sessions. It should list
-  them, and a search should find archived matches. If a project with archived sessions
-  shows no fold, that is #227.
+  them, and a search should find archived matches. If a project with archived sessions shows no fold, reopen #227 and say when it happened.
 - **From outside the app:** open from a notification banner or the widget. The chat should
   open, and Back should return to the list.
