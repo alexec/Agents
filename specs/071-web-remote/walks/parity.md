@@ -120,3 +120,4 @@ What is still different, and why:
 - **#83, "said at once":** neither the window nor the page hears a paused host for about a minute. Both learn of it from the control plane, which is #106's lane.
 - **Event trigger words:** the page says an event's name, not the window's catalogue meaning. Its filters read as the window's since 073.
 - **The window's Try Again for its host:** nothing on the page to redial.
+| Sidebar search waits for a pause in the typing, shows 10 archived matches a fold then "Show all N", and asks each host for a capped page with "More matches…"; a Dashboard drop is sent one at a time, newest last, and a stale fetch can't undo it (2026-10-03) | #176 | lacks, #193 | The page filters what it holds on every keystroke, shows every match, and doesn't ask its hosts. Its `arrangeDashboard` sends and refetches per drop, so it has the race the window's `DashboardOrderSync` closes. |

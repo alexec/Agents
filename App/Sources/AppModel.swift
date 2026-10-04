@@ -952,48 +952,53 @@ final class AppModel {
         work.replaceDashboardSummaries(listed)
     }
 
-    /// The selected project's Dashboard, asked for when its page opens and again on each
-    /// `dashboard/changed` for it.
-    func refreshDashboard(_ folder: URL) async {
-        let host = selectedProjectHost
+    /// The order writes and fetches of each Dashboard, kept in step (#176).
+    @ObservationIgnored private var dashboardOrders = DashboardOrderSync()
+
+    /// A project's Dashboard, asked of its own host when its page opens and again on
+    /// each `dashboard/changed` for it. A reply older than one already shown is dropped.
+    func refreshDashboard(_ folder: URL, on host: HostID) async {
+        let ticket = dashboardOrders.beginFetch(in: folder)
         guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.dashboardGet,
                                                                DaemonAPI.DashboardRequest(folder: folder),
-                                                               returning: DashboardSnapshot.self) else { return }
-        work.store(snapshot)
+                                                               returning: DashboardSnapshot.self),
+              let shown = dashboardOrders.accept(snapshot, ticket: ticket) else { return }
+        work.store(shown)
     }
 
     /// Hide, Show or Remove a tile: the person's, from any client (FR-027 to FR-029).
-    func actOnTile(_ method: String, folder: URL, id: String) async {
-        let host = selectedProjectHost
+    func actOnTile(_ method: String, folder: URL, on host: HostID, id: String) async {
         await attempt(on: host) {
             try await self.client(for: host).call(method, DaemonAPI.TileRequest(folder: folder, id: id))
         }
-        await refreshDashboard(folder)
+        await refreshDashboard(folder, on: host)
     }
 
     /// Update now (#146): the project's dashboard workflow, or a one-off agent. A refusal
     /// (running, cooling down, waiting for approval) is said, as Run now's is.
-    func updateDashboard(_ folder: URL) async {
-        let host = selectedProjectHost
+    func updateDashboard(_ folder: URL, on host: HostID) async {
         await attempt(on: host) {
             try await self.client(for: host).call(DaemonAPI.Method.dashboardUpdate,
                                                   DaemonAPI.DashboardRequest(folder: folder))
         }
-        await refreshDashboard(folder)
+        await refreshDashboard(folder, on: host)
     }
 
-    /// A drop or a Move menu item (#147): shown at once, then the whole order sent once.
-    func arrangeDashboard(_ order: DashboardOrder, folder: URL) async {
+    /// A drop or a Move menu item (#147): shown at once, then the whole order sent. One
+    /// send at a time, the newest order next, so the host ends with the last drop (#176).
+    func arrangeDashboard(_ order: DashboardOrder, folder: URL, on host: HostID) async {
         if var snapshot = dashboard(in: folder) {
             snapshot.order = order
             work.store(snapshot)
         }
-        let host = selectedProjectHost
-        await attempt(on: host) {
-            try await self.client(for: host).call(DaemonAPI.Method.dashboardArrange,
-                                                  DaemonAPI.ArrangeRequest(folder: folder, order: order))
+        guard dashboardOrders.arrange(order, in: folder) else { return }
+        while let next = dashboardOrders.takeUnsent(in: folder) {
+            await attempt(on: host) {
+                try await self.client(for: host).call(DaemonAPI.Method.dashboardArrange,
+                                                      DaemonAPI.ArrangeRequest(folder: folder, order: next))
+            }
         }
-        await refreshDashboard(folder)
+        await refreshDashboard(folder, on: host)
     }
 
     /// A tile's keeper: its session, or its workflow's page (FR-030).

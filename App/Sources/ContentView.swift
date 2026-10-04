@@ -93,7 +93,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 WaitingForOKBanner(folder: folder)
                 OfflineStrip(host: summary.host)
-                DashboardPage(folder: folder)
+                DashboardPage(folder: folder, host: summary.host)
             }
             .paperGround()
         } else if let path = model.openPin, let key = model.selectedProjectKey, let summary = model.selectedProjectSummary {

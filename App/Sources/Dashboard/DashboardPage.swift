@@ -9,6 +9,8 @@ struct DashboardPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
     let folder: URL
+    /// The project's host: what its Dashboard is asked of, whatever is selected by then.
+    let host: HostID
 
     @State private var showsHidden = false
     @State private var detail: TileView?
@@ -31,7 +33,7 @@ struct DashboardPage: View {
                         empty(hiddenCount: snapshot.tiles.filter { $0.tile?.isHidden == true }.count)
                     }
                     VStack(alignment: .leading, spacing: 22) {
-                        ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
+                        ForEach(Array(sections.enumerated()), id: \.element.title) { index, section in
                             sectionView(section.title, section.tiles, now: snapshot.now,
                                         place: (index, sections.count, sections.map(\.title)))
                         }
@@ -59,7 +61,7 @@ struct DashboardPage: View {
         // project, as a chat is named for its session.
         .navigationTitle(AppCheckout.windowTitle(model.selectedProjectSummary?.name))
         .navigationSubtitle("Dashboard")
-        .task(id: model.dashboardRevision(in: folder)) { await model.refreshDashboard(folder) }
+        .task(id: model.dashboardRevision(in: folder)) { await model.refreshDashboard(folder, on: host) }
         .sheet(item: $detail) { tile in
             TileDetail(tile: tile, now: snapshot?.now ?? .now) { detail = nil }.paperSheet()
         }
@@ -96,7 +98,7 @@ struct DashboardPage: View {
     /// Update now (#146): Updating… while a run is going, off while it can't start.
     private func updateButton(_ update: DashboardUpdate, now: Date) -> some View {
         Button {
-            Task { await model.updateDashboard(folder) }
+            Task { await model.updateDashboard(folder, on: host) }
         } label: {
             if update.isRunning {
                 HStack(spacing: 6) {
@@ -213,7 +215,7 @@ struct DashboardPage: View {
     private func arrange(_ change: (DashboardOrder) -> DashboardOrder?) {
         guard let snapshot = model.dashboard(in: folder),
               let order = change(DashboardModel.arrangement(snapshot)) else { return }
-        Task { await model.arrangeDashboard(order, folder: folder) }
+        Task { await model.arrangeDashboard(order, folder: folder, on: host) }
     }
 
     /// A drop: the tiles go before the one they were dropped on, or after the last of the
@@ -279,12 +281,12 @@ struct DashboardPage: View {
         moveItems(tile)
         Divider()
         if tile.tile?.isHidden == true {
-            Button("Show") { Task { await model.actOnTile(DaemonAPI.Method.dashboardShow, folder: folder, id: tile.id) } }
+            Button("Show") { Task { await model.actOnTile(DaemonAPI.Method.dashboardShow, folder: folder, on: host, id: tile.id) } }
         } else {
-            Button("Hide") { Task { await model.actOnTile(DaemonAPI.Method.dashboardHide, folder: folder, id: tile.id) } }
+            Button("Hide") { Task { await model.actOnTile(DaemonAPI.Method.dashboardHide, folder: folder, on: host, id: tile.id) } }
                 .disabled(tile.tile == nil)
         }
-        Button("Remove") { Task { await model.actOnTile(DaemonAPI.Method.dashboardRemove, folder: folder, id: tile.id) } }
+        Button("Remove") { Task { await model.actOnTile(DaemonAPI.Method.dashboardRemove, folder: folder, on: host, id: tile.id) } }
     }
 
     /// Move Up, Move Down and Move to Section ▸: the order without a drag (#147).
