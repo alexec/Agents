@@ -102,9 +102,9 @@ a { color: var(--accent); }
   font-size: 12px;
 }
 
-/* The three columns (071 US2, US6; frames A–D). Widths from look/README.md: three columns
-   from 1200, the files pane as a fourth from 1440 (over the chat below that), the projects
-   folded into a menu from 760, and one column at a time below 760. */
+/* The columns (071 US2, US6; #151, #235): the one sidebar and the chat, the files pane a third
+   from 1440 (over the chat below that), and below 760 the sidebar or what it picked. The widths
+   are in sidebar.css. */
 .app {
   height: 100vh;
   display: flex;
@@ -587,35 +587,13 @@ button.link.reading:hover { text-decoration: underline; }
   padding: 4px;
 }
 
-/* Below 1440 the files pane opens over the chat, with its close button. */
-@media (max-width: 1439px) {
-  .files-open .columns { grid-template-columns: 236px 320px minmax(0, 1fr); }
-  /* The chat and the pane share one cell; the pane lies over the chat. */
-  .chat, .files { grid-column: 3; grid-row: 1; }
-  .files { z-index: 5; }
-}
-
-/* 760–1200: the projects fold into a menu atop the sessions column. */
-@media (max-width: 1199px) {
-  .columns, .files-open .columns { grid-template-columns: 300px minmax(0, 1fr); }
-  .projects { display: none; }
-  .chat, .files { grid-column: 2; grid-row: 1; }
-  .medium-only { display: inline-block; }
-  /* Frame C: the menu, then the icons; the search field waits for the wide layout. */
-  .search.wide-only { display: none; }
-}
-
-/* Below 760: one column at a time, in the iPhone Remote's order, with a back control. */
+/* Below 760: the back control and the heading only a phone's width shows; sidebar.css lays out
+   the list or what it picked (#235). */
 @media (max-width: 759px) {
-  .columns, .files-open .columns { grid-template-columns: minmax(0, 1fr); }
-  .projects, .sessions, .chat { display: none; border-right: none; }
-  .depth-projects .projects, .depth-sessions .sessions, .depth-chat .chat { display: flex; }
-  .chat, .files, .sessions, .projects { grid-column: 1; grid-row: 1; }
   .medium-only, .wide-only { display: none; }
   .narrow-only { display: block; }
   button.back.narrow-only { display: inline-block; border: none; background: none; color: #2f6fd1; padding: 0; }
   .column-head h1.narrow-only { display: block; text-align: center; }
-  .projects .column-head h1 { text-align: left; font-size: 17px; }
 }
 
 /* US3: the prompt's menus, attachments, labels, the session menu, the new-session form. */

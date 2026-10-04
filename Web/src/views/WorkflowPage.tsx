@@ -16,6 +16,7 @@ import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { SessionRow } from "./SessionRow";
 import { CooldownMenu, RuntimeRow, WorkflowSettingsForm } from "./WorkflowSettings";
+import { BackToList } from "./BackToList";
 
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
   store: Store; host: string; folder: string; projectName: string; workflowID: string; down: boolean;
@@ -23,7 +24,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   const summary = (store.workflows.value[`${host}|${folderKey(folder)}`] ?? []).find((w) => w.workflow.workflowID === workflowID);
   // The daemon's refusal of the last change, said beside the controls until the next one.
   const problem = useSignal<{ workflowID: string; text: string } | null>(null);
-  const back = <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>;
+  const back = <BackToList />;
   if (!summary) {
     return (
       <section class="chat workflow-page" aria-label="Workflow">

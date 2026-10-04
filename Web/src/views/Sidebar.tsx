@@ -1,4 +1,5 @@
-// The page's one sidebar from 760 wide (#151), as the window's (#145, ProjectListView.swift):
+// The page's one sidebar (#151), as the window's (#145, ProjectListView.swift), and below 760 the
+// root list, as the iPhone Remote's (#226, #235):
 // Activity at the top, then every project, each a row that folds open on its sessions and
 // workflows, and at the foot what the hosts and this browser are doing. No host headings: a
 // server's project reads `host:Project`. A project's row opens its Dashboard.
@@ -75,6 +76,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   return (
     <nav class="sidebar" aria-label="Sidebar">
       <header class="column-head sidebar-head">
+        {/* The root list's title at a phone's width, as the iPhone's (#235). */}
+        <h1 class="narrow-only">Agents</h1>
         <input class="search" type="search" placeholder="Search sessions and workflows"
           aria-label="Search sessions and workflows" value={search.value}
           onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />

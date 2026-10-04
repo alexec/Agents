@@ -11,7 +11,7 @@ import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../mo
 import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
 import type { Agent } from "../protocol/generated";
-import { go, replace, route } from "../route";
+import { replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
@@ -27,6 +27,7 @@ import { CallActionsContext, detailSummaries, detailTitles, TurnView, type CallA
 import { setPane } from "./files/paneState";
 import { ViewLayerContext } from "./chat/AppView";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
+import { BackToList } from "./BackToList";
 
 const detailKey = "agents.turnDetail";
 
@@ -55,7 +56,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const timer = setTimeout(() => store.prewarm(host, session, "opened"), 1500);
     return () => clearTimeout(timer);
   }, [host, session]);
-  const project = r.project ? (store.projects.value[host] ?? []).find((p) => p.project.folder === r.project) : undefined;
   const level = useSignal<TurnDetail>(defaultDetail.value);
   /** Turns opened or closed by hand, kept until the chat is left. */
   const chosen = useSignal<Record<string, TurnDetail>>({});
@@ -213,7 +213,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   return (
     <section class="chat" aria-label="Chat" ref={chatColumn}>
       <header class="column-head">
-        <button class="back narrow-only" onClick={() => go({ host: r.host, project: r.project })}>‹ {project?.name ?? "Sessions"}</button>
+        <BackToList />
         <h1>{agent?.title ?? "New session"}</h1>
         <span class="actions">
           <select class="detail" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}

@@ -7,6 +7,7 @@ import type { ControlHost, CostState, Event, RuntimeAvailability, RuntimeStatus 
 import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
+import { BackToList } from "./BackToList";
 
 /** "14:05", twenty-four hours, as the window's Events row says it. */
 function clock(date: Date): string {
@@ -146,7 +147,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
   const hostName = (host: string) => (host === "mac" ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host);
   return (
     <section class={`chat activity-page ${page}-page`} aria-label={pageTitles[page]}>
-      <header class="column-head"><h1>{pageTitles[page]}</h1></header>
+      <header class="column-head"><BackToList /><h1>{pageTitles[page]}</h1></header>
       <div class="scroll">
         <div class="activity-body">
           {page === "events" && <EventsList store={store} hostName={several ? hostName : null} />}

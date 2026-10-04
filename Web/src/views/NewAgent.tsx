@@ -18,6 +18,7 @@ import { Reach } from "./Reach";
 import { Prompt } from "./Prompt";
 import { OfflineStrip } from "./OfflineStrip";
 import { PromptMenus } from "./PromptMenus";
+import { BackToList } from "./BackToList";
 
 type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string };
 
@@ -153,7 +154,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   return (
     <section class="chat new-agent" aria-label="New session">
       <header class="column-head narrow-only">
-        <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>
+        <BackToList />
       </header>
       {/* The same strip as over a chat: a prompt here goes to that host too (#83). */}
       {!down && <OfflineStrip store={store} host={host} />}

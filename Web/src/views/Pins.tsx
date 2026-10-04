@@ -13,6 +13,7 @@ import type { FileStamp, PinView } from "../protocol/generated";
 import { go } from "../route";
 import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { LiveDocument, type PageSource } from "./LiveDocument";
+import { BackToList } from "./BackToList";
 
 export function PinnedPageRows({ store, host, folder, chosen, down }: {
   store: Store; host: string; folder: string; chosen: string | undefined; down: boolean;
@@ -77,8 +78,8 @@ type Shown =
   | { kind: "html"; path: string; text: string; stamp: FileStamp }
   | { kind: "problem"; why: string };
 
-export function PinnedPage({ store, host, folder, projectName, path, down }: {
-  store: Store; host: string; folder: string; projectName: string; path: string; down: boolean;
+export function PinnedPage({ store, host, folder, path, down }: {
+  store: Store; host: string; folder: string; path: string; down: boolean;
 }) {
   const key = `${host}|${folderKey(folder)}`;
   const revision = store.pageRevisions.value[key] ?? 0;
@@ -86,7 +87,7 @@ export function PinnedPage({ store, host, folder, projectName, path, down }: {
   const isHTML = /\.html?$/i.test(path);
   const shown = useSignal<Shown>({ kind: "reading" });
   const title = pin?.title ?? path.split("/").pop() ?? path;
-  const back = <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>;
+  const back = <BackToList />;
 
   const read = (file: string, stamp?: FileStamp) => store.readPage(host, folder, file, stamp);
   // HTML only: Markdown is LiveDocument's to read.
