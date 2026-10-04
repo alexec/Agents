@@ -752,7 +752,7 @@ final class AppModel {
 
     /// How many archived sessions an Archived fold shows: enough to find last week's; the
     /// rest are on the phone's archive and in Events.
-    static let archivedShown = 50
+    static let archivedShown = SidebarProjectFold.archivedShown
 
     /// A project's newest archived sessions, for its Archived fold when it opens (#164):
     /// the window holds the live agents, and a page of archived ones per open fold.

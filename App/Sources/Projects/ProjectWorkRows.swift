@@ -11,25 +11,18 @@ import SwiftUI
 /// workflows fold away at its foot, where their pages (and Bring Back) are. A search
 /// narrows it with the sessions, and leaves it out when nothing in it matches.
 struct ProjectWorkflowRows: View {
-    @Environment(AppModel.self) private var model
-    let project: ProjectKey
-    let query: String
+    /// The project's fold, which has its workflows as the search leaves them.
+    let fold: SidebarProjectFold
     let folds: SidebarFolds
 
-    private var matching: [WorkflowSummary] {
-        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let all = model.workflows(in: project.folder)
-        guard !words.isEmpty else { return all }
-        return all.filter(SessionLabelQuery(words).matches)
-    }
+    private var project: ProjectKey { fold.key }
 
     var body: some View {
-        let matching = matching
-        let workflows = matching.filter { !$0.isArchived }
-        let archived = matching.filter(\.isArchived)
-        if !matching.isEmpty {
+        let workflows = fold.workflows
+        let archived = fold.archivedWorkflows
+        if !workflows.isEmpty || !archived.isEmpty {
             // Folds as a session group does (#181); a search unfolds it to show what matched.
-            let workflowsOpen = !query.isEmpty || folds.isOpen(project, .workflows)
+            let workflowsOpen = fold.isSearching || folds.isOpen(project, .workflows)
             DisclosureGroup(isExpanded: Binding(
                 get: { workflowsOpen },
                 set: { folds.set(project, .workflows, open: $0) })) {
@@ -40,7 +33,7 @@ struct ProjectWorkflowRows: View {
                 SidebarSubheading(title: "Workflows", count: workflows.count)
             }
             if !archived.isEmpty {
-                let archivedOpen = !query.isEmpty || folds.isOpen(project, .archivedWorkflows)
+                let archivedOpen = fold.isSearching || folds.isOpen(project, .archivedWorkflows)
                 DisclosureGroup(isExpanded: Binding(
                     get: { archivedOpen },
                     set: { folds.set(project, .archivedWorkflows, open: $0) })) {

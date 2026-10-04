@@ -41,9 +41,7 @@ struct ProjectListView: View {
     /// This Mac's projects, then each server's: no headings for hosts (Alex, #145), the
     /// host is in a server project's own name.
     private var orderedProjects: [DaemonAPI.ProjectSummary] {
-        let live = model.liveProjects
-        return live.filter { $0.host == .mac }
-            + model.hosts.servers.flatMap { host in live.filter { $0.host == host } }
+        SidebarOrder.projects(model.liveProjects, servers: model.hosts.servers)
     }
 
     var body: some View {
@@ -295,43 +293,39 @@ private struct ProjectFold: View {
     var showsAllMatches = false
     var showAllMatches: () -> Void = {}
 
-    /// The most archived matches a fold shows before Show all (#176).
-    static let matchesShown = 10
-
     private var key: ProjectKey { summary.key }
 
     var body: some View {
-        let searching = !query.isEmpty
-        let isOpen = searching || folds.isOpen(key)
         // Folded, nothing under the row is drawn, so nothing is filed for it: the row
-        // reads its own numbers off the project's shelf (#165).
-        let lists = isOpen ? sessionLists() : SessionLists()
-        if !searching || lists.hasAny || hasWorkflowMatch || nameMatches {
+        // reads its own numbers off the project's shelf (#165). What goes under which
+        // heading is the shared model's, which the Remote draws too (#226).
+        let fold = SidebarProjectFold(key, label: label, in: model.work, query: query,
+                                      isOpen: folds.isOpen(key))
+        let isOpen = fold.isSearching || folds.isOpen(key)
+        if fold.isShown {
             DisclosureGroup(isExpanded: Binding(
                 get: { isOpen },
                 set: { folds.set(key, open: $0) })) {
                 // The project's pinned pages (#159), beside the Dashboard its own row opens,
                 // before its sessions. Not while searching: the search is for sessions.
-                if !searching {
+                if !fold.isSearching {
                     PinnedPageRows(project: key)
                 }
                 // Then its pinned sessions (#180), whatever their state, in the order
                 // they were put in. They still count under their own groups' numbers.
-                if !lists.pinned.isEmpty {
-                    pinnedSessions(lists.pinned, searching: searching)
+                if !fold.pinned.isEmpty {
+                    pinnedSessions(fold)
                 }
-                ForEach(AgentGroup.live, id: \.self) { group in
-                    ForEach(group.headings(lists.shown[group] ?? [])) { part in
-                        sessionGroup(group, part, searching: searching)
-                    }
+                ForEach(fold.groups) { part in
+                    sessionGroup(part, searching: fold.isSearching)
                 }
-                if !searching, !lists.hasLive {
+                if !fold.isSearching, !fold.hasLive {
                     Text("No sessions yet")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
-                archivedSessions(lists.shown[.archived] ?? [])
-                ProjectWorkflowRows(project: key, query: query, folds: folds)
+                archivedSessions(fold)
+                ProjectWorkflowRows(fold: fold, folds: folds)
             } label: {
                 ProjectRow(summary: summary, label: label, isFolded: !isOpen)
                     .appText(.supporting)
@@ -351,20 +345,13 @@ private struct ProjectFold: View {
     /// A server's project says which server (Alex, #145): no heading for each host, so
     /// the host goes in the name. This Mac's go by name alone.
     private var label: String {
-        summary.host == .mac ? summary.name : "\(model.hosts.label(summary.host)):\(summary.name)"
-    }
-
-    private var nameMatches: Bool {
-        label.localizedCaseInsensitiveContains(query)
-    }
-
-    private var hasWorkflowMatch: Bool {
-        model.workflows(in: key.folder).contains(where: SessionLabelQuery(query).matches)
+        SidebarOrder.label(summary) { model.hosts.label($0) }
     }
 
     /// One group of sessions, folding at its heading (#181). Open until folded; a search
     /// unfolds it, so what matched is in sight.
-    private func sessionGroup(_ group: AgentGroup, _ part: AgentHeading, searching: Bool) -> some View {
+    private func sessionGroup(_ part: SidebarProjectFold.Group, searching: Bool) -> some View {
+        let group = part.group
         let isOpen = searching || folds.isOpen(key, .group(group))
         return DisclosureGroup(isExpanded: Binding(
             get: { isOpen },
@@ -373,14 +360,16 @@ private struct ProjectFold: View {
                 SessionSidebarRow(agent: row.item)
             }
         } label: {
-            SidebarSubheading(title: part.title, count: part.agents.count,
-                              unread: part.agents.filter(\.showsUnread).count,
+            SidebarSubheading(title: part.heading.title, count: part.agents.count,
+                              unread: part.unread,
                               tint: !isOpen && group == .needsAttention ? .attention : .none)
         }
     }
 
     /// The pinned sessions, folding as a group does, and dragged into the order wanted.
-    private func pinnedSessions(_ pinned: [Agent], searching: Bool) -> some View {
+    private func pinnedSessions(_ fold: SidebarProjectFold) -> some View {
+        let pinned = fold.pinned
+        let searching = fold.isSearching
         let isOpen = searching || folds.isOpen(key, .pinned)
         return DisclosureGroup(isExpanded: Binding(
             get: { isOpen },
@@ -400,30 +389,29 @@ private struct ProjectFold: View {
         } label: {
             SidebarSubheading(title: "Pinned", count: pinned.count,
                               unread: pinned.filter(\.showsUnread).count,
-                              tint: !isOpen && pinned.contains { model.work.group(of: $0) == .needsAttention }
-                                  ? .attention : .none)
+                              tint: !isOpen && fold.pinnedWantsAPerson(in: model.work) ? .attention : .none)
         }
     }
 
     /// Archived sessions, folded under the live ones, with what has been retired from
     /// here (051) as the last line.
     @ViewBuilder
-    private func archivedSessions(_ archived: [Agent]) -> some View {
-        let retiredLine = query.isEmpty ? RetirementWords.retiredLine(summary.retiredCount) : nil
+    private func archivedSessions(_ fold: SidebarProjectFold) -> some View {
+        let retiredLine = fold.retiredLine(summary)
         // How many there are is the host's count: the window holds a page of them only
         // while the fold is open (#165).
-        let count = query.isEmpty ? max(summary.counts[.archived] ?? 0, archived.count) : archived.count
-        let isOpen = !query.isEmpty || folds.isOpen(key, .archivedSessions)
-        if count > 0 || !archived.isEmpty || retiredLine != nil {
+        let count = fold.archivedCount(summary)
+        let isOpen = fold.isSearching || folds.isOpen(key, .archivedSessions)
+        if fold.showsArchivedFold(summary) {
             DisclosureGroup(isExpanded: Binding(
                 get: { isOpen },
                 set: { folds.set(key, .archivedSessions, open: $0) })) {
-                let cap = query.isEmpty ? AppModel.archivedShown : showsAllMatches ? archived.count : Self.matchesShown
-                ForEach(FoldedRow.rows(isOpen ? archived.prefix(cap) : [], in: .archivedSessions)) { row in
+                let shown = fold.archivedShown(showingAll: showsAllMatches)
+                ForEach(FoldedRow.rows(isOpen ? shown : [], in: .archivedSessions)) { row in
                     SessionSidebarRow(agent: row.item)
                 }
-                if !query.isEmpty, archived.count > cap {
-                    Button("Show all \(archived.count)", action: showAllMatches)
+                if fold.isSearching, fold.archived.count > shown.count {
+                    Button("Show all \(fold.archived.count)", action: showAllMatches)
                         .buttonStyle(.plain)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -439,44 +427,14 @@ private struct ProjectFold: View {
                 SidebarSubheading(title: "Archived sessions", count: count)
             }
             // A page of them while the fold is open, let go when it closes (#165).
-            .task(id: query.isEmpty && isOpen) {
-                if query.isEmpty && isOpen {
+            .task(id: !fold.isSearching && isOpen) {
+                if !fold.isSearching && isOpen {
                     await model.loadArchived(in: key)
-                } else if query.isEmpty {
+                } else if !fold.isSearching {
                     model.letGoOfArchived(in: key)
                 }
             }
         }
-    }
-
-    /// The project's sessions in each group, as held and as the search leaves them.
-    private struct SessionLists {
-        var all: [AgentGroup: [Agent]] = [:]
-        /// Each group's rows, the pinned left out: they are drawn in Pinned (#180).
-        var shown: [AgentGroup: [Agent]] = [:]
-        /// The pinned sessions held and not archived, in their order, as the search leaves them.
-        var pinned: [Agent] = []
-
-        /// Whether the project has a session that is not archived.
-        var hasLive: Bool { AgentGroup.live.contains { !(all[$0]?.isEmpty ?? true) } }
-        var hasAny: Bool { !pinned.isEmpty || AgentGroup.allCases.contains { !(shown[$0]?.isEmpty ?? true) } }
-    }
-
-    private func sessionLists() -> SessionLists {
-        var lists = SessionLists()
-        let matcher = query.isEmpty ? nil : SessionLabelQuery(query)
-        let shelf = model.work.shelf(key)
-        let pinned = model.pinnedSessions(in: key.folder).compactMap { model.work.agent($0) }
-            .filter { $0.host == key.host && $0.state != .archived }
-        let pinnedIDs = Set(pinned.map(\.id))
-        lists.pinned = matcher.map { pinned.filter($0.matches) } ?? pinned
-        for group in AgentGroup.allCases {
-            let held = shelf.groups[group] ?? []
-            lists.all[group] = held
-            let unpinned = pinnedIDs.isEmpty || group == .archived ? held : held.filter { !pinnedIDs.contains($0.id) }
-            lists.shown[group] = matcher.map { unpinned.filter($0.matches) } ?? unpinned
-        }
-        return lists
     }
 }
 

@@ -1,13 +1,13 @@
-import AgentsKitCore
 import Foundation
 
-/// What can be picked in the window's one sidebar (#145).
+/// What can be picked in the window's one sidebar (#145), and in the Remote's, which is
+/// the same list (#226).
 ///
 /// The sidebar is Activity at the top, then every project folded open on its sessions
 /// and workflows. All of those in one list, so one value says which of them is picked —
 /// with a binding each, a project and a session could both look chosen, and the reader
 /// would have to guess which one the detail was showing.
-enum SidebarItem: Hashable {
+public enum SidebarItem: Hashable, Sendable {
     /// The project's own pages: its Dashboard, with its settings a sheet over it.
     case project(ProjectKey)
     /// One session, under its project.
