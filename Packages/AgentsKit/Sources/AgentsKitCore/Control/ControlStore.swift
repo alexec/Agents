@@ -189,27 +189,68 @@ public struct FolderStore: ControlStore {
         guard flock(lock, LOCK_EX) == 0 else { throw StoreError.unavailable("cannot lock \(key): errno \(errno)") }
         defer { flock(lock, LOCK_UN) }
 
-        let current = try? Data(contentsOf: file)
-        switch when {
-        case .absent where current != nil: throw StoreError.conflict(key: key)
-        case .matching(let etag) where current.map(Self.etag) != etag: throw StoreError.conflict(key: key)
-        default: break
+        // Only a file that is not there is absent (#206): one there and unreadable is
+        // neither overwritten as absent nor taken as some other version.
+        if when != .always {
+            let current: Data?
+            do {
+                current = try Data(contentsOf: file)
+            } catch {
+                var info = stat()
+                guard lstat(file.path, &info) != 0, errno == ENOENT else {
+                    throw StoreError.unavailable("cannot read \(key): \(error.localizedDescription)")
+                }
+                current = nil
+            }
+            switch when {
+            case .absent where current != nil: throw StoreError.conflict(key: key)
+            case .matching(let etag) where current.map(Self.etag) != etag: throw StoreError.conflict(key: key)
+            default: break
+            }
         }
         let temporary = folder.appendingPathComponent(".\(file.lastPathComponent).\(UUID().uuidString).tmp")
-        guard FileManager.default.createFile(atPath: temporary.path, contents: data,
-                                             attributes: [.posixPermissions: 0o600]) else {
-            throw StoreError.unavailable("cannot write \(key)")
+        do {
+            try Self.writeSynced(data, to: temporary.path)
+        } catch {
+            unlink(temporary.path)
+            throw StoreError.unavailable("cannot write \(key): \(error)")
         }
-        let written = open(temporary.path, O_RDONLY)
-        if written >= 0 { fsync(written); close(written) }
         guard rename(temporary.path, file.path) == 0 else {
-            try? FileManager.default.removeItem(at: temporary)
-            throw StoreError.unavailable("cannot move \(key) into place: errno \(errno)")
+            let failed = errno
+            unlink(temporary.path)
+            throw StoreError.unavailable("cannot move \(key) into place: errno \(failed)")
         }
+        // The rename is kept only once its folder is synced too.
+        let directory = open(folder.path, O_RDONLY)
+        guard directory >= 0 else { throw StoreError.unavailable("cannot sync the folder of \(key): errno \(errno)") }
+        defer { close(directory) }
+        guard fsync(directory) == 0 else { throw StoreError.unavailable("cannot sync the folder of \(key): errno \(errno)") }
         let etag = Self.etag(data)
         // Known already, so the next listing need not read it back.
         if let stamp = StoreStamp(file.path) { index.know(key, stamp: stamp, etag: etag) }
         return etag
+    }
+
+    /// Writes a new file and syncs it, or throws with the errno that stopped it.
+    private static func writeSynced(_ data: Data, to path: String) throws {
+        let fd = open(path, O_CREAT | O_EXCL | O_WRONLY, 0o600)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        var failed: Int32 = 0
+        data.withUnsafeBytes { bytes in
+            var offset = 0
+            while offset < bytes.count {
+                let wrote = write(fd, bytes.baseAddress! + offset, bytes.count - offset)
+                if wrote < 0 {
+                    if errno == EINTR { continue }
+                    failed = errno
+                    return
+                }
+                offset += wrote
+            }
+        }
+        if failed == 0, fsync(fd) != 0 { failed = errno }
+        if close(fd) != 0, failed == 0 { failed = errno }
+        if failed != 0 { throw POSIXError(POSIXErrorCode(rawValue: failed) ?? .EIO) }
     }
 
     public func delete(_ key: String) async throws {
@@ -286,6 +327,7 @@ public struct FolderStore: ControlStore {
     private func scan(_ folder: String, path: String, stamp: StoreStamp) -> FolderIndex.Listing {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
         var files: [(String, String)] = [], folders: [String] = []
+        var unreadable = false
         for name in names.sorted() where !name.hasPrefix(".") && !name.hasSuffix(".lock") {
             let key = Self.join(folder, name)
             let file = path + "/" + name
@@ -300,12 +342,20 @@ public struct FolderStore: ControlStore {
                     let etag = Self.etag(data)
                     index.know(key, stamp: entry, etag: etag, hashed: true)
                     files.append((name, etag))
+                } else {
+                    // There and unreadable (EACCES, EIO) is listed all the same (#206): left
+                    // out, its member would be refused as unknown and a browser delete its
+                    // key. The tag is no file's hash, so whoever lists it reads it, fails,
+                    // and keeps what they held. It is not remembered: it is tried again.
+                    unreadable = true
+                    files.append((name, Self.unreadableTag(entry)))
                 }
             }
         }
         // A folder changed within the clock's grain of now could change again with the
-        // same time; it is scanned again next time rather than trusted.
-        let settled = stamp.modified < Date().timeIntervalSince1970 - 2
+        // same time; it is scanned again next time rather than trusted. So is one holding
+        // a file that could not be read: a chmod changes neither stamp.
+        let settled = stamp.modified < Date().timeIntervalSince1970 - 2 && !unreadable
         let listing = FolderIndex.Listing(stamp: stamp, settled: settled, files: files, folders: folders)
         index.keep(folder, listing)
         return listing
@@ -324,6 +374,11 @@ public struct FolderStore: ControlStore {
     }
 
     static func etag(_ data: Data) -> String { "\"\(ControlAgreement.sha256(data).hexString)\"" }
+
+    /// What a file listed and not readable is tagged with: never a hash, so never matched.
+    static func unreadableTag(_ stamp: StoreStamp) -> String {
+        "\"unreadable-\(stamp.inode)-\(stamp.size)-\(stamp.seconds).\(stamp.nanoseconds)\""
+    }
 }
 
 /// What a file or folder is, as `lstat` says: enough to tell it changed without reading it.

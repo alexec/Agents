@@ -205,6 +205,98 @@ struct UnreadableControlRecordsTests {
         #expect(await records.client(kept.id)?.name == "Phone")
     }
 
+    // MARK: #206
+
+    /// A folder store with one client file made unreadable; put back on the way out.
+    private func lockedClient(_ body: (FolderStore, URL, String) async throws -> Void) async throws {
+        let (store, root) = ControlStoreTests.folder()
+        let key = ControlRecords.clientKey(UUID())
+        let path = root.appendingPathComponent(key).path
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
+            try? FileManager.default.removeItem(at: root)
+        }
+        _ = try await store.put(key, Data("{}".utf8), when: .absent)
+        try await body(store, root, key)
+    }
+
+    private func lock(_ root: URL, _ key: String) throws {
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: root.appendingPathComponent(key).path)
+    }
+
+    @Test func anUnreadableFileIsStillListedWithATagNoFileHas() async throws {
+        try await lockedClient { store, root, key in
+            let readable = try #require(try await store.list(prefix: ControlRecords.clientsPrefix).first)
+            try lock(root, key)
+            // Listed afresh: the folder is new, so it is scanned again.
+            let fresh = FolderStore(root: root)
+            let listed = try await fresh.list(prefix: ControlRecords.clientsPrefix)
+            #expect(listed.map(\.key) == [key])
+            #expect(listed.first?.etag != readable.etag)
+            #expect(listed.first?.etag.contains("unreadable") == true)
+            // Readable again, it is read again: a chmod moves no stamp, so nothing is trusted.
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: root.appendingPathComponent(key).path)
+            #expect(try await fresh.list(prefix: ControlRecords.clientsPrefix).first?.etag == readable.etag)
+        }
+    }
+
+    @Test func aWriteNeverTakesAnUnreadableFileForAbsentOrForAnotherVersion() async throws {
+        try await lockedClient { store, root, key in
+            let etag = try #require(try await store.get(key)?.etag)
+            try lock(root, key)
+            // Unavailable, not a conflict: neither "it is there" nor "it changed" is known.
+            for condition in [StoreCondition.absent, .matching(etag)] {
+                await #expect {
+                    _ = try await store.put(key, Data("new".utf8), when: condition)
+                } throws: { error in
+                    if case .unavailable? = error as? StoreError { true } else { false }
+                }
+            }
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: root.appendingPathComponent(key).path)
+            #expect(try await store.get(key)?.data == Data("{}".utf8), "left as it was")
+        }
+    }
+
+    @Test func oneUnreadableClientFileDoesNotStopLoadingTheRest() async throws {
+        let (store, root) = ControlStoreTests.folder()
+        let records = ControlRecords(store: store)
+        let kept = ClientRecord(id: UUID(), name: "Phone", kind: .iPhone, publicKey: Data([1]), paired: Date())
+        let other = ClientRecord(id: UUID(), name: "iPad", kind: .iPad, publicKey: Data([2]), paired: Date())
+        let never = ClientRecord(id: UUID(), name: "Mac", kind: .mac, publicKey: Data([3]), paired: Date())
+        try await records.save(kept)
+        try await records.save(other)
+        try await records.save(never)
+        let paths = [kept.id, never.id].map { root.appendingPathComponent(ControlRecords.clientKey($0)).path }
+        defer {
+            for path in paths { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path) }
+            try? FileManager.default.removeItem(at: root)
+        }
+        // Held from before, then unreadable: kept.
+        try await records.load()
+        for path in paths { try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: path) }
+        try await records.load()
+        #expect(await records.client(kept.id)?.name == "Phone")
+        #expect(await records.client(other.id)?.name == "iPad")
+
+        // Never held, and unreadable from the start: the others load, and it is unavailable.
+        let fresh = ControlRecords(store: FolderStore(root: root))
+        let said = Said()
+        await fresh.onUnreadable { said.add($0) }
+        try await fresh.load()
+        #expect(await fresh.client(other.id)?.name == "iPad")
+        #expect(await fresh.client(never.id) == nil)
+        #expect(await fresh.isUnreadable(never.id))
+        #expect(await !fresh.wasForgotten(never.id))
+        #expect(said.lines.contains { $0.contains(ControlRecords.clientKey(never.id)) })
+    }
+
+    final class Said: @unchecked Sendable {
+        private let lock = NSLock()
+        private var all: [String] = []
+        func add(_ line: String) { lock.withLock { all.append(line) } }
+        var lines: [String] { lock.withLock { all } }
+    }
+
     @Test func settingsThatCannotBeReadAreNotMadeAgain() async throws {
         let store = MemoryStore()
         let torn = Data(#"{"name":"#.utf8)
