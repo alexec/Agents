@@ -138,11 +138,37 @@ public final class AgentsModel {
     public var watching: UUID? {
         didSet {
             guard watching != oldValue else { return }
+            shown.id = watching
             clearTranscript()
             // A chat opens at its end, whatever the last one was left at.
             isFollowingEnd = true
+            // Output is kept for the chat on screen only (#203). The host sends what a
+            // terminal still holds to whoever opens its agent, so none of it is lost.
+            terminalOutput = [:]
+            terminalAgents = [:]
+            terminalsByWrite = []
+            terminalOutputBytes = 0
         }
     }
+
+    /// `watching`, readable off the main actor: what `read` checks an entry's or a
+    /// terminal's agentID against before it decodes the rest (#203).
+    public nonisolated let shown = Shown()
+
+    public final class Shown: @unchecked Sendable {
+        private let lock = NSLock()
+        private var held: UUID?
+        public init() {}
+        public var id: UUID? {
+            get { lock.withLock { held } }
+            set { lock.withLock { held = newValue } }
+        }
+    }
+
+    /// Told of an entry too big for the host to send (#203): the agent, the entry's id and
+    /// where it is, for the client to read it with `agents/transcript` and hand it to
+    /// `fillOversized`. Its stub holds its place meanwhile and draws nothing.
+    @ObservationIgnored public var onOversized: (_ agentID: UUID, _ entryID: UUID, _ index: Int?) -> Void = { _, _, _ in }
 
     /// Files an agent has asked be put in front of the user, one per agent, newest
     /// winning. Held rather than acted on, because the client hearing this may be
@@ -217,16 +243,15 @@ public final class AgentsModel {
     /// Files the host could not read in this run (#205); empty when all read.
     public private(set) var storeNotes: [String] = []
 
-    /// What each command an agent ran has printed, as far as this client heard it (033).
+    /// What each command the agent on screen ran has printed (033, #203).
     ///
     /// Here rather than in the Mac's own model so a phone shows the same output in a
-    /// call's detail. Only what arrived while this client was listening: the output is
-    /// streamed, not kept in the transcript.
+    /// call's detail. The output is streamed, not kept in the transcript; a host sends
+    /// what a terminal still holds when its agent is opened, and only the open agent's
+    /// output after that.
     ///
-    /// Bounded as a whole as well as per terminal. Every agent's output reaches every
-    /// window, so a window left open for days heard every command every agent ran, and
-    /// until 2026-09-25 kept all of it. The terminals written to least recently go
-    /// first, the agent on screen's last.
+    /// Bounded as a whole as well as per terminal, as when every agent's output reached
+    /// every window. The terminals written to least recently go first.
     public private(set) var terminalOutput: [String: String] = [:]
     public static let terminalOutputLimit = 200_000
     /// Bytes of output kept across all terminals, and how many terminals.
@@ -299,14 +324,25 @@ public final class AgentsModel {
         case terminalOutput(DaemonAPI.TerminalOutputNotification)
         /// Ours, and unreadable. Claimed, so nobody else guesses at it, and skipped.
         case unreadable
+        /// Ours, and about an agent this client is not showing: not read past its agentID.
+        case skipped
     }
 
     /// Read a notification, anywhere. Nil for anything this model does not know, so
     /// a client with notifications of its own — the Mac has shells and terminals —
     /// can go on and handle them.
-    public nonisolated static func read(_ method: String, _ params: JSONValue?) -> Update? {
+    ///
+    /// With `showing`, an entry or terminal output for any other agent is `.skipped` on its
+    /// agentID alone, before the rest of it is decoded (#203). A host sends them only to
+    /// the client showing that agent; this is for the moment the chat changes, and for a
+    /// host from before.
+    public nonisolated static func read(_ method: String, _ params: JSONValue?, showing: UUID?? = nil) -> Update? {
         func decode<T: Decodable>(_ type: T.Type, _ wrap: (T) -> Update) -> Update {
             (try? params?.decode(type)).map(wrap) ?? .unreadable
+        }
+        if let showing, method == DaemonAPI.Notification.agentEntry || method == DaemonAPI.Notification.agentTerminalOutput {
+            let agentID = params?["agentID"]?.stringValue.flatMap(UUID.init(uuidString:))
+            guard let agentID, agentID == showing else { return .skipped }
         }
         switch method {
         case DaemonAPI.Notification.agentChanged: return decode(Agent.self, Update.agentChanged)
@@ -363,6 +399,11 @@ public final class AgentsModel {
         return true
     }
 
+    /// Apply one notification from one of several daemons, already read off the main actor.
+    public func apply(_ update: Update, from host: HostID) {
+        apply(Self.stamp(update, host: host))
+    }
+
     nonisolated static func stamp(_ update: Update, host: HostID) -> Update {
         switch update {
         case .agentChanged(var agent):
@@ -380,13 +421,21 @@ public final class AgentsModel {
     public func apply(_ update: Update) {
         switch update {
         case .agentChanged(let agent):
-            upsert(agent)
+            let held = byID[agent.id]
+            // An archived agent this client has let go of, or never had, stays out: a list
+            // of the live ones and a page of the rest is all it holds (#165, #203).
+            guard agent.state != .archived || held != nil else { return }
+            // Lean unless its lists moved and this client shows it (#203).
+            file(agent.keepingLists(of: held))
 
         case .projectChanged(let summary):
             upsert(summary)
 
         case .entry(let notification):
             guard notification.agentID == watching else { return }
+            if notification.oversized != nil {
+                onOversized(notification.agentID, notification.entry.id, notification.index)
+            }
             heardSincePage.append(notification.entry)
             if heardSincePage.count > Self.heardSincePageLimit {
                 heardSincePage.removeFirst(heardSincePage.count - Self.heardSincePageLimit)
@@ -507,9 +556,10 @@ public final class AgentsModel {
             }
 
         case .terminalOutput(let notification):
+            guard notification.agentID == watching else { return }
             let id = notification.terminalID
             let before = terminalOutput[id]?.utf8.count ?? 0
-            var text = terminalOutput[id, default: ""] + notification.chunk
+            var text = notification.whole == true ? notification.chunk : terminalOutput[id, default: ""] + notification.chunk
             // The tail, because a build that prints for ten minutes is read from the end.
             // Bytes first: they are counted already, and characters are counted by walking.
             if text.utf8.count > Self.terminalOutputLimit, text.count > Self.terminalOutputLimit {
@@ -522,17 +572,28 @@ public final class AgentsModel {
             terminalsByWrite.append(id)
             dropOldTerminalOutput()
 
-        case .unreadable:
+        case .unreadable, .skipped:
             break
         }
+    }
+
+    /// An entry the host was too big to send, read whole: put where its stub is (#203).
+    /// One whose stub has gone with the page, or a chat that has changed, is let go.
+    public func fillOversized(_ entry: TranscriptEntry, for agentID: UUID) {
+        guard agentID == watching else { return }
+        if let at = heardSincePage.firstIndex(where: { $0.id == entry.id }) { heardSincePage[at] = entry }
+        guard let at = entries.firstIndex(where: { $0.id == entry.id }) else { return }
+        entries[at] = entry
+        refold()
     }
 
     // MARK: Filing what arrives
 
     /// One agent, new or changed, moved to where it now goes: in `agents`, in its
-    /// project's shelf, in its own cell. Nothing else is filed again (#165).
+    /// project's shelf, in its own cell. Nothing else is filed again (#165). A record that
+    /// left its lists out keeps the ones held (#203).
     public func upsert(_ agent: Agent) {
-        file(agent)
+        file(agent.keepingLists(of: byID[agent.id]))
     }
 
     public func upsert(_ summary: WorkflowSummary) {
@@ -641,7 +702,7 @@ public final class AgentsModel {
 
     /// Agents from a list that is not all of them (a project's archived ones, a workflow's
     /// runs, the open chat's record), filed beside the rest. A lean one keeps the lists
-    /// held for it (#107); `agent/changed` is always whole and goes through `upsert`.
+    /// held for it (#107), as a lean `agent/changed` does (#203).
     ///
     /// Merged in one go and sorted once, as `replaceAgents` does: filed one at a time it
     /// was a search and a sort of everything held for each one listed (#136).

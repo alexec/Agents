@@ -1,8 +1,8 @@
 // Presence and the tab's title (071 FR-021, FR-022, research R11).
 //
 // The page reports presence as the Mac window does: active while it is visible and has focus,
-// with the session open, on every change of either (half a second settled) and on every
-// connection. It takes no notices, so it never says whether it may show one. The title is
+// with the session open, on every change of either (half a second settled; a session opened at
+// once) and on every connection. It takes no notices, so it never says whether it may show one. The title is
 // `(N) Agents` when N sessions need the person, counted as the window counts its Dock badge.
 import { effect } from "@preact/signals";
 import type { Store } from "./model/store";
@@ -34,13 +34,16 @@ export function startPresence(store: Store): void {
   let open = false;
   const report = () => {
     if (!open) return;
-    const watching = store.watching.value?.session;
+    const shown = store.watching.value;
     const active = document.visibilityState === "visible" && document.hasFocus();
-    // To the host whose session is open, else the first online one: presence is per client.
-    const host = store.watching.value?.host ?? store.hosts.value.find((h) => h.state === "online")?.id;
-    if (!host) return;
-    void store.link.call("presence/report", { active, ...(watching ? { watching: watching as never } : {}) }, host)
-      .catch(() => {});
+    // Every online host hears whether the person is here; the open session's host hears which
+    // it is, which is where its entries come from (#203). Another host hears it shows nothing.
+    for (const host of store.hosts.value) {
+      if (host.state !== "online") continue;
+      const session = shown?.host === host.id ? shown.session as never : undefined;
+      void store.link.call("presence/report", { active, ...(session ? { watching: session, showing: session } : {}) }, host.id)
+        .catch(() => {});
+    }
   };
   const soon = () => {
     clearTimeout(timer);
@@ -53,11 +56,17 @@ export function startPresence(store: Store): void {
     open = state.kind === "open";
     if (open) soon();
   });
-  // A session opened or closed, or hosts arriving after a connection.
+  // Hosts arriving after a connection.
   effect(() => {
-    void store.watching.value;
     void store.hosts.value;
     soon();
+  });
+  // A session opened or closed: said at once, before its transcript is read, so nothing it says
+  // meanwhile goes only to the pages already showing it (#203).
+  effect(() => {
+    void store.watching.value;
+    clearTimeout(timer);
+    report();
   });
   effect(() => {
     document.title = titleFor(needsPersonCount(store));

@@ -150,6 +150,9 @@ final class RemoteModel {
             guard let self, let agentID = work.watching else { return }
             for entry in dropped { touchedEarlier[agentID, default: TouchedPaths()].absorb(entry) }
         }
+        work.onOversized = { [weak self] agentID, entryID, index in
+            Task { await self?.loadOversized(entryID, of: agentID, at: index) }
+        }
     }
 
     /// Away, and slower (046): what the screens read to show the Away line and to put
@@ -1082,11 +1085,20 @@ final class RemoteModel {
                 work.replaceAgents(agents, from: id)
             }
             let notes = other.notifications()
-            Task { [weak self] in
-                for await note in notes { _ = self?.work.apply(note.method, note.params, from: id) }
+            let shown = work.shown
+            // Read off the main actor, once, and applied there (#203).
+            Task.detached(priority: .userInitiated) { [weak self] in
+                for await note in notes {
+                    guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
+                    await self?.work.apply(update, from: id)
+                }
                 // Its connection ended: its cards are stale until the watch reaches it again.
-                if self?.otherHosts[id] === other { self?.reachableHosts.remove(id) }
+                await MainActor.run { [weak self] in
+                    if self?.otherHosts[id] === other { self?.reachableHosts.remove(id) }
+                }
             }
+            // A new connection is a new record there: where the person is, and what is open.
+            presence?.connected()
         }
         // A host that went offline keeps its projects, greyed under its heading (frame H).
         // One the control plane no longer lists is gone, and so is what it showed.
@@ -1103,84 +1115,91 @@ final class RemoteModel {
     private func listen() {
         listening?.cancel()
         let notifications = client.notifications()
-        listening = Task { [weak self] in
+        let shown = work.shown
+        // Detached, so that each notification is decoded once, off the main actor, and
+        // only what it means is applied there, in the order the Mac said them (#203).
+        // An entry or terminal output for another chat is not read past its agentID.
+        listening = Task.detached(priority: .userInitiated) { [weak self] in
             for await notification in notifications {
+                let update = AgentsModel.read(notification.method, notification.params, showing: shown.id)
                 guard let self else { return }
-                self.lastHeardFrom = Date()
-                let updated = notification.method == DaemonAPI.Notification.agentChanged
-                    ? (try? notification.params?.decode(Agent.self)) : nil
-                let previousLabels = updated.flatMap { self.work.agent($0.id)?.labels }
-                let removed = notification.method == DaemonAPI.Notification.agentRemoved
-                    ? (try? notification.params?.decode(DaemonAPI.AgentRemovedNotification.self)) : nil
-                let removedProject = removed.flatMap { self.work.agent($0.agentID)?.projectFolder }
-                // Anything the shared model does not claim is the Mac's own — shells,
-                // terminals — and a remote has no business with it.
-                _ = self.work.apply(notification.method, notification.params)
-                // Nothing below waits on the network: one slow answer would hold every
-                // notification after it (#175). What needs asking is asked beside the loop.
-                if let updated, previousLabels != updated.labels,
-                   self.labelVocabularies[updated.projectFolder] != nil {
-                    self.reloadLabelVocabulary(in: updated.projectFolder)
-                }
-                if let removedProject, self.labelVocabularies[removedProject] != nil {
-                    self.reloadLabelVocabulary(in: removedProject)
-                }
-                if Self.attentionNotifications.contains(notification.method) {
-                    self.publishAttentionSoon()
-                }
-                if notification.method == DaemonAPI.Notification.attentionChanged,
-                   let change = try? notification.params?.decode(DaemonAPI.AttentionNotification.self) {
-                    self.toNotifier { [deviceID = self.deviceID] notifier in
-                        await notifier.apply(change, me: .device(deviceID))
-                    }
-                }
-                if notification.method == DaemonAPI.Notification.draftOptions,
-                   let change = try? notification.params?.decode(DaemonAPI.DraftOptionsNotification.self) {
-                    self.settleStartDraft(change)
-                }
-                // The Mac sends a device only the shells it has open (034).
-                if notification.method == DaemonAPI.Notification.shellOutput,
-                   let params = notification.params,
-                   let output = DaemonAPI.ShellOutputNotification(params: params),
-                   output.shell == 0 {
-                    self.shells[output.agentID]?.received(output.bytes)
-                }
-                if notification.method == DaemonAPI.Notification.shellStateChanged,
-                   let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self),
-                   change.shell == 0 {
-                    self.shells[change.agentID]?.received(change.state)
-                }
-                if notification.method == DaemonAPI.Notification.filesChanged,
-                   let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
-                    self.files.apply(change)
-                }
-                if notification.method == DaemonAPI.Notification.sandboxChanged,
-                   let settings = try? notification.params?.decode(SandboxSettings.self) {
-                    self.sandboxSettings = settings
-                }
-                if notification.method == DaemonAPI.Notification.runtimeChanged, self.parts.changed(.runtimes) {
-                    self.reloadRuntimes()
-                }
-                // The Mac could not keep something nobody was waiting on (#88).
-                if notification.method == DaemonAPI.Notification.writeFailed,
-                   let failure = try? notification.params?.decode(WriteFailure.self) {
-                    self.problem = failure.message
-                }
-                if notification.method == DaemonAPI.Notification.runtimeAccountChanged,
-                   let account = try? notification.params?.decode(RuntimeAccount.self) {
-                    self.accounts[account.runtimeID] = account
-                }
-                if notification.method == DaemonAPI.Notification.deviceChanged,
-                   let change = try? notification.params?.decode(DaemonAPI.DeviceNotification.self),
-                   change.id == self.deviceID {
-                    self.thisDevice = change.device
-                    self.subscribeOnce()
-                }
+                await self.received(notification, update)
             }
             // Cancelled is not lost: a newer listener took over, or the model was stopped,
             // and either way this one's end is not a reason to go back (#208).
             guard !Task.isCancelled else { return }
             await self?.lostTouch()
+        }
+    }
+
+    private func received(_ notification: (method: String, params: JSONValue?), _ update: AgentsModel.Update?) {
+        self.lastHeardFrom = Date()
+        var updated: Agent?
+        if case .agentChanged(let agent)? = update { updated = agent }
+        let previousLabels = updated.flatMap { self.work.agent($0.id)?.labels }
+        var removedProject: URL?
+        if case .agentRemoved(let removed)? = update { removedProject = self.work.agent(removed.agentID)?.projectFolder }
+        // Anything the shared model does not claim is the Mac's own — shells,
+        // terminals — and a remote has no business with it.
+        if let update { self.work.apply(update) }
+        // Nothing below waits on the network: one slow answer would hold every
+        // notification after it (#175). What needs asking is asked beside the loop.
+        if let updated, previousLabels != updated.labels,
+           self.labelVocabularies[updated.projectFolder] != nil {
+            self.reloadLabelVocabulary(in: updated.projectFolder)
+        }
+        if let removedProject, self.labelVocabularies[removedProject] != nil {
+            self.reloadLabelVocabulary(in: removedProject)
+        }
+        if Self.attentionNotifications.contains(notification.method) {
+            self.publishAttentionSoon()
+        }
+        if case .attention(let change)? = update {
+            self.toNotifier { [deviceID = self.deviceID] notifier in
+                await notifier.apply(change, me: .device(deviceID))
+            }
+        }
+        if notification.method == DaemonAPI.Notification.draftOptions,
+           let change = try? notification.params?.decode(DaemonAPI.DraftOptionsNotification.self) {
+            self.settleStartDraft(change)
+        }
+        // The Mac sends a device only the shells it has open (034).
+        if notification.method == DaemonAPI.Notification.shellOutput,
+           let params = notification.params,
+           let output = DaemonAPI.ShellOutputNotification(params: params),
+           output.shell == 0 {
+            self.shells[output.agentID]?.received(output.bytes)
+        }
+        if notification.method == DaemonAPI.Notification.shellStateChanged,
+           let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self),
+           change.shell == 0 {
+            self.shells[change.agentID]?.received(change.state)
+        }
+        if notification.method == DaemonAPI.Notification.filesChanged,
+           let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
+            self.files.apply(change)
+        }
+        if notification.method == DaemonAPI.Notification.sandboxChanged,
+           let settings = try? notification.params?.decode(SandboxSettings.self) {
+            self.sandboxSettings = settings
+        }
+        if notification.method == DaemonAPI.Notification.runtimeChanged, self.parts.changed(.runtimes) {
+            self.reloadRuntimes()
+        }
+        // The Mac could not keep something nobody was waiting on (#88).
+        if notification.method == DaemonAPI.Notification.writeFailed,
+           let failure = try? notification.params?.decode(WriteFailure.self) {
+            self.problem = failure.message
+        }
+        if notification.method == DaemonAPI.Notification.runtimeAccountChanged,
+           let account = try? notification.params?.decode(RuntimeAccount.self) {
+            self.accounts[account.runtimeID] = account
+        }
+        if notification.method == DaemonAPI.Notification.deviceChanged,
+           let change = try? notification.params?.decode(DaemonAPI.DeviceNotification.self),
+           change.id == self.deviceID {
+            self.thisDevice = change.device
+            self.subscribeOnce()
         }
     }
 
@@ -1583,11 +1602,19 @@ final class RemoteModel {
             self.notifier.open(agentID)
         }
         notifier.authorisationChanged = { [weak self] in self?.presence?.connected() }
-        let reporter = PresenceReporter { [weak self] watching, active, mayNotify in
+        let reporter = PresenceReporter { [weak self] watching, active, mayNotify, showing in
             guard let self else { return }
-            _ = try? await self.client.call(DaemonAPI.Method.presenceReport,
-                                            DaemonAPI.PresenceReport(watching: watching, active: active,
-                                                                     mayNotify: mayNotify))
+            // Every host hears whether the person is here; only the open chat's host hears
+            // which it is, and that is where its entries and output come from (#203).
+            let owner = showing.map { self.work.agent($0)?.host ?? .mac }
+            func report(for host: HostID) -> DaemonAPI.PresenceReport {
+                DaemonAPI.PresenceReport(watching: owner == host ? watching : nil, active: active,
+                                         mayNotify: mayNotify, showing: owner == host ? showing : nil)
+            }
+            _ = try? await self.client.call(DaemonAPI.Method.presenceReport, report(for: .mac))
+            for (id, other) in self.otherHosts where self.reachableHosts.contains(id) {
+                _ = try? await other.call(DaemonAPI.Method.presenceReport, report(for: id))
+            }
         }
         presence = reporter
     }
@@ -2133,6 +2160,15 @@ final class RemoteModel {
         guard self.selection == selection else { return }
         work.replaceTurns(with: turns)
         work.replaceTranscript(with: page)
+    }
+
+    /// An entry its host sent as a stub, too big to send to every chat (#203), read here.
+    func loadOversized(_ entryID: UUID, of agentID: UUID, at index: Int?) async {
+        let request = DaemonAPI.TranscriptRequest.around(index, of: agentID)
+        guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                              returning: TranscriptPage.self),
+              let entry = page.entries.first(where: { $0.id == entryID }) else { return }
+        work.fillOversized(entry, for: agentID)
     }
 
     /// A finished turn's entries, for the chat to open it: the last page of them when

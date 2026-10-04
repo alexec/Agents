@@ -125,20 +125,36 @@ extension DaemonCore {
         let scope = agent?.folderScope ?? FolderScope(folders: [])
         // The box, not the door: a terminal made before the socket is open — during
         // recovery, say — still finds the way out once there is one.
-        let broadcaster = broadcaster
+        let addressed = addressed
+        let showing = showing
         let service = TerminalService(scope: scope,
                                       defaultCWD: agent?.cwd ?? locations.root) { terminalID, chunk in
             // Output goes straight to the windows as it arrives, so a long command
-            // reads like a terminal rather than appearing all at once at the end.
-            guard broadcaster.isSet else { return }
+            // reads like a terminal rather than appearing all at once at the end. Only
+            // to those showing the agent (#203); one that opens it later is sent what the
+            // terminal still holds (`sendTerminals`).
+            let showers = showing.connections(showing: agentID)
+            guard addressed.isSet, !showers.isEmpty else { return }
             let notification = DaemonAPI.TerminalOutputNotification(agentID: agentID,
                                                                    terminalID: terminalID,
                                                                    chunk: chunk)
-            broadcaster(DaemonAPI.Notification.agentTerminalOutput,
-                        try? JSONValue.encoding(notification))
+            addressed(DaemonAPI.Notification.agentTerminalOutput,
+                      try? JSONValue.encoding(notification), to: { showers.contains($0.id) })
         }
         terminalServices[agentID] = service
         return service
+    }
+
+    /// What each of the agent's terminals still holds, to a connection that has just opened
+    /// it (#203): the output it was not sent while it showed something else.
+    func sendTerminals(of agentID: UUID, to connection: UUID) async {
+        guard let service = terminalServices[agentID] else { return }
+        for (terminalID, output) in await service.held() where !output.isEmpty {
+            send(DaemonAPI.Notification.agentTerminalOutput,
+                 DaemonAPI.TerminalOutputNotification(agentID: agentID, terminalID: terminalID,
+                                                      chunk: output, whole: true),
+                 to: { $0.id == connection })
+        }
     }
 
     /// Everything this agent started, stopped. An agent that is not running has no

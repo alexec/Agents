@@ -144,6 +144,7 @@ export interface Agent {
   effectiveSandbox?: EffectiveSandbox;
   pendingSandboxFailure?: SandboxFailureRecord;
   missingFolder?: MissingFolder;
+  listsLeftOut?: boolean;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -658,6 +659,8 @@ export type EndedReason = "endTurn" | "maxTokens" | "maxTurnRequests" | "refusal
 export interface EntryNotification {
   agentID: UUID;
   entry: TranscriptEntry;
+  index?: number;
+  oversized?: number;
 }
 
 export interface Event {
@@ -1054,6 +1057,7 @@ export interface PresenceReport {
   watching?: UUID;
   active: boolean;
   mayNotify?: boolean;
+  showing?: UUID;
 }
 
 export interface PrewarmRequest {
@@ -1992,7 +1996,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
@@ -2053,7 +2057,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ElicitationSchemaProperty: { required: ["name", "isRequired", "kind"], optional: ["title", "description", "defaultValue"] },
   ElicitationSchemaPropertyChoice: { required: ["value", "title"], optional: ["description"] },
   Empty: { required: [], optional: [] },
-  EntryNotification: { required: ["agentID", "entry"], optional: [] },
+  EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },
   EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID"] },
@@ -2101,7 +2105,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
-  PresenceReport: { required: ["active"], optional: ["watching", "mayNotify"] },
+  PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing"] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace"] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions"] },

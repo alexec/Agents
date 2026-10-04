@@ -54,17 +54,23 @@ export const searchShown = 200;
 type ByHost<T> = Record<string, T[]>;
 
 /**
- * A listed record, keeping the lists already held for it where it came without them: a lean
- * list must not empty the open session's menus (Agent.keepingLists). A runtime never takes
- * its lists back to nothing, so an empty one is one that was left out.
+ * A record as heard, keeping the lists already held for it where it came without them: a lean
+ * list or a lean `agent/changed` must not empty the open session's menus (Agent.keepingLists).
+ * One marked `listsLeftOut` keeps them all (#203); one that isn't is the whole truth, an emptied
+ * plan included, unless all three are empty, which is a host from before #203 leaving them out.
  */
 export function keepingLists(listed: Agent, held: Agent | undefined): Agent {
   if (!held) return listed;
+  const leftOut = listed.listsLeftOut
+    || (!listed.advertisedOptions.length && !listed.availableCommands.length && !listed.plans?.length);
+  if (!leftOut) return listed;
+  const { plans: _plans, listsLeftOut: _leftOut, ...rest } = listed;
   return {
-    ...listed,
-    advertisedOptions: listed.advertisedOptions.length ? listed.advertisedOptions : held.advertisedOptions,
-    availableCommands: listed.availableCommands.length ? listed.availableCommands : held.availableCommands,
-    ...(listed.plans?.length || !held.plans ? {} : { plans: held.plans }),
+    ...rest,
+    advertisedOptions: held.advertisedOptions,
+    availableCommands: held.availableCommands,
+    ...(held.plans ? { plans: held.plans } : {}),
+    ...(listed.listsLeftOut && held.listsLeftOut ? { listsLeftOut: true } : {}),
   };
 }
 
@@ -325,10 +331,15 @@ export class Work {
    * One agent as it is now, put where its activity sorts it. Only its project's list, and the
    * one it left if it moved, are made again (#170).
    */
-  upsertAgent(agent: Agent, host: string): void {
+  upsertAgent(heard: Agent, host: string): void {
     const list = [...(this.agents.value[host] ?? [])];
-    const at = list.findIndex((a) => a.id === agent.id);
+    const at = list.findIndex((a) => a.id === heard.id);
+    // An archived session this page has let go of, or never had, stays out: the live ones and a
+    // page of the rest is all it holds (#170, #203).
+    if (at < 0 && heard.state === "archived") return;
     const was = at >= 0 ? list.splice(at, 1)[0] : undefined;
+    // Lean unless its lists moved and this page shows it (#203).
+    const agent = keepingLists(heard, was);
     // Newest first, after any as new: where a stable sort of the list with it last puts it.
     let into = 0;
     while (into < list.length && list[into]!.lastActivityAt >= agent.lastActivityAt) into++;
@@ -443,9 +454,29 @@ export class Work {
     });
   }
 
+  /**
+   * Told of an entry too big for its host to send (#203): its stub holds its place, drawing
+   * nothing, until the page reads it with `agents/transcript` and hands it to `fillOversized`.
+   */
+  protected oversized(_host: string, _agentID: string, _entryID: string, _index: number | undefined): void {}
+
+  /** An entry its host sent as a stub, read whole: put where its stub is. */
+  fillOversized(entry: TranscriptEntry, host: string, agentID: string): void {
+    const watching = this.watching.value;
+    if (!watching || watching.host !== host || watching.session !== agentID) return;
+    const heard = this.heardSincePage.findIndex((e) => e.id === entry.id);
+    if (heard >= 0) this.heardSincePage[heard] = entry;
+    const at = this.entries.value.findIndex((e) => e.id === entry.id);
+    if (at < 0) return;
+    const entries = [...this.entries.value];
+    entries[at] = entry;
+    this.refold(entries);
+  }
+
   private takeEntry(note: EntryNotification, host: string): void {
     const watching = this.watching.value;
     if (!watching || watching.host !== host || watching.session !== note.agentID) return;
+    if (note.oversized !== undefined) this.oversized(host, note.agentID, note.entry.id, note.index);
     this.heardSincePage.push(note.entry);
     if (this.heardSincePage.length > heardSincePageLimit) {
       this.heardSincePage.splice(0, this.heardSincePage.length - heardSincePageLimit);
@@ -970,6 +1001,17 @@ export class Store extends Work {
       this.replaceTurns(turns);
       this.replaceTranscript(page);
     });
+  }
+
+  /** An entry its host sent as a stub, read from among its neighbours (#203). */
+  protected override oversized(host: string, agentID: string, entryID: string, index: number | undefined): void {
+    const around = index === undefined ? { limit: 50 } : { before: index + 4, limit: 8 };
+    void this.link.call("agents/transcript", { agentID: agentID as never, ...around }, host)
+      .then((page) => {
+        const entry = page.entries.find((e) => e.id === entryID);
+        if (entry) this.fillOversized(entry, host, agentID);
+      })
+      .catch(() => {});
   }
 
   /** Further back: the open turn's earlier entries, then the turns before it. */

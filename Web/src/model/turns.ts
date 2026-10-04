@@ -169,6 +169,8 @@ export class DisplayBuilder {
 
   add(entry: TranscriptEntry): void {
     if (entry.subagentID !== this.subagent) return;
+    // A stub for an entry too big to send (#203) holds its place and draws nothing.
+    if ("oversized" in entry.kind) return;
     const joined = join(entry, this.last);
     if (joined) {
       this.last = joined;

@@ -83,6 +83,8 @@ def main(argv):
     agent_id = client.call("agents/start", {"runtimeID": runtime, "cwd": "file://" + folder, "prompt": PROMPT})
     if isinstance(agent_id, dict):
         agent_id = agent_id.get("agentID") or agent_id.get("id")
+    # A host sends an agent's entries only to a connection showing it (#203).
+    client.call("presence/report", {"active": False, "showing": agent_id})
     settled(client, agent_id)
     times = []
     for _ in range(repeats):

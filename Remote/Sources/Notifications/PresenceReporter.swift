@@ -12,10 +12,11 @@ import UserNotifications
 /// screen locks. A report is sent on a change, never on a timer. It decides nothing.
 @MainActor
 final class PresenceReporter {
-    typealias Report = @MainActor (UUID?, Bool, Bool?) async -> Void
+    /// Watching, active, may notify, and the chat open whether in front or not (#203).
+    typealias Report = @MainActor (UUID?, Bool, Bool?, UUID?) async -> Void
 
     private let report: Report
-    private var last: (watching: UUID?, active: Bool)?
+    private var last: (watching: UUID?, active: Bool, showing: UUID?)?
     private var active = false
     private var watching: UUID?
 
@@ -39,8 +40,9 @@ final class PresenceReporter {
     }
 
     private func send(force: Bool = false) {
-        let now = (watching: active ? watching : nil, active: active)
-        if !force, let last, last.watching == now.watching, last.active == now.active { return }
+        let now = (watching: active ? watching : nil, active: active, showing: watching)
+        if !force, let last, last.watching == now.watching, last.active == now.active,
+           last.showing == now.showing { return }
         last = now
         Task {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
@@ -50,7 +52,7 @@ final class PresenceReporter {
             case .denied: mayNotify = false
             default: mayNotify = nil
             }
-            await report(now.watching, now.active, mayNotify)
+            await report(now.watching, now.active, mayNotify, now.showing)
         }
     }
 }

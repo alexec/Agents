@@ -1252,6 +1252,13 @@ public enum DaemonAPI {
             from = try c.decodeIfPresent(Int.self, forKey: .from)
         }
 
+        /// The few entries around `index`, to find an entry sent as a stub among them by its
+        /// id (#203); the last page when where it is was not said.
+        public static func around(_ index: Int?, of agentID: UUID) -> TranscriptRequest {
+            guard let index else { return TranscriptRequest(agentID: agentID, limit: 50) }
+            return TranscriptRequest(agentID: agentID, before: index + 4, limit: 8)
+        }
+
         /// The request as a host answers it (#200): a negative limit or position is
         /// refused, and a limit past the ceiling is cut to it. A limit of zero is an
         /// empty page.
@@ -1579,12 +1586,35 @@ public enum DaemonAPI {
 
     // MARK: Notifications
 
+    /// `agent/entry`: sent only to the connections showing the agent (#203).
     public struct EntryNotification: Codable, Sendable {
+        /// The most an entry may weigh on the wire, encoded (#203). A tool call's diff or a
+        /// file read whole can be megabytes; past this, a stub goes and the open chat reads
+        /// the entry with `agents/transcript`.
+        public static let entryByteLimit = 32 * 1024
+
         public var agentID: UUID
         public var entry: TranscriptEntry
-        public init(agentID: UUID, entry: TranscriptEntry) {
+        /// Where the entry is in the transcript, as `agents/transcript` counts. Sent with a
+        /// stub, so the chat can read it; nil on everything else.
+        public var index: Int?
+        /// Set when the entry was too big to send: its encoded size. `entry` is then a stub
+        /// with only its id and time, of a kind every build skips when drawing.
+        public var oversized: Int?
+
+        public init(agentID: UUID, entry: TranscriptEntry, index: Int? = nil, oversized: Int? = nil) {
             self.agentID = agentID
             self.entry = entry
+            self.index = index
+            self.oversized = oversized
+        }
+
+        /// The stub sent in place of an entry of `bytes` (#203).
+        public static func stub(agentID: UUID, for entry: TranscriptEntry, bytes: Int, index: Int?) -> EntryNotification {
+            let stub = TranscriptEntry(id: entry.id, at: entry.at,
+                                       kind: .unrecognised(.object(["oversized": .int(bytes)])),
+                                       subagentID: entry.subagentID)
+            return EntryNotification(agentID: agentID, entry: stub, index: index, oversized: bytes)
         }
     }
 
@@ -1680,15 +1710,21 @@ public enum DaemonAPI {
         }
     }
 
+    /// `agent/terminalOutput`: sent only to the connections showing the agent (#203).
     public struct TerminalOutputNotification: Codable, Sendable {
         public var agentID: UUID
         public var terminalID: String
         public var chunk: String
+        /// `chunk` is everything the terminal still holds, not the next piece of it: sent to
+        /// a connection that has just started showing the agent, in place of what it was not
+        /// sent while it showed something else (#203).
+        public var whole: Bool?
 
-        public init(agentID: UUID, terminalID: String, chunk: String) {
+        public init(agentID: UUID, terminalID: String, chunk: String, whole: Bool? = nil) {
             self.agentID = agentID
             self.terminalID = terminalID
             self.chunk = chunk
+            self.whole = whole
         }
     }
 
@@ -2948,11 +2984,17 @@ public enum DaemonAPI {
         public var active: Bool
         /// Whether this surface may show notifications; omitted means unchanged.
         public var mayNotify: Bool?
+        /// The conversation this connection has open, whether or not anybody is looking at
+        /// it: a window behind another app still shows its chat. What decides where that
+        /// agent's entries and terminal output go (#203). Omitted, `watching` stands in, as
+        /// it did for a client from before.
+        public var showing: UUID?
 
-        public init(watching: UUID?, active: Bool, mayNotify: Bool? = nil) {
+        public init(watching: UUID?, active: Bool, mayNotify: Bool? = nil, showing: UUID? = nil) {
             self.watching = watching
             self.active = active
             self.mayNotify = mayNotify
+            self.showing = showing
         }
     }
 

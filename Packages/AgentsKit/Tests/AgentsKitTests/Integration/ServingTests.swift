@@ -348,13 +348,16 @@ struct ServingTests {
 
         // Output reaches the windows as it arrives, which is the thing worth asserting:
         // the terminal itself is let go when the agent is, along with the runtime.
+        // Only to a connection showing the agent (#203).
         let heard = Heard()
-        await core.setBroadcaster { method, params in
-            guard method == DaemonAPI.Notification.agentTerminalOutput else { return }
+        let window = UUID()
+        await core.setAddressedBroadcaster { method, params, wanted in
+            guard method == DaemonAPI.Notification.agentTerminalOutput, wanted(.init(id: window, surface: .mac)) else { return }
             heard.add(params?["chunk"]?.stringValue ?? "")
         }
 
-        _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "run it"))
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "run it"))
+        try await core.reportPresence(.init(watching: nil, active: false, showing: id), from: .mac, connection: window)
 
         let created = await eventuallySome("the terminal was created") {
             await launcher.lastAgent?.answer(to: ACP.ClientMethod.createTerminal)
