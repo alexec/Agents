@@ -281,7 +281,9 @@ export class ViewLayer {
       this.views.set(call.id, view);
       this.element?.append(view.box);
     } else {
-      view.actions = actions;
+      // Never another chat's: a row still drawn for a moment after the chat changed must not
+      // hand a closing view the next chat's calls.
+      if (actions.agentID === view.actions.agentID) view.actions = actions;
       view.update(call);
     }
     return view;

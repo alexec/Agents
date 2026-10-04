@@ -30,7 +30,8 @@ final class AppViewStore {
     /// The host for this call, made the first time it is drawn.
     func host(for call: AppViewCall, actions: AppViewActions) -> AppViewHost {
         if let host = hosts[call.id] {
-            host.actions = actions
+            // Never another chat's: a row still drawn as the chat changes keeps its own.
+            if actions.agentID == host.actions.agentID { host.actions = actions }
             host.update(call)
             order.removeAll { $0 == call.id }
             order.append(call.id)
