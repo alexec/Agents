@@ -17,6 +17,14 @@ import Testing
        .enabled(if: ProcessInfo.processInfo.environment["AGENTS_LIVE"] == "1"),
        .timeLimit(.minutes(10)))
 struct FinishTurnLiveTests {
+    /// The runtimes the app installed (048), read where they are and never changed:
+    /// `AGENTS_LIVE_TOOLS=<root>/tools`. Without it, only what is on the PATH.
+    var discovery: RuntimeDiscovery {
+        var discovery = RuntimeDiscovery()
+        discovery.macToolsHome = ProcessInfo.processInfo.environment["AGENTS_LIVE_TOOLS"]
+        return discovery
+    }
+
     /// A daemon of its own, on its own socket, so this never touches the real one.
     func daemon() throws -> (Daemon, StoreLocations, URL) {
         let root = URL(filePath: "/tmp").appending(path: "ag-\(UUID().uuidString.prefix(8))")
@@ -25,12 +33,12 @@ struct FinishTurnLiveTests {
         try "print('hello')\n".write(to: work.appending(path: "hello.py"),
                                      atomically: true, encoding: .utf8)
         let locations = StoreLocations(root: root)
-        return (try Daemon(locations: locations), locations, work.resolvingSymlinksInPath())
+        return (try Daemon(locations: locations, discovery: discovery), locations, work.resolvingSymlinksInPath())
     }
 
     func installed(_ runtimeID: String) -> Bool {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else { return false }
-        if case .available = RuntimeDiscovery().locate(runtime) { return true }
+        if case .available = discovery.locate(runtime) { return true }
         Issue.record("\(runtimeID) is not installed")
         return false
     }
