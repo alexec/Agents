@@ -1306,6 +1306,9 @@ final class RemoteModel {
             case .part(let part): await load(part)
             }
         }
+        // The low-disk strip is under the banner on every page (#196), so it is read
+        // on every catch-up, not when a page asks for it.
+        await refreshDisk()
         await settleUnsettledStart()
         settleSelection()
         // Once the counts have landed, so the widget's number is this refresh's number.
@@ -1760,6 +1763,14 @@ final class RemoteModel {
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
+    }
+
+    /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac
+    /// too old to know the method leaves it empty, and no strip is drawn.
+    private func refreshDisk() async {
+        guard let state = try? await client.call(DaemonAPI.Method.diskState, Optional<String>.none,
+                                                 returning: DiskState.self) else { return }
+        work.replaceDisk(state)
     }
 
     /// The newest events and who is waiting (042). The phone only reads them.

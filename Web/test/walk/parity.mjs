@@ -8,10 +8,11 @@
 // run-app scratch root seeded as parity.md says: a git project `work`, three workflows (one
 // turned off), a finished unread session "Repo notes", one in a worktree with two labels, and
 // one parked. Scenes that need the host away pause the root's own agentsd (its daemon.lock pid)
-// with SIGSTOP and always resume it.
+// with SIGSTOP and always resume it. The disk scene writes the root's disk-free-override (#195,
+// a debug host on a scratch root only) and always removes it; the host looks once a minute.
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { launch } from "./cdp.mjs";
 
@@ -28,7 +29,7 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(code);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
+await page.waitFor(`document.querySelector(".projects .row, .sidebar .row.project")`, 20_000);
 
 const shot = async (name) => {
   await sleep(300);
@@ -318,6 +319,35 @@ for (const scene of scenes) {
       // #111: the footer names the browser, and no grant.
       say(`footer: ${JSON.stringify(await page.text(".identity"))}`);
       await shot("identity");
+    } else if (scene === "disk") {
+      // #196: the low disk space strip across the top, as the window's DiskStrip (#195).
+      const override = `${root}/disk-free-override`;
+      const strip = (want) => page.waitFor(`[...document.querySelectorAll(".disk-strip")].some((el) => el.innerText.includes(${JSON.stringify(want)}))`, 150_000);
+      try {
+        writeFileSync(override, "1.5GB\n");
+        await strip("almost full");
+        say(`critical: ${JSON.stringify(await visible(".disk-strip"))} dot ${await page.eval(`getComputedStyle(document.querySelector(".disk-strip .dot")).backgroundColor`)}`);
+        await shot("disk-critical");
+        writeFileSync(override, "12GB\n");
+        await strip("running low");
+        say(`low: ${JSON.stringify(await visible(".disk-strip"))} dot ${await page.eval(`getComputedStyle(document.querySelector(".disk-strip .dot")).backgroundColor`)}`);
+        await shot("disk-low");
+      } finally {
+        rmSync(override, { force: true });
+      }
+      await page.waitFor(`!document.querySelector(".disk-strip")`, 150_000).catch(() => {});
+      say(`after the override: ${JSON.stringify(await visible(".disk-strip"))}`);
+      // A reload asks disk/state afresh rather than hearing disk/changed.
+      writeFileSync(override, "12GB\n");
+      try {
+        await strip("running low");
+        await page.goto(webURL);
+        await page.waitFor(`document.querySelector(".projects .row, .sidebar .row.project")`, 30_000);
+        await page.waitFor(`document.querySelector(".disk-strip")`, 10_000).catch(() => {});
+        say(`on a fresh load: ${JSON.stringify(await visible(".disk-strip"))}`);
+      } finally {
+        rmSync(override, { force: true });
+      }
     } else if (scene === "hostdown") {
       // #83: the host down is plain and said at once.
       await openProject();
@@ -342,7 +372,7 @@ for (const scene of scenes) {
     say(`${scene} failed: ${error.message}`);
   }
   await page.goto(webURL);
-  await page.waitFor(`document.querySelector(".projects .row")`, 30_000);
+  await page.waitFor(`document.querySelector(".projects .row, .sidebar .row.project")`, 30_000);
 }
 
 say(`errors: ${JSON.stringify(page.errors)}`);

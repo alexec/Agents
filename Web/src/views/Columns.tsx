@@ -14,6 +14,7 @@ import { go, replace, route } from "../route";
 import { setPane } from "./files/paneState";
 import { browserName, type Session } from "../session";
 import { Banner } from "./Banner";
+import { DiskStrip } from "./DiskStrip";
 import { Chat } from "./Chat";
 import { NewAgent } from "./NewAgent";
 import { CloningRows, EmptyProjects, NewProjectDialog, NewProjectItems, NewProjectMenu } from "./NewProject";
@@ -59,6 +60,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   return (
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}
+      <DiskStrip store={store} />
       <Problem store={store} />
       <div class={`columns${wide ? " with-sidebar" : ""}`} aria-busy={down}>
         {wide ? <Sidebar session={session} store={store} linkDown={down} /> : <>

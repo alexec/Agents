@@ -12,6 +12,14 @@ struct StaleBanner: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
+        VStack(spacing: 0) {
+            connection
+            // While it can be trusted: a stale banner says nothing here is current.
+            if !model.isStale && !model.needsPairing { DiskRows() }
+        }
+    }
+
+    @ViewBuilder private var connection: some View {
         if model.needsPairing {
             // Never paired, or forgotten by the Mac: the list below may still be what it
             // last knew, so the one thing to do is said here, on every screen.
@@ -67,6 +75,33 @@ struct StaleBanner: View {
     }
 
     private var device: String { UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone" }
+}
+
+/// A volume on the Mac low on space (#196), as the window's DiskStrip (#195): how much is
+/// free, and the largest worktrees when they could be measured. Gone by itself once it
+/// climbs back.
+private struct DiskRows: View {
+    @Environment(RemoteModel.self) private var model
+
+    var body: some View {
+        ForEach(model.work.disk.alarms) { alarm in
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Circle().tinted(alarm.level == .critical ? .failure : .attention)
+                    .frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
+                Text(alarm.line)
+                    .appText(.fine)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(Paper.wash)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(alarm.line)
+        }
+    }
 }
 
 /// What a screen looks like while it cannot be trusted: still readable, plainly not

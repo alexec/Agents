@@ -40,3 +40,11 @@ for (const { name, input, expected } of cases("asker/line.json")) {
     assert.equal(asker.askerFor(input.agents, input.agentID, (id) => input.runtimes[id], input.subagent ?? undefined), expected);
   });
 }
+
+const disk = await load("src/model/disk.ts");
+
+for (const { name, input, expected } of cases("disk/lines.json")) {
+  test(`disk: ${name}`, () => {
+    assert.equal(disk.diskLine(input), expected);
+  });
+}

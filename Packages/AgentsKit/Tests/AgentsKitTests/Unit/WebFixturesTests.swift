@@ -161,6 +161,36 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: disk/ (#196)
+
+    /// The low disk space strip's line (#195), as `DiskAlarm.line` says it: low and critical,
+    /// GB and MB, with no worktrees, with more than three, and with one only partly counted.
+    @Test func disk() throws {
+        let gb = DiskSpace.gigabyte
+        func reading(_ free: Int64) -> DiskReading {
+            DiskReading(volume: "Macintosh HD", mount: "/", freeBytes: free, totalBytes: 500 * gb)
+        }
+        let alarms: [(String, DiskAlarm)] = [
+            ("low, no worktrees", DiskAlarm(reading: reading(12_345_000_000), level: .low, threshold: 25 * gb)),
+            ("low, rounding up", DiskAlarm(reading: reading(19_960_000_000), level: .low, threshold: 25 * gb)),
+            ("an exact tie rounds to even", DiskAlarm(reading: reading(12_250_000_000), level: .low, threshold: 25 * gb)),
+            ("an exact tie rounds up to even", DiskAlarm(reading: reading(12_750_000_000), level: .low, threshold: 25 * gb)),
+            ("not quite a tie", DiskAlarm(reading: reading(12_350_000_000), level: .low, threshold: 25 * gb)),
+            ("critical, in MB", DiskAlarm(reading: reading(850_400_000), level: .critical, threshold: 2 * gb)),
+            ("critical, nothing free", DiskAlarm(reading: reading(0), level: .critical, threshold: 2 * gb)),
+            ("low, four worktrees, one over", DiskAlarm(reading: reading(15 * gb), level: .low, threshold: 25 * gb, worktrees: [
+                DiskWorktree(name: "fix-github-issue-196", bytes: 12_300_000_000),
+                DiskWorktree(name: "perf-lane", bytes: 8 * gb, partial: true),
+                DiskWorktree(name: "ui-lane", bytes: 640_000_000),
+                DiskWorktree(name: "small", bytes: 1_000_000),
+            ])),
+            ("an empty volume", DiskAlarm(reading: DiskReading(volume: "Data", mount: "/Volumes/Data", freeBytes: 0,
+                                                               totalBytes: 0), level: .critical, threshold: 2 * gb)),
+        ]
+        let cases = try alarms.map { name, alarm in Case(name: name, input: try Self.encode(alarm)) }
+        try pin("disk/lines.json", cases) { input in .string(try input.decode(DiskAlarm.self).line) }
+    }
+
     // MARK: block/ (#157)
 
     /// The wait lines under a blocked agent (039, #152), as `AgentsModel.blockLines` says
