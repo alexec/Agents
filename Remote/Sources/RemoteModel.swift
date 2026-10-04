@@ -1120,6 +1120,7 @@ final class RemoteModel {
         await refreshCostState()
         await refreshRuntimeAllowances()
         await refreshLeases()
+        await refreshDisk()
         await refreshEvents()
         await refreshWorkflows()
         await refreshDashboardSummaries()
@@ -1487,6 +1488,14 @@ final class RemoteModel {
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
+    }
+
+    /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac
+    /// too old to know the method leaves it empty, and no strip is drawn.
+    private func refreshDisk() async {
+        guard let state = try? await client.call(DaemonAPI.Method.diskState, Optional<String>.none,
+                                                 returning: DiskState.self) else { return }
+        work.replaceDisk(state)
     }
 
     /// The newest events and who is waiting (042). The phone only reads them.

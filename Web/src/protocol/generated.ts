@@ -544,10 +544,36 @@ export interface DiscardDraftRequest {
   draftID: UUID;
 }
 
+export interface DiskAlarm {
+  reading: DiskReading;
+  level: DiskLevel;
+  threshold: number;
+  worktrees: DiskWorktree[];
+}
+
+export type DiskLevel = "ok" | "low" | "critical";
+
+export interface DiskReading {
+  volume: string;
+  mount: string;
+  freeBytes: number;
+  totalBytes: number;
+}
+
+export interface DiskState {
+  alarms: DiskAlarm[];
+}
+
 export interface DiskThresholds {
   lowGB?: number;
   lowPercent?: number;
   criticalGB?: number;
+}
+
+export interface DiskWorktree {
+  name: string;
+  bytes: number;
+  partial: boolean;
 }
 
 export interface DraftOptionsNotification {
@@ -1793,6 +1819,7 @@ export interface Methods {
   "dashboard/show": { params: TileRequest; result: Empty };
   "dashboard/summaries": { params: Empty; result: DashboardSummary[] };
   "dashboard/update": { params: DashboardRequest; result: DashboardUpdate };
+  "disk/state": { params: Empty; result: DiskState };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
   "elicitations/pending": { params: Empty; result: ElicitationRequest[] };
   "events/list": { params: EventsListRequest; result: EventsPage };
@@ -1869,6 +1896,7 @@ export const MethodTarget = {
   "dashboard/show": "host",
   "dashboard/summaries": "host",
   "dashboard/update": "host",
+  "disk/state": "host",
   "elicitations/answer": "host",
   "elicitations/pending": "host",
   "events/list": "host",
@@ -1920,6 +1948,7 @@ export interface Notifications {
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
   "dashboard/changed": DashboardChangedNotification;
+  "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
   "modes/changed": Record<string, JSONValue>;
@@ -1983,7 +2012,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
   DirectoryListing: { required: ["url", "entries", "omitted"], optional: [] },
   DiscardDraftRequest: { required: ["draftID"], optional: [] },
+  DiskAlarm: { required: ["reading", "level", "threshold", "worktrees"], optional: [] },
+  DiskReading: { required: ["volume", "mount", "freeBytes", "totalBytes"], optional: [] },
+  DiskState: { required: ["alarms"], optional: [] },
   DiskThresholds: { required: [], optional: ["lowGB", "lowPercent", "criticalGB"] },
+  DiskWorktree: { required: ["name", "bytes", "partial"], optional: [] },
   DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },

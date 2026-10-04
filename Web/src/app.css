@@ -539,6 +539,11 @@ button.link.reading:hover { text-decoration: underline; }
 .offline-strip { padding: 6px 16px; font-size: 12px; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
   display: flex; align-items: center; gap: 8px; }
 .offline-strip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tint-attention); }
+/* A volume low on space (#196), as the window's DiskStrip: attention when low, failure when critical. */
+.disk-strip { padding: 6px 16px; font-size: 12px; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
+  display: flex; align-items: center; gap: 8px; margin: 0; user-select: text; }
+.disk-strip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tint-attention); }
+.disk-strip.critical .dot { background: var(--tint-failure); }
 /* An agent whose folder has gone (#119): which, and the ways on, as the window's strip. */
 .missing-folder-strip { padding: 6px 16px; font-size: 12px; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

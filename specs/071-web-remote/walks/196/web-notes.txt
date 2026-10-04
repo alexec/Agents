@@ -1,0 +1,8 @@
+— disk
+critical: ["Macintosh HD is almost full: 1.5 GB free. Agents’ commands will start failing."] dot rgb(240, 123, 110)
+shot p196-disk-critical.png
+low: ["Macintosh HD is running low: 12.0 GB free (2%)."] dot rgb(240, 138, 75)
+shot p196-disk-low.png
+after the override: []
+on a fresh load: ["Macintosh HD is running low: 12.0 GB free (2%)."]
+errors: []
