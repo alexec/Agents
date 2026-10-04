@@ -782,6 +782,9 @@ final class Sockets: @unchecked Sendable {
         for socket in lock.withLock({ Array(open.values) }) { socket.close() }
     }
 
+    /// Every socket open now, for measuring what each holds (#167).
+    var all: [WebSocketLineTransport] { lock.withLock { Array(open.values) } }
+
     /// Left out of `closeAll`: a handover's own session.
     func keepOpen(_ socket: WebSocketLineTransport) {
         _ = lock.withLock { open.removeValue(forKey: ObjectIdentifier(socket)) }

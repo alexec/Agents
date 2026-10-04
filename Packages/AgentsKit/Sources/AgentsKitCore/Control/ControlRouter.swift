@@ -309,6 +309,10 @@ public actor ControlRouter {
         session.channels[mine] = target
         session.proxied[target] = mine
         hosts[host] = session
+        // This copy reads fan-out frames and hands each peer its part channel by channel,
+        // which every copy reads, so the host may fan out whatever the peer is.
+        var open = open
+        open.fanOut = true
         try? session.transport.write(line: ControlWire.open(mine, open))
     }
 
@@ -380,44 +384,75 @@ public actor ControlRouter {
     /// makes of the client, whose ids are the host's own).
     ///
     /// Scanned, not decoded: every reply a host sends passes here, a page of transcript is
-    /// a hundred kilobytes, and all this needs is two keys at the top of the object.
+    /// a hundred kilobytes, and all this needs is two keys at the top of the object. Only
+    /// the top level is read (#167): a nested value is stepped over without a string being
+    /// made of anything in it, and the scan stops once an id and `result` or `error` have
+    /// both been seen, which is usually long before the result itself.
     static func answeredID(_ message: String) -> JSONRPCID? {
         var id: JSONRPCID?
-        var isRequest = false
-        var depth = 0
-        var bytes = message.utf8[...]
-        while let byte = bytes.first {
-            switch byte {
-            case UInt8(ascii: "{"), UInt8(ascii: "["):
-                depth += 1
-                bytes = bytes.dropFirst()
-            case UInt8(ascii: "}"), UInt8(ascii: "]"):
-                depth -= 1
-                bytes = bytes.dropFirst()
-            case UInt8(ascii: "\""):
-                guard let (text, rest) = Self.string(bytes) else { return nil }
-                bytes = rest
-                // A key at the top: a string followed by a colon, one level in.
-                guard depth == 1, let colon = rest.firstIndex(where: { !Self.isSpace($0) }),
-                      rest[colon] == UInt8(ascii: ":") else { continue }
-                var value = rest[rest.index(after: colon)...].drop(while: Self.isSpace)
-                if text == "method" { isRequest = true }
-                guard text == "id", let first = value.first else { continue }
-                if first == UInt8(ascii: "\"") {
+        var isReply = false
+        var bytes = message.utf8[...].drop(while: isSpace)
+        guard bytes.first == UInt8(ascii: "{") else { return nil }
+        bytes = bytes.dropFirst()
+        while true {
+            bytes = bytes.drop(while: { isSpace($0) || $0 == UInt8(ascii: ",") })
+            guard let first = bytes.first else { return nil }
+            if first == UInt8(ascii: "}") { break }
+            guard first == UInt8(ascii: "\""), let (key, rest) = Self.string(bytes) else { return nil }
+            var value = rest.drop(while: isSpace)
+            guard value.first == UInt8(ascii: ":") else { return nil }
+            value = value.dropFirst().drop(while: isSpace)
+            switch key {
+            case "method":
+                return nil
+            case "id":
+                if value.first == UInt8(ascii: "\"") {
                     guard let (string, after) = Self.string(value) else { return nil }
                     id = .string(string)
-                    value = after
+                    bytes = after
                 } else {
                     let digits = value.prefix(while: { $0 == UInt8(ascii: "-") || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains($0) })
                     id = Int(String(decoding: digits, as: UTF8.self)).map(JSONRPCID.number)
-                    value = value.dropFirst(digits.count)
+                    bytes = Self.skipValue(value)
                 }
-                bytes = value
             default:
-                bytes = bytes.dropFirst()
+                if key == "result" || key == "error" { isReply = true }
+                bytes = Self.skipValue(value)
             }
+            if isReply, id != nil { return id }
         }
-        return isRequest ? nil : id
+        return id
+    }
+
+    /// What follows the JSON value `bytes` starts with, stepped over without reading it.
+    private static func skipValue(_ bytes: Substring.UTF8View.SubSequence) -> Substring.UTF8View.SubSequence {
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var index = bytes.startIndex
+        while index < bytes.endIndex {
+            let byte = bytes[index]
+            if inString {
+                if escaped { escaped = false } else if byte == UInt8(ascii: "\\") { escaped = true } else if byte == UInt8(ascii: "\"") {
+                    inString = false
+                    if depth == 0 { return bytes[bytes.index(after: index)...] }
+                }
+            } else {
+                switch byte {
+                case UInt8(ascii: "\""): inString = true
+                case UInt8(ascii: "{"), UInt8(ascii: "["): depth += 1
+                case UInt8(ascii: "}"), UInt8(ascii: "]"):
+                    if depth == 0 { return bytes[index...] }
+                    depth -= 1
+                    if depth == 0 { return bytes[bytes.index(after: index)...] }
+                case UInt8(ascii: ","):
+                    if depth == 0 { return bytes[index...] }
+                default: break
+                }
+            }
+            index = bytes.index(after: index)
+        }
+        return bytes[bytes.endIndex...]
     }
 
     private static func isSpace(_ byte: UInt8) -> Bool {
@@ -488,9 +523,37 @@ public actor ControlRouter {
                 hosts[other]?.channels[theirs] = nil
                 try? hosts[other]?.transport.write(line: ControlWire.close(theirs))
             }
+        case .fanOut(let channels, let message):
+            fanOut(message, to: channels, from: host)
         case .open:
             // Only the control plane opens channels. A host that tries is ignored.
             return
+        }
+    }
+
+    /// A host's broadcast said once for every channel named (#167): copied here to each
+    /// one's client, wrapped once for them all. Only notifications come this way, so there
+    /// is no reply in it to look for. A client whose transport has given up on it (too far
+    /// behind) is detached by `write`, and reconnects to read everything afresh.
+    private func fanOut(_ message: String, to channels: [Int], from host: HostID) {
+        guard let session = hosts[host] else { return }
+        var wrapped: String?
+        for channel in channels {
+            switch session.channels[channel] {
+            case .session(let sessionID)?:
+                guard let client = clients[sessionID] else { continue }
+                if client.wrapped {
+                    if wrapped == nil { wrapped = ControlWire.wrap(host: host, message: message) }
+                    write(wrapped!, to: sessionID)
+                } else if host == homeHost {
+                    write(message, to: sessionID)
+                }
+            case .peer(let peer, let theirs)?:
+                // Channel by channel, which a copy of any age reads.
+                peers[peer]?(PeerWire.frame(host, ControlWire.channel(theirs, message: message)))
+            case .tunnel?, nil:
+                continue
+            }
         }
     }
 
@@ -612,7 +675,7 @@ public actor ControlRouter {
         // on the socket is: presence is reported as it, and it names no other device.
         let open = ControlWire.ChannelOpen(client: caller.client.uuidString,
                                            device: caller.kind == .mac ? nil : caller.client,
-                                           relayed: caller.relayed ? true : nil)
+                                           relayed: caller.relayed ? true : nil, fanOut: true)
         try? hostSession.transport.write(line: ControlWire.open(channel, open))
     }
 

@@ -12,30 +12,113 @@ import NIOWebSocket
 public final class WebSocketLineTransport: LineTransport, @unchecked Sendable {
     let channel: any Channel
     private let isClient: Bool
-    private let stream: AsyncThrowingStream<String, any Error>
-    let continuation: AsyncThrowingStream<String, any Error>.Continuation
+    /// What the other end sent and this end's reader hasn't taken yet. Past
+    /// `inboundHigh` the socket stops being read, so TCP pushes back on the sender,
+    /// until the reader brings it down to `inboundLow` (#167).
+    let inbound: BoundedLines
 
-    init(channel: any Channel, isClient: Bool) {
+    /// The most this end holds for the other end to read before giving up on it (#167): a
+    /// phone on poor cellular or a page that stopped reading costs the control plane at
+    /// most this, not everything said until its pings time out. The host's own uplink is
+    /// given more (`uplinkOutboundLimit`), since everything its clients hear crosses it.
+    public static let outboundLimit = 8 << 20
+    public static let uplinkOutboundLimit = 32 << 20
+    /// How long queued bytes may wait with none of them sent before the other end is
+    /// given up on: the daemon socket's `sendWait`, for the same reason.
+    public static let writeDeadline: Duration = .seconds(10)
+    static let inboundHigh = 4 << 20
+    static let inboundLow = 1 << 20
+    /// The close code a reader that fell too far behind is told (4000–4999 are ours).
+    public static let tooSlowCode: UInt16 = 4008
+
+    private let lock = NSLock()
+    private var limit: Int
+    private var pending = 0
+    /// When the bytes waiting last made progress; nil while nothing waits.
+    private var waitingSince: ContinuousClock.Instant?
+    private var gaveUp = false
+
+    init(channel: any Channel, isClient: Bool, outboundLimit: Int = WebSocketLineTransport.outboundLimit) {
         self.channel = channel
         self.isClient = isClient
-        var c: AsyncThrowingStream<String, any Error>.Continuation!
-        stream = AsyncThrowingStream(bufferingPolicy: .unbounded) { c = $0 }
-        continuation = c
+        self.limit = outboundLimit
+        inbound = BoundedLines(high: Self.inboundHigh, low: Self.inboundLow,
+                               onHigh: { [channel] in channel.setOption(ChannelOptions.autoRead, value: false).whenComplete { _ in } },
+                               onLow: { [channel] in channel.setOption(ChannelOptions.autoRead, value: true).whenComplete { _ in } })
     }
+
+    /// The cap on what may wait to be sent; the uplink raises it.
+    public var outboundLimit: Int {
+        get { lock.withLock { limit } }
+        set { lock.withLock { limit = newValue } }
+    }
+
+    /// Bytes written and not yet handed to the kernel: this end's queue for the other.
+    public var bytesQueued: Int { lock.withLock { pending } }
 
     public func write(line: String) throws {
         guard channel.isActive else { throw WebSocketClosed() }
+        let size = line.utf8.count
+        let now = ContinuousClock.now
+        let refused = lock.withLock { () -> String? in
+            if gaveUp { return "" }
+            if let since = waitingSince, now - since > Self.writeDeadline {
+                gaveUp = true
+                return "nothing sent for \(Self.writeDeadline)"
+            }
+            if pending > 0, pending + size > limit {
+                gaveUp = true
+                return "\(pending + size) bytes waiting, more than \(limit)"
+            }
+            if pending == 0 { waitingSince = now }
+            pending += size
+            return nil
+        }
+        if let refused {
+            if !refused.isEmpty { tooSlow(refused) }
+            throw WebSocketTooSlow()
+        }
         let masked = isClient
         let channel = self.channel
+        weak let owner = self
         channel.eventLoop.execute {
-            var buffer = channel.allocator.buffer(capacity: line.utf8.count)
+            var buffer = channel.allocator.buffer(capacity: size)
             buffer.writeString(line)
             let frame = WebSocketFrame(fin: true, opcode: .text, maskKey: masked ? .random() : nil, data: buffer)
-            channel.writeAndFlush(frame, promise: nil)
+            channel.writeAndFlush(frame).whenComplete { _ in owner?.sent(size) }
         }
     }
 
-    public func lines() -> AsyncThrowingStream<String, any Error> { stream }
+    private func sent(_ size: Int) {
+        lock.withLock {
+            pending -= size
+            waitingSince = pending > 0 ? ContinuousClock.now : nil
+        }
+    }
+
+    /// Bytes have waited past the deadline with none sent: the ping timer's check, for an
+    /// end nobody is writing to any more.
+    func stalled() -> Bool {
+        let gone = lock.withLock { () -> Bool in
+            guard !gaveUp, let since = waitingSince, ContinuousClock.now - since > Self.writeDeadline else { return false }
+            gaveUp = true
+            return true
+        }
+        if gone { tooSlow("nothing sent for \(Self.writeDeadline)") }
+        return gone
+    }
+
+    /// Gives up on a reader that fell behind. What is queued is dropped with the socket;
+    /// the other end reconnects and reads everything afresh, as it does after any drop.
+    private func tooSlow(_ why: String) {
+        WireLog.write("control: closing \(remote), too slow: \(why)")
+        close(WebSocketErrorCode(codeNumber: Int(Self.tooSlowCode)), reason: "too slow")
+        // The close frame waits behind the same queue, so the socket goes now.
+        let channel = self.channel
+        channel.eventLoop.scheduleTask(in: .seconds(1)) { channel.close(promise: nil) }
+    }
+
+    public func lines() -> AsyncThrowingStream<String, any Error> { inbound.lines }
 
     public func close() {
         close(.normalClosure, reason: "")
@@ -74,6 +157,11 @@ public struct WebSocketClosed: Error, Sendable, CustomStringConvertible {
     public var description: String { "the WebSocket has closed" }
 }
 
+/// The other end fell too far behind and was given up on (#167).
+public struct WebSocketTooSlow: Error, Sendable, CustomStringConvertible {
+    public var description: String { "the other end stopped reading" }
+}
+
 /// Turns frames into lines and back, answers pings, and sends its own.
 final class WebSocketLineHandler: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = WebSocketFrame
@@ -100,6 +188,7 @@ final class WebSocketLineHandler: ChannelInboundHandler, @unchecked Sendable {
         pinger = context.eventLoop.scheduleRepeatedTask(initialDelay: Self.pingEvery, delay: Self.pingEvery) {
             [weak self, channel = context.channel] _ in
             guard let self else { return }
+            if self.transport?.stalled() == true { return }
             self.missed += 1
             if self.missed > Self.missedPongsAllowed {
                 channel.close(promise: nil)
@@ -120,7 +209,7 @@ final class WebSocketLineHandler: ChannelInboundHandler, @unchecked Sendable {
             if let text = body.readString(length: body.readableBytes) {
                 // A peer that sent several lines in one message is still heard line by line.
                 for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-                    transport?.continuation.yield(String(line))
+                    transport?.inbound.yield(String(line))
                 }
             }
         case .ping:
@@ -140,13 +229,13 @@ final class WebSocketLineHandler: ChannelInboundHandler, @unchecked Sendable {
 
     func channelInactive(context: ChannelHandlerContext) {
         pinger?.cancel()
-        transport?.continuation.finish()
+        transport?.inbound.finish()
         context.fireChannelInactive()
     }
 
     func errorCaught(context: ChannelHandlerContext, error: any Error) {
         pinger?.cancel()
-        transport?.continuation.finish(throwing: error)
+        transport?.inbound.finish(throwing: error)
         context.close(promise: nil)
     }
 }

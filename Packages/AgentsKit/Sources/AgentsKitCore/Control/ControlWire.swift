@@ -31,6 +31,10 @@ public enum ControlWire {
         case message(channel: Int, message: String)
         case open(channel: Int, ChannelOpen)
         case close(channel: Int)
+        /// One notification for several channels (#167): the host says it once and the
+        /// control plane copies it to each channel named. Only on channels opened with
+        /// `fanOut`, and only notifications, so nothing in it is a reply to wait for.
+        case fanOut(channels: [Int], message: String)
     }
 
     /// What a channel is opened as: a connection that may do everything a window's may,
@@ -50,9 +54,14 @@ public enum ControlWire {
         /// On the borrowing host's end: the reference it asked with, so it knows which of
         /// its waiting connections this is.
         public var tunnelRef: String?
+        /// The control plane reads `fanOut` frames (#167): a broadcast may go up the uplink
+        /// once for every channel opened this way, rather than once per channel. An older
+        /// control plane leaves it out and is written to channel by channel.
+        public var fanOut: Bool?
 
         public init(client: String, device: UUID? = nil, relayed: Bool? = nil,
-                    tunnel: String? = nil, tunnelRef: String? = nil) {
+                    tunnel: String? = nil, tunnelRef: String? = nil, fanOut: Bool? = nil) {
+            self.fanOut = fanOut
             self.relayed = relayed
             self.tunnel = tunnel
             self.tunnelRef = tunnelRef
@@ -109,7 +118,21 @@ public enum ControlWire {
         #"{"c":"# + String(channel) + #","close":true}"#
     }
 
+    /// `{"f":[1,2],"m":…}`: one notification for every channel named (#167).
+    public static func fanOut(_ channels: [Int], message: String) -> String {
+        #"{"f":["# + channels.map(String.init).joined(separator: ",") + #"],"m":"# + message + "}"
+    }
+
     public static func readHost(_ line: String) throws -> HostFrame {
+        if line.hasPrefix(#"{"f":["#), line.hasSuffix("}"), let end = line.firstIndex(of: "]") {
+            let list = line[line.index(line.startIndex, offsetBy: 6)..<end]
+            let channels = list.split(separator: ",").compactMap { Int($0) }
+            let rest = line[line.index(after: end)...]
+            if channels.count == list.split(separator: ",").count, channels.allSatisfy({ $0 > 0 }),
+               rest.hasPrefix(#","m":"#) {
+                return .fanOut(channels: channels, message: String(rest.dropFirst(5).dropLast()))
+            }
+        }
         if line.hasPrefix(#"{"c":"#), line.hasSuffix("}") {
             let afterC = line.dropFirst(5)
             let digits = afterC.prefix { $0.isASCII && $0.isNumber }
@@ -121,6 +144,11 @@ public enum ControlWire {
             }
         }
         guard let object = try? JSONValue.parse(Data(line.utf8)).objectValue else { throw WireError.notAnObject }
+        if case .array(let list)? = object["f"], let m = object["m"] {
+            let channels = list.compactMap(\.intValue)
+            guard channels.count == list.count, channels.allSatisfy({ $0 > 0 }) else { throw WireError.badChannel }
+            return .fanOut(channels: channels, message: try encode(m))
+        }
         guard let channel = object["c"]?.intValue, channel >= 0 else { throw WireError.badChannel }
         if let m = object["m"] { return .message(channel: channel, message: try encode(m)) }
         if let open = object["open"] { return .open(channel: channel, try open.decode(ChannelOpen.self)) }

@@ -30,6 +30,8 @@ public final class ControlUplink: @unchecked Sendable {
     /// request each was asked with.
     private var waitingTunnels: [String: CheckedContinuation<any LineTransport, any Error>] = [:]
     private var tunnelAsks: [Int: String] = [:]
+    /// The fan-out queue of the uplink up now, by that uplink.
+    private var fanQueue: (ObjectIdentifier, DispatchQueue)?
 
     public static let firstWait: Duration = .seconds(1)
     public static let longestWait: Duration = .seconds(30)
@@ -203,7 +205,10 @@ public final class ControlUplink: @unchecked Sendable {
             let channel = Channel(number: number, uplink: transport)
             let replaced = lock.withLock { channels.updateValue(channel, forKey: number) }
             replaced?.end(tellingTheControlPlane: false)
-            server.acceptVirtual(channel, device: open.device) { [weak self] in
+            // A control plane that copies a broadcast to each channel named hears it once
+            // for them all (#167).
+            let route = open.fanOut == true ? fanOutRoute(number, on: transport) : nil
+            server.acceptVirtual(channel, device: open.device, fanOut: route) { [weak self] in
                 self?.ended(channel)
             }
         case .close(let number):
@@ -219,6 +224,24 @@ public final class ControlUplink: @unchecked Sendable {
             return
         case .message(let number, let message):
             lock.withLock { channels[number] }?.yield(message)
+        case .fanOut:
+            // Only the host fans out; one from the control plane means nothing here.
+            return
+        }
+    }
+
+    /// The fan-out route for channels on `transport`: one queue per uplink, so its frames
+    /// go up in the order the daemon said them.
+    private func fanOutRoute(_ number: Int, on transport: any LineTransport) -> DaemonServer.FanOutRoute {
+        let key = ObjectIdentifier(transport as AnyObject)
+        let queue = lock.withLock { () -> DispatchQueue in
+            if let (owner, queue) = fanQueue, owner == key { return queue }
+            let queue = DispatchQueue(label: "com.alexecollins.agents.uplink.fanout")
+            fanQueue = (key, queue)
+            return queue
+        }
+        return DaemonServer.FanOutRoute(uplink: key, channel: number, queue: queue) { channels, line in
+            try transport.write(line: ControlWire.fanOut(channels, message: line))
         }
     }
 
@@ -235,34 +258,42 @@ public final class ControlUplink: @unchecked Sendable {
     final class Channel: LineTransport, @unchecked Sendable {
         let number: Int
         private let uplink: any LineTransport
-        private let stream: AsyncThrowingStream<String, any Error>
-        private let continuation: AsyncThrowingStream<String, any Error>.Continuation
+        /// What the client sent and this daemon hasn't read yet. The uplink can't stop
+        /// reading for one channel without stopping them all, so a client this far ahead of
+        /// the daemon loses its connection instead (#167).
+        private var inbound: BoundedLines!
         private let closed = ManagedAtomicFlag()
         /// A tunnel's: take it off the uplink's list when it ends.
         var onEnd: (@Sendable () -> Void)?
 
+        static let inboundLimit = 8 << 20
+
         init(number: Int, uplink: any LineTransport) {
             self.number = number
             self.uplink = uplink
-            var c: AsyncThrowingStream<String, any Error>.Continuation!
-            self.stream = AsyncThrowingStream(bufferingPolicy: .unbounded) { c = $0 }
-            self.continuation = c
+            inbound = BoundedLines(high: Self.inboundLimit, low: 0, onHigh: { [weak self] in
+                DaemonLog.shared.write("uplink: closing channel \(number), \(Self.inboundLimit >> 20) MB unread")
+                self?.end(tellingTheControlPlane: true)
+            })
         }
 
-        func yield(_ line: String) { continuation.yield(line) }
+        func yield(_ line: String) {
+            guard !closed.isSet else { return }
+            inbound.yield(line)
+        }
 
         func write(line: String) throws {
             guard !closed.isSet else { throw JSONRPCTransportError.closed }
             try uplink.write(line: ControlWire.channel(number, message: line))
         }
 
-        func lines() -> AsyncThrowingStream<String, any Error> { stream }
+        func lines() -> AsyncThrowingStream<String, any Error> { inbound.lines }
 
         func close() { end(tellingTheControlPlane: true) }
 
         func end(tellingTheControlPlane: Bool) {
             guard closed.set() else { return }
-            continuation.finish()
+            inbound.finish()
             if tellingTheControlPlane { try? uplink.write(line: ControlWire.close(number)) }
             onEnd?()
         }

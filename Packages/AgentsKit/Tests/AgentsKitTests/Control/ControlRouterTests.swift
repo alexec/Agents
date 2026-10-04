@@ -35,6 +35,8 @@ final class FakeUplinkHost: @unchecked Sendable {
                let reply = try? JSONRPCCodec.encode(.success(id: id, result: ["channel": .int(channel), "method": .string(method)])) {
                 try? transport.write(line: ControlWire.channel(channel, message: reply))
             }
+        case .fanOut:
+            break
         }
     }
 
