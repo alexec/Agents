@@ -50,7 +50,22 @@ $S/stop.sh $ROOT
 `launch.sh` builds with `xcodegen generate`, then `xcodebuild -scheme AgentsHost`
 and `-scheme AgentsStore`, one after the other, into the one `build/DD`, with `-skipPackagePluginValidation`. Skip the build with `--no-build` when
 nothing has changed since the last one. The build log is at
-`/tmp/run-<slug>-build.log`. Then it:
+`/tmp/run-<slug>-build.log`.
+
+Every build goes through `scripts/build-cache.sh` (#234): one package cache, one set of
+checked-out packages and one Xcode compilation cache in `~/Library/Caches/Agents-build/`,
+shared by every worktree. A fresh worktree replays what any other build already compiled,
+so its first build is no longer a cold one. Build the same way by hand:
+`scripts/build-cache.sh xcodebuild …` and `scripts/build-cache.sh swift test …`. Deleting a
+worktree's own `build/` and `.build` is still the clean-up, and leaves the cache alone;
+`scripts/build-cache.sh du` shows its size and `prune` bounds it.
+
+Verify only what you touched: the schemes and tests for the paths your branch changes, as
+`merge-wave.sh plan` lists them (an `App/` change needs `AgentsHost` and `AgentsStore`,
+not the Remote or the web page; a `Packages/AgentsKit` change needs its tests filtered
+by `scripts/select-test-suites.sh`). The full suite and every scheme run once, in the wave.
+
+Then it:
 1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
    no Bonjour (its log is `$ROOT/control/control.log`), serving the web remote (071) from
    this checkout's `Web/dist` on another free loopback port, printed as `WEB_URL` (never
@@ -216,8 +231,8 @@ pairing is the one thing kept apart.
 The Remote is built for the generic simulator only, never booted here:
 
 ```sh
-xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath build/DD -skipPackagePluginValidation build
+scripts/build-cache.sh xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath build/DD-sim -skipPackagePluginValidation build
 ```
 
 A fake device (`FakeDeviceLiveTests`) stands in for a phone against a scratch

@@ -32,8 +32,10 @@ Since 058 the Mac runs:
 There is no phone bridge to start. The Remote reaches the control plane itself.
 
 The script builds `AgentsHost` into `build/DD-host`, `AgentsStore` into `build/DD-store`
-and the Remote into `build/DD-ios`, one after another in the main checkout. Logs are
-in `/tmp/ship-app-<sha>/`. It refuses when:
+and the Remote into `build/DD-ios`, one after another in the main checkout, through
+`scripts/build-cache.sh` (#234): the packages and compiled outputs come from the cache in
+`~/Library/Caches/Agents-build/` that every worktree and wave shares, so a ship after a
+wave recompiles little. Logs are in `/tmp/ship-app-<sha>/`. It refuses when:
 - the main checkout is not on `main`;
 - a build is running from the main checkout's `build/` (an agent forgot its worktree);
 - the build is not signed by the team;

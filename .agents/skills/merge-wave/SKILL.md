@@ -88,7 +88,18 @@ verified by its lane.
 | `docs/`, `specs/`, `.agents/` only | nothing, so straight to `finish` |
 
 The Mac builds use the wave's `build/DD`, as run-app's `launch.sh` does, so the smoke
-check rebuilds nothing.
+check rebuilds nothing. Every build and test goes through `scripts/build-cache.sh`, so a
+fresh wave worktree replays what the lanes already compiled.
+
+**Checks that passed before are not run again (#234).** Every pass is recorded by tree
+hash in `<main>/.git/merge-wave-passed`. When the tree a check would run on already passed
+it (a wave started again with the same branches, a bisect probe at the wave's base, which
+is the last wave's tip), `next` says `lease=none … passed at this tree before` and `step`
+marks it passed without building. Take no lease for those.
+
+**This is the one place everything runs.** Lanes verify only the schemes and tests for
+what they touched. The wave runs every check the merged paths need, the full test
+suites included, once.
 
 **The smoke check** (`smoke`) runs the run-app loop on the wave's tip. It starts
 `launch.sh --slug w<stamp>` (its own control plane, host and window, behind Alex's), checks
@@ -127,8 +138,8 @@ branch. That is the only worktree the wave removes.
   Do not `pkill`, `killall` or ⌘Q anything.
 - Never run the script against a main you were not told to merge into. To try it out,
   use `scripts/selftest.sh`. It works in a throwaway clone at `/tmp/mw-selftest` and
-  covers two clean branches, a `Web/dist` conflict, a real conflict, a failing check, and
-  a docs-only wave. Its builds are a stub (`MERGE_WAVE_STUB`), except the real
+  covers two clean branches, a `Web/dist` conflict, a real conflict, a failing check, a
+  docs-only wave, and a wave started again that reuses the first one's passes. Its builds are a stub (`MERGE_WAVE_STUB`), except the real
   `web.sh build`, so run it under the "build" lease.
 - If main moved while the wave ran, `finish` refuses. Start a new wave with the same
   branches.
