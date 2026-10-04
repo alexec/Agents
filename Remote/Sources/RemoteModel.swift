@@ -81,8 +81,19 @@ final class RemoteModel {
     /// This device, as the Mac has it: `nil` until the Mac has answered the announce.
     private(set) var thisDevice: Device?
     private var listening: Task<Void, Never>?
-    /// The loop looking for the Mac, so two of them never run at once.
-    private var reconnecting: Task<Void, Never>?
+    /// The loop looking for the Mac, so two of them never run at once; what a send lost
+    /// with the connection waits on, for at most `sendPatience` (#208); stopped for good
+    /// by a new pairing.
+    @ObservationIgnored private lazy var reconnect = ReconnectLoop(backoff: backoff) { [weak self] in
+        guard let self else { return .forgotten }
+        // Lost again while this attempt was still settling in: `lostTouch` found this
+        // loop running and left it to go round once more.
+        if await self.tryOnce(), self.isConnected { return .connected }
+        // Forgotten: nothing to dial until a new pairing starts a loop of its own (#81).
+        if self.forgottenByControlPlane { return .forgotten }
+        note("link: no answer; waiting before the next try")
+        return .failed
+    }
     private var isLoadingEarlier = false
     /// What the pages on screen show, and what has been read on this connection (#175).
     @ObservationIgnored private var parts = OnScreenParts()
@@ -608,8 +619,10 @@ final class RemoteModel {
             }
             return false
         } catch {
-            startRefusal = "Your Mac stopped answering before it said whether the agent started. "
-                + "This will be checked when it is back."
+            // Out of patience too (#208): the sheet is let go, and the start is settled
+            // when the host is back, by its `requestID`.
+            startRefusal = "\(hostName(of: error) ?? "Your Mac") stopped answering before it said whether the agent "
+                + "started. This will be checked when it is back."
             return false
         }
     }
@@ -839,35 +852,15 @@ final class RemoteModel {
     /// It is also the right behaviour afterwards. A Mac that is asleep, or on another
     /// network, is a thing that comes back, and the screens say "last heard from" in
     /// the meantime rather than looking broken.
+    ///
+    /// Backing off to half a minute between tries, so a phone in a pocket with no Mac to
+    /// find is not holding the radio open every second all afternoon. A model whose
+    /// pairing was replaced is stopped, and never looks again (#208).
     func connect() async {
-        guard reconnecting == nil else { return }
+        guard !reconnect.isStopped, !reconnect.isRunning else { return }
         note("link: looking for the Mac")
         networkChanges.start()
-        let backoff = backoff
-        reconnecting = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
-                backoff.trying()
-                // Lost again while this attempt was still settling in: `lostTouch` found
-                // this loop running and left it to go round once more.
-                if await self.tryOnce(), self.isConnected { break }
-                // Forgotten: nothing to dial until a new pairing starts a loop of its own.
-                // Ended here rather than cancelled, so `reconnecting` is cleared (#81).
-                if self.forgottenByControlPlane { break }
-                note("link: no answer; waiting before the next try")
-                // Backing off to half a minute, so a phone in a pocket with no Mac to
-                // find is not holding the radio open every second all afternoon.
-                await backoff.wait()
-            }
-            // Cancelled by a pairing, which has already started the loop that replaces
-            // this one; that one's handle is not this one's to clear.
-            if !Task.isCancelled {
-                // Back from the first wait only once this connection has lasted (#172).
-                if self?.isConnected == true { backoff.connected() } else { backoff.settle() }
-                self?.finishedReconnecting()
-            }
-        }
-        await reconnecting?.value
+        await reconnect.run()
     }
 
     /// How long the loop waits before the next attempt, and the wait itself, which coming
@@ -884,9 +877,10 @@ final class RemoteModel {
     /// died while it was suspended; either way, look now. A try already in flight is
     /// left alone.
     private func goBackNow(_ reason: ReconnectTriggers.Reason) async {
-        note("link: \(reason); connected \(isConnected), reconnecting \(reconnecting != nil)")
+        guard !reconnect.isStopped else { return }
+        note("link: \(reason); connected \(isConnected), reconnecting \(reconnect.isRunning)")
         otherHostsBackoff.nudge()
-        guard backoff.nudge() == .idle, isConnected, reconnecting == nil, !checkingConnection else { return }
+        guard backoff.nudge() == .idle, isConnected, !reconnect.isRunning, !checkingConnection else { return }
         checkingConnection = true
         defer { checkingConnection = false }
         if await !client.answers(within: .seconds(4)) {
@@ -906,6 +900,11 @@ final class RemoteModel {
         let began = ContinuousClock.now
         do {
             try await client.connect(startIfNeeded: false)
+            // Stopped while dialling: a new pairing has the screen, and this one lets go.
+            guard !reconnect.isStopped else {
+                await client.disconnect()
+                return false
+            }
             note("link: connected \(link) after \(ContinuousClock.now - began)")
             refusals.connected()
             isConnected = true
@@ -951,21 +950,51 @@ final class RemoteModel {
     /// The client a call belongs to: another host's for an agent or a folder there,
     /// this phone's own host's for everything else. Worked out from what the call names,
     /// so no call site has to know there is more than one host.
-    private func client(for params: some Encodable) -> DaemonClient {
-        guard !otherHosts.isEmpty, let value = try? JSONValue.encoding(params) else { return client }
+    ///
+    /// Another host this phone cannot reach now is `HostAway` at once: the call used to
+    /// go to the home host, which could mean a whole catch-up there before failing
+    /// anyway (#208).
+    private func client(for params: some Encodable) throws -> DaemonClient {
+        guard let host = otherHost(named: params) else { return client }
+        guard let other = otherHosts[host], reachableHosts.contains(host) else { throw HostAway(host: host) }
+        return other
+    }
+
+    /// The host other than this phone's own that a call names, by its agent or its folder.
+    private func otherHost(named params: some Encodable) -> HostID? {
+        guard !controlHosts.isEmpty, let value = try? JSONValue.encoding(params) else { return nil }
         if let id = (value["agentID"] ?? value["id"])?.stringValue.flatMap(UUID.init(uuidString:)),
-           let host = work.agent(id)?.host, let other = otherHosts[host] {
-            return other
+           let host = work.agent(id)?.host, host != .mac {
+            return host
         }
         for key in ["folder", "cwd"] {
             guard let folder = value[key]?.stringValue else { continue }
-            if let project = work.projects.first(where: { $0.folder.absoluteString == folder && $0.host != .mac }),
-               let other = otherHosts[project.host] {
-                return other
+            if let project = work.projects.first(where: { $0.folder.absoluteString == folder && $0.host != .mac }) {
+                return project.host
             }
         }
-        return client
+        return nil
     }
+
+    /// Another of the control plane's hosts, not reachable from here now (#208).
+    struct HostAway: Error {
+        let host: HostID
+    }
+
+    /// The home host did not come back within `sendPatience` (#208).
+    struct MacAway: Error {}
+
+    /// The other hosts this phone has a live connection to now (058, #208): an agent on
+    /// one that is not is stale on its own, whatever the home host is doing.
+    private(set) var reachableHosts: Set<HostID> = []
+
+    /// Whether what is shown of `host`'s work can be trusted, and acted on: the home host's
+    /// staleness for its own, that host's link for another's (#208).
+    func isStale(on host: HostID) -> Bool {
+        host == .mac ? isStale : !reachableHosts.contains(host)
+    }
+
+    func isStale(_ agent: Agent) -> Bool { isStale(on: agent.host) }
 
     /// Ask whether a control plane is on the other end, and follow its other hosts if so.
     /// A bridge with no control plane answers `control/status` with methodNotFound, and
@@ -975,7 +1004,7 @@ final class RemoteModel {
     /// new pairing) ends its watch rather than being kept dialling by it (#175). `stop`
     /// ends it at once.
     private func watchOtherHosts() {
-        guard hostWatch == nil else { return }
+        guard hostWatch == nil, !reconnect.isStopped else { return }
         let client = client
         // Through the relay a device has one session at a time (046), and it is the
         // home host's: the other hosts wait until the control plane's address answers.
@@ -1008,17 +1037,21 @@ final class RemoteModel {
         }
     }
 
-    /// Everything this model dials, ended: a new pairing has made a new model (#175).
+    /// Everything this model dials, ended for good: a new pairing has made a new model
+    /// (#175). Stopped first, so nothing below starts a loop again: the listener's end,
+    /// a network change, a send (#208).
     func stop() async {
         note("link: stopping this pairing's connections")
+        reconnect.stop()
+        networkChanges.stop()
+        (baseLink as? ControlPlaneLink)?.watching.stop()
         hostWatch?.cancel()
         hostWatch = nil
-        reconnecting?.cancel()
-        reconnecting = nil
         listening?.cancel()
         listening = nil
         for (_, other) in otherHosts { await other.disconnect() }
         otherHosts = [:]
+        reachableHosts = []
         await client.disconnect()
     }
 
@@ -1035,9 +1068,11 @@ final class RemoteModel {
         for host in others {
             let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
             otherHosts[host.id] = other
-            guard await !other.isConnected,
-                  (try? await other.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
+            if await other.isConnected { continue }
+            reachableHosts.remove(host.id)
+            guard (try? await other.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
             let id = host.id
+            reachableHosts.insert(id)
             if let projects = try? await other.call(DaemonAPI.Method.projectsList,
                                                     DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                     returning: [DaemonAPI.ProjectSummary].self) {
@@ -1049,21 +1084,20 @@ final class RemoteModel {
             let notes = other.notifications()
             Task { [weak self] in
                 for await note in notes { _ = self?.work.apply(note.method, note.params, from: id) }
+                // Its connection ended: its cards are stale until the watch reaches it again.
+                if self?.otherHosts[id] === other { self?.reachableHosts.remove(id) }
             }
         }
         // A host that went offline keeps its projects, greyed under its heading (frame H).
         // One the control plane no longer lists is gone, and so is what it showed.
         for id in otherHosts.keys where !others.contains(where: { $0.id == id }) {
+            reachableHosts.remove(id)
             await otherHosts.removeValue(forKey: id)?.disconnect()
             if !listed.contains(where: { $0.id == id }) {
                 work.replaceProjects([], from: id)
                 work.replaceAgents([], from: id)
             }
         }
-    }
-
-    private func finishedReconnecting() {
-        reconnecting = nil
     }
 
     private func listen() {
@@ -1143,12 +1177,16 @@ final class RemoteModel {
                     self.subscribeOnce()
                 }
             }
+            // Cancelled is not lost: a newer listener took over, or the model was stopped,
+            // and either way this one's end is not a reason to go back (#208).
+            guard !Task.isCancelled else { return }
             await self?.lostTouch()
         }
     }
 
     /// The Mac stopped answering. Say so, keep what is on screen, and go back for it.
     private func lostTouch() async {
+        guard !reconnect.isStopped else { return }
         note("link: lost touch")
         isConnected = false
         parts.connectionLost()
@@ -1206,17 +1244,40 @@ final class RemoteModel {
     /// `sendID`, a start's `requestID` — or it is one the Mac can safely do twice (stop,
     /// archive). A call lost with the connection is sent once more, unchanged, as soon
     /// as the Mac is back.
+    ///
+    /// Every wait in it is bounded (#208). The call is held only while the host answers
+    /// pings; the wait for the Mac to come back is at most `sendPatience`, and none at
+    /// all from inside the reconnect loop's own catching up, which would be the loop
+    /// waiting on itself. Out of patience it is `MacAway`: the caller keeps what was
+    /// typed, and the person's retry is the same send. A call to another host whose
+    /// link went is `HostAway` at once: that host's watch brings it back, not this
+    /// phone's own reconnect.
     @discardableResult
     private func sendOnce(_ method: String, _ params: some Encodable & Sendable) async throws -> JSONValue {
-        let client = client(for: params)
+        let client = try client(for: params)
+        let patience = Self.sendPatience
         do {
-            return try await client.call(method, params)
+            return try await client.callWhileAnswering(method, params, checkingEvery: patience)
         } catch is JSONRPCTransportError {
         } catch DaemonClient.ConnectError.couldNotConnect {
         }
-        if let underway = reconnecting { await underway.value } else { await connect() }
-        return try await client.call(method, params)
+        guard client === self.client else {
+            if let host = otherHost(named: params) {
+                reachableHosts.remove(host)
+                throw HostAway(host: host)
+            }
+            throw MacAway()
+        }
+        guard await reconnect.waitForHost(within: patience) else {
+            note("link: \(method) not sent; the Mac did not come back in \(patience)")
+            throw MacAway()
+        }
+        return try await client.callWhileAnswering(method, params, checkingEvery: patience)
     }
+
+    /// How long a send waits for the Mac to come back, and between its pings while it
+    /// waits for an answer (#208).
+    static let sendPatience = catchUpPatience
 
     /// Catch up with the Mac: after every connection, and on a pull to refresh (#175).
     ///
@@ -2083,7 +2144,7 @@ final class RemoteModel {
                                                        sendID: UUID()))
             return true
         } catch {
-            problem = "That question could not be answered."
+            problem = away(error, "that could not be sent.") ?? "That question could not be answered."
             return false
         }
     }
@@ -2109,7 +2170,8 @@ final class RemoteModel {
         } catch {
             // The daemon refuses an answer that does not fit the shape the agent asked
             // for, and says why. Its words, not ours: it knows which field was wrong.
-            problem = (error as? JSONRPCError)?.message ?? "That question could not be answered."
+            problem = (error as? JSONRPCError)?.message ?? away(error, "that could not be sent.")
+                ?? "That question could not be answered."
             return false
         }
     }
@@ -2125,7 +2187,7 @@ final class RemoteModel {
     /// from here. What is attached is checked first, by the same rules as a start from
     /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
     func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID) async -> Bool {
-        guard !isStale else {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that was not sent."
             return false
         }
@@ -2153,7 +2215,7 @@ final class RemoteModel {
                                        attachments: attachments)
             return false
         } catch {
-            problem = "That did not reach your Mac. What you typed is still there."
+            problem = (away(error, "that was not sent.") ?? "That did not reach your Mac.") + " What you typed is still there."
             return false
         }
     }
@@ -2362,27 +2424,28 @@ final class RemoteModel {
     @discardableResult
     private func act(_ act: AgentAct, on agentID: UUID, _ method: String,
                      _ request: some Encodable & Sendable) async -> Bool {
-        guard !isStale else {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that could not be sent."
             return false
         }
         guard work.begin(act, on: agentID) else { return false }
         defer { work.end(act, on: agentID) }
         do {
-            // To the agent's own host (073).
-            try await client(for: request).call(method, request)
+            // To the agent's own host (073), and held no longer than `sendPatience` while
+            // that host is away (#208).
+            try await sendOnce(method, request)
             return true
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
             problem = error.message
             return false
         } catch {
-            problem = "That did not reach your Mac."
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
             return false
         }
     }
 
     private func act(_ method: String, _ agentID: UUID) async {
-        guard !isStale else {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that could not be sent."
             return
         }
@@ -2390,10 +2453,25 @@ final class RemoteModel {
             // To the agent's own host: one on another of the control plane's hosts is not
             // the home host's to stop, park or archive (073).
             let request = DaemonAPI.AgentRequest(agentID: agentID)
-            try await client(for: request).call(method, request)
+            try await sendOnce(method, request)
         } catch {
-            problem = "That did not reach your Mac."
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
+    }
+
+    /// What to say when a send did not go because its host is away (#208): the home host
+    /// or another of the control plane's, by name. Nil for any other failure.
+    private func away(_ error: any Error, _ outcome: String) -> String? {
+        if error is MacAway { return "Your Mac is not answering, so \(outcome)" }
+        guard error is HostAway else { return nil }
+        return "\(hostName(of: error) ?? "That host") is not answering, so \(outcome)"
+    }
+
+    /// The name of the other host a `HostAway` is about.
+    private func hostName(of error: any Error) -> String? {
+        guard let away = error as? HostAway else { return nil }
+        return controlHosts.first { $0.id == away.host }.map { $0.name.isEmpty ? $0.id.rawValue : $0.name }
+            ?? "That host"
     }
 
     func dismissProblem() { problem = nil }

@@ -173,6 +173,27 @@ public actor DaemonClient {
         }
     }
 
+    /// `call`, waited on only while the far end is there (#208): a ping every `every`, and
+    /// a connection that does not answer one within `pingPatience` is closed, which fails
+    /// this call with everything else on it. A slow answer from a host that keeps
+    /// answering pings is waited for, as a start that makes a worktree must be; a host
+    /// that went away is not, so a Sending indicator does not stay up for the afternoon.
+    @discardableResult
+    public func callWhileAnswering(_ method: String, _ params: (some Encodable)? = Optional<String>.none,
+                                   checkingEvery every: Duration,
+                                   pingPatience: Duration = .seconds(4)) async throws -> JSONValue {
+        let connection = try connected()
+        let watch = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: every)
+                guard !Task.isCancelled else { return }
+                if await !Self.answers(connection, within: pingPatience) { return }
+            }
+        }
+        defer { watch.cancel() }
+        return try await call(method, params)
+    }
+
     private func unbounded(_ method: String, _ value: JSONValue?) async throws -> JSONValue {
         do {
             return try await connected().call(method, value)

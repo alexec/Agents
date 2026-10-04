@@ -120,6 +120,32 @@ struct DroppedReplyTests {
         #expect(answer == [:])
     }
 
+    // MARK: A send held only while the host is there (#208)
+
+    /// The Mac went quiet under a send: its pings go unanswered, the connection is let go,
+    /// and the send fails rather than holding the Sending indicator up for good.
+    @Test func aSendToAHostGoneQuietFails() async throws {
+        let (client, _) = try await connected(.quiet)
+        let started = ContinuousClock.now
+        await #expect(throws: JSONRPCTransportError.self) {
+            try await client.callWhileAnswering(DaemonAPI.Method.agentsPrompt, checkingEvery: .milliseconds(100),
+                                                pingPatience: .milliseconds(200))
+        }
+        #expect(ContinuousClock.now - started < .seconds(10))
+        #expect(await !client.isConnected)
+    }
+
+    /// A slow answer from a host that keeps answering pings is waited for: a start that
+    /// makes a worktree is not a host gone away.
+    @Test func aSlowAnswerFromAHostThatIsThereArrives() async throws {
+        let (client, _) = try await connected(.delay(.milliseconds(800)))
+        let answer = try await client.callWhileAnswering(DaemonAPI.Method.agentsStart,
+                                                         checkingEvery: .milliseconds(100),
+                                                         pingPatience: .seconds(2))
+        #expect(answer == [:])
+        #expect(await client.isConnected)
+    }
+
     // MARK: The control plane
 
     private let home = HostID(rawValue: "mac")
