@@ -84,6 +84,9 @@ extension TranscriptEntry.Kind {
         case "background":
             guard let item = try? payload["_0"]?.decode(BackgroundItem.self) else { return nil }
             return .background(item)
+        case "appView":
+            guard let call = try? payload["_0"]?.decode(AppViewCall.self) else { return nil }
+            return .appView(call)
         case "workReported":
             // An outcome this build does not know is a report that never arrived, and
             // the entry falls to `.unrecognised` rather than being rounded to `done`.
@@ -162,6 +165,8 @@ extension TranscriptEntry.Kind {
             return ["sandboxFailure": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
         case .handoff(let markdown, let characters):
             return ["handoff": ["markdown": .string(markdown), "characters": .int(characters)]]
+        case .appView(let call):
+            return ["appView": ["_0": (try? JSONValue.encoding(call)) ?? .null]]
         case .unrecognised(let raw):
             // Written back exactly as it was read, so passing a record through an
             // older build does not quietly delete what it did not understand.

@@ -314,6 +314,9 @@ private struct EntryRow: View {
         case .background(let item):
             BackgroundEntryLine(item: item)
 
+        case .appView(let call):
+            AppViewRow(call: call)
+
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()

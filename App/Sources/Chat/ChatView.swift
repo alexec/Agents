@@ -15,7 +15,10 @@ struct ChatView: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
     @Environment(SidebarStates.self) private var states
+    @Environment(\.openURL) private var openURL
     @State private var formHeight: CGFloat = 0
+    /// The open chat's views (#187), torn down when another chat opens.
+    @State private var views = AppViewStore()
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -65,6 +68,25 @@ struct ChatView: View {
         .animation(.snappy(duration: 0.28), value: model.selection == nil)
         // Title stays on ContentView's detail: one owner for the window title.
         .environment(\.chatActions, chatActions)
+        .environment(\.appViewStore, views)
+        .environment(\.appViewActions, agent.map(appViewActions))
+        // A view full screen is drawn in the chat's place, as a pinned page is (#187).
+        .overlay {
+            if let id = views.fullscreen, let host = views.existing(id) {
+                AppViewFullscreen(host: host)
+            }
+        }
+        .onChange(of: agent?.id) { views.tearDownAll(reason: "The conversation was closed.") }
+    }
+
+    /// What a view in the chat may ask of the Mac (#187): the host the chat is on, the
+    /// person's own send, and the default browser.
+    private func appViewActions(_ agent: Agent) -> AppViewActions {
+        AppViewActions(
+            agentID: agent.id,
+            call: { [model] method, params in try await model.viewCall(agent.id, method, params) },
+            send: { [model] text in await model.send(text) },
+            openLink: { [openURL] url in openURL(url) })
     }
 
     /// What the shared chat rows mean on a Mac (033).

@@ -89,6 +89,10 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// The settings a switch chose, changed afterwards from its note (052, FR-029).
         case settingsChanged(SwitchRecord)
 
+        /// A call of a tool that has a view (#187): drawn as the view, where the call began.
+        /// Written by the daemon as the call arrives and again as it ends, under one id.
+        case appView(AppViewCall)
+
         /// Something a newer version of this app wrote down, read by an older one.
         /// Kept whole and skipped when drawing, so a transcript is never lost to a
         /// kind that did not exist when this build was made.

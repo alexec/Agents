@@ -235,6 +235,9 @@ extension TranscriptItem {
         // choice is a step: "You chose Yes" says nothing about the outcome.
         case .elicitationAnswered, .workReported, .sandboxFailure:
             return true
+        // A view is what the call is for (#187): drawn at every level, as a reply is.
+        case .appView:
+            return true
         case .stateChanged(let state, _):
             return state == .stopped
         case .notice(let notice):

@@ -163,6 +163,19 @@ extension AppService {
                                   DaemonAPI.DashboardTokenRequest(token: token),
                                   fallback: "The Dashboard has no tiles yet.")
             }
+        } viewTool: { name, arguments in
+            // The whole result back, not a note: the view is drawn from it (#187).
+            let params: JSONValue
+            do {
+                params = try JSONValue.encoding(DaemonAPI.ViewToolCallRequest(token: token, name: name,
+                                                                              arguments: arguments))
+            } catch {
+                return .failure("That call could not be read, so nothing was done.")
+            }
+            switch await relay(DaemonAPI.Method.viewsToolCall, params) {
+            case .success(let result): return .success(result)
+            case .failure(let error): return .failure(ViewToolFailure(error.message))
+            }
         }
     }
 }

@@ -609,6 +609,11 @@ extension DaemonCore {
             queued.preface = EventWords.cancelledByPrompt(ended)
             agent = agents[request.agentID] ?? agent
         }
+        // What a view in the conversation asked the agent to know (#187), told with the
+        // person's next message and not in their bubble, as the wait's ending is.
+        if request.from == .person, let context = takeViewContext(request.agentID) {
+            queued.preface = [queued.preface, context].compactMap { $0 }.joined(separator: "\n\n")
+        }
         agent.queuedPrompts.insert(queued, at: first ? 0 : agent.queuedPrompts.endIndex)
         // The person moving the work on is what settles the turn before it. What the
         // agent said about that turn is now history, and so is any claim on the one
@@ -1750,6 +1755,8 @@ extension DaemonCore {
                       DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
         }
         endWatch(agentID)
+        // A view still waiting for its call's answer is told the call was cancelled (#187).
+        await cancelViews(for: agentID, reason: "The turn was stopped.")
         if let session = live[agentID] { await session.cancel() }
         turnTasks.removeValue(forKey: agentID)?.cancel()
         // Re-read, rather than trusting the `agent` captured at the top of this

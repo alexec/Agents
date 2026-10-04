@@ -192,6 +192,9 @@ public struct TranscriptDisplayBuilder: Sendable {
     /// Where in `drawn` each closed run's calls are, by call id, for an update that
     /// arrives after something else has closed its run.
     private var closedRunAt: [String: Int] = [:]
+    /// Where in `drawn` each view is (#187), by its call's id: the call's later entries
+    /// carry its result, and the view stays where the call began.
+    private var viewAt: [UUID: Int] = [:]
     /// The last entry taken, as it stands after joining, for the chunk that
     /// continues it.
     private var last: TranscriptEntry?
@@ -245,6 +248,15 @@ public struct TranscriptDisplayBuilder: Sendable {
                 run.append(call)
             }
             if runID == nil { runID = entry.id }
+        case .appView(let call):
+            if let at = viewAt[call.id], drawn.indices.contains(at), case .entry(var first) = drawn[at] {
+                first.kind = .appView(call)
+                drawn[at] = .entry(first)
+                return
+            }
+            closeRun()
+            viewAt[call.id] = drawn.count
+            drawn.append(.entry(entry))
         case .background(let item) where item.isRunning && item.kind == .task && item.toolCallID != nil:
             // A task starting from a tool call: the call is already on the page, and
             // says it runs on while it does (057). Not a break in the run either.
