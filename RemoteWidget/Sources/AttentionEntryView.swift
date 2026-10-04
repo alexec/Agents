@@ -2,8 +2,9 @@ import AgentsKitCore
 import SwiftUI
 import WidgetKit
 
-/// The widget, drawn: a number on a small square, and the newest few sessions on a wider
-/// one. Both read the same entry and nothing else (FR-002).
+/// The widget, drawn: a number on a small square, the newest few sessions on a wider one,
+/// and more of them, with more of each, on a large one (#192). All read the same entry and
+/// nothing else (FR-002).
 ///
 /// The words are the app's own. "Needs you" is the heading the projects page files these
 /// sessions under (`AgentGroup.needsAttention`), and a row's second line is the `Headline`
@@ -14,9 +15,31 @@ struct AttentionEntryView: View {
     let entry: AttentionEntry
 
     var body: some View {
+        AttentionLayout(entry: entry, size: Self.size(of: family))
+    }
+
+    /// WidgetKit's family as the snapshot's size, which is what says how many rows it has.
+    static func size(of family: WidgetFamily) -> AttentionSnapshot.Size {
         switch family {
-        case .systemMedium: Medium(entry: entry)
-        default: Small(entry: entry)
+        case .systemMedium: .medium
+        case .systemLarge: .large
+        case .systemExtraLarge: .extraLarge
+        default: .small
+        }
+    }
+}
+
+/// One size's layout, chosen by the snapshot's size rather than read from the environment,
+/// so every size can be drawn outside a widget too (`specs/192-remote-widget/`).
+struct AttentionLayout: View {
+    let entry: AttentionEntry
+    let size: AttentionSnapshot.Size
+
+    var body: some View {
+        switch size {
+        case .small: Small(entry: entry)
+        case .medium: Medium(entry: entry)
+        case .large, .extraLarge: Large(entry: entry, size: size)
         }
     }
 }
@@ -89,22 +112,8 @@ private struct Medium: View {
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\(entry.count)")
-                    .font(.system(size: 22, weight: .semibold, design: .serif))
-                    .monospacedDigit()
-                    .foregroundStyle(StateTint.attention.color ?? .primary)
-                Text(entry.count == 1 ? "needs you" : "need you")
-                    .appText(.supporting)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                if entry.leftover > 0 {
-                    Text("+\(entry.leftover) more")
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            ForEach(entry.sessions) { session in
+            Heading(count: entry.count, leftover: entry.leftover(for: .medium))
+            ForEach(entry.rows(for: .medium)) { session in
                 Link(destination: AttentionLink.agent(session.id).url) {
                     SessionRow(session: session)
                 }
@@ -114,6 +123,145 @@ private struct Medium: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The count in the one colour for a thing that needs a person, what it means, and how
+/// many are waiting that are not drawn. The same over medium and large.
+private struct Heading: View {
+    let count: Int
+    let leftover: Int
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("\(count)")
+                .font(.system(size: 22, weight: .semibold, design: .serif))
+                .monospacedDigit()
+                .foregroundStyle(StateTint.attention.color ?? .primary)
+            Text(count == 1 ? "needs you" : "need you")
+                .appText(.supporting)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if leftover > 0 {
+                Text("+\(leftover) more")
+                    .appText(.fine)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+}
+
+/// More sessions, and more of each: the headline over up to two lines and how long it has
+/// waited (#192). The extra large one on an iPad is two columns of the same rows, read down
+/// the first and then the second, as the app's own list is.
+private struct Large: View {
+    let entry: AttentionEntry
+    let size: AttentionSnapshot.Size
+
+    var body: some View {
+        if entry.isUnknown {
+            Unknown()
+        } else if entry.isEmpty {
+            NothingWaiting()
+        } else {
+            rows
+        }
+    }
+
+    /// As many of the rows as fit, newest first, with the rest counted: at a large text
+    /// size fewer fit, and a row is left out whole rather than cut off (#192).
+    private var rows: some View {
+        let all = entry.rows(for: size)
+        return ViewThatFits(in: .vertical) {
+            ForEach(Array(stride(from: all.count, through: 1, by: -1)), id: \.self) { drawn in
+                fitted(Array(all.prefix(drawn)))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func fitted(_ sessions: [AttentionSnapshotSession]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Heading(count: entry.count, leftover: max(0, entry.count - sessions.count))
+            if size == .extraLarge {
+                let half = (sessions.count + 1) / 2
+                HStack(alignment: .top, spacing: 20) {
+                    column(Array(sessions.prefix(half)))
+                    column(Array(sessions.dropFirst(half)))
+                }
+            } else {
+                column(sessions)
+            }
+            if let age = entry.age(), entry.isStale() {
+                Updated(age: age)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func column(_ sessions: [AttentionSnapshotSession]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(sessions) { session in
+                Link(destination: AttentionLink.agent(session.id).url) {
+                    LargeRow(session: session, now: entry.date)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+/// One session with room: its title and how long it has waited, then the project and what
+/// it is asking for, the asking allowed a second line before it truncates.
+private struct LargeRow: View {
+    let session: AttentionSnapshotSession
+    let now: Date
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: SessionRow.symbol(for: session.kind) ?? Self.unread)
+                .appText(.fine)
+                .foregroundStyle(session.kind == nil
+                                 ? StateTint.none.style(or: .secondary) : StateTint.attention.style(or: .tertiary))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(session.title)
+                        .appText(.supporting)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(session.waited(at: now))
+                        .appText(.fine)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                        .layoutPriority(1)
+                }
+                Text(SessionRow.subtitle(for: session))
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1...2)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    /// The app's mark for something done and not yet read (#70), for a session with no
+    /// need pending.
+    private static let unread = "circle.fill"
+
+    private var accessibilityLabel: String {
+        let state = switch session.kind {
+        case .permission: "asks permission"
+        case .elicitation: "asks a question"
+        case .report: "has a report"
+        case nil: "finished, unread"
+        }
+        let waited = session.since.formatted(.relative(presentation: .named, unitsStyle: .wide))
+        return [session.title, session.project, state, session.wanted, "since \(waited)"]
+            .compactMap { $0 }
+            .joined(separator: ", ")
     }
 }
 
@@ -136,7 +284,7 @@ private struct SessionRow: View {
                     .appText(.supporting)
                     .fontWeight(.semibold)
                     .lineLimit(1)
-                Text(subtitle)
+                Text(Self.subtitle(for: session))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -148,7 +296,7 @@ private struct SessionRow: View {
     }
 
     /// The project's name, and what is being asked for where something is being asked.
-    private var subtitle: String {
+    static func subtitle(for session: AttentionSnapshotSession) -> String {
         guard let wanted = session.wanted, !wanted.isEmpty else { return session.project }
         return "\(session.project) · \(wanted)"
     }

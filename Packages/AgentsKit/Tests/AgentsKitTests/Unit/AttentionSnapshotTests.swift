@@ -122,16 +122,72 @@ struct AttentionSnapshotTests {
         #expect(row.title == "Untitled", "the words the app's own card uses")
     }
 
-    /// FR-006: four rows fit, and the rest are counted rather than drawn.
+    /// FR-006: the file names as many as the largest size draws, newest first, and counts
+    /// the rest rather than naming them.
     @Test func rowsAreNewestFirstAndCappedWithTheRestCounted() {
         let base = Date(timeIntervalSinceNow: -3600)
-        let waiting = (0..<6).map { agent(at: base.addingTimeInterval(Double($0) * 60)) }
+        let waiting = (0..<15).map { agent(at: base.addingTimeInterval(Double($0) * 60)) }
         let snapshot = AttentionSnapshot.make(model: model(waiting))
-        #expect(snapshot.total == 6)
-        #expect(snapshot.sessions.count == 4)
-        #expect(snapshot.leftover == 2)
+        #expect(snapshot.total == 15)
+        #expect(snapshot.sessions.count == AttentionSnapshot.rowLimit)
+        #expect(AttentionSnapshot.rowLimit == 12, "bounded by the extra large widget, not by what is waiting")
         let dates = snapshot.sessions.map(\.since)
         #expect(dates == dates.sorted(by: >), "newest first, as the app's own list is")
+        #expect(snapshot.sessions.first?.since == waiting.last?.lastActivityAt)
+    }
+
+    /// #192: each size draws the newest it has room for and counts the rest, from one file.
+    @Test(arguments: [
+        (0, [0, 0, 0, 0], [0, 0, 0, 0]),
+        (1, [0, 1, 1, 1], [1, 0, 0, 0]),
+        (5, [0, 4, 5, 5], [5, 1, 0, 0]),
+        (15, [0, 4, 6, 12], [15, 11, 9, 3]),
+    ])
+    func eachSizeDrawsWhatItHasRoomFor(waiting: Int, drawn: [Int], leftover: [Int]) {
+        let base = Date(timeIntervalSinceNow: -3600)
+        let snapshot = AttentionSnapshot.make(
+            model: model((0..<waiting).map { agent(at: base.addingTimeInterval(Double($0) * 60)) }))
+        let sizes: [AttentionSnapshot.Size] = [.small, .medium, .large, .extraLarge]
+        #expect(sizes.map { snapshot.rows(for: $0).count } == drawn)
+        #expect(sizes.map { snapshot.leftover(for: $0) } == leftover)
+        for size in sizes {
+            #expect(snapshot.rows(for: size) == Array(snapshot.sessions.prefix(size.rowLimit)),
+                    "a smaller size draws the first of the same rows, so medium is what it was")
+        }
+    }
+
+    /// An app from before #192 wrote four. A large widget draws those four and counts the
+    /// rest, rather than drawing nothing until the app catches up.
+    @Test func aFileOfFourStillFillsALargeWidgetAsFarAsItGoes() {
+        let sessions = (0..<4).map {
+            AttentionSnapshotSession(id: UUID(), project: "api", title: "Row \($0)", wanted: nil,
+                                     kind: nil, since: Date())
+        }
+        let snapshot = AttentionSnapshot(writtenAt: Date(), total: 9, sessions: sessions)
+        #expect(snapshot.rows(for: .large).count == 4)
+        #expect(snapshot.leftover(for: .large) == 5)
+        #expect(snapshot.leftover(for: .medium) == 5)
+    }
+
+    @Test func nothingWaitingDrawsNoRowsAndCountsNone() {
+        let snapshot = AttentionSnapshot(writtenAt: Date(), total: 0, sessions: [])
+        for size in AttentionSnapshot.Size.allCases {
+            #expect(snapshot.rows(for: size).isEmpty)
+            #expect(snapshot.leftover(for: size) == 0)
+        }
+    }
+
+    @Test func howLongARowHasWaitedIsShort() {
+        let now = Date()
+        func waited(_ seconds: TimeInterval) -> String {
+            AttentionSnapshotSession(id: UUID(), project: "api", title: "t", wanted: nil, kind: nil,
+                                     since: now.addingTimeInterval(-seconds)).waited(at: now)
+        }
+        #expect(waited(-30) == "now", "a clock a little ahead is not a negative wait")
+        #expect(waited(59) == "now")
+        #expect(waited(5 * 60) == "5m")
+        #expect(waited(3 * 3600 + 59) == "3h")
+        #expect(waited(2 * 86_400) == "2d")
     }
 
     // MARK: The file

@@ -14,9 +14,33 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     /// configuration cannot name each other wrongly.
     public static let widgetKind = "AttentionWidget"
 
-    /// How many rows a medium widget draws. Four fits legibly; the rest are counted in
-    /// words rather than drawn (FR-006).
-    public static let rowLimit = 4
+    /// The widget's sizes, each with the rows it has room for (FR-006, #192). Named here
+    /// rather than as WidgetKit's families so the rule for what each draws can be tested
+    /// without a widget.
+    public enum Size: CaseIterable, Hashable, Sendable {
+        /// The number on its own.
+        case small
+        /// The number and the newest four, a line each.
+        case medium
+        /// The newest six, each with room for its headline over two lines.
+        case large
+        /// The iPad's widest: the newest twelve, in two columns of six.
+        case extraLarge
+
+        /// How many rows this size draws. The rest are counted in words rather than drawn.
+        public var rowLimit: Int {
+            switch self {
+            case .small: 0
+            case .medium: 4
+            case .large: 6
+            case .extraLarge: 12
+            }
+        }
+    }
+
+    /// How many rows the app writes: enough for the largest size and no more, so the file
+    /// stays a bounded handful whatever is waiting. A smaller size draws the first of them.
+    public static let rowLimit = Size.allCases.map(\.rowLimit).max() ?? 0
 
     /// How old a snapshot may be before it has to say so (FR-017).
     public static let staleness: TimeInterval = 15 * 60
@@ -34,8 +58,15 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         self.sessions = sessions
     }
 
-    /// How many are waiting and not drawn.
-    public var leftover: Int { max(0, total - sessions.count) }
+    /// The rows a size draws: the newest, as many as it has room for.
+    public func rows(for size: Size) -> [AttentionSnapshotSession] {
+        Array(sessions.prefix(size.rowLimit))
+    }
+
+    /// How many are waiting and not drawn at a size, whether or not the file names them.
+    public func leftover(for size: Size) -> Int {
+        max(0, total - rows(for: size).count)
+    }
 
     /// Whether two snapshots say the same thing, whatever time either was written.
     ///
@@ -126,5 +157,19 @@ public struct AttentionSnapshotSession: Codable, Hashable, Sendable, Identifiabl
         self.wanted = wanted
         self.kind = kind
         self.since = since
+    }
+
+    /// How long it has waited, as a row has room to say it: "now", "5m", "3h", "2d".
+    ///
+    /// Worked out against the entry's own date, so it is a fixed label and not a clock
+    /// that ticks on a Home screen; the widget is redrawn often enough for it to stay true.
+    public func waited(at now: Date) -> String {
+        let seconds = max(0, now.timeIntervalSince(since))
+        switch seconds {
+        case ..<60: return "now"
+        case ..<3600: return "\(Int(seconds / 60))m"
+        case ..<86_400: return "\(Int(seconds / 3600))h"
+        default: return "\(Int(seconds / 86_400))d"
+        }
     }
 }
