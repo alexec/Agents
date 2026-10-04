@@ -70,6 +70,7 @@ final class HostModel {
     init() {
         let settings = HostSettings.load(HostPaths.current)
         self.settings = settings
+        problem = HostSettings.unreadableNote(HostPaths.current)
         storeDraft = settings.store
         bucketDraft = settings.bucket
         if let keys = HostSecrets.bucketKeys(HostPaths.current) {

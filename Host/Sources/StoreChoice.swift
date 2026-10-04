@@ -33,13 +33,33 @@ struct HostSettings: Codable, Sendable, Equatable {
 
     private static func key(_ paths: HostPaths) -> String { "hostSettings.\(paths.suffix)" }
 
+    /// Where settings that would not decode are kept (#205): a newer build's role or
+    /// store, say. The first such value is kept and never written over.
+    static func asideKey(_ paths: HostPaths) -> String { "\(key(paths)).unreadable" }
+
     static func load(_ paths: HostPaths) -> HostSettings {
         UserDefaults.standard.data(forKey: key(paths)).flatMap { try? JSONDecoder().decode(HostSettings.self, from: $0) }
             ?? HostSettings()
     }
 
+    /// What to tell the person when the saved settings would not decode, or nil.
+    static func unreadableNote(_ paths: HostPaths) -> String? {
+        guard let data = UserDefaults.standard.data(forKey: key(paths)),
+              (try? JSONDecoder().decode(HostSettings.self, from: data)) == nil else { return nil }
+        return "This Mac's host settings could not be read (perhaps a newer build saved them), so it starts "
+            + "with the defaults. What was saved is kept aside, under its own name, and never written over."
+    }
+
+    /// A value that would not decode is copied aside first, so the defaults written now
+    /// never take the only copy of what a newer build chose.
     func save(_ paths: HostPaths) {
-        if let data = try? JSONEncoder().encode(self) { UserDefaults.standard.set(data, forKey: Self.key(paths)) }
+        let defaults = UserDefaults.standard
+        if let old = defaults.data(forKey: Self.key(paths)),
+           (try? JSONDecoder().decode(HostSettings.self, from: old)) == nil,
+           defaults.data(forKey: Self.asideKey(paths)) == nil {
+            defaults.set(old, forKey: Self.asideKey(paths))
+        }
+        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.key(paths)) }
     }
 }
 

@@ -191,18 +191,28 @@ public enum GitWorktrees {
 
     /// Put the app's worktrees folder in this clone's own exclude file, once. That file
     /// is never committed, so the project's tracked files are not touched (FR-010).
+    ///
+    /// The person's own lines are kept byte for byte: one that does not read (after a
+    /// second try) is refused, never taken as empty and written over with only this line
+    /// (#205), and the write is a synced rename that keeps the file's mode.
     public static func ensureExcluded(commonDir: URL) throws {
         let info = commonDir.appending(path: "info", directoryHint: .isDirectory)
         let exclude = info.appending(path: "exclude")
-        let existing = (try? String(contentsOf: exclude, encoding: .utf8)) ?? ""
-        let lines = existing.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
+        var existing = Data()
+        if FileManager.default.fileExists(atPath: exclude.path) {
+            guard let read = (try? StoreFile.reader(exclude)) ?? (try? StoreFile.reader(exclude)) else {
+                throw Failure(message: "Could not keep the worktrees out of the project: \(exclude.path) could not be read, so it was left as it is.")
+            }
+            existing = read
+        }
+        let lines = String(decoding: existing, as: UTF8.self).split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
         guard !lines.contains(excludeLine) else { return }
         do {
-            try FileManager.default.createDirectory(at: info, withIntermediateDirectories: true)
-            let joiner = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
-            let added = existing + joiner
-                + "# Worktrees the Agents app makes for its agents.\n" + excludeLine + "\n"
-            try added.write(to: exclude, atomically: true, encoding: .utf8)
+            let joiner = existing.isEmpty || existing.last == 0x0A ? "" : "\n"
+            let added = existing + Data((joiner + "# Worktrees the Agents app makes for its agents.\n" + excludeLine + "\n").utf8)
+            let mode = (try? FileManager.default.attributesOfItem(atPath: exclude.path)[.posixPermissions]) as? Int
+            try StoreCoding.writeAtomically(added, to: exclude, permissions: mode)
         } catch {
             throw Failure(message: "Could not keep the worktrees out of the project: \(error.localizedDescription)")
         }

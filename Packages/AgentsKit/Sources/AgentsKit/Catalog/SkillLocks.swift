@@ -1,4 +1,5 @@
 import Foundation
+import AgentsKitCore
 
 /// The `skills` CLI's two lock files, read and written in the CLI's own shape (059, research
 /// R5, contracts/lock-files.md), so each tool sees what the other added.
@@ -49,11 +50,15 @@ struct SkillLock {
 
     /// Read a lock, or start an empty one if there is no file.
     ///
-    /// A file that cannot be read, or is of an older version, throws `lockUnreadable`: the
-    /// CLI would treat it as empty and write over it, and the app will not.
+    /// A file that cannot be read (after a second try), or is of an older version, throws
+    /// `lockUnreadable`: the CLI would treat it as empty and write over it, and the app
+    /// will not (#205). It is the CLI's file too, so it is never moved aside.
     static func load(_ kind: Kind, at url: URL) throws -> SkillLock {
-        guard let data = try? Data(contentsOf: url) else {
+        guard FileManager.default.fileExists(atPath: url.path) else {
             return SkillLock(kind: kind, url: url, root: empty(kind))
+        }
+        guard let data = (try? StoreFile.reader(url)) ?? (try? StoreFile.reader(url)) else {
+            throw DaemonAPI.CatalogError.lockUnreadable(path: url.path)
         }
         let want = kind == .personal ? personalVersion : projectVersion
         guard let root = try? OrderedJSON.parse(data), let version = root["version"]?.intValue, version >= want,
@@ -138,8 +143,7 @@ struct SkillLock {
 
     /// Written whole, to a file beside it and renamed, so a reader never sees half of one.
     func write() throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(text().utf8).write(to: url, options: .atomic)
+        try StoreCoding.writeAtomically(Data(text().utf8), to: url)
     }
 
     /// `new Date().toISOString()`: milliseconds, UTC, `Z`.
@@ -174,9 +178,11 @@ struct CatalogSidecar: Codable, Equatable, Sendable {
         }
     }
 
+    /// One that does not decode is set aside and this starts empty; one that does not
+    /// read is held, so no save writes over it (`StoreFile`, #205).
     static func load(from url: URL) -> CatalogSidecar {
-        guard let data = try? Data(contentsOf: url) else { return CatalogSidecar() }
-        return (try? Self.decoder.decode(CatalogSidecar.self, from: data)) ?? CatalogSidecar()
+        StoreFile.load(CatalogSidecar.self, at: url, empty: CatalogSidecar(), decoder: decoder,
+                       meaning: "skills added from the catalogue show without where they were taken from")
     }
 
     /// Written with anything whose lock entry has gone left out: `stillManaged` answers for
@@ -187,8 +193,7 @@ struct CatalogSidecar: Codable, Equatable, Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try encoder.encode(kept).write(to: url, options: .atomic)
+        try StoreFile.write(encoder.encode(kept), to: url)
     }
 
     private static var decoder: JSONDecoder {

@@ -1,4 +1,5 @@
 import Foundation
+import AgentsKitCore
 
 /// Which servers the app added from the registry (060, contracts/mcp-json.md). In the
 /// daemon's root, so a scratch root has its own.
@@ -20,19 +21,20 @@ struct MCPCatalogSidecar: Codable, Equatable, Sendable {
         }
     }
 
+    /// One that does not decode is set aside and this starts empty; one that does not
+    /// read is held, so no save writes over it and the servers stay the app's (#205).
     static func load(from url: URL) -> MCPCatalogSidecar {
-        guard let data = try? Data(contentsOf: url) else { return MCPCatalogSidecar() }
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
-        return (try? d.decode(MCPCatalogSidecar.self, from: data)) ?? MCPCatalogSidecar()
+        return StoreFile.load(MCPCatalogSidecar.self, at: url, empty: MCPCatalogSidecar(), decoder: d,
+                              meaning: "servers added from the registry show as written by hand")
     }
 
     func save(to url: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try encoder.encode(self).write(to: url, options: .atomic)
+        try StoreFile.write(encoder.encode(self), to: url)
     }
 
     mutating func upsert(destination: DaemonAPI.SkillDestination, name: String, record: Record) {
