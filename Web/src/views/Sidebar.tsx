@@ -40,12 +40,15 @@ export function projectLabel(host: ControlHost | undefined, project: ProjectSumm
   return !host || host.id === "mac" ? project.name : `${host.name}:${project.name}`;
 }
 
-/** This Mac's projects, then each server's, each by name: no heading for a host. */
+/**
+ * This Mac's projects, then each server's, each with the latest worked on first, as the window's
+ * and the Remote's (SidebarOrder.projects, #250): no heading for a host.
+ */
 function orderedProjects(store: Store): { host: ControlHost; project: ProjectSummary }[] {
   const hosts = store.hosts.value;
   const ordered = [...hosts.filter((h) => h.id === "mac"), ...hosts.filter((h) => h.id !== "mac")];
   return ordered.flatMap((host) => [...(store.projects.value[host.id] ?? [])]
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
     .map((project) => ({ host, project })));
 }
 
@@ -108,7 +111,10 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
           somewhere to go. Each is absent when there is nothing to say. */}
       <footer class="sidebar-foot">
-        {offline.map((host) => host.id === "mac" ? (
+        {/* This Mac's host still connecting is said as the window says it, not as down (#250). */}
+        {offline.map((host) => host.id === "mac" && host.state === "connecting" ? (
+          <p class="foot-line quiet" role="status" key={host.id}>Connecting…</p>
+        ) : host.id === "mac" ? (
           <div class="host-down" role="status" key={host.id}>
             <p class="strong">⚠︎ This Mac’s host isn’t answering</p>
             <p class="quiet small">What’s listed is what it last said. The control plane is trying again by itself.</p>
@@ -271,7 +277,8 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               </details>
             );
           })}
-          {!searching && groups.length === 0 && <p class="hint">No sessions yet</p>}
+          {/* Only with no live session at all, pinned ones counted, as the window's (#250). */}
+          {!searching && live.length === 0 && <p class="hint">No sessions yet</p>}
           {(archived.length > 0 || (project.counts.archived ?? 0) > 0 || project.retiredCount > 0) && (
             <details class="archived" open={showsArchived}
               onToggle={(e) => {
@@ -305,23 +312,24 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
                     onPick={() => go({ host: host.id, project: folder, workflow: summary.workflow.workflowID })} />
                 </div>
               ))}
-              {archivedWorkflows.length > 0 && (
-                <details class="archived" open={searching || folds.isOpen(host.id, folder, "archivedWorkflows")}
-                  onToggle={(e) => {
-                    if (!searching) folds.set(host.id, folder, (e.currentTarget as HTMLDetailsElement).open, "archivedWorkflows");
-                  }}>
-                  <summary class="subhead" data-fold="archivedWorkflows">Archived workflows <span class="count">{archivedWorkflows.length}</span></summary>
-                  {archivedWorkflows.map((summary) => (
-                    <div class="nav-item" key={summary.workflow.workflowID}>
-                      <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
-                        chosen={r.workflow === summary.workflow.workflowID}
-                        onPick={() => go({ host: host.id, project: folder, workflow: summary.workflow.workflowID })} />
-                    </div>
-                  ))}
-                </details>
-              )}
             </details>
           )}
+          {/* A sibling of Workflows, not inside it, so folding Workflows leaves it, as the window's (#250). */}
+          {archivedWorkflows.length > 0 && (
+            <details class="archived" open={searching || folds.isOpen(host.id, folder, "archivedWorkflows")}
+              onToggle={(e) => {
+                if (!searching) folds.set(host.id, folder, (e.currentTarget as HTMLDetailsElement).open, "archivedWorkflows");
+              }}>
+              <summary class="subhead" data-fold="archivedWorkflows">Archived workflows <span class="count">{archivedWorkflows.length}</span></summary>
+              {archivedWorkflows.map((summary) => (
+                <div class="nav-item" key={summary.workflow.workflowID}>
+                  <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
+                    chosen={r.workflow === summary.workflow.workflowID}
+                    onPick={() => go({ host: host.id, project: folder, workflow: summary.workflow.workflowID })} />
+                </div>
+                ))}
+              </details>
+            )}
         </div>
       )}
     </div>
