@@ -20,12 +20,17 @@ struct RemoteChatView: View {
     private var agent: Agent? { model.selectedAgent }
 
     var body: some View {
-        if let agent {
-            // The conversation with its panes beside it or over it (034).
-            PaneHost(agent: agent) { conversation }
-        } else {
-            conversation
+        Group {
+            if let agent {
+                // The conversation with its panes beside it or over it (034).
+                PaneHost(agent: agent) { conversation }
+            } else {
+                conversation
+            }
         }
+        // What its prompt bar reads: the runtime's capabilities, the cost limit, the
+        // sandbox default and what the agent holds (#175).
+        .shows([.runtimes, .costs, .sandbox, .leases])
     }
 
     private var conversation: some View {

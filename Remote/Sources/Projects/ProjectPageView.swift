@@ -46,6 +46,8 @@ struct ProjectPageView: View {
         .task(id: model.selectedProject) {
             if let folder = model.selectedProject { await model.loadLabelVocabulary(in: folder) }
         }
+        // Its workflows, pinned pages, Dashboard row and the cards' lease marks (#175).
+        .shows([.workflows, .pins, .dashboards, .leases])
         .task(id: query.isEmpty ? "" : (model.selectedProject?.absoluteString ?? "")) {
             guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   let folder = model.selectedProject else { return }
@@ -127,7 +129,7 @@ struct ProjectPageView: View {
             guard showsArchived, let folder = model.selectedProject else { return }
             await model.loadArchivedAgents(in: folder, limit: archivedShown)
         }
-        .refreshable { await model.refreshEverything() }
+        .refreshable { await model.catchUp() }
     }
 
     private var isEmpty: Bool {

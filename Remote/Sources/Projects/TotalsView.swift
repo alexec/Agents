@@ -51,8 +51,9 @@ struct TotalsView: View {
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         .markedStale(model.isStale)
         .task { await model.loadArchivedProjects() }
+        .shows([.costs])
         .refreshable {
-            await model.refreshEverything()
+            await model.catchUp()
             await model.loadArchivedProjects()
         }
     }

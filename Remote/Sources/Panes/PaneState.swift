@@ -102,3 +102,9 @@ final class RemotePanes {
         return state
     }
 }
+
+/// Returns once the task it runs in is cancelled: what a `.task` waits on to let go of
+/// something it took for as long as its view is shown.
+func untilCancelled() async {
+    while !Task.isCancelled { try? await Task.sleep(for: .seconds(3_600)) }
+}

@@ -44,7 +44,14 @@ struct PagePane: View {
                                        description: Text("A Markdown file the agent shows, or one you open in Files, reads here."))
             }
         }
-        .task(id: state.pagePath) { await open() }
+        .task(id: state.pagePath) {
+            let watched = folder
+            await open()
+            // The page's folder is watched while it shows, and let go when another page
+            // opens or the pane goes (#175).
+            await untilCancelled()
+            if let watched { await model.files.unwatch(agentID: agent.id, folder: watched) }
+        }
         .onChange(of: folder.map { model.files.changeCount(agentID: agent.id, folder: $0) }) {
             Task { await read() }
         }

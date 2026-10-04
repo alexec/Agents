@@ -118,6 +118,7 @@ struct PinnedPage: View {
             }
         }
         .task(id: "\(path)|\(revision)|\(pin?.missing == true)") { await load() }
+        .shows([.pins])
     }
 
     private var actions: PageActions {

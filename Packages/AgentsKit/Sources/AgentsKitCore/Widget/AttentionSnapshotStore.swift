@@ -36,13 +36,19 @@ public enum AttentionSnapshotStore {
     /// count.
     ///
     /// - Returns: whether it was written, so a caller can skip a redraw when nothing moved.
+    ///
+    /// - Parameter last: what the caller last wrote, when it keeps that, so the file is
+    ///   not read back on every call (#175). Nil reads it.
     @discardableResult
-    public static func write(_ snapshot: AttentionSnapshot, into container: URL? = nil) -> Bool {
-        guard let url = url(in: container),
-              let data = try? JSONEncoder().encode(snapshot) else { return false }
+    public static func write(_ snapshot: AttentionSnapshot, into container: URL? = nil,
+                             over last: AttentionSnapshot? = nil) -> Bool {
+        guard let url = url(in: container) else { return false }
         // Compared by what it says, not by its bytes: the notification loop delivers several
-        // notifications for one change, and a redraw costs more than the write.
-        if let existing = read(from: container), existing.saysTheSame(as: snapshot) { return false }
+        // notifications for one change, and a redraw costs more than the write. Written
+        // again when the same count has grown old, so a connected phone's widget is not
+        // called stale.
+        guard snapshot.needsWriting(over: last ?? read(from: container)),
+              let data = try? JSONEncoder().encode(snapshot) else { return false }
         do {
             try data.write(to: url, options: .atomic)
             return true

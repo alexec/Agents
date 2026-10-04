@@ -52,7 +52,8 @@ struct WorkflowPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         .markedStale(model.isStale)
-        .refreshable { await model.refreshEverything() }
+        .shows([.workflows])
+        .refreshable { await model.catchUp() }
         .toolbar {
             if let summary {
                 ToolbarItem(placement: .topBarTrailing) { archiveButton(summary) }

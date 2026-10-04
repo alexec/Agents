@@ -8,8 +8,10 @@ import Observation
 /// the folders the agent was given, and the answer is what is shown; the phone keeps
 /// no copy past the screen that asked for it.
 ///
-/// Watches belong to the connection, so a new connection has none. What was being
-/// watched is remembered here and asked for again every time the Mac comes back.
+/// Watches belong to the connection, so a new connection has none. What is being
+/// watched is remembered here and asked for again every time the Mac comes back: only
+/// what a pane on screen still shows, because each pane lets its folder go when it goes
+/// (#175).
 @MainActor
 @Observable
 public final class RemoteFiles {
@@ -35,7 +37,11 @@ public final class RemoteFiles {
     /// Mac never received reads its file again and saves it (034 FR-009).
     public private(set) var reconnections = 0
 
-    private var watched: Set<DaemonAPI.FilesWatchRequest> = []
+    /// Each folder watched, with how many panes on screen show it.
+    private var watched: [DaemonAPI.FilesWatchRequest: Int] = [:]
+
+    /// The folders watched now, for a test.
+    public var watching: Set<DaemonAPI.FilesWatchRequest> { Set(watched.keys) }
 
     public init(client: DaemonClient, patience: Duration = .seconds(10)) {
         self.client = client
@@ -68,27 +74,40 @@ public final class RemoteFiles {
 
     // MARK: Watching
 
-    /// Hear about changes under this folder. Idempotent here and on the Mac.
+    /// Hear about changes under this folder, for one pane. Asked of the Mac once however
+    /// many panes show it; each pane that calls this calls `unwatch` when it goes.
     public func watch(agentID: UUID, folder: URL) async {
         let request = DaemonAPI.FilesWatchRequest(agentID: agentID, folder: folder.path)
-        guard watched.insert(request).inserted else { return }
+        watched[request, default: 0] += 1
+        guard watched[request] == 1 else { return }
         await askToWatch(request)
     }
 
+    /// The pane showing this folder has gone. The last one to go stops the Mac watching
+    /// it, and what was counted for it is let go.
     public func unwatch(agentID: UUID, folder: URL) async {
         let request = DaemonAPI.FilesWatchRequest(agentID: agentID, folder: folder.path)
-        guard watched.remove(request) != nil else { return }
-        _ = try? await client.call(DaemonAPI.Method.filesUnwatch, request)
+        guard let count = watched[request] else { return }
+        guard count == 1 else {
+            watched[request] = count - 1
+            return
+        }
+        watched[request] = nil
+        changes[Self.key(request.agentID, request.folder)] = nil
+        if !watched.keys.contains(where: { $0.agentID == agentID }) { anyChange[agentID] = nil }
+        let client = client
+        _ = try? await Self.answered(within: patience) { try await client.call(DaemonAPI.Method.filesUnwatch, request) }
     }
 
-    /// A new connection: it watches nothing yet, and may be to a newer Mac.
+    /// A new connection: it watches nothing yet, and may be to a newer Mac. Only what a
+    /// pane still shows is asked for again.
     public func reconnected() async {
         macLacksPanes = false
         reconnections += 1
-        for request in watched { await askToWatch(request) }
+        for request in watched.keys { await askToWatch(request) }
         // Everything shown may have changed while nobody was listening.
-        for agentID in Set(watched.map(\.agentID)) { anyChange[agentID, default: 0] += 1 }
-        for request in watched { changes[Self.key(request.agentID, request.folder), default: 0] += 1 }
+        for agentID in Set(watched.keys.map(\.agentID)) { anyChange[agentID, default: 0] += 1 }
+        for request in watched.keys { changes[Self.key(request.agentID, request.folder), default: 0] += 1 }
     }
 
     /// `files/changed`, from the notification switch.

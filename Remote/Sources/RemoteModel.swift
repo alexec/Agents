@@ -41,6 +41,7 @@ final class RemoteModel {
             selection = nil
             openWorkflow = nil
             openDashboard = false
+            letGoOfProjects(keeping: selectedProject)
         }
     }
 
@@ -50,6 +51,7 @@ final class RemoteModel {
             guard selection != oldValue else { return }
             work.watching = selection
             presence?.watching(selection)
+            letGoOfChats(keeping: selection)
             Task { await loadTranscript() }
         }
     }
@@ -82,6 +84,15 @@ final class RemoteModel {
     /// The loop looking for the Mac, so two of them never run at once.
     private var reconnecting: Task<Void, Never>?
     private var isLoadingEarlier = false
+    /// What the pages on screen show, and what has been read on this connection (#175).
+    @ObservationIgnored private var parts = OnScreenParts()
+    /// The catch-up under way, so a pull to refresh during a reconnect waits for it
+    /// rather than starting a second.
+    @ObservationIgnored private var catchingUp: Task<Void, Never>?
+    /// The first page of live agents was full: the rest come a project at a time, as each
+    /// project's page opens.
+    @ObservationIgnored private var moreLiveAgents = false
+    @ObservationIgnored private var filledProjects: Set<URL> = []
 
     /// The agent's files as the Mac reads them, and where each agent's pane is (034).
     let files: RemoteFiles
@@ -347,22 +358,35 @@ final class RemoteModel {
 
     var startRuntime: RuntimeStatus? { runtimes.first { $0.runtime.id == startRuntimeID } }
 
+    /// What the sheet reads: the runtimes to choose from, and, for its runtime menu, what
+    /// the Mac's allowances say, before it is opened rather than after whoever happens to
+    /// visit the Runtimes page.
+    private static let startParts: Set<CatchUpPart> = [.runtimes, .allowances, .modes, .sandbox]
+
     private func openStart(in folder: URL) async {
         startRefusal = nil
         startWorktree = nil
         startWorktrees = .notARepository
         Task { await loadStartWorktrees(in: folder) }
+        if !startShowsParts {
+            startShowsParts = true
+            await showing(Self.startParts)
+        }
+        guard startingIn == folder else { return }
         if startRuntimeID == nil || !availableRuntimeIDs.contains(startRuntimeID ?? "") {
             startRuntimeID = work.defaultRuntimeID(available: availableRuntimeIDs)
         }
         await loadStartChoices()
-        // The runtime menu groups by what the Mac's allowances say, so it needs them
-        // before it is opened, not after whoever happens to visit the Runtimes page.
-        await refreshRuntimeAllowances()
     }
 
     /// Put the sheet away. Its runtime is let go; what was typed is the keeper's.
+    @ObservationIgnored private var startShowsParts = false
+
     private func closeStart() {
+        if startShowsParts {
+            startShowsParts = false
+            notShowing(Self.startParts)
+        }
         startGeneration += 1
         discardStartDraft()
         startOptions = []
@@ -598,8 +622,7 @@ final class RemoteModel {
         StartDraftKeeper.shared.clear(in: folder)
         guard open else { return }
         startDraftID = nil
-        await refreshAgents()
-        await refreshProjects()
+        await refreshSnapshot()
         startingIn = nil
         selectedProject = folder
         openWorkflow = nil
@@ -816,6 +839,7 @@ final class RemoteModel {
     /// the meantime rather than looking broken.
     func connect() async {
         guard reconnecting == nil else { return }
+        note("link: looking for the Mac")
         networkChanges.start()
         let backoff = backoff
         reconnecting = Task { [weak self] in
@@ -828,6 +852,7 @@ final class RemoteModel {
                 // Forgotten: nothing to dial until a new pairing starts a loop of its own.
                 // Ended here rather than cancelled, so `reconnecting` is cleared (#81).
                 if self.forgottenByControlPlane { break }
+                note("link: no answer; waiting before the next try")
                 // Backing off to half a minute, so a phone in a pocket with no Mac to
                 // find is not holding the radio open every second all afternoon.
                 await backoff.wait()
@@ -857,11 +882,13 @@ final class RemoteModel {
     /// died while it was suspended; either way, look now. A try already in flight is
     /// left alone.
     private func goBackNow(_ reason: ReconnectTriggers.Reason) async {
+        note("link: \(reason); connected \(isConnected), reconnecting \(reconnecting != nil)")
         otherHostsBackoff.nudge()
         guard backoff.nudge() == .idle, isConnected, reconnecting == nil, !checkingConnection else { return }
         checkingConnection = true
         defer { checkingConnection = false }
         if await !client.answers(within: .seconds(4)) {
+            note("link: no answer after \(reason); letting go")
             // The listener hears the connection close and reconnects.
             await client.disconnect()
         }
@@ -874,8 +901,10 @@ final class RemoteModel {
     static let catchUpPatience = Duration.seconds(20)
 
     private func tryOnce() async -> Bool {
+        let began = ContinuousClock.now
         do {
             try await client.connect(startIfNeeded: false)
+            note("link: connected \(link) after \(ContinuousClock.now - began)")
             refusals.connected()
             isConnected = true
             lastHeardFrom = Date()
@@ -893,12 +922,15 @@ final class RemoteModel {
             if link == .relayed { relayTrouble = nil }
             await DaemonClient.$patience.withValue(Self.catchUpPatience) {
                 await files.reconnected()
-                await refreshEverything()
+                await catchUp()
             }
             watchOtherHosts()
+            note("link: settled after \(ContinuousClock.now - began); still connected \(isConnected)")
             return true
         } catch {
+            note("link: attempt failed after \(ContinuousClock.now - began): \(error)")
             if let reason = ControlPlaneLink.refused.take(), refusals.forgets(after: reason) {
+                note("link: forgotten by the control plane (\(reason))")
                 // Forgotten from a window, or unknown for minutes on end: this device asks
                 // for a new code, and stops dialling. One "unknown" alone is a control plane
                 // that could not tell yet, and is dialled again (#81).
@@ -936,34 +968,56 @@ final class RemoteModel {
     /// Ask whether a control plane is on the other end, and follow its other hosts if so.
     /// A bridge with no control plane answers `control/status` with methodNotFound, and
     /// nothing more happens.
+    ///
+    /// Holds the model only for each step, never for the whole watch: a model let go (a
+    /// new pairing) ends its watch rather than being kept dialling by it (#175). `stop`
+    /// ends it at once.
     private func watchOtherHosts() {
         guard hostWatch == nil else { return }
+        let client = client
+        // Through the relay a device has one session at a time (046), and it is the
+        // home host's: the other hosts wait until the control plane's address answers.
+        let base: any DaemonLink = (baseLink as? ControlPlaneLink)?.addressOnly ?? baseLink
+        let backoff = otherHostsBackoff
         hostWatch = Task { [weak self] in
-            guard let self else { return }
-            guard (try? await self.client.call(DaemonAPI.Method.controlStatus)) != nil else {
-                self.hostWatch = nil
+            guard (try? await client.call(DaemonAPI.Method.controlStatus)) != nil else {
+                self?.hostWatch = nil
                 return
             }
-            // Through the relay a device has one session at a time (046), and it is the
-            // home host's: the other hosts wait until the control plane's address answers.
-            let base: any DaemonLink = (self.baseLink as? ControlPlaneLink)?.addressOnly ?? self.baseLink
             let link = ControlLink { try await base.transport() }
             let control = DaemonClient(link: link.controlLink)
-            let backoff = self.otherHostsBackoff
-            while !Task.isCancelled {
+            defer { Task { await control.disconnect() } }
+            while !Task.isCancelled, self != nil {
                 backoff.trying()
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(5))) != nil {
                     backoff.connected()
-                    await self.syncOtherHosts(control, link: link)
-                    for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
+                    await self?.syncOtherHosts(control, link: link)
+                    for await change in control.notifications() where change.method == DaemonAPI.Notification.controlHostChanged {
+                        guard let self, !Task.isCancelled else { return }
                         // A host back while this phone waits out its backoff: go back now (#172).
-                        if !self.isConnected, note.params?["state"]?.stringValue == "online" { self.backoff.nudge() }
+                        if !self.isConnected, change.params?["state"]?.stringValue == "online" { self.backoff.nudge() }
                         await self.syncOtherHosts(control, link: link)
                     }
+                    note("hosts: the control plane's watch closed")
                 }
+                guard !Task.isCancelled, self != nil else { return }
                 await backoff.wait()
             }
         }
+    }
+
+    /// Everything this model dials, ended: a new pairing has made a new model (#175).
+    func stop() async {
+        note("link: stopping this pairing's connections")
+        hostWatch?.cancel()
+        hostWatch = nil
+        reconnecting?.cancel()
+        reconnecting = nil
+        listening?.cancel()
+        listening = nil
+        for (_, other) in otherHosts { await other.disconnect() }
+        otherHosts = [:]
+        await client.disconnect()
     }
 
     private func syncOtherHosts(_ control: DaemonClient, link: ControlLink) async {
@@ -1026,19 +1080,23 @@ final class RemoteModel {
                 // Anything the shared model does not claim is the Mac's own — shells,
                 // terminals — and a remote has no business with it.
                 _ = self.work.apply(notification.method, notification.params)
+                // Nothing below waits on the network: one slow answer would hold every
+                // notification after it (#175). What needs asking is asked beside the loop.
                 if let updated, previousLabels != updated.labels,
                    self.labelVocabularies[updated.projectFolder] != nil {
-                    await self.loadLabelVocabulary(in: updated.projectFolder)
+                    self.reloadLabelVocabulary(in: updated.projectFolder)
                 }
                 if let removedProject, self.labelVocabularies[removedProject] != nil {
-                    await self.loadLabelVocabulary(in: removedProject)
+                    self.reloadLabelVocabulary(in: removedProject)
                 }
                 if Self.attentionNotifications.contains(notification.method) {
-                    self.publishAttention()
+                    self.publishAttentionSoon()
                 }
                 if notification.method == DaemonAPI.Notification.attentionChanged,
                    let change = try? notification.params?.decode(DaemonAPI.AttentionNotification.self) {
-                    await self.notifier.apply(change, me: .device(self.deviceID))
+                    self.toNotifier { [deviceID = self.deviceID] notifier in
+                        await notifier.apply(change, me: .device(deviceID))
+                    }
                 }
                 if notification.method == DaemonAPI.Notification.draftOptions,
                    let change = try? notification.params?.decode(DaemonAPI.DraftOptionsNotification.self) {
@@ -1064,8 +1122,8 @@ final class RemoteModel {
                    let settings = try? notification.params?.decode(SandboxSettings.self) {
                     self.sandboxSettings = settings
                 }
-                if notification.method == DaemonAPI.Notification.runtimeChanged {
-                    await self.refreshRuntimes()
+                if notification.method == DaemonAPI.Notification.runtimeChanged, self.parts.changed(.runtimes) {
+                    self.reloadRuntimes()
                 }
                 // The Mac could not keep something nobody was waiting on (#88).
                 if notification.method == DaemonAPI.Notification.writeFailed,
@@ -1089,9 +1147,56 @@ final class RemoteModel {
 
     /// The Mac stopped answering. Say so, keep what is on screen, and go back for it.
     private func lostTouch() async {
+        note("link: lost touch")
         isConnected = false
+        parts.connectionLost()
         listening = nil
         await connect()
+    }
+
+    // MARK: Beside the notification loop (#175)
+
+    @ObservationIgnored private var labelsReloading: Set<URL> = []
+    @ObservationIgnored private var runtimesReloading = false
+    /// The banners, in the order the Mac said: each waits for the one before.
+    @ObservationIgnored private var notifierTail: Task<Void, Never>?
+    @ObservationIgnored private var attentionPublishing: Task<Void, Never>?
+
+    /// One reload per folder at a time; a change while one is under way is in its answer.
+    private func reloadLabelVocabulary(in folder: URL) {
+        guard labelsReloading.insert(folder).inserted else { return }
+        Task {
+            await loadLabelVocabulary(in: folder)
+            labelsReloading.remove(folder)
+        }
+    }
+
+    private func reloadRuntimes() {
+        guard !runtimesReloading else { return }
+        runtimesReloading = true
+        Task {
+            await refreshRuntimes()
+            runtimesReloading = false
+        }
+    }
+
+    private func toNotifier(_ work: @escaping @MainActor (DeviceNotifier) async -> Void) {
+        let before = notifierTail
+        let notifier = notifier
+        notifierTail = Task {
+            await before?.value
+            await work(notifier)
+        }
+    }
+
+    /// The widget's file written once for a burst of notifications, not once for each.
+    private func publishAttentionSoon() {
+        guard attentionPublishing == nil else { return }
+        attentionPublishing = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            attentionPublishing = nil
+            publishAttention()
+        }
     }
 
     /// A call that changes something, sent so that it happens once even if the link
@@ -1111,31 +1216,86 @@ final class RemoteModel {
         return try await client.call(method, params)
     }
 
-    func refreshEverything() async {
-        // Projects first: the screen the app opens on, and a row's counts are read from
-        // the agents as they land, so the list is there while they are still coming.
-        await refreshProjects()
-        await refreshAgents()
-        await refreshPermissions()
-        await refreshElicitations()
-        await refreshAttention()
-        await refreshResuming()
-        await refreshCostState()
-        await refreshRuntimeAllowances()
-        await refreshLeases()
-        await refreshEvents()
-        await refreshWorkflows()
-        await refreshDashboardSummaries()
-        await refreshPins()
-        await refreshRuntimes()
-        await refreshModes()
-        await refreshSandboxSettings()
+    /// Catch up with the Mac: after every connection, and on a pull to refresh (#175).
+    ///
+    /// Only what is on screen: the projects, the first page of live agents and what is
+    /// waiting on a person in one call, then the open chat, then whatever the pages on
+    /// screen show. The rest is read when a page that shows it opens. One at a time, and
+    /// one catch-up at a time: a pull during a reconnect waits for the reconnect's.
+    func catchUp() async {
+        if let running = catchingUp {
+            await running.value
+            return
+        }
+        let running = Task { await runCatchUp() }
+        catchingUp = running
+        await running.value
+        catchingUp = nil
+    }
+
+    private func runCatchUp() async {
+        let began = ContinuousClock.now
+        let plan = parts.plan(chat: selection)
+        for step in plan.steps {
+            switch step {
+            case .snapshot: await refreshSnapshot()
+            case .chat: await loadTranscript()
+            case .part(let part): await load(part)
+            }
+        }
         await settleUnsettledStart()
-        await loadTranscript()
         settleSelection()
         // Once the counts have landed, so the widget's number is this refresh's number.
         publishAttention()
         if let pendingOpen { open(pendingOpen) }
+        note("catch-up: \(plan.steps.count) steps (\(plan.parts.map(\.rawValue).sorted().joined(separator: ", "))) "
+             + "in \(ContinuousClock.now - began)")
+    }
+
+    /// Projects, the first page of live agents, and what waits on a person: one call to a
+    /// host that knows `client/catchUp`, one per part to one that does not.
+    private func refreshSnapshot() async {
+        let snapshot: DaemonAPI.CatchUpSnapshot
+        do {
+            snapshot = try await client.catchUp()
+        } catch {
+            note("catch-up: the snapshot failed: \(error)")
+            return
+        }
+        work.replaceProjects(snapshot.projects, from: .mac)
+        takeLiveAgents(snapshot.agents, page: DaemonAPI.CatchUpRequest.firstPage)
+        work.replacePermissions(snapshot.permissions)
+        work.replaceElicitations(snapshot.elicitations)
+        work.replaceAttention(snapshot.attention)
+        work.setResuming(snapshot.resuming)
+        toNotifier { [deviceID = self.deviceID] notifier in await notifier.sweep(keeping: snapshot.attention, me: .device(deviceID)) }
+        if let selectedProject { await fillProject(selectedProject) }
+    }
+
+    /// A page showing `parts` appeared: read the ones not read on this connection.
+    func showing(_ shown: Set<CatchUpPart>) async {
+        let unread = parts.appeared(shown)
+        for part in CatchUpPart.allCases where unread.contains(part) {
+            await load(part)
+        }
+    }
+
+    func notShowing(_ shown: Set<CatchUpPart>) {
+        parts.disappeared(shown)
+    }
+
+    private func load(_ part: CatchUpPart) async {
+        switch part {
+        case .workflows: await refreshWorkflows()
+        case .pins: await refreshPins()
+        case .dashboards: await refreshDashboardSummaries()
+        case .leases: await refreshLeases()
+        case .runtimes: await refreshRuntimes()
+        case .allowances: await refreshRuntimeAllowances()
+        case .modes: await refreshModes()
+        case .sandbox: await refreshSandboxSettings()
+        case .costs: await refreshCostState()
+        }
     }
 
     // MARK: Where this device is (021)
@@ -1217,7 +1377,8 @@ final class RemoteModel {
     /// system shows them. Everything this does is to local notifications, and it
     /// decides nothing about where the need belongs.
     func receivedPush(_ userInfo: [AnyHashable: Any]) async {
-        note("push: \(userInfo)")
+        // What kind of push, never its payload: that is the person's work (#175).
+        note("push: \(CloudKitRelayChannel.isRelayPush(userInfo) ? "relay wake-up" : "mailbox")")
         // The relay's wake-up: a relayed session polls, so there is nothing to poke.
         if CloudKitRelayChannel.isRelayPush(userInfo) { return }
         guard let pushed = CloudKitMailbox.pushed(from: userInfo) else { return }
@@ -1285,9 +1446,14 @@ final class RemoteModel {
     /// A push is also what tells the app something moved, so this runs on those too
     /// rather than waiting for the person to open the app.
     func publishAttention() {
-        guard AttentionSnapshotStore.write(AttentionSnapshot.make(model: work, at: Date())) else { return }
+        let snapshot = AttentionSnapshot.make(model: work, at: Date())
+        guard AttentionSnapshotStore.write(snapshot, over: lastPublished) else { return }
+        lastPublished = snapshot
         WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
     }
+
+    /// What was last written for the widget, so the file is not read back each time.
+    @ObservationIgnored private var lastPublished: AttentionSnapshot?
 
     /// The notifications that can move the number. The Mac sends a great deal more than
     /// this — a shell printing, a file changing, a runtime's status — and a widget does
@@ -1365,25 +1531,66 @@ final class RemoteModel {
                                                    Optional<String>.none,
                                                    returning: DaemonAPI.AttentionPending.self) else { return }
         work.replaceAttention(pending)
-        await notifier.sweep(keeping: pending, me: .device(deviceID))
+        toNotifier { [deviceID = self.deviceID] notifier in await notifier.sweep(keeping: pending, me: .device(deviceID)) }
     }
 
-    /// The live agents only. Archived ones outnumber them many times over and are
-    /// almost never looked at, so they come when a page asks for them — a project's
-    /// Archived section, a workflow's runs — and not on every connection.
-    ///
-    /// Archived agents already fetched are kept: an open archived chat stays open. One
-    /// brought back while this phone was away is in the live list, and that copy wins.
+    /// The live agents only, the first page of them. Archived ones outnumber them many
+    /// times over and are almost never looked at, so they come when a page asks for them
+    /// — a project's Archived section, a workflow's runs — and not on every connection.
     private func refreshAgents() async {
         // Lean: no card or row reads the option and command lists, which were nearly all of
         // each record (#107). The open chat's come with `loadWholeAgent`.
-        // A page at a time (#164): a host answers at most a page of them at once.
-        guard let listed = try? await client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
+        let page = DaemonAPI.CatchUpRequest.firstPage
+        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, page, returning: [Agent].self)
         else { return }
+        takeLiveAgents(listed, page: page)
+        if let selectedProject { await fillProject(selectedProject) }
+    }
+
+    /// The first page of live agents, in place of what was held. Archived agents already
+    /// fetched are kept only where a screen can still show them: the open project, and an
+    /// open archived chat (#175). One brought back while this phone was away is in the live
+    /// list, and that copy wins.
+    private func takeLiveAgents(_ listed: [Agent], page: DaemonAPI.ListRequest) {
+        moreLiveAgents = page.next(after: listed) != nil
+        filledProjects = []
         let live = Set(listed.map(\.id))
+        let letGo = Set(ClientHolding.archivedToLetGo(work.agents, project: selectedProject, chat: selection))
         // Only this host's: another host's agents come from that host (058, US4).
-        work.replaceAgents(listed + work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) },
-                           from: .mac)
+        let kept = work.agents.filter {
+            $0.host == .mac && $0.state == .archived && !live.contains($0.id) && !letGo.contains($0.id)
+        }
+        work.replaceAgents(listed + kept, from: .mac)
+    }
+
+    /// The rest of a project's live agents, when the first page did not hold them all:
+    /// asked as its page opens, once per connection.
+    func fillProject(_ folder: URL) async {
+        guard moreLiveAgents, filledProjects.insert(folder).inserted else { return }
+        let request = DaemonAPI.ListRequest(includeArchived: false, folder: folder, lean: true)
+        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self)
+        else {
+            filledProjects.remove(folder)
+            return
+        }
+        work.takeListed(listed)
+    }
+
+    /// A project page has gone: what only it could show is let go (#175). Its archived
+    /// agents, its label suggestions, and the live agents beyond the first page that it
+    /// filled in.
+    private func letGoOfProjects(keeping folder: URL?) {
+        work.forget(ClientHolding.archivedToLetGo(work.agents, project: folder, chat: selection))
+        labelVocabularies = labelVocabularies.filter { $0.key == folder.map(Project.standardize) }
+        if let folder { Task { await fillProject(folder) } }
+    }
+
+    /// A chat has gone: what was read for it alone is let go (#175). Its earlier marks
+    /// for Files, and an archived chat outside the open project.
+    private func letGoOfChats(keeping agentID: UUID?) {
+        touchedEarlier = touchedEarlier.filter { $0.key == agentID }
+        touchedHistoryAsked = touchedHistoryAsked.filter { $0 == agentID }
+        work.forget(ClientHolding.archivedToLetGo(work.agents, project: selectedProject, chat: agentID))
     }
 
     /// The newest `limit` archived agents in a project, for its Archived section when
@@ -1509,32 +1716,6 @@ final class RemoteModel {
                                                 DaemonAPI.EventsListRequest(before: oldest, filter),
                                                 returning: DaemonAPI.EventsPage.self) else { return }
         work.takeEvents(page, for: filter, appending: true)
-    }
-
-    private func refreshProjects() async {
-        // Live ones only; Spending asks for the archived ones when it opens.
-        guard let listed = try? await client.call(DaemonAPI.Method.projectsList,
-                                                  DaemonAPI.ProjectsListRequest(includeArchived: false),
-                                                  returning: [DaemonAPI.ProjectSummary].self)
-        else { return }
-        work.replaceProjects(listed, from: .mac)
-    }
-
-    private func refreshPermissions() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.permissionsPending,
-                                                  Optional<String>.none,
-                                                  returning: [PermissionRequest].self) else { return }
-        work.replacePermissions(listed)
-    }
-
-    /// The forms an agent is blocked on. Fetched for the same reason permissions are:
-    /// `agent/elicitation` keeps them current afterwards, but a question raised before
-    /// this phone connected would otherwise never appear at all.
-    private func refreshElicitations() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.elicitationsPending,
-                                                  Optional<String>.none,
-                                                  returning: [ElicitationRequest].self) else { return }
-        work.replaceElicitations(listed)
     }
 
     /// What the Mac is still bringing back after a restart.
@@ -1804,13 +1985,6 @@ final class RemoteModel {
                                                returning: [RuntimeAccount].self) {
             accounts = Dictionary(uniqueKeysWithValues: listed.map { ($0.runtimeID, $0) })
         }
-    }
-
-    private func refreshResuming() async {
-        let response = try? await client.call(DaemonAPI.Method.agentsResuming,
-                                              Optional<String>.none,
-                                              returning: DaemonAPI.ResumingResponse.self)
-        work.setResuming(response?.agentIDs ?? [])
     }
 
     /// A project archived on the Mac while it is being read here moves the selection

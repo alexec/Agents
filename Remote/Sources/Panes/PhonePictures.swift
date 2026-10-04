@@ -2,10 +2,12 @@ import AgentsKitCore
 import UIKit
 import WebKit
 
-/// The pictures a page shows, read from the Mac and kept while the app runs (034).
+/// The pictures a page shows, read from the Mac and kept while they are recently used (034).
 ///
 /// Each is held with the stamp it was read at, so asking again whether it changed costs
-/// one small request and no bytes: the Mac answers `unchanged` until the file moves.
+/// one small request and no bytes: the Mac answers `unchanged` until the file moves. At
+/// most `limit` are held, the least recently shown let go first, and none once the system
+/// warns that memory is short (#175): a picture let go is read again when it is shown.
 @MainActor
 final class PhonePictures {
     private struct Held {
@@ -21,8 +23,12 @@ final class PhonePictures {
     /// alternative text.
     private static let attemptsAllowed = 3
 
+    /// About a page or two of diagrams.
+    static let limit = 24
+
     private let files: RemoteFiles
-    private var held: [URL: Held] = [:]
+    private var held = LRUCache<URL, Held>(limit: PhonePictures.limit)
+    private var memoryWarnings: (any NSObjectProtocol)?
     /// One read and draw per picture at a time. The page asks for a picture's stamp and
     /// for the picture itself at the same moment, and two web views drawing the same
     /// markup side by side is one too many.
@@ -30,6 +36,18 @@ final class PhonePictures {
 
     init(files: RemoteFiles) {
         self.files = files
+        memoryWarnings = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                note("pictures: memory is short; letting \(self?.held.count ?? 0) go")
+                self?.held.removeAll()
+            }
+        }
+    }
+
+    isolated deinit {
+        if let memoryWarnings { NotificationCenter.default.removeObserver(memoryWarnings) }
     }
 
     /// What the picture's file is now, reading it again only if it changed.
@@ -38,7 +56,7 @@ final class PhonePictures {
     }
 
     func image(agentID: UUID, url: URL) async -> UIImage? {
-        if let image = held[url]?.image { return image }
+        if let image = held.value(for: url)?.image { return image }
         return await refresh(agentID: agentID, url: url)?.image
     }
 
@@ -52,7 +70,7 @@ final class PhonePictures {
     }
 
     private func read(agentID: UUID, url: URL) async -> Held? {
-        let known = held[url]
+        let known = held.value(for: url)
         // A picture that could not be drawn is drawn again from the bytes already here,
         // a few times, before its file is asked about again.
         if var retry = known, let bytes = retry.undrawn, retry.attempts < Self.attemptsAllowed {
@@ -61,7 +79,7 @@ final class PhonePictures {
                 retry.image = image
                 retry.undrawn = nil
             }
-            held[url] = retry
+            held.set(retry, for: url)
             return retry
         }
         guard let reading = try? await files.read(agentID: agentID, path: url.path, known: known?.stamp) else {
@@ -73,11 +91,11 @@ final class PhonePictures {
         case .image(let bytes, _, let stamp):
             let image = await Self.decode(bytes, isSVG: Self.isSVG(url))
             let fresh = Held(stamp: stamp, image: image, undrawn: image == nil ? bytes : nil, attempts: 1)
-            held[url] = fresh
+            held.set(fresh, for: url)
             return fresh
         case .text(_, _, _, let stamp), .other(_, _, let stamp):
             let fresh = Held(stamp: stamp, image: nil)
-            held[url] = fresh
+            held.set(fresh, for: url)
             return fresh
         }
     }

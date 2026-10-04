@@ -39,6 +39,7 @@ struct ResourcesListView: View {
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
         .navigationTitle("Resources")
+        .shows([.leases])
     }
 }
 

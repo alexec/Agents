@@ -52,7 +52,7 @@ struct ProjectListView: View {
         .overlay {
             if model.projects.isEmpty { Waiting() }
         }
-        .refreshable { await model.refreshEverything() }
+        .refreshable { await model.catchUp() }
     }
 
     /// One host's projects. An offline host's stay, greyed, as frame H's sidebar does.

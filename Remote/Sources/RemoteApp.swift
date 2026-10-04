@@ -40,7 +40,11 @@ struct RemoteApp: App {
                 .id(ObjectIdentifier(model))
                 .task { push.received = { [model] userInfo in await model.receivedPush(userInfo) } }
                 .onChange(of: model.pairedWithControlPlane) { _, paired in
-                    if paired { model = RemoteModel(link: RemoteApp.link()) }
+                    guard paired else { return }
+                    // The old pairing's connections end with it rather than dialling on (#175).
+                    let old = model
+                    model = RemoteModel(link: RemoteApp.link())
+                    Task { await old.stop() }
                 }
         }
     }

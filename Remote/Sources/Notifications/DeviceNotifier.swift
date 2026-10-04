@@ -89,7 +89,7 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         if let agentID { content.userInfo["agentID"] = agentID.uuidString }
         content.threadIdentifier = agentID?.uuidString ?? token
         showing[token] = needID
-        note("notifier: showing \(token) alert=\(alert) \"\(headline.h3)\"")
+        note("notifier: showing \(token) alert=\(alert)")
         center.add(UNNotificationRequest(identifier: token, content: content, trigger: nil)) { [weak self] error in
             guard let error else { return }
             note("notifier: could not show \(token): \(error)")
@@ -161,6 +161,19 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
 
 /// A line on stderr, unbuffered, for a walk that streams the app's console with
 /// `devicectl --console`. `print` goes to stdout, which is block-buffered on a pipe.
+///
+/// Kept in a file too (#175), because the moment worth reading is the one nobody was
+/// watching: a Remote stuck until it is killed takes its console with it. Read it off the
+/// device while it is still stuck, without a relaunch:
+/// `xcrun devicectl device copy from --device <UDID> --domain-type appDataContainer
+/// --domain-identifier com.alexecollins.agents.remote --source Library/Caches/remote.log
+/// --destination remote.log` (and `remote.1.log` for the file before it). Nothing the
+/// person wrote goes in it: states, attempts, errors, ids.
 func note(_ line: String) {
     FileHandle.standardError.write(Data((line + "\n").utf8))
+    deviceLog.append(line)
 }
+
+/// `Library/Caches/remote.log`, a quarter of a megabyte, and the one before it.
+let deviceLog = RollingLog(url: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+    .appendingPathComponent("remote.log"))
