@@ -73,6 +73,25 @@ struct PluginApprovalTests {
         #expect(DotAgents.pluginCarries(url).prefix(1) == ["hooks"])
     }
 
+    /// Asked for on every start and warm check (#202): taken once, and again only when the
+    /// folder moved, even by an edit that puts back a file's size and modified time.
+    @Test func theDigestIsNotTakenAgainWhenNothingChanged() throws {
+        let work = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PluginDigest-\(UUID().uuidString)", isDirectory: true)
+        let url = try plugin("deploy", in: work)
+        let first = try #require(DotAgents.pluginDigest(url))
+        for _ in 0..<5 { #expect(DotAgents.pluginDigest(url) == first) }
+        #expect(DotAgents.pluginDigestsTaken(url) == 1, "every file read once, not once per ask")
+
+        let hooks = url.appending(path: "hooks/hooks.json")
+        let size = try #require(try fileManager.attributesOfItem(atPath: hooks.path)[.size] as? Int)
+        let modified = try #require(try fileManager.attributesOfItem(atPath: hooks.path)[.modificationDate] as? Date)
+        try String(repeating: "x", count: size).write(to: hooks, atomically: false, encoding: .utf8)
+        try fileManager.setAttributes([.modificationDate: modified], ofItemAtPath: hooks.path)
+        #expect(DotAgents.pluginDigest(url) != first, "same size and modified time, different content")
+        #expect(DotAgents.pluginDigestsTaken(url) == 2)
+    }
+
     // MARK: Waiting and approving
 
     @Test func whatWasThereWhenApprovalBeganStaysIn() async throws {

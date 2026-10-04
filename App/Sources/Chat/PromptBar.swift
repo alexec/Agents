@@ -171,9 +171,13 @@ struct PromptBar: View {
         // page's bar. The chat's own bar, on its way out, has no agent by then either,
         // so it is told apart by being the one whose folder is not fixed.
         .onChange(of: requests.wantsPromptFocus, initial: true) { takeFocusIfAsked() }
-        // Opened: its runtime starts now, so the reply does not wait for it (#183).
+        // Opened: its runtime starts now, so the reply does not wait for it (#183). Once
+        // it has been on screen a moment, so arrowing past chats starts nothing (#202).
         .task(id: agent?.id) {
-            if let id = agent?.id { await model.prewarm(id, .opened) }
+            guard let id = agent?.id else { return }
+            try? await Task.sleep(for: DaemonAPI.PrewarmRequest.openedAfter)
+            guard !Task.isCancelled else { return }
+            await model.prewarm(id, .opened)
         }
         // Words offered from elsewhere on the page. They land in the field, focused
         // and unsent, the same as a suggestion taken with Tab.

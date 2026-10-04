@@ -71,6 +71,8 @@ extension DaemonCore {
                 : "the pool is full and its score \(Int(score)) was lowest")
         }
         tickWhileWarm()
+        // Room may have come for a prewarm that waited.
+        if !prewarmQueue.isEmpty { startQueuedPrewarms() }
     }
 
     /// Let one go, if it is still warm, saying why.
@@ -125,6 +127,7 @@ extension DaemonCore {
             || elicitations.values.contains { $0.agentID == agent.id }
         signals.unread = agent.isUnread
         signals.parked = agent.parking?.isParked == true
+        signals.pendingWake = agent.isWaiting
         let prompts = personPromptTimes[agent.id] ?? []
         signals.personsConversation = !prompts.isEmpty
             || (agent.startedByWorkflow == nil && agent.startedByAgent == nil)
@@ -142,6 +145,7 @@ extension DaemonCore {
         if s.needsAnswer { words.append("needs an answer") }
         if s.unread { words.append("unread") }
         if s.parked { words.append("parked") }
+        if s.pendingWake { words.append("waiting to be woken") }
         if !s.personsConversation { words.append(agent.startedByWorkflow != nil ? "a workflow's" : "an agent's") }
         if let last = s.lastPersonPrompt { words.append("last prompt \(Int(now().timeIntervalSince(last)))s ago") }
         if let gap = s.typicalGap { words.append("replies every \(Int(gap))s") }
@@ -177,6 +181,12 @@ extension DaemonCore {
     func warmMismatch(_ agent: Agent) -> String? {
         guard let print = launchPrints[agent.id] else { return "what it started with is unknown" }
         if print != launchPrint(for: agent) { return "what its next turn starts with changed" }
+        // What a request may lend depends on the connection it came in on, and a turn the
+        // app wakes has none (#202). A credential other than the one it was lent starts
+        // afresh; a request that can name none, and would be asked, uses what it was lent.
+        if let lent = try? launchEnvironment(for: agent.runtimeID), Self.lentPrint(lent) != lentPrints[agent.id] {
+            return "the credential it would be lent changed"
+        }
         if agent.runtimeID == RuntimeCatalog.codex.id, let home = locations.personalHome {
             let changes = PersonalDotAgents.codexChanges(home: home, record: .load(from: locations.personalLayout, home: home))
             if !changes.add.isEmpty || !changes.remove.isEmpty { return "Codex plugins changed" }
@@ -187,8 +197,8 @@ extension DaemonCore {
 
     /// What a start of this agent's runtime would be given, as one number: where the
     /// runtime is (an update moves `current`), the sandbox, the session's `_meta`
-    /// (scoping, plugins, rules), its folders, MCP servers, and the credential lent.
-    /// Hashed in memory and never kept, so nothing lent is written anywhere.
+    /// (scoping, plugins, rules), its folders and MCP servers. The credential lent is
+    /// `lentPrint`, apart, since what can be lent depends on who is asking.
     func launchPrint(for agent: Agent) -> Int {
         var hasher = Hasher()
         hasher.combine(agent.runtimeID)
@@ -203,11 +213,16 @@ extension DaemonCore {
         hasher.combine(agent.cwd)
         hasher.combine(agent.additionalDirectories)
         hasher.combine(agent.mcpServers)
-        if let lent = try? launchEnvironment(for: agent.runtimeID) {
-            for key in lent.keys.sorted() {
-                hasher.combine(key)
-                hasher.combine(lent[key])
-            }
+        return hasher.finalize()
+    }
+
+    /// The credential a runtime is lent, as one number. Hashed in memory and never kept,
+    /// so nothing lent is written anywhere.
+    static func lentPrint(_ lent: [String: String]) -> Int {
+        var hasher = Hasher()
+        for key in lent.keys.sorted() {
+            hasher.combine(key)
+            hasher.combine(lent[key])
         }
         return hasher.finalize()
     }
@@ -219,6 +234,10 @@ extension DaemonCore {
     /// started behind, without a word in the conversation, and joins the pool. A
     /// window saying so on every keystroke starts one runtime: the debounce is here as
     /// well as in each window.
+    ///
+    /// The cap holds before anything is launched (#202): warm runtimes and prewarms
+    /// under way together never pass it. A prewarm with no room waits, and when more
+    /// wait than the cap the oldest ask is dropped: the newest intent is the best guess.
     public func prewarm(_ request: DaemonAPI.PrewarmRequest) throws {
         guard let agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
@@ -231,18 +250,83 @@ extension DaemonCore {
             warm[id] = entry
             return
         }
-        // Busy, already starting, or nothing to warm.
-        guard live[id] == nil, launching[id] == nil, !sending.contains(id), turnTasks[id] == nil,
-              Self.mayPrewarm(agent), warmCap > 0 else { return }
+        guard mayStartPrewarm(agent, at: at) else { return }
         if let last = prewarmedAt[id], at.timeIntervalSince(last) < Self.prewarmDebounce { return }
         prewarmedAt[id] = at
-        DaemonLog.shared.write("warm pool: prewarming \(id): \(request.why.rawValue)")
-        let stopsBefore = stops[id, default: 0]
-        Task { [weak self] in await self?.finishPrewarm(id, stopsBefore: stopsBefore, why: request.why) }
+        prewarmQueue.removeAll { $0.id == id }
+        prewarmQueue.append((id, request.why, at))
+        let cap = warmCap
+        if prewarmQueue.count > cap {
+            for dropped in prewarmQueue.prefix(prewarmQueue.count - cap) {
+                DaemonLog.shared.write("warm pool: dropped a prewarm of \(dropped.id): newer ones asked")
+            }
+            prewarmQueue.removeFirst(prewarmQueue.count - cap)
+        }
+        startQueuedPrewarms()
+    }
+
+    /// Busy, already starting, or nothing to warm; or its runtime failed a prewarm lately.
+    private func mayStartPrewarm(_ agent: Agent, at: Date) -> Bool {
+        let id = agent.id
+        guard live[id] == nil, launching[id] == nil, !prewarming.contains(id), !sending.contains(id),
+              turnTasks[id] == nil, warmCap > 0, mayPrewarm(agent) else { return false }
+        if let failed = prewarmFailures[agent.runtimeID], at.timeIntervalSince(failed) < Self.prewarmBackoff {
+            return false
+        }
+        return true
+    }
+
+    /// Start what waits, newest first, while there is room. Room is the cap less the
+    /// prewarms under way and the warm runtimes that would outrank this one; a warm one
+    /// it outranks is let go first, so the count never passes the cap even for a moment.
+    func startQueuedPrewarms() {
+        let at = now()
+        let cap = warmCap
+        // An ask that waited past the time intent counts for is no longer one.
+        prewarmQueue.removeAll { at.timeIntervalSince($0.at) >= WarmPool.intentLasts }
+        while let next = prewarmQueue.last {
+            guard let agent = agents[next.id], mayStartPrewarm(agent, at: at) else {
+                prewarmQueue.removeLast()
+                continue
+            }
+            let candidate = WarmPool.score(.init(since: at, intentAt: at), warmSignals(agent), now: at)
+            let staying = warm.filter { !prewarmEvicting.contains($0.key) }.map { id, entry in
+                (id: id, score: agents[id].map { WarmPool.score(entry, warmSignals($0), now: at) } ?? 0, since: entry.since)
+            }
+            // A tie goes to the newer intent.
+            let outranked = staying.filter { $0.score <= candidate }
+                .sorted { $0.score != $1.score ? $0.score < $1.score : $0.since < $1.since }
+            guard prewarming.count + staying.count - outranked.count < cap else { return }
+            prewarmQueue.removeLast()
+            let victim = prewarming.count + staying.count >= cap ? outranked.first?.id : nil
+            if let victim { prewarmEvicting.insert(victim) }
+            prewarming.insert(next.id)
+            DaemonLog.shared.write("warm pool: prewarming \(next.id): \(next.why.rawValue) (\(prewarming.count) starting, \(warm.count - prewarmEvicting.count) warm)")
+            let stopsBefore = stops[next.id, default: 0]
+            Task { [weak self] in
+                guard let self else { return }
+                if let victim {
+                    await self.releaseWarm(victim, because: "making room for a prewarm of \(next.id)")
+                    await self.endEviction(victim)
+                }
+                await self.finishPrewarm(next.id, stopsBefore: stopsBefore, why: next.why)
+            }
+        }
+    }
+
+    private func endEviction(_ id: UUID) {
+        prewarmEvicting.remove(id)
     }
 
     /// Settled, where it is, with nothing waiting to move it: a finished chat, or one
-    /// the person stopped and is coming back to.
+    /// the person stopped and is coming back to. Not one put down (parked), and not one a
+    /// spending limit would refuse the prompt this is for (#202).
+    func mayPrewarm(_ agent: Agent) -> Bool {
+        guard Self.mayPrewarm(agent), agent.parking == nil else { return false }
+        let limits = limitStore.load()
+        return !agent.isAtCostLimit(under: limits) && !isDayLimitReached(under: limits)
+    }
+
     static func mayPrewarm(_ agent: Agent) -> Bool {
         (agent.state == .finished || agent.state == .stopped)
             && agent.pendingMove == nil && agent.missingFolder == nil
@@ -250,23 +334,42 @@ extension DaemonCore {
 
     /// One start per session per this long, however often a window asks.
     static let prewarmDebounce: TimeInterval = 20
+    /// After a prewarm of a runtime fails, none of it is tried again for this long. A
+    /// runtime that needs signing in would otherwise start every 20 s per chat open.
+    static let prewarmBackoff: TimeInterval = 10 * 60
 
     private func finishPrewarm(_ id: UUID, stopsBefore: Int, why: DaemonAPI.PrewarmRequest.Why) async {
+        defer {
+            prewarming.remove(id)
+            startQueuedPrewarms()
+        }
         guard let agent = agents[id] else { return }
         do {
             _ = try await liveSession(for: agent, quiet: true)
+        } catch is CancellationError {
+            return
         } catch {
+            notePrewarmFailure(agent.runtimeID, agentID: id, error)
             return
         }
         // A prompt took it as it came up: it is that turn's now.
         guard turnTasks[id] == nil, !sending.contains(id), live[id] != nil else { return }
-        guard stops[id, default: 0] == stopsBefore, let now = agents[id], Self.mayPrewarm(now) else {
-            DaemonLog.shared.write("warm pool: released \(id) after prewarming: stopped, archived or moved meanwhile")
+        guard stops[id, default: 0] == stopsBefore, let now = agents[id], mayPrewarm(now) else {
+            DaemonLog.shared.write("warm pool: released \(id) after prewarming: stopped, archived, parked or moved meanwhile")
             return await releaseRuntime(for: id)
         }
         let at = self.now()
         warm[id] = WarmPool.Entry(since: at, intentAt: at)
         DaemonLog.shared.write("warm pool: warmed \(id) on intent (\(why.rawValue)), \(warm.count) warm")
         await reviseWarmPool()
+    }
+
+    /// Remembered per runtime, and said once until it has passed or the runtime starts.
+    private func notePrewarmFailure(_ runtimeID: String, agentID: UUID, _ error: any Error) {
+        let at = now()
+        if let failed = prewarmFailures[runtimeID], at.timeIntervalSince(failed) < Self.prewarmBackoff { return }
+        prewarmFailures[runtimeID] = at
+        DaemonLog.shared.write("warm pool: \(runtimeID) for \(agentID) did not start ahead of a prompt: \(reason(error)); "
+            + "no prewarms of \(runtimeID) for \(Int(Self.prewarmBackoff / 60)) minutes")
     }
 }

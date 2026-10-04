@@ -311,6 +311,130 @@ struct WarmPoolTests {
         try await Task.sleep(for: .milliseconds(200))
         #expect(launcher.launchCount == launches)
     }
+
+    // MARK: Prewarms within the cap (#202)
+
+    /// The issue's own measure: twelve chats opened in a row, with a cap of 3.
+    @Test func twelvePrewarmsNeverStartMoreThanTheCap() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher(keepsRuntimesWarm: true)
+        let clock = Clock()
+        let core = try await core(launcher, locations, clock: clock)
+        var ids: [UUID] = []
+        for _ in 0..<12 { ids.append(try await chat(core, work)) }
+        await core.releaseWarm(runtimeID: "cursor", because: "a clean pool for the test")
+        #expect(await core.warm.isEmpty)
+        let launches = launcher.launchCount
+
+        var most = 0
+        for id in ids {
+            try await core.prewarm(.init(agentID: id, why: .opened))
+            most = max(most, await core.poolRuntimesForTest(ids))
+        }
+        #expect(await core.prewarmQueue.count <= 3, "no more wait than the cap")
+        for _ in 0..<2000 {
+            most = max(most, await core.poolRuntimesForTest(ids))
+            if await core.prewarming.isEmpty, await core.prewarmQueue.isEmpty { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(await core.prewarming.isEmpty, "the prewarms settled")
+        #expect(most <= 3, "never more than the cap at once, starting or warm")
+        #expect(await core.warm.count == 3)
+        #expect(await ids.asyncCount { await core.live[$0] != nil } == 3)
+        #expect(launcher.launchCount - launches <= 6, "the first three, then the newest three asks")
+        for id in ids.suffix(3) { #expect(await isWarm(core, id), "the newest intent wins") }
+    }
+
+    @Test func aParkedSessionIsNotPrewarmed() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher(keepsRuntimesWarm: true)
+        let clock = Clock()
+        let core = try await core(launcher, locations, clock: clock)
+        let id = try await chat(core, work)
+        try await core.park(id)
+        await eventually("parking let it go") { await core.live[id] == nil }
+        let launches = launcher.launchCount
+        try await core.prewarm(.init(agentID: id, why: .opened))
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(launcher.launchCount == launches)
+        #expect(await core.live[id] == nil)
+    }
+
+    @Test func aSessionOverItsSpendingLimitIsNotPrewarmed() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher(keepsRuntimesWarm: true)
+        let clock = Clock()
+        let core = try await core(launcher, locations, clock: clock)
+        let id = try await chat(core, work)
+        await core.releaseWarm(id, because: "the test")
+        await core.mutateForTest(id) {
+            $0.costToDate = ["USD": 2]
+            $0.costCeiling = Cost(amount: 1, currency: "USD")
+        }
+        let launches = launcher.launchCount
+        try await core.prewarm(.init(agentID: id, why: .opened))
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(launcher.launchCount == launches, "its prompt would be held, so nothing is warmed for it")
+    }
+
+    @Test func aFailingRuntimeIsBackedOffAndSaidOnce() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FlakyLauncher()
+        let clock = Clock()
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: launcher, now: { clock.now })
+        _ = await core.setWakeSettings(WakeSettings(keepsAwake: false, graceHours: 0, warmRuntimes: 3))
+        let id = try await chat(core, work)
+        await core.releaseWarm(id, because: "the test")
+        launcher.fails = true
+
+        try await core.prewarm(.init(agentID: id, why: .opened))
+        await eventually("the failure is heard") { await core.prewarmFailures["cursor"] != nil }
+        await eventually("and the prewarm is over") { await core.prewarming.isEmpty }
+        let failedAt = await core.prewarmFailures["cursor"]
+        #expect(launcher.failures == 1)
+
+        // Past the debounce, asked again and again: nothing is started, nothing new said.
+        for _ in 0..<3 {
+            clock.advance(DaemonCore.prewarmDebounce + 1)
+            try await core.prewarm(.init(agentID: id, why: .opened))
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(launcher.failures == 1, "backed off")
+        #expect(await core.prewarmFailures["cursor"] == failedAt, "remembered from the first, said once")
+
+        // Once the back-off has passed, it is tried again.
+        launcher.fails = false
+        clock.advance(DaemonCore.prewarmBackoff)
+        try await core.prewarm(.init(agentID: id, why: .opened))
+        await eventually("it warmed") { await core.warm[id] != nil }
+        #expect(await core.prewarmFailures["cursor"] == nil, "a start clears it")
+    }
+
+    @Test func anAgentWaitingToBeWokenIsExpected() async throws {
+        let (locations, work) = try temporary()
+        let clock = Clock()
+        let core = try await core(FakeLauncher(keepsRuntimesWarm: true), locations, clock: clock)
+        let lead = try await chat(core, work)
+        let errand = try await chat(core, work)
+        let waiting = try await chat(core, work)
+        await core.mutateForTest(errand) { $0.startedByAgent = lead }
+        await core.mutateForTest(waiting) {
+            $0.startedByAgent = lead
+            $0.eventWait = EventWait(patterns: [], from: EventPosition(0), since: clock.now)
+        }
+        await core.forgetPromptsForTest(errand)
+        await core.forgetPromptsForTest(waiting)
+        await core.machineChanged(.away(why: "locked"))
+        clock.advance(WarmPool.awayDrainsAfter + 1)
+
+        for id in [errand, waiting] {
+            await core.takeFromPoolForTest(id)
+            await core.keepWarmOrRelease(id)
+        }
+        #expect(await core.live[errand] == nil, "an agent's errand with the person away goes, as before")
+        #expect(await isWarm(core, waiting), "one the app will wake is kept for its wake")
+    }
 }
 
 /// The score on its own: what outranks what.
@@ -363,6 +487,17 @@ struct WarmPoolScoreTests {
         #expect(WarmPool.score(.init(since: now, intentAt: now), away, now: now) > 0)
     }
 
+    @Test func aPendingWakeCountsWithNobodyAbout() {
+        var errand = WarmPool.Signals()
+        errand.personsConversation = false
+        errand.personAway = true
+        #expect(WarmPool.score(.init(since: now), errand, now: now) == 0)
+        errand.pendingWake = true
+        #expect(WarmPool.score(.init(since: now), errand, now: now) > 0)
+        errand.parked = true
+        #expect(WarmPool.score(.init(since: now), errand, now: now) == 0, "parked still goes")
+    }
+
     @Test func typicalGapWantsThreePrompts() {
         #expect(WarmPool.typicalGap([now, now.addingTimeInterval(60)]) == nil)
         #expect(WarmPool.typicalGap([now, now.addingTimeInterval(60), now.addingTimeInterval(180)]) == 120)
@@ -374,6 +509,10 @@ extension DaemonCore {
         turnTasks[id] != nil || sending.contains(id) || launching[id] != nil
     }
 
+    func forgetPromptsForTest(_ id: UUID) {
+        personPromptTimes.removeValue(forKey: id)
+    }
+
     func takeFromPoolForTest(_ id: UUID) {
         warm.removeValue(forKey: id)
     }
@@ -381,6 +520,11 @@ extension DaemonCore {
     /// The turn end's decision is made: pooled, or let go.
     func decidedForTest(_ id: UUID) -> Bool {
         warm[id] != nil || live[id] == nil
+    }
+
+    /// Runtimes of these agents held by the pool: warm, or being started for it.
+    func poolRuntimesForTest(_ ids: [UUID]) -> Int {
+        Set(ids.filter { live[$0] != nil && turnTasks[$0] == nil }).union(prewarming).count
     }
 
     func isWarmForTest(_ id: UUID) -> Bool {
@@ -392,5 +536,38 @@ extension DaemonCore {
         guard var agent = agents[id] else { return }
         change(&agent)
         agents[id] = agent
+    }
+}
+
+extension Sequence {
+    func asyncCount(_ test: (Element) async -> Bool) async -> Int {
+        var count = 0
+        for element in self where await test(element) { count += 1 }
+        return count
+    }
+}
+
+/// A fake launcher whose launches can be made to fail, for a runtime that will not start.
+final class FlakyLauncher: SessionLauncher, @unchecked Sendable {
+    private let fake = FakeLauncher(keepsRuntimesWarm: true)
+    private let lock = NSLock()
+    private var failing = false
+    private var failed = 0
+    var keepsRuntimesWarm: Bool { true }
+
+    var fails: Bool {
+        get { lock.withLock { failing } }
+        set { lock.withLock { failing = newValue } }
+    }
+
+    var failures: Int { lock.withLock { failed } }
+
+    func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
+        let fail = lock.withLock { () -> Bool in
+            if failing { failed += 1 }
+            return failing
+        }
+        if fail { throw CocoaError(.fileNoSuchFile) }
+        return try fake.launch(runtime: runtime, path: path, cwd: cwd)
     }
 }

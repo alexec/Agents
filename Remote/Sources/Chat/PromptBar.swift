@@ -121,8 +121,13 @@ struct PromptBar: View {
         }
         .onAppear { restoreDraft() }
         .onChange(of: agent.id) { restoreDraft() }
-        // Opened: its runtime starts now, so the reply does not wait for it (#183).
-        .task(id: agent.id) { await model.prewarm(agent.id, .opened) }
+        // Opened: its runtime starts now, so the reply does not wait for it (#183). Once
+        // it has been on screen a moment, so paging past chats starts nothing (#202).
+        .task(id: agent.id) {
+            try? await Task.sleep(for: DaemonAPI.PrewarmRequest.openedAfter)
+            guard !Task.isCancelled else { return }
+            await model.prewarm(agent.id, .opened)
+        }
         .onChange(of: text) {
             selectedCommand = 0
             selectedMention = 0

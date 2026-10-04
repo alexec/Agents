@@ -210,6 +210,20 @@ public actor DaemonCore {
     /// When each agent was last warmed on intent, so a window saying so on every
     /// keystroke starts one runtime and not one per key.
     var prewarmedAt: [UUID: Date] = [:]
+    /// Prewarms started and not yet over, counted with `warm` against the cap before
+    /// anything is launched (#202). Set before the start's task runs, so a burst of
+    /// asks sees the ones ahead of it.
+    var prewarming: Set<UUID> = []
+    /// Prewarms waiting for room, oldest first. At most the cap: the newest intent wins.
+    var prewarmQueue: [(id: UUID, why: DaemonAPI.PrewarmRequest.Why, at: Date)] = []
+    /// Warm runtimes being let go to make room for a prewarm, not counted twice.
+    var prewarmEvicting: Set<UUID> = []
+    /// When a prewarm of each runtime last failed: none of it is tried again for a
+    /// while, and the failure is logged once (#202). One entry per runtime at most.
+    var prewarmFailures: [String: Date] = [:]
+    /// What each live runtime was lent, hashed, kept apart from `launchPrints`: what a
+    /// request's connection can lend differs from one to the next (#202).
+    var lentPrints: [UUID: Int] = [:]
     /// The person's last few prompts to each conversation, for how quickly they reply.
     var personPromptTimes: [UUID: [Date]] = [:]
     /// Since when the person has been away from this Mac (idle or locked), if they are.
@@ -1455,6 +1469,7 @@ public actor DaemonCore {
         let draining = eventTasks.removeValue(forKey: agentID)
         live.removeValue(forKey: agentID)
         launchPrints.removeValue(forKey: agentID)
+        lentPrints.removeValue(forKey: agentID)
         // A warm runtime that went by any other door than `releaseWarm`: its process
         // died, or a move or a failure let it go. Forgotten quietly; the next prompt
         // starts one as it always did (#183).

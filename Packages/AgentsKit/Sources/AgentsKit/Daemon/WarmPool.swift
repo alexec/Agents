@@ -42,6 +42,9 @@ public enum WarmPool {
         public var typicalGap: TimeInterval?
         /// They have been away from the Mac (idle or locked) long enough to drain.
         public var personAway = false
+        /// The app will carry it on by itself (#202): an open `wait_for_event`, or a block
+        /// waiting on agents or a time. Its next turn is coming whether anyone is about.
+        public var pendingWake = false
 
         public init() {}
     }
@@ -64,15 +67,20 @@ public enum WarmPool {
         let age = max(0, now.timeIntervalSince(entry.since))
         guard age < ceiling else { return 0 }
         let intent = entry.intentAt.map { now.timeIntervalSince($0) < intentLasts } ?? false
+        let wanted = signals.watchedActive || intent
+        // A session put down: nobody is expected, unless somebody is looking at it now.
+        if signals.parked, !wanted { return 0 }
         // Away from the Mac: only what is in front of somebody on another surface is
-        // kept, or what somebody has just opened or typed in there, which says they are.
-        if signals.personAway, !signals.watchedActive, !intent { return 0 }
-        // A workflow's or an agent's errand nobody chatted in, or a session put down:
-        // nobody is expected, unless somebody is looking at it right now.
-        if !signals.watchedActive, !intent, signals.parked || !signals.personsConversation { return 0 }
+        // kept, or what somebody has just opened or typed in there, which says they are,
+        // or what the app itself will wake: that needs nobody about.
+        if signals.personAway, !wanted, !signals.pendingWake { return 0 }
+        // A workflow's or an agent's errand nobody chatted in: nobody is expected, unless
+        // somebody is looking at it right now or it is waiting to be woken.
+        if !wanted, !signals.pendingWake, !signals.personsConversation { return 0 }
         var points = 10.0
         if signals.watchedActive { points += 100 } else if signals.watched { points += 40 }
         if intent { points += 80 }
+        if signals.pendingWake { points += 40 }
         if signals.needsAnswer { points += 60 }
         if let last = signals.lastPersonPrompt, now.timeIntervalSince(last) < recentPrompt { points += 50 }
         if let gap = signals.typicalGap, gap < quickReplies { points += 20 }

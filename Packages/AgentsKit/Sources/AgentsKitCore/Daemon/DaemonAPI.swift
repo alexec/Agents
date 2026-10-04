@@ -831,6 +831,10 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.why = why
         }
+
+        /// How long a chat is on screen before a window says `opened` (#202): arrowing
+        /// past a dozen chats starts none, and the one settled on starts one.
+        public static let openedAfter: Duration = .milliseconds(1500)
     }
 
     /// `agents/setUnread`: put the unread mark on a finished chat, or take it off.
