@@ -118,7 +118,10 @@ extension DaemonCore {
 
     /// One change, as its event, for every project to hear (US5-AS3).
     func machineChanged(_ change: MachineChange) {
-        if change == .wake { for handler in wakeHandlers { handler() } }
+        if change == .wake {
+            for handler in wakeHandlers { handler() }
+            scheduleDiskCheck()
+        }
         // The warm pool drains while nobody is at the Mac (#183).
         switch change {
         case .away: notePersonAway(true)
@@ -200,6 +203,8 @@ extension DaemonCore {
                              details: ["resource": lease.resource.key, "agent": lease.holder.uuidString,
                                        "agent_title": agents[lease.holder]?.title ?? "Untitled"]))
         case .released(let lease, let ending):
+            // A build just ended: what it left behind is worth a look (#195).
+            scheduleDiskCheck()
             let how: String
             switch ending {
             case .expired: how = "expired"

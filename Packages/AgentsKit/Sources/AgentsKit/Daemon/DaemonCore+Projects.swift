@@ -49,6 +49,7 @@ extension DaemonCore {
         }
         let newest = tally?.newestActivity ?? gone.map(\.lastActivityAt).max() ?? project.addedAt
         project.helperLimits = configuredHelperLimits(in: project.folder)
+        project.diskSpace = configuredDiskSpace(in: project.folder)
         var summary = DaemonAPI.ProjectSummary(
             project: project,
             name: projectNames()[folder] ?? folder.lastPathComponent,
@@ -131,6 +132,7 @@ extension DaemonCore {
             // The limits are the project's own file's (#126), not the record's.
             var project = project
             project.helperLimits = configuredHelperLimits(in: project.folder)
+            project.diskSpace = configuredDiskSpace(in: project.folder)
             var summary = DaemonAPI.ProjectSummary(
                 project: project,
                 name: names[project.folder] ?? project.folder.lastPathComponent,
@@ -433,8 +435,13 @@ extension DaemonCore {
         guard changed.contains(where: { $0.path == file || file.hasPrefix($0.path + "/") || $0.path == file + "/" })
         else { return }
         let before = projectConfigCache[folder] ?? nil
+        let diskBefore = diskSpaceConfigCache[folder] ?? nil
         projectConfigCache[folder] = nil
-        guard configuredHelperLimits(in: folder) != before, let summary = projectSummary(for: folder) else { return }
+        diskSpaceConfigCache[folder] = nil
+        let diskMoved = configuredDiskSpace(in: folder) != diskBefore
+        if diskMoved { scheduleDiskCheck() }
+        guard configuredHelperLimits(in: folder) != before || diskMoved,
+              let summary = projectSummary(for: folder) else { return }
         sendProject(summary)
     }
 

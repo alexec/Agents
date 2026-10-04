@@ -194,6 +194,10 @@ public enum DaemonAPI {
         /// paired client (#111). Not in `ConnectionRole.agentMethods`, so no agent and no
         /// workflow can raise a ceiling over agents.
         public static let projectsSetHelperLimits = "projects/setHelperLimits"
+        /// A project's disk space lines (#195), kept in its `.agents/project.json`.
+        public static let projectsSetDiskSpace = "projects/setDiskSpace"
+        /// Every volume that is low on space, for the window's strip (#195).
+        public static let diskState = "disk/state"
         /// Clone a Git URL into the home folder and add it (027). Answers when the
         /// project exists, which for a big repository is minutes: the window shows the
         /// clone from `clone/changed`, not from waiting on this.
@@ -464,6 +468,8 @@ public enum DaemonAPI {
         /// Also once a minute while anything is held, so "minutes left" stays true
         /// without each client counting against its own clock.
         public static let leasesChanged = "leases/changed"
+        /// A volume went low or came back, or how much a low one has free moved (#195).
+        public static let diskChanged = "disk/changed"
 
         /// The Mac is now being kept awake, or is not. Sent only when the verdict
         /// moves — `reviseWakefulness` is reached on every streamed token, and a
@@ -499,6 +505,17 @@ public enum DaemonAPI {
         public init(folder: URL, limits: HelperLimits) {
             self.folder = folder
             self.limits = limits
+        }
+    }
+
+    /// A project's disk space lines as the person set them (#195). A nil field is its
+    /// default; all nil puts the project back to the defaults.
+    public struct SetDiskSpaceRequest: Codable, Sendable {
+        public var folder: URL
+        public var diskSpace: DiskThresholds
+        public init(folder: URL, diskSpace: DiskThresholds) {
+            self.folder = folder
+            self.diskSpace = diskSpace
         }
     }
 

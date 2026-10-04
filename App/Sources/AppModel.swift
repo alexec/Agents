@@ -1141,6 +1141,14 @@ final class AppModel {
         work.replaceLeases(snapshot)
     }
 
+    /// Every volume low on space (#195). A daemon too old to know the method leaves it
+    /// empty, and no strip is drawn.
+    func refreshDisk() async {
+        guard let state = try? await client.call(DaemonAPI.Method.diskState, Optional<String>.none,
+                                                 returning: DiskState.self) else { return }
+        work.replaceDisk(state)
+    }
+
     /// The newest page of events and who is waiting (042), narrowed by `filter`, or as
     /// the page last narrowed it. A daemon too old to know the method leaves the list
     /// empty, and the Events page says there is nothing yet.
@@ -1546,6 +1554,20 @@ final class AppModel {
             var summary = try await client(for: key.host).call(
                 DaemonAPI.Method.projectsSetHelperLimits,
                 DaemonAPI.SetHelperLimitsRequest(folder: key.folder, limits: limits),
+                returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            upsert(summary)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
+    /// The person's disk space lines for a project (#195), through the window only.
+    func setDiskSpace(_ lines: DiskThresholds, for key: ProjectKey) async {
+        do {
+            var summary = try await client(for: key.host).call(
+                DaemonAPI.Method.projectsSetDiskSpace,
+                DaemonAPI.SetDiskSpaceRequest(folder: key.folder, diskSpace: lines),
                 returning: DaemonAPI.ProjectSummary.self)
             summary.host = key.host
             upsert(summary)
@@ -2134,12 +2156,13 @@ final class AppModel {
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let leases: Void = refreshLeases()
+        async let disk: Void = refreshDisk()
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, dashboards, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person)
+                   transcript, runtimeStates, sandbox, person, disk)
         #if DEBUG
         openFromLaunchArguments()
         #endif

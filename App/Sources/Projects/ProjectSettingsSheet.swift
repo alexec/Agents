@@ -235,6 +235,23 @@ private struct ProjectGeneralPane: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    row("Low disk space") {
+                        diskLine(\.lowGB, in: summary, default: DiskThresholds.defaultLowGB,
+                                 choices: DiskThresholds.lowChoices)
+                    }
+                    row("Critical disk space") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            diskLine(\.criticalGB, in: summary, default: DiskThresholds.defaultCriticalGB,
+                                     choices: DiskThresholds.criticalChoices)
+                            Text("When free space on the disk holding this project or its worktrees falls below "
+                                 + "these, the window says so and mac.disk_low is raised for agents and workflows. "
+                                 + "Low is also below \((summary.project.diskSpace ?? DiskThresholds()).effectiveLowPercent)% "
+                                 + "of the disk. Saved in .agents/project.json.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
                 .appText(.supporting)
                 Divider().padding(.vertical, 20)
@@ -270,6 +287,27 @@ private struct ProjectGeneralPane: View {
         })) {
             ForEach(Array(Swift.min(minimum, current)...Swift.max(maximum, current)), id: \.self) { number in
                 Text(number == standard ? "\(number) (default)" : "\(number)").tag(number)
+            }
+        }
+        .labelsHidden()
+        .fixedSize()
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
+    /// One disk space line (#195) as a menu of sizes, its default marked and choosing it
+    /// putting the project back to the default. A size set by hand is offered too.
+    private func diskLine(_ key: WritableKeyPath<DiskThresholds, Int?>, in summary: DaemonAPI.ProjectSummary,
+                          default standard: Int, choices: [Int]) -> some View {
+        let kept = summary.project.diskSpace ?? DiskThresholds()
+        let current = kept[keyPath: key] ?? standard
+        let offered = Set(choices + [current]).sorted()
+        return Picker("", selection: Binding(get: { current }, set: { chosen in
+            var lines = kept
+            lines[keyPath: key] = chosen == standard ? nil : chosen
+            Task { await model.setDiskSpace(lines, for: summary.key) }
+        })) {
+            ForEach(offered, id: \.self) { size in
+                Text(size == standard ? "\(size) GB (default)" : "\(size) GB").tag(size)
             }
         }
         .labelsHidden()

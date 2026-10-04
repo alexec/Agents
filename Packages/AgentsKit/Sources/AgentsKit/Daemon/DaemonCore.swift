@@ -234,6 +234,19 @@ public actor DaemonCore {
     /// inside for a project whose file sets none. Let go when the folder's `.agents`
     /// changes and when the daemon writes the file.
     var projectConfigCache: [URL: HelperLimits?] = [:]
+    /// Each project's `.agents/project.json` disk space lines as last read (#195), as
+    /// `projectConfigCache` holds its helper limits.
+    var diskSpaceConfigCache: [URL: DiskThresholds?] = [:]
+    /// The once-a-minute look at the volumes (#195). Nil until started.
+    var diskTicker: Task<Void, Never>?
+    /// A look asked for by a lease given back or a wake, so a burst makes one.
+    var diskCheckSoon: Task<Void, Never>?
+    /// How a volume is read. A test hands in its own.
+    var diskReader: @Sendable (URL) -> DiskReading? = DiskReader.read
+    /// Every volume that is low, by where it is mounted, as the window draws it.
+    var diskAlarms: [String: DiskAlarm] = [:]
+    /// How much a crossing may walk to measure the worktrees on the volume.
+    var diskMeasureBudget: (files: Int, time: Duration) = (200_000, .seconds(5))
     /// Clones under way, by id (027). Memory only: a clone the daemon did not live to
     /// finish is not resumed, and its staging folder is removed on the next start.
     var clones: [UUID: RunningClone] = [:]
@@ -1475,6 +1488,7 @@ public actor DaemonCore {
         stopWatchingAllWorkflows()
         machineWatch?.stop()
         machineWatch = nil
+        stopWatchingDisk()
         // The servers the bridge started for Copilot sessions are this daemon's children,
         // not a runtime's, so nobody else ends them (054).
         #if canImport(Network) && canImport(Security)

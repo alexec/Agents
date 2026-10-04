@@ -93,6 +93,8 @@ These belong to the Mac, not to a project. Any agent can wait for them.
 | `lease.released` | resource, how | A lease was given back, ended or ran out. `how` is `released`, `ended` or `expired`. |
 | `mac.sleep` | | The Mac is going to sleep. |
 | `mac.wake` | | The Mac woke up. |
+| `mac.disk_low` | volume, free_bytes, free_percent, level, threshold, worktrees | Free space on a volume holding the Agents root, a project or a worktree fell below its threshold. `level` is `low` (below 20 GB or 5% of the disk, whichever is more) or `critical` (below 2 GB, where commands start failing). `threshold` is the line it fell below, in bytes. `worktrees` names the largest worktrees on the volume and their sizes, measured within a budget, so `over` means at least. Raised once per crossing; falling further from low to critical is a second crossing. The window shows a strip across the top while it lasts. |
+| `mac.disk_ok` | volume, free_bytes, free_percent, threshold | Free space on a volume that was low climbed back above its threshold, by a margin of a tenth of it (at least 1 GB) so it does not flap. |
 | `person.away` | why | You locked the screen or stepped away for 5 minutes. `why` is `locked` or `idle`. |
 | `person.back` | why | You unlocked the screen or came back. `why` is `locked` or `idle`. |
 | `cost.limit_reached` | limit, agent | A spending limit was reached. When it is an agent's, it also carries `labels`, `runtime` and `started_by`. See [Settings and the Resources page](settings.md). |

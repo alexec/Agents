@@ -201,6 +201,11 @@ const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: 
   "lease.released": { scope: "mac", details: ["resource", "how"] },
   "mac.sleep": { scope: "mac", details: [] },
   "mac.wake": { scope: "mac", details: [] },
+  "mac.disk_low": {
+    scope: "mac",
+    details: ["volume", "free_bytes", "free_percent", "level", "threshold", "worktrees"],
+  },
+  "mac.disk_ok": { scope: "mac", details: ["volume", "free_bytes", "free_percent", "threshold"] },
   "person.away": { scope: "mac", details: ["why"] },
   "person.back": { scope: "mac", details: ["why"] },
   "cost.limit_reached": { scope: "either", details: ["limit", "agent", ...context] },
