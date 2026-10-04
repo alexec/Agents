@@ -100,6 +100,23 @@ tests_since() { # dir base
 	[ "$(val webtypes)" = skip ] || echo "test-webtypes"
 }
 
+# --- checks that passed before --------------------------------------------------------
+# A check's result depends on the tree it ran on, not on which wave or commit it was. So
+# every pass is recorded by tree hash, for every wave of this repository, and a check that
+# passed at the same tree is not run again: the next wave's bisect needs no build to know
+# its base (the last wave's tip) is good, and a wave started again re-runs nothing. Built
+# products come back through the shared build cache (scripts/build-cache.sh) instead.
+PASSED=${MERGE_WAVE_PASSED:-$common/merge-wave-passed}
+
+# The command, without the path of the copy of build-cache.sh it names.
+check_key() { cat "$ST/cmd.$1" | sed "s|$CACHED|build-cache.sh|g" | shasum | cut -c1-12; }
+passed_at() { # name tree -> 0 if it passed there before
+	[ -s "$PASSED" ] && grep -q "^$2 $1 $(check_key "$1") " "$PASSED"
+}
+record_pass() { # name tree
+	passed_at "$1" "$2" || echo "$2 $1 $(check_key "$1") $(date +%Y-%m-%dT%H:%M:%S) $WBRANCH" >>"$PASSED"
+}
+
 # --- reading branches -------------------------------------------------------------------
 
 # "name sha" for BRANCH[@SHA], refusing a branch that moved past the verified sha.
@@ -338,6 +355,9 @@ decide() {
 		probe=$(bisect_probe "$lo" "$hi")
 		NEXT=bisect NEXT_LEASE=build NEXT_MIN=$(check_minutes "$check")
 		NEXT_WHAT="bisect $check: try it at $(probe_name "$probe")"
+		if passed_at "$check" "$(g rev-parse "$(probe_sha "$probe")^{tree}")"; then
+			NEXT_LEASE=none NEXT_MIN=0 NEXT_WHAT="$NEXT_WHAT (passed at that tree before: not run again)"
+		fi
 		return
 	fi
 	local name state
@@ -346,6 +366,9 @@ decide() {
 			NEXT=$name NEXT_LEASE=build NEXT_MIN=$(check_minutes "$name")
 			NEXT_WHAT=$(cat "$ST/cmd.$name")
 			[ "$state" = todo ] || NEXT_WHAT="once more, as tests flake under load: $NEXT_WHAT"
+			if passed_at "$name" "$(g rev-parse 'HEAD^{tree}')"; then
+				NEXT_LEASE=none NEXT_MIN=0 NEXT_WHAT="passed at this tree before: recorded, not run again"
+			fi
 			return
 		fi
 	done < <(lines checks)
@@ -400,8 +423,14 @@ step() {
 	rebuild-web) rebuild_web ;;
 	bisect) bisect_step ;;
 	*)
-		if run_logged "$NEXT" "$(cat "$ST/cmd.$NEXT")"; then
+		local tree
+		tree=$(g rev-parse 'HEAD^{tree}')
+		if passed_at "$NEXT" "$tree"; then
 			mark "$NEXT" pass
+			say "$NEXT passed at this tree before (${tree:0:10}): not run again"
+		elif run_logged "$NEXT" "$(cat "$ST/cmd.$NEXT")"; then
+			mark "$NEXT" pass
+			record_pass "$NEXT" "$tree"
 			say "$NEXT passed"
 		else
 			say "$NEXT FAILED; last lines:"
@@ -473,12 +502,18 @@ probe_sha() {
 }
 
 bisect_step() {
-	local check lo hi probe ok=0
+	local check lo hi probe tree ok=0
 	read -r check lo hi <"$ST/bisect"
 	probe=$(bisect_probe "$lo" "$hi")
-	g checkout -q --detach "$(probe_sha "$probe")"
-	run_logged "$check" "$(cat "$ST/cmd.$check")" && ok=1
-	g checkout -q "$WBRANCH"
+	tree=$(g rev-parse "$(probe_sha "$probe")^{tree}")
+	if passed_at "$check" "$tree"; then
+		say "$check passed at this tree before (${tree:0:10}): not run again"
+		ok=1
+	else
+		g checkout -q --detach "$(probe_sha "$probe")"
+		run_logged "$check" "$(cat "$ST/cmd.$check")" && ok=1 && record_pass "$check" "$tree"
+		g checkout -q "$WBRANCH"
+	fi
 	if [ $ok = 1 ]; then
 		say "$check passes at $(probe_name "$probe")"
 		lo=$probe

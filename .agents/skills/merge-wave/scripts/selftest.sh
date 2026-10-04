@@ -3,7 +3,7 @@
 # shellcheck disable=SC2015,SC2329
 # merge-wave.sh's own test, in a throwaway clone of this repository: never the real main.
 #
-#   selftest.sh [scenario...]   clean, web, conflict, bisect, docs (all by default)
+#   selftest.sh [scenario...]   clean, web, conflict, bisect, docs, reuse (all by default)
 #
 # Builds are a stub (MERGE_WAVE_STUB): it fails any step when the tree has a file
 # called WAVE_BREAK, and passes otherwise. The one real build is the web scenario's
@@ -176,7 +176,32 @@ scenario_docs() {
 	ok "docs-only wave: no builds, no ship"
 }
 
-for s in "${@:-clean web conflict bisect docs}"; do
+scenario_reuse() {
+	reset
+	git checkout -q -b s6-base "$M" && git commit -q --allow-empty -m "main moves" && git checkout -q main
+	git merge -q --ff-only s6-base
+	branch s6-one sh -c 'echo "// wave self-test six" >>Host/Sources/ControlKey.swift'
+	branch s6-two sh -c 'echo "// wave self-test six" >>Remote/Sources/RemoteApp.swift'
+	out=$("$MW" start s6-one s6-two); echo "$out"
+	wave=$(wave_of "$out")
+	"$MW" next "$wave" | grep -q 'lease=build' || fail "the first wave builds"
+	while line=$("$MW" next "$wave"); [ "${line#step=finish}" = "$line" ]; do "$MW" step "$wave" >/dev/null; done
+	ran=$(wc -l <"$(git -C "$wave" rev-parse --git-dir)/stub-ran" | tr -d ' ')
+	[ "$ran" -gt 0 ] || fail "the first wave ran its checks"
+	"$MW" clean "$wave" --force
+	# The same branches on the same main: the same tree, so nothing is built again.
+	out=$("$MW" start s6-one s6-two); echo "$out"
+	wave=$(wave_of "$out")
+	echo "$out" | grep -q 'lease=none.*passed at this tree before' || fail "the second wave reuses the first's passes"
+	log=$(run_wave "$wave"); echo "$log"
+	echo "$log" | grep -q 'lease=build' && fail "nothing needs the build lease the second time"
+	[ ! -e "$(git -C "$wave" rev-parse --git-dir)/stub-ran" ] || fail "no step ran the second time"
+	on_main s6-one && on_main s6-two || fail "both on main"
+	"$MW" clean "$wave"
+	ok "a check that passed at the same tree is not run again ($ran checks reused)"
+}
+
+for s in "${@:-clean web conflict bisect docs reuse}"; do
 	for one in $s; do "scenario_$one"; done
 done
 echo "all passed"
