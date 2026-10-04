@@ -20,6 +20,7 @@ import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type It
 import { sortedRuntimes } from "./runtimes";
 import { blockLines, openBlock } from "./block";
 import { DashboardOrderSync } from "./dashboardOrderSync";
+import { Drafts } from "./drafts";
 
 export { folderKey } from "./groups";
 
@@ -1081,8 +1082,8 @@ export class Store extends Work {
   readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
   /** A choice made on a menu that the host hasn't confirmed, by agent then option. */
   readonly pendingOptions = signal<Record<string, Record<string, JSONValue>>>({});
-  /** What is typed and attached, per session or per new-agent form, kept in memory only. */
-  readonly drafts = new Map<string, { text: string; attachments: Attachment[] }>();
+  /** What is typed and attached, per session or per new-agent form, kept across a reload (#254). */
+  readonly drafts = new Drafts(typeof localStorage === "undefined" ? undefined : localStorage);
 
   /** Calls `method`, and on failure says why in `problem` and answers null. */
   async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string): Promise<Methods[M]["result"] | null> {

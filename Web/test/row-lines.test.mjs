@@ -75,3 +75,18 @@ test("who started it, and the worktree's help", () => {
   assert.equal(lines.worktreeHelp(worktree, false), "agents/fix — /w/Agents wt/fix/");
   assert.equal(lines.worktreeHelp({ ...worktree, branch: undefined }, true), "detached — /w/Agents wt/fix/, which is not there any more");
 });
+
+test("the chat's capsules: one a lease or wait, and an event wait's line and hint (#254)", () => {
+  const now = new Date(2026, 9, 4, 14, 0);
+  const snapshot = { at: wire(now), resources: [{ name: "screen", kind: "screen", displayName: "Screen", isGone: false,
+    endingSoon: false, line: [{ agentID: "me", askedAt: 0, isCallOpen: true }],
+    holds: [{ resource: "screen", displayName: "Screen", holder: "a", grantedAt: wire(now), expiresAt: wire(new Date(2026, 9, 4, 14, 12)), warned: false }] }] };
+  assert.deepEqual(lines.leaseMark("me", snapshot, title).capsules, ["◷ Waiting for Screen · held by “Fix login” until 14:12 · 1st"]);
+  const agent = { state: "finished", eventWait: { id: "w", from: 0, since: wire(new Date(2026, 9, 4, 23, 30)),
+    deadline: wire(new Date(2026, 9, 5, 9, 0)), patterns: [{ name: "workflow.completed", filters: { workflow: "nightly" } }] } };
+  assert.deepEqual(lines.eventWaitCapsule(agent, title), {
+    line: "◷ Waiting for workflow.completed workflow nightly · since 23:30 · until 09:00",
+    hint: "Sending will cancel the wait on workflow.completed workflow nightly.",
+  });
+  assert.equal(lines.eventWaitCapsule({ state: "running" }, title), null);
+});

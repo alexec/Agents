@@ -1,6 +1,8 @@
 // The prompt (071 FR-025): text and attachments, dropped, pasted or picked, sent as the Remote
-// sends them (PhoneAttachment's rules), with the draft kept per session in memory. Return sends;
-// Shift-Return is a new line, as in the window.
+// sends them (PhoneAttachment's rules), with the draft kept per session across a reload (#254).
+// Return sends; Shift-Return is a new line, as in the window. While the agent works and nothing
+// is typed, Send is Stop; what is typed then is queued, and Send says so. The agent's suggestion
+// is the empty field's placeholder, taken with Tab and put away with Escape, as the window's.
 //
 // Laid out as the window's PromptBar (#108): where it works and its labels above the input on the
 // left, the runtime above on the right, attach and send inside the input, and the runtime's
@@ -8,7 +10,8 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import type { ACPPromptCapabilities, Attachment } from "../protocol/generated";
+import type { ACPPromptCapabilities, Attachment, SuggestedPrompt } from "../protocol/generated";
+import { sendHelp, sendLabel, stopHelp } from "../model/promptWords";
 import type { Store } from "../model/store";
 import { attach, refusal, totalRefusal } from "../model/attachments";
 import { Telling } from "./Telling";
@@ -16,7 +19,8 @@ import { Telling } from "./Telling";
 /** A send usually lands before anyone could read a word; words only for one still going after this. */
 const slowSend = 400;
 
-export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, onTyping, children }: {
+export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
+  stop, queues = false, suggestion }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -38,6 +42,12 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   children?: ComponentChildren;
   /** Something was typed: a prompt is coming, so its runtime can start now (#183). */
   onTyping?: () => void;
+  /** While the agent works: Send is this, with nothing typed (#254). */
+  stop?: (() => void) | undefined;
+  /** What is typed now will wait for the turn to end. */
+  queues?: boolean;
+  /** What the agent offers to be asked next (031). */
+  suggestion?: SuggestedPrompt | undefined;
 }) {
   const kept = store.drafts.get(draftKey);
   const text = useSignal(kept?.text ?? "");
@@ -46,6 +56,9 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   const sending = useSignal(false);
   const slow = useSignal(false);
   const picker = useRef<HTMLInputElement>(null);
+  // Escape puts the suggestion away until the agent offers another.
+  const dismissed = useSignal<string | null>(null);
+  const offered = suggestion && dismissed.value !== suggestion.id && text.value === "" ? suggestion : undefined;
 
   useEffect(() => {
     const draft = store.drafts.get(draftKey);
@@ -142,7 +155,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
         )}
         <div class="prompt-field">
           {/* Never disabled: what is typed while the link is down is kept and sent once it's back (US7). */}
-          <textarea aria-label="Prompt" placeholder={placeholder} rows={2} value={text.value}
+          <textarea aria-label="Prompt" placeholder={offered ? `${offered.prompt}  (Tab)` : placeholder} rows={2} value={text.value}
             readOnly={starting && sending.value}
             onInput={(e) => {
               text.value = (e.currentTarget as HTMLTextAreaElement).value;
@@ -153,6 +166,13 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
               if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
                 void submit();
+              } else if (e.key === "Tab" && !e.shiftKey && offered) {
+                // Taken into the field, not sent: sending it is still the person's move.
+                e.preventDefault();
+                text.value = offered.prompt;
+                keep();
+              } else if (e.key === "Escape" && offered) {
+                dismissed.value = offered.id;
               }
             }}
             onPaste={(e) => {
@@ -170,10 +190,15 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
             input.value = "";
           }} />
           {/* Bright while its own spinner turns, as the answer that went stays bright on the cards (#86). */}
-          <button class={`send${sending.value ? " going" : ""}`} aria-label={sending.value ? tellingLabel(starting, recipient) : "Send"}
-            title="Send (Return)" disabled={!canSend && !sending.value} onClick={() => void submit()}>
-            {sending.value ? <span class="spinner" aria-hidden="true" /> : "↑"}
-          </button>
+          {stop && !sending.value && text.value.trim() === "" && attachments.value.length === 0 ? (
+            // The one way to stop it, where Send is, as PromptWords.stopSymbol (#254).
+            <button class="send stop" aria-label="Stop" title={stopHelp} disabled={disabled} onClick={stop}>■</button>
+          ) : (
+            <button class={`send${sending.value ? " going" : ""}`} aria-label={sending.value ? tellingLabel(starting, recipient) : sendLabel(queues)}
+              title={`${sendHelp(queues)} (Return)`} disabled={!canSend && !sending.value} onClick={() => void submit()}>
+              {sending.value ? <span class="spinner" aria-hidden="true" /> : queues ? "⤒" : "↑"}
+            </button>
+          )}
         </div>
       </div>
       {(said.value || tooMuch) && <p class="failure small" role="status">{said.value ?? tooMuch}</p>}

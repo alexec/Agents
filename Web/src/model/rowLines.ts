@@ -33,8 +33,8 @@ function shortName(displayName: string, kind: ResourceKind): string {
   return displayName;
 }
 
-/** LeaseMark: the first lease or wait in short, how many more, and the whole of it. */
-export interface LeaseMark { mark: string; more: number; full: string }
+/** LeaseMark: the first lease or wait in short, how many more, the whole of it, and one capsule each. */
+export interface LeaseMark { mark: string; more: number; full: string; capsules: string[] }
 
 /** LeaseStatus.of, then its mark: nothing when the agent holds and waits for nothing. */
 export function leaseMark(agentID: string, snapshot: LeaseSnapshot | undefined,
@@ -68,7 +68,12 @@ export function leaseMark(agentID: string, snapshot: LeaseSnapshot | undefined,
     ...holding.map((h) => `Holding ${h.display}, ${h.minutes} min left, until ${clock(h.expires)}`),
     ...waiting.map((w) => `Waiting for ${w.display}, held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""}, ${ordinal(w.place)} in line`),
   ].join(". ") + ".";
-  return { mark, more: holding.length + waiting.length - 1, full };
+  // LeaseStatus.capsules: holdings first, for the chat's row over the prompt.
+  const capsules = [
+    ...holding.map((h) => `\u25A3 ${h.short} \u00B7 ${h.minutes} min${h.soon ? " left" : ""}`),
+    ...waiting.map((w) => `\u25F7 Waiting for ${w.short} \u00B7 held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""} \u00B7 ${ordinal(w.place)}`),
+  ];
+  return { mark, more: holding.length + waiting.length - 1, full, capsules };
 }
 
 /** WaitStatus.finishing: "“A” to finish", "“A” and “B” to finish". */
@@ -89,6 +94,19 @@ function patternLabel(pattern: EventPattern): string {
 function single(pattern: EventPattern, key: string): string | undefined {
   const values = pattern.anyOf?.[key] ?? (pattern.filters[key] !== undefined ? pattern.filters[key]!.split("|") : []);
   return values.length === 1 ? values[0] : undefined;
+}
+
+/**
+ * WaitStatus.of(…).line and EventWords.hint for a wait on events, for the chat's capsule over the
+ * prompt: "◷ Waiting for … · since 23:30 · until 09:00", and that sending takes its place.
+ */
+export function eventWaitCapsule(agent: Agent, title: (id: string) => string | undefined): { line: string; hint: string } | null {
+  const wait = agent.eventWait;
+  const mark = eventWaitMark(agent, title);
+  if (!wait || !mark) return null;
+  let line = `${mark} \u00B7 since ${clock(fromWireDate(wait.since))}`;
+  if (wait.deadline !== undefined) line += ` \u00B7 until ${clock(fromWireDate(wait.deadline))}`;
+  return { line, hint: `Sending will cancel the wait on ${wait.patterns.map(patternLabel).join(" or ")}.` };
 }
 
 /** WaitStatus.of(…).mark for a wait on events: "◷ Waiting for “Fix login” to finish". A block's is blockLines'. */

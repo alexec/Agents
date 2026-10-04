@@ -974,3 +974,9 @@ button.plain:hover { opacity: 1; }
 .retired-body .facts dd { margin: 0; user-select: text; }
 /* A parked chat's line under its head (040, #253). */
 .park-strip { margin: 0; padding: 4px 16px; font-size: 12px; border-bottom: 1px solid var(--paper-rule); }
+/* Over the prompt: what the open agent holds and waits for (036, 042, #254). Untinted. */
+.capsules { display: flex; flex-direction: column; gap: 4px; margin: 0 0 8px; }
+.capsule-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.capsule { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--paper-raised); border: 1px solid var(--paper-rule);
+  box-shadow: 0 1px 2px var(--paper-shadow); opacity: 0.85; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capsules .hint { margin: 0; }

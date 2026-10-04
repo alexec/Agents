@@ -30,6 +30,8 @@ import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { BackToList } from "./BackToList";
 import { comingBackDescription } from "../model/status";
 import { parkLine } from "./SessionRow";
+import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
+import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 
 const detailKey = "agents.turnDetail";
 
@@ -271,8 +273,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       )}
       <footer class="foot">
         <BackgroundRows store={store} host={host} agent={agent} disabled={down} />
+        {agent && <Capsules store={store} host={host} agent={agent} />}
         <Cards store={store} host={host} session={session} down={down} />
-        <Prompt store={store} draftKey={`${host}|${session}`} placeholder="Reply…" disabled={down || !agent}
+        <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={down || !agent}
+          stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
+          queues={willQueue(agent)} suggestion={agent?.suggestedPrompts?.[0]}
           recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
           send={(text, attachments) => store.prompt(host, session, text, attachments)}
@@ -352,6 +357,32 @@ function Queued({ store, host, agent, disabled }: { store: Store; host: string; 
         );
       })}
     </>
+  );
+}
+
+/**
+ * What the open agent holds and waits for, and the events it waits on, over the prompt (036,
+ * 042; LeaseRow and WaitCapsule, #254): one capsule each, and that sending takes a wait's place.
+ */
+function Capsules({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
+  const title = (id: string) => store.agent(host, id)?.title;
+  const leases = leaseMark(agent.id, store.leases.value[host], title);
+  const wait = eventWaitCapsule(agent, title);
+  if (!leases && !wait) return null;
+  return (
+    <div class="capsules">
+      {leases && (
+        <p class="capsule-row" role="note" aria-label={leases.full}>
+          {leases.capsules.map((text) => <span key={text} class="capsule" title={leases.full}>{text}</span>)}
+        </p>
+      )}
+      {wait && (
+        <>
+          <p class="capsule-row"><span class="capsule" title={wait.line}>{wait.line}</span></p>
+          <p class="faint small hint">{wait.hint}</p>
+        </>
+      )}
+    </div>
   );
 }
 
