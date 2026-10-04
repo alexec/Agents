@@ -7,6 +7,11 @@
 - **For a task a skill covers:** USE the skill in `.agents/skills/`.
 - **When a task calls for a specialist perspective:** ADOPT a persona from `.agents/personas/`.
 
+## Durable data
+
+- Store data in the project itself when possible.
+- When important long-term data cannot safely live in the project, store it on disk in `~/.agents` when safe. Do not rely on an agent's memory for data that can safely be stored there.
+
 ## Keeping the three clients in step
 
 - **Three clients draw the same product:** the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). `Shared/UI` is drawn by both the window and the Remote.
