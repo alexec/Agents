@@ -11,6 +11,7 @@ extension AppService {
     public static let pinPageToolName = AppTool.pinPage
     public static let unpinPageToolName = AppTool.unpinPage
     public static let movePinToolName = AppTool.movePin
+    public static let pinSessionToolName = AppTool.pinSession
 
     /// One of the three Dashboard calls, as the agent made it. A set's arguments go to the
     /// daemon as they are: it is the one place that knows a tile's rules.
@@ -25,6 +26,8 @@ extension AppService {
         case pin(arguments: JSONValue)
         case unpin(arguments: JSONValue)
         case movePin(arguments: JSONValue)
+        /// `pin_session` (#180): the caller's own session, at the top of its project.
+        case pinSession(arguments: JSONValue)
     }
 
     /// Where those go.
@@ -47,6 +50,7 @@ extension AppService {
         if name.hasSuffix(unpinPageToolName) { return .success(.unpin(arguments: arguments ?? .object([:]))) }
         if name.hasSuffix(pinPageToolName) { return .success(.pin(arguments: arguments ?? .object([:]))) }
         if name.hasSuffix(movePinToolName) { return .success(.movePin(arguments: arguments ?? .object([:]))) }
+        if name.hasSuffix(pinSessionToolName) { return .success(.pinSession(arguments: arguments ?? .object([:]))) }
         return nil
     }
 
@@ -157,6 +161,27 @@ extension AppService {
                 "position": ["type": "string", "enum": ["first", "last"]],
             ],
             "required": .array(["path"]),
+        ],
+    ]
+
+    static let pinSessionTool: JSONValue = [
+        "name": .string(pinSessionToolName),
+        "title": "Pin this session",
+        "description": """
+            Pin this session at the top of its project in the person's sidebar, under the \
+            pinned pages, where it stays whatever state it is in, so the person can always \
+            find it. For a long-running session the person keeps coming back to, such as a \
+            project lead or an intake chat; only when it is that, or when asked. With \
+            pinned false, unpin it, if you were the one who pinned it. The person can unpin \
+            any session. Archiving a session unpins it. At most 10 a project.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "pinned": ["type": "boolean", "description": "true (the default) to pin this session; false to unpin it."],
+                "position": ["type": "string", "enum": ["first", "last"],
+                             "description": "Where among the pinned sessions; last if left out."],
+            ],
         ],
     ]
 

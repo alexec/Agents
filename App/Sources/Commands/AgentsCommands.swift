@@ -143,6 +143,13 @@ struct AgentsCommands: Commands {
                     .keyboardShortcut(.delete, modifiers: [.command, .option])
                     .disabled(agent == nil || acting)
             }
+            // At the top of its project whatever its state (#180).
+            let pinned = agent.map(model.isPinned) ?? false
+            Button(pinned ? "Unpin" : "Pin") {
+                guard let agent else { return }
+                Task { await model.setPinned(agent, !pinned) }
+            }
+            .disabled(agent == nil || agent?.state == .archived)
             Divider()
             Button("Branch") { act { await model.fork($0.id) } }
                 .keyboardShortcut("b", modifiers: [.command, .option])

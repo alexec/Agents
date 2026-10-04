@@ -722,6 +722,25 @@ extension DaemonCore {
                 try arrangePins(request)
                 return .success([:])
 
+            case DaemonAPI.Method.pinsPinSessionTool:
+                let request = try require(params, as: DaemonAPI.PinToolRequest.self)
+                return .success(["note": .string(try pinSessionTool(request))])
+
+            case DaemonAPI.Method.pinsPinSession:
+                let request = try require(params, as: DaemonAPI.PinSessionRequest.self)
+                try pinSessionByPerson(request)
+                return .success([:])
+
+            case DaemonAPI.Method.pinsUnpinSession:
+                let request = try require(params, as: DaemonAPI.PinSessionRequest.self)
+                try unpinSessionByPerson(request)
+                return .success([:])
+
+            case DaemonAPI.Method.pinsArrangeSessions:
+                let request = try require(params, as: DaemonAPI.PinArrangeSessionsRequest.self)
+                try arrangeSessionPins(request)
+                return .success([:])
+
             case DaemonAPI.Method.pinsRead:
                 let request = try require(params, as: DaemonAPI.PinReadRequest.self)
                 return .success(try JSONValue.encoding(try readPage(request)))

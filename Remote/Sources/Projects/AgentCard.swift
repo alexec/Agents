@@ -205,8 +205,24 @@ struct AgentCard: View {
                 }
                 .disabled(model.isStale)
             }
+            // At the top of its project whatever its state (#180), and where among the pinned.
+            if agent.state != .archived {
+                pinButton
+                if model.isPinned(agent) {
+                    let ids = model.pinnedSessions(in: agent.projectFolder)
+                    Button("Move Up", systemImage: "arrow.up") { step(-1, in: ids) }
+                        .disabled(ids.first == agent.id || model.isStale)
+                    Button("Move Down", systemImage: "arrow.down") { step(1, in: ids) }
+                        .disabled(ids.last == agent.id || model.isStale)
+                }
+            }
             if agent.state != .archived {
                 archiveButton
+            }
+        }
+        .swipeActions(edge: .leading) {
+            if agent.state != .archived {
+                pinButton.tint(.accentColor)
             }
         }
         // As a row in Mail: a swipe uncovers Archive, and a long one archives. The page
@@ -219,6 +235,23 @@ struct AgentCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(agent.showsUnread ? "unread" : "")
+    }
+
+    private var pinButton: some View {
+        let pinned = model.isPinned(agent)
+        return Button {
+            Task { await model.setPinned(agent, !pinned) }
+        } label: {
+            Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+        }
+        .disabled(model.isStale)
+    }
+
+    private func step(_ by: Int, in ids: [UUID]) {
+        var ids = ids
+        guard let index = ids.firstIndex(of: agent.id), ids.indices.contains(index + by) else { return }
+        ids.swapAt(index, index + by)
+        Task { await model.arrangeSessionPins(ids, in: agent.projectFolder) }
     }
 
     private var archiveButton: some View {

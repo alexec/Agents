@@ -47,6 +47,9 @@ public final class AgentsModel {
     /// Each project's pinned pages (#159), by its standardized folder: kept current by
     /// `pins/changed`, which carries them. A project with none is absent.
     public private(set) var pins: [URL: [PinView]] = [:]
+    /// Each project's pinned sessions (#180), by its standardized folder, in their order:
+    /// kept current by `pins/changed` as the pages are. A project with none is absent.
+    public private(set) var sessionPins: [URL: [UUID]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: Int] = [:]
@@ -433,6 +436,10 @@ public final class AgentsModel {
         case .pinsChanged(let notification):
             let folder = Project.standardize(notification.folder)
             pins[folder] = notification.pins.isEmpty ? nil : notification.pins
+            let sessions = notification.sessions ?? []
+            if sessionPins[folder] != (sessions.isEmpty ? nil : sessions) {
+                sessionPins[folder] = sessions.isEmpty ? nil : sessions
+            }
 
         case .pagesChanged(let notification):
             pageRevisions[Project.standardize(notification.folder), default: 0] += 1
@@ -562,7 +569,23 @@ public final class AgentsModel {
     }
 
     public func replacePins(_ listed: [ProjectPins]) {
-        pins = Dictionary(listed.map { (Project.standardize($0.folder), $0.pins) }, uniquingKeysWith: { $1 })
+        pins = Dictionary(listed.compactMap { $0.pins.isEmpty ? nil : (Project.standardize($0.folder), $0.pins) },
+                          uniquingKeysWith: { $1 })
+        let sessions = Dictionary(listed.compactMap { listed in
+            listed.sessions.map { (Project.standardize(listed.folder), $0) }
+        }, uniquingKeysWith: { $1 })
+        if sessionPins != sessions { sessionPins = sessions }
+    }
+
+    /// One project's pinned sessions (#180), in their order: ids, whether or not this
+    /// client holds them.
+    public func pinnedSessions(in folder: URL?) -> [UUID] {
+        folder.map { sessionPins[Project.standardize($0)] ?? [] } ?? []
+    }
+
+    /// A project's pinned sessions as a screen left them, before the host says so.
+    public func setSessionPins(_ ids: [UUID], in folder: URL) {
+        sessionPins[Project.standardize(folder)] = ids.isEmpty ? nil : ids
     }
 
     /// A project's pins as a screen left them, before the host says so: a drop, an Unpin.

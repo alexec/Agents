@@ -67,7 +67,8 @@ struct AppServiceTests {
                 AppService.publishEventToolName,
                 AppService.setTileToolName, AppService.removeTileToolName,
                 AppService.readDashboardToolName, AppService.moveTileToolName,
-                AppService.pinPageToolName, AppService.unpinPageToolName, AppService.movePinToolName])
+                AppService.pinPageToolName, AppService.unpinPageToolName, AppService.movePinToolName,
+                AppService.pinSessionToolName])
 
         let finish = tools.first?["inputSchema"]
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?

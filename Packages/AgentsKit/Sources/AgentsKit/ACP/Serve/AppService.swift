@@ -564,9 +564,10 @@ public actor AppService {
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
         // The two for reading another session in this project, for every agent (065).
         let sessionTools = [Self.listSessionsTool, Self.readSessionTool]
-        // The four for the project's Dashboard, and the three for its pinned pages, for every agent (074, #147, #159).
+        // The four for the project's Dashboard, the three for its pinned pages and the one
+        // for pinning its own session, for every agent (074, #147, #159, #180).
         let dashboardTools = [Self.setTileTool, Self.removeTileTool, Self.readDashboardTool, Self.moveTileTool,
-                              Self.pinPageTool, Self.unpinPageTool, Self.movePinTool]
+                              Self.pinPageTool, Self.unpinPageTool, Self.movePinTool, Self.pinSessionTool]
         // Moving itself rides on the call that ends the turn, since that is when a move
         // happens (053); not offered on a runtime that would forget the conversation on
         // the way.

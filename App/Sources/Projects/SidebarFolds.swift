@@ -33,17 +33,19 @@ final class SidebarFolds {
     }
 
     /// What can be folded: a project; one of its Archived folds; one of its session
-    /// groups or its Workflows.
+    /// groups, its pinned sessions or its Workflows.
     enum Fold: Hashable {
         case project, archivedSessions, archivedWorkflows
         case group(AgentGroup)
+        /// The pinned sessions (#180).
+        case pinned
         case workflows
 
         /// A project and the Archived folds start folded; the rest start open.
         var startsOpen: Bool {
             switch self {
             case .project, .archivedSessions, .archivedWorkflows: false
-            case .group, .workflows: true
+            case .group, .pinned, .workflows: true
             }
         }
 
@@ -53,6 +55,7 @@ final class SidebarFolds {
             case .archivedSessions: "archivedSessions"
             case .archivedWorkflows: "archivedWorkflows"
             case .group(let group): "group.\(group.rawValue)"
+            case .pinned: "pinned"
             case .workflows: "workflows"
             }
         }

@@ -945,6 +945,35 @@ final class AppModel {
         }
     }
 
+    // MARK: Pinned sessions (#180)
+
+    func pinnedSessions(in folder: URL?) -> [UUID] { work.pinnedSessions(in: folder) }
+
+    func isPinned(_ agent: Agent) -> Bool {
+        pinnedSessions(in: agent.projectFolder).contains(agent.id)
+    }
+
+    /// Pin or Unpin from a session's menu or swipe: shown at once, then the host told.
+    func setPinned(_ agent: Agent, _ pinned: Bool) async {
+        let folder = agent.projectFolder
+        let held = pinnedSessions(in: folder).filter { $0 != agent.id }
+        work.setSessionPins(pinned ? held + [agent.id] : held, in: folder)
+        await attempt(on: agent.host) {
+            try await self.client(for: agent.host).call(
+                pinned ? DaemonAPI.Method.pinsPinSession : DaemonAPI.Method.pinsUnpinSession,
+                DaemonAPI.PinSessionRequest(folder: folder, agentID: agent.id))
+        }
+    }
+
+    /// A drop or a Move item among the pinned sessions: shown at once, the order sent once.
+    func arrangeSessionPins(_ ids: [UUID], in key: ProjectKey) async {
+        work.setSessionPins(ids, in: key.folder)
+        await attempt(on: key.host) {
+            try await self.client(for: key.host).call(DaemonAPI.Method.pinsArrangeSessions,
+                                                      DaemonAPI.PinArrangeSessionsRequest(folder: key.folder, agentIDs: ids))
+        }
+    }
+
     // MARK: Dashboard (074)
 
     func dashboardSummary(in folder: URL?) -> DashboardSummary? { work.dashboardSummary(in: folder) }

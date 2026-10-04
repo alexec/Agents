@@ -6,15 +6,15 @@ import { signal } from "@preact/signals";
 import type { AgentGroup } from "../protocol/generated";
 import { folderKey } from "./groups";
 
-export type Fold = "project" | "archivedSessions" | "archivedWorkflows" | "workflows" | `group.${AgentGroup}`;
+export type Fold = "project" | "archivedSessions" | "archivedWorkflows" | "workflows" | "pinned" | `group.${AgentGroup}`;
 
 const storageKey = "agents.sidebar.folds";
 /** The folds that start open and have been closed: the groups and Workflows (#181). */
 const closedKey = "agents.sidebar.folded";
 
-/** A project and the Archived folds start folded; the groups and Workflows start open. */
+/** A project and the Archived folds start folded; the groups, Pinned (#180) and Workflows start open. */
 export function startsOpen(fold: Fold): boolean {
-  return fold === "workflows" || fold.startsWith("group.");
+  return fold === "workflows" || fold === "pinned" || fold.startsWith("group.");
 }
 
 function read(storage: Storage | undefined, key: string): Set<string> {

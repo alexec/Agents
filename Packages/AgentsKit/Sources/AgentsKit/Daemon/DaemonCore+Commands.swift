@@ -1843,6 +1843,8 @@ extension DaemonCore {
             // ended; that ask is now dropped, and only the person archives.
             await move(agentID, on: .archivedByAgent)
         }
+        // Out of Pinned (#180): an archived session is put away, not kept on top.
+        unpinArchived(agentID, in: agent.projectFolder)
         await removeWorktreeIfDone(archiving: agentID)
         // Whole for the ten minutes after, as if just read: the window that archived it
         // is usually still showing it. The sweep slims it after that (051).

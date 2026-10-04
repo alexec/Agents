@@ -279,6 +279,11 @@ private struct ProjectFold: View {
                 if !searching {
                     PinnedPageRows(project: key)
                 }
+                // Then its pinned sessions (#180), whatever their state, in the order
+                // they were put in. They still count under their own groups' numbers.
+                if !lists.pinned.isEmpty {
+                    pinnedSessions(lists.pinned, searching: searching)
+                }
                 ForEach(AgentGroup.live, id: \.self) { group in
                     ForEach(group.headings(lists.shown[group] ?? [])) { part in
                         sessionGroup(group, part, searching: searching)
@@ -338,6 +343,32 @@ private struct ProjectFold: View {
         }
     }
 
+    /// The pinned sessions, folding as a group does, and dragged into the order wanted.
+    private func pinnedSessions(_ pinned: [Agent], searching: Bool) -> some View {
+        let isOpen = searching || folds.isOpen(key, .pinned)
+        return DisclosureGroup(isExpanded: Binding(
+            get: { isOpen },
+            set: { folds.set(key, .pinned, open: $0) })) {
+            ForEach(pinned) { agent in
+                SessionSidebarRow(agent: agent)
+            }
+            // Among the pinned only, and the whole order: a search shows only some.
+            .onMove { from, to in
+                guard !searching else { return }
+                var ids = pinned.map(\.id)
+                ids.move(fromOffsets: from, toOffset: to)
+                let shown = Set(ids)
+                let rest = model.pinnedSessions(in: key.folder).filter { !shown.contains($0) }
+                Task { await model.arrangeSessionPins(ids + rest, in: key) }
+            }
+        } label: {
+            SidebarSubheading(title: "Pinned", count: pinned.count,
+                              unread: pinned.filter(\.showsUnread).count,
+                              tint: !isOpen && pinned.contains { model.work.group(of: $0) == .needsAttention }
+                                  ? .attention : .none)
+        }
+    }
+
     /// Archived sessions, folded under the live ones, with what has been retired from
     /// here (051) as the last line.
     @ViewBuilder
@@ -378,11 +409,14 @@ private struct ProjectFold: View {
     /// The project's sessions in each group, as held and as the search leaves them.
     private struct SessionLists {
         var all: [AgentGroup: [Agent]] = [:]
+        /// Each group's rows, the pinned left out: they are drawn in Pinned (#180).
         var shown: [AgentGroup: [Agent]] = [:]
+        /// The pinned sessions held and not archived, in their order, as the search leaves them.
+        var pinned: [Agent] = []
 
         /// Whether the project has a session that is not archived.
         var hasLive: Bool { AgentGroup.live.contains { !(all[$0]?.isEmpty ?? true) } }
-        var hasAny: Bool { AgentGroup.allCases.contains { !(shown[$0]?.isEmpty ?? true) } }
+        var hasAny: Bool { !pinned.isEmpty || AgentGroup.allCases.contains { !(shown[$0]?.isEmpty ?? true) } }
     }
 
     private func sessionLists() -> SessionLists {
@@ -390,10 +424,15 @@ private struct ProjectFold: View {
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matcher = words.isEmpty ? nil : SessionLabelQuery(words)
         let shelf = model.work.shelf(key)
+        let pinned = model.pinnedSessions(in: key.folder).compactMap { model.work.agent($0) }
+            .filter { $0.host == key.host && $0.state != .archived }
+        let pinnedIDs = Set(pinned.map(\.id))
+        lists.pinned = matcher.map { pinned.filter($0.matches) } ?? pinned
         for group in AgentGroup.allCases {
             let held = shelf.groups[group] ?? []
             lists.all[group] = held
-            lists.shown[group] = matcher.map { held.filter($0.matches) } ?? held
+            let unpinned = pinnedIDs.isEmpty || group == .archived ? held : held.filter { !pinnedIDs.contains($0.id) }
+            lists.shown[group] = matcher.map { unpinned.filter($0.matches) } ?? unpinned
         }
         return lists
     }
@@ -411,6 +450,16 @@ private struct SessionSidebarRow: View {
             .listRowInsets(.vertical, 2)
             .sidebarInk(.session(agent.id))
             .tag(SidebarItem.session(agent.id))
+            // Pin or Unpin (#180), from the other edge.
+            .swipeActions(edge: .leading) {
+                if agent.state != .archived {
+                    let pinned = model.isPinned(agent)
+                    SwipeAction(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
+                        await model.setPinned(agent, !pinned)
+                    }
+                    .tint(.accentColor)
+                }
+            }
             // The list's own swipe, in place of the cards' hand-built one.
             .swipeActions(edge: .trailing) {
                 if agent.state == .archived {

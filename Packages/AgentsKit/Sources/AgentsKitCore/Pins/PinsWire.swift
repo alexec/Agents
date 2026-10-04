@@ -16,6 +16,13 @@ public extension DaemonAPI.Method {
     static let pinsRead = "pins/read"
     /// What a person typed on a pinned Markdown page.
     static let pinsWrite = "pins/write"
+    /// A person's Pin and Unpin on a session (#180): any session in the project.
+    static let pinsPinSession = "pins/pinSession"
+    static let pinsUnpinSession = "pins/unpinSession"
+    /// A person's drop or Move item among the pinned sessions: the whole new order.
+    static let pinsArrangeSessions = "pins/arrangeSessions"
+    /// `pin_session`, relayed: an agent pins or unpins its own session.
+    static let pinsPinSessionTool = "pins/pinSessionTool"
     /// `pin_page`, `unpin_page` and `move_pin`, relayed.
     static let pinsPinPage = "pins/pinPage"
     static let pinsUnpinPage = "pins/unpinPage"
@@ -106,13 +113,38 @@ public extension DaemonAPI {
         }
     }
 
+    /// A person's Pin or Unpin on one session (#180).
+    struct PinSessionRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var agentID: UUID
+
+        public init(folder: URL, agentID: UUID) {
+            self.folder = folder
+            self.agentID = agentID
+        }
+    }
+
+    /// The whole order a person left the pinned sessions in.
+    struct PinArrangeSessionsRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var agentIDs: [UUID]
+
+        public init(folder: URL, agentIDs: [UUID]) {
+            self.folder = folder
+            self.agentIDs = agentIDs
+        }
+    }
+
     struct PinsChangedNotification: Codable, Sendable, Hashable {
         public var folder: URL
         public var pins: [PinView]
+        /// The pinned sessions in their order (#180). Nil from a host with none.
+        public var sessions: [UUID]?
 
-        public init(folder: URL, pins: [PinView]) {
+        public init(folder: URL, pins: [PinView], sessions: [UUID] = []) {
             self.folder = folder
             self.pins = pins
+            self.sessions = sessions.isEmpty ? nil : sessions
         }
     }
 

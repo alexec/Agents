@@ -188,6 +188,9 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
         case .movePin(let arguments):
             return await relay(DaemonAPI.Method.pinsMovePin,
                                DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Moved.")
+        case .pinSession(let arguments):
+            return await relay(DaemonAPI.Method.pinsPinSessionTool,
+                               DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Pinned.")
         case .read:
             return await relay(DaemonAPI.Method.dashboardRead,
                                DaemonAPI.DashboardTokenRequest(token: token),

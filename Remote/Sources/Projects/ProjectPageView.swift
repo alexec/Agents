@@ -91,8 +91,24 @@ struct ProjectPageView: View {
                     SectionHeading(title: "Sessions")
                 }
 
+                // Pinned first, whatever their state (#180); they leave their groups below.
+                let pinned = matching(pinnedAgents)
+                if !pinned.isEmpty {
+                    let isOpen = !query.isEmpty || !isFolded("pinned")
+                    DisclosureHeading(title: "Pinned", count: pinned.count,
+                                      unread: pinned.filter(\.showsUnread).count,
+                                      tint: !isOpen && pinned.contains { model.work.group(of: $0) == .needsAttention }
+                                          ? .attention : .none,
+                                      isOpen: Binding(get: { isOpen }, set: { setFolded("pinned", !$0) }))
+                    if isOpen {
+                        ForEach(pinned) { agent in
+                            AgentCard(agent: agent)
+                        }
+                    }
+                }
+
                 ForEach(AgentGroup.live, id: \.self) { group in
-                    ForEach(group.headings(matching(model.agents(group: group)))) { heading in
+                    ForEach(group.headings(matching(unpinned(model.agents(group: group))))) { heading in
                         // Each group folds at its heading (#181); a search shows every match.
                         let isOpen = !query.isEmpty || !isFolded(group.rawValue)
                         DisclosureHeading(title: heading.title, count: heading.agents.count,
@@ -148,6 +164,18 @@ struct ProjectPageView: View {
     private func setFolded(_ fold: String, _ isFolded: Bool) {
         guard let folder = model.selectedProject else { return }
         folded.set(FoldedGroups.name(fold, in: folder), folded: isFolded)
+    }
+
+    /// The project's pinned sessions held and not archived, in their order (#180).
+    private var pinnedAgents: [Agent] {
+        model.pinnedSessions(in: model.selectedProject).compactMap { model.work.agent($0) }
+            .filter { $0.state != .archived }
+    }
+
+    /// A group's sessions without the pinned, which are drawn in Pinned.
+    private func unpinned(_ agents: [Agent]) -> [Agent] {
+        let pinned = Set(model.pinnedSessions(in: model.selectedProject))
+        return pinned.isEmpty ? agents : agents.filter { !pinned.contains($0.id) }
     }
 
     private var isEmpty: Bool {

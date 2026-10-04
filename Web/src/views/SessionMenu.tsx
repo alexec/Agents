@@ -4,13 +4,16 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { isOpenBlock } from "../model/groups";
+import { isOpenBlock, projectFolder } from "../model/groups";
 
-type Action = "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
-  | "markRead" | "markUnread";
+export type Action = "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
+  | "markRead" | "markUnread" | "pin" | "unpin";
 
-/** What the menu offers, in order, with the window's words (ParkWords, AgentRow's menu). */
-export function sessionActions(agent: Agent): { action: Action; label: string; help: string }[] {
+/**
+ * What the menu offers, in order, with the window's words (ParkWords, AgentRow's menu). Given
+ * whether it is pinned, Pin or Unpin too (#180).
+ */
+export function sessionActions(agent: Agent, pinned?: boolean): { action: Action; label: string; help: string }[] {
   const found: { action: Action; label: string; help: string }[] = [];
   const holds = agent.state === "starting" || agent.state === "running" || agent.state === "waitingOnUser";
   if (holds || (agent.state === "finished" && isOpenBlock(agent.report))) {
@@ -27,6 +30,12 @@ export function sessionActions(agent: Agent): { action: Action; label: string; h
     found.push(agent.isUnread === true
       ? { action: "markRead", label: "Mark as Read", help: "Clear the unread mark" }
       : { action: "markUnread", label: "Mark as Unread", help: "Leave this to come back to" });
+  }
+  // At the top of its project whatever its state, or back among the rest (#180).
+  if (pinned !== undefined && agent.state !== "archived") {
+    found.push(pinned
+      ? { action: "unpin", label: "Unpin", help: "Put this session back among the others" }
+      : { action: "pin", label: "Pin", help: "Keep this session at the top of its project, whatever its state" });
   }
   found.push(agent.state === "archived"
     ? { action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" }
@@ -51,16 +60,22 @@ export function SessionMenu({ store, host, agent, disabled }: { store: Store; ho
         disabled={!agent || disabled || (agent && !!store.onItsWay.value[agent.id])} onClick={() => (open.value = !open.value)}>···</button>
       {open.value && agent && (
         <div class="popover right" role="menu">
-          {sessionActions(agent).map(({ action, label, help }) => (
+          {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id)).map(({ action, label, help }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {
                 open.value = false;
-                if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
-                else void store.perform(host, agent.id, action);
+                runSessionAction(store, host, agent, action);
               }}>{label}</button>
           ))}
         </div>
       )}
     </span>
   );
+}
+
+/** One of `sessionActions`, done. */
+export function runSessionAction(store: Store, host: string, agent: Agent, action: Action): void {
+  if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
+  else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
+  else void store.perform(host, agent.id, action);
 }
