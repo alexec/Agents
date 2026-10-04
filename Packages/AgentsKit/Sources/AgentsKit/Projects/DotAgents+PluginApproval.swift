@@ -13,12 +13,71 @@ import Foundation
 /// A plugin's `gemini-extension.json` is written, when it has none, before the digest is
 /// taken: the app writes it on the way to every Gemini session, and a manifest the app
 /// wrote must not read as the plugin having changed.
+///
+/// It is asked for on every session start and every warm check (#202), and reading every
+/// file of a plugin carrying `node_modules` stalls the daemon. So the digest is kept per
+/// folder against a stamp of what `lstat` says of every entry (inode, size, modified and
+/// changed times), which reads no file; it is taken again only when the stamp moves. The
+/// changed time cannot be set back by anyone writing the folder, so an edit that restores
+/// a file's size and modified time still moves the stamp.
 extension DotAgents {
     static let ignoredInDigest: Set<String> = [".DS_Store"]
 
     /// The digest of `plugin`'s folder, or nil when it cannot be read at all.
     public static func pluginDigest(_ plugin: URL) -> String? {
         attempt("write \(geminiManifest) for \(plugin.lastPathComponent)") { try writeGeminiManifest(for: plugin) }
+        let key = plugin.standardizedFileURL.path
+        let stamp = pluginStamp(plugin)
+        if let stamp, let digest = digestCache.digest(key, stamp: stamp) { return digest }
+        let digest = computePluginDigest(plugin)
+        if let stamp { digestCache.keep(key, stamp: stamp, digest: digest) }
+        return digest
+    }
+
+    /// How many times `plugin`'s digest was taken in full, for the test that it is not
+    /// taken again when nothing changed.
+    static func pluginDigestsTaken(_ plugin: URL) -> Int {
+        digestCache.taken(plugin.standardizedFileURL.path)
+    }
+
+    /// What `lstat` says of every entry under the folder, as one number; nil when the
+    /// folder cannot be listed.
+    static func pluginStamp(_ plugin: URL) -> Int? {
+        let fileManager = FileManager.default
+        var hasher = Hasher()
+        if let destination = try? fileManager.destinationOfSymbolicLink(atPath: plugin.path) {
+            hasher.combine(destination)
+        }
+        let root = plugin.resolvingSymlinksInPath().standardizedFileURL.path
+        guard isDirectory(URL(filePath: root)), let enumerator = fileManager.enumerator(atPath: root) else { return nil }
+        hasher.combine(statLine(root, following: false))
+        for case let relative as String in enumerator {
+            if ignoredInDigest.contains((relative as NSString).lastPathComponent) { continue }
+            let path = root + "/" + relative
+            hasher.combine(relative)
+            hasher.combine(statLine(path, following: false))
+            // A link to a file is digested by its content, which lives where it points.
+            if let destination = try? fileManager.destinationOfSymbolicLink(atPath: path) {
+                hasher.combine(destination)
+                hasher.combine(statLine(path, following: true))
+            }
+        }
+        return hasher.finalize()
+    }
+
+    private static func statLine(_ path: String, following: Bool) -> String {
+        var info = stat()
+        guard (following ? stat(path, &info) : lstat(path, &info)) == 0 else { return "?" }
+        #if canImport(Darwin)
+        let modified = info.st_mtimespec, changed = info.st_ctimespec
+        #else
+        let modified = info.st_mtim, changed = info.st_ctim
+        #endif
+        return "\(info.st_ino) \(info.st_size) \(modified.tv_sec).\(modified.tv_nsec) \(changed.tv_sec).\(changed.tv_nsec)"
+    }
+
+    /// Every file read and hashed: what `pluginDigest` keeps.
+    private static func computePluginDigest(_ plugin: URL) -> String? {
         let fileManager = FileManager.default
         var lines: [String] = []
         // The folder itself may be a link (`pluginFolders` takes one to a folder); where
@@ -75,4 +134,39 @@ extension DotAgents {
         }
         return carries
     }
+}
+
+/// The plugin digests already taken, by folder. Bounded: a daemon sees a few projects'
+/// plugins, and past the bound the whole cache starts again.
+final class PluginDigestCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [String: (stamp: Int, digest: String?)] = [:]
+    private var counts: [String: Int] = [:]
+    static let bound = 256
+
+    func digest(_ key: String, stamp: Int) -> String?? {
+        lock.withLock {
+            guard let entry = entries[key], entry.stamp == stamp else { return nil }
+            return .some(entry.digest)
+        }
+    }
+
+    func keep(_ key: String, stamp: Int, digest: String?) {
+        lock.withLock {
+            if entries[key] == nil, entries.count >= Self.bound {
+                entries.removeAll()
+                counts.removeAll()
+            }
+            entries[key] = (stamp, digest)
+            counts[key, default: 0] += 1
+        }
+    }
+
+    func taken(_ key: String) -> Int {
+        lock.withLock { counts[key] ?? 0 }
+    }
+}
+
+extension DotAgents {
+    static let digestCache = PluginDigestCache()
 }

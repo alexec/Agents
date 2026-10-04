@@ -199,7 +199,9 @@ extension DaemonCore {
         live.removeValue(forKey: id)
         warm.removeValue(forKey: id)
         launchPrints.removeValue(forKey: id)
+        lentPrints.removeValue(forKey: id)
         prewarmedAt.removeValue(forKey: id)
+        prewarmQueue.removeAll { $0.id == id }
         personPromptTimes.removeValue(forKey: id)
         eventTasks.removeValue(forKey: id)
         turnTasks.removeValue(forKey: id)
@@ -228,7 +230,9 @@ extension DaemonCore {
         if live[id] != nil { held.append("live") }
         if warm[id] != nil { held.append("warm") }
         if launchPrints[id] != nil { held.append("launchPrints") }
+        if lentPrints[id] != nil { held.append("lentPrints") }
         if prewarmedAt[id] != nil { held.append("prewarmedAt") }
+        if prewarmQueue.contains(where: { $0.id == id }) { held.append("prewarmQueue") }
         if personPromptTimes[id] != nil { held.append("personPromptTimes") }
         if eventTasks[id] != nil { held.append("eventTasks") }
         if turnTasks[id] != nil { held.append("turnTasks") }

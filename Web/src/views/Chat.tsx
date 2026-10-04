@@ -46,8 +46,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const down = linkDown || hostDown;
   const r = route.value;
   const agent = store.agent(host, session);
-  // Opened: its runtime starts now, so the reply does not wait for it (#183).
-  useEffect(() => { store.prewarm(host, session, "opened"); }, [host, session]);
+  // Opened: its runtime starts now, so the reply does not wait for it (#183). Once it has been
+  // on screen a moment (the window's PrewarmRequest.openedAfter), so paging past chats starts
+  // nothing (#202).
+  useEffect(() => {
+    const timer = setTimeout(() => store.prewarm(host, session, "opened"), 1500);
+    return () => clearTimeout(timer);
+  }, [host, session]);
   const project = r.project ? (store.projects.value[host] ?? []).find((p) => p.project.folder === r.project) : undefined;
   const level = useSignal<TurnDetail>(defaultDetail.value);
   /** Turns opened or closed by hand, kept until the chat is left. */

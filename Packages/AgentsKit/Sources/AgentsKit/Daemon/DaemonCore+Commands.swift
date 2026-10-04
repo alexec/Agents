@@ -334,6 +334,7 @@ extension DaemonCore {
         live[agent.id] = session
         // What it started with, so the pool can tell whether it may be reused (#183).
         launchPrints[agent.id] = launchPrint(for: agent)
+        lentPrints[agent.id] = Self.lentPrint((try? launchEnvironment(for: agent.runtimeID)) ?? [:])
         // Where its changes will be measured from (035), asked for beside the start
         // rather than inside it: a start waits for nothing it does not need, and git
         // answers in milliseconds where a runtime takes seconds to make its first edit.
@@ -1077,12 +1078,15 @@ extension DaemonCore {
         do {
             let connected = try await connect(session, runtime: runtime, for: agent, sandbox: sandbox, quiet: quiet)
             launchPrints[agent.id] = launchPrint(for: agents[agent.id] ?? agent)
+            lentPrints[agent.id] = Self.lentPrint(lent)
+            // It starts now, so whatever kept prewarms of it back has passed (#202).
+            prewarmFailures.removeValue(forKey: runtime.id)
             return connected
         } catch {
             if quiet {
+                // Logged by the prewarm, once per runtime however often it is asked (#202).
                 dropAppTokens(for: agent.id)
                 await session.end(gracePeriod: .seconds(1))
-                DaemonLog.shared.write("warm pool: \(runtime.id) for \(agent.id) did not start ahead of a prompt: \(error)")
                 throw error
             }
             // Its sandbox first (064), read while the process's last words are to hand.
