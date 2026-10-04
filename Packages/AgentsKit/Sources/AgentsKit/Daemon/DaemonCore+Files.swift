@@ -146,7 +146,11 @@ extension DaemonCore {
             }
         }
         let paths = folders.map { $0.standardizedFileURL.path }
-        for agentID in byAgent.keys { reportedChanges[agentID]?.answer = nil }
+        for agentID in byAgent.keys {
+            guard var held = reportedChanges.peek(agentID), held.answer != nil else { continue }
+            held.answer = nil
+            reportedChanges.set(held, for: agentID)
+        }
         for (agentID, connections) in byAgent {
             send(DaemonAPI.Notification.filesChanged,
                  DaemonAPI.FilesChangedNotification(agentID: agentID, folders: paths),

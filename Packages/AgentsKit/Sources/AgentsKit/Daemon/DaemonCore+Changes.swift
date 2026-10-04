@@ -117,19 +117,19 @@ extension DaemonCore {
     /// Each fresh answer is three git calls, a `cat-file` and a read of every changed file.
     func changes(of agent: Agent) async throws -> (list: ChangesList, fold: ReportedChanges, git: GitContext?) {
         let fold = try await reported(for: agent.id)
-        let through = reportedChanges[agent.id]?.through ?? 0
+        let through = reportedChanges.peek(agent.id)?.through ?? 0
         let (context, view) = await gitContext(for: agent)
         let key = ChangesAnswer.Key(through: through, cwd: agent.cwd, startingPoint: agent.startingPoint,
                                     view: view, root: context?.root,
                                     stamp: context.map { GitStamp.of($0.root) } ?? nil)
-        if let held = reportedChanges[agent.id]?.answer, held.key == key, isWatched(agent.cwd, for: agent.id),
+        if let held = reportedChanges.peek(agent.id)?.answer, held.key == key, isWatched(agent.cwd, for: agent.id),
            now().timeIntervalSince(held.madeAt) < ChangesAnswer.lifetime {
             return (held.list, fold, held.git)
         }
         let answer = try await freshChanges(of: agent, fold: fold, context: context, view: view)
-        if reportedChanges[agent.id]?.through == through {
-            reportedChanges[agent.id]?.answer = ChangesAnswer(key: key, list: answer.list, git: answer.git,
-                                                              madeAt: now())
+        if var held = reportedChanges.peek(agent.id), held.through == through {
+            held.answer = ChangesAnswer(key: key, list: answer.list, git: answer.git, madeAt: now())
+            reportedChanges.set(held, for: agent.id)
         }
         return answer
     }

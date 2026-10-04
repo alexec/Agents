@@ -189,10 +189,10 @@ struct ChangesTests {
         // have, a second ask is the first answer.
         await eventually("the second ask was the first answer") {
             _ = try? await core.changesList(.init(agentID: id))
-            guard let made = await core.reportedChanges[id]?.answer?.madeAt else { return false }
+            guard let made = await core.reportedChanges.peek(id)?.answer?.madeAt else { return false }
             try? await Task.sleep(for: .milliseconds(200))
             _ = try? await core.changesList(.init(agentID: id))
-            return await core.reportedChanges[id]?.answer?.madeAt == made
+            return await core.reportedChanges.peek(id)?.answer?.madeAt == made
         }
 
         let c = try write("let c = 1\n", to: "c.swift", in: work)
