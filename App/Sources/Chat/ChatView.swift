@@ -76,7 +76,7 @@ struct ChatView: View {
                 AppViewFullscreen(host: host)
             }
         }
-        .onChange(of: agent?.id) { views.tearDownAll(reason: "The conversation was closed.") }
+        .onChange(of: agent?.id) { views.tearDownAll() }
     }
 
     /// What a view in the chat may ask of the Mac (#187): the host the chat is on, the

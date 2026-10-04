@@ -52,7 +52,7 @@ final class AppViewStore {
     func existing(_ id: UUID) -> AppViewHost? { hosts[id] }
 
     /// Every view, told and then taken down: the chat is closing or changing.
-    func tearDownAll(reason: String) {
+    func tearDownAll(reason: String = "The conversation was closed.") {
         let all = hosts.values
         hosts = [:]
         order = []

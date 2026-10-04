@@ -81,8 +81,8 @@ struct RemoteChatView: View {
                 AppViewFullscreen(host: host)
             }
         }
-        .onChange(of: agent?.id) { views.tearDownAll(reason: "The conversation was closed.") }
-        .onDisappear { views.tearDownAll(reason: "The conversation was closed.") }
+        .onChange(of: agent?.id) { views.tearDownAll() }
+        .onDisappear { views.tearDownAll() }
         .navigationTitle(agent?.title ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
