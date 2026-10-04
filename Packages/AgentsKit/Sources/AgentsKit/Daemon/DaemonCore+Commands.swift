@@ -248,12 +248,14 @@ extension DaemonCore {
         let appToken: String
         // A draft is only usable if it was made with the servers this start names.
         // They are read once, when the session is made, so reusing a session that
-        // never heard about a server would attach it in name only.
+        // never heard about a server would attach it in name only. The same goes for
+        // extra folders, which a draft is never made with (#230).
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
         let sandbox = resolveSandbox(runtimeID: request.runtimeID, override: request.sandbox, starter: starter)
         let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == cwd
                                      && $0.sandbox == sandbox.choice
                                      && $0.mcpServers == request.mcpServers
+                                     && request.additionalDirectories.isEmpty
                                      && $0.personalServers == PersonalDotAgents.mcpStamp(home: locations.personalHome)
                                      && $0.managesAgents == (starter == nil) ? $0 : nil }
         if let usable {
@@ -270,6 +272,7 @@ extension DaemonCore {
             // on a session it has already decided against.
             if let draft { Task { [self] in await endDraft(draft) } }
             let made = try await freshSession(runtimeID: request.runtimeID, cwd: cwd,
+                                              additionalDirectories: request.additionalDirectories,
                                               mcpServers: request.mcpServers,
                                               managesAgents: starter == nil,
                                               sandbox: sandbox.choice)
@@ -393,6 +396,7 @@ extension DaemonCore {
     /// session before there is an agent, so that it can refuse a setting the runtime
     /// will not take without an agent ever existing to be refused on.
     func freshSession(runtimeID: String, cwd: URL,
+                              additionalDirectories: [URL] = [],
                               mcpServers: [MCPServer] = [],
                               managesAgents: Bool = true,
                               sandbox: SandboxChoice = .runtime) async throws -> MadeSession {
@@ -437,6 +441,7 @@ extension DaemonCore {
                                                managesAgents: managesAgents, cwd: cwd,
                                                capabilities: handshake.agentCapabilities?.mcpCapabilities)
             let result = try await session.newSession(cwd: cwd,
+                                                      additionalDirectories: additionalDirectories,
                                                       mcpServers: servers,
                                                       meta: sessionMeta(runtimeID: runtimeID, cwd: cwd,
                                                                         sandbox: sandbox))
