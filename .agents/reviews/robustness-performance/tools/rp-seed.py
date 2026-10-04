@@ -4,7 +4,8 @@
 import json, os, sys, uuid, datetime, random, subprocess
 root, P, A, L, E = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 assert root.startswith("/tmp/run-")
-fx = json.load(open(os.path.join(os.path.dirname(__file__) if False else "/Users/alexcollins/Agents/.agents/worktrees/re-robustness-performance", "Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/archived-agent.json")))
+repo = subprocess.run(["git", "-C", os.path.dirname(os.path.abspath(__file__)), "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
+fx = json.load(open(os.path.join(repo, "Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/archived-agent.json")))
 now = datetime.datetime.now(datetime.timezone.utc)
 iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%S.") + f"{d.microsecond//1000:03d}Z"
 os.makedirs(f"{root}/agents", exist_ok=True)
