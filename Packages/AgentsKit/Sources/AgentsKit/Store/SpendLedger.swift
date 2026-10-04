@@ -11,8 +11,18 @@ import AgentsKitCore
 /// It is **not** a history and must never be shown as one. Days beyond today are kept
 /// only so that every boundary question — a spend banked either side of midnight, a
 /// daemon restarted at four in the morning — has an unambiguous answer.
-public struct SpendLedger: Sendable {
+///
+/// Held in memory once read (#177): a busy turn quotes its cost on several usage
+/// updates, and each used to read the file, rewrite it, and read it twice more for the
+/// limits. Now `record` changes memory, `flush` writes, and `add` does both. The daemon
+/// is the only writer of this file while it runs.
+public final class SpendLedger: @unchecked Sendable {
     private let locations: StoreLocations
+    private let lock = NSLock()
+    /// The file's contents, once read.
+    private var held: Contents?
+    /// The day of the last change not yet written, or nil when the file is current.
+    private var unwritten: String?
 
     public init(locations: StoreLocations) {
         self.locations = locations
@@ -45,24 +55,49 @@ public struct SpendLedger: Sendable {
     /// Called once per turn from `finishTurn`, before the agent is broadcast, so a
     /// daemon killed between the two comes back having counted the money.
     public func add(_ cost: Cost, on date: Date) throws {
-        var contents = read()
-        let day = Self.stamp(for: date)
-        contents.days[day, default: [:]][cost.currency, default: 0] += cost.amount
-        try write(contents, keeping: day)
+        record(cost, on: date)
+        try flush()
     }
+
+    /// Add a cost into its day's bucket in memory only; `flush` writes it.
+    public func record(_ cost: Cost, on date: Date) {
+        lock.withLock {
+            var contents = readLocked()
+            let day = Self.stamp(for: date)
+            contents.days[day, default: [:]][cost.currency, default: 0] += cost.amount
+            held = contents
+            unwritten = day
+        }
+    }
+
+    /// Write what `record` added, if anything. A failed write stays unwritten, for the
+    /// next flush to try again.
+    public func flush() throws {
+        try lock.withLock {
+            guard let day = unwritten, let contents = held else { return }
+            try write(contents, keeping: day)
+            unwritten = nil
+        }
+    }
+
+    /// Whether `record` added anything not yet written.
+    public var hasUnwritten: Bool { lock.withLock { unwritten != nil } }
 
     /// What was spent on that local day, per currency. Empty when nothing was, so a
     /// view shows nothing rather than a zero.
     public func total(on date: Date) -> [String: Decimal] {
-        read().days[Self.stamp(for: date)] ?? [:]
+        lock.withLock { readLocked().days[Self.stamp(for: date)] ?? [:] }
     }
 
     /// A missing file is an empty ledger. An unreadable one is set aside and is empty
     /// too (#171): a daemon that cannot read its own ledger must not refuse to work; it
-    /// under-counts today, and the limits say so (`note`).
-    private func read() -> Contents {
-        StoreFile.load(Contents.self, at: locations.spend, empty: Contents(),
-                       meaning: "today's spend starts again from nothing")
+    /// under-counts today, and the limits say so (`note`). Read once, then held.
+    private func readLocked() -> Contents {
+        if let held { return held }
+        let read = StoreFile.load(Contents.self, at: locations.spend, empty: Contents(),
+                                  meaning: "today's spend starts again from nothing")
+        held = read
+        return read
     }
 
     /// What the limits say while this run set the ledger aside, or nil.
@@ -77,6 +112,7 @@ public struct SpendLedger: Sendable {
         var contents = contents
         let keep = contents.days.keys.sorted().suffix(Self.daysKept)
         contents.days = contents.days.filter { keep.contains($0.key) || $0.key == day }
+        held = contents
         try StoreFile.write(try StoreCoding.encoder.encode(contents), to: locations.spend)
     }
 }

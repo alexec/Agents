@@ -840,8 +840,8 @@ extension DaemonCore {
         return notes.isEmpty ? nil : notes.joined(separator: " ")
     }
 
-    /// Always after the ledger is written, never before. A window is never told about
-    /// money the daemon has not yet recorded.
+    /// Always after the ledger has the money, never before. A window is never told
+    /// about money the daemon has not yet recorded.
     func broadcastCostState() {
         broadcast(DaemonAPI.Notification.costChanged, currentCostState())
     }
@@ -875,10 +875,34 @@ extension DaemonCore {
         guard added > 0 else { return }
         // Per currency. Adding two currencies would be a number nobody could check.
         agent.costToDate[cost.currency] = (agent.costToDate[cost.currency] ?? 0) + added
-        // The ledger before the windows: a daemon killed between here and the next
-        // broadcast comes back having counted the money rather than having forgotten
-        // it. It is also the only copy that survives the agent being archived.
-        keepQuietly("today's spend") { try spendLedger.add(Cost(amount: added, currency: cost.currency), on: now()) }
+        // Into the ledger's memory now, and to its file within `spendSaveDelay` and at
+        // the end of the turn (#177): a turn quotes its cost several times. The ledger
+        // is also the only copy that survives the agent being archived.
+        spendLedger.record(Cost(amount: added, currency: cost.currency), on: now())
+    }
+
+    /// How long a cost banked on a usage update waits to be written, at most.
+    static let spendSaveDelay: Duration = .seconds(2)
+
+    /// Write the ledger, then `agentID`'s record, once `spendSaveDelay` has passed.
+    func saveSpendSoon(with agentID: UUID) {
+        spendSaveAgents.insert(agentID)
+        guard spendSave == nil else { return }
+        spendSave = Task { [weak self] in
+            try? await Task.sleep(for: Self.spendSaveDelay)
+            await self?.flushSpend()
+        }
+    }
+
+    /// Write what the ledger holds unwritten, then the agents whose costs went with it:
+    /// the day is never behind an agent on disk. At a turn's end and at shut-down too.
+    func flushSpend() {
+        spendSave?.cancel()
+        spendSave = nil
+        keepQuietly("today's spend") { try spendLedger.flush() }
+        let waiting = spendSaveAgents
+        spendSaveAgents = []
+        for id in waiting { if let agent = agents[id] { saveQuietly(agent) } }
     }
 
     /// Send what is waiting to every agent that has something waiting.
@@ -1226,6 +1250,9 @@ extension DaemonCore {
 
     func finishTurn(agentID: UUID, result: TurnResult) async {
         turnTasks.removeValue(forKey: agentID)
+        // What the turn's usage updates banked so far is on disk before the turn is
+        // over; any still arriving follow within `spendSaveDelay`.
+        flushSpend()
         // Whether the app cancelled this turn because the agent had ended it (#139).
         let endedByTheAgent = endWatch(agentID)
         // Read before anything is awaited, so a stop in any of the waits below is seen.

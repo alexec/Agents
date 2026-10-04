@@ -62,6 +62,39 @@ struct SpendLedgerTests {
                 "the money was counted, not forgotten")
     }
 
+    @Test("a recorded cost is counted at once and written on flush (#177)")
+    func recordHoldsAndFlushWrites() throws {
+        let (ledger, locations) = temporary()
+        let when = day("2026-09-19 09:00")
+        ledger.record(usd(1), on: when)
+        ledger.record(usd(2), on: when)
+        #expect(ledger.total(on: when) == ["USD": 3], "the limits see it before it is written")
+        #expect(ledger.hasUnwritten)
+        #expect(!FileManager.default.fileExists(atPath: locations.spend.path), "nothing written per update")
+
+        try ledger.flush()
+        #expect(!ledger.hasUnwritten)
+        #expect(SpendLedger(locations: locations).total(on: when) == ["USD": 3])
+    }
+
+    @Test("the file is read once, then held (#177)")
+    func readOnceThenHeld() throws {
+        let (ledger, locations) = temporary()
+        let when = day("2026-09-19 09:00")
+        try ledger.add(usd(1), on: when)
+        // Taken away behind its back: a ledger that read the file per question would
+        // now say nothing was spent.
+        try FileManager.default.removeItem(at: locations.spend)
+        #expect(ledger.total(on: when) == ["USD": 1])
+    }
+
+    @Test("a flush with nothing new writes nothing")
+    func anEmptyFlushWritesNothing() throws {
+        let (ledger, locations) = temporary()
+        try ledger.flush()
+        #expect(!FileManager.default.fileExists(atPath: locations.spend.path))
+    }
+
     @Test("pruning keeps the last seven days and drops the eighth")
     func onlyEnoughDaysToAnswerTheBoundaryQuestions() throws {
         let (ledger, locations) = temporary()
@@ -120,5 +153,21 @@ struct SpendLedgerTests {
         let late = ISO8601DateFormatter().date(from: "2026-03-29T22:30:00Z")!
         #expect(SpendLedger.stamp(for: early, calendar: calendar)
                 == SpendLedger.stamp(for: late, calendar: calendar))
+    }
+
+    // MARK: The limits, held (#177)
+
+    @Test("the limits are read again only when the file changed")
+    func limitsFollowTheFile() throws {
+        let (_, locations) = temporary()
+        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        let limits = LimitStore(locations: locations)
+        #expect(limits.load().isEmpty)
+        // Another writer: a second store, as a test or the person's editor would be.
+        try LimitStore(locations: locations).save(CostLimits(daily: usd(3)))
+        #expect(limits.load().daily == usd(3), "a change on disk is seen")
+        #expect(limits.load().daily == usd(3))
+        try LimitStore(locations: locations).save(CostLimits())
+        #expect(limits.load().isEmpty)
     }
 }
