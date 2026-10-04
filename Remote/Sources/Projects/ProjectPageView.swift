@@ -122,7 +122,7 @@ struct ProjectPageView: View {
         }
         // The cards' swipe to Archive (`AgentCard`).
         .swipeActionsContainer()
-        .markedStale(model.isStale)
+        .markedStale(model.isStale(on: model.selectedSummary?.host ?? .mac))
         // The archived page wanted, once it is open, and again when the count moves.
         .task(id: ArchivedAsk(project: model.selectedProject, isOpen: showsArchived,
                               shown: archivedShown, count: archivedCount)) {

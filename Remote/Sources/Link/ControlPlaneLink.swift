@@ -121,17 +121,30 @@ extension RemoteControl {
 struct ControlPlaneLink: DaemonLink {
     let dial: @Sendable () async throws -> any LineTransport
     var relayed: (@Sendable () async throws -> any LineTransport)?
+    /// This link's watcher for the address while relayed: one per pairing, so stopping an
+    /// old pairing's does not stop the new one's (#208).
+    let watching: Watching
+
+    init(dial: @escaping @Sendable () async throws -> any LineTransport,
+         relayed: (@Sendable () async throws -> any LineTransport)?, watching: Watching = Watching()) {
+        self.dial = dial
+        self.relayed = relayed
+        self.watching = watching
+    }
 
     /// The same link without the relay: for a second connection, which the relay cannot
     /// carry beside the first.
-    var addressOnly: ControlPlaneLink { ControlPlaneLink(dial: dial, relayed: nil) }
+    var addressOnly: ControlPlaneLink { ControlPlaneLink(dial: dial, relayed: nil, watching: watching) }
 
     /// How often a relayed connection looks for the address again.
     static let lookAgain: Duration = .seconds(30)
 
     func transport() async throws -> any LineTransport {
         do {
-            return try await dial()
+            let direct = try await dial()
+            // The address answers this connection itself: nothing left to watch for (#208).
+            if relayed != nil { watching.stop(keepsWatching: true) }
+            return direct
         } catch let refusal as ControlAuth.Refusal {
             // `DaemonClient` keeps only "could not connect"; the model asks what was said.
             // A control plane that answered and refused is not one to go round.
@@ -155,37 +168,61 @@ struct ControlPlaneLink: DaemonLink {
 
     /// While relayed, try the address now and then; when it answers, end the relayed
     /// connection so the model reconnects, and the address wins. One watcher, for the
-    /// latest relayed connection.
+    /// latest relayed connection; it ends when the address answers, when this link next
+    /// connects to the address by itself, or when its pairing is stopped (#208). It used
+    /// to dial every half minute for good.
     private func watchForTheAddress(while relayed: any LineTransport) {
-        guard Self.watching.hold(relayed) else { return }
         let dial = self.dial
-        Task.detached {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: Self.lookAgain)
-                if let direct = try? await dial() {
-                    direct.close()
-                    Self.watching.take()?.close()
-                    return
+        let watching = self.watching
+        watching.hold(relayed) {
+            Task.detached {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: Self.lookAgain)
+                    guard !Task.isCancelled else { return }
+                    if let direct = try? await dial() {
+                        direct.close()
+                        watching.take()?.close()
+                        return
+                    }
                 }
             }
         }
     }
 
-    static let watching = Watching()
-
-    /// The relayed connection in use, and whether somebody is already watching for the
-    /// address on its behalf.
+    /// The relayed connection in use, and the watcher looking for the address on its behalf.
     final class Watching: @unchecked Sendable {
         private let lock = NSLock()
         private var relayed: (any LineTransport)?
-        /// Holds the connection; true when no watcher is running yet.
-        func hold(_ transport: any LineTransport) -> Bool {
+        private var watcher: Task<Void, Never>?
+        private var stopped = false
+
+        /// Holds the connection, and starts a watcher with `watch` when none is running.
+        /// Nothing once stopped.
+        func hold(_ transport: any LineTransport, watch: () -> Task<Void, Never>) {
             lock.withLock {
-                defer { relayed = transport }
-                return relayed == nil
+                guard !stopped else { return }
+                relayed = transport
+                if watcher == nil { watcher = watch() }
             }
         }
-        func take() -> (any LineTransport)? { lock.withLock { defer { relayed = nil }; return relayed } }
+
+        /// The relayed connection, to close: the address answered. The watcher is done.
+        func take() -> (any LineTransport)? {
+            lock.withLock {
+                defer { relayed = nil; watcher = nil }
+                return relayed
+            }
+        }
+
+        /// No more watching. `keepsWatching` lets a later relayed connection watch again;
+        /// without it, as for a pairing replaced, nothing does.
+        func stop(keepsWatching: Bool = false) {
+            let ended = lock.withLock {
+                defer { relayed = nil; watcher = nil; if !keepsWatching { stopped = true } }
+                return watcher
+            }
+            ended?.cancel()
+        }
     }
 
     func start() async throws {}

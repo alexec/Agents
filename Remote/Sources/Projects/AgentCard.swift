@@ -192,7 +192,7 @@ struct AgentCard: View {
                 } label: {
                     Label(ParkWords.label(action), systemImage: ParkWords.symbol(action))
                 }
-                .disabled(model.isStale || isActing)
+                .disabled(model.isStale(agent) || isActing)
                 .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
             }
             // Leave it to come back to, or clear it unopened (#70).
@@ -203,7 +203,7 @@ struct AgentCard: View {
                     Label(agent.isUnread ? "Mark as Read" : "Mark as Unread",
                           systemImage: agent.isUnread ? "envelope.open" : "envelope.badge")
                 }
-                .disabled(model.isStale)
+                .disabled(model.isStale(agent))
             }
             if agent.state != .archived {
                 archiveButton
@@ -227,7 +227,7 @@ struct AgentCard: View {
         } label: {
             Label("Archive", systemImage: "archivebox")
         }
-        .disabled(model.isStale || isActing)
+        .disabled(model.isStale(agent) || isActing)
     }
 
     /// Something is on its way to this agent; its menu and swipe hold until it is back (#87).
