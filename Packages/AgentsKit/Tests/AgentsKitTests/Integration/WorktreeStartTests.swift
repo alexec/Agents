@@ -479,6 +479,8 @@ struct WorktreeStartTests {
         #expect(!(try await git(["worktree", "list"], in: repo.top)).contains("fix-login"))
         #expect(try await git(["branch", "--list", "agents/*"], in: repo.top).isEmpty)
         #expect(await core.agent(id)?.state == .archived)
+        // The window's row strikes the worktree through from this mark alone (#176).
+        #expect(await core.agent(id)?.missingFolder == MissingFolder(branchKept: false))
     }
 
     @Test func archivingKeepsAWorktreeWithUncommittedChanges() async throws {

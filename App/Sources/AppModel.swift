@@ -660,24 +660,6 @@ final class AppModel {
         return nil
     }
 
-    /// Whether a path is there: `files/browse` on its host, and a host that cannot be
-    /// asked is left as still there.
-    func pathIsThere(_ url: URL, on host: HostID) async -> Bool {
-        if controlPlaneAway || hosts.isOffline(host) { return true }
-        do {
-            _ = try await client(for: host).call(DaemonAPI.Method.filesBrowse,
-                                                  DaemonAPI.FilesBrowseRequest(path: url.path(percentEncoded: false)),
-                                                  returning: DirectoryListing.self)
-            return true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.fileGone {
-            return false
-        } catch let error as JSONRPCError where error.message == "That is a file." {
-            return true
-        } catch {
-            return true
-        }
-    }
-
     private func client(forAgent id: UUID?) -> DaemonClient {
         client(for: host(ofAgent: id))
     }

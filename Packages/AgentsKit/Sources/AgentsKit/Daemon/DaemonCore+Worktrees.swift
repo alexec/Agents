@@ -301,6 +301,7 @@ extension DaemonCore {
                 try await GitWorktrees.deleteBranch(branch, force: facts.check.unmerged, in: facts.project)
                 removedBranch = true
             }
+            await noteFolders(in: facts.root, of: facts.project)
             projectChanged(forAgentIn: facts.project)
             return DaemonAPI.WorktreeRemoved(removedBranch: removedBranch)
         } catch let failure as GitWorktrees.Failure {
@@ -333,10 +334,26 @@ extension DaemonCore {
             }
             await record(.runtimeNote("Removed the worktree \(worktree.name)\(branchNote), since everything in it was committed."),
                          for: agentID)
+            await noteFolders(in: facts.root, of: facts.project)
             projectChanged(forAgentIn: facts.project)
         } catch let failure as GitWorktrees.Failure {
             DaemonLog.shared.write("left the worktree \(facts.root.path) after archiving \(agentID): \(failure.message)")
         } catch {}
+    }
+
+    /// Mark the agents whose worktree was just removed, archived ones included: the
+    /// heartbeat looks only at live agents' folders, and the rows read this mark rather
+    /// than asking the host whether each worktree is there (#176).
+    /// Only that project's agents are looked at.
+    func noteFolders(in root: URL, of project: URL) async {
+        let path = Self.canonicalPath(root)
+        let members = agents.byFolder[Project.standardize(project)] ?? []
+        let inIt = members.filter { id in
+            guard let worktree = agents[id]?.worktree, worktree.root.lastPathComponent == root.lastPathComponent
+            else { return false }
+            return Self.canonicalPath(worktree.root) == path
+        }
+        for id in inIt { await noteFolder(of: id) }
     }
 
     /// Whether an archived agent's app-made worktree still holds work that only its
