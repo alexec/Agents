@@ -558,6 +558,10 @@ extension DaemonCore {
             case DaemonAPI.Method.wakeState:
                 return .success(try JSONValue.encoding(wakeState()))
 
+            // Asked once by a window on connecting, then heard as it changes (#205).
+            case DaemonAPI.Method.storeNotes:
+                return .success(try JSONValue.encoding(storeNotes()))
+
             case DaemonAPI.Method.wakeSettings:
                 return .success(try JSONValue.encoding(readWakeSettings()))
 

@@ -51,7 +51,7 @@ struct MCPInstaller: Sendable {
         }
 
         // Required secrets must be provided or already set.
-        var env = SecretsEnv.load(from: SecretsEnv.url(home: home))
+        var env = try Self.secretsForChange(home: home)
         for variable in staged.preview.variables where variable.kind == .secret && variable.required {
             if let value = secrets[variable.name], !value.isEmpty {
                 env.set(variable.name, value: value)
@@ -97,6 +97,16 @@ struct MCPInstaller: Sendable {
                                           addedAt: addedAt, destination: destination)
     }
 
+    /// The person's `secrets.env` to change, or the refusal that keeps an unreadable one.
+    static func secretsForChange(home: URL) throws -> SecretsEnv {
+        do {
+            return try SecretsEnv.loadForChange(from: SecretsEnv.url(home: home))
+        } catch let unreadable as SecretsEnv.Unreadable {
+            DaemonLog.shared.write("mcp: secrets.env could not be read; nothing written to it")
+            throw DaemonAPI.MCPCatalogError.failed(unreadable.message)
+        }
+    }
+
     /// Write one name into the person's `secrets.env`. The value is not logged.
     func setSecret(name: String, value: String, personalHome: URL?) throws {
         guard let home = personalHome else { throw DaemonAPI.MCPCatalogError.noPersonalHome }
@@ -104,7 +114,7 @@ struct MCPInstaller: Sendable {
             throw DaemonAPI.MCPCatalogError.failed("A secret's name is letters, digits and underscores.")
         }
         guard !value.isEmpty else { throw DaemonAPI.MCPCatalogError.failed("A secret needs a value.") }
-        var env = SecretsEnv.load(from: SecretsEnv.url(home: home))
+        var env = try Self.secretsForChange(home: home)
         env.set(name, value: value)
         try env.save(to: SecretsEnv.url(home: home))
     }
@@ -123,6 +133,8 @@ struct MCPInstaller: Sendable {
            secretIsReferenced(secret, excluding: name, destination: destination, personalHome: home, alsoScan: alsoScan) {
             throw DaemonAPI.MCPCatalogError.secretStillInUse(name: secret)
         }
+        // Read before anything changes, so an unreadable one stops the whole removal.
+        let env = forgetSecret?.isEmpty == false ? try Self.secretsForChange(home: home) : nil
         do {
             try MCPJSONFile.remove(name: name, at: url)
         } catch is MCPJSONFile.Problem {
@@ -135,8 +147,7 @@ struct MCPInstaller: Sendable {
             records.drop(folder: URL(filePath: path), name: name)
             try MCPApprovalStore(file: approvalsURL).save(records, replacing: true)
         }
-        if let secret = forgetSecret, !secret.isEmpty {
-            var env = SecretsEnv.load(from: SecretsEnv.url(home: home))
+        if let secret = forgetSecret, !secret.isEmpty, var env {
             env.remove(secret)
             try env.save(to: SecretsEnv.url(home: home))
         }

@@ -241,10 +241,17 @@ public struct WorkflowStore: Sendable {
     var file: URL { locations.workflows }
 
     func load() -> WorkflowRecords {
-        switch ApprovalFile.read(WorkflowRecords.self, at: locations.workflows) {
+        switch ApprovalFile.read(WorkflowRecords.self, at: locations.workflows, began: \.approvalsBegan) {
         case .missing: return WorkflowRecords()
         case .read(let records): return records
-        case .unreadable: return WorkflowRecords(approvalsBegan: Date(), unreadable: true)
+        case .unreadable(let salvage):
+            // What decoded is kept, so the person's Approve does not drop standing
+            // agents, switches, held fires or runs in flight (#205); never an approval.
+            var records = salvage ?? WorkflowRecords()
+            for index in records.states.indices { records.states[index].approvedDigest = nil }
+            records.approvalsBegan = Date()
+            records.unreadable = true
+            return records
         }
     }
 
@@ -253,7 +260,7 @@ public struct WorkflowStore: Sendable {
     func save(_ records: WorkflowRecords, replacing: Bool = false) throws {
         let data = try StoreCoding.encoder.encode(records)
         try ApprovalFile.write(data, to: locations.workflows, overUnreadable: records.unreadable,
-                               replacing: replacing)
+                               replacing: replacing, began: records.approvalsBegan != nil)
     }
 }
 

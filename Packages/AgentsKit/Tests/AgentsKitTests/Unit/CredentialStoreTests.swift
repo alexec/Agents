@@ -105,6 +105,71 @@ struct CredentialStoreTests {
         }
     }
 
+    private func keychainHas(_ store: CredentialStore, _ account: String) -> Bool {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: store.service, kSecAttrAccount as String: account]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+    }
+
+    private func addItem(_ store: CredentialStore, _ account: String) {
+        let item: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: store.service,
+            kSecAttrAccount as String: account, kSecValueData as String: Data("future-secret".utf8)]
+        #expect(SecItemAdd(item as CFDictionary, nil) == errSecSuccess)
+    }
+
+    /// A kind a newer build added is not this build's to forget (#205): swapping builds
+    /// keeps its record and its Keychain item, and a save beside it carries it through.
+    @Test func aNewerBuildsKindIsKeptRecordAndSecret() throws {
+        try withStore { store in
+            defer { try? store.remove("future") }
+            try FileManager.default.createDirectory(at: store.file.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try Data(#"{"future":{"kind":"futureKey","lastFour":"9999","addedAt":"2026-10-04T10:00:00Z"}}"#.utf8)
+                .write(to: store.file)
+            addItem(store, "future")
+
+            #expect(store.forgetKindsNoLongerTaken().isEmpty)
+            #expect(keychainHas(store, "future"))
+            try store.save(Self.token, for: "gemini")
+            try store.markWorked("future")
+            let text = try String(contentsOf: store.file, encoding: .utf8)
+            #expect(text.contains("futureKey") && text.contains("9999"), "the newer record is carried through")
+            #expect(store.record(for: "gemini") != nil)
+            let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                        kSecAttrService as String: store.service, kSecAttrAccount as String: "future"]
+            SecItemDelete(query as CFDictionary)
+        }
+    }
+
+    /// A records file that cannot be read, by permissions or by its bytes, is never
+    /// written over with one runtime, and the Keychain is left as it was.
+    @Test(arguments: ["permissions", "corrupt", "conflict"])
+    func anUnreadableRecordsFileIsNeverWrittenOver(_ how: String) throws {
+        try withStore { store in
+            try store.save(Self.token, for: "gemini")
+            var bytes = try Data(contentsOf: store.file)
+            switch how {
+            case "corrupt": bytes = Data(#"{"gemini":{"kind":"gem"#.utf8)
+            case "conflict": bytes = Data("<<<<<<< HEAD\n".utf8) + bytes + Data("=======\n>>>>>>> b\n".utf8)
+            default: break
+            }
+            try bytes.write(to: store.file)
+            if how == "permissions" {
+                try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: store.file.path)
+            }
+            #expect(store.isUnreadable)
+            #expect(throws: CredentialStore.Unreadable.self) { try store.save(Self.key, for: "gemini") }
+            #expect(throws: CredentialStore.Unreadable.self) { try store.remove("gemini") }
+            #expect(throws: CredentialStore.Unreadable.self) { try store.markWorked("gemini") }
+            #expect(store.forgetKindsNoLongerTaken().isEmpty)
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: store.file.path)
+            #expect(try Data(contentsOf: store.file) == bytes, "byte for byte")
+            #expect(store.secret(for: "gemini") == Self.token, "the Keychain item is untouched")
+            try FileManager.default.removeItem(at: store.file)
+        }
+    }
+
     @Test func twoRootsNeverShareOne() {
         let a = CredentialStore(locations: StoreLocations(root: URL(filePath: "/tmp/root-a")))
         let b = CredentialStore(locations: StoreLocations(root: URL(filePath: "/tmp/root-b")))

@@ -513,6 +513,16 @@ private struct SidebarFoot: View {
                     .padding(.vertical, 4)
                     .accessibilityElement(children: .combine)
             }
+            // A file this Mac keeps that could not be read (#205): why paired devices or
+            // projects may have gone from view, and that what they held is kept.
+            ForEach(model.storeNotes, id: \.self) { note in
+                Label(note, systemImage: "exclamationmark.triangle")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
+            }
             WakefulnessRow()
         }
         .frame(maxWidth: .infinity, alignment: .leading)

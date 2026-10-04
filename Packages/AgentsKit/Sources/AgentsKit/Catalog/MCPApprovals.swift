@@ -78,7 +78,7 @@ struct MCPApprovalStore: Sendable {
 
     /// A file that cannot be read approves nothing, and is left as it is (`ApprovalFile`).
     func load() -> MCPApprovals {
-        switch ApprovalFile.read(MCPApprovals.self, at: file) {
+        switch ApprovalFile.read(MCPApprovals.self, at: file, began: \.approvalsBegan) {
         case .missing: return MCPApprovals()
         case .read(let records): return records
         case .unreadable: return MCPApprovals(approvalsBegan: Date(), unreadable: true)
@@ -89,7 +89,8 @@ struct MCPApprovalStore: Sendable {
     /// could not be read.
     func save(_ records: MCPApprovals, replacing: Bool = false) throws {
         let data = try StoreCoding.encoder.encode(records)
-        try ApprovalFile.write(data, to: file, overUnreadable: records.unreadable, replacing: replacing)
+        try ApprovalFile.write(data, to: file, overUnreadable: records.unreadable, replacing: replacing,
+                               began: records.approvalsBegan != nil)
     }
 }
 

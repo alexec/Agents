@@ -247,4 +247,65 @@ struct PinsTests {
         }
         #expect(problem.message.contains("Markdown (.md) or HTML (.html)"))
     }
+
+    // MARK: A pins file that does not read (#205)
+
+    /// Conflict markers, a newer build's pinner, and a file that may not be read: no pin
+    /// change writes over it, it is never moved inside the project, a copy is kept under
+    /// the daemon's root, and once it reads again pins change as before.
+    @Test(arguments: ["conflict", "permissions"])
+    func aPinsFileThatDoesNotReadIsNeverWrittenOver(_ how: String) async throws {
+        let s = try await setUp([("Lead", false, nil)])
+        try write(s.project, "docs/a.md")
+        try write(s.project, "docs/b.md")
+        _ = try await pin(s, "Lead", ["path": "docs/a.md"])
+        let url = s.project.appending(path: PinsFile.path)
+        let good = try Data(contentsOf: url)
+        let bytes: Data = switch how {
+        case "conflict": Data("<<<<<<< HEAD\n".utf8) + good + Data("=======\n{\"pins\":[]}\n>>>>>>> b\n".utf8)
+        case "newer": Data(#"{"pins":[{"path":"docs/a.md","pinned_by":{"team":{"id":"x"}}}]}"#.utf8)
+        default: good
+        }
+        try bytes.write(to: url)
+        if how == "permissions" { try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: url.path) }
+
+        #expect(await s.core.pinViews(s.project).isEmpty)
+        let refused = await refusal { try await pin(s, "Lead", ["path": "docs/b.md"]) }
+        #expect(refused?.contains("could not be read") == true, "\(refused ?? "nil")")
+        #expect(await refusal { try await s.core.arrangePins(DaemonAPI.PinArrangeRequest(folder: s.project, paths: [])) } != nil)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+        #expect(try Data(contentsOf: url) == bytes, "byte for byte")
+        let beside = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
+        #expect(!beside.contains { $0.contains(".corrupt-") }, "nothing set aside inside the project: \(beside)")
+        if how != "permissions" {
+            let kept = StoreCoding.asides(of: url, in: StoreCoding.asideFolder(for: url, under: await s.core.locations.root))
+            #expect(kept.count == 1)
+            #expect(try kept.first.map { try Data(contentsOf: $0) } == bytes)
+
+            // Fixed by hand: pins change again.
+            try good.write(to: url)
+            _ = try await pin(s, "Lead", ["path": "docs/b.md"])
+            #expect(try pinsFile(s).pins.map(\.path) == ["docs/a.md", "docs/b.md"])
+        }
+    }
+
+    /// A newer build's pins (a kind of page or a pinner this build does not know) read as
+    /// far as they can; before a change drops them, the whole file is kept under the root.
+    @Test func aNewerBuildsPinsAreKeptBeforeAChangeDropsThem() async throws {
+        let s = try await setUp([("Lead", false, nil)])
+        try write(s.project, "docs/a.md")
+        try write(s.project, "docs/b.md")
+        let url = s.project.appending(path: PinsFile.path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let newer = Data(#"{"pins":[{"path":"docs/a.md","pinned_by":{"team":"x"}},{"path":"docs/c.pdf","pinned_by":{"person":true}}]}"#.utf8)
+        try newer.write(to: url)
+
+        _ = try await pin(s, "Lead", ["path": "docs/b.md"])
+        let kept = StoreCoding.asides(of: url, in: StoreCoding.asideFolder(for: url, under: await s.core.locations.root))
+        #expect(kept.count == 1)
+        #expect(try kept.first.map { try Data(contentsOf: $0) } == newer, "byte for byte")
+        _ = try await pin(s, "Lead", ["path": "docs/a.md", "title": "A"])
+        #expect(StoreCoding.asides(of: url, in: StoreCoding.asideFolder(for: url, under: await s.core.locations.root)).count == 1,
+                "kept once")
+    }
 }

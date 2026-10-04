@@ -21,6 +21,12 @@ final class ServerCredentials {
     }
 
     private(set) var records: [String: CredentialStore.Record] = [:]
+    /// What to say while `credentials.json` cannot be read (#205): nothing is saved or
+    /// removed over it, and no record shows, though the Keychain still has the secrets.
+    var unreadableNote: String? {
+        unreadable ? "This Mac's credentials file could not be read, so no credential can be saved or removed until it can. Nothing in it or in the Keychain was changed." : nil
+    }
+    private(set) var unreadable = false
     private(set) var checking: [String: Checking] = [:]
 
     @ObservationIgnored private let store: CredentialStore
@@ -33,7 +39,12 @@ final class ServerCredentials {
         // A Claude token from before 056 (or 047's OpenAI key) is lent to nothing now.
         // Kept while 056 is after the #58 cut-off (051).
         store.forgetKindsNoLongerTaken()
+        refresh()
+    }
+
+    private func refresh() {
         records = store.records()
+        unreadable = store.isUnreadable
     }
 
     func record(_ runtimeID: String) -> CredentialStore.Record? { records[runtimeID] }
@@ -44,10 +55,12 @@ final class ServerCredentials {
         do {
             try store.save(secret, for: runtimeID)
         } catch {
-            checking[runtimeID] = .answered(.cannotCheck("The Keychain would not keep it (\(error))."))
+            checking[runtimeID] = .answered(.cannotCheck(error is CredentialStore.Unreadable
+                ? "It was not saved: \(error)." : "The Keychain would not keep it (\(error))."))
+            refresh()
             return true
         }
-        records = store.records()
+        refresh()
         await check(runtimeID)
         return true
     }
@@ -61,13 +74,13 @@ final class ServerCredentials {
         case .refused: try? store.markRefused(runtimeID)
         case .cannotCheck: break
         }
-        records = store.records()
+        refresh()
         checking[runtimeID] = .answered(answer)
     }
 
     func remove(_ runtimeID: String) {
         try? store.remove(runtimeID)
-        records = store.records()
+        refresh()
         checking[runtimeID] = nil
     }
 
@@ -76,11 +89,11 @@ final class ServerCredentials {
 
     func markWorked(_ runtimeID: String) {
         try? store.markWorked(runtimeID)
-        records = store.records()
+        refresh()
     }
 
     func markRefused(_ runtimeID: String) {
         try? store.markRefused(runtimeID)
-        records = store.records()
+        refresh()
     }
 }

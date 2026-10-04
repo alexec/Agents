@@ -49,7 +49,7 @@ extension DaemonCore {
         let project = caller.projectFolder
         let lead = "Nothing was unpinned: "
         guard let given = pinText(request.arguments, "path") else { throw pinRefusal(lead + "say which page, in `path`.") }
-        var file = readPins(project)
+        var file = try readPinsToChange(project)
         guard let path = agentPinPath(given, for: caller), let index = file.pins.firstIndex(where: { $0.path == path }) else {
             throw pinRefusal(lead + "\(given) is not pinned in this project.")
         }
@@ -71,7 +71,7 @@ extension DaemonCore {
         let lead = "Nothing was moved: "
         let arguments = request.arguments
         guard let given = pinText(arguments, "path") else { throw pinRefusal(lead + "say which page, in `path`.") }
-        var file = readPins(project)
+        var file = try readPinsToChange(project)
         let paths = file.pins.map(\.path)
         guard let path = agentPinPath(given, for: caller), paths.contains(path) else {
             throw pinRefusal(lead + "\(given) is not pinned in this project.")
@@ -126,7 +126,7 @@ extension DaemonCore {
     /// Unpin, from any client: any pin.
     public func unpinByPerson(_ request: DaemonAPI.PinPathRequest) throws {
         let project = try knownPinProject(request.folder)
-        var file = readPins(project)
+        var file = try readPinsToChange(project)
         let path = personPinPath(request.path, in: project) ?? request.path
         guard file.pins.contains(where: { $0.path == path }) else {
             throw pinRefusal("Nothing was unpinned: \(request.path) is not pinned in this project.")
@@ -139,7 +139,7 @@ extension DaemonCore {
     /// pins it leaves out keep their place after the ones it names.
     public func arrangePins(_ request: DaemonAPI.PinArrangeRequest) throws {
         let project = try knownPinProject(request.folder)
-        var file = readPins(project)
+        var file = try readPinsToChange(project)
         var placed: [PinEntry] = []
         for path in request.paths {
             if let entry = file.pins.first(where: { $0.path == path }), !placed.contains(entry) { placed.append(entry) }
@@ -270,25 +270,47 @@ extension DaemonCore {
         project.appending(path: PinsFile.path)
     }
 
+    /// The project's pins. One that does not read (a merge's conflict markers, a newer
+    /// build's pinner, a read error) shows as none and is never written over: a copy goes
+    /// under the daemon's root and every pin change is refused until it reads (#205).
     func readPins(_ project: URL) -> PinsFile {
-        guard let data = try? Data(contentsOf: Self.pinsFileURL(project)),
-              let read = try? PinsFile.read(data) else { return PinsFile() }
-        return read.file
+        let read = StoreFile.read(at: Self.pinsFileURL(project), meaning: "no pins show",
+                                  outside: locations.root) { try PinsFile.read($0).file }
+        guard case .read(let file) = read else { return PinsFile() }
+        return file
+    }
+
+    /// The pins, to change; refused while the file is held, before anything else is said.
+    /// What this build cannot show (a newer build's kind of page, pinner or field) is
+    /// dropped by the write, so the whole file is first kept under the daemon's root (#205).
+    func readPinsToChange(_ project: URL) throws -> PinsFile {
+        let url = Self.pinsFileURL(project)
+        let file = readPins(project)
+        do {
+            try StoreFile.requireWritable(url)
+        } catch {
+            throw pinRefusal("The pins were not changed: \(error.localizedDescription)")
+        }
+        if let data = try? StoreFile.reader(url), let read = try? PinsFile.read(data),
+           let raw = try? JSONSerialization.jsonObject(with: data) as? NSDictionary,
+           raw != (try? read.file.fileData()).flatMap({ try? JSONSerialization.jsonObject(with: $0) as? NSDictionary }) {
+            StoreFile.keepPartCopy(url, under: locations.root, what: "pins this build cannot show")
+        }
+        return file
     }
 
     func writePins(_ file: PinsFile, in project: URL) throws {
         let url = Self.pinsFileURL(project)
         do {
             if file.pins.isEmpty {
+                try StoreFile.requireWritable(url)
                 if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
                     try FileManager.default.removeItem(at: url)
                 }
             } else {
                 let data = try file.fileData()
                 if (try? Data(contentsOf: url)) != data {
-                    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
-                                                            withIntermediateDirectories: true)
-                    try data.write(to: url, options: .atomic)
+                    try StoreFile.write(data, to: url)
                 }
             }
         } catch {
@@ -306,7 +328,7 @@ extension DaemonCore {
         if let title, title.count > PinLimits.titleLength {
             throw pinRefusal(lead + "`title` is at most \(PinLimits.titleLength) characters.")
         }
-        var file = readPins(project)
+        var file = try readPinsToChange(project)
         if let index = file.pins.firstIndex(where: { $0.path == path }) {
             if let title { file.pins[index].title = title }
             try writePins(file, in: project)

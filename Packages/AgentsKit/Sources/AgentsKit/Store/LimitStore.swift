@@ -6,9 +6,10 @@ import AgentsKitCore
 /// One file, read whole and written whole, on the pattern `ProjectStore` already
 /// follows. There are two facts in it and both belong to the person.
 ///
-/// A missing or unreadable file is an empty `CostLimits` — no limit. A daemon that
-/// cannot read its own limits must not refuse to work, and it must not invent a limit
-/// nobody set: both failures are worse than the thing the file is for.
+/// A missing file is an empty `CostLimits` — no limit. One that is there and cannot be
+/// read fails closed (#205): `unreadable` says so for the rest of the run, or until the
+/// person sets the limits again, and while it does nothing new starts. Reading it as no
+/// limit would let a limit the person set be spent past without a word.
 ///
 /// Held once read (#177), and read again only when the file's modification date, size
 /// or inode moved: one `stat` per question instead of an open, a read and a decode, at
@@ -18,6 +19,7 @@ public final class LimitStore: @unchecked Sendable {
     private let locations: StoreLocations
     private let lock = NSLock()
     private var held: (limits: CostLimits, stamp: FileStamp?)?
+    private var failedClosed = false
 
     public init(locations: StoreLocations) {
         self.locations = locations
@@ -27,12 +29,26 @@ public final class LimitStore: @unchecked Sendable {
         lock.withLock {
             let stamp = FileStamp(locations.limits)
             if let held, held.stamp == stamp { return held.limits }
-            let limits = StoreFile.load(CostLimits.self, at: locations.limits, empty: CostLimits(),
-                                        meaning: "no spending limits set")
+            let limits: CostLimits
+            switch StoreFile.read(CostLimits.self, at: locations.limits,
+                                  meaning: "nothing new starts until the limits are set again") {
+            case .read(let read): limits = read
+            case .missing: limits = CostLimits()
+            case .unreadable:
+                limits = CostLimits()
+                failedClosed = true
+            }
             // Stamped as it is after the read: a file set aside is gone, and nil.
             held = (limits, FileStamp(locations.limits))
             return limits
         }
+    }
+
+    /// True when the limits could not be read in this run and have not been set since:
+    /// nothing new may start.
+    public var unreadable: Bool {
+        _ = load()
+        return lock.withLock { failedClosed }
     }
 
     public func save(_ limits: CostLimits) throws {
@@ -41,6 +57,7 @@ public final class LimitStore: @unchecked Sendable {
             let data = try StoreCoding.encoder.encode(limits)
             try StoreFile.write(data, to: locations.limits)
             held = (limits, FileStamp(locations.limits))
+            failedClosed = false
         }
     }
 }

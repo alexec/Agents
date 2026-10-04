@@ -19,6 +19,9 @@ struct CredentialRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if let note = credentials.unreadableNote {
+                Label(note, systemImage: "exclamationmark.triangle").appText(.fine).foregroundStyle(.secondary)
+            }
             if let record = credentials.record(runtimeID), !isReplacing {
                 saved(record)
             } else {

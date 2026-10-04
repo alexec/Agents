@@ -1123,6 +1123,7 @@ public actor DaemonCore {
     // MARK: Reading
 
     public func loadFromDisk() async {
+        watchStoreNotes()
         loadRetentionIfNeeded()
         // A retire the last daemon was cut off in: its tombstone is written, so what is
         // left is deleting, and it is done before anything is listed (051, FR-017).

@@ -533,7 +533,12 @@ struct DashboardTests {
             .filter { $0.hasPrefix(url.lastPathComponent + ".corrupt-") }
     }
 
-    @Test func anUnreadableOrderIsSetAsideNotWrittenOver() async throws {
+    /// Copies of a project's file are kept under the daemon's root, never in the project (#205).
+    private func outsideAsides(_ url: URL, _ s: Setup) async -> [URL] {
+        StoreCoding.asides(of: url, in: StoreCoding.asideFolder(for: url, under: await s.core.locations.root))
+    }
+
+    @Test func anUnreadableOrderIsKeptNotWrittenOver() async throws {
         let s = try await setUp([("Lead", false, nil, .finished)])
         for id in ["a", "b"] { _ = try await set(s, "Lead", status(id)) }
         let orderFile = s.project.appendingPathComponent(".agents/dashboard/_order.json")
@@ -544,16 +549,23 @@ struct DashboardTests {
         #expect(snapshot.order == nil, "the tiles show in the order they were made")
         #expect(snapshot.tiles.count == 2, "the Dashboard keeps working")
         #expect(snapshot.note?.contains("_order.json could not be read") == true, "the page says so")
-        let kept = asides(orderFile)
+        #expect(asides(orderFile).isEmpty, "nothing set aside in the project, mid-merge")
+        let kept = await outsideAsides(orderFile, s)
         #expect(kept.count == 1)
-        #expect(try Data(contentsOf: orderFile.deletingLastPathComponent().appendingPathComponent(kept[0])) == conflicted)
+        #expect(try Data(contentsOf: kept[0]) == conflicted)
 
-        // The next arrange writes a whole, readable file, and the set-aside copy stays.
-        try await s.core.arrangeDashboard(.init(folder: s.project, order: DashboardOrder(sections: [
+        // No arrange writes over it while it does not read (#205)…
+        let arrange = DaemonAPI.ArrangeRequest(folder: s.project, order: DashboardOrder(sections: [
             .init(title: nil, tiles: ["b", "a"]),
-        ])))
+        ]))
+        await #expect(throws: (any Error).self) { try await s.core.arrangeDashboard(arrange) }
+        #expect(try Data(contentsOf: orderFile) == conflicted)
+
+        // …and once the person resolves it, the next arrange writes a whole, readable file.
+        try Data(#"{"sections":[]}"#.utf8).write(to: orderFile)
+        try await s.core.arrangeDashboard(arrange)
         #expect(try JSONDecoder().decode(DashboardOrder.self, from: Data(contentsOf: orderFile)).tiles == ["b", "a"])
-        #expect(asides(orderFile).count == 1)
+        #expect(await outsideAsides(orderFile, s).count == 1)
         #expect(Self.temporaries(in: orderFile.deletingLastPathComponent()).isEmpty)
     }
 
@@ -568,7 +580,8 @@ struct DashboardTests {
 
         let tile = try #require(await s.core.dashboardSnapshot(s.project).tiles.first)
         #expect(tile.recent.map(\.value) == [4, 5], "the lines that read are kept")
-        #expect(asides(history).count == 1, "the whole file is kept before a write drops the bad line")
+        #expect(asides(history).isEmpty, "never copied into the project (#205)")
+        #expect(await outsideAsides(history, s).count == 1, "the whole file is kept before a write drops the bad line")
         #expect(await s.core.dashboardSnapshot(s.project).note?.contains("bugs.jsonl") == true)
     }
 

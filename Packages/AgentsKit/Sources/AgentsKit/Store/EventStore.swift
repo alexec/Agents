@@ -72,7 +72,10 @@ public final class EventStore: @unchecked Sendable {
 
     public func load() -> EventLog {
         lock.lock(); defer { lock.unlock() }
-        guard let data = try? Data(contentsOf: locations.events) else { return EventLog() }
+        // A read error is tried again, then holds the log for the run: the hourly prune's
+        // rewrite would otherwise replace it with nothing (#205). Appends still land.
+        guard case .read(let data) = StoreFile.read(at: locations.events, meaning: "starting with no events",
+                                                    decode: { $0 }) else { return EventLog() }
         var log = EventLog()
         var unreadable = 0
         var torn = false
@@ -96,7 +99,11 @@ public final class EventStore: @unchecked Sendable {
             return EventLog()
         }
         if unreadable > 0 {
-            DaemonLog.shared.write("events.jsonl: skipped \(unreadable) unreadable line(s)")
+            // The next prune rewrites without them, so the whole file is kept first.
+            let aside = StoreCoding.setAside(locations.events, copy: true)
+            DaemonLog.shared.write("events.jsonl: skipped \(unreadable) unreadable line(s)"
+                + (aside.map { "; the whole file is kept as \($0.lastPathComponent)" } ?? ""))
+            if let aside { SetAsideNotes.shared.add(locations.events, aside: aside, partly: true) }
         }
         if torn {
             DaemonLog.shared.write("events.jsonl: skipped a torn last line (\(lines.last?.count ?? 0) bytes), from a daemon stopped mid-write")

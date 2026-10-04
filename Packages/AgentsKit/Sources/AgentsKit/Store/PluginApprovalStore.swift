@@ -17,7 +17,7 @@ struct PluginApprovalStore: Sendable {
 
     /// A file that cannot be read approves nothing, and is left as it is (`ApprovalFile`).
     func load() -> PluginApprovals {
-        switch ApprovalFile.read(PluginApprovals.self, at: file) {
+        switch ApprovalFile.read(PluginApprovals.self, at: file, began: \.approvalsBegan) {
         case .missing: return PluginApprovals()
         case .read(let records): return records
         case .unreadable: return PluginApprovals(approvalsBegan: Date(), unreadable: true)
@@ -28,6 +28,7 @@ struct PluginApprovalStore: Sendable {
     /// could not be read.
     func save(_ records: PluginApprovals, replacing: Bool = false) throws {
         let data = try StoreCoding.encoder.encode(records)
-        try ApprovalFile.write(data, to: file, overUnreadable: records.unreadable, replacing: replacing)
+        try ApprovalFile.write(data, to: file, overUnreadable: records.unreadable, replacing: replacing,
+                               began: records.approvalsBegan != nil)
     }
 }

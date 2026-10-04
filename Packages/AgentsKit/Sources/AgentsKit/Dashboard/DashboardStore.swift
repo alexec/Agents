@@ -22,6 +22,8 @@ import AgentsKitCore
 /// per project. Plain Foundation, so the Linux daemon has it too.
 final class DashboardStore: @unchecked Sendable {
     let root: URL
+    /// The daemon's root, where a project file that does not read is copied (#205).
+    let storeRoot: URL
     private var states: [URL: DashboardState] = [:]
     private var pointCache: [String: [TilePoint]] = [:]
     /// Each cached history file's modification date as read or written here, so the
@@ -30,6 +32,7 @@ final class DashboardStore: @unchecked Sendable {
 
     init(locations: StoreLocations) {
         root = locations.root.appendingPathComponent("dashboards", isDirectory: true)
+        storeRoot = locations.root
     }
 
     // MARK: The project's files
@@ -100,12 +103,13 @@ final class DashboardStore: @unchecked Sendable {
     }
 
     /// Nil when nobody has moved a tile. One that does not read (a merge's conflict
-    /// markers, say) is set aside as `_order.json.corrupt-<time>` rather than written
-    /// over by the next move (#171); the tiles show in the order they were made, and the
-    /// Dashboard says so (`notes`).
+    /// markers, say) is left where it is, mid-merge or not, with a copy under the
+    /// daemon's root, and no move writes over it until it reads again (#171, #205); the
+    /// tiles show in the order they were made, and the Dashboard says so (`notes`).
     func readOrder(_ project: URL) -> DashboardOrder? {
         if case .read(let order) = StoreFile.read(DashboardOrder.self, at: Self.orderFile(project), decoder: JSONDecoder(),
-                                                  meaning: "the tiles show in the order they were made") {
+                                                  meaning: "the tiles show in the order they were made",
+                                                  outside: storeRoot) {
             return order
         }
         return nil
@@ -122,7 +126,9 @@ final class DashboardStore: @unchecked Sendable {
     /// are left alone, as a tile's are.
     func writeOrder(_ order: DashboardOrder, in project: URL) throws {
         let url = Self.orderFile(project)
+        _ = readOrder(project)  // one fixed by hand since it was last read is writable again
         guard !order.isEmpty else {
+            try StoreFile.requireWritable(url)
             try? FileManager.default.removeItem(at: url)
             return
         }
@@ -182,11 +188,11 @@ final class DashboardStore: @unchecked Sendable {
     func points(_ project: URL, _ id: String) -> [TilePoint] {
         let key = Self.key(project) + "/" + id
         if let known = pointCache[key] { return known }
-        var out = Self.readPoints(pointsFile(project, id))
+        var out = readPoints(pointsFile(project, id))
         // Points this host kept before #127, folded into the project's once.
         let legacy = hostPointsFile(project, id)
         if FileManager.default.fileExists(atPath: legacy.path) {
-            let merged = (Self.readPoints(legacy) + out).sorted { $0.at < $1.at }
+            let merged = (readPoints(legacy) + out).sorted { $0.at < $1.at }
             out = Self.compacted(merged, now: Date())
             if (try? writePoints(out, for: id, in: project)) != nil {
                 try? FileManager.default.removeItem(at: legacy)
@@ -202,25 +208,26 @@ final class DashboardStore: @unchecked Sendable {
     }
 
     /// A line that does not read costs that line, but never silently (#171): the whole
-    /// file is kept as `<id>.jsonl.corrupt-<time>` before the next write drops it. A
-    /// torn last line, a crash mid-append, is only dropped.
-    private static func readPoints(_ url: URL) -> [TilePoint] {
-        guard let data = try? Data(contentsOf: url) else { return [] }
-        let lines = data.split(separator: UInt8(ascii: "\n"))
-        var unreadable = 0
-        let points = lines.enumerated().compactMap { index, line -> TilePoint? in
-            guard let point = try? JSONDecoder().decode(PointLine.self, from: Data(line)) else {
-                if index != lines.count - 1 { unreadable += 1 }
-                return nil
+    /// file is first copied under the daemon's root, once for those bytes and never into
+    /// the project (#205), before the next write drops it. A torn last line, a crash
+    /// mid-append, is only dropped. A file that does not read at all is held, so no
+    /// point is written over it (`StoreFile`).
+    private func readPoints(_ url: URL) -> [TilePoint] {
+        let read = StoreFile.read(at: url, meaning: "the tile's trend starts again", outside: storeRoot) { data in
+            let lines = data.split(separator: UInt8(ascii: "\n"))
+            var unreadable = 0
+            let points = lines.enumerated().compactMap { index, line -> TilePoint? in
+                guard let point = try? JSONDecoder().decode(PointLine.self, from: Data(line)) else {
+                    if index != lines.count - 1 { unreadable += 1 }
+                    return nil
+                }
+                return TilePoint(at: Date(timeIntervalSince1970: point.t), value: point.v)
             }
-            return TilePoint(at: Date(timeIntervalSince1970: point.t), value: point.v)
+            return (points, unreadable)
         }
+        guard case .read(let (points, unreadable)) = read else { return [] }
         if unreadable > 0 {
-            let aside = StoreCoding.asideName(for: url)
-            if (try? FileManager.default.copyItem(at: url, to: aside)) != nil {
-                DaemonLog.shared.write("dashboard: \(unreadable) lines of \(url.lastPathComponent) could not be read; the whole file is kept as \(aside.lastPathComponent)")
-                SetAsideNotes.shared.add(url, aside: aside, partly: true)
-            }
+            StoreFile.keepPartCopy(url, under: storeRoot, what: "\(unreadable) lines")
         }
         return points
     }
@@ -251,6 +258,7 @@ final class DashboardStore: @unchecked Sendable {
     private func writePoints(_ all: [TilePoint], for id: String, in project: URL) throws {
         let url = pointsFile(project, id)
         guard !all.isEmpty else {
+            try StoreFile.requireWritable(url)
             if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
             return
         }
@@ -286,7 +294,8 @@ final class DashboardStore: @unchecked Sendable {
     /// The project's history, in bytes (FR-021).
     func historyBytes(_ project: URL) -> Int {
         let folder = Self.historyFolder(project)
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        // Only the histories: a `.corrupt-` copy an earlier build left here is not one.
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { $0.hasSuffix(".jsonl") }
         return names.reduce(0) { total, name in
             let size = (try? FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent(name).path)[.size]) as? Int
             return total + (size ?? 0)

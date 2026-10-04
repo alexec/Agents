@@ -100,6 +100,8 @@ final class AppModel {
     /// said — and for ever against one too old to know the method, which is drawn the
     /// same way as nothing to say.
     var wakeState: DaemonAPI.WakeState? { work.wakeState }
+    /// What this Mac's host could not read in this run (#205), said at the sidebar's foot.
+    var storeNotes: [String] { work.storeNotes }
     /// The switch and the hours (Settings ▸ General ▸ Sleep). Nil until the daemon has
     /// said, including a daemon too old to know the method.
     private(set) var wakeSettings: WakeSettings?
@@ -1109,6 +1111,15 @@ final class AppModel {
     /// Tolerates method-not-found exactly as `refreshCostState` does: a daemon too old
     /// to know `wake/state` leaves `wakeState` nil, and the window simply says nothing
     /// about sleep rather than failing to open.
+    /// Asked once on connecting, then heard as it changes. A daemon too old to know the
+    /// method leaves the list empty, as it would be with nothing to say.
+    func refreshStoreNotes() async {
+        guard let notes = try? await client.call(DaemonAPI.Method.storeNotes,
+                                                 Optional<String>.none,
+                                                 returning: DaemonAPI.StoreNotes.self) else { return }
+        work.replaceStoreNotes(notes)
+    }
+
     func refreshWakeState() async {
         guard let state = try? await client.call(DaemonAPI.Method.wakeState,
                                                  Optional<String>.none,
@@ -2028,7 +2039,7 @@ final class AppModel {
             }
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
-             DaemonAPI.Notification.attentionChanged:
+             DaemonAPI.Notification.attentionChanged, DaemonAPI.Notification.storeNotesChanged:
             return
         default:
             break
@@ -2155,6 +2166,7 @@ final class AppModel {
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
+        async let storeNotes: Void = refreshStoreNotes()
         async let leases: Void = refreshLeases()
         async let disk: Void = refreshDisk()
         async let events: Void = refreshEvents()
@@ -2162,7 +2174,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, dashboards, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person, disk)
+                   transcript, runtimeStates, sandbox, person, disk, storeNotes)
         #if DEBUG
         openFromLaunchArguments()
         #endif

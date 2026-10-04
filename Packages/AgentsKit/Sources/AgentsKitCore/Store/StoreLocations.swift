@@ -287,35 +287,80 @@ public enum StoreCoding {
 }
 
 extension StoreCoding {
-    /// Move a file that exists and cannot be read out of the way, keeping it beside
-    /// the original as `<name>.corrupt-<time>` (#171). The stores that read such a file
-    /// as empty go on to write that empty value back, and without this the only copy
-    /// of what somebody set is gone. Answers where it went, or nil when it could not
-    /// be moved (then it is still where it was, and a store must not write over it).
+    /// How many set-aside copies of one file are kept; the oldest go first (#205).
+    public static let asidesKept = 3
+
+    /// Move a file that exists and cannot be read out of the way, keeping it as
+    /// `<name>.corrupt-<time>` (#171): beside the original, or in `folder` when given
+    /// (#205: a project's file is never set aside inside the person's tree). The stores
+    /// that read such a file as empty go on to write that empty value back, and without
+    /// this the only copy of what somebody set is gone. Answers where it went, or nil
+    /// when it could not be moved (then it is still where it was, and a store must not
+    /// write over it). With `copy`, the original stays where it is.
     @discardableResult
-    public static func setAside(_ url: URL) -> URL? {
+    public static func setAside(_ url: URL, in folder: URL? = nil, copy: Bool = false) -> URL? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        let aside = asideName(for: url)
         do {
-            try FileManager.default.moveItem(at: url, to: aside)
+            if let folder { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+            let aside = asideName(for: url, in: folder)
+            if copy {
+                try FileManager.default.copyItem(at: url, to: aside)
+            } else {
+                try FileManager.default.moveItem(at: url, to: aside)
+            }
+            pruneAsides(of: url, in: folder)
             return aside
         } catch {
             return nil
         }
     }
 
-    /// `<name>.corrupt-<time>` beside `url`, one not yet taken.
-    public static func asideName(for url: URL, at date: Date = Date()) -> URL {
+    /// Where a file outside the daemon's root is set aside: a folder of its own under
+    /// `root/set-aside`, named for the folder it came from, so two projects' `pins.json`
+    /// never meet.
+    public static func asideFolder(for url: URL, under root: URL) -> URL {
+        let parent = url.deletingLastPathComponent().standardizedFileURL.path
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in parent.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100_0000_01b3 }
+        let name = url.deletingLastPathComponent().lastPathComponent
+        return root.appendingPathComponent("set-aside", isDirectory: true)
+            .appendingPathComponent("\(name)-\(String(hash, radix: 16))", isDirectory: true)
+    }
+
+    /// `<name>.corrupt-<time>` beside `url` (or in `folder`), one not yet taken.
+    public static func asideName(for url: URL, in folder: URL? = nil, at date: Date = Date()) -> URL {
         let stamp = date.formatted(.iso8601.year().month().day().dateSeparator(.dash)
             .time(includingFractionalSeconds: false).timeSeparator(.omitted))
-        let folder = url.deletingLastPathComponent()
-        var aside = folder.appendingPathComponent("\(url.lastPathComponent).corrupt-\(stamp)")
-        var n = 2
-        while FileManager.default.fileExists(atPath: aside.path) {
-            aside = folder.appendingPathComponent("\(url.lastPathComponent).corrupt-\(stamp)-\(n)")
-            n += 1
+        let folder = folder ?? url.deletingLastPathComponent()
+        let base = "\(url.lastPathComponent).corrupt-\(stamp)"
+        // After any copy of this second, even one pruned since, so the names still sort
+        // oldest first.
+        let taken = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).compactMap { name -> Int? in
+            if name == base { return 1 }
+            guard name.hasPrefix(base + "-") else { return nil }
+            return Int(name.dropFirst(base.count + 1))
         }
-        return aside
+        guard let last = taken.max() else { return folder.appendingPathComponent(base) }
+        var n = last + 1
+        while FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(base)-\(n)").path) { n += 1 }
+        return folder.appendingPathComponent("\(base)-\(n)")
+    }
+
+    /// Every set-aside copy of `url` in `folder` (beside it by default), oldest first.
+    public static func asides(of url: URL, in folder: URL? = nil) -> [URL] {
+        let folder = folder ?? url.deletingLastPathComponent()
+        let prefix = url.lastPathComponent + ".corrupt-"
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+            .filter { $0.hasPrefix(prefix) }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return names.map { folder.appendingPathComponent($0) }
+    }
+
+    /// Keep only the newest `asidesKept` copies of `url`.
+    public static func pruneAsides(of url: URL, in folder: URL? = nil) {
+        for old in asides(of: url, in: folder).dropLast(asidesKept) {
+            try? FileManager.default.removeItem(at: old)
+        }
     }
 
     /// Write `data` to `url` whole: to a temporary file beside it, synced to the disk,
