@@ -773,6 +773,7 @@ private struct StateLine: View {
             case .unrecognised: return "Stopped for a reason we do not know"
             case .costLimit: return "Reached its cost limit"
             case .sandboxFailed: return "Its sandbox could not start"
+            case .imported: return "Imported from another set-up, so not run here"
             case .endTurn, nil: return "Stopped"
             }
         case .archived: return "Archived"

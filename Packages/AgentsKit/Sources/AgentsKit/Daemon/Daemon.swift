@@ -53,7 +53,9 @@ public final class Daemon: @unchecked Sendable {
                 launcher: (any SessionLauncher)? = nil,
                 serve: Bool = false,
                 control: Control? = nil,
-                toolsetsFolder: URL? = nil) throws {
+                toolsetsFolder: URL? = nil,
+                sessionLocks: URL? = nil,
+                allowOutsideRoot: Bool = true) throws {
         Self.applyPrivateUmask()
         self.locations = locations
         self.control = control
@@ -94,7 +96,23 @@ public final class Daemon: @unchecked Sendable {
         self.core = DaemonCore(store: store, locations: locations, discovery: discovery,
                                installer: installer, launcher: launcher)
         self.serve = serve
+        self.sessionLocks = sessionLocks
+        // A scratch daemon on this Mac runs agents inside its own root (#228). A server's
+        // daemon keeps its projects beside its root, never in it, and is exempt.
+        self.confinedTo = allowOutsideRoot || serve || locations.isStandard ? nil : locations.root
     }
+
+    /// Where every daemon on this Mac claims the runtime sessions it holds (#228), or nil
+    /// for no claims, which is what a test wants.
+    private let sessionLocks: URL?
+    private let confinedTo: URL?
+
+    /// The folder `agentsd` hands every daemon on this Mac: beside the ordinary root, under
+    /// the person's home. `AGENTS_SESSION_LOCKS` names another.
+    public static var sharedSessionLocks: URL { SessionClaims.sharedFolder() }
+
+    /// `--allow-outside-root`: a scratch daemon that may run agents anywhere (#228).
+    public static let allowOutsideRootFlag = "--allow-outside-root"
 
     /// Started with `--serve`: a server's daemon, which does not leave for being idle.
     private let serve: Bool
@@ -109,6 +127,10 @@ public final class Daemon: @unchecked Sendable {
         await core.setExitsWhenIdle(!serve && control == nil)
         await core.setHostsForControlPlane(control != nil && !serve)
         await core.holdWorkflowEventsUntilStarted()
+        // Before any record is read or any runtime started (#228).
+        if let sessionLocks { await core.setSessionLocks(sessionLocks) }
+        await core.setConfinedTo(confinedTo)
+        if let confinedTo { DaemonLog.shared.write("scratch root: agents run only inside \(confinedTo.path); \(Self.allowOutsideRootFlag) lifts it") }
         // Whatever a previous daemon was cloning when it went is half a repository.
         // It was never in the home folder, so this is the whole of cleaning up (027).
         await core.clearCloneStaging()

@@ -100,6 +100,8 @@ struct LifecycleWriterTests {
     static let allowed: [(file: String, why: String)] = [
         (file: "Packages/AgentsKit/Sources/AgentsKit/Store/AgentStore.swift",
          why: "mends a record the invariants forbid, before it is an agent anything holds (FR-020)"),
+        (file: "Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Imports.swift",
+         why: "stops a record copied from another root as it is read, before anything holds it, and without the triggers a stop through `move` fires: a workflow run for a copy is the copy acting (#228)"),
     ]
 
     /// One transition writer, and it is the apply inside `move`.
@@ -135,6 +137,6 @@ struct LifecycleWriterTests {
         #expect(writes.first?.hasPrefix("Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift") == true,
                 "the one writer moved: \(writes.first ?? "none")")
         // The allow-list is not a place things drift into unnoticed.
-        #expect(allowedWrites == 2, "the mender's writes changed count: \(allowedWrites)")
+        #expect(allowedWrites == 3, "the mender's and the importer's writes changed count: \(allowedWrites)")
     }
 }

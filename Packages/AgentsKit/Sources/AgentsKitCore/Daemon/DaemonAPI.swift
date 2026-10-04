@@ -2074,6 +2074,16 @@ public enum DaemonAPI {
         /// A write the disk refused: full, or a folder this may not write to (#88). The
         /// message says what was not kept and what to do; the data is `WriteFailure`.
         public static let couldNotSave = -32095
+        /// An agent copied in from another root (#228): its session and folder are that
+        /// root's live work, so this daemon will not start a runtime for it.
+        public static let importedAgent = -32096
+        /// The runtime session is live under another daemon on this Mac (#228), which
+        /// holds its lock. Two daemons driving one conversation is two agents doing one
+        /// agent's work in the same folder.
+        public static let sessionLiveElsewhere = -32097
+        /// A scratch daemon asked to run an agent in a folder outside its own root
+        /// (#228), without `--allow-outside-root`.
+        public static let outsideScratchRoot = -32098
     }
 
     // MARK: Workflows

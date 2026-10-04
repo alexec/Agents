@@ -32,6 +32,7 @@ export const endingSummaries: Record<EndedReason, string | null> = {
   allowanceSpent: "Its allowance ran out",
   rateLimited: "Rate limited, and still limited after retrying",
   sandboxFailed: "Its sandbox could not start",
+  imported: "Imported from another set-up, so not run here",
 };
 
 export const comingBackDescription = "Coming back after a restart";

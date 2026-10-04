@@ -27,6 +27,14 @@ This skill sits on top of **run-app**: read that one first. Its rules still hold
 own, nothing of this session leaked into what you start, launched behind, never a pattern kill,
 and always stop what you started.
 
+**Never seed from the real root** (`~/Library/Application Support/Agents`) (#228): no copied
+agent records, projects or workflows, on this Mac or copied into the box. A copy carries real
+runtime sessions and folders, and a scratch host once resumed copies of live agents in the real
+repo. Seed synthetic agents (`.agents/reviews/robustness-performance/tools/rp-seed.py`,
+`scripts/seed-archived.swift`) under the scratch root; `launch.sh` refuses a root holding real
+copies. Projects for this Mac's scratch host go under `$ROOT` (it refuses folders outside it);
+a server's `--serve` daemon is not confined.
+
 ```sh
 S=.claude/skills/run-app/scripts
 T=.claude/skills/test-servers/scripts

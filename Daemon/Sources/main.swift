@@ -56,7 +56,11 @@ do {
     } else {
         nil
     }
-    daemon = try Daemon(serve: serve, control: control, toolsetsFolder: toolsetsFolder)
+    // Every daemon on this Mac claims its runtime sessions in one shared folder, so a
+    // scratch one never drives a conversation the real one holds (#228).
+    daemon = try Daemon(serve: serve, control: control, toolsetsFolder: toolsetsFolder,
+                        sessionLocks: Daemon.sharedSessionLocks,
+                        allowOutsideRoot: CommandLine.arguments.contains(Daemon.allowOutsideRootFlag))
 } catch Daemon.StartError.alreadyRunning {
     // Another daemon holds the lock. That is the ordinary case when two windows open
     // at once, and there is nothing to say about it.

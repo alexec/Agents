@@ -119,6 +119,12 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "There is no runtime called \(runtimeID).")
         }
+        try refuseOutsideRoot(cwd)
+        // Claimed under a placeholder until the agent exists, so a session live under
+        // another daemon is refused before anything starts (#228).
+        let claimant = UUID()
+        try claimSession(claimant, runtimeID: runtimeID, sessionID: sessionID)
+        defer { sessionClaims.release(claimant) }
         let (session, handshake) = try await handshakeOnly(runtimeID: runtimeID)
         guard handshake.supportsLoad else {
             await session.end(gracePeriod: .seconds(2))
@@ -132,8 +138,11 @@ extension DaemonCore {
                           state: .finished,
                           runtimeSessionID: sessionID,
                           endedReason: .endTurn)
+        agent.madeInRoot = rootID
         agents[agent.id] = agent
         try await store.save(agent)
+        sessionClaims.release(claimant)
+        _ = sessionClaims.claim(agent.id, runtimeID: runtimeID, sessionID: sessionID)
         live[agent.id] = session
         listen(to: session, agentID: agent.id)
         await record(.runtimeNote("Picked up a conversation \(runtime.name) was already holding."),
@@ -167,6 +176,8 @@ extension DaemonCore {
         guard let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
+        // A branch opens the original's conversation, and is ours to run (#228).
+        try refuseToRun(agentID)
         guard let sessionID = agent.runtimeSessionID else {
             throw JSONRPCError(code: DaemonAPI.Failure.sessionGone,
                                message: "That agent has no conversation to branch yet.")
@@ -188,7 +199,7 @@ extension DaemonCore {
         // original was doing, owes, has queued or was started by is the original's: a
         // branch taken from a running agent copied `running` with no runtime behind it,
         // which queued its prompts for ever and kept the daemon open.
-        let copy = Agent(runtimeID: agent.runtimeID,
+        var copy = Agent(runtimeID: agent.runtimeID,
                          cwd: agent.cwd,
                          title: agent.title.map { "\($0) (branch)" },
                          state: .finished,
@@ -205,6 +216,7 @@ extension DaemonCore {
                          // And so does where its changes are counted from: the branch
                          // carries the edits the history before it made (035).
                          startingPoint: agent.startingPoint)
+        copy.madeInRoot = rootID
         agents[copy.id] = copy
         try await store.save(copy)
         // The history so far is ours, so the branch starts with a copy of it rather

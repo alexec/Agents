@@ -97,6 +97,21 @@ Host.app`.
    off the user mid-keystroke. Use `--front` only if you must, and prefer it
    when nobody is at the keyboard:
    `ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1e9)}'`.
+6. **Never seed a root from the real one** (`~/Library/Application Support/Agents`), not
+   its `agents/`, not one record, not `projects.json` or `workflows.json` (#228). A copied
+   record carries a real runtime session, worktree and folder: a scratch host that resumed
+   copies of live agents once had them merge, archive and start agents in the real repo.
+   Seed synthetic agents under the scratch root instead:
+   `.agents/reviews/robustness-performance/tools/rp-seed.py /tmp/run-<slug> …`, or
+   `scripts/seed-archived.swift --root /tmp/run-<slug> …`, then `launch.sh --seeded`.
+   `launch.sh` refuses a root holding records copied from the real one, and the host
+   itself shows any record stamped with another root as *imported*, stopped, and never
+   runs it.
+7. **A scratch host runs agents only inside its root.** Started on a root that is not the
+   real one, `agentsd` refuses a folder outside it (`--allow-outside-root` lifts that), so
+   keep projects under `$ROOT`, as `$ROOT/work` below. It also claims each runtime session
+   it runs in `~/Library/Application Support/Agents Session Locks/`, which every daemon on
+   this Mac shares, and will not resume a conversation another daemon holds.
 
 ## Driving it without the screen
 

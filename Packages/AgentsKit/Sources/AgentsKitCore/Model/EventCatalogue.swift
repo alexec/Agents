@@ -202,7 +202,8 @@ public enum EventCatalogue {
 
     /// The endings `agent.failed` is raised for: everything nobody chose.
     public static let failedReasons: [EndedReason] = EndedReason.allCases.filter {
-        ![.endTurn, .cancelled, .costLimit].contains($0)
+        // `imported` is set on a copied record as it is read, never by a turn (#228).
+        ![.endTurn, .cancelled, .costLimit, .imported].contains($0)
     }
 
     /// `agent.failed`'s `reason` (073 FR-007): the ending's code, once its summary.

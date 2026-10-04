@@ -59,6 +59,10 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// to decide, with the card in the conversation; the app never retries on its own.
     case sandboxFailed
 
+    /// Copied in from another root (#228): its runtime session and folder are another
+    /// daemon's, so this one shows it and never runs it. Set on load, never by a turn.
+    case imported
+
     /// Stopped short, and why. Never a reason dressed up as a finish, and `nil` for a
     /// turn that simply ended — there is nothing to say about that.
     ///
@@ -81,6 +85,7 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         case .allowanceSpent: return "Its allowance ran out"
         case .rateLimited: return "Rate limited, and still limited after retrying"
         case .sandboxFailed: return "Its sandbox could not start"
+        case .imported: return "Imported from another set-up, so not run here"
         }
     }
 

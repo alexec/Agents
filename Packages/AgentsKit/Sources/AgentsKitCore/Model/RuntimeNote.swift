@@ -23,6 +23,10 @@ public enum RuntimeNote {
     /// and then by the agent being picked back up, which is when it stops mattering.
     public static let stoppedWithDaemon = "This agent was working when the daemon stopped, so it stopped too."
 
+    /// A record copied in from another Agents root (#228). Its conversation and folder
+    /// are that root's live work, so this daemon shows it and never runs it.
+    public static let imported = "This agent was made under another Agents set-up and copied here, so it is shown but never run here: its conversation and its folder belong to that set-up."
+
     /// A question the agent asked that ended without an answer, because its runtime
     /// exited, the person stopped it, or the daemon went.
     ///
