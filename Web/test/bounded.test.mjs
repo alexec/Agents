@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const { Work, Store, archivedPage, keepingTurns, effect } = await load("test/bounded.ts");
+const { Work, Store, archivedPage, searchShown, keepingTurns, effect } = await load("test/bounded.ts");
 const w = await load("test/wire.ts");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -232,4 +232,106 @@ test("out of sight, a dropped link waits for the tab to come back", async () => 
   assert.equal(sockets.length, 2);
   assert.equal(l.state.kind, "open");
   l.stop();
+});
+
+/** A link whose replies are held until the test lets each go, in any order. */
+function heldLink(answer) {
+  const out = [];
+  return {
+    out,
+    onNotification: () => {},
+    onState: () => {},
+    call: (method, params, host) => new Promise((resolve) => out.push({ method, params, host, reply: () => resolve(answer(method, params, host)) })),
+    /** The first held call of `method`, answered and let go. */
+    async answer(method) {
+      const at = out.findIndex((c) => c.method === method);
+      assert.ok(at >= 0, `a ${method} is out`);
+      const [call] = out.splice(at, 1);
+      call.reply();
+      await wait(0);
+      return call;
+    },
+  };
+}
+
+test("a search asks each host for a capped page of matches and holds one search's at a time (#193)", async () => {
+  const lists = [];
+  const archived = (id, at) => agent(id, "p", at, { state: "archived" });
+  const link = fakeLink((method, params, host) => {
+    if (method !== "agents/list") return undefined;
+    lists.push({ host, ...params });
+    if (host === "box") return [archived("box-old", 1)];
+    // A full page from the Mac, then a short one after the cursor.
+    if (!params.after) return [agent("live", "p", 900), ...Array.from({ length: searchShown - 1 }, (_, i) => archived(`m${i}`, 800 - i))];
+    return [archived("m-more", 1)];
+  });
+  const store = new Store(link);
+  store.hosts.value = [{ id: "mac", state: "online" }, { id: "box", state: "online" }, { id: "off", state: "offline" }];
+  store.replaceAgents([agent("live", "p", 900)], "mac");
+
+  await store.searchSessions("seeded ar");
+  assert.deepEqual(lists.map((l) => [l.host, l.query, l.limit, l.lean, l.archivedCommands]),
+    [["mac", "seeded ar", searchShown, true, false], ["box", "seeded ar", searchShown, true, false]], "an offline host is not asked");
+  assert.equal(store.agents.value.mac.length, searchShown);
+  assert.deepEqual(Object.keys(store.searchNext.value), ["mac"], "only a full page has more");
+
+  await store.searchMore();
+  assert.deepEqual(lists[2].after, { lastActivityAt: 800 - (searchShown - 2), id: `m${searchShown - 2}` }, "the next page starts after the last");
+  assert.ok(store.agents.value.mac.some((a) => a.id === "m-more"));
+  assert.deepEqual(store.searchNext.value, {});
+
+  // The search ends: what it brought in is let go; the live agent stays.
+  await store.searchSessions("");
+  assert.deepEqual(store.agents.value.mac.map((a) => a.id), ["live"]);
+  assert.deepEqual(store.agents.value.box, []);
+});
+
+test("a search's reply for words no longer asked is dropped (#193)", async () => {
+  const link = heldLink((method, params) => [agent(`for-${params.query}`, "p", 1, { state: "archived" })]);
+  const store = new Store(link);
+  store.hosts.value = [{ id: "mac", state: "online" }];
+  const first = store.searchSessions("ab");
+  const second = store.searchSessions("abc");
+  await link.answer("agents/list");
+  await link.answer("agents/list");
+  await Promise.all([first, second]);
+  assert.deepEqual((store.agents.value.mac ?? []).map((a) => a.id), ["for-abc"]);
+});
+
+test("two quick drops are sent one at a time, and the host and page end with the last (#193)", async () => {
+  const tiles = ["a", "b", "c"];
+  let hostOrder = { sections: [{ tiles }] };
+  const link = heldLink((method, params) => {
+    if (method === "dashboard/arrange") { hostOrder = params.order; return null; }
+    return { folder: "file:///w/p", tiles: [], now: 0, order: hostOrder };
+  });
+  const store = new Store(link);
+  const key = "mac|file:///w/p";
+  const shown = () => store.dashboards.value[key]?.order.sections[0].tiles.join("");
+
+  // The page opens and a dashboard/changed refresh is out, from before the drops.
+  const opening = store.loadDashboard("mac", "file:///w/p");
+  await link.answer("dashboard/get");
+  await opening;
+  const early = store.loadDashboard("mac", "file:///w/p");
+
+  const first = store.arrangeDashboard("mac", "file:///w/p", { sections: [{ tiles: ["b", "a", "c"] }] });
+  const second = store.arrangeDashboard("mac", "file:///w/p", { sections: [{ tiles: ["c", "b", "a"] }] });
+  assert.equal(shown(), "cba");
+  assert.equal(link.out.filter((c) => c.method === "dashboard/arrange").length, 1, "one send at a time");
+
+  // The early refresh lands with the host's old order: the drop stays on the page.
+  await link.answer("dashboard/get");
+  await early;
+  assert.equal(shown(), "cba");
+
+  await link.answer("dashboard/arrange");
+  const next = await link.answer("dashboard/arrange");
+  assert.deepEqual(next.params.order.sections[0].tiles, ["c", "b", "a"], "the newest drop goes next");
+  await second;
+  await link.answer("dashboard/get");
+  await first;
+  assert.deepEqual(hostOrder.sections[0].tiles, ["c", "b", "a"]);
+  assert.equal(shown(), "cba");
+  assert.equal(link.out.length, 0);
 });
