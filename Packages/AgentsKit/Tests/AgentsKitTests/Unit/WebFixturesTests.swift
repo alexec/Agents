@@ -637,6 +637,32 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: plan/
+
+    @Test func plan() throws {
+        let calls: [(String, String?, JSONValue?)] = [
+            ("a file", "switch_mode", .object(["planFilePath": .string("/Users/a/.claude/plans/tidy.md")])),
+            ("a file and its text", "switch_mode", .object(["planFilePath": .string(" /p/./x/../plan.MD "), "plan": .string("1. Do it")])),
+            ("text only", "switch_mode", .object(["plan": .string("## Plan\n- one")])),
+            ("blank text", "switch_mode", .object(["plan": .string("  \n ")])),
+            ("relative path", "switch_mode", .object(["planFilePath": .string("plans/tidy.md"), "plan": .string("x")])),
+            ("not markdown", "switch_mode", .object(["planFilePath": .string("/p/plan.txt")])),
+            ("nothing", "switch_mode", nil),
+            ("not a plan", "edit", .object(["planFilePath": .string("/p/plan.md"), "plan": .string("x")])),
+        ]
+        let cases = try calls.map { name, kind, input in
+            Case(name: name, input: try Self.encode(ToolCall(title: "Ready to code?", kind: kind, rawInput: input)))
+        }
+        try pin("plan/approval.json", cases) { input in
+            let call = try input.decode(ToolCall.self)
+            guard call.isPlanApproval else { return .null }
+            return .object([
+                "file": call.planFile.map { .string($0.path) } ?? .null,
+                "text": call.planText.map(JSONValue.string) ?? .null,
+            ])
+        }
+    }
+
     // MARK: reducer/
 
     static func notify(_ method: String, _ params: some Encodable) throws -> JSONValue {
