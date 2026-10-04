@@ -1193,6 +1193,23 @@ export interface ResourceState {
   endingSoon: boolean;
 }
 
+export interface ResumingNotification {
+  agentID: UUID;
+  isResuming: boolean;
+}
+
+export interface ResumingResponse {
+  agentIDs: UUID[];
+}
+
+export type RetiredBecause = "age" | "cap" | "person";
+
+export interface RetiredRequest {
+  folder?: URLString;
+  ids?: UUID[];
+  limit?: number;
+}
+
 // uses: Hold
 /** Retirement (Model/Retirement.swift): one key, or none for a kind this build can't name. */
 export type Retirement =
@@ -1478,6 +1495,26 @@ export interface TileView {
   points: TilePoint[];
   recent: TilePoint[];
   keeperChanges: KeeperChange[];
+}
+
+export interface Tombstone {
+  id: UUID;
+  title?: string;
+  project: URLString;
+  runtimeID: string;
+  createdAt: WireDate;
+  lastActivityAt: WireDate;
+  archivedAt: WireDate;
+  retiredAt: WireDate;
+  endedReason?: EndedReason;
+  archivedReason: AgentArchivedReason;
+  costToDate: Record<string, number>;
+  startedByWorkflow?: string;
+  startedByRun?: UUID;
+  startedByAgent?: UUID;
+  worktreeName?: string;
+  worktreeBranch?: string;
+  retiredBecause: RetiredBecause;
 }
 
 export interface ToolCall {
@@ -1886,6 +1923,8 @@ export interface Methods {
   "agents/prewarm": { params: PrewarmRequest; result: Empty };
   "agents/prompt": { params: PromptRequest; result: Empty };
   "agents/recreateWorktree": { params: AgentRequest; result: Agent };
+  "agents/resuming": { params: Empty; result: ResumingResponse };
+  "agents/retired": { params: RetiredRequest; result: Tombstone[] };
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
   "agents/setLabels": { params: SetLabelsRequest; result: Agent };
   "agents/setOption": { params: SetOptionRequest; result: ConfigOption[] };
@@ -1972,6 +2011,8 @@ export const MethodTarget = {
   "agents/prewarm": "host",
   "agents/prompt": "host",
   "agents/recreateWorktree": "host",
+  "agents/resuming": "host",
+  "agents/retired": "host",
   "agents/sendNow": "host",
   "agents/setLabels": "host",
   "agents/setOption": "host",
@@ -2052,6 +2093,7 @@ export interface Notifications {
   "agent/entry": EntryNotification;
   "agent/permission": PermissionNotification;
   "agent/removed": AgentRemovedNotification;
+  "agent/resuming": ResumingNotification;
   "agent/showFile": ShowFileNotification;
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
@@ -2198,6 +2240,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface"] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
+  ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
+  ResumingResponse: { required: ["agentIDs"], optional: [] },
+  RetiredRequest: { required: [], optional: ["folder", "ids", "limit"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote"] },
@@ -2232,6 +2277,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TileStatus: { required: ["level", "line"], optional: ["since"] },
   TileTable: { required: ["columns", "rows"], optional: [] },
   TileView: { required: ["id", "keeper", "changedOutside", "points", "recent", "keeperChanges"], optional: ["tile", "problem", "made", "setAt"] },
+  Tombstone: { required: ["id", "project", "runtimeID", "createdAt", "lastActivityAt", "archivedAt", "retiredAt", "archivedReason", "costToDate", "retiredBecause"], optional: ["title", "endedReason", "startedByWorkflow", "startedByRun", "startedByAgent", "worktreeName", "worktreeBranch"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
   ToolCallLocation: { required: ["path"], optional: ["line"] },
   TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID"] },
