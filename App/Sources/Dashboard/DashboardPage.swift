@@ -18,6 +18,13 @@ struct DashboardPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 heading(snapshot)
+                // A file of this Dashboard's set aside as unreadable (#171).
+                if let note = snapshot?.note {
+                    Label(note, systemImage: "exclamationmark.triangle")
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if let snapshot {
                     let sections = DashboardModel.sections(snapshot, includeHidden: showsHidden)
                     if sections.isEmpty {

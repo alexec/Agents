@@ -223,6 +223,7 @@ public final class ControlService: @unchecked Sendable {
     func takeUp() async throws {
         let configuration = self.configuration
         let publicKey = self.publicKey
+        await records.onUnreadable { [weak self] in self?.log($0) }
         let made = try await records.settings {
             ControlSettings(name: configuration.name, machineID: configuration.machineID,
                             url: configuration.url.absoluteString, pin: configuration.pin, controlKey: publicKey)
@@ -353,12 +354,21 @@ public final class ControlService: @unchecked Sendable {
 
     /// The backstop for an event missed: every session here is held to the records as
     /// they are now (R4, re-listed every 15 s and whenever a peer link comes up).
+    ///
+    /// A client is closed only on its tombstone (#171): a record that is listed and cannot
+    /// be read, or a moment the store answers oddly, must not end a session with 4403 and
+    /// have a browser delete its key. A host is let go only when its record is gone, not
+    /// when it cannot be read.
     func reconcile() async {
         for client in await router.connectedClients() where await methods.client(client) == nil {
+            guard await records.wasForgotten(client) else { continue }
             await router.forgetClient(client)
         }
         let known = Set(await methods.knownHosts)
-        for host in await router.hostStates.keys where !known.contains(host) { await router.forgetHost(host) }
+        for host in await router.hostStates.keys where !known.contains(host) {
+            guard !(await records.isUnreadable(host)) else { continue }
+            await router.forgetHost(host)
+        }
     }
 
     // MARK: The web remote's listener (071)
@@ -558,11 +568,14 @@ public final class ControlService: @unchecked Sendable {
             if await records.client(id) == nil { try await readAgain() }
             // A browser hears it was forgotten, and deletes its key (071 FR-014).
             if await records.client(id) == nil, await records.wasForgotten(id) { throw ControlAuth.Refusal(.forgotten) }
+            // Listed and unreadable is not unknown (#171).
+            if await records.client(id) == nil, await records.isUnreadable(id) { throw ControlAuth.Refusal(.unavailable) }
             guard let client = await records.client(id), !client.publicKey.isEmpty else { throw ControlAuth.Refusal(.unknown) }
             return (try ControlAuth.clientKey(privateKey: privateKey, peer: client.publicKey, client: id),
                     Admitted(client: client))
         case .host(let id):
             if await records.host(id) == nil { try await readAgain() }
+            if await records.host(id) == nil, await records.isUnreadable(id) { throw ControlAuth.Refusal(.unavailable) }
             guard let host = await records.host(id), let key = host.publicKey else { throw ControlAuth.Refusal(.unknown) }
             return (try ControlAuth.hostKey(privateKey: privateKey, peer: key, host: id), Admitted(host: id))
         case .pairing(let id), .enrolling(let id):

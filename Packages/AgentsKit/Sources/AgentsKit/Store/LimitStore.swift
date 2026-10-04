@@ -17,17 +17,12 @@ public struct LimitStore: Sendable {
     }
 
     public func load() -> CostLimits {
-        guard let data = try? Data(contentsOf: locations.limits) else { return CostLimits() }
-        guard let limits = try? StoreCoding.decoder.decode(CostLimits.self, from: data) else {
-            StoreCoding.setAside(locations.limits)
-            return CostLimits()
-        }
-        return limits
+        return StoreFile.load(CostLimits.self, at: locations.limits, empty: CostLimits(), meaning: "no spending limits set")
     }
 
     public func save(_ limits: CostLimits) throws {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         let data = try StoreCoding.encoder.encode(limits)
-        try data.write(to: locations.limits, options: .atomic)
+        try StoreFile.write(data, to: locations.limits)
     }
 }

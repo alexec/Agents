@@ -61,6 +61,12 @@ struct DashboardPage: View {
             LazyVStack(alignment: .leading, spacing: 10) {
                 if let snapshot {
                     if let update = snapshot.update { updateLine(update) }
+                    // A file of this Dashboard's set aside as unreadable (#171).
+                    if let note = snapshot.note {
+                        Label(note, systemImage: "exclamationmark.triangle")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
                     let sections = DashboardModel.sections(snapshot)
                     if sections.isEmpty {
                         Text("No tiles yet. Agents keep tiles here with set_tile.")

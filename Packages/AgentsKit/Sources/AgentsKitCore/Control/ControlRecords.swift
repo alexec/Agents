@@ -27,8 +27,17 @@ public actor ControlRecords {
     private var settingsHeld: Held<ControlSettings>?
     /// Tags of tombstones, so a refresh does not read them again and again.
     private var tombstones: [String: String] = [:]
+    /// Keys listed in the store whose object could not be decoded, by entity tag (#171).
+    /// Such a member is not known *and* not forgotten: it is refused as `unavailable`,
+    /// and nobody is closed over it. A record held from before keeps being used.
+    private var unreadable: [String: String] = [:]
+    /// Says a key could not be read, once per version of it.
+    private var onUnreadable: (@Sendable (String) -> Void)?
 
     public init(store: any ControlStore) { self.store = store }
+
+    /// Where an unreadable record is said, once per version (the service's log).
+    public func onUnreadable(_ say: @escaping @Sendable (String) -> Void) { onUnreadable = say }
 
     // MARK: Reading
 
@@ -36,36 +45,69 @@ public actor ControlRecords {
     /// objects whose tag changed are read again.
     public func load() async throws {
         var clients: [UUID: Held<ClientRecord>] = [:]
+        var listed: Set<String> = []
         for entry in try await store.list(prefix: Self.clientsPrefix) {
+            listed.insert(entry.key)
             if let held = clientsHeld.values.first(where: { Self.clientKey($0.record.id) == entry.key && $0.etag == entry.etag }) {
                 clients[held.record.id] = held
                 continue
             }
             if tombstones[entry.key] == entry.etag { continue }
-            guard let object = try await store.get(entry.key),
-                  let record = try? Self.decoder.decode(ClientRecord.self, from: object.data) else { continue }
+            guard let object = try await store.get(entry.key) else { continue }
+            guard let record = try? Self.decoder.decode(ClientRecord.self, from: object.data) else {
+                noteUnreadable(entry.key, etag: object.etag)
+                if let held = clientsHeld.values.first(where: { Self.clientKey($0.record.id) == entry.key }) {
+                    clients[held.record.id] = held
+                }
+                continue
+            }
+            unreadable[entry.key] = nil
             if record.forgotten == true { tombstones[entry.key] = object.etag; continue }
             clients[record.id] = Held(record: record, etag: object.etag)
         }
         var hosts: [HostID: Held<HostRecord>] = [:]
         for entry in try await store.list(prefix: Self.hostsPrefix) {
+            listed.insert(entry.key)
             if let held = hostsHeld.values.first(where: { Self.hostKey($0.record.id) == entry.key && $0.etag == entry.etag }) {
                 hosts[held.record.id] = held
                 continue
             }
             if tombstones[entry.key] == entry.etag { continue }
-            guard let object = try await store.get(entry.key),
-                  let record = try? Self.decoder.decode(HostRecord.self, from: object.data) else { continue }
+            guard let object = try await store.get(entry.key) else { continue }
+            guard let record = try? Self.decoder.decode(HostRecord.self, from: object.data) else {
+                noteUnreadable(entry.key, etag: object.etag)
+                if let held = hostsHeld.values.first(where: { Self.hostKey($0.record.id) == entry.key }) {
+                    hosts[held.record.id] = held
+                }
+                continue
+            }
+            unreadable[entry.key] = nil
             if record.forgotten == true { tombstones[entry.key] = object.etag; continue }
             hosts[record.id] = Held(record: record, etag: object.etag)
         }
+        // A key no longer listed is no longer unreadable.
+        unreadable = unreadable.filter { listed.contains($0.key) || $0.key == Self.settingsKey }
         clientsHeld = clients
         hostsHeld = hosts
-        if let object = try await store.get(Self.settingsKey),
-           let settings = try? Self.decoder.decode(ControlSettings.self, from: object.data) {
-            settingsHeld = Held(record: settings, etag: object.etag)
+        if let object = try await store.get(Self.settingsKey) {
+            if let settings = try? Self.decoder.decode(ControlSettings.self, from: object.data) {
+                settingsHeld = Held(record: settings, etag: object.etag)
+                unreadable[Self.settingsKey] = nil
+            } else {
+                noteUnreadable(Self.settingsKey, etag: object.etag)
+            }
         }
     }
+
+    private func noteUnreadable(_ key: String, etag: String) {
+        guard unreadable[key] != etag else { return }
+        unreadable[key] = etag
+        onUnreadable?("store: \(key) could not be read; it is left as it is, and its member is refused as unavailable rather than forgotten")
+    }
+
+    /// Listed, and its record could not be read: neither known nor forgotten (#171).
+    public func isUnreadable(_ id: UUID) -> Bool { unreadable[Self.clientKey(id)] != nil }
+    public func isUnreadable(_ id: HostID) -> Bool { unreadable[Self.hostKey(id)] != nil }
 
     public var clients: [ClientRecord] { clientsHeld.values.map(\.record).sorted { $0.paired < $1.paired } }
     public var hosts: [HostRecord] { hostsHeld.values.map(\.record).sorted { $0.id.rawValue < $1.id.rawValue } }
@@ -79,12 +121,26 @@ public actor ControlRecords {
 
     /// The settings, made once if there are none. Two copies starting on an empty store
     /// both try; the one that loses reads the winner's.
+    ///
+    /// Settings that are there and cannot be read are never made afresh over: they hold
+    /// the owner and the key every member was paired against. Start-up stops and says so
+    /// (#171), where it used to try to make them, lose to the file it could not read, and
+    /// try again for ever.
     public func settings(orMake make: @Sendable () -> ControlSettings) async throws -> ControlSettings {
+        try await settings(orMake: make, attempt: 1)
+    }
+
+    private func settings(orMake make: @Sendable () -> ControlSettings, attempt: Int) async throws -> ControlSettings {
         if let settings = settingsHeld?.record { return settings }
-        if let object = try await store.get(Self.settingsKey),
-           let settings = try? Self.decoder.decode(ControlSettings.self, from: object.data) {
-            settingsHeld = Held(record: settings, etag: object.etag)
-            return settings
+        if let object = try await store.get(Self.settingsKey) {
+            do {
+                let settings = try Self.decoder.decode(ControlSettings.self, from: object.data)
+                settingsHeld = Held(record: settings, etag: object.etag)
+                return settings
+            } catch {
+                throw StoreError.unavailable("\(Self.settingsKey) can't be read (\(error)); it is left as it is. "
+                    + "Restore it from a backup, or move it aside to start a new control plane and pair everything again")
+            }
         }
         var made = make()
         if made.owner == nil { made.owner = PersonID.make() }
@@ -100,9 +156,9 @@ public actor ControlRecords {
                                          try Self.encoder.encode(Person(id: owner, name: made.name)), when: .absent)
             }
             return made
-        } catch StoreError.conflict {
+        } catch StoreError.conflict where attempt < 3 {
             settingsHeld = nil
-            return try await settings(orMake: make)
+            return try await settings(orMake: make, attempt: attempt + 1)
         }
     }
 

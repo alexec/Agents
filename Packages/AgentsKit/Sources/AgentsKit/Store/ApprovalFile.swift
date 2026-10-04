@@ -44,21 +44,16 @@ enum ApprovalFile {
             guard replacing else { return }
             try keepCopy(of: url)
         }
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        try StoreCoding.writeAtomically(data, to: url)
     }
 
     /// Copy `url` to `<name>.corrupt-<date>` beside it, so the only copy of what was
     /// approved is not the one about to be replaced.
     static func keepCopy(of url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
-        let stamp = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash)
-            .time(includingFractionalSeconds: false).timeSeparator(.omitted))
-        let copy = url.deletingLastPathComponent()
-            .appendingPathComponent("\(url.lastPathComponent).corrupt-\(stamp)")
-        if !FileManager.default.fileExists(atPath: copy.path) {
-            try FileManager.default.copyItem(at: url, to: copy)
-        }
+        // The same name every store sets an unreadable file aside under (#171).
+        let copy = StoreCoding.asideName(for: url)
+        try FileManager.default.copyItem(at: url, to: copy)
         DaemonLog.shared.write("store: \(url.lastPathComponent) replaced at the person's approval; the unreadable one is kept as \(copy.lastPathComponent)")
     }
 }

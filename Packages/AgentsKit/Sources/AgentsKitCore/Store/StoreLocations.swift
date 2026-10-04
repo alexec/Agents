@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 /// Where everything lives. Injectable, so tests use a temporary directory and never go
 /// near the real one.
@@ -283,12 +288,74 @@ public enum StoreCoding {
 
 extension StoreCoding {
     /// Move a file that exists and cannot be read out of the way, keeping it beside
-    /// the original. The stores that read such a file as empty go on to write that
-    /// empty value back, and without this the only copy of what somebody set is gone.
-    public static func setAside(_ url: URL) {
-        let stamp = Int(Date().timeIntervalSince1970)
-        let aside = url.appendingPathExtension("unreadable-\(stamp)")
-        try? FileManager.default.moveItem(at: url, to: aside)
+    /// the original as `<name>.corrupt-<time>` (#171). The stores that read such a file
+    /// as empty go on to write that empty value back, and without this the only copy
+    /// of what somebody set is gone. Answers where it went, or nil when it could not
+    /// be moved (then it is still where it was, and a store must not write over it).
+    @discardableResult
+    public static func setAside(_ url: URL) -> URL? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let aside = asideName(for: url)
+        do {
+            try FileManager.default.moveItem(at: url, to: aside)
+            return aside
+        } catch {
+            return nil
+        }
+    }
+
+    /// `<name>.corrupt-<time>` beside `url`, one not yet taken.
+    public static func asideName(for url: URL, at date: Date = Date()) -> URL {
+        let stamp = date.formatted(.iso8601.year().month().day().dateSeparator(.dash)
+            .time(includingFractionalSeconds: false).timeSeparator(.omitted))
+        let folder = url.deletingLastPathComponent()
+        var aside = folder.appendingPathComponent("\(url.lastPathComponent).corrupt-\(stamp)")
+        var n = 2
+        while FileManager.default.fileExists(atPath: aside.path) {
+            aside = folder.appendingPathComponent("\(url.lastPathComponent).corrupt-\(stamp)-\(n)")
+            n += 1
+        }
+        return aside
+    }
+
+    /// Write `data` to `url` whole: to a temporary file beside it, synced to the disk,
+    /// then renamed into place (#171). A crash at any moment leaves the old file or the
+    /// new one, never a torn one; `.atomic` alone renames without the sync, so a power
+    /// cut could still leave the new name pointing at nothing written.
+    public static func writeAtomically(_ data: Data, to url: URL, permissions: Int? = nil) throws {
+        let folder = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let temporary = folder.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        /// What Foundation's own write throws, with the errno underneath, so a refusal
+        /// still says why (`WriteFailure`: full, not allowed, read-only).
+        func failure(_ code: Int32) -> CocoaError {
+            let kind: CocoaError.Code = switch code {
+            case ENOSPC, EDQUOT: .fileWriteOutOfSpace
+            case EACCES, EPERM: .fileWriteNoPermission
+            case EROFS: .fileWriteVolumeReadOnly
+            default: .fileWriteUnknown
+            }
+            return CocoaError(kind, userInfo: [NSFilePathErrorKey: url.path,
+                                               NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(code))])
+        }
+        let fd = open(temporary.path, O_CREAT | O_EXCL | O_WRONLY, mode_t(permissions ?? 0o644))
+        guard fd >= 0 else { throw failure(errno) }
+        var code: Int32 = 0
+        data.withUnsafeBytes { buffer in
+            var offset = 0
+            while offset < buffer.count {
+                let n = write(fd, buffer.baseAddress! + offset, buffer.count - offset)
+                if n < 0 { if errno == EINTR { continue }; code = errno; return }
+                offset += n
+            }
+        }
+        if code == 0, fsync(fd) != 0 { code = errno }
+        close(fd)
+        if code == 0, rename(temporary.path, url.path) != 0 { code = errno }
+        guard code == 0 else {
+            try? FileManager.default.removeItem(at: temporary)
+            throw failure(code)
+        }
     }
 }
 

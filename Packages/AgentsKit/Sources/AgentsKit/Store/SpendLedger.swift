@@ -57,15 +57,18 @@ public struct SpendLedger: Sendable {
         read().days[Self.stamp(for: date)] ?? [:]
     }
 
-    /// A missing or unreadable file is an empty ledger. A daemon that cannot read its
-    /// own ledger must not refuse to work; it under-counts today and says so by
-    /// showing what it has.
+    /// A missing file is an empty ledger. An unreadable one is set aside and is empty
+    /// too (#171): a daemon that cannot read its own ledger must not refuse to work; it
+    /// under-counts today, and the limits say so (`note`).
     private func read() -> Contents {
-        guard let data = try? Data(contentsOf: locations.spend),
-              let contents = try? StoreCoding.decoder.decode(Contents.self, from: data) else {
-            return Contents()
-        }
-        return contents
+        StoreFile.load(Contents.self, at: locations.spend, empty: Contents(),
+                       meaning: "today's spend starts again from nothing")
+    }
+
+    /// What the limits say while this run set the ledger aside, or nil.
+    public var note: String? {
+        SetAsideNotes.shared.note(for: locations.spend)
+            .map { "\($0) Today's spend may be under-counted." }
     }
 
     /// Pruned on write, relative to the day being written rather than to the clock,
@@ -74,8 +77,6 @@ public struct SpendLedger: Sendable {
         var contents = contents
         let keep = contents.days.keys.sorted().suffix(Self.daysKept)
         contents.days = contents.days.filter { keep.contains($0.key) || $0.key == day }
-        let data = try StoreCoding.encoder.encode(contents)
-        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try data.write(to: locations.spend, options: .atomic)
+        try StoreFile.write(try StoreCoding.encoder.encode(contents), to: locations.spend)
     }
 }

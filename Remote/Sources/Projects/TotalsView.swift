@@ -22,6 +22,12 @@ struct TotalsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // The day's ledger or the limits set aside as unreadable (#171).
+                if let note = model.costState?.note {
+                    Label(note, systemImage: "exclamationmark.triangle")
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                }
                 if spending.isEmpty {
                     nothingSpent
                 } else {

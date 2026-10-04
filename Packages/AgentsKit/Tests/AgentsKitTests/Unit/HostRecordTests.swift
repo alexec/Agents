@@ -49,7 +49,7 @@ struct HostRecordTests {
         #expect(HostStore(file: file).load().all.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: file.path), "moved, so a save cannot write over it")
         let aside = try #require(try FileManager.default.contentsOfDirectory(atPath: folder.path)
-            .first { $0.hasPrefix("hosts.json.unreadable-") })
+            .first { $0.hasPrefix("hosts.json.corrupt-") })
         #expect(try Data(contentsOf: folder.appending(path: aside)) == old)
     }
 

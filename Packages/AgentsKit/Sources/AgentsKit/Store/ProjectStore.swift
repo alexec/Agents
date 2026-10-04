@@ -17,12 +17,8 @@ public struct ProjectStore: Sendable {
     }
 
     public func load() -> [Project] {
-        guard let data = try? Data(contentsOf: locations.projects) else { return [] }
-        guard let entries = try? StoreCoding.decoder.decode([Lossy<Project>].self, from: data) else {
-            StoreCoding.setAside(locations.projects)
-            return []
-        }
-        let projects = entries.compactMap(\.value)
+        let projects = StoreFile.loadList(Project.self, at: locations.projects,
+                                          meaning: "starting with no archived projects")
         // One folder is one project. A file that somehow holds two records for one
         // folder keeps the first and drops the rest rather than showing both.
         var seen: Set<URL> = []
@@ -33,6 +29,6 @@ public struct ProjectStore: Sendable {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         let ordered = projects.sorted { $0.folder.path < $1.folder.path }
         let data = try StoreCoding.encoder.encode(ordered)
-        try data.write(to: locations.projects, options: .atomic)
+        try StoreFile.write(data, to: locations.projects)
     }
 }

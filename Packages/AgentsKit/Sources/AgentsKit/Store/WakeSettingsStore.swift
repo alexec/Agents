@@ -14,16 +14,11 @@ public struct WakeSettingsStore: Sendable {
     }
 
     public func load() -> WakeSettings {
-        guard let data = try? Data(contentsOf: locations.wakeSettings) else { return WakeSettings() }
-        guard let settings = try? StoreCoding.decoder.decode(WakeSettings.self, from: data) else {
-            StoreCoding.setAside(locations.wakeSettings)
-            return WakeSettings()
-        }
-        return settings
+        return StoreFile.load(WakeSettings.self, at: locations.wakeSettings, empty: WakeSettings(), meaning: "wake at its default")
     }
 
     public func save(_ settings: WakeSettings) throws {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try StoreCoding.encoder.encode(settings).write(to: locations.wakeSettings, options: .atomic)
+        try StoreFile.write(StoreCoding.encoder.encode(settings), to: locations.wakeSettings)
     }
 }

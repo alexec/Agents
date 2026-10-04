@@ -5,9 +5,10 @@ import Foundation
 /// `projects.json`, read whole and written whole on change.
 ///
 /// The one thing feature 021 writes to disk. **The daemon is the only writer**; the
-/// bridge reads nothing from here and is handed what to send. A missing or unreadable
-/// file is no devices, which is the safe reading: nothing is routed to, or sealed to, a
-/// device whose key is not on record.
+/// bridge reads nothing from here and is handed what to send. A missing file is no
+/// devices, which is the safe reading: nothing is routed to, or sealed to, a device whose
+/// key is not on record. One that cannot be read is set aside rather than written over
+/// on the next announce (#171), and one bad record costs that record only.
 public struct DeviceStore: Sendable {
     private let locations: StoreLocations
 
@@ -16,10 +17,7 @@ public struct DeviceStore: Sendable {
     }
 
     public func load() -> [Device] {
-        guard let data = try? Data(contentsOf: locations.devices) else { return [] }
-        guard let devices = try? StoreCoding.decoder.decode([Device].self, from: data) else {
-            return []
-        }
+        let devices = StoreFile.loadList(Device.self, at: locations.devices, meaning: "starting with no paired devices")
         // One id is one device. A file that somehow holds two records for one id keeps
         // the first rather than showing both.
         var seen: Set<UUID> = []
@@ -27,9 +25,7 @@ public struct DeviceStore: Sendable {
     }
 
     public func save(_ devices: [Device]) throws {
-        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         let ordered = devices.sorted { $0.announcedAt < $1.announcedAt }
-        let data = try StoreCoding.encoder.encode(ordered)
-        try data.write(to: locations.devices, options: .atomic)
+        try StoreFile.write(try StoreCoding.encoder.encode(ordered), to: locations.devices)
     }
 }

@@ -830,7 +830,14 @@ extension DaemonCore {
     func currentCostState() -> DaemonAPI.CostState {
         DaemonAPI.CostState(limits: limitStore.load(),
                             today: spendLedger.total(on: now()),
-                            day: SpendLedger.stamp(for: now()))
+                            day: SpendLedger.stamp(for: now()),
+                            note: costNote)
+    }
+
+    /// The limits' or the ledger's file set aside in this run (#171), for the limits page.
+    private var costNote: String? {
+        let notes = [SetAsideNotes.shared.note(for: locations.limits), spendLedger.note].compactMap { $0 }
+        return notes.isEmpty ? nil : notes.joined(separator: " ")
     }
 
     /// Always after the ledger is written, never before. A window is never told about

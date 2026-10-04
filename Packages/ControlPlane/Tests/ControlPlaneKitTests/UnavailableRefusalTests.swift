@@ -58,4 +58,29 @@ struct UnavailableRefusalTests {
             _ = try await base.join(running.url, try credentials(for: UUID()))
         }
     }
+
+    // MARK: #171
+
+    @Test func aClientWhoseRecordCannotBeReadIsUnavailableNotUnknown() async throws {
+        let store = MemoryStore()
+        let running = try await base.start(store: store)
+        defer { Task { await running.service.stop() } }
+        let id = UUID()
+        _ = try await store.put(ControlRecords.clientKey(id), Data(#"{"id":"#.utf8), when: .absent)
+        await #expect(throws: ControlAuth.Refusal(.unavailable)) {
+            _ = try await base.join(running.url, try credentials(for: id))
+        }
+    }
+
+    @Test func aControlJSONThatCannotBeReadStopsStartUpAndSaysSo() async throws {
+        let store = MemoryStore()
+        let torn = Data(#"{"name":"Studio","owner":"#.utf8)
+        _ = try await store.put(ControlRecords.settingsKey, torn, when: .absent)
+        await #expect {
+            _ = try await base.start(store: store)
+        } throws: { error in
+            "\(error)".contains("v1/control.json can")
+        }
+        #expect(try await store.get(ControlRecords.settingsKey)?.data == torn, "left as it is")
+    }
 }

@@ -31,16 +31,11 @@ public struct RetentionStore: Sendable {
     }
 
     public func load() -> File {
-        guard let data = try? Data(contentsOf: locations.retention) else { return File() }
-        guard let file = try? StoreCoding.decoder.decode(File.self, from: data) else {
-            StoreCoding.setAside(locations.retention)
-            return File()
-        }
-        return file
+        return StoreFile.load(File.self, at: locations.retention, empty: File(), meaning: "retention at its defaults")
     }
 
     public func save(_ file: File) throws {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try StoreCoding.encoder.encode(file).write(to: locations.retention, options: .atomic)
+        try StoreFile.write(StoreCoding.encoder.encode(file), to: locations.retention)
     }
 }

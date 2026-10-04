@@ -1241,11 +1241,15 @@ public enum DaemonAPI {
         /// never consult its own clock: it may be in a different time zone from the
         /// daemon's, and the daemon's is the one the limit uses.
         public var day: String
+        /// The day's ledger could not be read and was set aside in this run (#171), so
+        /// `today` may be short; said beside the limits. Nil when it read.
+        public var note: String?
 
-        public init(limits: CostLimits, today: [String: Decimal], day: String) {
+        public init(limits: CostLimits, today: [String: Decimal], day: String, note: String? = nil) {
             self.limits = limits
             self.today = today
             self.day = day
+            self.note = note
         }
 
         /// Derived here rather than sent, so there is one place the rule lives.

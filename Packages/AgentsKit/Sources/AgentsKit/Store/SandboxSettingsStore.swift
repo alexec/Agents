@@ -10,17 +10,11 @@ public struct SandboxSettingsStore: Sendable {
     public init(locations: StoreLocations) { root = locations.root }
 
     public func load() -> SandboxSettings {
-        guard let data = try? Data(contentsOf: file) else { return .init() }
-        guard let settings = try? StoreCoding.decoder.decode(SandboxSettings.self, from: data) else {
-            StoreCoding.setAside(file)
-            DaemonLog.shared.write("sandbox-settings.json could not be read; set aside, every runtime as configured")
-            return .init()
-        }
-        return settings
+        return StoreFile.load(SandboxSettings.self, at: file, empty: .init(), meaning: "every runtime as configured")
     }
 
     public func save(_ settings: SandboxSettings) throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try StoreCoding.encoder.encode(settings).write(to: file, options: .atomic)
+        try StoreFile.write(StoreCoding.encoder.encode(settings), to: file)
     }
 }

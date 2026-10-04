@@ -13,12 +13,7 @@ public struct AllowanceStore: Sendable {
     }
 
     public func loadAllowances() -> [AllowanceState] {
-        guard let data = try? Data(contentsOf: locations.allowances) else { return [] }
-        guard let states = try? StoreCoding.decoder.decode([AllowanceState].self, from: data) else {
-            StoreCoding.setAside(locations.allowances)
-            return []
-        }
-        return states
+        return StoreFile.load([AllowanceState].self, at: locations.allowances, empty: [], meaning: "starting with no allowance readings")
     }
 
     public func saveAllowances(_ states: [AllowanceState]) throws {
@@ -27,6 +22,6 @@ public struct AllowanceStore: Sendable {
 
     private func write<T: Encodable>(_ value: T, to url: URL) throws {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try StoreCoding.encoder.encode(value).write(to: url, options: .atomic)
+        try StoreFile.write(StoreCoding.encoder.encode(value), to: url)
     }
 }
