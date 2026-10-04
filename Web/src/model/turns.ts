@@ -163,6 +163,8 @@ export class DisplayBuilder {
   private runID: string | undefined;
   private suppressed = new Set<string>();
   private closedRunAt = new Map<string, number>();
+  /** Where each view is (#187), by its call's id: drawn once, where the call began. */
+  private viewAt = new Map<string, number>();
   private last: TranscriptEntry | undefined;
 
   constructor(readonly subagent?: string) {}
@@ -197,6 +199,19 @@ export class DisplayBuilder {
         this.run.push(call);
       }
       if (this.runID === undefined) this.runID = entry.id;
+      return;
+    }
+    const view = fields(entry, "appView");
+    if (view) {
+      const at = this.viewAt.get(view._0.id);
+      const first = at === undefined ? undefined : this.drawn[at];
+      if (at !== undefined && first?.kind === "entry") {
+        this.drawn[at] = { kind: "entry", id: first.id, entry: { ...first.entry, kind: { appView: view } } };
+        return;
+      }
+      this.closeRun();
+      this.viewAt.set(view._0.id, this.drawn.length);
+      this.drawn.push({ kind: "entry", id: entry.id, entry });
       return;
     }
     const background = fields(entry, "background");
@@ -294,6 +309,8 @@ export function isOutcome(item: Item): boolean {
   if (item.kind !== "entry") return false;
   const kind = kindOf(item.entry);
   if (kind === "elicitationAnswered" || kind === "workReported" || kind === "sandboxFailure") return true;
+  // A view is what its call is for (#187): drawn at every level, as a reply is.
+  if (kind === "appView") return true;
   const state = fields(item.entry, "stateChanged");
   if (state) return state._0 === "stopped";
   const notice = fields(item.entry, "notice");

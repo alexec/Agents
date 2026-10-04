@@ -25,6 +25,8 @@ import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
 import { CallActionsContext, detailSummaries, detailTitles, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
 import { setPane } from "./files/paneState";
+import { ViewLayerContext } from "./chat/AppView";
+import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 
 const detailKey = "agents.turnDetail";
 
@@ -81,6 +83,25 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   }, [session]);
 
   const scroller = useRef<HTMLDivElement>(null);
+  const chatColumn = useRef<HTMLElement>(null);
+  // The chat's views (#187): one layer while the chat is open, its views told and taken down
+  // when another chat opens, and when the page leaves the chat.
+  const layer = useMemo(() => new ViewLayer(), []);
+  const viewHosting = useMemo(() => {
+    const actions: ViewActions = {
+      agentID: session,
+      call: (method, params) => store.link.call(method, params as never, host) as Promise<unknown>,
+      send: (text) => store.prompt(host, session, text, []),
+    };
+    return { layer, actions };
+  }, [layer, host, session]);
+  useEffect(() => () => { void layer.tearDownAll("The conversation was closed."); }, [layer, host, session]);
+  useEffect(() => () => layer.stop(), [layer]);
+  useLayoutEffect(() => {
+    layer.scroller = scroller.current;
+    layer.chat = chatColumn.current;
+    layer.sync();
+  });
   const following = useRef(true);
   /** Following the end or not, told to the store: it trims the chat's front only while following. */
   const follow = (on: boolean) => {
@@ -185,7 +206,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   };
 
   return (
-    <section class="chat" aria-label="Chat">
+    <section class="chat" aria-label="Chat" ref={chatColumn}>
       <header class="column-head">
         <button class="back narrow-only" onClick={() => go({ host: r.host, project: r.project })}>‹ {project?.name ?? "Sessions"}</button>
         <h1>{agent?.title ?? "New session"}</h1>
@@ -205,7 +226,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <MissingFolderStrip store={store} host={host} agent={agent} />
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       <CallActionsContext.Provider value={callActions}>
+      <ViewLayerContext.Provider value={viewHosting}>
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
+        <div class="view-layer" ref={(el) => { layer.element = el; }} />
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, index) => (
           <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value} fetched={fetched.value[turn.id]}
@@ -217,6 +240,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
       </div>
+      </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
       {newBelow.value && <button class="jump" onClick={toEnd}>New messages ↓</button>}
       <footer class="foot">

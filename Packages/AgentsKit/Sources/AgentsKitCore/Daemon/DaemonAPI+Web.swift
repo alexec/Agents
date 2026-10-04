@@ -74,6 +74,11 @@ public extension DaemonAPI {
                 // Pinned pages (#159): the sidebar's rows and the pages themselves.
                 Row(Method.pinsList, params: Empty.self, result: [ProjectPins].self, kind: .hostRequest),
                 Row(Method.pinsRead, params: PinReadRequest.self, result: FileReading.self, kind: .hostRequest),
+                // A view drawn in the chat (#187): its resource, and what it asks of its server.
+                Row(Method.viewsRead, params: ViewReadRequest.self, result: ViewResource.self, kind: .hostRequest),
+                Row(Method.viewsCall, params: ViewCallRequest.self, result: JSONValue.self, kind: .hostRequest),
+                Row(Method.viewsLog, params: ViewLogRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.viewsContext, params: ViewContextRequest.self, result: Empty.self, kind: .hostRequest),
                 // Acting
                 Row(Method.agentsStart, params: StartRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),

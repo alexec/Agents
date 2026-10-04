@@ -42,6 +42,10 @@ const allowedURLs = new Set([
   "http://www.w3.org/2000/svg",
   "http://www.w3.org/1999/xlink",
   "http://www.w3.org/XML/1998/namespace",
+  // The listener's own two origins (#187): the page at the name, and the views' sandbox proxy at
+  // the address, which MCP Apps requires be another origin than the page's. Same port, same Mac.
+  "http://localhost:${location.port}",
+  "http://127.0.0.1:${location.port}",
 ]);
 const strings = [
   [/\beval\s*\(/g, "no eval"],

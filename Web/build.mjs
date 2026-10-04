@@ -24,7 +24,7 @@ if (process.versions.node !== wanted) {
 }
 
 // The files whose bytes decide dist's. Keep in step with WebDistManifestTests.inputs.
-const fixedInputs = ["index.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"];
+const fixedInputs = ["index.html", "sandbox.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"];
 const inputFolders = ["src", "assets"];
 
 function files(folder) {
@@ -62,7 +62,10 @@ await esbuild.build({
   jsxImportSource: "preact",
 });
 await esbuild.build({ ...common, entryPoints: ["src/app.css"], outfile: "dist/app.css" });
+// The sandbox proxy a view is drawn through (#187), served at another origin than the page.
+await esbuild.build({ ...common, entryPoints: ["src/sandbox/proxy.ts"], outfile: "dist/sandbox.js", format: "iife" });
 cpSync(join(web, "index.html"), join(dist, "index.html"));
+cpSync(join(web, "sandbox.html"), join(dist, "sandbox.html"));
 if (existsSync(join(web, "assets"))) cpSync(join(web, "assets"), join(dist, "assets"), { recursive: true });
 
 const inputs = [...fixedInputs.map((name) => join(web, name)), ...inputFolders.flatMap((name) => files(join(web, name)))]

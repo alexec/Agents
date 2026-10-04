@@ -65,6 +65,7 @@ export const Failure = {
   shellWillNotStart: -32010,
   signInWanted: -32070,
   storeUnavailable: -32094,
+  viewRefused: -32062,
   workflowLimitReached: -32017,
   workflowTurnedOffByPerson: -32041,
   workflowUnreadable: -32015,
@@ -187,6 +188,27 @@ export interface AnswerRequest {
 export interface AnswerSandboxRequest {
   agentID: UUID;
   carryOn: boolean;
+}
+
+export interface AppViewCall {
+  id: UUID;
+  server: string;
+  tool: string;
+  resourceUri: string;
+  arguments?: JSONValue;
+  result?: JSONValue;
+  state: AppViewCallState;
+  reason?: string;
+}
+
+export type AppViewCallState = "running" | "done" | "cancelled";
+
+export interface AppViewPolicy {
+  connectDomains: string[];
+  resourceDomains: string[];
+  frameDomains: string[];
+  baseUriDomains: string[];
+  refused: string[];
 }
 
 export interface ArrangeRequest {
@@ -1464,7 +1486,8 @@ export type TranscriptEntryKind =
   | { poolSwitch: { _0: SwitchRecord } }
   | { sandboxFailure: { _0: SandboxFailureRecord } }
   | { handoff: { markdown: string; characters: number } }
-  | { settingsChanged: { _0: SwitchRecord } };
+  | { settingsChanged: { _0: SwitchRecord } }
+  | { appView: { _0: AppViewCall } };
 
 export interface TranscriptPage {
   firstIndex: number;
@@ -1522,6 +1545,42 @@ export interface Usage {
   size: number;
   cost?: Cost;
   at: WireDate;
+}
+
+export interface ViewCallRequest {
+  agentID: UUID;
+  viewID: UUID;
+  name: string;
+  arguments?: JSONValue;
+}
+
+export interface ViewContextRequest {
+  agentID: UUID;
+  viewID: UUID;
+  uri?: string;
+  content?: JSONValue;
+  structuredContent?: JSONValue;
+}
+
+export interface ViewLogRequest {
+  agentID: UUID;
+  viewID: UUID;
+  level?: string;
+  data?: JSONValue;
+}
+
+export interface ViewReadRequest {
+  agentID: UUID;
+  uri: string;
+}
+
+export interface ViewResource {
+  uri: string;
+  mimeType: string;
+  html: string;
+  policy: AppViewPolicy;
+  prefersBorder?: boolean;
+  variables: Record<string, string>;
 }
 
 export interface Wait {
@@ -1830,6 +1889,10 @@ export interface Methods {
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
+  "views/call": { params: ViewCallRequest; result: JSONValue };
+  "views/context": { params: ViewContextRequest; result: Empty };
+  "views/log": { params: ViewLogRequest; result: Empty };
+  "views/read": { params: ViewReadRequest; result: ViewResource };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
@@ -1907,6 +1970,10 @@ export const MethodTarget = {
   "runtimes/accounts": "host",
   "runtimes/list": "host",
   "surface/identify": "host",
+  "views/call": "host",
+  "views/context": "host",
+  "views/log": "host",
+  "views/read": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
   "workflows/enable": "host",
@@ -1952,6 +2019,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
+  AppViewCall: { required: ["id", "server", "tool", "resourceUri", "state"], optional: ["arguments", "result", "reason"] },
+  AppViewPolicy: { required: ["connectDomains", "resourceDomains", "frameDomains", "baseUriDomains", "refused"], optional: [] },
   ArrangeRequest: { required: ["folder", "order"], optional: [] },
   ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
@@ -2103,6 +2172,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
+  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["arguments"] },
+  ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
+  ViewLogRequest: { required: ["agentID", "viewID"], optional: ["level", "data"] },
+  ViewReadRequest: { required: ["agentID", "uri"], optional: [] },
+  ViewResource: { required: ["uri", "mimeType", "html", "policy", "variables"], optional: ["prefersBorder"] },
   Wait: { required: ["agentID", "nameAtReport"], optional: ["ending"] },
   WaitEnding: { required: ["at", "how"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },

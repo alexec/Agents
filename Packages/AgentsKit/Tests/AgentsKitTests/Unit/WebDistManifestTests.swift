@@ -15,7 +15,7 @@ struct WebDistManifestTests {
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
     /// The same inputs `Web/build.mjs` hashes. Keep the two in step.
-    static let fixedInputs = ["index.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"]
+    static let fixedInputs = ["index.html", "sandbox.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"]
     static let inputFolders = ["src", "assets"]
 
     @Test func theCheckedInBuildMatchesItsSource() throws {

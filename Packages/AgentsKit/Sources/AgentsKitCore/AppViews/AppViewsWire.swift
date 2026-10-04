@@ -47,14 +47,19 @@ public extension DaemonAPI {
         public var policy: AppViewPolicy
         /// Whether the view asked for a border and background of the host's.
         public var prefersBorder: Bool?
+        /// The app's look as the spec's CSS variables (`AppViewTheme`), for the web page,
+        /// which has no copy of its own.
+        public var variables: [String: String]
 
         public init(uri: String, mimeType: String = AppViewResourceType.html, html: String,
-                    policy: AppViewPolicy, prefersBorder: Bool? = nil) {
+                    policy: AppViewPolicy, prefersBorder: Bool? = nil,
+                    variables: [String: String] = AppViewTheme.variables) {
             self.uri = uri
             self.mimeType = mimeType
             self.html = html
             self.policy = policy
             self.prefersBorder = prefersBorder
+            self.variables = variables
         }
     }
 

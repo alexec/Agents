@@ -16,6 +16,8 @@ Nothing here needs doing; it is for understanding.
   window is closed, what Agents Host does, and what happens when the Mac restarts.
 - [Why agents' own tools are taken away](scoped-tools.md): what a runtime loses in the
   app's sessions, what it keeps, and why your own setup is untouched.
+- [Views in a conversation](views.md): how a tool's `ui://` view is drawn on every device,
+  what it may reach, and what its messages do.
 - [Projects, hosts and worktrees](projects-hosts-worktrees.md): a project is a folder on
   one machine, and an agent can have a worktree of its own.
 - [Leases on shared resources](leases.md): how agents take turns with the screen, a
