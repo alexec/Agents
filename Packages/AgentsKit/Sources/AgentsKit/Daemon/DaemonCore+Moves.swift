@@ -109,19 +109,8 @@ extension DaemonCore {
             }
             let facts = try await removalFacts(DaemonAPI.WorktreeRemovalRequest(project: leaving.project,
                                                                                 root: leaving.root))
-            guard facts.madeByApp else {
-                throw JSONRPCError(code: DaemonAPI.Failure.notAWorktree,
-                                   message: "\(leaving.name) was not made by this app, so it is not this app's to remove. Use keep.")
-            }
-            let others = facts.check.blockedBy.filter { $0 != agentID }
-            guard others.isEmpty else {
-                let names = others.compactMap { agents[$0]?.title ?? "an agent" }
-                throw JSONRPCError(code: DaemonAPI.Failure.worktreeInUse,
-                                   message: "\(leaving.name) is still in use by \(names.joined(separator: ", ")), so it cannot be removed. Use keep.")
-            }
-            if facts.check.losesWork && !move.discardChanges {
-                throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
-                                   message: "Removing \(leaving.name) would lose \(Self.whatIsLost(facts.check, base: facts.base)). Commit it, use keep, or ask the person before calling again with discard_changes.")
+            if let refusal = await whyNotRemoveLeft(facts, leaving: agentID, discardChanges: move.discardChanges) {
+                throw JSONRPCError(code: refusal.code, message: refusal.message)
             }
         }
 
@@ -209,11 +198,8 @@ extension DaemonCore {
         }
         if move.removeLeft, let leaving {
             do {
-                let removed = try await removeWorktree(DaemonAPI.WorktreeRemovalRequest(
-                    project: leaving.project, root: leaving.root, confirmed: move.discardChanges))
-                note += removed.removedBranch
-                    ? " Removed the worktree \(leaving.name) and its branch."
-                    : " Removed the worktree \(leaving.name)" + (leaving.branch.map { "; its branch \($0) is kept." } ?? ".")
+                note += " " + (try await removeLeftWorktree(leaving, leaving: agentID,
+                                                            discardChanges: move.discardChanges))
             } catch {
                 note += " Kept the worktree \(leaving.name): \(reason(error))"
             }

@@ -339,6 +339,94 @@ extension DaemonCore {
         } catch {}
     }
 
+    /// Why an agent leaving a worktree with `remove` may not take it away, in words that
+    /// say what would be lost, or nil when it may (#194). Like archiving, commits are not
+    /// in the way: the branch stays and holds them, so a lane whose work waits for a merge
+    /// still cleans up. What is in the way is what no branch would hold — a detached HEAD
+    /// or a branch that is gone, whatever the agent says — and changes not committed,
+    /// unless it says to discard them. `agentID` is the one leaving, so it does not count
+    /// as working there.
+    func whyNotRemoveLeft(_ facts: RemovalFacts, leaving agentID: UUID, discardChanges: Bool) async -> (code: Int, message: String)? {
+        let name = facts.root.lastPathComponent
+        guard let branch = facts.branch else {
+            return (DaemonAPI.Failure.worktreeFailed,
+                    "\(name) is on a detached HEAD, so removing it would leave any commits made there on no branch. Put them on a branch, or use keep.")
+        }
+        guard facts.madeByApp else {
+            return (DaemonAPI.Failure.notAWorktree, "\(name) was not made by this app, so it is not this app's to remove. Use keep.")
+        }
+        let others = facts.check.blockedBy.filter { $0 != agentID }
+        guard others.isEmpty else {
+            let names = others.compactMap { agents[$0]?.title ?? "an agent" }
+            return (DaemonAPI.Failure.worktreeInUse,
+                    "\(name) is still in use by \(names.joined(separator: ", ")), so it cannot be removed. Use keep.")
+        }
+        guard await GitWorktrees.branchExists(branch, in: facts.project) else {
+            return (DaemonAPI.Failure.worktreeFailed,
+                    "\(name)'s branch \(branch) is not there any more, so removing it would leave its commits on no branch. Make the branch again, or use keep.")
+        }
+        if facts.check.uncommitted > 0, !discardChanges {
+            let lines = (try? await GitWorktrees.status(in: facts.root)) ?? []
+            return (DaemonAPI.Failure.worktreeFailed,
+                    "Removing \(name) would lose \(Self.uncommittedWords(lines, count: facts.check.uncommitted)). Its commits are safe on \(branch). Commit the changes, use keep, or ask the person before calling again with discard_changes.")
+        }
+        return nil
+    }
+
+    /// Take away the worktree an agent has just left with `remove`, on the terms of
+    /// `whyNotRemoveLeft`, checked again now that the turn is over. The branch goes too
+    /// only when it is the app's and merged, as when archiving. What happened, as a
+    /// sentence for the agent's chat.
+    func removeLeftWorktree(_ worktree: AgentWorktree, leaving agentID: UUID, discardChanges: Bool) async throws -> String {
+        let facts = try await removalFacts(DaemonAPI.WorktreeRemovalRequest(project: worktree.project,
+                                                                            root: worktree.root))
+        if let refusal = await whyNotRemoveLeft(facts, leaving: agentID, discardChanges: discardChanges) {
+            throw JSONRPCError(code: refusal.code, message: refusal.message)
+        }
+        do {
+            if facts.exists {
+                try await GitWorktrees.remove(facts.root, force: facts.check.uncommitted > 0, in: facts.project)
+            } else {
+                try await GitWorktrees.prune(in: facts.project)
+            }
+            projectChanged(forAgentIn: facts.project)
+            guard let branch = facts.branch else { return "Removed the worktree \(worktree.name)." }
+            if Self.isAppBranch(branch), !facts.check.unmerged {
+                try await GitWorktrees.deleteBranch(branch, force: false, in: facts.project)
+                return "Removed the worktree \(worktree.name) and its branch."
+            }
+            return "Removed the worktree \(worktree.name); its branch \(branch) is kept."
+        } catch let failure as GitWorktrees.Failure {
+            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
+                               message: "Could not remove \(worktree.name): \(failure.message)")
+        }
+    }
+
+    /// "2 uncommitted changes: edited a.swift, untracked notes.txt", from `git status
+    /// --porcelain` lines, naming the first few.
+    static func uncommittedWords(_ lines: [String], count: Int) -> String {
+        var words = count == 1 ? "1 uncommitted change" : "\(count) uncommitted changes"
+        let shown = 5
+        let named = lines.prefix(shown).compactMap { line -> String? in
+            guard line.count > 3 else { return nil }
+            let code = line.prefix(2)
+            let path = String(line.dropFirst(3))
+            let kind = switch code {
+            case "??": "untracked"
+            case _ where code.contains("D"): "deleted"
+            case _ where code.contains("A"): "added"
+            case _ where code.contains("R"): "renamed"
+            default: "edited"
+            }
+            return "\(kind) \(path)"
+        }
+        if !named.isEmpty {
+            words += ": " + named.joined(separator: ", ")
+            if lines.count > shown { words += " and \(lines.count - shown) more" }
+        }
+        return words
+    }
+
     /// Whether an archived agent's app-made worktree still holds work that only its
     /// conversation explains (051, FR-007): changes not committed, or commits not merged.
     /// A worktree another agent still works in is not this agent's to hold: that agent

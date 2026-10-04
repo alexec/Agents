@@ -764,10 +764,11 @@ public actor AppService {
         when the work turns into a change that should be on its own branch, or when \
         asked. To go back to the project folder, give leave_worktree: keep leaves the \
         worktree and its branch as they are; remove takes the worktree away, and its \
-        branch if the app made it and it is merged. Remove is refused for a worktree \
-        the app did not make or another agent works in, and, unless discard_changes \
-        is true, when anything in it is uncommitted or unmerged: ask the person before \
-        discarding. You move once this turn ends and are started again there to carry \
+        branch if the app made it and it is merged. An unmerged branch is kept with \
+        its commits, so remove once your work is committed. Remove is refused for a \
+        worktree the app did not make, another agent works in, or that is detached or \
+        whose branch is gone, and, unless discard_changes is true, when anything in it \
+        is uncommitted: ask the person before discarding. You move once this turn ends and are started again there to carry \
         on, so the outcome is how the work stands now, and a move does not go with \
         needs_answer, blocked or afterwards. Nothing uncommitted comes with you, and a \
         new worktree starts from the commit you have checked out: commit first what \
@@ -862,7 +863,7 @@ public actor AppService {
                 ],
                 "discard_changes": [
                     "type": "boolean",
-                    "description": "Only with leave_worktree remove. Remove even though work would be lost.",
+                    "description": "Only with leave_worktree remove. Remove even though uncommitted changes would be lost. Commits are never lost: the branch keeps them.",
                 ],
                 "outcome": [
                     "type": "string",
