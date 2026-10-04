@@ -12,6 +12,9 @@ struct TranscriptReader {
 
     init(url: URL) { self.url = url }
 
+    /// The file holds less than its index says: it was removed or replaced under the read.
+    struct Shrunk: Error {}
+
     /// Where every complete line starts, and how far the file was read to find out.
     ///
     /// A trailing fragment with no newline is not in it: that is a daemon that died
@@ -114,7 +117,9 @@ struct TranscriptReader {
         defer { try? handle.close() }
         let from = index.start(of: range.lowerBound)
         try handle.seek(toOffset: from)
-        let data = try handle.read(upToCount: Int(index.lineEnds[range.upperBound - 1] - from)) ?? Data()
+        let wanted = Int(index.lineEnds[range.upperBound - 1] - from)
+        let data = try handle.read(upToCount: wanted) ?? Data()
+        guard data.count == wanted else { throw Shrunk() }
         var entries: [TranscriptEntry?] = []
         entries.reserveCapacity(range.count)
         var cursor = data.startIndex
@@ -131,8 +136,8 @@ struct TranscriptReader {
         let total = index.count
         guard total > 0 else { return TranscriptPage(firstIndex: 0, total: 0, entries: []) }
 
-        let end = min(before ?? total, total)
-        let start = max(0, end - limit)
+        let end = max(0, min(before ?? total, total))
+        let start = end - min(max(0, limit), end)
         guard start < end else { return TranscriptPage(firstIndex: start, total: total, entries: []) }
 
         let handle = try FileHandle(forReadingFrom: url)
