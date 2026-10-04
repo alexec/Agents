@@ -264,11 +264,37 @@ extension DaemonCore {
     }
 
     public func dashboardSummaries() -> [DashboardSummary] {
-        allProjects(includeArchived: false).compactMap { project in
-            let folder = Project.standardize(project.folder)
-            guard FileManager.default.fileExists(atPath: DashboardStore.tilesFolder(folder).path) else { return nil }
-            return DashboardModel.summary(dashboardSnapshot(folder, withUpdate: false))
+        allProjects(includeArchived: false).compactMap { dashboardSummary(Project.standardize($0.folder)) }
+    }
+
+    /// One project's Dashboard summary, made from its tile files only when it has changed
+    /// (#204) or when a tile it counts as live has gone stale since: up to 60 files read
+    /// and decoded per project per call was most of `dashboard/summaries`. Nil for a
+    /// project with no Dashboard.
+    ///
+    /// Kept only for a project under a watch, which is what hears a tile changed by hand
+    /// or by a pull; every change the daemon makes goes through `dashboardChanged`.
+    func dashboardSummary(_ project: URL) -> DashboardSummary? {
+        let at = now()
+        let keep = projectWatches[project] != nil
+        if keep, let kept = dashboardSummaryCache[project], at < kept.until { return kept.summary }
+        guard FileManager.default.fileExists(atPath: DashboardStore.tilesFolder(project).path) else {
+            if keep { dashboardSummaryCache[project] = (nil, .distantFuture) }
+            return nil
         }
+        let snapshot = dashboardSnapshot(project, withUpdate: false)
+        // A tile's staleness moves the summary with no file changing: it holds until the
+        // first live tile it counts goes stale.
+        let until = snapshot.tiles
+            .filter { $0.tile?.isHidden != true && !DashboardModel.isStale($0, now: at) }
+            .compactMap { view -> Date? in
+                guard let file = view.tile, file.type != .page, let setAt = view.setAt else { return nil }
+                return setAt.addingTimeInterval(file.staleAfter)
+            }
+            .min() ?? .distantFuture
+        let summary = DashboardModel.summary(snapshot)
+        if keep { dashboardSummaryCache[project] = (summary, until) }
+        return summary
     }
 
     /// Hide or Show, in the tile's file (FR-027).
@@ -325,6 +351,7 @@ extension DaemonCore {
 
     /// Tell every screen, at most once a second per project (research R6).
     func dashboardChanged(_ project: URL) {
+        dashboardSummaryCache[project] = nil
         guard dashboardBroadcasts[project] == nil else { return }
         dashboardBroadcasts[project] = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(Self.dashboardBroadcastGap))

@@ -14,12 +14,34 @@ extension DaemonCore {
         branchFolders.insert(folder)
         watchProject(folder)
         // Seed what the tips are now, so the first move after this is a move.
-        scheduleBranchCheck(in: folder, after: .zero)
+        seedBranches(in: folder)
     }
 
     func stopWatchingBranches(in folder: URL) {
         branchFolders.remove(folder)
         branchChecks.removeValue(forKey: folder)?.cancel()
+    }
+
+    /// In line behind any other project's seeding, so a start that adopts every project
+    /// runs one project's git at a time and answers the socket in between.
+    private func seedBranches(in folder: URL) {
+        branchSeeds.append(folder)
+        guard branchSeeding == nil else { return }
+        branchSeeding = Task { [weak self] in
+            while let folder = await self?.nextBranchSeed() {
+                await self?.checkBranches(in: folder)
+            }
+        }
+    }
+
+    private func nextBranchSeed() -> URL? {
+        while !branchSeeds.isEmpty {
+            let folder = branchSeeds.removeFirst()
+            // A project put away meanwhile is not looked at.
+            if branchFolders.contains(folder) { return folder }
+        }
+        branchSeeding = nil
+        return nil
     }
 
     /// Whether a changed path is a branch tip or what a worktree has checked out.
@@ -41,23 +63,24 @@ extension DaemonCore {
 
     /// The branches worth saying moved: the project's default branch, and each branch
     /// an agent's worktree in it is on.
-    func watchedBranches(in folder: URL) async -> Set<String> {
-        var branches = Set(agents.values.compactMap { agent -> String? in
-            guard agent.state != .archived, agent.projectFolder == folder else { return nil }
+    ///
+    /// The project's own agents only (#204), not every agent there is once per project.
+    func watchedBranches(in folder: URL, tips: [String: String]) async -> Set<String> {
+        var branches = Set(agents.agents(in: folder).compactMap { agent -> String? in
+            guard agent.state != .archived else { return nil }
             return agent.worktree?.branch
         })
-        branches.insert(await defaultBranch(of: folder))
+        branches.insert(await defaultBranch(of: folder, tips: tips))
         return branches
     }
 
     /// `origin/HEAD`'s branch when there is one, otherwise `main`, otherwise `master`.
-    private func defaultBranch(of folder: URL) async -> String {
+    private func defaultBranch(of folder: URL, tips: [String: String]) async -> String {
         if let git = try? GitProcess(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], in: folder),
            let outcome = try? await git.run(), outcome.succeeded {
             let name = outcome.output.trimmingCharacters(in: .whitespacesAndNewlines)
             if let slash = name.firstIndex(of: "/") { return String(name[name.index(after: slash)...]) }
         }
-        let tips = await branchTips(in: folder)
         return tips["main"] != nil || tips["master"] == nil ? "main" : "master"
     }
 
@@ -80,11 +103,13 @@ extension DaemonCore {
     func checkBranches(in folder: URL) async {
         loadEventsIfNeeded()
         let tips = await branchTips(in: folder)
-        let watched = await watchedBranches(in: folder)
+        let watched = await watchedBranches(in: folder, tips: tips)
         let key = folder.path
         let before = eventState.branchTips[key]
         var now: [String: String] = [:]
         for branch in watched { if let tip = tips[branch] { now[branch] = tip } }
+        // Written only when it moved: at start every project is looked at (#204).
+        guard before != now else { return }
         eventState.branchTips[key] = now
         eventStore.saveState(eventState)
         guard let before else { return }

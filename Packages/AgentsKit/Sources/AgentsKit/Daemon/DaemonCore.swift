@@ -229,7 +229,17 @@ public actor DaemonCore {
     /// The kept project records, read from disk once and held. The daemon is their
     /// only writer, and `allProjects` — which runs each time any agent changes —
     /// used to read the file every time.
-    var projectRecordsCache: [URL: Project]?
+    var projectRecordsCache: [URL: Project]? {
+        didSet { projectIndexCache = nil }
+    }
+    /// Every project's folder and name, made once and kept until a folder gains or loses
+    /// its last agent, a record or a tombstone (#204). Every project-wide call used to
+    /// make the set again for each project it summarised.
+    var projectIndexCache: ProjectIndex?
+    /// Whether each project's folder was there when last looked (#204), so a list of 500
+    /// projects is not 500 stats. Dropped for a folder when its watch hears anything, and
+    /// old after `folderExistenceFresh` for the moves a watch never hears.
+    var folderExistence: [URL: (exists: Bool, at: Date)] = [:]
     /// Each project's `.agents/project.json` helper limits as last read (#126), nil
     /// inside for a project whose file sets none. Let go when the folder's `.agents`
     /// changes and when the daemon writes the file.
@@ -316,13 +326,8 @@ public actor DaemonCore {
     lazy var retentionStore = RetentionStore(locations: locations)
     lazy var archiveIndexStore = ArchiveIndex(locations: locations)
     /// What is left of every retired agent, by id. Read at start, before the agents.
-    var retired: [UUID: Tombstone] = [:] {
-        didSet { tombstoneIndex = nil }
-    }
-    /// `retired` by project, made when first asked after it changed (#164).
-    var tombstoneIndex: [URL: [Tombstone]]?
-    /// The project names last worked out, and for which folders (#164).
-    var projectNamesCache: (folders: Set<URL>, names: [URL: String])?
+    /// Each project's share of it kept as it changes (#204).
+    var retired = TombstoneTable()
     /// What each project was last told as, so an agent change that moves nothing in its
     /// project's row says nothing (#164). A window that connects lists them anyway.
     var lastProjectSent: [URL: DaemonAPI.ProjectSummary] = [:]
@@ -368,6 +373,9 @@ public actor DaemonCore {
     lazy var dashboardStore = DashboardStore(locations: locations)
     /// A `dashboard/changed` waiting to go, per project: at most one a second.
     var dashboardBroadcasts: [URL: Task<Void, Never>] = [:]
+    /// Each project's Dashboard summary as last made, and until when it holds (#204):
+    /// let go by `dashboardChanged`, which every change to a Dashboard passes through.
+    var dashboardSummaryCache: [URL: (summary: DashboardSummary?, until: Date)] = [:]
     /// Whose sessions each agent has read with `read_session`, in memory only: what lets
     /// a successor take its predecessor's tiles over (074 research R1).
     var sessionReads: [UUID: Set<UUID>] = [:]
@@ -407,6 +415,11 @@ public actor DaemonCore {
     var branchFolders: Set<URL> = []
     /// The one pending look at each project's branch tips, so a rebase is one look.
     var branchChecks: [URL: Task<Void, Never>] = [:]
+    /// Projects whose branch tips have yet to be seeded, looked at one at a time (#204):
+    /// 500 projects adopted at start used to start 500 checks at once, each two or three
+    /// git processes, with the first list waiting behind them.
+    var branchSeeds: [URL] = []
+    var branchSeeding: Task<Void, Never>?
     /// What says the Mac slept, woke, or was left (042 R10). Nil until started.
     var machineWatch: (any MachineWatch)?
     /// Told when the Mac wakes: the uplink dials at once (#82, #113).
@@ -517,6 +530,9 @@ public actor DaemonCore {
     /// How many times a project's watch has woken the daemon, for the tests: a build in
     /// a worktree must not (#173).
     var projectWatchWakes = 0
+    /// How many times the project index has been made (#204): what a test counts to
+    /// know a project-wide call read it rather than made it again.
+    var projectIndexBuilds = 0
     /// Rescans waiting out their debounce, by project folder.
     var workflowRescans: [URL: Task<Void, Never>] = [:]
     /// The runs in flight, by `Workflow.id`. This is what a second fire collides with,
