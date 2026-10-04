@@ -221,6 +221,9 @@ extension DaemonCore {
         // to wait on, which is why this is a refusal where a prompt is a hold — and
         // it names the limit, because a silent refusal is the one thing forbidden.
         let limits = limitStore.load()
+        if limitStore.unreadable {
+            throw JSONRPCError(code: DaemonAPI.Failure.dayLimitReached, message: Self.limitsUnreadableWords)
+        }
         if limits.isDayLimitReached(spentToday: spendLedger.total(on: now())) {
             let spent = Cost.total(of: spendLedger.total(on: now())) ?? "nothing"
             let ceiling = limits.daily
@@ -744,6 +747,12 @@ extension DaemonCore {
             await holdForCostLimit(agentID)
             return
         }
+        if limitStore.unreadable {
+            if held.insert(agentID).inserted {
+                await record(.runtimeNote("What you sent is waiting. " + Self.limitsUnreadableWords), for: agentID)
+            }
+            return
+        }
         if isDayLimitReached(under: limits) {
             raiseCostLimit("day", agent: nil)
             if held.insert(agentID).inserted {
@@ -823,10 +832,16 @@ extension DaemonCore {
     ///
     /// One global fact rather than a per-agent one: every agent is affected
     /// identically, so there is one number to compare and nothing is marked.
+    /// Also true while the limits could not be read (#205): failing open would let a
+    /// limit the person set be spent past.
     func isDayLimitReached(under limits: CostLimits? = nil) -> Bool {
+        if limitStore.unreadable { return true }
         let limits = limits ?? limitStore.load()
         return limits.isDayLimitReached(spentToday: spendLedger.total(on: now()))
     }
+
+    static let limitsUnreadableWords = "The spending limits could not be read, so nothing new starts until "
+        + "they are set again in Settings ▸ Spending. What was in the file is kept."
 
     /// The whole truth about money as it stands, for a broadcast or a reply.
     func currentCostState() -> DaemonAPI.CostState {
@@ -838,7 +853,9 @@ extension DaemonCore {
 
     /// The limits' or the ledger's file set aside in this run (#171), for the limits page.
     private var costNote: String? {
-        let notes = [SetAsideNotes.shared.note(for: locations.limits), spendLedger.note].compactMap { $0 }
+        let unreadable = limitStore.unreadable
+            ? "Nothing new starts until the limits are set again here." : nil
+        let notes = [SetAsideNotes.shared.note(for: locations.limits), unreadable, spendLedger.note].compactMap { $0 }
         return notes.isEmpty ? nil : notes.joined(separator: " ")
     }
 
