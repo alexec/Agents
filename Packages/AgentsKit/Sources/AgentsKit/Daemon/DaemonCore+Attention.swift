@@ -161,13 +161,18 @@ extension DaemonCore {
         let before = presences[connection]
         presences[connection] = Presence(surface: surface, watching: report.watching,
                                          active: report.active, heardAt: now)
+        // Where its agent's entries go (#203). A client from before says only `watching`.
+        let shows = report.showing ?? report.watching
+        if showing.set(shows, for: connection), let shows, report.showing != nil {
+            Task { [weak self] in await self?.sendTerminals(of: shows, to: connection) }
+        }
         // Read when it comes into view, not each time the surface says it is still there:
         // a chat marked unread while it is open stays so until it is opened again (#70).
         let wasWatching = before.map { $0.active ? $0.watching : nil } ?? nil
         if report.active, let watching = report.watching, watching != wasWatching { markRead(watching) }
         // An archived chat on screen is read whole (051, FR-024).
-        if let watching = report.watching, agents[watching]?.isSlim == true {
-            Task { [weak self] in await self?.makeWhole(watching) }
+        if let shows, agents[shows]?.isSlim == true {
+            Task { [weak self] in await self?.makeWhole(shows) }
         }
         if let id = surface.deviceID, var known = device(id) {
             // Heard from is what the default rung reads when nobody is in hand, and what
@@ -219,6 +224,7 @@ extension DaemonCore {
     /// than stale, and it is the difference between the Mac rung failing fast and the
     /// person waiting `macIdle` for a banner nobody can show.
     func forgetPresence(connection: UUID) {
+        showing.set(nil, for: connection)
         guard presences.removeValue(forKey: connection) != nil else { return }
         reconsider()
     }

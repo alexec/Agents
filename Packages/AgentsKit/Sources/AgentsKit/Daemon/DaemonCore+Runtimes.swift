@@ -210,7 +210,7 @@ extension DaemonCore {
         // The history so far is ours, so the branch starts with a copy of it rather
         // than with whatever the runtime chooses to replay.
         let page = try await store.transcript(for: agent.id, before: nil, limit: 10_000)
-        for entry in page.entries { try? await store.append(entry, for: copy.id) }
+        for entry in page.entries { _ = try? await store.append(entry, for: copy.id) }
         await record(.runtimeNote("Branched from \(agent.title ?? "another agent")."), for: copy.id)
         changed(copy)
         return copy.id

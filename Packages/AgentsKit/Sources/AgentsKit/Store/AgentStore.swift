@@ -229,8 +229,10 @@ public actor AgentStore {
     // MARK: Transcripts
 
     /// Appended, never rewritten. The handle is kept open because this is called for
-    /// every chunk a runtime emits.
-    public func append(_ entry: TranscriptEntry, for agentID: UUID) throws {
+    /// every chunk a runtime emits. Returns the bytes written, which is what decides
+    /// whether the entry is sent whole (#203).
+    @discardableResult
+    public func append(_ entry: TranscriptEntry, for agentID: UUID) throws -> Int {
         let handle = try appendHandle(for: agentID)
         var line = try StoreCoding.encoder.encode(entry)
         line.append(0x0A)
@@ -242,6 +244,7 @@ public actor AgentStore {
             closeTranscript(for: agentID)
             throw error
         }
+        return line.count
     }
 
     public func appendAll(_ entries: [TranscriptEntry], for agentID: UUID) throws {

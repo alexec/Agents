@@ -210,6 +210,12 @@ public actor TerminalService {
         return .object(result)
     }
 
+    /// What each terminal not yet released holds, for a window that has just opened its
+    /// agent (#203).
+    public func held() -> [(id: String, output: String)] {
+        terminals.map { ($0.key, $0.value.output) }
+    }
+
     public func waitForExit(id: String) async -> JSONValue {
         guard let terminal = terminals[id] else { return exitStatus(code: 0, signal: nil) }
         if terminal.exitCode == nil {

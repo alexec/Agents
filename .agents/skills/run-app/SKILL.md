@@ -124,7 +124,9 @@ same protocol the window speaks through the control plane. Every method is in
 $S/rpc.py $ROOT call daemon/ping
 $S/rpc.py $ROOT call projects/list
 $S/rpc.py $ROOT call agents/transcript '{"agentID":"…"}'
-$S/rpc.py $ROOT watch 60 agent/changed agent/entry    # notifications as they arrive
+$S/rpc.py $ROOT watch 60 agent/changed agent/entry --showing <agentID>
+#   notifications as they arrive; an agent's entries and terminal output go only to a
+#   connection whose presence shows it (#203), which --showing reports
 ```
 
 ### The turn that stops for a person

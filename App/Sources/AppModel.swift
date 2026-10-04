@@ -1790,9 +1790,10 @@ final class AppModel {
         // output can be a hundred kilobytes — happens off the main actor, and only
         // what it means is applied there. Each one is applied before the next is
         // read, so the order the daemon said them in is the order they land.
+        let shown = work.shown
         listening = Task.detached(priority: .userInitiated) { [weak self] in
             for await notification in notifications {
-                let update = AgentsModel.read(notification.method, notification.params)
+                let update = AgentsModel.read(notification.method, notification.params, showing: shown.id)
                 await self?.received(notification.method, notification.params, update)
             }
             // The daemon went, or the connection did. A list that has quietly stopped
@@ -1913,8 +1914,11 @@ final class AppModel {
     private func startHosts() {
         guard !hostsStarted else { return }
         hostsStarted = true
+        let shown = work.shown
         hosts.onNotification = { [weak self] host, method, params in
-            await self?.receivedFromServer(host, method, params)
+            // Read off the main actor, as the Mac's own are (#203).
+            let update = await Task.detached { AgentsModel.read(method, params, showing: shown.id) }.value
+            await self?.receivedFromServer(host, method, params, update)
         }
         hosts.offerFor = { [weak self] id in self?.credentialOffer(id) }
         hosts.lenderFor = { [weak self] id in
@@ -2012,9 +2016,12 @@ final class AppModel {
                 await self?.answerCredentialWanted(wanted, on: id) ?? false
             }
             _ = try? await server.call(DaemonAPI.Method.credentialsOffer, credentialOffer(id))
+            let shown = work.shown
             Task.detached(priority: .userInitiated) { [weak self] in
                 for await note in server.notifications() {
-                    await self?.receivedFromServer(id, note.method, note.params)
+                    // Read here, off the main actor, and applied there (#203).
+                    let update = AgentsModel.read(note.method, note.params, showing: shown.id)
+                    await self?.receivedFromServer(id, note.method, note.params, update)
                 }
             }
             await refreshServer(id)
@@ -2038,7 +2045,8 @@ final class AppModel {
         runtimes.first { $0.id == runtimeID }?.availability.isAvailable ?? false
     }
 
-    private func receivedFromServer(_ host: HostID, _ method: String, _ params: JSONValue?) async {
+    private func receivedFromServer(_ host: HostID, _ method: String, _ params: JSONValue?,
+                                    _ update: AgentsModel.Update?) async {
         // What is about the whole of a daemon rather than its work is the Mac's alone in
         // the model: a server's spending is kept beside it, and a server's wakefulness,
         // modes and notices have no place in this window (037).
@@ -2073,7 +2081,8 @@ final class AppModel {
         default:
             break
         }
-        if work.apply(method, params, from: host) {
+        if let update {
+            work.apply(update, from: host)
             if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
             return
         }
@@ -2522,6 +2531,9 @@ final class AppModel {
     /// life of the window. Opening a banner selects the conversation it names.
     private func startPresence() {
         guard presence == nil else { return }
+        work.onOversized = { [weak self] agentID, entryID, index in
+            Task { await self?.loadOversized(entryID, of: agentID, at: index) }
+        }
         notifier.open = { [weak self] agentID in
             guard let self else { return }
             // Its own project first, because picking a project empties the selection:
@@ -2529,20 +2541,24 @@ final class AppModel {
             // sidebar and a page that disagree about where you are.
             self.openAgent(agentID)
         }
-        let reporter = PresenceReporter { [weak self] watching, active in
+        let reporter = PresenceReporter { [weak self] watching, active, showing in
             guard let self else { return }
             // Every host hears whether the person is here; only the one the open
             // conversation lives on hears which it is, since that is what marks it read
             // there (058, T093a). A control plane's hosts used to hear nothing, so their
-            // finished turns stayed under Needs you however often they were opened.
-            let owner = watching.map { self.host(ofAgent: $0) }
+            // finished turns stayed under Needs you however often they were opened. The
+            // same host hears which chat is open, in front or not, which is where it sends
+            // that agent's entries and output (#203).
+            let owner = showing.map { self.host(ofAgent: $0) }
+            func report(for host: HostID) -> DaemonAPI.PresenceReport {
+                DaemonAPI.PresenceReport(watching: owner == host ? watching : nil, active: active,
+                                         showing: owner == host ? showing : nil)
+            }
             if self.hasMacHost {
-                _ = try? await self.client.call(DaemonAPI.Method.presenceReport,
-                                                DaemonAPI.PresenceReport(watching: owner == .mac ? watching : nil, active: active))
+                _ = try? await self.client.call(DaemonAPI.Method.presenceReport, report(for: .mac))
             }
             for (id, server) in self.controlHosts {
-                _ = try? await server.call(DaemonAPI.Method.presenceReport,
-                                           DaemonAPI.PresenceReport(watching: owner == id ? watching : nil, active: active))
+                _ = try? await server.call(DaemonAPI.Method.presenceReport, report(for: id))
             }
             // Coming to the front is also the moment to drop any banner that has gone
             // stale while nobody was looking.
@@ -2620,6 +2636,15 @@ final class AppModel {
             }
         }
         await whole
+    }
+
+    /// An entry its host sent as a stub, too big to send to every chat (#203), read here.
+    func loadOversized(_ entryID: UUID, of agentID: UUID, at index: Int?) async {
+        guard let page = try? await client(forAgent: agentID).call(
+            DaemonAPI.Method.agentsTranscript, DaemonAPI.TranscriptRequest.around(index, of: agentID),
+            returning: TranscriptPage.self),
+              let entry = page.entries.first(where: { $0.id == entryID }) else { return }
+        work.fillOversized(entry, for: agentID)
     }
 
     /// A finished turn's entries, for the chat to open it: the last page of them when

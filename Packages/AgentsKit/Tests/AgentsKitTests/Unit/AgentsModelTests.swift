@@ -466,6 +466,7 @@ struct AgentsModelTests {
     @Test func aCommandsOutputIsKeptPerTerminalAndByItsTail() throws {
         let model = AgentsModel()
         let id = UUID()
+        model.watching = id
         model.apply(DaemonAPI.Notification.agentTerminalOutput,
                     try notification(DaemonAPI.TerminalOutputNotification(agentID: id, terminalID: "t1", chunk: "one ")))
         model.apply(DaemonAPI.Notification.agentTerminalOutput,
@@ -482,35 +483,116 @@ struct AgentsModelTests {
         #expect(model.terminalOutput["t1"]?.hasSuffix("END") == true)
     }
 
-    /// Every agent's output reaches every window; what is kept of it is bounded as a
-    /// whole, the least recently written going first and the watched agent's last.
-    @Test func outputAcrossTerminalsIsBoundedOldestFirstWatchedLast() throws {
+    /// Output is kept for the chat on screen only (#203), bounded as a whole, the least
+    /// recently written terminal going first.
+    @Test func outputIsKeptForTheChatOnScreenAndBoundedOldestFirst() throws {
         let model = AgentsModel()
         let watched = UUID(), other = UUID()
         model.watching = watched
-        func say(_ agent: UUID, _ terminal: String, _ chunk: String) throws {
+        func say(_ agent: UUID, _ terminal: String, _ chunk: String, whole: Bool? = nil) throws {
             model.apply(DaemonAPI.Notification.agentTerminalOutput,
                         try notification(DaemonAPI.TerminalOutputNotification(agentID: agent, terminalID: terminal,
-                                                                             chunk: chunk)))
+                                                                             chunk: chunk, whole: whole)))
         }
+        try say(other, "theirs", "not on screen")
+        #expect(model.terminalOutput["theirs"] == nil)
+
         // Each terminal is kept to its limit, so this many full ones fill the budget.
         let full = String(repeating: "b", count: AgentsModel.terminalOutputLimit)
         let fit = AgentsModel.terminalOutputBudget / AgentsModel.terminalOutputLimit
-        try say(watched, "mine", full)
-        for index in 1 ..< fit { try say(other, "o\(index)", full) }
+        for index in 0 ..< fit { try say(watched, "t\(index)", full) }
         #expect(model.terminalOutput.count == fit)
-        // One more over the budget: the oldest not on screen goes, not the older one that is.
-        try say(other, "last", full)
-        #expect(model.terminalOutput["o1"] == nil)
-        #expect(model.terminalOutput["o2"] != nil)
-        #expect(model.terminalOutput["mine"] != nil)
+        try say(watched, "last", full)
+        #expect(model.terminalOutput["t0"] == nil)
+        #expect(model.terminalOutput["t1"] != nil)
         #expect(model.terminalOutput.values.reduce(0) { $0 + $1.utf8.count } <= AgentsModel.terminalOutputBudget)
 
-        // And many small ones stop at a count.
-        for index in 0 ..< AgentsModel.terminalsKept + 50 { try say(other, "s\(index)", "x") }
-        #expect(model.terminalOutput.count == AgentsModel.terminalsKept)
-        #expect(model.terminalOutput["mine"] != nil)
-        #expect(model.terminalOutput["s\(AgentsModel.terminalsKept + 49)"] == "x")
+        // What a host sends a chat opening is the terminal whole, in place of what was held.
+        try say(watched, "last", "everything so far", whole: true)
+        #expect(model.terminalOutput["last"] == "everything so far")
+
+        // Another chat opened: the last one's output goes with it.
+        model.watching = other
+        #expect(model.terminalOutput.isEmpty)
+    }
+
+    /// An entry or terminal output for another chat is not read past its agentID (#203).
+    @Test func anEntryForAnotherChatIsSkippedBeforeItIsDecoded() throws {
+        let shown = UUID(), other = UUID()
+        let entry = try notification(DaemonAPI.EntryNotification(
+            agentID: other, entry: TranscriptEntry(kind: .agentMessage(messageID: nil, text: "hi"))))
+        guard case .skipped? = AgentsModel.read(DaemonAPI.Notification.agentEntry, entry, showing: shown) else {
+            Issue.record("an entry for another chat was read"); return
+        }
+        guard case .skipped? = AgentsModel.read(DaemonAPI.Notification.agentEntry, entry, showing: .some(nil)) else {
+            Issue.record("an entry with no chat open was read"); return
+        }
+        guard case .entry? = AgentsModel.read(DaemonAPI.Notification.agentEntry, entry, showing: other) else {
+            Issue.record("the open chat's entry was skipped"); return
+        }
+    }
+
+    /// An archived agent the client does not hold stays out: a retention sweep must not
+    /// file thousands of them into a client holding the live ones and a page (#203).
+    @Test func anArchivedChangeForAnAgentNotHeldIsDropped() throws {
+        let model = AgentsModel()
+        let held = agent(state: .finished)
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(held))
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(agent(state: .archived)))
+        #expect(model.agents.map(\.id) == [held.id])
+        var archived = held
+        archived.state = .archived
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(archived))
+        #expect(model.agents.first?.state == .archived)
+    }
+
+    /// A lean change keeps the open chat's menus; a whole one is the truth, an emptied plan
+    /// included (#203).
+    @Test func aLeanChangeKeepsTheListsAndAWholeOneReplacesThem() throws {
+        let model = AgentsModel()
+        var whole = agent()
+        whole.availableCommands = [SlashCommand(name: "review")]
+        whole.plans = [Plan(entries: [PlanEntry(content: "Step", status: .inProgress)])]
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(whole))
+        var renamed = whole
+        renamed.title = "Renamed"
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(renamed.leaned()))
+        #expect(model.agent(whole.id)?.title == "Renamed")
+        #expect(model.agent(whole.id)?.availableCommands.map(\.name) == ["review"])
+        #expect(model.agent(whole.id)?.plans.count == 1)
+        var planDone = whole
+        planDone.plans = []
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(planDone))
+        #expect(model.agent(whole.id)?.plans.isEmpty == true)
+        #expect(model.agent(whole.id)?.availableCommands.map(\.name) == ["review"])
+    }
+
+    /// An entry too big to send arrives as a stub that draws nothing; read whole, it takes
+    /// the stub's place (#203).
+    @Test func anOversizedEntryIsAskedForAndFilledInPlace() throws {
+        let model = AgentsModel()
+        let id = UUID()
+        model.watching = id
+        var asked: (UUID, UUID, Int?)?
+        model.onOversized = { asked = ($0, $1, $2) }
+        let before = TranscriptEntry(kind: .agentMessage(messageID: "a", text: "before"))
+        let big = TranscriptEntry(kind: .toolCall(ToolCall(toolCallID: "c", title: "Read a file")))
+        let after = TranscriptEntry(kind: .agentMessage(messageID: "b", text: "after"))
+        model.apply(DaemonAPI.Notification.agentEntry,
+                    try notification(DaemonAPI.EntryNotification(agentID: id, entry: before)))
+        model.apply(DaemonAPI.Notification.agentEntry,
+                    try notification(DaemonAPI.EntryNotification.stub(agentID: id, for: big, bytes: 90_000, index: 7)))
+        model.apply(DaemonAPI.Notification.agentEntry,
+                    try notification(DaemonAPI.EntryNotification(agentID: id, entry: after)))
+        #expect(asked?.0 == id)
+        #expect(asked?.1 == big.id)
+        #expect(asked?.2 == 7)
+        model.fillOversized(big, for: id)
+        #expect(model.entries.map(\.id) == [before.id, big.id, after.id])
+        #expect(model.entries[1] == big)
+        guard case .toolRun? = model.transcriptItems.first(where: { $0.id == big.id }) else {
+            Issue.record("the filled entry is not drawn as its tool call: \(model.transcriptItems)"); return
+        }
     }
 
 

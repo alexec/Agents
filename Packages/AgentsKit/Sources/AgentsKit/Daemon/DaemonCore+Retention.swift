@@ -106,7 +106,7 @@ extension DaemonCore {
     /// order, cheapest first; git is only asked when nothing else holds it.
     func holds(for candidates: [RetentionPlan.Candidate]) async -> [UUID: Hold] {
         var holds: [UUID: Hold] = [:]
-        let watched = Set(presences.values.compactMap(\.watching))
+        let watched = Set(presences.values.compactMap(\.watching)).union(showing.agents)
         let inRuns = Set(workflowRuns.values.flatMap { [$0.agentID, $0.triggeringAgentID].compactMap { $0 } })
         for candidate in candidates {
             let id = candidate.id
@@ -177,12 +177,13 @@ extension DaemonCore {
               let current = agents[id], current.isSlim else { return }
         let whole = current.madeWhole(from: disk)
         agents[id] = whole
-        broadcast(DaemonAPI.Notification.agentChanged, whole)
+        // Whole to whoever shows it, a row to the rest (#203).
+        tellChanged(whole, from: current)
     }
 
     /// Slim again every archived agent nobody has read for ten minutes (FR-025).
     func slimIdle() {
-        let watched = Set(presences.values.compactMap(\.watching))
+        let watched = Set(presences.values.compactMap(\.watching)).union(showing.agents)
         for (id, agent) in agents.archived where !agent.isSlim && !watched.contains(id) {
             if let read = lastWhole[id], now().timeIntervalSince(read) < Self.letGoAfter { continue }
             agents[id] = agent.slimmed()
@@ -332,7 +333,9 @@ extension DaemonCore {
     /// Put each archived agent's note on its record, and only where it changed.
     ///
     /// Each project is told once at the end rather than once per agent: a settings change
-    /// can note thousands (#164).
+    /// can note thousands (#164). The agents themselves are not told about one by one
+    /// (#203): that re-sent every archived agent to every client, which filed each one it
+    /// had let go of. A row on screen reads its note when its list is next read.
     func noteRetirements(_ notes: [UUID: Retirement]) {
         let noting = agents.archived.values.filter { $0.retirement != notes[$0.id] }
         guard !noting.isEmpty else { return }
@@ -340,7 +343,7 @@ extension DaemonCore {
         for agent in noting {
             var noted = agent
             noted.retirement = notes[agent.id]
-            changed(noted)
+            changed(noted, tellingClients: false)
         }
         let held = heldProjectChanges ?? []
         heldProjectChanges = nil

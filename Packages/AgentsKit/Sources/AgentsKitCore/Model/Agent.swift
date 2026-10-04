@@ -219,6 +219,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// about this copy and not about the agent. `AgentStore.save` reads the lists back
     /// before writing, so a slim copy can never reach `agent.json`.
     public var isSlim = false
+    /// The three lists were left out of this copy on the wire (#107, #203): a lean list, or
+    /// an `agent/changed` saying something other than the lists moved. Their being empty
+    /// here says nothing about the agent's, and `keepingLists(of:)` keeps the ones held.
+    /// Never on a record the daemon keeps, and written only when true.
+    public var listsLeftOut: Bool = false
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
@@ -363,6 +368,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         effectiveSandbox = (try? c.decodeIfPresent(EffectiveSandbox.self, forKey: .effectiveSandbox)) ?? nil
         pendingSandboxFailure = (try? c.decodeIfPresent(SandboxFailureRecord.self, forKey: .pendingSandboxFailure)) ?? nil
         missingFolder = (try? c.decodeIfPresent(MissingFolder.self, forKey: .missingFolder)) ?? nil
+        listsLeftOut = try c.decodeIfPresent(Bool.self, forKey: .listsLeftOut) ?? false
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -433,6 +439,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(effectiveSandbox, forKey: .effectiveSandbox)
         try c.encodeIfPresent(pendingSandboxFailure, forKey: .pendingSandboxFailure)
         try c.encodeIfPresent(missingFolder, forKey: .missingFolder)
+        if listsLeftOut { try c.encode(listsLeftOut, forKey: .listsLeftOut) }
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -462,6 +469,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case archivedAt, retirement
         case sandboxOverride, effectiveSandbox, pendingSandboxFailure
         case missingFolder
+        case listsLeftOut
     }
 
     struct AnyKey: CodingKey {
@@ -713,24 +721,45 @@ extension Agent {
 
     /// This agent as a lean `agents/list` sends it (#107): the slim lists, for a client's
     /// sessions column. Unlike `slimmed()` it is a copy on the wire, not a held state, so
-    /// `isSlim` is not set.
+    /// `isSlim` is not set; `listsLeftOut` is, so the reader knows the empty lists are not
+    /// the agent's (#203).
     public func leaned() -> Agent {
         var lean = self
         lean.advertisedOptions = []
         lean.availableCommands = []
         lean.plans = []
+        lean.listsLeftOut = true
         return lean
     }
 
-    /// This record as listed, keeping the lists `held` already had where it came without
-    /// them: a lean list must not empty the open chat's menus. A runtime never takes its
-    /// lists back to nothing, so an empty list here is one that was left out.
+    /// Whether the lists differ from `other`'s: what decides whether an `agent/changed`
+    /// carries them (#203). Cheap when they have not moved: copies share their storage.
+    public func listsDiffer(from other: Agent) -> Bool {
+        advertisedOptions != other.advertisedOptions || availableCommands != other.availableCommands
+            || plans != other.plans
+    }
+
+    /// This record as heard, keeping the lists `held` already had where it came without
+    /// them: a lean list or a lean `agent/changed` must not empty the open chat's menus.
+    ///
+    /// A record that says it left them out keeps them all (#203). One that does not is the
+    /// whole truth, an emptied plan included, unless all three are empty: a host from
+    /// before #203 marked nothing, and a runtime never takes its options and commands back
+    /// to nothing, so that is one that left them out.
     public func keepingLists(of held: Agent?) -> Agent {
         guard let held else { return self }
         var kept = self
-        if kept.advertisedOptions.isEmpty { kept.advertisedOptions = held.advertisedOptions }
-        if kept.availableCommands.isEmpty { kept.availableCommands = held.availableCommands }
-        if kept.plans.isEmpty { kept.plans = held.plans }
+        if listsLeftOut {
+            kept.advertisedOptions = held.advertisedOptions
+            kept.availableCommands = held.availableCommands
+            kept.plans = held.plans
+            kept.listsLeftOut = held.listsLeftOut
+            return kept
+        }
+        guard advertisedOptions.isEmpty, availableCommands.isEmpty, plans.isEmpty else { return self }
+        kept.advertisedOptions = held.advertisedOptions
+        kept.availableCommands = held.availableCommands
+        kept.plans = held.plans
         return kept
     }
 }

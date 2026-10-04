@@ -2,7 +2,11 @@
 """Talk to one scratch daemon over its socket: JSON-RPC, one object per line.
 
   rpc.py ROOT call METHOD ['{"json":"params"}']   one request, prints the reply
-  rpc.py ROOT watch [SECONDS] [METHOD ...]        print notifications as they arrive
+  rpc.py ROOT watch [SECONDS] [METHOD ...] [--showing AGENT]
+                                                  print notifications as they arrive;
+                                                  an agent's agent/entry and
+                                                  agent/terminalOutput come only to a
+                                                  connection showing it (#203)
   rpc.py ROOT start RUNTIME CWD PROMPT [SECONDS] [--ask]
                                                   start an agent, answer its
                                                   permissions yes, follow it to
@@ -133,8 +137,16 @@ def main(argv):
         return 0
 
     if verb == "watch":
-        seconds = float(argv[3]) if len(argv) > 3 else 30.0
-        wanted = set(argv[4:])
+        rest = argv[3:]
+        showing = None
+        if "--showing" in rest:
+            at = rest.index("--showing")
+            showing = rest[at + 1]
+            rest = rest[:at] + rest[at + 2:]
+        seconds = float(rest[0]) if rest else 30.0
+        wanted = set(rest[1:])
+        if showing:
+            client.call("presence/report", {"active": False, "showing": showing})
         client.on_note = lambda m: (
             not wanted or m.get("method") in wanted
         ) and print(json.dumps(m), flush=True)

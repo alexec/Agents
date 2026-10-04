@@ -20,11 +20,12 @@ import Foundation
 /// It reports; it decides nothing. Where a need goes is the daemon's (FR-012).
 @MainActor
 final class PresenceReporter {
-    typealias Report = @MainActor (UUID?, Bool) async -> Void
+    /// Watching, active, and the chat this window has open whether in front or not (#203).
+    typealias Report = @MainActor (UUID?, Bool, UUID?) async -> Void
 
     private let report: Report
     private let macIdle = AttentionThresholds.standard.macIdle
-    private var last: (watching: UUID?, active: Bool)?
+    private var last: (watching: UUID?, active: Bool, showing: UUID?)?
     private var lastReportedAt = Date.distantPast
     private var lastCheckedAt = Date.distantPast
     private var watching: UUID?
@@ -87,19 +88,20 @@ final class PresenceReporter {
         // change that matters — a Mac gone quiet coming back — is never held.
         let checkedAt = Date()
         if !force, let last, last.active, last.watching == (NSApp.isActive ? watching : nil),
-           checkedAt.timeIntervalSince(lastCheckedAt) < 0.5 {
+           last.showing == watching, checkedAt.timeIntervalSince(lastCheckedAt) < 0.5 {
             return
         }
         lastCheckedAt = checkedAt
         let inUse = MacActivity.isInUse(within: macIdle)
-        let now = (watching: NSApp.isActive && inUse ? watching : nil, active: inUse)
+        let now = (watching: NSApp.isActive && inUse ? watching : nil, active: inUse, showing: watching)
         // Unchanged, and heard from recently enough: nothing to say. The daemon ages a
         // record past `macIdle`, so a Mac still in use is told again before that.
         let stale = Date().timeIntervalSince(lastReportedAt) > macIdle / 2
-        if !force, !stale, let last, last.watching == now.watching, last.active == now.active { return }
+        if !force, !stale, let last, last.watching == now.watching, last.active == now.active,
+           last.showing == now.showing { return }
         last = now
         lastReportedAt = Date()
-        Task { await report(now.watching, now.active) }
+        Task { await report(now.watching, now.active, now.showing) }
     }
 }
 

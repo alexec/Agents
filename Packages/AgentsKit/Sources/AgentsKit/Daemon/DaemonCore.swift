@@ -597,6 +597,9 @@ public actor DaemonCore {
     /// The other way out: to the connections a predicate picks (034). What a device
     /// watches, and the shells it has open, go this way.
     let addressed = AddressedBox()
+    /// Which agent each connection has open (#203): where its entries, its terminal output
+    /// and its whole record go, and nowhere else.
+    let showing = ShowingBox()
     /// Ends the connections a test picks: a forgotten device's, so its direct link
     /// stops at once rather than when the phone next hangs up (security review, Phase 3).
     let closer = CloserBox()
@@ -690,6 +693,29 @@ public actor DaemonCore {
         func callAsFunction(_ method: String, _ params: JSONValue?, to wanted: @escaping Wanted) {
             lock.withLock { send }?(method, params, wanted)
         }
+    }
+
+    /// The agent each connection shows, as its presence last said (#203). In a box rather
+    /// than on the actor because a terminal's reader addresses its output from off it.
+    public final class ShowingBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var shown: [UUID: UUID] = [:]
+
+        /// Returns whether it moved.
+        @discardableResult
+        func set(_ agentID: UUID?, for connection: UUID) -> Bool {
+            lock.withLock {
+                guard shown[connection] != agentID else { return false }
+                shown[connection] = agentID
+                return true
+            }
+        }
+
+        func connections(showing agentID: UUID) -> Set<UUID> {
+            lock.withLock { Set(shown.compactMap { $0.value == agentID ? $0.key : nil }) }
+        }
+
+        var agents: Set<UUID> { lock.withLock { Set(shown.values) } }
     }
 
     public final class CloserBox: @unchecked Sendable {
@@ -884,7 +910,9 @@ public actor DaemonCore {
         addressed(method, params, to: wanted)
     }
 
-    func changed(_ agent: Agent) {
+    /// `tellingClients: false` is for a sweep that changes many records at once and tells
+    /// their projects instead: retirement notes (#203).
+    func changed(_ agent: Agent, tellingClients: Bool = true) {
         let before = agents[agent.id]
         agents[agent.id] = agent
         dashboardUpdaterMoved(agent, from: before)
@@ -895,7 +923,7 @@ public actor DaemonCore {
             indexEntry(for: agent.id)
             saveArchiveIndexSoon()
         }
-        broadcast(DaemonAPI.Notification.agentChanged, agent)
+        if tellingClients { tellChanged(agent, from: before) }
         // An agent changing state is what moves its project's counts. Sending the
         // project after the agent is what lets a sidebar row say a project needs you
         // in a window that is looking at a different one.
@@ -912,6 +940,21 @@ public actor DaemonCore {
         // `reviseWakefulness` compares before acting and returns doing nothing when
         // nothing has moved (024 FR-001, FR-004).
         reviseWakefulness()
+    }
+
+    /// `agent/changed`, lean (#203): every connection is told what a row needs, not the
+    /// option, command and plan lists that were 20 of every 21 KB. The connections showing
+    /// the agent are sent it whole, and only when those lists are what moved; they keep the
+    /// lists they hold otherwise (`Agent.keepingLists`). A slim record has no lists to send.
+    func tellChanged(_ agent: Agent, from before: Agent?) {
+        let lean = agent.leaned()
+        let showers = showing.connections(showing: agent.id)
+        guard addressed.isSet, !agent.isSlim, !showers.isEmpty,
+              before.map({ agent.listsDiffer(from: $0) || $0.isSlim }) ?? true else {
+            return broadcast(DaemonAPI.Notification.agentChanged, lean)
+        }
+        send(DaemonAPI.Notification.agentChanged, agent, to: { showers.contains($0.id) })
+        send(DaemonAPI.Notification.agentChanged, lean, to: { !showers.contains($0.id) })
     }
 
     /// Each write waits for the one before it. Separate tasks reach the store in no
@@ -936,8 +979,9 @@ public actor DaemonCore {
     func record(_ kind: TranscriptEntry.Kind, for agentID: UUID, subagentID: String? = nil) async {
         let entry = TranscriptEntry(kind: kind, subagentID: subagentID)
         if case .userMessage(_, _, .person) = kind { clearWaitingSandbox(agentID: agentID) }
+        var bytes: Int?
         do {
-            try await store.append(entry, for: agentID)
+            bytes = try await store.append(entry, for: agentID)
         } catch {
             // The window still shows it; a restart would not. Said, so a full disk is
             // found out rather than as lines missing from a conversation (073, #88).
@@ -947,8 +991,19 @@ public actor DaemonCore {
             agent.lastActivityAt = entry.at
             agents[agentID] = agent
         }
-        broadcast(DaemonAPI.Notification.agentEntry,
-                  DaemonAPI.EntryNotification(agentID: agentID, entry: entry))
+        // Only to the connections showing it (#203): every other one draws the row, which
+        // `agent/changed` keeps, and an unwatched agent's tool output went to all of them.
+        let showers = showing.connections(showing: agentID)
+        guard !showers.isEmpty else { return }
+        let size = bytes ?? (try? JSONEncoder().encode(entry).count) ?? 0
+        var note = DaemonAPI.EntryNotification(agentID: agentID, entry: entry)
+        if size > DaemonAPI.EntryNotification.entryByteLimit {
+            // Its place, for the chat to read it at. Near enough if another entry landed
+            // between: the chat finds it by id among its neighbours.
+            let index = (try? await store.transcriptCount(for: agentID)).map { max(0, $0 - 1) }
+            note = .stub(agentID: agentID, for: entry, bytes: size, index: index)
+        }
+        send(DaemonAPI.Notification.agentEntry, note, to: { showers.contains($0.id) })
     }
 
     /// The one way an agent's state changes.
