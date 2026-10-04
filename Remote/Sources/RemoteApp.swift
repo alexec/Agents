@@ -50,68 +50,86 @@ struct RemoteApp: App {
     }
 }
 
-/// The three levels: projects, the project, the conversation.
+/// The Mac's layout, for the screen it is on (#226): its one sidebar, and what the
+/// sidebar picked beside it.
 ///
-/// A split view with two columns and a push, which is what the Mac shipped and what a
-/// phone wants anyway. On a wide iPad the projects column stays beside the project; on
-/// a phone it collapses and the same three levels are reached one at a time, each with
-/// a way back.
+/// On an iPad the sidebar stays beside the detail, as the Mac's does; on an iPhone the
+/// split view collapses, the sidebar is the screen the app opens on, and a pick is pushed
+/// over it with a way back. What is opened from the detail — a workflow's run, a session
+/// from a Dashboard tile — is pushed over it in turn.
 struct RemoteView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
-    /// Which column a phone shows. Set to the project whenever one is chosen, so a tap
-    /// on a project always opens it, whatever the list's selection was left at.
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// Which column a phone shows: the detail whenever something is picked.
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
 
-    /// What is pushed over the project: a workflow's page, a conversation, or a
-    /// conversation opened from a workflow's page, which goes back to it. A chat is
-    /// somewhere you go from the project and come back out of, not a third column.
-    private var path: Binding<[RemoteRoute]> {
-        Binding(get: {
-                    [model.openDashboard ? RemoteRoute.dashboard : nil, model.openPin.map(RemoteRoute.page),
-                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
-                        .compactMap { $0 }
-                },
-                set: { routes in
-                    model.openDashboard = routes.contains(.dashboard)
-                    model.openPin = routes.lazy.compactMap(\.pinPath).first
-                    model.openWorkflow = routes.lazy.compactMap(\.workflowID).first
-                    model.selection = routes.compactMap(\.agentID).last
+    /// What is open over the project, in the order each was opened from the one before:
+    /// its Dashboard, a pinned page, a workflow, a conversation. The first is the detail's
+    /// own page, the one the sidebar lights; the rest are pushed over it.
+    private var routes: [RemoteRoute] {
+        let open = [model.openDashboard ? RemoteRoute.dashboard : nil, model.openPin.map(RemoteRoute.page),
+                    model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
+            .compactMap { $0 }
+        // A project with nothing open over it shows its Dashboard, as the Mac's row does.
+        if open.isEmpty, model.selectedProject != nil { return [.dashboard] }
+        return open
+    }
+
+    private var pushed: Binding<[RemoteRoute]> {
+        Binding(get: { Array(routes.dropFirst()) },
+                set: { more in
+                    guard let root = routes.first else { return }
+                    let all = [root] + more
+                    model.openDashboard = all.contains(.dashboard)
+                    model.openPin = all.lazy.compactMap(\.pinPath).first
+                    model.openWorkflow = all.lazy.compactMap(\.workflowID).first
+                    model.selection = all.compactMap(\.agentID).last
                 })
     }
 
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(preferredCompactColumn: $compactColumn) {
-            ProjectListView(selection: $model.selectedProject, compactColumn: $compactColumn)
+            RemoteSidebar()
         } detail: {
-            NavigationStack(path: path) {
-                ProjectPageView()
-                    .paperGround()
-                    .navigationDestination(for: RemoteRoute.self) { route in
-                        switch route {
-                        case .agent(let id):
-                            // Retired (051): nothing left to chat with, only who it was.
-                            if model.selectedAgent == nil, let gone = model.work.tombstones[id] {
-                                RetiredAgentPage(tombstone: gone).paperGround()
-                            } else {
-                                RemoteChatView().paperGround()
-                                    .task(id: id) { await model.lookUpRetired(id) }
-                            }
-                        case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
-                        case .dashboard: DashboardPage().paperGround()
-                        case .page(let path):
-                            if let folder = model.selectedProject {
-                                PinnedPage(folder: folder, path: path).paperGround()
-                            }
-                        }
+            NavigationStack(path: pushed) {
+                Group {
+                    if let root = routes.first {
+                        page(root)
+                    } else if let activity = model.openActivity {
+                        activityPage(activity)
+                    } else {
+                        ContentUnavailableView("Nothing open", systemImage: "sidebar.left",
+                                               description: Text("Pick a session, a workflow or a project."))
                     }
+                }
+                .navigationDestination(for: RemoteRoute.self) { page($0) }
             }
+            // The detail's own page changes with the pick, so nothing pushed over the
+            // last one is left on top of the next (#226).
+            .id(model.sidebarItem)
         }
         .navigationSplitViewStyle(.balanced)
-        // A project opened for the person (a banner, a start) is shown, not only chosen.
-        .onChange(of: model.selectedProject) { _, folder in
-            if folder != nil { compactColumn = .detail }
+        // Something picked, here or from a banner, a widget or a start, is shown; back to
+        // the list on a phone puts it down, so the same row opens it again.
+        .onChange(of: model.sidebarItem) { _, item in
+            if item != nil { compactColumn = .detail }
+        }
+        .onChange(of: compactColumn) { _, column in
+            if column == .sidebar, sizeClass == .compact { model.sidebarItem = nil }
+        }
+        .task(id: model.selectedProject) {
+            if let folder = model.selectedProject { await model.loadLabelVocabulary(in: folder) }
+        }
+        .sheet(isPresented: Binding(get: { model.startingIn != nil },
+                                    set: { if !$0 { model.startingIn = nil } })) {
+            if let project = model.startingIn {
+                StartAgentView(project: project)
+                    .paperSheet()
+                    .presentationDetents([.large])
+                    .presentationSizing(.form)
+            }
         }
         // Where this device is, told to the Mac on every change (021).
         .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase) }
@@ -148,9 +166,48 @@ struct RemoteView: View {
             Text(ask.message + " What you typed is still there.")
         }
     }
+
+    @ViewBuilder
+    private func page(_ route: RemoteRoute) -> some View {
+        switch route {
+        case .agent(let id):
+            // Retired (051): nothing left to chat with, only who it was.
+            if model.work.agent(id) == nil, let gone = model.work.tombstones[id] {
+                RetiredAgentPage(tombstone: gone).paperGround()
+            } else {
+                RemoteChatView().paperGround()
+                    .task(id: id) { await model.lookUpRetired(id) }
+            }
+        case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
+        case .dashboard:
+            DashboardPage().paperGround()
+                .toolbar {
+                    // New session, from the project's own page (029), as from its row's menu.
+                    if let folder = model.selectedProject {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            NewSessionButton(folder: folder)
+                        }
+                    }
+                }
+        case .page(let path):
+            if let folder = model.selectedProject {
+                PinnedPage(folder: folder, path: path).paperGround()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func activityPage(_ item: SidebarItem) -> some View {
+        switch item {
+        case .events: EventsListView().paperGround()
+        case .resources: ResourcesListView().paperGround()
+        case .runtimes: RuntimesView().paperGround()
+        default: TotalsView().paperGround()
+        }
+    }
 }
 
-/// Somewhere to go from the project page.
+/// Somewhere to go over the project: the detail's own page, or one pushed over it.
 enum RemoteRoute: Hashable {
     case workflow(Workflow.ID)
     case agent(UUID)

@@ -176,91 +176,22 @@ struct AgentCard: View {
             .paperRow()
         }
         .buttonStyle(.plain)
-        .contextMenu {
-            if model.isBlocked(agent) {
-                Button {
-                    Task { await model.carryOn(agent.id) }
-                } label: {
-                    Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
-                }
-                .help(AgentsModel.carryOnHelp(for: agent))
-            }
-            // Here rather than over the chat, as on the Mac: the chat is for reading.
-            if let action = agent.parkAction {
-                Button {
-                    Task { await model.perform(action, on: agent.id) }
-                } label: {
-                    Label(ParkWords.label(action), systemImage: ParkWords.symbol(action))
-                }
-                .disabled(model.isStale(agent) || isActing)
-                .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
-            }
-            // Leave it to come back to, or clear it unopened (#70).
-            if agent.state == .finished {
-                Button {
-                    Task { await model.setUnread(agent.id, !agent.isUnread) }
-                } label: {
-                    Label(agent.isUnread ? "Mark as Read" : "Mark as Unread",
-                          systemImage: agent.isUnread ? "envelope.open" : "envelope.badge")
-                }
-                .disabled(model.isStale(agent))
-            }
-            // At the top of its project whatever its state (#180), and where among the pinned.
-            if agent.state != .archived {
-                pinButton
-                if model.isPinned(agent) {
-                    let ids = model.pinnedSessions(in: agent.projectFolder)
-                    Button("Move Up", systemImage: "arrow.up") { step(-1, in: ids) }
-                        .disabled(ids.first == agent.id || model.isStale)
-                    Button("Move Down", systemImage: "arrow.down") { step(1, in: ids) }
-                        .disabled(ids.last == agent.id || model.isStale)
-                }
-            }
-            if agent.state != .archived {
-                archiveButton
-            }
-        }
+        .contextMenu { AgentMenuItems(agent: agent) }
         .swipeActions(edge: .leading) {
             if agent.state != .archived {
-                pinButton.tint(Paper.accent)
+                PinAgentButton(agent: agent).tint(Paper.accent)
             }
         }
         // As a row in Mail: a swipe uncovers Archive, and a long one archives. The page
         // is a `swipeActionsContainer`.
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             if agent.state != .archived {
-                archiveButton.tint(.gray)
+                ArchiveAgentButton(agent: agent).tint(.gray)
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(agent.showsUnread ? "unread" : "")
-    }
-
-    private var pinButton: some View {
-        let pinned = model.isPinned(agent)
-        return Button {
-            Task { await model.setPinned(agent, !pinned) }
-        } label: {
-            Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
-        }
-        .disabled(model.isStale)
-    }
-
-    private func step(_ by: Int, in ids: [UUID]) {
-        var ids = ids
-        guard let index = ids.firstIndex(of: agent.id), ids.indices.contains(index + by) else { return }
-        ids.swapAt(index, index + by)
-        Task { await model.arrangeSessionPins(ids, in: agent.projectFolder) }
-    }
-
-    private var archiveButton: some View {
-        Button {
-            Task { await model.archive(agent.id) }
-        } label: {
-            Label("Archive", systemImage: "archivebox")
-        }
-        .disabled(model.isStale(agent) || isActing)
     }
 
     /// Something is on its way to this agent; its menu and swipe hold until it is back (#87).
@@ -281,6 +212,124 @@ struct AgentCard: View {
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
             .compactMap { $0 } + model.blockLines(agent) + [ParkWords.line(agent.parking)].compactMap { $0 })
             .joined(separator: ", ")
+    }
+}
+
+/// A session's long-press menu, wherever its row is drawn: Carry on, Park, Mark as Read
+/// or Unread, Pin and where among the pinned, Archive or Bring Back. The Mac's row menu,
+/// less what the phone leaves to the Mac (Branch, Retire, Show in Finder).
+struct AgentMenuItems: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        if model.isBlocked(agent) {
+            Button {
+                Task { await model.carryOn(agent.id) }
+            } label: {
+                Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
+            }
+            .help(AgentsModel.carryOnHelp(for: agent))
+        }
+        // Here rather than over the chat, as on the Mac: the chat is for reading.
+        if let action = agent.parkAction {
+            Button {
+                Task { await model.perform(action, on: agent.id) }
+            } label: {
+                Label(ParkWords.label(action), systemImage: ParkWords.symbol(action))
+            }
+            .disabled(model.isStale(agent) || isActing)
+            .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
+        }
+        // Leave it to come back to, or clear it unopened (#70).
+        if agent.state == .finished {
+            MarkReadButton(agent: agent)
+        }
+        // At the top of its project whatever its state (#180), and where among the pinned.
+        if agent.state != .archived {
+            PinAgentButton(agent: agent)
+            if model.isPinned(agent) {
+                let ids = model.pinnedSessions(in: agent.projectFolder)
+                Button("Move Up", systemImage: "arrow.up") { step(-1, in: ids) }
+                    .disabled(ids.first == agent.id || model.isStale)
+                Button("Move Down", systemImage: "arrow.down") { step(1, in: ids) }
+                    .disabled(ids.last == agent.id || model.isStale)
+            }
+            ArchiveAgentButton(agent: agent)
+        } else {
+            BringBackAgentButton(agent: agent)
+        }
+    }
+
+    private var isActing: Bool { model.acting(agent.id) != nil }
+
+    private func step(_ by: Int, in ids: [UUID]) {
+        var ids = ids
+        guard let index = ids.firstIndex(of: agent.id), ids.indices.contains(index + by) else { return }
+        ids.swapAt(index, index + by)
+        Task { await model.arrangeSessionPins(ids, in: agent.projectFolder) }
+    }
+}
+
+/// Pin or Unpin (#180): in a row's menu, and its leading swipe.
+struct PinAgentButton: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        let pinned = model.isPinned(agent)
+        Button {
+            Task { await model.setPinned(agent, !pinned) }
+        } label: {
+            Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+        }
+        .disabled(model.isStale)
+    }
+}
+
+/// Archive: in a row's menu, and its trailing swipe.
+struct ArchiveAgentButton: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        Button {
+            Task { await model.archive(agent.id) }
+        } label: {
+            Label("Archive", systemImage: "archivebox")
+        }
+        .disabled(model.isStale(agent) || model.acting(agent.id) != nil)
+    }
+}
+
+/// Bring Back an archived session, as the Mac's row and its swipe do.
+struct BringBackAgentButton: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        Button {
+            Task { await model.unarchive(agent.id) }
+        } label: {
+            Label("Bring Back", systemImage: "arrow.uturn.backward")
+        }
+        .disabled(model.isStale(agent))
+    }
+}
+
+/// Mark as Read or Unread (#70).
+struct MarkReadButton: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        Button {
+            Task { await model.setUnread(agent.id, !agent.isUnread) }
+        } label: {
+            Label(agent.isUnread ? "Mark as Read" : "Mark as Unread",
+                  systemImage: agent.isUnread ? "envelope.open" : "envelope.badge")
+        }
+        .disabled(model.isStale(agent))
     }
 }
 

@@ -2,64 +2,6 @@ import AgentsKitCore
 import SwiftUI
 import UIKit
 
-/// The project's pinned pages (#159) on its page, under the Dashboard row and above
-/// Sessions, as the Mac lists them under the project. A long press is the menu, so pins
-/// move by its Move Up and Move Down rather than a drag, as tiles do (#147).
-struct PinnedPageCards: View {
-    @Environment(RemoteModel.self) private var model
-    let folder: URL
-
-    var body: some View {
-        let pins = model.pins(in: folder)
-        if !pins.isEmpty {
-            VStack(spacing: 0) {
-                ForEach(Array(pins.enumerated()), id: \.element.path) { index, pin in
-                    if index > 0 { Divider().padding(.leading, 40) }
-                    Button { model.openPin = pin.path } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: pin.kind == .html ? "globe" : "doc.text")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 20)
-                            Text(pin.title)
-                                .appText(.reading)
-                                .foregroundStyle(pin.missing ? .secondary : .primary)
-                                .lineLimit(1)
-                            Spacer(minLength: 0)
-                            if pin.missing {
-                                Text("Missing").appText(.fine).foregroundStyle(.tertiary)
-                            }
-                            Image(systemName: "chevron.right").appText(.fine).foregroundStyle(.tertiary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(pin.missing ? "\(pin.title), pinned page, missing" : "\(pin.title), pinned page")
-                    .contextMenu {
-                        Button("Move Up", systemImage: "arrow.up") { step(pin, -1, in: pins) }
-                            .disabled(index == 0)
-                        Button("Move Down", systemImage: "arrow.down") { step(pin, 1, in: pins) }
-                            .disabled(index == pins.count - 1)
-                        Button("Unpin", systemImage: "pin.slash", role: .destructive) {
-                            Task { await model.unpin(pin.path, in: folder) }
-                        }
-                    }
-                }
-            }
-            .background(Paper.raised, in: .rect(cornerRadius: Paper.Radius.card))
-            .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Paper.rule))
-        }
-    }
-
-    private func step(_ pin: PinView, _ by: Int, in pins: [PinView]) {
-        var paths = pins.map(\.path)
-        guard let index = paths.firstIndex(of: pin.path), paths.indices.contains(index + by) else { return }
-        paths.swapAt(index, index + by)
-        Task { await model.arrangePins(paths, in: folder) }
-    }
-}
-
 /// A pinned page, pushed over the project page: the live page an agent's files show,
 /// read from the project folder through the Mac. Markdown follows the file and takes
 /// typing; HTML is drawn with scripts and the network off.
