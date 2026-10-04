@@ -688,7 +688,7 @@ struct MoveTests {
         #expect(try await notes(core, id).contains { $0.contains("Removed the worktree tidy and its branch.") })
     }
 
-    @Test func leavingWithRemoveKeepsABranchThatHoldsCommits() async throws {
+    @Test func leavingWithRemoveTakesACleanWorktreeAndKeepsItsUnmergedBranch() async throws {
         let repo = try await repository()
         let core = try await makeCore(repo, FakeLauncher())
         let id = try await idleAgent(core, repo)
@@ -697,14 +697,16 @@ struct MoveTests {
         try "work\n".write(to: root.appending(path: "work.txt"), atomically: true, encoding: .utf8)
         _ = try await git(["add", "."], in: root)
         _ = try await git(["commit", "-q", "-m", "work"], in: root)
+        let tip = try await git(["rev-parse", "HEAD"], in: root)
 
-        let refused = await failure { try await personMove(core, id, .projectFolder, removeLeft: true) }
-        #expect(refused?.code == DaemonAPI.Failure.worktreeFailed, "unmerged commits need discard_changes")
-        #expect(refused?.message.contains("commits not in main") == true)
+        // A lane's commits wait for a merge in a wave: that is no reason to keep the folder (#194).
+        let answer = try await personMove(core, id, .projectFolder, removeLeft: true)
 
-        _ = try await personMove(core, id, .projectFolder, removeLeft: true, discard: true)
+        #expect(answer.when == .now)
         #expect(!FileManager.default.fileExists(atPath: root.path))
         #expect(await core.agent(id)?.cwd == repo.project)
+        #expect(try await git(["rev-parse", "agents/worked"], in: repo.top) == tip, "the branch holds the commits")
+        #expect(try await notes(core, id).contains { $0.contains("Removed the worktree worked; its branch agents/worked is kept.") })
     }
 
     @Test func removingOverUncommittedWorkNeedsDiscard() async throws {
@@ -713,16 +715,47 @@ struct MoveTests {
         let id = try await idleAgent(core, repo)
         _ = try await personMove(core, id, .newWorktree(name: "dirty"))
         let root = try #require(await core.agent(id)?.worktree?.root)
+        try "work\n".write(to: root.appending(path: "work.txt"), atomically: true, encoding: .utf8)
+        _ = try await git(["add", "."], in: root)
+        _ = try await git(["commit", "-q", "-m", "work"], in: root)
+        try "changed\n".write(to: root.appending(path: "work.txt"), atomically: true, encoding: .utf8)
         try "unsaved\n".write(to: root.appending(path: "unsaved.txt"), atomically: true, encoding: .utf8)
 
         let refused = await failure { try await personMove(core, id, .projectFolder, removeLeft: true) }
         #expect(refused?.code == DaemonAPI.Failure.worktreeFailed)
-        #expect(refused?.message.contains("1 uncommitted change") == true)
+        let message = refused?.message ?? ""
+        #expect(message.contains("2 uncommitted changes: edited work.txt, untracked unsaved.txt"), "\(message)")
+        #expect(!message.contains("commits not in"), "commits are not what would be lost")
         #expect(await core.agent(id)?.pendingMove == nil)
         #expect(await core.agent(id)?.cwd == root, "nothing moved")
 
         _ = try await personMove(core, id, .projectFolder, removeLeft: true, discard: true)
         #expect(!FileManager.default.fileExists(atPath: root.path))
+        #expect(try await git(["branch", "--list", "agents/dirty"], in: repo.top).isEmpty == false,
+                "discarding changes never discards commits")
+    }
+
+    @Test func removingAWorktreeWhoseCommitsWouldBeOnNoBranchIsRefused() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+
+        let detached = try await idleAgent(core, repo)
+        _ = try await personMove(core, detached, .newWorktree(name: "loose"))
+        let looseRoot = try #require(await core.agent(detached)?.worktree?.root)
+        _ = try await git(["checkout", "-q", "--detach"], in: looseRoot)
+        let onHead = await failure { try await personMove(core, detached, .projectFolder, removeLeft: true, discard: true) }
+        #expect(onHead?.code == DaemonAPI.Failure.worktreeFailed)
+        #expect(onHead?.message.contains("detached HEAD") == true, "\(onHead?.message ?? "")")
+        #expect(FileManager.default.fileExists(atPath: looseRoot.path))
+
+        let orphan = try await idleAgent(core, repo, prompt: "Another")
+        _ = try await personMove(core, orphan, .newWorktree(name: "gone"))
+        let goneRoot = try #require(await core.agent(orphan)?.worktree?.root)
+        _ = try await git(["update-ref", "-d", "refs/heads/agents/gone"], in: repo.top)
+        let noBranch = await failure { try await personMove(core, orphan, .projectFolder, removeLeft: true, discard: true) }
+        #expect(noBranch?.code == DaemonAPI.Failure.worktreeFailed)
+        #expect(noBranch?.message.contains("agents/gone is not there any more") == true, "\(noBranch?.message ?? "")")
+        #expect(FileManager.default.fileExists(atPath: goneRoot.path))
     }
 
     @Test func removingAWorktreeTheAppDidNotMakeOrAnotherAgentIsInIsRefused() async throws {

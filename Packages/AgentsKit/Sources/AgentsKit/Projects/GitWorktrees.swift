@@ -126,6 +126,13 @@ public enum GitWorktrees {
             .split(separator: "\n").count
     }
 
+    /// The lines of `git status --porcelain` themselves: `XY path`, with `??` for a file
+    /// git does not track. Ignored files are not in it.
+    public static func status(in folder: URL) async throws -> [String] {
+        try await git(["status", "--porcelain"], in: folder)
+            .split(separator: "\n").map(String.init)
+    }
+
     /// Whether every commit on `branch` is already in `base`.
     public static func isAncestor(_ branch: String, of base: String, in folder: URL) async -> Bool {
         (try? await git(["merge-base", "--is-ancestor", branch, base], in: folder)) != nil
