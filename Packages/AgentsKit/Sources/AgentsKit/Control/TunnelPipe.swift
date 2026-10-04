@@ -132,12 +132,16 @@ public final class TunnelSocket: @unchecked Sendable {
     }
 
     private func acceptLoop() {
+        let failures = AcceptFailures(name: "tunnel socket")
         while !isClosed {
             let client = accept(listener, nil, nil)
             guard client >= 0 else {
-                if isClosed { return }
+                // Waited out rather than spun on (#201).
+                let error = errno
+                if isClosed || failures.after(error, listener: listener) == .stop { return }
                 continue
             }
+            failures.accepted()
             let open = self.open
             Task.detached {
                 do {

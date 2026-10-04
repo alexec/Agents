@@ -70,8 +70,16 @@ let package = Package(
         // same bytes in any chunking give the same screen.
         .testTarget(
             name: "AgentsKitTests",
-            dependencies: ["ControlDial", "AgentsKit", "AgentsKitCore",
+            dependencies: ["ControlDial", "AgentsKit", "AgentsKitCore", "accept-probe",
                            .product(name: "SwiftTerm", package: "SwiftTerm")],
+            swiftSettings: [.treatAllWarnings(as: .error)]),
+        // Tests only, and no product: a daemon socket in a process of its own with few
+        // descriptors (#201). Out of descriptors is the whole process's state, so it
+        // cannot be done to a server inside the test process beside every other test.
+        .executableTarget(
+            name: "accept-probe",
+            dependencies: ["AgentsKit"],
+            path: "Tests/AcceptProbe",
             swiftSettings: [.treatAllWarnings(as: .error)]),
     ]
 )

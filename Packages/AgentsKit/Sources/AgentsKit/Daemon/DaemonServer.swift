@@ -200,13 +200,23 @@ public final class DaemonServer: @unchecked Sendable {
         }
 
         let listenFD = self.listenFD
+        let stopped = self.stopped
         let thread = Thread { [weak self] in
+            let failures = AcceptFailures(name: "socket")
             while true {
                 let fd = accept(listenFD, nil, nil)
                 if fd < 0 {
-                    if errno == EINTR { continue }
-                    return
+                    // Not the end of the listener unless it was closed (#201): one
+                    // descriptor spike used to leave daemon.sock taking nobody, for good.
+                    let error = errno
+                    if stopped.isSet { return }
+                    if failures.after(error, listener: listenFD) == .stop {
+                        DaemonLog.shared.write("socket: the listener failed (\(String(cString: strerror(error)))); no more connections")
+                        return
+                    }
+                    continue
                 }
+                failures.accepted()
                 // accept() hands back a descriptor with the flag clear however the
                 // listener was opened, so each window's connection says it again.
                 // This is the one a long-lived shell is most likely to be handed: a
