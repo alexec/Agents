@@ -11,6 +11,10 @@
 # The window runs from a copy in ~/Applications/AgentsLive/<sha>-<time>/, never from
 # build/DD-store: every build in the main checkout writes over that.
 #
+# Everything is built in the Live configuration (#220): optimised like Release, signed for
+# development like Debug. Release itself is the App Store archive's. Scratch walks
+# (run-app), merge-wave's checks and the tests stay on Debug.
+#
 #   ship.sh                 everything
 #   ship.sh --no-build      reuse build/DD-host, build/DD-store and build/DD-ios as they are
 #   ship.sh --no-linux      skip rebuilding the Linux hosts in App/Resources/servers
@@ -18,6 +22,8 @@
 #   ship.sh --no-mac        skip the Mac
 #   ship.sh --device UDID   only this device (repeatable)
 #   ship.sh --now           relaunch the Mac after 3s instead of 20s
+#   ship.sh --build-only    build in this checkout (a worktree's copy builds the worktree),
+#                           check the products are optimised, and stop: nothing is installed
 set -u
 setopt pipefail
 
@@ -111,7 +117,7 @@ if [[ ${1:-} == --restart ]]; then
   exit
 fi
 
-BUILD=1 DEVICES=1 MAC=1 DELAY=20 LINUX=1
+BUILD=1 DEVICES=1 MAC=1 DELAY=20 LINUX=1 BUILD_ONLY=0
 typeset -a ONLY
 while (( $# )); do
   case $1 in
@@ -121,6 +127,7 @@ while (( $# )); do
     --no-mac) MAC=0 ;;
     --device) ONLY+=$2; shift ;;
     --now) DELAY=3 ;;
+    --build-only) BUILD_ONLY=1 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -130,16 +137,23 @@ HERE=${0:A:h}
 # The main checkout, wherever this script is run from (a worktree's copy included).
 REPO=$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir)
 REPO=${REPO:h}
-BRANCH=$(git -C "$REPO" --no-optional-locks branch --show-current)
-[[ $BRANCH == main ]] || { echo "main checkout $REPO is on '$BRANCH', not main; stop" >&2; exit 1; }
+if (( BUILD_ONLY )); then
+  # The checkout this copy of the script is in, so a worktree never writes over main's build.
+  REPO=$(git -C "$HERE" rev-parse --show-toplevel)
+  (( BUILD )) || { echo "--build-only with --no-build has nothing to do" >&2; exit 2; }
+else
+  BRANCH=$(git -C "$REPO" --no-optional-locks branch --show-current)
+  [[ $BRANCH == main ]] || { echo "main checkout $REPO is on '$BRANCH', not main; stop" >&2; exit 1; }
+fi
 SHA=$(git -C "$REPO" rev-parse --short HEAD)
-LOGS=/tmp/ship-app-$SHA; mkdir -p $LOGS
-HOSTAPP=$REPO/build/DD-host/Build/Products/Debug/"Agents Host.app"
-STOREAPP=$REPO/build/DD-store/Build/Products/Debug/Agents.app
-IOSAPP=$REPO/build/DD-ios/Build/Products/Debug-iphoneos/Agents.app
-echo "main $SHA  logs $LOGS"
+LOGS=/tmp/ship-app-$SHA; (( BUILD_ONLY )) && LOGS+=-build-only; mkdir -p $LOGS
+CONFIG=Live
+HOSTAPP=$REPO/build/DD-host/Build/Products/$CONFIG/"Agents Host.app"
+STOREAPP=$REPO/build/DD-store/Build/Products/$CONFIG/Agents.app
+IOSAPP=$REPO/build/DD-ios/Build/Products/$CONFIG-iphoneos/Agents.app
+echo "$( (( BUILD_ONLY )) && echo "build only, $REPO" || echo main) $SHA  logs $LOGS"
 if [[ -n $(git -C "$REPO" --no-optional-locks status --porcelain --untracked-files=no) ]]; then
-  echo "note: main checkout has uncommitted changes; the build includes them"
+  echo "note: $REPO has uncommitted changes; the build includes them"
 fi
 
 # Any build run from inside the main checkout, rather than from a live copy or a
@@ -150,7 +164,7 @@ while read -r pid cmd; do
     $REPO/build/*/Contents/MacOS/*) BAD+=("$pid $cmd") ;;
   esac
 done < <(ps -axww -o pid=,command=)
-if (( ${#BAD} )); then
+if (( ${#BAD} && ! BUILD_ONLY )); then
   echo "An agent failed to create a worktree. Nothing runs from the main checkout's build." >&2
   printf '%s\n' "${BAD[@]}" >&2
   exit 1
@@ -175,12 +189,33 @@ if (( BUILD )); then
     # The Linux hosts a server is given, which Agents Host carries and its control plane
     # serves: gitignored build outputs, so stale until rebuilt here.
     (( LINUX )) && run build-linux scripts/build-linux-agentsd.sh
-    run build-host scripts/build-cache.sh xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
-    run build-window scripts/build-cache.sh xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD-store $XFLAGS build
+    run build-host scripts/build-cache.sh xcodebuild -scheme AgentsHost -configuration $CONFIG -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
+    run build-window scripts/build-cache.sh xcodebuild -scheme AgentsStore -configuration $CONFIG -destination 'platform=macOS' -derivedDataPath build/DD-store $XFLAGS build
   fi
   if (( DEVICES )); then
-    run build-ios scripts/build-cache.sh xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DD-ios -allowProvisioningUpdates $XFLAGS build
+    run build-ios scripts/build-cache.sh xcodebuild -scheme Remote -configuration $CONFIG -destination 'generic/platform=iOS' -derivedDataPath build/DD-ios -allowProvisioningUpdates $XFLAGS build
   fi
+fi
+
+# A Debug build carries its code in a .debug.dylib (and a __preview.dylib) beside a stub;
+# an optimised one has neither. Checked before anything is installed.
+debug_parts() { # bundle...
+  local b
+  for b in "$@"; do [[ -d $b ]] && find "$b" \( -name '*.debug.dylib' -o -name '__preview.dylib' \) -print; done
+}
+typeset -a BUILT
+(( MAC )) && BUILT+=("$HOSTAPP" "$STOREAPP")
+(( DEVICES )) && BUILT+=("$IOSAPP")
+if [[ -n $(debug_parts $BUILT) ]]; then
+  echo "these builds are not optimised (Debug parts in them); not shipping:" >&2
+  debug_parts $BUILT >&2; exit 1
+fi
+if (( BUILD_ONLY )); then
+  for b in $BUILT; do
+    [[ -d $b ]] || { echo "missing $b" >&2; exit 1; }
+    echo "built $b ($(du -sh "$b" | cut -f1), no Debug parts; $(codesign -dv "$b" 2>&1 | grep -E '^TeamIdentifier='))"
+  done
+  exit 0
 fi
 
 if (( DEVICES )); then
