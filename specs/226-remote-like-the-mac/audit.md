@@ -25,6 +25,8 @@ Both apps draw from the same model in `AgentsKitCore/Sidebar`:
 
 The views stay separate for each platform.
 
+The Mac's sidebar on the shared model, walked on a scratch window: Pinned above Done, the unread counts, and the Archived fold loading its page when opened (`window-sidebar.png`).
+
 | What | Status |
 |---|---|
 | Activity at the top: Events, Resources, Runtimes, Spending, with plain titles (#155) | same |
