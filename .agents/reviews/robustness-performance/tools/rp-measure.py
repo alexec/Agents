@@ -51,12 +51,12 @@ if mode == "lists":
     agents = c.call("agents/list", {"lean": True})
     folder = agents[0]["cwd"] if agents else None
     one = agents[0]["id"] if agents else None
-    rows = [("daemon/ping", None), ("projects/list", None), ("agents/list, lean", {"lean": True}),
+    rows = [("daemon/ping", None), ("projects/list", {}), ("agents/list, lean", {"lean": True}),
             ("agents/list", {}), ("agents/list, lean, includeArchived", {"lean": True, "includeArchived": True}),
             ("agents/list, includeArchived", {"includeArchived": True}),
             ("agents/list, one agentID", {"agentID": one}), ("agents/list, one folder, lean", {"folder": folder, "lean": True}),
             ("agents/list, one folder archivedOnly lean", {"folder": folder, "archivedOnly": True, "lean": True}),
-            ("events/list", {}), ("workflows/list", None), ("retention/state", None)]
+            ("events/list", {"limit": 1000}), ("agents/list, query", {"lean": True, "includeArchived": True, "query": "seeded 7"}), ("agents/list, archived page 100", {"lean": True, "includeArchived": True, "archivedOnly": True, "limit": 100}), ("workflows/list", None), ("retention/state", None)]
     print(f"| call | median ms | max ms | reply bytes |\n|---|---|---|---|")
     for name, p in rows:
         meth = name.split(",")[0]
