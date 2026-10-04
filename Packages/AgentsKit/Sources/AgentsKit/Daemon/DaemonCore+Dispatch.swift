@@ -207,6 +207,13 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await unarchiveProject(request.folder)))
 
+            case DaemonAPI.Method.projectsSetDiskSpace:
+                let request = try require(params, as: DaemonAPI.SetDiskSpaceRequest.self)
+                return .success(try JSONValue.encoding(try setDiskSpace(request)))
+
+            case DaemonAPI.Method.diskState:
+                return .success(try JSONValue.encoding(diskState()))
+
             case DaemonAPI.Method.projectsSetHelperLimits:
                 let request = try require(params, as: DaemonAPI.SetHelperLimitsRequest.self)
                 return .success(try JSONValue.encoding(try setHelperLimits(request)))

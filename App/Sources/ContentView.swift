@@ -173,6 +173,7 @@ struct ContentView: View {
         // under an inset and hide their first rows behind it.
         VStack(spacing: 0) {
         if model.controlPlaneAway { ControlAwayStrip() }
+        DiskStrip()
         Group {
             if model.needsFirstRun {
                 // No control plane and nothing of the old way: one question, and no

@@ -173,6 +173,9 @@ public final class AgentsModel {
     /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
     public private(set) var leases: DaemonAPI.LeaseSnapshot?
+    /// Every volume that is low on space (#195), as the daemon last said. Replaced whole
+    /// by each `disk/changed`. Empty from a daemon too old to say, which draws nothing.
+    public private(set) var disk = DiskState()
     /// The newest events (042), newest first, as far back as has been paged in. A new
     /// or changed event from `events/changed` is put in by its position. Empty until a
     /// page has been asked for, and on a daemon too old to have events.
@@ -278,6 +281,7 @@ public final class AgentsModel {
         case runtimeAllowancesChanged(RuntimeAllowances)
         case agentRemoved(DaemonAPI.AgentRemovedNotification)
         case leasesChanged(DaemonAPI.LeaseSnapshot)
+        case diskChanged(DiskState)
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
@@ -316,6 +320,7 @@ public final class AgentsModel {
             return decode(RuntimeAllowances.self, Update.runtimeAllowancesChanged)
         case DaemonAPI.Notification.agentRemoved: return decode(DaemonAPI.AgentRemovedNotification.self, Update.agentRemoved)
         case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
+        case DaemonAPI.Notification.diskChanged: return decode(DiskState.self, Update.diskChanged)
         case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
@@ -458,6 +463,9 @@ public final class AgentsModel {
 
         case .leasesChanged(let snapshot):
             leases = snapshot
+
+        case .diskChanged(let state):
+            disk = state
 
         case .eventsChanged(let change):
             waitingAgents = change.waiting
@@ -654,6 +662,7 @@ public final class AgentsModel {
         for tombstone in found { tombstones[tombstone.id] = tombstone }
     }
     public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) { leases = snapshot }
+    public func replaceDisk(_ state: DiskState) { disk = state }
 
     /// A page of events from `events/list`, asked for with `filter`. The first page
     /// replaces what was there; a page from further back (`appending`) goes on the end.

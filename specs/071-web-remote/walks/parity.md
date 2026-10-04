@@ -114,7 +114,7 @@ Of the rows above, the page lacked or partly had 12 before this branch. All 12 a
 #87, #98, #100, #83 (page side), #88, #101, the sessions column, #63 (Changes), #63 (Files), #66, #82, #90.
 
 The window's shots found two more, both closed: answer cards held while their host is down (#83), and the Changes total line (#63).
-
+| Low disk space: a strip across the top of the window while a volume is low or critical, with how much is free and the largest worktrees; Project Settings ▸ Low / Critical disk space (2026-10-03) | #195 | lacks | **lacks**, #196 | | | The window draws `disk/state` and `disk/changed`; the page and the Remote don't yet. The page has `mac.disk_low` and `mac.disk_ok` as workflow triggers and in its catalogue. |
 
 What is still different, and why:
 - **#83, "said at once":** neither the window nor the page hears a paused host for about a minute. Both learn of it from the control plane, which is #106's lane.

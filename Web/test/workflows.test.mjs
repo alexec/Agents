@@ -52,6 +52,8 @@ test("each trigger listens where its events are", () => {
   assert.equal(w.listensIn({ workflowCompleted: {} }), "project");
   assert.equal(w.listensIn(event("branch.moved")), "project");
   assert.equal(w.listensIn(event("mac.wake")), "mac");
+  assert.equal(w.listensIn(event("mac.disk_low", { level: "critical" })), "mac");
+  assert.equal(w.listensIn(event("mac.disk_ok")), "mac");
   assert.equal(w.listensIn(event("cost.limit_reached")), "either");
   assert.equal(w.listensIn(event("custom.build_green")), "project");
   assert.equal(w.listensIn(event("cost.*")), "either");

@@ -4,6 +4,9 @@ import Foundation
 /// they travel with it to every clone and host and show in its history.
 ///
 ///     {
+///       "diskSpace" : {
+///         "lowGB" : 50
+///       },
 ///       "helperLimits" : {
 ///         "notArchived" : 8,
 ///         "running" : 4
@@ -25,6 +28,7 @@ public enum ProjectConfig {
         public var message: String { "\(DotAgents.folder)/\(fileName) is not a JSON object, so it was left as it is. Fix it or remove it, then try again." }
     }
     static let helperLimitsKey = "helperLimits"
+    static let diskSpaceKey = "diskSpace"
 
     public static func url(in project: URL) -> URL {
         project.appendingPathComponent(DotAgents.folder, isDirectory: true)
@@ -50,6 +54,23 @@ public enum ProjectConfig {
     /// nothing is left in it. Returns whether the file changed.
     @discardableResult
     public static func setHelperLimits(_ limits: HelperLimits?, in project: URL) throws -> Bool {
+        try set(helperLimitsKey, to: limits?.orNilIfDefault, in: project)
+    }
+
+    /// The disk space lines the file sets (#195), or nil when it sets none.
+    public static func diskSpace(in project: URL) -> DiskThresholds? {
+        guard let lines = try? read(in: project)[diskSpaceKey]?.decode(DiskThresholds.self) else { return nil }
+        return lines.orNilIfDefault
+    }
+
+    /// Write the disk space lines, or take them out when nil, as `setHelperLimits` does.
+    @discardableResult
+    public static func setDiskSpace(_ lines: DiskThresholds?, in project: URL) throws -> Bool {
+        try set(diskSpaceKey, to: lines?.orNilIfDefault, in: project)
+    }
+
+    /// One key written, or taken out when `value` is nil, leaving every other key as it was.
+    private static func set(_ key: String, to value: (some Encodable)?, in project: URL) throws -> Bool {
         // A file somebody broke by hand is theirs to fix, not ours to replace.
         if let data = try? Data(contentsOf: url(in: project)),
            case .object? = try? JSONDecoder().decode(JSONValue.self, from: data) {} else if
@@ -57,10 +78,10 @@ public enum ProjectConfig {
             throw Unreadable()
         }
         var keys = read(in: project)
-        if let limits = limits?.orNilIfDefault {
-            keys[helperLimitsKey] = try JSONValue.encoding(limits)
+        if let value {
+            keys[key] = try JSONValue.encoding(value)
         } else {
-            keys[helperLimitsKey] = nil
+            keys[key] = nil
         }
         let file = url(in: project)
         let old = try? Data(contentsOf: file)

@@ -28,6 +28,10 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// from before then, moved into that file once. Set only by
     /// `projects/setHelperLimits`, which agents cannot call.
     public var helperLimits: HelperLimits?
+    /// The person's disk space lines (#195), from the project's own
+    /// `.agents/project.json`. Nil is the defaults. Only ever in a summary; never kept in
+    /// `projects.json`. Set only by `projects/setDiskSpace`, which agents cannot call.
+    public var diskSpace: DiskThresholds?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
@@ -71,13 +75,14 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
 
     public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(),
                 laidOutAt: Date? = nil, layoutVersion: Int? = nil, helperLimits: HelperLimits? = nil,
-                unknownFields: [String: JSONValue] = [:]) {
+                diskSpace: DiskThresholds? = nil, unknownFields: [String: JSONValue] = [:]) {
         self.folder = Self.standardize(folder)
         self.archivedAt = archivedAt
         self.addedAt = addedAt
         self.laidOutAt = laidOutAt
         self.layoutVersion = layoutVersion
         self.helperLimits = helperLimits
+        self.diskSpace = diskSpace
         self.unknownFields = unknownFields
     }
 
@@ -90,6 +95,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         layoutVersion = try c.decodeIfPresent(Int.self, forKey: .layoutVersion)
         // A setting this build cannot read is the defaults, not a project that fails to load.
         helperLimits = (try? c.decodeIfPresent(HelperLimits.self, forKey: .helperLimits)) ?? nil
+        diskSpace = (try? c.decodeIfPresent(DiskThresholds.self, forKey: .diskSpace)) ?? nil
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         unknownFields = [:]
         if let extra = try? decoder.container(keyedBy: AnyKey.self) {
@@ -107,6 +113,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(laidOutAt, forKey: .laidOutAt)
         try c.encodeIfPresent(layoutVersion, forKey: .layoutVersion)
         try c.encodeIfPresent(helperLimits, forKey: .helperLimits)
+        try c.encodeIfPresent(diskSpace, forKey: .diskSpace)
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
             for (key, value) in unknownFields {
@@ -116,7 +123,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case folder, archivedAt, addedAt, laidOutAt, layoutVersion, helperLimits
+        case folder, archivedAt, addedAt, laidOutAt, layoutVersion, helperLimits, diskSpace
     }
 
     struct AnyKey: CodingKey {

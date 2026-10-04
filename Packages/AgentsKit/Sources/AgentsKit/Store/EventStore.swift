@@ -174,6 +174,9 @@ public struct EventState: Codable, Hashable, Sendable {
     public var publishes: [String: [Date]] = [:]
     /// Day ("2026-09-25") → the limits already said to be reached that day.
     public var costCrossings: [String: [String]] = [:]
+    /// Volume mount → how it stood at the last look (#195), so a crossing is raised
+    /// once and a restart does not raise it again.
+    public var diskLevels: [String: String]?
 
     public init() {}
 }

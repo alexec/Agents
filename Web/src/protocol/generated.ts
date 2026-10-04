@@ -544,6 +544,12 @@ export interface DiscardDraftRequest {
   draftID: UUID;
 }
 
+export interface DiskThresholds {
+  lowGB?: number;
+  lowPercent?: number;
+  criticalGB?: number;
+}
+
 export interface DraftOptionsNotification {
   draftID: UUID;
   options: ConfigOption[];
@@ -1020,6 +1026,7 @@ export interface Project {
   laidOutAt?: WireDate;
   layoutVersion?: number;
   helperLimits?: HelperLimits;
+  diskSpace?: DiskThresholds;
 }
 
 export interface ProjectPins {
@@ -1976,6 +1983,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
   DirectoryListing: { required: ["url", "entries", "omitted"], optional: [] },
   DiscardDraftRequest: { required: ["draftID"], optional: [] },
+  DiskThresholds: { required: [], optional: ["lowGB", "lowPercent", "criticalGB"] },
   DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
@@ -2032,7 +2040,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify"] },
-  Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits"] },
+  Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace"] },
   ProjectPins: { required: ["folder", "pins"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: [] },

@@ -139,6 +139,12 @@ public enum EventCatalogue {
                   "A lease was given back, ended or ran out."),
         EventKind("mac.sleep", .mac, [], "This Mac is going to sleep."),
         EventKind("mac.wake", .mac, [], "This Mac woke up."),
+        EventKind("mac.disk_low", .mac,
+                  open("volume", "free_bytes", "free_percent") + [fixed("level", ["low", "critical"])]
+                      + open("threshold", "worktrees"),
+                  "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold."),
+        EventKind("mac.disk_ok", .mac, open("volume", "free_bytes", "free_percent", "threshold"),
+                  "Free space on a volume that was low climbed back above its threshold."),
         EventKind("person.away", .mac, [fixed("why", ["locked", "idle"])],
                   "You locked the screen or stepped away for 5 minutes."),
         EventKind("person.back", .mac, [fixed("why", ["locked", "idle"])], "You unlocked the screen or came back."),

@@ -196,6 +196,8 @@ public final class Daemon: @unchecked Sendable {
         // The Mac and the person, as events (042). Only in the real daemon; a test
         // hands the core a fake.
         await core.startWatchingMachine()
+        // And the volumes it writes to (#195).
+        await core.startWatchingDisk()
         // Last of all, once the agents that are coming back are back. A daemon
         // restarting under resumed agents is holding work from its first moment, and
         // without this it would not take the assertion until one of them next changed
