@@ -100,27 +100,62 @@ extension DaemonCore {
         guard projectWatches[standardized] == nil, Self.isDirectory(standardized) else { return }
         let excluded = projectWatchExclusions(standardized)
         projectWatchExclusions[standardized] = excluded
-        // FSEvents reports the real path (`/private/tmp/…`); everything here compares
-        // against the standardised one (`/tmp/…`), so the reports are put in its spelling.
-        let root = standardized.path
-        let real = FolderWatch.realPath(root)
+        projectWatchTopLevel[standardized] = Self.topLevelNames(standardized)
+        projectWatchPages[standardized] = pagePaths(standardized)
+        let filter = WatchFilter(root: standardized, excluded: excluded, gitNoise: true)
         projectWatches[standardized] = FolderWatch(root: standardized, excluding: excluded) { [weak self] changed in
-            let kept = changed.compactMap { url -> URL? in
-                var path = url.path
-                if real != root, path == real || path.hasPrefix(real + "/") { path = root + path.dropFirst(real.count) }
-                // FSEvents has dropped these already; a stray one does not hop over.
-                guard !excluded.contains(where: { path == $0.path || path.hasPrefix($0.path + "/") }) else { return nil }
-                return URL(filePath: path)
-            }
+            let kept = filter.kept(changed)
             guard !kept.isEmpty else { return }
             Task { await self?.projectFilesChanged(kept, in: standardized) }
+        }
+    }
+
+    /// What a watch's reports are put through before they hop onto the actor (#216).
+    ///
+    /// FSEvents takes eight folders to leave out; the rest of the list is dropped here,
+    /// on the watch's own queue, so a ninth package's `.build` costs a string compare and
+    /// never a wake. With `gitNoise`, so is what git writes besides the branches: its
+    /// logs, index and remotes, which every git operation in any lane touches.
+    struct WatchFilter: Sendable {
+        let root: String
+        let real: String
+        let excluded: [String]
+        let gitNoise: Bool
+
+        init(root: URL, excluded: [URL], gitNoise: Bool) {
+            self.root = root.path
+            real = FolderWatch.realPath(root.path)
+            self.excluded = excluded.map(\.path)
+            self.gitNoise = gitNoise
+        }
+
+        /// The reports to act on, in the root's spelling. FSEvents reports the real path
+        /// (`/private/tmp/…`); everything here compares against the standardised one.
+        func kept(_ changed: [URL]) -> [URL] {
+            changed.compactMap { url -> URL? in
+                var path = url.path
+                if real != root, path == real || path.hasPrefix(real + "/") { path = root + path.dropFirst(real.count) }
+                guard !excluded.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) else { return nil }
+                if gitNoise, path.hasPrefix(root + "/.git/"), !Self.isBranchFolder(String(path.dropFirst(root.count + 6))) {
+                    return nil
+                }
+                return URL(filePath: path)
+            }
+        }
+
+        /// Under `.git/`, the folders that say where branches point: `refs/heads` and
+        /// each lane's `worktrees/<name>`. `.git` itself (HEAD, packed-refs) is kept too.
+        static func isBranchFolder(_ inside: String) -> Bool {
+            inside == "refs" || inside.hasPrefix("refs/heads") || inside == "worktrees"
+                || (inside.hasPrefix("worktrees/") && !inside.dropFirst("worktrees/".count).contains("/"))
         }
     }
 
     /// Folders under a project whose changes nobody here reads: lane worktrees, git's
     /// objects, and build output and packages at the top and one level down (#173).
     /// One holding a pinned page or a page tile stays watched, so the page stays live.
-    /// FSEvents takes eight; the worktrees always come first.
+    /// All of them, in the order they matter: FSEvents takes the first eight, the
+    /// worktrees always among them, and the watch drops the rest itself (#216).
     func projectWatchExclusions(_ folder: URL) -> [URL] {
         let pages = pagePaths(folder)
         func holdsAPage(_ relative: String) -> Bool {
@@ -139,32 +174,93 @@ extension DaemonCore {
         }
         // Not there yet, but where a first build at the top would put its output.
         for name in Self.buildOutputNames where !found.contains(name) { found.append(name) }
-        return found.filter { !holdsAPage($0) }.prefix(FolderWatch.maximumExclusions)
+        return found.filter { !holdsAPage($0) }
             .map { folder.appending(path: $0, directoryHint: .isDirectory).standardizedFileURL }
     }
 
+    static func topLevelNames(_ folder: URL) -> Set<String> {
+        Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+    }
+
     static let buildOutputNames = ["node_modules", ".build", "build", "DerivedData", "target", "dist"]
+
+    /// What `scheduleExclusionCheck` is given when the pages, not a folder, moved.
+    static let pagesMoved = "\u{0}pages"
+
+    /// Look again at the folders a project's watch leaves out, within the second (#216).
+    /// `near` names what changed: the root (""), folders just under it, or the pages.
+    func scheduleExclusionCheck(_ folder: URL, near: [String]) {
+        projectExclusionPending[folder, default: []].formUnion(near)
+        guard projectExclusionChecks[folder] == nil else { return }
+        projectExclusionChecks[folder] = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(Self.exclusionCheckGap))
+            guard !Task.isCancelled else { return }
+            await self?.checkProjectExclusions(folder)
+        }
+    }
+
+    static let exclusionCheckGap = 1000
+
+    /// The cheap look first: the root's names against those the watch started with, and
+    /// six stats for each folder just under it that changed. Only a difference pays for
+    /// the whole list again.
+    func checkProjectExclusions(_ folder: URL) {
+        projectExclusionChecks[folder] = nil
+        let pending = projectExclusionPending.removeValue(forKey: folder) ?? []
+        guard let current = projectWatchExclusions[folder] else { return }
+        exclusionChecks += 1
+        var stale = pending.contains(Self.pagesMoved)
+        if !stale, pending.contains("") { stale = Self.topLevelNames(folder) != projectWatchTopLevel[folder] }
+        if !stale {
+            let held = Set(current.map(\.path))
+            stale = pending.contains { child in
+                !child.isEmpty && child != Self.pagesMoved && Self.buildOutputNames.contains { name in
+                    let output = folder.appending(path: "\(child)/\(name)", directoryHint: .isDirectory).standardizedFileURL
+                    return !held.contains(output.path) && Self.isDirectory(output)
+                }
+            }
+        }
+        guard stale else { return }
+        refreshProjectWatchIfNeeded(folder)
+    }
 
     /// A pin or page tile came or went: if the folders left out of the watch should
     /// change with it, the watch starts again without them.
     func refreshProjectWatchIfNeeded(_ folder: URL) {
         let standardized = Project.standardize(folder)
-        guard let current = projectWatchExclusions[standardized],
-              projectWatchExclusions(standardized) != current else { return }
+        guard let current = projectWatchExclusions[standardized] else { return }
+        guard projectWatchExclusions(standardized) != current else {
+            projectWatchTopLevel[standardized] = Self.topLevelNames(standardized)
+            return
+        }
         projectWatches.removeValue(forKey: standardized)?.stop()
         watchProject(standardized)
     }
 
     /// Something changed under a project, worktrees and build output already left out.
+    ///
+    /// Several times a second while an agent edits in the main checkout, so what it costs
+    /// is bounded (#216): the pins and tiles are read again only when their own folders
+    /// changed, and the folders left out are looked at again only when the top level, a
+    /// folder just under it, or the pages changed — at most once a second.
     func projectFilesChanged(_ changed: [URL], in folder: URL) {
         projectWatchWakes += 1
         // Whatever moved, the folder is looked at again before a list says it is there.
         folderExistence[folder] = nil
+        forgetProjectFileCaches(changed, in: folder)
         // Pinned pages and page tiles (#159) can be anywhere in the project.
         pinFilesChanged(changed, in: folder)
         if branchFolders.contains(folder), changed.contains(where: Self.isBranchPath) {
             scheduleBranchCheck(in: folder)
         }
+        let root = folder.path
+        let near = changed.compactMap { url -> String? in
+            if url.path == root { return "" }
+            guard url.path.hasPrefix(root + "/") else { return nil }
+            let inside = url.path.dropFirst(root.count + 1)
+            return inside.contains("/") || inside.hasPrefix(".") ? nil : String(inside)
+        }
+        if !near.isEmpty { scheduleExclusionCheck(folder, near: near) }
         let agents = folder.appending(path: ".agents").path
         let own = changed.filter { $0.path == agents || $0.path.hasPrefix(agents + "/") }
         guard !own.isEmpty else { return }
@@ -173,7 +269,11 @@ extension DaemonCore {
             scheduleWorkflowRescan(in: folder)
         }
         // A pin or page tile may have moved into a folder the watch leaves out.
-        refreshProjectWatchIfNeeded(folder)
+        let pages = pagePaths(folder)
+        if pages != projectWatchPages[folder] {
+            projectWatchPages[folder] = pages
+            scheduleExclusionCheck(folder, near: [Self.pagesMoved])
+        }
         // The Dashboard's tile files, changed by hand or by a pull (074).
         dashboardFilesChanged(own, in: folder)
         // And the project's own settings file (#126).
@@ -187,6 +287,11 @@ extension DaemonCore {
         projectWatchExclusions.removeAll()
         folderExistence.removeAll()
         dashboardSummaryCache.removeAll()
+        projectWatchTopLevel.removeAll()
+        projectWatchPages.removeAll()
+        for (_, check) in projectExclusionChecks { check.cancel() }
+        projectExclusionChecks.removeAll()
+        projectExclusionPending.removeAll()
         for folder in branchFolders { stopWatchingBranches(in: folder) }
     }
 
@@ -215,6 +320,10 @@ extension DaemonCore {
         projectWatchExclusions.removeValue(forKey: standardized)
         folderExistence[standardized] = nil
         dashboardSummaryCache[standardized] = nil
+        projectWatchTopLevel.removeValue(forKey: standardized)
+        projectWatchPages.removeValue(forKey: standardized)
+        projectExclusionChecks.removeValue(forKey: standardized)?.cancel()
+        projectExclusionPending.removeValue(forKey: standardized)
         workflowRescans.removeValue(forKey: standardized)?.cancel()
         // The branches went with the watch; an archived project's moves are not raised.
         stopWatchingBranches(in: standardized)

@@ -18,10 +18,10 @@ extension DaemonCore {
 
     // MARK: Reading
 
-    public func listFiles(_ request: DaemonAPI.FilesListRequest) throws -> DirectoryListing {
+    public func listFiles(_ request: DaemonAPI.FilesListRequest) async throws -> DirectoryListing {
         let (url, _) = try resolveInScope(agentID: request.agentID, path: request.folder)
         do {
-            return try DirectoryReader.read(url)
+            return try await Self.readOffTheActor(url)
         } catch DirectoryReader.Failure.notADirectory {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That is a file.")
         } catch DirectoryReader.Failure.notReadable {
@@ -35,7 +35,7 @@ extension DaemonCore {
     /// window choosing a server folder as a project, before there is an agent to scope
     /// a listing to. The daemon runs as the person, so it shows exactly what they could
     /// `ls` themselves, and no more.
-    public func browse(_ request: DaemonAPI.FilesBrowseRequest) throws -> DirectoryListing {
+    public func browse(_ request: DaemonAPI.FilesBrowseRequest) async throws -> DirectoryListing {
         let home = FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
         var path = request.path ?? "~"
         if path == "~" { path = home } else if path.hasPrefix("~/") { path = home + path.dropFirst(1) }
@@ -44,7 +44,7 @@ extension DaemonCore {
         }
         let url = URL(filePath: path, directoryHint: .isDirectory).standardizedFileURL
         do {
-            return try DirectoryReader.read(url)
+            return try await Self.readOffTheActor(url)
         } catch DirectoryReader.Failure.notADirectory {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That is a file.")
         } catch DirectoryReader.Failure.notReadable {
@@ -52,6 +52,12 @@ extension DaemonCore {
         } catch {
             throw Self.gone(url)
         }
+    }
+
+    /// A folder's listing, read off the daemon's actor (#216): even capped it is thousands
+    /// of stats, and nothing else the daemon does should wait on them.
+    static func readOffTheActor(_ url: URL) async throws -> DirectoryListing {
+        try await Task.detached(priority: .userInitiated) { try DirectoryReader.read(url) }.value
     }
 
     /// Keep a file attached on another machine where this agent can read it (037):
@@ -97,9 +103,17 @@ extension DaemonCore {
         guard let connection else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Only a connection can watch.")
         }
-        let (_, root) = try resolveInScope(agentID: request.agentID, path: request.folder)
+        let (url, root) = try resolveInScope(agentID: request.agentID, path: request.folder)
         guard FileManager.default.fileExists(atPath: root.path) else { throw Self.gone(root) }
         fileInterests[connection, default: []].insert(FileInterest(agentID: request.agentID, root: root))
+        // A folder asked for inside one the watch leaves out (somebody opening `build/`)
+        // is watched after all, from now until the watch stops.
+        let folder = url.standardizedFileURL
+        let excluded = fileWatchExclusions[root] ?? fileWatchExclusionList(root)
+        if excluded.contains(where: { folder.path == $0.path || folder.path.hasPrefix($0.path + "/") }) {
+            fileWatchOpened[root, default: []].insert(folder)
+            fileWatches.removeValue(forKey: root)?.stop()
+        }
         startWatching(root)
     }
 
@@ -125,10 +139,25 @@ extension DaemonCore {
     /// take its watch with it.
     var fileWatchCount: Int { fileWatches.count }
 
+    /// Left out as a project's watch leaves them out (#216): lane worktrees, git's
+    /// objects and build output, so a build in a lane does not tell every device.
     private func startWatching(_ root: URL) {
         guard fileWatches[root] == nil else { return }
-        fileWatches[root] = FolderWatch(root: root) { [weak self] folders in
-            Task { await self?.filesChanged(under: root, folders: folders) }
+        let excluded = fileWatchExclusionList(root)
+        fileWatchExclusions[root] = excluded
+        let filter = WatchFilter(root: root, excluded: excluded, gitNoise: false)
+        fileWatches[root] = FolderWatch(root: root, excluding: excluded) { [weak self] folders in
+            let kept = filter.kept(folders)
+            guard !kept.isEmpty else { return }
+            Task { await self?.filesChanged(under: root, folders: kept) }
+        }
+    }
+
+    /// The project watch's exclusions, less any a device has asked to look inside.
+    func fileWatchExclusionList(_ root: URL) -> [URL] {
+        let opened = fileWatchOpened[root] ?? []
+        return (projectWatchExclusions[root] ?? projectWatchExclusions(root)).filter { excluded in
+            !opened.contains { $0.path == excluded.path || $0.path.hasPrefix(excluded.path + "/") }
         }
     }
 
@@ -136,6 +165,8 @@ extension DaemonCore {
         let wanted = fileInterests.values.contains { $0.contains { $0.root == root } }
         guard !wanted, let watch = fileWatches.removeValue(forKey: root) else { return }
         watch.stop()
+        fileWatchExclusions[root] = nil
+        fileWatchOpened[root] = nil
     }
 
     /// Something changed under a root: told to each connection watching it, once per
@@ -147,7 +178,11 @@ extension DaemonCore {
                 byAgent[interest.agentID, default: []].insert(connection)
             }
         }
-        let paths = folders.map { $0.standardizedFileURL.path }
+        // Bounded (#216): past the limit the notice says "many" rather than naming them
+        // all, and every device reads what it shows again.
+        let limit = DaemonAPI.FilesChangedNotification.folderLimit
+        let paths = folders.prefix(limit).map { $0.standardizedFileURL.path }
+        let many: Bool? = folders.count > limit ? true : nil
         for agentID in byAgent.keys {
             guard var held = reportedChanges.peek(agentID), held.answer != nil else { continue }
             held.answer = nil
@@ -155,7 +190,7 @@ extension DaemonCore {
         }
         for (agentID, connections) in byAgent {
             send(DaemonAPI.Notification.filesChanged,
-                 DaemonAPI.FilesChangedNotification(agentID: agentID, folders: paths),
+                 DaemonAPI.FilesChangedNotification(agentID: agentID, folders: paths, many: many),
                  to: { connections.contains($0.id) })
         }
     }

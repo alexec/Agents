@@ -16,6 +16,7 @@ import Foundation
 public final class FolderWatch: @unchecked Sendable {
     public static let coalescingInterval: TimeInterval = 0.2
 
+    /// FSEvents' limit, kept so callers read the same on both; inotify takes them all.
     public static let maximumExclusions = 8
 
     private let fd: Int32
@@ -35,7 +36,8 @@ public final class FolderWatch: @unchecked Sendable {
 
     public init(root: URL, excluding: [URL] = [], onChange: @escaping @Sendable ([URL]) -> Void) {
         self.onChange = onChange
-        excluded = excluding.prefix(Self.maximumExclusions).map { $0.standardizedFileURL.path }
+        // inotify has no limit of its own: every folder left out is one never watched (#216).
+        excluded = excluding.map { $0.standardizedFileURL.path }
         fd = inotify_init1(Int32(IN_CLOEXEC))
         guard fd >= 0 else { return }
         addTree(root.path)

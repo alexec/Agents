@@ -45,7 +45,7 @@ extension DaemonCore {
             notes.append("You keep this tile now; it was \(keeperWords(held, in: project))'s.")
         }
         if existing == nil {
-            let count = dashboardStore.readTiles(project).count
+            let count = dashboardStore.tileIDs(project).count
             guard count < TileLimits.tilesPerProject else {
                 throw dashboardRefusal(TileCheck.lead + "this project's Dashboard has \(TileLimits.tilesPerProject) tiles, "
                     + "the most it may; remove one you keep first.")
