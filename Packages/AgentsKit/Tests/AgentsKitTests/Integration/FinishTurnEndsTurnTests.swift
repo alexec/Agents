@@ -131,6 +131,35 @@ struct FinishTurnEndsTurnTests {
         #expect(endings.count == 1)
     }
 
+    /// With the warm pool on (#183): a runtime that answered the cancel is idle, and may be
+    /// kept for the reply; one that did not is still inside its turn, and never is.
+    @Test func aWarmPoolKeepsOnlyARuntimeThatAnsweredTheCancel() async throws {
+        let (locations, work) = try temporary()
+        let answered = TurnGate(), ignored = TurnGate()
+        let launcher = FakeLauncher(script: Self.keepsGoing(answered, hearsCancel: true),
+                                    then: [Self.keepsGoing(answered, hearsCancel: true),
+                                           Self.keepsGoing(ignored, hearsCancel: false)],
+                                    keepsRuntimesWarm: true)
+        let core = try await makeCore(locations, launcher,
+                                      grace: FinishGrace(quiet: .milliseconds(200), afterCancel: .milliseconds(300)))
+        let (heard, heardToken) = try await start(core, in: work, "Fix the login")
+        await running(core, heard)
+        try await finish(core, heard, heardToken, "done", "Fixed.")
+        await settled(core, heard, "the turn ended on the cancel")
+        await eventually("the pool kept it") { await core.decidedForTest(heard) }
+        #expect(await core.warm[heard] != nil, "idle after its cancel, so kept for the reply")
+
+        let (deaf, deafToken) = try await start(core, in: work, "Port the model")
+        await running(core, deaf)
+        await eventually("the fake is in its turn") { ignored.turnsArrived == 1 }
+        try await finish(core, deaf, deafToken, "done", "Ported.")
+        await settled(core, deaf, "the turn ended without the runtime's answer")
+        await eventually("the runtime was let go") { await core.live[deaf] == nil }
+        #expect(await core.warm[deaf] == nil, "still in its turn, so never kept")
+        answered.open()
+        ignored.open()
+    }
+
     /// The point of the issue: an agent waiting on a helper is resumed when the helper
     /// says it is done, not when the helper's runtime gets round to letting go.
     @Test func anAgentWaitingOnAHelperIsResumedWhenTheHelperFinishes() async throws {

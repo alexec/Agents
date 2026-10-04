@@ -5,7 +5,8 @@ import { load } from "./load.mjs";
 import { cases } from "./fixtures.mjs";
 import { digest } from "./digest.mjs";
 
-const { Work } = await load("src/model/store.ts");
+const mod = await load("src/model/store.ts");
+const { Work } = mod;
 const host = "H";
 
 for (const { name, input, expected } of cases("reducer/streams.json")) {
@@ -82,4 +83,24 @@ test("a lean list keeps the open session's menus; agent/changed replaces them (#
   assert.deepEqual(held.availableCommands.map((c) => c.name), ["review"]);
   work.apply("agent/changed", { ...whole, advertisedOptions: [{ id: "mode", name: "Mode", type: "select" }] }, host);
   assert.deepEqual(work.agents.value[host][0].advertisedOptions.map((o) => o.id), ["mode"]);
+});
+
+test("opening and typing warm a settled session once a while, however many keys (#183)", () => {
+  const { Store } = mod;
+  const calls = [];
+  const link = {
+    onNotification() {}, onState() {},
+    call(method, params, host) { calls.push([method, params, host]); return Promise.resolve({}); },
+  };
+  const store = new Store(link);
+  const [{ input }] = cases("reducer/streams.json");
+  const agent = { ...input.steps[0].notify.params, state: "finished" };
+  store.apply("agent/changed", agent, host);
+  store.prewarm(host, agent.id, "opened");
+  for (let i = 0; i < 20; i++) store.prewarm(host, agent.id, "typing");
+  assert.deepEqual(calls.map(([m, p]) => [m, p.why]), [["agents/prewarm", "opened"], ["agents/prewarm", "typing"]]);
+  // Working is not warmed: there is a runtime already.
+  store.apply("agent/changed", { ...agent, id: "busy", state: "running" }, host);
+  store.prewarm(host, "busy", "opened");
+  assert.equal(calls.length, 2);
 });
