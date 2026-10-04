@@ -11,7 +11,7 @@ tools are: connect, call, read `note`, disconnect, hand the sentence back.
 |---|---|---|
 | `token` | string | The session's app token. |
 | `outcome` | string | One of `done`, `nothing_to_do`, `needs_answer`, `partly_done`, `stuck`. |
-| `message` | string | Trimmed. Empty is refused; over 1,000 characters is cut, as 014 does. |
+| `message` | string | Trimmed. Empty is refused; over 200 characters is refused too, with a sentence saying how short (#184; was cut at 1,000). |
 | `prompts` | array of `{label, prompt}` | Zero to four. Already cleaned by the service; the daemon cuts to `SuggestedPrompt.limit` again as `suggestPrompts` does. |
 
 **Result**
