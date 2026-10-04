@@ -40,6 +40,19 @@ public enum RuntimeNote {
     /// what is left is the agent's state).
     public static let questionWentUnanswered = "Nobody answered this question before the agent ended."
 
+    /// A runtime the app ended because it missed a deadline (#166): "Claude did not answer
+    /// its handshake in 2 minutes, so the app ended it." History, not passing: it is the
+    /// reason the agent stopped.
+    public static func endedLate(_ runtimeName: String, _ late: RuntimeDidNotAnswer) -> String {
+        switch late.phase {
+        case .turn:
+            "\(runtimeName) said nothing for \(RuntimeDidNotAnswer.span(late.after)) with nothing pending, "
+                + "so the app ended it. Send it a message to pick it back up."
+        default:
+            "\(runtimeName) \(late.words), so the app ended it."
+        }
+    }
+
     /// Whether this note is about the moment it was written and nothing after.
     ///
     /// `questionWentUnanswered` is deliberately absent. See the note on it.

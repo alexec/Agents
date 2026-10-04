@@ -36,6 +36,8 @@ public struct RuntimeLaunch: Hashable, Sendable {
     public var providerSignOutWord: String? = nil
     /// The Mac's sign-in a server run of this runtime borrows (049 D7: OpenCode's `auth.json`).
     public var lentSignIn: LentFileSignIn? = nil
+    /// How long it is given to answer, start, pick up and go quiet in a turn (#166).
+    public var deadlines: RuntimeDeadlines = .standard
 
     /// The command that signs a provider out, from the command that signs one in.
     public func providerSignOutCommand(from signIn: String) -> String? {
@@ -63,8 +65,9 @@ public struct RuntimeLaunch: Hashable, Sendable {
                 turnErrorPrefix: String? = nil, turnErrorPrefixes: [String] = [],
                 turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil,
                 asksForTerminalAuthCommand: Bool = false, providerSignOutWord: String? = nil,
-                lentSignIn: LentFileSignIn? = nil) {
+                lentSignIn: LentFileSignIn? = nil, deadlines: RuntimeDeadlines = .standard) {
         self.runtimeID = runtimeID
+        self.deadlines = deadlines
         self.environment = environment
         self.hiddenAuthMethods = hiddenAuthMethods
         self.turnErrorPrefixes = !turnErrorPrefixes.isEmpty ? turnErrorPrefixes

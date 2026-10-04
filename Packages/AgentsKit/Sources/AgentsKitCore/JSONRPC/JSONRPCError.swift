@@ -64,3 +64,15 @@ public enum JSONRPCTransportError: Error, Sendable {
     case writeFailed(errno: Int32)
     case notStarted
 }
+
+/// A call that had no answer by its deadline (#166). Not a `JSONRPCError`: the other side
+/// said nothing, so there is no code or message of theirs to carry.
+public struct JSONRPCTimeout: Error, Sendable, Hashable {
+    public var method: String
+    public var after: Duration
+
+    public init(method: String, after: Duration) {
+        self.method = method
+        self.after = after
+    }
+}

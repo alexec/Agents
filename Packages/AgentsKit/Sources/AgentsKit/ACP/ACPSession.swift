@@ -137,6 +137,8 @@ public actor ACPSession {
     /// What the runtime needs beyond its command (049), for reading a turn that fails
     /// in words.
     private let launch: RuntimeLaunch?
+    /// How long it is given (#166): the launch's, unless whoever made the session said.
+    public nonisolated let deadlines: RuntimeDeadlines
     /// The agent's words in the turn under way, only while `launch` has a
     /// `turnErrorPrefix` to look for in them, and only the start of them.
     private var turnText = ""
@@ -147,6 +149,14 @@ public actor ACPSession {
     private var turnInFlight = false
     private var turnFailure: SessionFailure?
     private var turnRateLimit: RateLimitInfo?
+    /// When the runtime last said anything at all, or the app last finished serving it.
+    private var lastHeard = ContinuousClock.now
+    /// The turn's tool calls not yet said to have ended, by id. A tool call open is work
+    /// in hand, however long it is quiet (#166).
+    private var openToolCalls: Set<String> = []
+    /// Requests of the runtime's the app is still answering: a question for the person, a
+    /// command it asked us to run.
+    private var serving = 0
 
     private var isReplaying = false
 
@@ -211,8 +221,10 @@ public actor ACPSession {
                 program: URL? = nil,
                 capabilities: ACP.ClientCapabilities = .none,
                 launch: RuntimeLaunch? = nil,
-                authMethodBeforeContinuing: String? = nil) {
+                authMethodBeforeContinuing: String? = nil,
+                deadlines: RuntimeDeadlines? = nil) {
         let box = self.box
+        self.deadlines = deadlines ?? launch?.deadlines ?? .standard
         self.program = program
         self.capabilities = capabilities
         self.launch = launch
@@ -231,6 +243,18 @@ public actor ACPSession {
 
     // MARK: Starting
 
+    /// A call given this runtime's deadline for the phase it belongs to (#166). The process
+    /// is left as it is: whoever asked ends it, as they end one that refused.
+    private func call(_ method: String, _ params: JSONValue?,
+                      within phase: RuntimeDeadlines.Phase) async throws -> JSONValue {
+        let after = deadlines[phase]
+        do {
+            return try await connection.call(method, params, timeout: after)
+        } catch is JSONRPCTimeout {
+            throw RuntimeDidNotAnswer(phase: phase, after: after)
+        }
+    }
+
     /// Handshake. What we advertise is whatever this session was built with, which is
     /// a promise about what we will answer rather than a hint.
     @discardableResult
@@ -241,7 +265,7 @@ public actor ACPSession {
             "protocolVersion": .int(ACP.protocolVersion),
             "clientCapabilities": capabilities.wire,
         ]
-        let result = try await connection.call(ACP.Method.initialize, params)
+        let result = try await call(ACP.Method.initialize, params, within: .handshake)
         var decoded = try result.decode(ACP.InitializeResult.self)
         if let program {
             decoded.authMethods = decoded.authMethods?.map { $0.naming(program: program) }
@@ -262,7 +286,7 @@ public actor ACPSession {
                            meta: JSONValue? = nil) async throws -> ACP.NewSessionResult {
         let params = sessionParams(cwd: cwd, additionalDirectories: additionalDirectories,
                                    mcpServers: mcpServers, meta: meta)
-        let result = try await connection.call(ACP.Method.newSession, params)
+        let result = try await call(ACP.Method.newSession, params, within: .start)
         let decoded = try result.decode(ACP.NewSessionResult.self)
         sessionID = decoded.sessionId
         // Read outside the decode on purpose: a shape we cannot read inside the
@@ -296,7 +320,8 @@ public actor ACPSession {
             // the sign-in type in its own settings when asked to sign in, so someone who
             // never needed it is never touched.
             do {
-                try await authenticate(methodID: authMethodBeforeContinuing!)
+                _ = try await call(ACP.Method.authenticate, ["methodId": .string(authMethodBeforeContinuing!)],
+                                   within: .load)
                 try await pickUp(params, resuming: canResume)
             } catch let error as JSONRPCError {
                 throw ACPSessionError.sessionGone(error)
@@ -309,7 +334,7 @@ public actor ACPSession {
 
     private func pickUp(_ params: JSONValue, resuming: Bool) async throws {
         if resuming {
-            let result = try await connection.call(ACP.Method.resumeSession, params)
+            let result = try await call(ACP.Method.resumeSession, params, within: .load)
             adoptOptions(from: result)
         } else {
             try await load(params)
@@ -336,7 +361,7 @@ public actor ACPSession {
         isReplaying = true
         defer { isReplaying = false }
         do {
-            let result = try await connection.call(ACP.Method.loadSession, params)
+            let result = try await call(ACP.Method.loadSession, params, within: .load)
             adoptOptions(from: result)
         } catch {
             // Drained on the way out too: whatever the runtime managed to replay
@@ -505,6 +530,8 @@ public actor ACPSession {
         turnEvidence = TurnEvidence()
         turnFailure = nil
         turnRateLimit = nil
+        openToolCalls = []
+        lastHeard = .now
         turnInFlight = true
         defer { turnInFlight = false }
         let result = try await connection.call(ACP.Method.prompt, params)
@@ -646,7 +673,7 @@ public actor ACPSession {
         if olderStyle.contains(id), let chosen = value.stringValue {
             let (method, key) = id == Self.modelOption ? (ACP.Method.setSessionModel, "modelId")
                                                            : (ACP.Method.setSessionMode, "modeId")
-            _ = try await connection.call(method, ["sessionId": .string(sessionID), key: .string(chosen)])
+            _ = try await call(method, ["sessionId": .string(sessionID), key: .string(chosen)], within: .start)
             if let index = options.firstIndex(where: { $0.id == id }) { options[index].currentValue = value }
             // Said the way a runtime's own `config_option_update` would be: the older calls
             // answer with nothing, so the menus hear of the change from here.
@@ -659,7 +686,7 @@ public actor ACPSession {
         // A boolean option is set with its type named, which is the protocol's own
         // shape for it. Nothing sends us one unless we advertised that we take them.
         if case .bool = value { params["type"] = "boolean" }
-        let result = try await connection.call(ACP.Method.setConfigOption, .object(params))
+        let result = try await call(ACP.Method.setConfigOption, .object(params), within: .start)
         let refreshed = ConfigOption.list(in: result["configOptions"])
         if !refreshed.isEmpty { options = refreshed }
         return options
@@ -768,6 +795,32 @@ public actor ACPSession {
     /// The runtime, for the extension that has to terminate it.
     var runtimeProcess: RuntimeProcess? { process }
 
+    // MARK: Silence (#166)
+
+    /// How long the turn under way has said nothing with nothing pending; nil when no turn
+    /// is, or while a tool call is open or the app is answering one of its requests.
+    public func silence() -> Duration? {
+        guard turnInFlight, serving == 0, openToolCalls.isEmpty else { return nil }
+        return ContinuousClock.now - lastHeard
+    }
+
+    /// A tool call opening or closing, the agent's or a subagent's. One that never says it
+    /// ended keeps the turn from ever counting as silent, which errs on the side of the work.
+    private func noteToolCall(_ kind: TranscriptEntry.Kind, of subagent: String?) {
+        guard turnInFlight else { return }
+        switch kind {
+        case .toolCall(let call), .toolCallUpdate(let call):
+            guard let id = call.toolCallID.map({ (subagent ?? "") + "/" + $0 }) else { return }
+            if call.status == "completed" || call.status == "failed" {
+                openToolCalls.remove(id)
+            } else {
+                openToolCalls.insert(id)
+            }
+        default:
+            break
+        }
+    }
+
     // MARK: Incoming
 
     /// The command lines of calls asked to run in the background, by the call's id and
@@ -816,6 +869,7 @@ public actor ACPSession {
             releaseNotificationDrain()
             return
         }
+        lastHeard = .now
         if method == ACP.ClientMethod.completeElicitation {
             // Finished somewhere else. The form comes down.
             if let id = params?["elicitationId"]?.stringValue {
@@ -865,6 +919,7 @@ public actor ACPSession {
             // A subagent's words and work are its own; its context meter, its plan and
             // its title are not the agent's, and are not taken as though they were.
             guard case .entry(let kind) = decoded, !isReplaying || recordsReplay else { return }
+            if !isReplaying { noteToolCall(kind, of: subagent) }
             eventsContinuation.yield(.subagentEntry(subagent, kind))
             return
         }
@@ -878,6 +933,7 @@ public actor ACPSession {
                 turnText += text
             }
             if !isReplaying, turnInFlight { turnEvidence.take(kind) }
+            if !isReplaying { noteToolCall(kind, of: nil) }
             eventsContinuation.yield(.entry(kind))
         case .options(let options):
             self.options = options
@@ -918,6 +974,12 @@ public actor ACPSession {
     /// rather than left to time out, which is what the protocol asks for and what lets
     /// a runtime fall back to its own tools.
     func handleIncoming(method: String, params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
+        serving += 1
+        lastHeard = .now
+        defer {
+            serving -= 1
+            lastHeard = .now
+        }
         switch method {
         case ACP.ClientMethod.requestPermission:
             return await askPermission(params)

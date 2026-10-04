@@ -102,6 +102,12 @@ actor FakeACPAgent {
         /// starting — which is the only window in which "one at a time" means
         /// anything, and the only one in which a crash mid-pick-up is reproducible.
         var handshakeDelay: Duration = .zero
+        /// How long `session/new`, and `session/resume` or `session/load`, take (#166).
+        var newSessionDelay: Duration = .zero
+        var loadDelay: Duration = .zero
+        /// A pause after the turn's updates and before its answer: with a tool call left
+        /// open in `updates`, a turn quiet with work in hand (#166).
+        var delayAfterUpdates: Duration = .zero
         /// The protocol version to answer the handshake with.
         var protocolVersion = 1
         /// Refuse `session/new` with this, for the signed-out case.
@@ -245,6 +251,7 @@ actor FakeACPAgent {
 
         case ACP.Method.newSession:
             newSessionParams = params
+            if script.newSessionDelay > .zero { try? await Task.sleep(for: script.newSessionDelay) }
             if let error = script.newSessionError { return .failure(error) }
             var result: [String: JSONValue] = ["sessionId": .string(sessionID)]
             if let raw = script.rawConfigOptions {
@@ -277,11 +284,13 @@ actor FakeACPAgent {
 
         case ACP.Method.resumeSession:
             continuedSessionParams = params
+            if script.loadDelay > .zero { try? await Task.sleep(for: script.loadDelay) }
             if let error = script.sessionGoneError { return .failure(error) }
             return .success([:])
 
         case ACP.Method.loadSession:
             continuedSessionParams = params
+            if script.loadDelay > .zero { try? await Task.sleep(for: script.loadDelay) }
             if script.loadNeedsAuthenticate, !received.contains(ACP.Method.authenticate) {
                 return .failure(JSONRPCError(code: -32000, message: "Authentication required"))
             }
@@ -356,6 +365,7 @@ actor FakeACPAgent {
         if !script.updatesOnFirstTurnOnly || turnsTaken == 1 {
             for update in script.updates { await send(update: update) }
         }
+        if script.delayAfterUpdates > .zero { try? await Task.sleep(for: script.delayAfterUpdates) }
         let airOn = advertised("asyncTasks"), subagentsOn = advertised("nativeSubagentSessions")
         for (session, update) in script.air {
             let kind = update["sessionUpdate"]?.stringValue ?? ""

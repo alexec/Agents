@@ -23,6 +23,10 @@ public actor DaemonCore {
     var live: [UUID: ACPSession] = [:]
     var eventTasks: [UUID: Task<Void, Never>] = [:]
     var turnTasks: [UUID: Task<Void, Never>] = [:]
+    /// The one watch over every turn under way for a runtime gone silent (#166), while
+    /// there is a turn to watch; and the turns it ended, until their failure is heard.
+    var silenceWatch: Task<Void, Never>?
+    var silencedTurns: Set<UUID> = []
     var drafts: [UUID: Draft] = [:]
     /// How long a draft outlives the connection that asked for it (029).
     let draftGracePeriod: Duration
@@ -1391,6 +1395,8 @@ public actor DaemonCore {
         // knows about the other, which is the point of keeping them apart.
         await killAllTerminals()
         shells.shutDown()
+        silenceWatch?.cancel()
+        silenceWatch = nil
         for (_, task) in turnTasks { task.cancel() }
         for (_, session) in live { await session.end(gracePeriod: .seconds(2)) }
         // Waited on, not cancelled. Every session above has just been closed, which

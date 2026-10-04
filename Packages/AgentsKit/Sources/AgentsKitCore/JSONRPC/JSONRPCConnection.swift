@@ -135,13 +135,24 @@ public actor JSONRPCConnection {
         try transport.write(line: try JSONRPCCodec.encode(message))
     }
 
-    /// Call the other side and wait for its answer.
+    /// Call the other side and wait for its answer: for ever, or for `timeout` and then
+    /// `JSONRPCTimeout` (#166). The call is forgotten at the deadline, so an answer that
+    /// comes after it is dropped like any reply nobody asked for.
     @discardableResult
-    public func call(_ method: String, _ params: JSONValue? = nil) async throws -> JSONValue {
+    public func call(_ method: String, _ params: JSONValue? = nil,
+                     timeout: Duration? = nil) async throws -> JSONValue {
         guard !closed.isSet else { throw JSONRPCTransportError.closed }
         guard readTask != nil else { throw JSONRPCTransportError.notStarted }
         nextID += 1
         let id = JSONRPCID.number(nextID)
+        let timer = timeout.map { timeout in
+            Task { [weak self] in
+                try? await Task.sleep(for: timeout)
+                guard !Task.isCancelled else { return }
+                await self?.expire(id, JSONRPCTimeout(method: method, after: timeout))
+            }
+        }
+        defer { timer?.cancel() }
         return try await withCheckedThrowingContinuation { continuation in
             pending[id] = continuation
             do {
@@ -151,6 +162,13 @@ public actor JSONRPCConnection {
                 continuation.resume(throwing: error)
             }
         }
+    }
+
+    /// A call whose deadline came first. Nothing if its answer already did.
+    private func expire(_ id: JSONRPCID, _ error: JSONRPCTimeout) {
+        guard let continuation = pending.removeValue(forKey: id) else { return }
+        WireLog.write("json-rpc: \(error.method) had no answer in \(error.after); given up")
+        continuation.resume(throwing: error)
     }
 
     /// Tell the other side something, without waiting and without the actor.
