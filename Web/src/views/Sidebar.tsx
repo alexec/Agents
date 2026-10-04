@@ -28,6 +28,12 @@ import { memo } from "../render/memo";
 /** Enough archived sessions to find last week's, as the window shows. */
 const archivedShown = 50;
 
+/** The most archived matches a fold shows before Show all, as the window's (#176). */
+const matchesShown = 10;
+
+/** How long the typing pauses before the folds filter and the hosts are asked (#176). */
+export const searchPause = 150;
+
 /** A project's name in the sidebar: `host:Project` on a server, the name alone on this Mac. */
 export function projectLabel(host: ControlHost | undefined, project: ProjectSummary): string {
   return !host || host.id === "mac" ? project.name : `${host.name}:${project.name}`;
@@ -44,8 +50,22 @@ function orderedProjects(store: Store): { host: ControlHost; project: ProjectSum
 
 export function Sidebar({ session, store, linkDown }: { session: Session; store: Store; linkDown: boolean }) {
   const search = useSignal("");
+  // What the folds filter by: the field's words once typing pauses, so a keystroke costs the
+  // field and not a pass over every project (#176, #193).
+  const searched = useSignal("");
   const confirming = useSignal(false);
   const r = route.value;
+  // After a pause in the typing: the folds filter what is held, and the archived sessions that
+  // match are the hosts' to find, a capped page each (#165).
+  useEffect(() => {
+    const words = search.value.trim();
+    if (words === searched.value) return;
+    const timer = setTimeout(() => {
+      searched.value = words;
+      void store.searchSessions(words);
+    }, words ? searchPause : 0);
+    return () => clearTimeout(timer);
+  }, [search.value]);
   // What is open, from anywhere (a link, Back), unfolds its project so its row is there to light.
   useEffect(() => {
     if (r.host && r.project && (r.session || r.workflow || r.page)) folds.set(r.host, r.project, true);
@@ -62,7 +82,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         <NewProjectMenu store={store} />
       </header>
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
-        {!search.value.trim() && (
+        {!searched.value && (
           <section class="activity" aria-label="Activity">
             <h2 class="sidebar-head-label">Activity</h2>
             <ActivityRows store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
@@ -72,8 +92,12 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           <h2 class="sidebar-head-label">Projects</h2>
           {projects.map(({ host, project }) => (
             <ProjectFold key={`${host.id}|${project.project.folder}`} store={store} host={host} project={project}
-              query={search.value} linkDown={linkDown} />
+              query={searched.value} linkDown={linkDown} />
           ))}
+          {/* A host had more matches than its page: the next page, on asking (#176). */}
+          {searched.value && Object.keys(store.searchNext.value).length > 0 && (
+            <button class="link more-matches" onClick={() => void store.searchMore()}>More matches…</button>
+          )}
           {store.hosts.value.map((host) => <CloningRows key={host.id} store={store} host={host.id} />)}
           <EmptyProjects store={store} />
         </section>
@@ -111,7 +135,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
  * One project: its row, and folded under it its sessions, Needs you first, then its workflows,
  * each kind's archived ones folded once more at its foot. A search unfolds every project with
  * something that matches and hides the rest. It reads its own project's agents alone, so a change
- * to an agent draws one fold again, and a folded one reads nothing of its sessions (#170).
+ * to an agent draws one fold again, and a folded one reads nothing of its sessions (#170). `query`
+ * is the search's words, already trimmed.
  */
 const ProjectFold = memo(function ProjectFold({ store, host, project, query, linkDown }: {
   store: Store; host: ControlHost; project: ProjectSummary; query: string; linkDown: boolean;
@@ -119,22 +144,28 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const r = route.value;
   const folder = project.project.folder;
   const label = projectLabel(host, project);
-  const searching = query.trim() !== "";
+  const searching = query !== "";
   const unfolded = searching || folds.isOpen(host.id, folder);
   const down = linkDown || !store.hostIsOnline(host.id);
-  const showsArchived = searching || folds.isOpen(host.id, folder, "archivedSessions");
+  // A search's archived matches come from the hosts (#193), not from a page of every fold.
+  const archivedFoldOpen = folds.isOpen(host.id, folder, "archivedSessions");
+  const showsArchived = searching || archivedFoldOpen;
+  // Every match on show, past the first few; a new search shows the few again.
+  const showsAllMatches = useSignal(false);
+  useEffect(() => { showsAllMatches.value = false; }, [query]);
   useEffect(() => {
     if (unfolded && store.hostIsOnline(host.id)) void store.loadWorkflows(host.id, folder);
   }, [unfolded, host.id, folder]);
   // Archived sessions are held while their fold is open, a page of them, and let go when it closes.
   const archivedWasShown = useRef(false);
   useEffect(() => {
-    if (showsArchived && store.hostIsOnline(host.id)) void store.loadArchived(host.id, folder);
-    if (!showsArchived && archivedWasShown.current) store.unloadArchived(host.id, folder);
-    archivedWasShown.current = showsArchived;
-  }, [showsArchived, host.id, folder]);
+    if (archivedFoldOpen && store.hostIsOnline(host.id)) void store.loadArchived(host.id, folder);
+    if (!archivedFoldOpen && archivedWasShown.current) store.unloadArchived(host.id, folder);
+    archivedWasShown.current = archivedFoldOpen;
+  }, [archivedFoldOpen, host.id, folder]);
 
   const view = store.projectView(host.id, folder);
+  // The matcher is made once per fold, not per row.
   const parsed = parseQuery(query);
   const matching = (list: Agent[]) => (searching ? list.filter((a) => queryMatches(parsed, a)) : list);
   const groups = !unfolded ? [] : view.headings.map((h) => ({ ...h, agents: matching(h.agents) })).filter((h) => h.agents.length > 0);
@@ -147,7 +178,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
   const workflows = allWorkflows.filter((w) => !w.isArchived);
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
-  const nameMatches = label.toLowerCase().includes(query.trim().toLowerCase());
+  const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && groups.length === 0 && archived.length === 0 && allWorkflows.length === 0 && !nameMatches) return null;
 
   const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder)
@@ -206,7 +237,10 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               <summary class="subhead" data-fold="archivedSessions">Archived sessions{" "}
                 <span class="count">{showsArchived ? archived.length : Math.max(archived.length, project.counts.archived ?? 0)}</span>
               </summary>
-              {(searching ? archived : archived.slice(0, archivedShown)).map(row)}
+              {archived.slice(0, !searching ? archivedShown : showsAllMatches.value ? archived.length : matchesShown).map(row)}
+              {searching && !showsAllMatches.value && archived.length > matchesShown && (
+                <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
+              )}
               {showsArchived && project.retiredCount > 0 && !searching && (
                 <p class="hint">{project.retiredCount === 1 ? "1 older agent has been retired."
                   : `${project.retiredCount} older agents have been retired.`}</p>

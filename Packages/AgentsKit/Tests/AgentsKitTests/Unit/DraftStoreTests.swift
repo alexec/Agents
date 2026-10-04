@@ -103,6 +103,21 @@ struct DraftStoreTests {
         #expect(store.draft(for: .agent(working)) != nil)
     }
 
+    /// The window sweeps once, then keeps the agents this names, so an agent archived
+    /// later costs a look at the drafts that exist rather than another pass (#176).
+    @Test func theSweepSaysWhichAgentsStillHaveADraft() {
+        let (store, _, suite) = store()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let now = Date()
+        let archived = UUID(), working = UUID(), old = UUID()
+        store.save(draft(), for: .agent(archived))
+        store.save(draft(), for: .agent(working))
+        store.save(draft(at: now.addingTimeInterval(-DraftStore.horizon - 60)), for: .agent(old))
+        store.save(draft(), for: .newAgent(folder: nil))
+
+        #expect(store.sweep(archived: [archived], now: now) == [working])
+    }
+
     /// The sweep runs before the agent list may have arrived. An agent it has not heard
     /// of is not evidence of anything, so it costs no draft — only "known, and archived"
     /// does, and the thirty days catches whatever is truly gone.

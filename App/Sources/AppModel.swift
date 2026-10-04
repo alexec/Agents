@@ -664,24 +664,6 @@ final class AppModel {
         return nil
     }
 
-    /// Whether a path is there: `files/browse` on its host, and a host that cannot be
-    /// asked is left as still there.
-    func pathIsThere(_ url: URL, on host: HostID) async -> Bool {
-        if controlPlaneAway || hosts.isOffline(host) { return true }
-        do {
-            _ = try await client(for: host).call(DaemonAPI.Method.filesBrowse,
-                                                  DaemonAPI.FilesBrowseRequest(path: url.path(percentEncoded: false)),
-                                                  returning: DirectoryListing.self)
-            return true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.fileGone {
-            return false
-        } catch let error as JSONRPCError where error.message == "That is a file." {
-            return true
-        } catch {
-            return true
-        }
-    }
-
     private func client(forAgent id: UUID?) -> DaemonClient {
         client(for: host(ofAgent: id))
     }
@@ -779,29 +761,46 @@ final class AppModel {
         work.forget(held)
     }
 
-    /// The most a search brings back from each host.
+    /// The most a search brings back from each host, a page at a time.
     static let searchShown = 200
     /// Archived sessions a search brought in, let go when the search ends.
     @ObservationIgnored private var searched: Set<UUID> = []
+    /// The next page of matches, for each host whose last page was full (#176).
+    private var searchNext: [HostID: DaemonAPI.ListRequest] = [:]
+    /// Whether a host has more matches than it has sent: More matches… asks for them.
+    var searchHasMore: Bool { !searchNext.isEmpty }
 
     /// Ask every host for the sessions matching `words`, archived ones included, a capped
     /// page each (#165): the sidebar holds the live ones and filters those itself.
     func searchSessions(_ words: String) async {
         let earlier = searched.filter { $0 != selection }
         searched = []
+        searchNext = [:]
         guard !words.isEmpty else {
             work.forget(earlier.filter { work.agent($0)?.state == .archived && !isInOpenArchivedFold($0) })
             return
         }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [HostID] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
-        for host in hosts {
-            guard let found = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
-                                                                 returning: [Agent].self) else { continue }
-            let fresh = found.filter { $0.state == .archived && work.agent($0.id) == nil }.map(\.id)
-            searched.formUnion(fresh)
-            work.takeListed(found.filter { $0.state == .archived }.map { var agent = $0; agent.host = host; return agent })
-        }
+        for host in hosts { await search(request, on: host) }
+    }
+
+    /// The next page from each host that has more, newest first as the host lists them.
+    func searchMore() async {
+        let next = searchNext
+        searchNext = [:]
+        for (host, request) in next { await search(request, on: host) }
+    }
+
+    private func search(_ request: DaemonAPI.ListRequest, on host: HostID) async {
+        guard let found = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
+                                                             returning: [Agent].self) else { return }
+        // A search ended or changed while this was on its way: not what is asked now.
+        guard !Task.isCancelled else { return }
+        let fresh = found.filter { $0.state == .archived && work.agent($0.id) == nil }.map(\.id)
+        searched.formUnion(fresh)
+        work.takeListed(found.filter { $0.state == .archived }.map { var agent = $0; agent.host = host; return agent })
+        searchNext[host] = request.next(after: found)
     }
 
     /// Whether an archived session is on show in its project's open Archived fold.
@@ -957,48 +956,53 @@ final class AppModel {
         work.replaceDashboardSummaries(listed)
     }
 
-    /// The selected project's Dashboard, asked for when its page opens and again on each
-    /// `dashboard/changed` for it.
-    func refreshDashboard(_ folder: URL) async {
-        let host = selectedProjectHost
+    /// The order writes and fetches of each Dashboard, kept in step (#176).
+    @ObservationIgnored private var dashboardOrders = DashboardOrderSync()
+
+    /// A project's Dashboard, asked of its own host when its page opens and again on
+    /// each `dashboard/changed` for it. A reply older than one already shown is dropped.
+    func refreshDashboard(_ folder: URL, on host: HostID) async {
+        let ticket = dashboardOrders.beginFetch(in: folder)
         guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.dashboardGet,
                                                                DaemonAPI.DashboardRequest(folder: folder),
-                                                               returning: DashboardSnapshot.self) else { return }
-        work.store(snapshot)
+                                                               returning: DashboardSnapshot.self),
+              let shown = dashboardOrders.accept(snapshot, ticket: ticket) else { return }
+        work.store(shown)
     }
 
     /// Hide, Show or Remove a tile: the person's, from any client (FR-027 to FR-029).
-    func actOnTile(_ method: String, folder: URL, id: String) async {
-        let host = selectedProjectHost
+    func actOnTile(_ method: String, folder: URL, on host: HostID, id: String) async {
         await attempt(on: host) {
             try await self.client(for: host).call(method, DaemonAPI.TileRequest(folder: folder, id: id))
         }
-        await refreshDashboard(folder)
+        await refreshDashboard(folder, on: host)
     }
 
     /// Update now (#146): the project's dashboard workflow, or a one-off agent. A refusal
     /// (running, cooling down, waiting for approval) is said, as Run now's is.
-    func updateDashboard(_ folder: URL) async {
-        let host = selectedProjectHost
+    func updateDashboard(_ folder: URL, on host: HostID) async {
         await attempt(on: host) {
             try await self.client(for: host).call(DaemonAPI.Method.dashboardUpdate,
                                                   DaemonAPI.DashboardRequest(folder: folder))
         }
-        await refreshDashboard(folder)
+        await refreshDashboard(folder, on: host)
     }
 
-    /// A drop or a Move menu item (#147): shown at once, then the whole order sent once.
-    func arrangeDashboard(_ order: DashboardOrder, folder: URL) async {
+    /// A drop or a Move menu item (#147): shown at once, then the whole order sent. One
+    /// send at a time, the newest order next, so the host ends with the last drop (#176).
+    func arrangeDashboard(_ order: DashboardOrder, folder: URL, on host: HostID) async {
         if var snapshot = dashboard(in: folder) {
             snapshot.order = order
             work.store(snapshot)
         }
-        let host = selectedProjectHost
-        await attempt(on: host) {
-            try await self.client(for: host).call(DaemonAPI.Method.dashboardArrange,
-                                                  DaemonAPI.ArrangeRequest(folder: folder, order: order))
+        guard dashboardOrders.arrange(order, in: folder) else { return }
+        while let next = dashboardOrders.takeUnsent(in: folder) {
+            await attempt(on: host) {
+                try await self.client(for: host).call(DaemonAPI.Method.dashboardArrange,
+                                                      DaemonAPI.ArrangeRequest(folder: folder, order: next))
+            }
         }
-        await refreshDashboard(folder)
+        await refreshDashboard(folder, on: host)
     }
 
     /// A tile's keeper: its session, or its workflow's page (FR-030).

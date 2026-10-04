@@ -11,7 +11,7 @@ import os
 @MainActor
 enum Perf {
     static let signposter = OSSignposter(subsystem: "com.alexecollins.Agents", category: "perf")
-    static let log = Logger(subsystem: "com.alexecollins.Agents", category: "perf")
+    nonisolated static let log = Logger(subsystem: "com.alexecollins.Agents", category: "perf")
 
     struct Interval {
         let name: StaticString
@@ -31,6 +31,12 @@ enum Perf {
             let took = ContinuousClock.now - interval.started
             log.notice("perf \(interval.name, privacy: .public) \(milliseconds(took), privacy: .public) ms \(detail, privacy: .public)")
         }
+    }
+
+    /// A cost measured where it ran, logged as it is: for work that is not a wait for
+    /// the screen, such as a sweep (#176).
+    nonisolated static func measured(_ name: StaticString, _ took: Duration, _ detail: String = "") {
+        log.notice("perf \(name, privacy: .public) \(milliseconds(took), privacy: .public) ms \(detail, privacy: .public)")
     }
 
     /// How long `interval` has run so far, for a line that splits it: the data in hand
@@ -54,7 +60,7 @@ enum Perf {
 
     private static var marked: Set<String> = []
 
-    private static func milliseconds(_ duration: Duration) -> Int {
+    nonisolated private static func milliseconds(_ duration: Duration) -> Int {
         let (seconds, attoseconds) = duration.components
         return Int(seconds * 1000 + attoseconds / 1_000_000_000_000_000)
     }

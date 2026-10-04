@@ -1,0 +1,8 @@
+between keys, Activity still shown (no filtering yet): [true,true,true,true,true,true,true,true,true]
+after the pause: {"activity":false,"folds":[{"project":"alpha","archivedCount":"170","archivedRows":10,"showAll":"Show all 170"},{"project":"beta","archivedCount":"30","archivedRows":10,"showAll":"Show all 30"}],"more":true}
+Show all on the first fold: [{"project":"alpha","archivedCount":"170","archivedRows":170,"showAll":null},{"project":"beta","archivedCount":"30","archivedRows":10,"showAll":"Show all 30"}]
+after More matches…: {"activity":false,"folds":[{"project":"alpha","archivedCount":"370","archivedRows":370,"showAll":null},{"project":"beta","archivedCount":"30","archivedRows":10,"showAll":"Show all 30"}],"more":true}
+search cleared: {"activity":true,"folds":[{"project":"alpha","archivedCount":null,"archivedRows":0,"showAll":null},{"project":"beta","archivedCount":null,"archivedRows":0,"showAll":null}],"more":false}
+tiles before: ["four","one","three","two"]
+tiles just after the drops: ["three","two","four","one"]
+tiles settled: ["three","two","four","one"]

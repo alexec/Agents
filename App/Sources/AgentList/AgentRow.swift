@@ -36,7 +36,6 @@ struct AgentRow: View {
             // Last known, not current: its host is not answering (037), or the control
             // plane that would carry the answer is away (058, frame H).
             .opacity(model.hostUnreachable(agent.host) ? 0.55 : 1)
-            .task(id: worktreeWatch) { await refreshWorktree() }
             .confirmationDialog("Retire this agent?",
                                 isPresented: Binding(get: { retiring != nil }, set: { if !$0 { retiring = nil } }),
                                 presenting: retiring) { preview in
@@ -139,7 +138,10 @@ struct AgentRow: View {
                 if agent.worktree != nil || !agent.labels.isEmpty {
                     WrappingHStack(spacing: 5) {
                         if let worktree = agent.worktree {
-                            WorktreeBadge(worktree: worktree, isGone: worktreeGone || agent.missingFolder != nil)
+                            // Gone is the daemon's mark on the record, which it keeps by a stat on
+                            // its heartbeat and when it removes a worktree: the row asks nothing
+                            // of the host itself, so a long list costs no folder listings (#176).
+                            WorktreeBadge(worktree: worktree, isGone: agent.missingFolder != nil)
                         }
                         ForEach(agent.labels, id: \.normalizedValue) { LabelChip(label: $0) }
                     }
@@ -269,20 +271,6 @@ struct AgentRow: View {
 
     @State private var retiring: DaemonAPI.RetirePreview?
     @State private var cannotRetire: String?
-    /// Whether the worktree's folder is gone. This Mac's is asked of the disk; another
-    /// host's is `files/browse`, and stays "there" until that answer arrives (058, R11).
-    @State private var worktreeGone = false
-
-    private var worktreeWatch: String {
-        // The host's mark too (#119), so a worktree made again is asked about again.
-        "\(agent.host.rawValue)|\(agent.worktree?.root.path ?? "")|\(model.controlPlaneAway)|\(agent.missingFolder != nil)"
-    }
-
-    private func refreshWorktree() async {
-        guard let worktree = agent.worktree else { worktreeGone = false; return }
-        worktreeGone = await !model.pathIsThere(worktree.root, on: agent.host)
-    }
-
     /// Whether the daemon is bringing this chat back by itself after a restart.
     private var isComingBack: Bool { model.isComingBack(agent) }
 

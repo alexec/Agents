@@ -8,7 +8,7 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor,
+  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -19,6 +19,7 @@ import { folderKey, projectFolder, projectView, type ProjectView } from "./group
 import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
 import { blockLines, openBlock } from "./block";
+import { DashboardOrderSync } from "./dashboardOrderSync";
 
 export { folderKey } from "./groups";
 
@@ -43,6 +44,9 @@ const filesSettle = 250;
 
 /** How many archived sessions an open Archived fold lists: as many as it shows (#170). */
 export const archivedPage = 50;
+
+/** The most a search brings back from each host, a page at a time (#165, #193). */
+export const searchShown = 200;
 
 type ByHost<T> = Record<string, T[]>;
 
@@ -727,6 +731,8 @@ export class Store extends Work {
       this.pins.value = notOf(this.pins.value);
     });
     for (const key of [...this.archivedLoaded]) if (key.startsWith(`${host}|`)) this.archivedLoaded.delete(key);
+    this.searched.delete(host);
+    if (this.searchNext.value[host]) this.searchNext.value = without(this.searchNext.value);
   }
 
   private async loadHost(host: string): Promise<void> {
@@ -749,6 +755,14 @@ export class Store extends Work {
     }
     for (const key of Object.keys(this.workflows.value)) if (key.startsWith(prefix)) void this.loadWorkflows(host, key.slice(prefix.length));
     for (const key of Object.keys(this.dashboards.value)) if (key.startsWith(prefix)) void this.loadDashboard(host, key.slice(prefix.length));
+    // A search on show: the live list just let its archived matches go, so they are asked again.
+    if (this.searchWords) {
+      this.searched.delete(host);
+      const { [host]: _again, ...rest } = this.searchNext.value;
+      this.searchNext.value = rest;
+      void this.search({ includeArchived: true, archivedCommands: false, archivedOnly: false, lean: true,
+        limit: searchShown, query: this.searchWords }, host, this.searchTurn);
+    }
     const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
     const clones = await this.link.call("projects/clones", {}, host).catch(failed("projects/clones"));
@@ -815,7 +829,82 @@ export class Store extends Work {
     const listed = await this.link.call("agents/list", {
       includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never, lean: true, limit: archivedPage,
     }, host).catch(() => null);
-    if (listed && this.archivedLoaded.has(key)) this.addAgents(listed, host);
+    if (!listed || !this.archivedLoaded.has(key)) return;
+    // On show in the fold now: no longer the search's to let go.
+    for (const agent of listed) this.searched.get(host)?.delete(agent.id);
+    this.addAgents(listed, host);
+  }
+
+  /** The search's words, trimmed; empty when there is none. */
+  private searchWords = "";
+  /** Bumped by each search: a reply for words no longer asked is dropped. */
+  private searchTurn = 0;
+  /** Archived sessions a search brought in, by host, let go when the search ends or changes. */
+  private searched = new Map<string, Set<string>>();
+  /** The next page of matches, for each host whose last page was full (#176, #193). */
+  readonly searchNext = signal<Record<string, ListRequest>>({});
+
+  /**
+   * Ask every host for the sessions matching `words`, archived ones included, a capped page each
+   * (#165, #193): the sidebar holds the live ones and filters those itself. What the last search
+   * brought in is let go first, so the page holds one search's matches at a time.
+   */
+  async searchSessions(words: string): Promise<void> {
+    const turn = ++this.searchTurn;
+    this.searchWords = words;
+    this.searchNext.value = {};
+    this.forgetSearched();
+    if (!words) return;
+    const request: ListRequest = {
+      includeArchived: true, archivedCommands: false, archivedOnly: false, lean: true, limit: searchShown, query: words,
+    };
+    for (const host of this.hosts.value) {
+      if (turn !== this.searchTurn) return;
+      if (this.hostIsOnline(host.id)) await this.search(request, host.id, turn);
+    }
+  }
+
+  /** The next page from each host that has more, newest first as the host lists them. */
+  async searchMore(): Promise<void> {
+    const turn = this.searchTurn;
+    const next = this.searchNext.value;
+    this.searchNext.value = {};
+    for (const [host, request] of Object.entries(next)) {
+      if (turn !== this.searchTurn) return;
+      await this.search(request, host, turn);
+    }
+  }
+
+  private async search(request: ListRequest, host: string, turn: number): Promise<void> {
+    const found = await this.link.call("agents/list", request, host).catch(() => null);
+    // The search ended or changed while this was on its way: not what is asked now.
+    if (!found || turn !== this.searchTurn) return;
+    const archived = found.filter((a) => a.state === "archived");
+    const held = new Set((this.agents.value[host] ?? []).map((a) => a.id));
+    const brought = this.searched.get(host) ?? new Set<string>();
+    for (const agent of archived) if (!held.has(agent.id)) brought.add(agent.id);
+    this.searched.set(host, brought);
+    if (archived.length) this.addAgents(archived, host);
+    const last = found[found.length - 1];
+    if (found.length === request.limit && last) {
+      this.searchNext.value = { ...this.searchNext.value,
+        [host]: { ...request, after: { lastActivityAt: last.lastActivityAt, id: last.id } } };
+    }
+  }
+
+  /** What searches brought in, let go: the open session stays, and anything no longer archived. */
+  private forgetSearched(): void {
+    const watching = this.watching.value;
+    for (const [host, ids] of this.searched) {
+      const held = this.agents.value[host] ?? [];
+      const gone = held.filter((a) => ids.has(a.id) && a.state === "archived"
+        && !(watching?.host === host && watching.session === a.id));
+      if (gone.length) {
+        const without = new Set(gone.map((a) => a.id));
+        this.setAgents(host, held.filter((a) => !without.has(a.id)), [...new Set(gone.map(projectFolder))]);
+      }
+    }
+    this.searched.clear();
   }
 
   /** Its fold closed: the project's archived sessions are let go, and listed again when it opens. */
@@ -1085,12 +1174,19 @@ export class Store extends Work {
     await this.act("pins/arrange", { folder: folder as never, paths }, host);
   }
 
-  /** One project's Dashboard (074), asked for when it opens and on each dashboard/changed for it. */
+  /** The order writes and fetches of each Dashboard, kept in step (#176, #193). */
+  private dashboardOrders = new DashboardOrderSync();
+
+  /**
+   * One project's Dashboard (074), asked for when it opens and on each dashboard/changed for it.
+   * A reply older than one already shown is dropped.
+   */
   async loadDashboard(host: string, folder: string): Promise<void> {
-    const snapshot = await this.link.call("dashboard/get", { folder: folder as never }, host).catch(() => null);
-    if (!snapshot) return;
     const key = `${host}|${folderKey(folder)}`;
-    this.dashboards.value = { ...this.dashboards.value, [key]: snapshot };
+    const ticket = this.dashboardOrders.beginFetch(key);
+    const snapshot = await this.link.call("dashboard/get", { folder: folder as never }, host).catch(() => null);
+    const shown = snapshot && this.dashboardOrders.accept(key, snapshot, ticket);
+    if (shown) this.dashboards.value = { ...this.dashboards.value, [key]: shown };
   }
 
   /** Hide, Show or Remove: the person's, from any client (FR-027 to FR-029). */
@@ -1105,12 +1201,18 @@ export class Store extends Work {
     await this.loadDashboard(host, folder);
   }
 
-  /** A drop or a Move item (#147): shown at once, then the whole order sent once. */
+  /**
+   * A drop or a Move item (#147): shown at once, then the whole order sent. One send at a time,
+   * the newest order next, so the host ends with the last drop (#176, #193).
+   */
   async arrangeDashboard(host: string, folder: string, order: DashboardOrder): Promise<void> {
     const key = `${host}|${folderKey(folder)}`;
     const snapshot = this.dashboards.value[key];
     if (snapshot) this.dashboards.value = { ...this.dashboards.value, [key]: { ...snapshot, order } };
-    await this.act("dashboard/arrange", { folder: folder as never, order }, host);
+    if (!this.dashboardOrders.arrange(key, order)) return;
+    for (let next = this.dashboardOrders.takeUnsent(key); next; next = this.dashboardOrders.takeUnsent(key)) {
+      await this.act("dashboard/arrange", { folder: folder as never, order: next }, host);
+    }
     await this.loadDashboard(host, folder);
   }
 

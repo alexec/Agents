@@ -15,7 +15,9 @@ import Foundation
 /// app. Unscoped, every scratch run would write its folder and runtime over the real
 /// app's, and the next ordinary launch would put them back. So a store for any other root
 /// keeps to a scope of its own, and never reads, writes or sweeps outside it.
-public struct DraftStore {
+/// Sendable because `UserDefaults` is safe to use from any thread, which the SDK does not
+/// say: the window's one sweep runs off the main thread (#176).
+public struct DraftStore: @unchecked Sendable {
     /// Every key any store writes starts with this.
     public static let prefix = "draft."
     /// How many bytes held by value a draft may carry. A pasted screenshot is the case in
@@ -71,20 +73,26 @@ public struct DraftStore {
         defaults.removeObject(forKey: defaultsKey(for: key))
     }
 
-    /// Let go of drafts that are over.
+    /// Let go of drafts that are over, and say which agents still have one.
     ///
     /// Only what is known to be over: a draft whose conversation is *known and archived*,
     /// and any draft untouched for `horizon`. An agent this has not heard of costs
     /// nothing — the sweep can run before the agent list has arrived, and an absence then
     /// is not evidence of anything.
-    public func sweep(archived: Set<UUID>, now: Date) {
-        let archivedKeys = Set(archived.map { defaultsKey(for: .agent($0)) })
+    ///
+    /// This reads every key the defaults hold, so the window runs it once, off the main
+    /// thread, and after that keeps the agents it returns: an agent archived later costs a
+    /// look at the drafts that exist, not another pass over the defaults (#176).
+    @discardableResult
+    public func sweep(archived: Set<UUID>, now: Date) -> Set<UUID> {
         let agents = scopePrefix + DraftKey.agentPrefix, newAgents = scopePrefix + DraftKey.newAgentPrefix
+        var kept: Set<UUID> = []
         // Only this scope's drafts: another root's, and the start form, are not this
         // sweep's to judge.
         for key in defaults.dictionaryRepresentation().keys
         where key.hasPrefix(agents) || key.hasPrefix(newAgents) {
-            if archivedKeys.contains(key) {
+            let agentID = key.hasPrefix(agents) ? UUID(uuidString: String(key.dropFirst(agents.count))) : nil
+            if let agentID, archived.contains(agentID) {
                 defaults.removeObject(forKey: key)
                 continue
             }
@@ -95,8 +103,11 @@ public struct DraftStore {
             }
             if now.timeIntervalSince(draft.editedAt) >= Self.horizon {
                 defaults.removeObject(forKey: key)
+            } else if let agentID {
+                kept.insert(agentID)
             }
         }
+        return kept
     }
 
     // MARK: The start form

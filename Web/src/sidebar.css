@@ -56,6 +56,12 @@
 .with-sidebar .fold-body { padding-left: 12px; margin-bottom: 6px; }
 .with-sidebar .fold-body .subhead { margin: 8px 8px 1px; }
 .with-sidebar .fold-body .hint { padding: 2px 8px; font-size: 12px; }
+/* Show all N under a fold's first archived matches, and More matches… after the projects (#193):
+   fine and secondary, as the window's. */
+.sidebar button.link.show-all, .sidebar button.link.more-matches {
+  display: block; padding: 3px 8px; font-size: 12px; color: inherit; opacity: 0.6; cursor: pointer; text-align: left;
+}
+.sidebar button.link.show-all:hover, .sidebar button.link.more-matches:hover { opacity: 0.9; }
 .with-sidebar .fold-body .session { padding: 5px 8px; }
 .with-sidebar details.archived > summary { list-style: none; }
 .with-sidebar details.archived > summary::before { content: "›"; display: inline-block; width: 12px; opacity: 0.7; }
