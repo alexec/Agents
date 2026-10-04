@@ -378,6 +378,12 @@ button.link.reading:hover { text-decoration: underline; }
 .plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .plan .mark { opacity: 0.6; }
 .plan .completed { opacity: 0.6; }
+.plan-block.withdrawn .plan .content { text-decoration: line-through; }
+.plan-block .dropped { margin: 2px 0 0; }
+.markdown li.task { list-style: none; margin-left: -1.2em; }
+.markdown .task-box { opacity: 0.45; }
+.markdown .task-box.done { opacity: 0.65; }
+.message-image { display: block; max-width: min(100%, 480px); max-height: 360px; border-radius: var(--radius-card); margin: 4px 0; }
 .thought { white-space: pre-wrap; }
 /* A queued prompt: the .bubble's place and shape, dashed and dimmed, its buttons underneath (#95). */
 .queued {

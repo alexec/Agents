@@ -78,3 +78,11 @@ test("an HTML file is its source, an SVG only a picture (FR-031)", () => {
   assert.equal(textShownAs("/w/notes.txt"), "text");
   assert.equal(textShownAs("/w/.html"), "text");
 });
+
+test("a task list draws a box, ticked or not, and never a control (#252)", () => {
+  assert.equal(md("- [ ] write it\n- [x] test it\n- plain"),
+    '<ul><li class="task"><span class="task-box" role="img" aria-label="Not done">☐</span> write it</li>'
+    + '<li class="task"><span class="task-box done" role="img" aria-label="Done">☑</span> test it</li><li>plain</li></ul>');
+  assert.doesNotMatch(md("- [x] done"), /<input/);
+  assert.equal(md("[ ] not in a list"), "<p>[ ] not in a list</p>");
+});

@@ -109,9 +109,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   });
   const following = useRef(true);
   /** Following the end or not, told to the store: it trims the chat's front only while following. */
+  // Away from the end, where Jump to end is shown whether or not anything new has come (#252).
+  const away = useSignal(false);
   const follow = (on: boolean) => {
     if (following.current === on) return;
     following.current = on;
+    away.value = !on;
     store.setFollowingEnd(on);
   };
   const loadingEarlier = useRef(false);
@@ -247,7 +250,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       </div>
       </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
-      {newBelow.value && <button class="jump" onClick={toEnd}>New messages ↓</button>}
+      {/* As JumpToEnd: shown whenever the reader is away from the end; what came since, said in words. */}
+      {(away.value || newBelow.value) && (
+        <button class={`jump${newBelow.value ? " news" : ""}`} onClick={toEnd}
+          title={newBelow.value ? "Go to the end, where something new is" : "Go to the end"}
+          aria-label={newBelow.value ? "Go to the end of the conversation, where something new is" : "Go to the end of the conversation"}>
+          <span aria-hidden="true">↓</span>{newBelow.value && " Something new"}
+        </button>
+      )}
       <footer class="foot">
         <BackgroundRows agent={agent} />
         <Cards store={store} host={host} session={session} down={down} />

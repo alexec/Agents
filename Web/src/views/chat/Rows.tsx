@@ -6,7 +6,7 @@ import { createContext } from "preact";
 import { useContext, useEffect } from "preact/hooks";
 import type {
   AgentState, BackgroundItem, ContentBlock, EndedReason, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
-  TranscriptEntry, WorkReport,
+  SwitchRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
 import { Lines } from "../Changes";
@@ -18,6 +18,7 @@ import {
 } from "../../model/turns";
 import { Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
+import { switchNote } from "../../model/switchNote";
 import { memo } from "../../render/memo";
 
 /** How much of a turn is drawn (TurnDetail). */
@@ -38,7 +39,11 @@ function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: st
         if (block.type === "text") return <Markdown key={index} text={block.text} />;
         if (block.type === "resource_link") return <p key={index} class="attachment">📎 {block.name}</p>;
         if (block.type === "resource") return <p key={index} class="attachment">📎 {block.resource.uri.split("/").pop()}</p>;
-        if (block.type === "image") return <p key={index} class="attachment">[image]</p>;
+        // Drawn from its own bytes, as ChatBlocks does; a remote address stays unloaded (071 FR-030).
+        if (block.type === "image") {
+          return block.data && /^image\/[a-z0-9.+-]+$/i.test(block.mimeType) ? <img key={index} class="message-image" alt="Image" src={`data:${block.mimeType};base64,${block.data}`} />
+            : <p key={index} class="attachment">[image]</p>;
+        }
         return null;
       })}
     </>
@@ -86,14 +91,22 @@ function pretty(value: JSONValue): string {
   return JSON.stringify(value, null, 2);
 }
 
+/** ChatBlocks' PlanView: a withdrawn plan is struck through, and says the agent dropped it (#252). */
 function PlanView({ plan }: { plan: Plan }) {
   const marks = { pending: "○", in_progress: "◐", completed: "●" } as const;
+  const spoken = { pending: "To do", in_progress: "Doing now", completed: "Done" } as const;
+  const withdrawn = plan.state === "withdrawn";
   return (
-    <ul class="plan" aria-label="Plan">
-      {plan.entries.map((entry, index) => (
-        <li key={index} class={entry.status}><span class="mark" aria-hidden="true">{marks[entry.status]}</span> {entry.content}</li>
-      ))}
-    </ul>
+    <div class={`plan-block${withdrawn ? " withdrawn" : ""}`}>
+      <ul class="plan" aria-label="Plan">
+        {plan.entries.map((entry, index) => (
+          <li key={index} class={entry.status} aria-label={`${withdrawn ? "Dropped" : spoken[entry.status]}: ${entry.content}`}>
+            <span class="mark" aria-hidden="true">{marks[entry.status]}</span> <span class="content">{entry.content}</span>
+          </li>
+        ))}
+      </ul>
+      {withdrawn && <p class="quiet dropped">The agent dropped this plan</p>}
+    </div>
   );
 }
 
@@ -165,8 +178,11 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
               );
             }
             if (piece.type === "content" && piece.content.type === "text") return <Markdown key={index} text={piece.content.text} />;
+            // Any other block as a message draws it: a picture, an attachment (#252).
+            if (piece.type === "content") return <div key={index} class="quiet"><Blocks blocks={[piece.content]} text="" /></div>;
             if (piece.type === "terminal") return <p key={index} class="quiet">Terminal output is shown in the Mac window.</p>;
-            return null;
+            // Kept rather than dropped: what the runtime sent, as the window shows it.
+            return <pre key={index} class="raw faint">{pretty(piece as unknown as JSONValue).split("\n").slice(0, 6).join("\n")}</pre>;
           })}
           {/* Where it did its work, each a way in, wrapped: file names are long. */}
           {(call.locations ?? []).length > 0 && (
@@ -197,20 +213,15 @@ function ToolRun({ calls, background }: { calls: ToolCall[]; background: readonl
   return <div class="run"><ToolCallLine call={calls[calls.length - 1]!} background={background} onClick={() => (expanded.value = true)} /></div>;
 }
 
-function poolSwitchLine(entry: TranscriptEntry): string {
-  const record = fields(entry, "poolSwitch")!._0;
-  const name = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
-  const from = name(record.from.runtimeID);
-  const to = name(record.to.runtimeID);
-  switch (record.reason) {
-    case "allowanceSpent": return `${from}’s allowance ran out. Carried on with ${to}.`;
-    case "overage": return `${from} started using paid extra usage. Carried on with ${to}.`;
-    case "creditUsedUp": return `${from}’s credit was used up. Carried on with ${to}.`;
-    case "rateLimitPersisted": return `${from} stayed rate limited. Carried on with ${to}.`;
-    case "runtimeFailed": return `${from} failed. Carried on with ${to}.`;
-    case "everyoneOutResumed": return `${to}’s allowance came back. Carried on.`;
-    default: return `Continued with ${to}.`;
-  }
+/** SwitchNote: the headline, then each line under it, as the window and the Remote draw it (#252). */
+function SwitchNote({ record }: { record: SwitchRecord }) {
+  const note = switchNote(record);
+  return (
+    <div class="note switch">
+      <p class="strong">⇄ {note.headline}</p>
+      {note.lines.map((line) => <p key={line} class="quiet">{line}</p>)}
+    </div>
+  );
 }
 
 /** One entry, drawn as its kind is (EntryRow). */
@@ -292,7 +303,7 @@ export function EntryRow({ entry }: { entry: TranscriptEntry }) {
     case "runtimeNote":
       return <p class="quiet">{fields(entry, "runtimeNote")!._0}</p>;
     case "poolSwitch":
-      return <div class="note switch"><p class="strong">⇄ {poolSwitchLine(entry)}</p></div>;
+      return <SwitchNote record={fields(entry, "poolSwitch")!._0} />;
     case "sandboxFailure": {
       const record = fields(entry, "sandboxFailure")!._0;
       return (
