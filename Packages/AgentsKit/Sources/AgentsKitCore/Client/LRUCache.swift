@@ -45,3 +45,5 @@ public struct LRUCache<Key: Hashable, Value> {
         values.removeAll()
     }
 }
+
+extension LRUCache: Sendable where Key: Sendable, Value: Sendable {}
