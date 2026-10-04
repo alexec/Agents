@@ -83,3 +83,33 @@ final class SidebarFolds {
         fold == .project ? project.stored : "\(fold.name):\(project.stored)"
     }
 }
+
+/// A row under one of a project's folds, known by the fold as well as by what it shows
+/// (#237).
+///
+/// A session that moves from one fold to another (Done to Parked, to Archived) used to
+/// keep its own id as it went. SwiftUI's outline list read that as the same item, and
+/// the rows it told `NSOutlineView` to take out no longer matched the rows it had:
+/// "error removing child indexes (6) in parent (which has 5 children)". AppKit catches
+/// that and goes on. From then on, the sidebar draws rows twice or leaves them out,
+/// and the window looks hung. With the fold in its id, a move is one row
+/// taken out of a fold and a new one put into another.
+///
+/// A closed fold is given no rows at all, as a folded project already is. `NSOutlineView`
+/// does not follow the children of an item it has not expanded, so rows that came and
+/// went under a closed fold left the two counts apart the same way.
+struct FoldedRow<Item: Identifiable>: Identifiable {
+    struct ID: Hashable {
+        let fold: SidebarFolds.Fold
+        let item: Item.ID
+    }
+
+    let fold: SidebarFolds.Fold
+    let item: Item
+
+    var id: ID { ID(fold: fold, item: item.id) }
+
+    static func rows(_ items: some Sequence<Item>, in fold: SidebarFolds.Fold) -> [FoldedRow] {
+        items.map { FoldedRow(fold: fold, item: $0) }
+    }
+}

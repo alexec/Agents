@@ -29,21 +29,23 @@ struct ProjectWorkflowRows: View {
         let archived = matching.filter(\.isArchived)
         if !matching.isEmpty {
             // Folds as a session group does (#181); a search unfolds it to show what matched.
+            let workflowsOpen = !query.isEmpty || folds.isOpen(project, .workflows)
             DisclosureGroup(isExpanded: Binding(
-                get: { !query.isEmpty || folds.isOpen(project, .workflows) },
+                get: { workflowsOpen },
                 set: { folds.set(project, .workflows, open: $0) })) {
-                ForEach(workflows) { summary in
-                    WorkflowListRow(summary: summary, project: project)
+                ForEach(FoldedRow.rows(workflowsOpen ? workflows : [], in: .workflows)) { row in
+                    WorkflowListRow(summary: row.item, project: project)
                 }
             } label: {
                 SidebarSubheading(title: "Workflows", count: workflows.count)
             }
             if !archived.isEmpty {
+                let archivedOpen = !query.isEmpty || folds.isOpen(project, .archivedWorkflows)
                 DisclosureGroup(isExpanded: Binding(
-                    get: { !query.isEmpty || folds.isOpen(project, .archivedWorkflows) },
+                    get: { archivedOpen },
                     set: { folds.set(project, .archivedWorkflows, open: $0) })) {
-                    ForEach(archived) { summary in
-                        WorkflowListRow(summary: summary, project: project)
+                    ForEach(FoldedRow.rows(archivedOpen ? archived : [], in: .archivedWorkflows)) { row in
+                        WorkflowListRow(summary: row.item, project: project)
                     }
                 } label: {
                     SidebarSubheading(title: "Archived workflows", count: archived.count)
