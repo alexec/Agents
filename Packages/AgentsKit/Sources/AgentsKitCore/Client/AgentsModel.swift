@@ -205,6 +205,8 @@ public final class AgentsModel {
     /// is drawn the same way — as nothing. It stays nil against a daemon too old to
     /// know `wake/state`, which is what lets a new window work against an old daemon.
     public private(set) var wakeState: DaemonAPI.WakeState?
+    /// Files the host could not read in this run (#205); empty when all read.
+    public private(set) var storeNotes: [String] = []
 
     /// What each command an agent ran has printed, as far as this client heard it (033).
     ///
@@ -281,6 +283,7 @@ public final class AgentsModel {
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
+        case storeNotesChanged(DaemonAPI.StoreNotes)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
         case terminalOutput(DaemonAPI.TerminalOutputNotification)
@@ -319,6 +322,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
+        case DaemonAPI.Notification.storeNotesChanged: return decode(DaemonAPI.StoreNotes.self, Update.storeNotesChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
         case DaemonAPI.Notification.agentTerminalOutput: return decode(DaemonAPI.TerminalOutputNotification.self, Update.terminalOutput)
@@ -468,6 +472,9 @@ public final class AgentsModel {
 
         case .wakeChanged(let state):
             wakeState = state
+
+        case .storeNotesChanged(let notes):
+            storeNotes = notes.notes
 
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
@@ -737,6 +744,7 @@ public final class AgentsModel {
     /// The mode last chosen for this runtime, on any device (029).
     public func rememberedMode(for runtimeID: String) -> JSONValue? { rememberedModes[runtimeID] }
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
+    public func replaceStoreNotes(_ notes: DaemonAPI.StoreNotes) { storeNotes = notes.notes }
 
     // MARK: Choices in flight
 

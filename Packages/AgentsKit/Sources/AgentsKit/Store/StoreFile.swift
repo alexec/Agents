@@ -240,6 +240,23 @@ final class SetAsideNotes: @unchecked Sendable {
     static let shared = SetAsideNotes()
     private let lock = NSLock()
     private var notes: [String: String] = [:]
+    /// Told after a note is added or cleared, so the daemon can tell its windows (#205).
+    private var watchers: [UUID: @Sendable () -> Void] = [:]
+
+    @discardableResult
+    func watch(_ changed: @escaping @Sendable () -> Void) -> UUID {
+        let id = UUID()
+        lock.withLock { watchers[id] = changed }
+        return id
+    }
+
+    func unwatch(_ id: UUID) {
+        _ = lock.withLock { watchers.removeValue(forKey: id) }
+    }
+
+    private func changed() {
+        for watcher in lock.withLock({ Array(watchers.values) }) { watcher() }
+    }
 
     func add(_ url: URL, aside: URL, partly: Bool = false) {
         add(url, sentence: partly
@@ -248,11 +265,17 @@ final class SetAsideNotes: @unchecked Sendable {
     }
 
     func add(_ url: URL, sentence: String) {
-        lock.withLock { notes[url.standardizedFileURL.path] = sentence }
+        let new = lock.withLock { () -> Bool in
+            let key = url.standardizedFileURL.path
+            defer { notes[key] = sentence }
+            return notes[key] != sentence
+        }
+        if new { changed() }
     }
 
     func clear(_ url: URL) {
-        _ = lock.withLock { notes.removeValue(forKey: url.standardizedFileURL.path) }
+        let removed = lock.withLock { notes.removeValue(forKey: url.standardizedFileURL.path) }
+        if removed != nil { changed() }
     }
 
     /// What to say where the store at `url` shows, or nil when it was read.

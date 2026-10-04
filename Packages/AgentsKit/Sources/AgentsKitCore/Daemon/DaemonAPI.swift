@@ -358,6 +358,9 @@ public enum DaemonAPI {
         /// has heard no broadcast, and for a long turn would otherwise show nothing
         /// for half an hour.
         public static let wakeState = "wake/state"
+        /// What this host keeps that could not be read in this run (#205): files set aside
+        /// or held, said so a person sees why paired devices or projects "disappeared".
+        public static let storeNotes = "store/notes"
         /// The switch and the grace. The window's, like retention: a phone does not set it.
         public static let wakeSettings = "wake/settings"
         public static let wakeSet = "wake/set"
@@ -469,6 +472,8 @@ public enum DaemonAPI {
         /// moves — `reviseWakefulness` is reached on every streamed token, and a
         /// notification per token would be a flood (024 FR-015, FR-016).
         public static let wakeChanged = "wake/changed"
+        /// `StoreNotes`, whenever a file is set aside, held, or reads again (#205).
+        public static let storeNotesChanged = "store/notesChanged"
     }
 
     // MARK: Requests
@@ -2936,6 +2941,17 @@ public enum DaemonAPI {
 
 public extension DaemonAPI {
     /// `daemon/status` (037).
+    /// What this host keeps that could not be read in this run (#205), one sentence a
+    /// file: set aside and started afresh, held and not written, or kept in part. Empty
+    /// when everything read.
+    struct StoreNotes: Codable, Hashable, Sendable {
+        public var notes: [String]
+
+        public init(notes: [String]) {
+            self.notes = notes
+        }
+    }
+
     struct DaemonStatus: Codable, Hashable, Sendable {
         /// Agents starting, running or waiting on the person: an update waits for zero.
         public var turnsInFlight: Int

@@ -43,7 +43,7 @@ struct SecretsEnv: Equatable, Sendable {
     struct Unreadable: Error, Equatable {
         var path: String
         var message: String {
-            "secrets.env could not be read, so nothing was written to it and the secrets in it are kept. Check its permissions and contents at \(path), then try again."
+            "secrets.env could not be read, so nothing was written to it and the secrets in it are kept. Check its permissions and contents at \(path), then try again"
         }
     }
 
@@ -66,7 +66,11 @@ struct SecretsEnv: Equatable, Sendable {
 
     static func parse(_ text: String) -> SecretsEnv {
         var lines: [Line] = []
-        for raw in text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+        var raws = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // The newline that ends the file ends its last line; it is not a blank line of its
+        // own, which a name set next would otherwise land after (`text` puts it back).
+        if text.hasSuffix("\n") { raws.removeLast() }
+        for raw in raws {
             if raw.hasPrefix("#") || raw.trimmingCharacters(in: .whitespaces).isEmpty {
                 lines.append(Line(kind: .other(raw)))
                 continue

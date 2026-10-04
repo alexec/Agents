@@ -88,6 +88,7 @@ struct UnreadableSecretsTests {
         try installer(home).setSecret(name: "C", value: "three", personalHome: home)
         #expect(try mode(url) == 0o600)
         #expect(SecretsEnv.load(from: url).names == ["A", "B", "C"])
+        #expect(try String(contentsOf: url, encoding: .utf8) == "A=one\nB=two\nC=three\n", "no blank line before the new one")
         #expect(try fileManager.attributesOfItem(atPath: url.path)[.systemFileNumber] as? Int != before, "a new file renamed in")
         let left = try fileManager.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
         #expect(left == ["secrets.env"], "no .part or temporary left: \(left)")

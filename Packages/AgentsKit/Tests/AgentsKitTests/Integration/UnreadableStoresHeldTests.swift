@@ -270,4 +270,19 @@ struct UnreadableStoresHeldTests {
         #expect(String(decoding: after, as: UTF8.self).contains(GitWorktrees.excludeLine))
         #expect((try fileManager.attributesOfItem(atPath: exclude.path)[.posixPermissions] as? NSNumber)?.intValue == 0o600)
     }
+
+    // MARK: Telling the person
+
+    /// Devices that do not read are said where the windows look, not only in the log:
+    /// asked on connecting, and gone once the file reads again (a held project file).
+    @Test func theDaemonSaysWhatItCouldNotRead() async throws {
+        let locations = try temporary()
+        try Data("{\"torn".utf8).write(to: locations.devices)
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: FakeLauncher())
+        await core.loadFromDisk()
+        _ = DeviceStore(locations: locations).load()
+        let notes = await core.storeNotes().notes
+        #expect(notes.contains { $0.contains("devices.json could not be read") }, "\(notes)")
+    }
 }
