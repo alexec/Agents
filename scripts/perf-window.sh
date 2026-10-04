@@ -14,7 +14,8 @@
 set -euo pipefail
 SLUG=${1:?usage: perf-window.sh SLUG [PROJECT_A PROJECT_B CHAT_A CHAT_B]}
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$REPO/build/DD/Build/Products/Debug/Agents.app"
+# CONFIG=Live times ship-app's optimised build (#220), launched with launch.sh --config Live.
+APP="$REPO/build/DD/Build/Products/${CONFIG:-Debug}/Agents.app"
 UI_SRC="$REPO/.agents/skills/run-app/scripts/ui.swift"
 WORK="${TMPDIR:-/tmp}/perf-window-$SLUG"
 mkdir -p "$WORK"

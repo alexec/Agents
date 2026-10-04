@@ -7,8 +7,9 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
-HOSTAPP="$REPO/build/DD/Build/Products/Debug/Agents Host.app"
-APP="$REPO/build/DD/Build/Products/Debug/Agents.app"
+# Debug, always, for a walk: its scratch hooks (AGENTS_TEST_*, -open-agent, events/raise)
+# are Debug-only. --config Live is for timing what ship-app puts live (#220).
+CONFIG=Debug
 SLUG=""
 BUILD=1
 FRONT=0
@@ -29,16 +30,20 @@ while [ $# -gt 0 ]; do
     --lan)       LAN=1 ;;            # the control plane at this Mac's LAN address, for a container
     --host-first) HOST_FIRST=1 ;;    # the host starts while the control plane is down, then it comes up (#113)
     --slug)      SLUG="$2"; shift ;;
+    --config)    CONFIG="$2"; shift ;;   # Debug (the default) or Live, ship-app's optimised build
     --web-port)  WEB_PORT="$2"; shift ;;   # the web remote's port, e.g. one held already (071 R3)
     --seeded)    SEEDED=1 ;;         # the root exists, filled beforehand (scripts/seed-archived.swift), with no control/ yet
     --env)       EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the host, e.g. AGENTS_TEST_…=…
     --control-env) CONTROL_ENV+=("$2"); shift ;;  # KEY=VALUE for the control plane, e.g. AGENTS_SSH=…
     --appearance) APP_ARGS+=(--appearance "$2"); shift ;;  # light|dark|system for the window, no setting changed
     --app-arg)   APP_ARGS+=("$2"); shift ;;   # one more argument for the window, e.g. a defaults key: -key value
-    *) echo "usage: launch.sh [--slug NAME] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]…" >&2; exit 2 ;;
+    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]…" >&2; exit 2 ;;
   esac
   shift
 done
+
+HOSTAPP="$REPO/build/DD/Build/Products/$CONFIG/Agents Host.app"
+APP="$REPO/build/DD/Build/Products/$CONFIG/Agents.app"
 
 [ -n "$SLUG" ] || SLUG="$(printf '%04x' $((RANDOM % 65536)))"
 case "$SLUG" in *[!A-Za-z0-9_-]*) echo "a slug is letters, digits, - and _" >&2; exit 2 ;; esac
@@ -59,9 +64,9 @@ if [ "$BUILD" = 1 ]; then
   echo "building…" >&2
   # One after the other: the schemes share SwiftPM state.
   ( cd "$REPO" && xcodegen generate >/dev/null \
-    && xcodebuild -scheme AgentsHost -destination 'platform=macOS' -configuration Debug \
+    && xcodebuild -scheme AgentsHost -destination 'platform=macOS' -configuration "$CONFIG" \
          -derivedDataPath build/DD -skipPackagePluginValidation build \
-    && xcodebuild -scheme AgentsStore -destination 'platform=macOS' -configuration Debug \
+    && xcodebuild -scheme AgentsStore -destination 'platform=macOS' -configuration "$CONFIG" \
          -derivedDataPath build/DD -skipPackagePluginValidation build ) >/tmp/run-$SLUG-build.log 2>&1 \
     || { echo "build failed — tail /tmp/run-$SLUG-build.log" >&2; tail -30 /tmp/run-$SLUG-build.log >&2; exit 1; }
 fi

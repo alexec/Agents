@@ -16,7 +16,22 @@ checks or write a watcher around it. Say in your report that you shipped it.
 hosts (`scripts/build-linux-agentsd.sh`, into `App/Resources/servers`), which the build
 otherwise does first, since Agents Host carries them and a stale one cannot join. `--no-devices --no-build` only
 relaunches the Mac. `--device <UDID>` (repeatable) picks one device. `--now`
-relaunches the Mac after 3s instead of 20s.
+relaunches the Mac after 3s instead of 20s. `--build-only` builds in the checkout the
+script is in (run a worktree's copy to build that worktree), checks the products, and
+stops: nothing is installed or relaunched. Use it to prove a change to this script.
+
+## What it builds
+
+Everything ships in the **Live** configuration (#220, Alex 2026-10-04): optimised like
+Release (`-O`, whole module, no `DEBUG`), but signed for development like Debug.
+`Release` is the App Store archive's (Apple Distribution, App Store profiles and
+entitlements), which neither `devicectl` nor a copy in `~/Applications` can run. The
+products are under `build/DD-*/Build/Products/Live/` (`Live-iphoneos/` for the Remote).
+The script refuses to install a bundle holding a `*.debug.dylib` or `__preview.dylib`.
+
+Debug-only scratch hooks (`-open-agent`, `AGENTS_TEST_*`, `events/raise`,
+`disk-free-override`, the reconnect notification) are absent from the live app. Scratch
+walks (run-app), merge-wave's checks and the tests stay on Debug.
 
 ## What runs on the Mac
 
@@ -31,7 +46,7 @@ Since 058 the Mac runs:
 
 There is no phone bridge to start. The Remote reaches the control plane itself.
 
-The script builds `AgentsHost` into `build/DD-host`, `AgentsStore` into `build/DD-store`
+The script builds `AgentsHost` (Live) into `build/DD-host`, `AgentsStore` into `build/DD-store`
 and the Remote into `build/DD-ios`, one after another in the main checkout. Logs are
 in `/tmp/ship-app-<sha>/`. It refuses when:
 - the main checkout is not on `main`;

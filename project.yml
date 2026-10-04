@@ -9,6 +9,14 @@ options:
   xcodeVersion: "27.0"
   createIntermediateGroups: true
   groupSortPosition: top
+# Live is what ship-app puts on Alex's Mac and devices (#220): optimised like Release, but
+# signed for development as Debug is, since Release is the App Store archive's (Apple
+# Distribution, App Store profiles and entitlements), which neither devicectl nor a
+# copy in ~/Applications can run. Scratch walks and tests stay on Debug.
+configs:
+  Debug: debug
+  Release: release
+  Live: release
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -38,6 +46,14 @@ settings:
       SWIFT_COMPILATION_MODE: wholemodule
       SWIFT_OPTIMIZATION_LEVEL: -O
       VALIDATE_PRODUCT: YES
+    # Release's settings without VALIDATE_PRODUCT, which is the App Store's check. There is
+    # not one assert() in the sources, and precondition() stays in -O, so a variant that
+    # keeps assertions would change nothing.
+    Live:
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      ENABLE_NS_ASSERTIONS: NO
+      SWIFT_COMPILATION_MODE: wholemodule
+      SWIFT_OPTIMIZATION_LEVEL: -O
 packages:
   AgentsKit:
     path: Packages/AgentsKit
