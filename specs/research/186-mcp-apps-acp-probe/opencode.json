@@ -1,0 +1,134 @@
+{
+  "runtime": "opencode",
+  "agentInfo": {
+    "name": "OpenCode",
+    "version": "1.18.33"
+  },
+  "mcpCapabilities": {
+    "http": true,
+    "sse": true
+  },
+  "models": null,
+  "stopReason": "end_turn",
+  "answer": "Line 1 TEXT: kite-apps Paris \u2192 \"KITE-WEATHER Paris: 21C, clear\"; heron-apps Oslo \u2192 \"KITE-WEATHER Oslo: 21C, clear\"\nLine 2 EXTRA: NONE",
+  "toolCalls": [
+    {
+      "sessionUpdate": "tool_call",
+      "toolCallId": "call_01a1051722a170dcad394248",
+      "title": "kite-apps_kite_apps_weather",
+      "kind": "other",
+      "status": "pending",
+      "locations": [],
+      "rawInput": {}
+    },
+    {
+      "sessionUpdate": "tool_call_update",
+      "toolCallId": "call_01a1051722a170dcad394248",
+      "status": "in_progress",
+      "kind": "other",
+      "title": "kite-apps_kite_apps_weather",
+      "locations": [],
+      "rawInput": {
+        "city": "Paris"
+      }
+    },
+    {
+      "sessionUpdate": "tool_call",
+      "toolCallId": "call_01a1051722a170dcad394249",
+      "title": "heron-apps_heron_apps_weather",
+      "kind": "other",
+      "status": "pending",
+      "locations": [],
+      "rawInput": {}
+    },
+    {
+      "sessionUpdate": "tool_call_update",
+      "toolCallId": "call_01a1051722a170dcad394249",
+      "status": "in_progress",
+      "kind": "other",
+      "title": "heron-apps_heron_apps_weather",
+      "locations": [],
+      "rawInput": {
+        "city": "Oslo"
+      }
+    },
+    {
+      "sessionUpdate": "tool_call_update",
+      "toolCallId": "call_01a1051722a170dcad394249",
+      "status": "completed",
+      "content": [
+        {
+          "type": "content",
+          "content": {
+            "type": "text",
+            "text": "KITE-WEATHER Oslo: 21C, clear"
+          }
+        }
+      ],
+      "rawOutput": {
+        "output": "KITE-WEATHER Oslo: 21C, clear",
+        "metadata": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "sessionUpdate": "tool_call_update",
+      "toolCallId": "call_01a1051722a170dcad394248",
+      "status": "completed",
+      "content": [
+        {
+          "type": "content",
+          "content": {
+            "type": "text",
+            "text": "KITE-WEATHER Paris: 21C, clear"
+          }
+        }
+      ],
+      "rawOutput": {
+        "output": "KITE-WEATHER Paris: 21C, clear",
+        "metadata": {
+          "truncated": false
+        }
+      }
+    }
+  ],
+  "mcpInitialize": {
+    "kite-apps": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+        "roots": {}
+      },
+      "clientInfo": {
+        "name": "opencode",
+        "version": "1.18.33"
+      }
+    },
+    "heron-apps": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+        "roots": {}
+      },
+      "clientInfo": {
+        "name": "opencode",
+        "version": "1.18.33"
+      }
+    }
+  },
+  "mcpMethods": {
+    "kite-apps": [
+      "initialize",
+      "notifications/initialized",
+      "tools/list",
+      "tools/call",
+      "notifications/cancelled"
+    ],
+    "heron-apps": [
+      "initialize",
+      "notifications/initialized",
+      "tools/list",
+      "tools/call",
+      "notifications/cancelled"
+    ]
+  }
+}

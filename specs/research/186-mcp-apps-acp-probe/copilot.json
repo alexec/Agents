@@ -1,0 +1,78 @@
+{
+  "runtime": "copilot",
+  "agentInfo": {
+    "name": "Copilot",
+    "title": "Copilot",
+    "version": "1.0.92-3"
+  },
+  "mcpCapabilities": {
+    "http": true,
+    "sse": true
+  },
+  "models": "claude-sonnet-5",
+  "stopReason": "end_turn",
+  "answer": "TEXT: KITE-WEATHER Paris: 21C, clear\nEXTRA: structuredContent: {\"city\":\"Paris\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}",
+  "toolCalls": [
+    {
+      "sessionUpdate": "tool_call",
+      "toolCallId": "toolu_018Kjowavipcwwzg82Xr6fwH",
+      "title": "kite-apps-kite_apps_weather",
+      "kind": "other",
+      "status": "pending",
+      "rawInput": {
+        "city": "Paris"
+      }
+    },
+    {
+      "sessionUpdate": "tool_call_update",
+      "toolCallId": "toolu_018Kjowavipcwwzg82Xr6fwH",
+      "status": "completed",
+      "content": [
+        {
+          "type": "content",
+          "content": {
+            "type": "text",
+            "text": "KITE-WEATHER Paris: 21C, clear\n\n{\"city\":\"Paris\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}"
+          }
+        }
+      ],
+      "rawOutput": {
+        "content": "KITE-WEATHER Paris: 21C, clear\n\n{\"city\":\"Paris\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}",
+        "detailedContent": "KITE-WEATHER Paris: 21C, clear\n\n{\"city\":\"Paris\",\"temperatureC\":21,\"conditions\":\"clear\",\"probe\":\"STRUCTURED-4\"}",
+        "contents": [
+          {
+            "type": "text",
+            "text": "KITE-WEATHER Paris: 21C, clear"
+          }
+        ],
+        "structuredContent": {
+          "city": "Paris",
+          "temperatureC": 21,
+          "conditions": "clear",
+          "probe": "STRUCTURED-4"
+        }
+      }
+    }
+  ],
+  "mcpInitialize": {
+    "kite-apps": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+        "sampling": {}
+      },
+      "clientInfo": {
+        "name": "copilot-cli",
+        "version": "1.0.92-3"
+      }
+    }
+  },
+  "mcpMethods": {
+    "kite-apps": [
+      "server/discover",
+      "initialize",
+      "notifications/initialized",
+      "tools/list",
+      "tools/call"
+    ]
+  }
+}
