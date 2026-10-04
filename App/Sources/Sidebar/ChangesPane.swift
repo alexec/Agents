@@ -156,6 +156,12 @@ struct ChangesPane: View {
                         }
                     })
             }
+            // The daemon names at most 500 files and counts the rest (#210).
+            if let more = list.more, more > 0 {
+                Text(more == 1 ? "and 1 more file" : "and \(more) more files")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)

@@ -205,7 +205,7 @@ extension DaemonCore {
         openEventWaits.removeValue(forKey: id)
         openEventWaitStarted.removeValue(forKey: id)
         artifactEdits.removeValue(forKey: id)
-        reportedChanges.removeValue(forKey: id)
+        reportedChanges.remove(id)
         shellWatchers.removeValue(forKey: id)
         interrupted.removeValue(forKey: id)
         resuming.remove(id)
@@ -236,7 +236,7 @@ extension DaemonCore {
         if openEventWaits[id] != nil { held.append("openEventWaits") }
         if openEventWaitStarted[id] != nil { held.append("openEventWaitStarted") }
         if artifactEdits[id] != nil { held.append("artifactEdits") }
-        if reportedChanges[id] != nil { held.append("reportedChanges") }
+        if reportedChanges.peek(id) != nil { held.append("reportedChanges") }
         if shellWatchers[id] != nil { held.append("shellWatchers") }
         if interrupted[id] != nil { held.append("interrupted") }
         if resuming.contains(id) { held.append("resuming") }

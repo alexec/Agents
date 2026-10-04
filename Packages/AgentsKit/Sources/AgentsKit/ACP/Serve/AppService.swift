@@ -158,7 +158,7 @@ public actor AppService {
     /// `list_sessions` or `read_session` (065), as the agent made it. Neither names a
     /// project: the daemon takes it from the caller.
     public enum SessionCall: Sendable, Equatable {
-        case list
+        case list(limit: Int? = nil, after: String? = nil)
         case read(session: String)
     }
 
@@ -456,7 +456,11 @@ public actor AppService {
     /// `nil` when the name is neither.
     static func sessionCall(named name: String,
                             _ arguments: JSONValue?) -> Result<SessionCall, AgentCallProblem>? {
-        if name.hasSuffix(listSessionsToolName) { return .success(.list) }
+        if name.hasSuffix(listSessionsToolName) {
+            let after = arguments?["after"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return .success(.list(limit: arguments?["limit"]?.intValue,
+                                  after: after?.isEmpty == false ? after : nil))
+        }
         if name.hasSuffix(readSessionToolName) {
             let value = arguments?["session"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !value.isEmpty else { return .failure(AgentCallProblem(stringLiteral: SessionLookup.noValue)) }
@@ -1372,12 +1376,26 @@ public actor AppService {
         "name": .string(listSessionsToolName),
         "title": "List the sessions in this project",
         "description": """
-            Every session in this project, most recent first, yours included: each one's \
+            The sessions in this project, a page at a time: the ones not archived first, \
+            then the archived, each most recent first, yours included. Each one's \
             id, title, runtime, status, worktree and branch, the resources it holds, labels with owners, \
-            and what it last said. Use it to find a session \
+            and what it last said. The page ends by saying how many more there are and \
+            what to pass as `after` for the next. Use it to find a session \
             the person asks you to continue, then read it with read_session.
             """,
-        "inputSchema": ["type": "object", "properties": .object([:])],
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "limit": [
+                    "type": "integer",
+                    "description": "How many sessions to list, at most 100. 30 when left out.",
+                ],
+                "after": [
+                    "type": "string",
+                    "description": "The id of the last session the previous page listed, for the next page.",
+                ],
+            ],
+        ],
     ]
 
     static let readSessionTool: JSONValue = [

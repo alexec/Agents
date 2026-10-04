@@ -44,7 +44,8 @@ extension DaemonCore {
             let held = leaseBook.held(by: agent.id).map(\.resource.key)
             if !held.isEmpty { holding[agent.id] = held }
         }
-        return SessionLookup.list(in: caller.projectFolder, agents: sessions, caller: caller.id, holding: holding)
+        return SessionLookup.list(in: caller.projectFolder, agents: sessions, caller: caller.id, holding: holding,
+                                  limit: request.limit, after: request.after)
     }
 
     /// The history, or the sentence saying why not. A refusal is a normal result the
@@ -69,24 +70,41 @@ extension DaemonCore {
         }
     }
 
-    /// Read a page at a time, in order, into a builder that keeps only what fits: a
-    /// transcript of tens of megabytes is never held whole.
-    private func history(of agentID: UUID, header: SessionHistory.Header) async -> SessionHistory.Document? {
-        guard let total = try? await store.transcriptCount(for: agentID) else { return nil }
+    /// The first turn and the latest, read a page at a time into a builder that keeps
+    /// only what fits. At most `historyBytes` of transcript is read, from the end back,
+    /// so a lead polling a helper of tens of megabytes no longer decodes it all (#210).
+    func history(of agentID: UUID, header: SessionHistory.Header,
+                 bytes: Int = DaemonCore.historyBytes) async -> SessionHistory.Document? {
+        guard let lines = try? await store.historyLines(for: agentID, bytes: bytes) else { return nil }
         var builder = SessionHistory.Builder(runtime: header.runtime)
-        var next = 0
-        while next < total {
-            let end = min(next + Self.historyPage, total)
-            guard let page = try? await store.transcript(for: agentID, before: end, limit: end - next) else {
-                return nil
+        // The first turn, then each of the latest, each ended before the next begins.
+        let turns = [lines.first] + lines.latest
+        for (position, ranges) in turns.enumerated() {
+            for range in ranges {
+                var next = range.lowerBound
+                while next < range.upperBound {
+                    let end = min(next + Self.historyPage, range.upperBound)
+                    guard let page = try? await store.transcript(for: agentID, before: end, limit: end - next) else {
+                        return nil
+                    }
+                    for entry in page.entries { builder.add(entry) }
+                    next = end
+                }
             }
+            if position == 0 { builder.leaveOut(lines.leftOut) } else { builder.endTurn() }
+        }
+        // The plan as it last stood, wherever in the session it was set.
+        if let plan = lines.plan,
+           let page = try? await store.transcript(for: agentID, before: plan + 1, limit: 1) {
             for entry in page.entries { builder.add(entry) }
-            next = end
         }
         return builder.document(header: header)
     }
 
     static let historyPage = 500
+    /// Transcript bytes one `read_session` reads at most (#210).
+    /// A megabyte holds a dozen times what the 80,000-character history can show.
+    static let historyBytes = 1 << 20
 
     /// The agent a token speaks for. Any agent: a helper reads as its lead does.
     private func sessionCaller(token: String) throws -> Agent {

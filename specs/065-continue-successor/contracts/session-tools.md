@@ -6,9 +6,10 @@ accepts a project or folder argument.
 
 ## `list_sessions`
 
-Input: no arguments.
+Input: `{ "limit"?: integer, "after"?: string }` (#210). `limit` defaults to 30 and is held to
+1–100; `after` is the id of the last session the previous page listed.
 
-The result is a list of live sessions in the caller's project, including the caller and
+The result is a page of the live sessions in the caller's project, including the caller and
 archived sessions. Retired sessions are not listed. Each item contains:
 
 | Field | Meaning |
@@ -20,8 +21,11 @@ archived sessions. Retired sessions are not listed. Each item contains:
 | `lastActivityAt` | Time of the last recorded activity, for distinguishing sessions. |
 | `lastSaid` | The latest recorded agent report, when present; omitted otherwise. |
 
-The list is ordered by `lastActivityAt` descending, with session UUID ascending as the tie
-breaker. An empty project returns an empty list. Listing does not open transcripts or change
+Sessions not archived come before archived ones; within each, the list is ordered by
+`lastActivityAt` descending, with session UUID ascending as the tie breaker. When more follow
+the page, it ends with how many (and how many of those are archived) and the `after` value for
+the next page. An `after` that names no session in the project is refused in words, to start
+again. An empty project returns an empty list. Listing does not open transcripts or change
 any session field.
 
 ## `read_session`
@@ -53,6 +57,11 @@ The history budget is 80,000 characters. If the complete rendered history exceed
 the first request and the newest complete turns that fit, and always retain the last plan.
 Include one sentence stating how many turns were omitted. If it fits, return the whole
 history without an omission sentence.
+
+A read takes at most 1 MB of transcript (#210): the first turn (a quarter of that at most, from
+its start), then whole turns back from the end while they fit, and the latest turn always —
+its ask and as much of its end as fits when it is longer. Turns not read count as omitted.
+The last plan is found by its line, wherever it is, so it is retained however long the session.
 
 ## Refusal sentences
 

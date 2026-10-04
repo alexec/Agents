@@ -13,13 +13,15 @@ public actor AgentStore {
     /// last one, not of the whole file. A window flicking back through an hour of
     /// transcript used to have the daemon read the whole file for every page, with
     /// every append to every transcript waiting behind it.
-    private var lineIndexes: [UUID: TranscriptReader.Index] = [:]
+    private var lineIndexes = LRUCache<UUID, TranscriptReader.Index>(limit: AgentStore.indexedTranscripts)
     /// Each read conversation's finished turns: where they start, and the summaries made
     /// so far.
-    private var turnCache: [UUID: Turns] = [:]
+    private var turnCache = LRUCache<UUID, Turns>(limit: AgentStore.indexedTranscripts)
     /// How many transcripts are indexed at once. Eight bytes a line, so an index is
-    /// small, but the daemon lives for weeks and this is a memo, not a record.
-    private static let indexedTranscripts = 16
+    /// small, but the daemon lives for weeks and this is a memo, not a record. Past it the
+    /// one read longest ago goes, not all of them: the seventeenth conversation read used
+    /// to make the other sixteen rescan their whole files (#210).
+    static let indexedTranscripts = 16
 
     public init(locations: StoreLocations = .default) throws {
         self.locations = locations
@@ -276,6 +278,11 @@ public actor AgentStore {
     /// Whether the agent's transcript is held open for appending. For a test (#163).
     func holdsTranscript(of agentID: UUID) -> Bool { appendHandles[agentID] != nil }
 
+    /// Which conversations the transcript caches hold. For a test (#210).
+    func heldTranscripts() -> (indexed: Set<UUID>, turns: Set<UUID>) {
+        (Set(lineIndexes.keys), Set(turnCache.keys))
+    }
+
     /// Let go of an agent's handle: it is finished, or archived, or the daemon is going.
     public func closeTranscript(for agentID: UUID) {
         try? appendHandles.removeValue(forKey: agentID)?.close()
@@ -322,12 +329,13 @@ public actor AgentStore {
     /// is one `loadAll` cannot read, so a half-deleted agent is never listed as whole.
     private func deleteRetiredFiles(_ id: UUID) throws {
         closeTranscript(for: id)
-        lineIndexes.removeValue(forKey: id)
+        lineIndexes.remove(id)
+        historyMarks.remove(id)
         try check(.closeTranscript)
         try removeIfThere(locations.record(id))
         try check(.deleteRecord)
         try removeIfThere(locations.transcript(id))
-        turnCache[id] = nil
+        turnCache.remove(id)
         try check(.deleteTranscript)
         try removeIfThere(locations.agent(id))
         try check(.removeFolder)
@@ -417,11 +425,103 @@ public actor AgentStore {
         }
         try keepWhatFollows(&turns, for: agentID)
 
-        if turnCache[agentID] == nil, turnCache.count >= Self.indexedTranscripts {
-            turnCache.removeAll(keepingCapacity: true)
-        }
-        turnCache[agentID] = turns
+        turnCache.set(turns, for: agentID)
         return TurnsPage(turns: page, firstTurn: start, openStart: starts.last ?? 0)
+    }
+
+    /// Which lines of a transcript a session history reads (#210).
+    public struct HistoryLines: Sendable, Equatable {
+        /// The first turn, as ranges of lines to read in order: all of it, or as much
+        /// of its start as fits.
+        public var first: [Range<Int>] = []
+        /// The latest turns, oldest first, each as ranges of lines: the whole turn, or
+        /// its ask and as much of its end as fits.
+        public var latest: [[Range<Int>]] = []
+        /// Whole turns between the first and the latest that are not read.
+        public var leftOut = 0
+        /// The line of the last plan, wherever it is.
+        public var plan: Int?
+    }
+
+    /// Where a session history's turns start and its last plan is, as far as `scanned`.
+    /// Found by the bytes alone: a history starts a turn at every `userMessage`, the app's
+    /// included, so unlike `turns` it decodes none of them (#210).
+    private struct HistoryMarks {
+        var asks: [Int] = []
+        var lastPlan: Int?
+        var scanned = 0
+    }
+
+    /// Kept apart from `turnCache`, so a lead reading its helpers never pushes out the
+    /// conversations a window has open.
+    private var historyMarks = LRUCache<UUID, HistoryMarks>(limit: AgentStore.indexedTranscripts)
+
+    /// The first turn and the turns back from the end, until `bytes` of transcript are
+    /// taken: a session history costs the same however long the session ran, where it
+    /// used to decode every line from the first (#210).
+    public func historyLines(for agentID: UUID, bytes: Int) throws -> HistoryLines {
+        let reader = TranscriptReader(url: locations.transcript(agentID))
+        let index = try lineIndex(for: agentID, with: reader)
+        var marks = historyMarks.value(for: agentID) ?? HistoryMarks()
+        // Read from some other transcript than this one: look again.
+        if marks.scanned > index.count { marks = HistoryMarks() }
+        // A key in the entry, never in a string: inside one its quotes are escaped.
+        marks.asks += try reader.lines(containing: "\"userMessage\"", index, from: marks.scanned)
+        if let plan = try reader.lines(containing: "\"planUpdated\"", index, from: marks.scanned).last {
+            marks.lastPlan = plan
+        }
+        marks.scanned = index.count
+        historyMarks.set(marks, for: agentID)
+
+        guard index.count > 0 else { return HistoryLines() }
+        let starts = [0] + marks.asks.drop { $0 == 0 }
+        let ranges = zip(starts, starts.dropFirst() + [index.count]).map { $0..<$1 }
+        func size(_ lines: Range<Int>) -> Int {
+            lines.isEmpty ? 0 : Int(index.lineEnds[lines.upperBound - 1] - index.start(of: lines.lowerBound))
+        }
+        // A turn too long to take whole: its ask, then as much of its end as fits.
+        func end(of turn: Range<Int>, within budget: Int) -> [Range<Int>] {
+            let ask = turn.lowerBound..<turn.lowerBound + 1
+            guard size(ask) <= budget else { return [] }
+            var from = turn.upperBound
+            while from > ask.upperBound, size((from - 1)..<turn.upperBound) + size(ask) <= budget { from -= 1 }
+            return from < turn.upperBound ? [ask, from..<turn.upperBound] : [ask]
+        }
+
+        var result = HistoryLines(plan: marks.lastPlan)
+        guard ranges.count > 1 else {
+            result.first = size(ranges[0]) <= bytes ? [ranges[0]] : end(of: ranges[0], within: bytes)
+            return result
+        }
+        // The first turn gets a quarter at most, and then its start: what was asked, and
+        // how the work began.
+        let firstBudget = bytes / 4
+        if size(ranges[0]) <= firstBudget {
+            result.first = [ranges[0]]
+        } else {
+            var to = ranges[0].lowerBound
+            while to < ranges[0].upperBound, size(ranges[0].lowerBound..<(to + 1)) <= firstBudget { to += 1 }
+            result.first = to > ranges[0].lowerBound ? [ranges[0].lowerBound..<to] : []
+        }
+        var left = bytes - result.first.reduce(0) { $0 + size($1) }
+        var oldest = ranges.count
+        for position in stride(from: ranges.count - 1, through: 1, by: -1) {
+            let turn = ranges[position]
+            if size(turn) <= left {
+                result.latest.insert([turn], at: 0)
+                left -= size(turn)
+                oldest = position
+            } else {
+                // The latest turn is always read, as much of it as fits.
+                if result.latest.isEmpty {
+                    result.latest = [end(of: turn, within: left)]
+                    oldest = position
+                }
+                break
+            }
+        }
+        result.leftOut = oldest - 1
+        return result
     }
 
     /// Make the summaries a page did not need, oldest first and one turn at a time, so
@@ -430,7 +530,7 @@ public actor AgentStore {
     public func fillTurns(for agentID: UUID) async {
         guard filling.insert(agentID).inserted else { return }
         defer { filling.remove(agentID) }
-        while var turns = turnCache[agentID] {
+        while var turns = turnCache.peek(agentID) {
             let starts = turns.starts(total: turns.scanned)
             let position = turns.known.count
             guard position + 1 < starts.count else { return }
@@ -444,7 +544,7 @@ public actor AgentStore {
             } catch {
                 return
             }
-            turnCache[agentID] = turns
+            turnCache.set(turns, for: agentID)
             await Task.yield()
         }
     }
@@ -457,7 +557,7 @@ public actor AgentStore {
                               _ index: TranscriptReader.Index) throws -> Turns {
         let total = index.count
         var turns: Turns
-        if let cached = turnCache[agentID] {
+        if let cached = turnCache.value(for: agentID) {
             turns = cached
         } else {
             turns = Turns(known: try readTurns(agentID))
@@ -603,12 +703,9 @@ public actor AgentStore {
 
     /// The transcript's line index, brought up to the end of the file.
     private func lineIndex(for agentID: UUID, with reader: TranscriptReader) throws -> TranscriptReader.Index {
-        var index = lineIndexes[agentID] ?? TranscriptReader.Index()
+        var index = lineIndexes.value(for: agentID) ?? TranscriptReader.Index()
         try reader.extend(&index)
-        if lineIndexes[agentID] == nil, lineIndexes.count >= Self.indexedTranscripts {
-            lineIndexes.removeAll(keepingCapacity: true)
-        }
-        lineIndexes[agentID] = index
+        lineIndexes.set(index, for: agentID)
         return index
     }
 }

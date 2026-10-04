@@ -6,7 +6,8 @@ import Foundation
 /// Built a transcript entry at a time, in order, so a session of tens of megabytes is
 /// never held whole: the first turn, the latest turns that fit and the last plan are
 /// all it keeps. Given whole when it fits the budget; otherwise the middle goes, and
-/// the history says how many turns.
+/// the history says how many turns. The daemon feeds it only the first turn and the
+/// latest it read back from the end, and says how many it skipped (#210).
 public enum SessionHistory {
     /// Characters. Over this, the middle of the conversation is left out.
     public static let budget = 80_000
@@ -146,6 +147,20 @@ public enum SessionHistory {
         /// A tool the app serves is the app's bookkeeping, not what the session did.
         private static func isTheApps(_ call: ToolCall) -> Bool {
             call.isTheApps || [call.name, call.title].contains { $0.map(AppTool.isServedByTheApp) == true }
+        }
+
+        /// The turn being read is over, though no ask follows: the next entries begin a
+        /// turn of their own (#210).
+        public mutating func endTurn() {
+            replyOpen = false
+            close()
+        }
+
+        /// `count` whole turns after the one being read were not read, to bound the read
+        /// (#210). The history says so as it does for the ones the budget leaves out.
+        public mutating func leaveOut(_ count: Int) {
+            endTurn()
+            dropped += max(0, count)
         }
 
         /// The turn being read is over: it becomes the first, or the latest kept.

@@ -2344,13 +2344,19 @@ public enum DaemonAPI {
         public init(credentialKey: String) { self.credentialKey = credentialKey }
     }
 
-    /// What an agent passes to `list_sessions` (065): nothing but who it is. Its project
-    /// is its own, never a parameter.
+    /// What an agent passes to `list_sessions` (065): who it is, and which page. Its
+    /// project is its own, never a parameter.
     public struct ListSessionsRequest: Codable, Sendable {
         public var token: String
+        /// How many sessions; nil is `SessionLookup.pageSize` (#210).
+        public var limit: Int?
+        /// The id of the last session the previous page listed; nil is the first page.
+        public var after: String?
 
-        public init(token: String) {
+        public init(token: String, limit: Int? = nil, after: String? = nil) {
             self.token = token
+            self.limit = limit
+            self.after = after
         }
     }
 

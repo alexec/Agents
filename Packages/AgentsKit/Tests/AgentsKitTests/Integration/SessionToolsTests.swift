@@ -233,7 +233,7 @@ struct SessionToolsTests {
             Issue.record("a read was not read"); return
         }
         #expect(value == "Login redirect")
-        #expect(AppService.sessionCall(named: "mcp__agents__list_sessions", nil).map { (try? $0.get()) == .list } == true)
+        #expect(AppService.sessionCall(named: "mcp__agents__list_sessions", nil).map { (try? $0.get()) == .list() } == true)
     }
 
     @Test func bothToolsAreOfferedToEveryAgentIncludingAHelper() {

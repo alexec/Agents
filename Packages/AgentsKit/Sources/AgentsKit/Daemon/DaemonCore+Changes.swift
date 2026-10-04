@@ -11,25 +11,41 @@ extension DaemonCore {
     /// Caught up from the store on every ask rather than fed as entries are written:
     /// the first ask for a long-lived agent reads its whole transcript across an
     /// `await`, and entries written in that gap would otherwise be missed, or folded
-    /// twice. Catching up by count has no gap to fall into.
+    /// twice. Catching up by count has no gap to fall into. A page at a time, so the
+    /// first ask never decodes a whole transcript at once (#210).
     func reported(for agentID: UUID) async throws -> ReportedChanges {
+        var held = reportedChanges.value(for: agentID) ?? HeldChanges()
         while true {
-            let held = reportedChanges[agentID] ?? HeldChanges()
             let count = try await store.transcriptCount(for: agentID)
-            if count <= held.through { return held.fold }
-            let page = try await store.transcript(for: agentID, before: count,
-                                                  limit: count - held.through)
-            // Another ask caught up while this one was reading. Start again from
-            // whatever it left rather than folding the same entries twice.
-            guard (reportedChanges[agentID]?.through ?? 0) == held.through else { continue }
-            var fold = held.fold
-            for (offset, entry) in page.entries.enumerated() {
-                fold.absorb(entry, at: page.firstIndex + offset)
+            if count <= held.through {
+                // Kept once caught up, not after every page: a fold the cache still holds
+                // is copied whole by the next page's first edit.
+                if held.through > (reportedChanges.peek(agentID)?.through ?? 0) {
+                    reportedChanges.set(held, for: agentID)
+                }
+                return held.fold
             }
-            reportedChanges[agentID] = HeldChanges(fold: fold, through: count)
-            return fold
+            let end = min(count, held.through + Self.changesPage)
+            let page = try await store.transcript(for: agentID, before: end, limit: end - held.through)
+            // Another ask got further while this one was reading. Go on from whatever it
+            // left rather than folding the same entries twice.
+            if let ahead = reportedChanges.peek(agentID), ahead.through > held.through {
+                held = ahead
+                continue
+            }
+            for (offset, entry) in page.entries.enumerated() {
+                held.fold.absorb(entry, at: page.firstIndex + offset)
+            }
+            held.through = end
         }
     }
+
+    /// Transcript lines folded per read when catching up (#210).
+    static let changesPage = 500
+
+    /// The most files `changes/list` names; the rest are counted (#210). A folder of
+    /// untracked build output can be thousands, each a row in every window that asks.
+    static let listedChanges = 500
 
     /// Where an agent's changes are measured from: the commit its folder is on now,
     /// taken once, as it starts. Saved without telling the windows; nothing they show
@@ -47,7 +63,12 @@ extension DaemonCore {
         guard let agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
-        return try await changes(of: agent).list
+        var list = try await changes(of: agent).list
+        if list.files.count > Self.listedChanges {
+            list.more = list.files.count - Self.listedChanges
+            list.files.removeLast(list.more ?? 0)
+        }
+        return list
     }
 
     public func changesFile(_ request: DaemonAPI.ChangesFileRequest) async throws -> ChangedFileDetail {

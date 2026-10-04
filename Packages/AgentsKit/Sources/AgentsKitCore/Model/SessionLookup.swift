@@ -54,14 +54,35 @@ public enum SessionLookup {
         return .refused(missing(value))
     }
 
-    /// What `list_sessions` says: a line for each session, the caller's marked. Its
-    /// worktree and the resources it holds are said too, so the clean-up workflow (#199)
-    /// can tell whose build output a folder is and leave a working or leasing one alone.
+    /// How many sessions a page of `list_sessions` gives when not asked, and the most it
+    /// gives when asked (#210): a project keeps hundreds, each line with its last report,
+    /// and all of them went into the calling agent's context.
+    public static let pageSize = 30
+    public static let largestPage = 100
+
+    /// What `list_sessions` says: a line for each session on the page, the caller's
+    /// marked. Its worktree and the resources it holds are said too, so the clean-up
+    /// workflow (#199) can tell whose build output a folder is and leave a working or
+    /// leasing one alone. The ones not archived come first; the page ends with how many
+    /// follow and the `after` that gives them.
     public static func list(in project: URL, agents: some Sequence<Agent>, caller: UUID?,
-                            holding: [UUID: [String]] = [:]) -> String {
-        let all = sessions(in: project, agents: agents)
-        guard !all.isEmpty else { return "There are no sessions in this project." }
-        let lines = all.map { agent -> String in
+                            holding: [UUID: [String]] = [:], limit: Int? = nil,
+                            after: String? = nil) -> String {
+        let sorted = sessions(in: project, agents: agents)
+        guard !sorted.isEmpty else { return "There are no sessions in this project." }
+        let all = sorted.filter { $0.state != .archived } + sorted.filter { $0.state == .archived }
+        var from = 0
+        if let after {
+            guard let at = all.firstIndex(where: { $0.id.uuidString == after.uppercased() }) else {
+                return "No session in this project has the id \u{201C}\(after)\u{201D} any more. "
+                    + "Call list_sessions without `after` to start again."
+            }
+            from = at + 1
+        }
+        let size = min(max(1, limit ?? pageSize), largestPage)
+        let page = all[from..<min(from + size, all.count)]
+        guard !page.isEmpty else { return "There are no more sessions in this project." }
+        let lines = page.map { agent -> String in
             let name = (agent.title.map { "\u{201C}\($0)\u{201D}" } ?? "Untitled") + (agent.id == caller ? " (you)" : "")
             var line = "- \(agent.id.uuidString): \(name) — \(PoolWords.runtimeName(agent.runtimeID)), "
                 + "\(status(of: agent)), last active \(when(agent.lastActivityAt))."
@@ -75,8 +96,17 @@ public enum SessionLookup {
             line += labels(of: agent)
             return line
         }
-        return (["Sessions in this project, most recent first. Read one with read_session, by id or exact title."]
-                + lines).joined(separator: "\n")
+        var text = (["Sessions in this project, not archived first, most recent first. "
+                     + "Read one with read_session, by id or exact title."]
+                    + lines).joined(separator: "\n")
+        let rest = all[page.endIndex...]
+        if let last = page.last, !rest.isEmpty {
+            let archived = rest.filter { $0.state == .archived }.count
+            text += "\n\n\(rest.count) more"
+                + (archived == 0 ? "" : archived == rest.count ? ", all archived" : ", \(archived) of them archived")
+                + ". For the next page, call list_sessions with after: \"\(last.id.uuidString)\"."
+        }
+        return text
     }
 
     public static func labels(of agent: Agent) -> String {
