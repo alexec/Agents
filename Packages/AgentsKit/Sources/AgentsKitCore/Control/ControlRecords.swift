@@ -53,7 +53,14 @@ public actor ControlRecords {
                 continue
             }
             if tombstones[entry.key] == entry.etag { continue }
-            guard let object = try await store.get(entry.key) else { continue }
+            let object: StoredObject
+            switch await read(entry) {
+            case .gone: continue
+            case .unreadable:
+                if let held = heldClients[entry.key] { clients[held.record.id] = held }
+                continue
+            case .read(let read): object = read
+            }
             guard let record = try? Self.decoder.decode(ClientRecord.self, from: object.data) else {
                 noteUnreadable(entry.key, etag: object.etag)
                 if let held = heldClients[entry.key] {
@@ -75,7 +82,14 @@ public actor ControlRecords {
                 continue
             }
             if tombstones[entry.key] == entry.etag { continue }
-            guard let object = try await store.get(entry.key) else { continue }
+            let object: StoredObject
+            switch await read(entry) {
+            case .gone: continue
+            case .unreadable:
+                if let held = heldHosts[entry.key] { hosts[held.record.id] = held }
+                continue
+            case .read(let read): object = read
+            }
             guard let record = try? Self.decoder.decode(HostRecord.self, from: object.data) else {
                 noteUnreadable(entry.key, etag: object.etag)
                 if let held = heldHosts[entry.key] {
@@ -95,7 +109,7 @@ public actor ControlRecords {
         unreadable = unreadable.filter { present.contains($0.key) || $0.key == Self.settingsKey }
         // A tombstone the sweep deleted is no longer one.
         tombstones = tombstones.filter { present.contains($0.key) }
-        if let object = try await store.get(Self.settingsKey) {
+        if case .read(let object) = await read(StoredKey(key: Self.settingsKey, etag: "unreadable")) {
             if let settings = try? Self.decoder.decode(ControlSettings.self, from: object.data) {
                 settingsHeld = Held(record: settings, etag: object.etag)
                 unreadable[Self.settingsKey] = nil
@@ -105,10 +119,30 @@ public actor ControlRecords {
         }
     }
 
-    private func noteUnreadable(_ key: String, etag: String) {
+    private enum Read {
+        case read(StoredObject)
+        case gone
+        case unreadable
+    }
+
+    /// One listed object (#206): one file's EACCES or EIO is that member's, not a reason
+    /// to stop reading the rest. One not readable is noted as one that can't be decoded
+    /// is, and the caller keeps what it held.
+    private func read(_ entry: StoredKey) async -> Read {
+        do {
+            guard let object = try await store.get(entry.key) else { return .gone }
+            return .read(object)
+        } catch {
+            noteUnreadable(entry.key, etag: entry.etag, because: "\(error)")
+            return .unreadable
+        }
+    }
+
+    private func noteUnreadable(_ key: String, etag: String, because why: String? = nil) {
         guard unreadable[key] != etag else { return }
         unreadable[key] = etag
-        onUnreadable?("store: \(key) could not be read; it is left as it is, and its member is refused as unavailable rather than forgotten")
+        onUnreadable?("store: \(key) could not be read\(why.map { " (\($0))" } ?? ""); it is left as it is, "
+            + "and its member is refused as unavailable rather than forgotten")
     }
 
     /// Listed, and its record could not be read: neither known nor forgotten (#171).

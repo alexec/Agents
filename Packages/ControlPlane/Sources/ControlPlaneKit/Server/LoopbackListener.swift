@@ -154,6 +154,8 @@ final class LoopbackListener: @unchecked Sendable {
                log: @escaping @Sendable (String) -> Void,
                opened: @escaping @Sendable (WebSocketLineTransport, String) -> Void) async throws -> Int {
         let box = GateBox()
+        // Its own cap, so strangers at the TLS listener never keep a browser out (#206).
+        let unproven = UnprovenGate()
         func bootstrap() -> ServerBootstrap {
             ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
                 .serverChannelOption(ChannelOptions.backlog, value: 64)
@@ -167,7 +169,7 @@ final class LoopbackListener: @unchecked Sendable {
                         return reply
                     }, upgrade: { head in
                         gate.judge(head) == .upgrade
-                    }, opened: { socket in
+                    }, unproven: unproven, opened: { socket in
                         opened(socket, gate.origin)
                     })
                 }

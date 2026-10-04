@@ -142,6 +142,23 @@ public final class WebSocketLineTransport: LineTransport, @unchecked Sendable {
         channel.closeFuture.whenComplete { _ in body() }
     }
 
+    /// Called once by `proven()`: the server's listener lifts its limits (#206).
+    var onProven: (@Sendable () -> Void)? {
+        get { lock.withLock { provenHook } }
+        set { lock.withLock { provenHook = newValue } }
+    }
+    private var provenHook: (@Sendable () -> Void)?
+
+    /// The other end proved who it is (the control plane's `ok`): its connection is no
+    /// longer held to what a stranger may send, nor counted as one (#206).
+    public func proven() {
+        let hook = lock.withLock { () -> (@Sendable () -> Void)? in
+            defer { provenHook = nil }
+            return provenHook
+        }
+        hook?()
+    }
+
     /// The address at the other end, for the log.
     public var remote: String { channel.remoteAddress?.description ?? "?" }
 }

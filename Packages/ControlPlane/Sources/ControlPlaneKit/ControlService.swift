@@ -26,7 +26,7 @@ public final class ControlService: @unchecked Sendable {
         public var machineID: String
         public var version: String
         /// Where other copies reach this one. Nil for a single copy (Agents Host's), which
-        /// takes leases all the same but links with nobody.
+        /// links with nobody and takes no leases (#206).
         public var peerURL: URL?
         /// How often a copy beats and looks for the others; shorter in tests.
         public var copyBeat: TimeInterval = CopyRecord.beatEvery
@@ -106,6 +106,8 @@ public final class ControlService: @unchecked Sendable {
     private let readAgainAt = DateBox()
     private let readiness = Readiness()
     let sockets = Sockets()
+    /// Connections to the TLS listener that have not had `ok` yet, capped (#206).
+    public let unproven = UnprovenGate()
     /// What this copy has told its relay host for each need (T097).
     let desk = NoticeDesk()
     /// Where this copy is in a handover (R16): serving, receiving, frozen or forwarding.
@@ -181,7 +183,7 @@ public final class ControlService: @unchecked Sendable {
         let bootstrap = ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
-            .childChannelInitializer { [weak self, readiness] channel in
+            .childChannelInitializer { [weak self, readiness, unproven] channel in
                 let service = self
                 return ControlWebSocketServer.configure(channel, tls: configuration.tls, reply: { head in
                     let path = head.uri.split(separator: "?").first.map(String.init) ?? ""
@@ -200,7 +202,7 @@ public final class ControlService: @unchecked Sendable {
                         return PlainReply(.ok, data)
                     default: return PlainReply(.notFound, text: "not here\n")
                     }
-                }, opened: { socket in
+                }, unproven: unproven, opened: { socket in
                     guard let service else { return socket.close() }
                     service.sockets.add(socket)
                     Task { await service.accept(socket, arrival: .tls) }
@@ -282,7 +284,9 @@ public final class ControlService: @unchecked Sendable {
             await router.closeLocal(host)
             await mesh?.released(host, epoch: epoch)
         }
-        await leases.start()
+        // A single copy (Agents Host's) has nobody to tell who holds a host (#206): no
+        // lease is taken or renewed, where it once wrote one every 10 s per host for nobody.
+        if mesh != nil { await leases.start() }
         // Copies (T064, T066).
         await router.onPresence { client, device, report in
             Task { await mesh?.broadcast(PeerWire.presence(client: client, device: device, report: report)) }
@@ -536,6 +540,8 @@ public final class ControlService: @unchecked Sendable {
                 mac: ControlCode.base64url(mac), client: admitted.client != nil, host: admitted.host,
                 relayed: relayed ? true : nil, endpoints: announced ? settings.currentEndpoints : nil,
                 epoch: settings.epoch)).line)
+            // Proved: no longer held to what a stranger may send, nor counted as one (#206).
+            socket.proven()
             // A member that says an epoch keeps a list, and takes the one just given: it
             // now holds the newer of the two. One that says none can't follow a move.
             if let held = auth.epoch {
@@ -644,10 +650,12 @@ public final class ControlService: @unchecked Sendable {
         }
         await router.attachHost(host, transport: reader)
         // This copy holds the host now (T063): every peer reaches it through here.
-        if let epoch = try? await leases.take(host) {
-            await mesh?.holding(host, epoch: epoch)
-        } else {
-            log("the store would not give \(host)'s lease to this copy; serving it anyway")
+        if let mesh {
+            if let epoch = try? await leases.take(host) {
+                await mesh.holding(host, epoch: epoch)
+            } else {
+                log("the store would not give \(host)'s lease to this copy; serving it anyway")
+            }
         }
         let reply: JSONRPCMessage
         do {

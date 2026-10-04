@@ -213,18 +213,25 @@ public enum ControlWebSocketServer {
     /// (`/healthz`, `/readyz`). `opened` is called with each WebSocket as lines.
     public static func configure(_ channel: any Channel, tls: NIOSSLContext?,
                                  plain: @escaping @Sendable (HTTPRequestHead) -> (HTTPResponseStatus, String),
+                                 unproven: UnprovenGate? = nil,
                                  opened: @escaping @Sendable (WebSocketLineTransport) -> Void) -> EventLoopFuture<Void> {
         configure(channel, tls: tls, reply: { head in let (status, text) = plain(head); return PlainReply(status, text: text) },
-                  opened: opened)
+                  unproven: unproven, opened: opened)
     }
 
     /// `upgrade` may refuse an upgrade at `/v1/connect` after reading its head (the web
     /// remote's `Host` and `Origin`, 071); a refused one is answered by `plain` instead.
+    ///
+    /// Until the WebSocket's owner calls `proven()` on it, the connection is held to
+    /// `UnprovenGuard`'s limits and holds a place in `unproven` (#206).
     public static func configure(_ channel: any Channel, tls: NIOSSLContext?,
                                  reply plain: @escaping @Sendable (HTTPRequestHead) -> PlainReply,
                                  upgrade: (@Sendable (HTTPRequestHead) -> Bool)? = nil,
+                                 unproven: UnprovenGate? = nil,
                                  opened: @escaping @Sendable (WebSocketLineTransport) -> Void) -> EventLoopFuture<Void> {
+        let guarding = UnprovenGuard(gate: unproven)
         do {
+            try channel.pipeline.syncOperations.addHandler(guarding)
             if let tls { try channel.pipeline.syncOperations.addHandler(NIOSSLServerHandler(context: tls)) }
         } catch {
             return channel.eventLoop.makeFailedFuture(error)
@@ -237,10 +244,14 @@ public enum ControlWebSocketServer {
                 return channel.eventLoop.makeSucceededFuture(wanted ? HTTPHeaders() : nil)
             },
             upgradePipelineHandler: { channel, _ in
-                channel.pipeline.addHandlers([
+                guarding.didUpgrade()
+                return channel.pipeline.addHandlers([
                     NIOWebSocketFrameAggregator(minNonFinalFragmentSize: 0, maxAccumulatedFrameCount: 100_000,
                                                 maxAccumulatedFrameSize: maxMessage),
-                    WebSocketLineHandler(isClient: false, opened: opened),
+                    WebSocketLineHandler(isClient: false) { transport in
+                        transport.onProven = { [eventLoop = channel.eventLoop] in eventLoop.execute { guarding.didProve() } }
+                        opened(transport)
+                    },
                 ])
             })
         return channel.pipeline.configureHTTPServerPipeline(

@@ -21,6 +21,11 @@
   only while the reader keeps up: past 4 MB unread the socket stops being read until it is down
   to 1 MB, so TCP pushes back on the sender.
 - **Size.** A message is at most 64 MB (`LineSplitter`'s cap).
+- **Before `ok` (#206).** A connection that has not upgraded is closed after 10 s with nothing
+  read, or 20 s in all (the TLS handshake counts). Between the upgrade and `ok` a peer may send
+  at most 64 KB, and the server's own 15 s wait for `auth` bounds it. Each listener holds at
+  most 64 connections without `ok`; past that the oldest is closed to make room, so strangers
+  that keep reconnecting never keep a member out.
 
 ## The key exchange (research R6)
 

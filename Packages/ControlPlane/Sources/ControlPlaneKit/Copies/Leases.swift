@@ -85,6 +85,10 @@ public actor Leases {
         return lease
     }
 
+    /// Each lease held, renewed. The actor is re-entered across each write (#206): a host
+    /// that reconnected took its lease afresh, or one released let it go, while the write
+    /// was out. Then the answer is about a lease no longer held, and is dropped: neither
+    /// brings a released lease back nor closes the new uplink as lost.
     func renewAll() async {
         for (host, mine) in held {
             var renewed = mine.lease
@@ -92,8 +96,18 @@ public actor Leases {
             do {
                 let etag = try await store.put(Self.key(host), try ControlRecords.encoder.encode(renewed),
                                                when: .matching(mine.etag))
+                guard held[host]?.etag == mine.etag else {
+                    // Released while out, and its mark lost to this write: marked again.
+                    if held[host] == nil {
+                        var over = renewed
+                        over.expires = Date()
+                        _ = try? await store.put(Self.key(host), try ControlRecords.encoder.encode(over), when: .matching(etag))
+                    }
+                    continue
+                }
                 held[host] = Held(etag: etag, lease: renewed)
             } catch StoreError.conflict {
+                guard held[host]?.etag == mine.etag else { continue }
                 held[host] = nil
                 await lost?(host, mine.lease.epoch)
             } catch {
