@@ -67,11 +67,31 @@ jobs:
           sdk="$(xcrun --sdk macosx --show-sdk-build-version)"
           echo "fingerprint=${version}-sdk${sdk}" >> "$GITHUB_OUTPUT"
 
+      # The Xcode and SwiftPM keys end in a hash of the sources their builds read (#269).
+      # They used to hash only project.yml and the package manifests, so a change to the
+      # sources still found an exact key: the old build was restored, the save after it
+      # was skipped as a hit, and every run built on that one stale graph until someone
+      # deleted the cache by hand. Now new sources miss their exact key, start warm from
+      # the nearest restore-key, and save a key of their own. `git ls-tree` names each
+      # folder by its tree hash, so this costs nothing and changes exactly when a file
+      # under one of them does. (AgentsKit's key already hashes its sources.)
+      - name: Cache keys
+        id: keys
+        env:
+          MANIFESTS: ${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+        run: |
+          xcode="$(git ls-tree HEAD -- project.yml App Daemon Host Packages Remote RemoteNotify RemoteWidget Shared Web/dist | git hash-object --stdin)"
+          swiftpm="$(git ls-tree HEAD -- Daemon Packages/AgentsKit Packages/CodeText | git hash-object --stdin)"
+          echo "base=${{ steps.toolchain.outputs.fingerprint }}-${MANIFESTS}" >> "$GITHUB_OUTPUT"
+          echo "xcode=${xcode}" >> "$GITHUB_OUTPUT"
+          echo "swiftpm=${swiftpm}" >> "$GITHUB_OUTPUT"
+
       # Restore Xcode and SwiftPM products from separate caches. The Xcode cache
       # can be saved as soon as both app builds finish.
       #
-      # Each falls back from its own key, to the newest of its kind for this
-      # toolchain, and only then to a -partial- of its kind, which is what a build that
+      # Each falls back from its own key, to the newest built from the same manifests,
+      # to the newest of its kind for this toolchain, and only then to a -partial- of
+      # its kind, which is what a build that
       # ran out of time leaves behind. There is deliberately no key that ignores the
       # fingerprint: that is the one that let a graph from the old image be restored
       # under a new one.
@@ -80,9 +100,9 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: build/DD
-          key: macos-xcode-27-derived-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          key: macos-xcode-27-derived-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.xcode }}
           restore-keys: |
-            macos-xcode-27-derived-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}-
+            macos-xcode-27-derived-${{ steps.keys.outputs.base }}-
             macos-xcode-27-derived-${{ steps.toolchain.outputs.fingerprint }}-
             macos-xcode-27-derived-partial-${{ steps.toolchain.outputs.fingerprint }}-
 
@@ -93,9 +113,9 @@ jobs:
           path: |
             Daemon/.build
             Packages/CodeText/.build
-          key: macos-xcode-27-swiftpm-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          key: macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.swiftpm }}
           restore-keys: |
-            macos-xcode-27-swiftpm-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}-
+            macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-
             macos-xcode-27-swiftpm-${{ steps.toolchain.outputs.fingerprint }}-
             macos-xcode-27-swiftpm-partial-${{ steps.toolchain.outputs.fingerprint }}-
 
@@ -127,10 +147,18 @@ jobs:
         if: steps.test-selection.outputs.agentskit != 'skip'
         run: python3 scripts/normalize-metaltoolchain-cache.py Packages/AgentsKit/.build
 
+      # Every build below that starts from a restored cache gets one more go from clean
+      # when it fails (scripts/ci-clean-retry.sh says why). The step only fails, and so
+      # is only kept from the cache, when the clean build fails as well.
       - name: Build AgentsKit tests
         id: build-agentskit
         if: steps.test-selection.outputs.agentskit != 'skip'
-        run: swift build --build-tests --package-path Packages/AgentsKit
+        env:
+          RESTORED: ${{ steps.agentskit-cache.outputs.cache-matched-key }}
+        run: |
+          source scripts/ci-clean-retry.sh
+          clean_retry "$RESTORED" Packages/AgentsKit/.build -- \
+            swift build --build-tests --package-path Packages/AgentsKit
 
       # A build that failed is never saved. What it leaves behind is exactly the state
       # that fails again, and restoring that is how one red run used to wedge every run
@@ -160,20 +188,30 @@ jobs:
       # carries agentsd and agents-control; the window is the App Store build.
       - name: Build Agents Host and the window (macOS)
         id: build-mac
+        env:
+          RESTORED: ${{ steps.xcode-cache.outputs.cache-matched-key }}
         run: |
-          xcodebuild build -project Agents.xcodeproj -scheme AgentsHost \
-            -destination 'platform=macOS' -derivedDataPath build/DD \
-            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
-          xcodebuild build -project Agents.xcodeproj -scheme AgentsStore \
-            -destination 'platform=macOS' -derivedDataPath build/DD \
-            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
+          source scripts/ci-clean-retry.sh
+          build() {
+            xcodebuild build -project Agents.xcodeproj -scheme AgentsHost \
+              -destination 'platform=macOS' -derivedDataPath build/DD \
+              -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO &&
+            xcodebuild build -project Agents.xcodeproj -scheme AgentsStore \
+              -destination 'platform=macOS' -derivedDataPath build/DD \
+              -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
+          }
+          clean_retry "$RESTORED" build/DD -- build
 
       - name: Build Remote (iOS Simulator)
         id: build-remote
-        run: >
-          xcodebuild build -project Agents.xcodeproj -scheme Remote
-          -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD
-          -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
+        env:
+          RESTORED: ${{ steps.xcode-cache.outputs.cache-matched-key }}
+        run: |
+          source scripts/ci-clean-retry.sh
+          clean_retry "$RESTORED" build/DD -- \
+            xcodebuild build -project Agents.xcodeproj -scheme Remote \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD \
+            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
 
       # Only when both app builds actually ran. They are skipped whenever an earlier
       # step fails, and a skipped step used to read as "not successful", so a job that
@@ -183,7 +221,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: build/DD
-          key: macos-xcode-27-derived-${{ (steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success') && format('{0}-{1}', steps.toolchain.outputs.fingerprint, hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved')) || format('partial-{0}-{1}-{2}-{3}', steps.toolchain.outputs.fingerprint, hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved'), github.run_id, github.run_attempt) }}
+          key: macos-xcode-27-derived-${{ (steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success') && format('{0}-{1}', steps.keys.outputs.base, steps.keys.outputs.xcode) || format('partial-{0}-{1}-{2}-{3}', steps.keys.outputs.base, steps.keys.outputs.xcode, github.run_id, github.run_attempt) }}
 
       # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
       # a whole Swift build inside the test run, holding a test thread for minutes,
@@ -191,7 +229,12 @@ jobs:
       - name: Build agentsd for the tests
         id: build-agentsd
         if: steps.test-selection.outputs.agentskit != 'skip'
-        run: swift build --package-path Daemon --product agentsd
+        env:
+          RESTORED: ${{ steps.swiftpm-cache.outputs.cache-matched-key }}
+        run: |
+          source scripts/ci-clean-retry.sh
+          clean_retry "$RESTORED" Daemon/.build -- \
+            swift build --package-path Daemon --product agentsd
 
       # How long the runner's login shell takes to say its PATH. The app reads it
       # once per process, synchronously, the first time anything looks a runtime up.
@@ -203,7 +246,12 @@ jobs:
       - name: Build CodeText tests
         id: build-codetext
         if: steps.test-selection.outputs.codetext != 'skip'
-        run: swift build --build-tests --package-path Packages/CodeText
+        env:
+          RESTORED: ${{ steps.swiftpm-cache.outputs.cache-matched-key }}
+        run: |
+          source scripts/ci-clean-retry.sh
+          clean_retry "$RESTORED" Packages/CodeText/.build -- \
+            swift build --build-tests --package-path Packages/CodeText
 
       - name: Save SwiftPM build cache
         # This combined cache contains both paths below. Save it only when both
@@ -215,7 +263,7 @@ jobs:
           path: |
             Daemon/.build
             Packages/CodeText/.build
-          key: macos-xcode-27-swiftpm-${{ (steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success') && format('{0}-{1}', steps.toolchain.outputs.fingerprint, hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved')) || format('partial-{0}-{1}-{2}-{3}', steps.toolchain.outputs.fingerprint, hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved'), github.run_id, github.run_attempt) }}
+          key: macos-xcode-27-swiftpm-${{ (steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success') && format('{0}-{1}', steps.keys.outputs.base, steps.keys.outputs.swiftpm) || format('partial-{0}-{1}-{2}-{3}', steps.keys.outputs.base, steps.keys.outputs.swiftpm, github.run_id, github.run_attempt) }}
 
       - name: Test CodeText
         if: steps.test-selection.outputs.codetext != 'skip'
