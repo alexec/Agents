@@ -112,7 +112,7 @@ extension DaemonCore {
         }
         if levels != eventState.diskLevels ?? [:] {
             eventState.diskLevels = levels
-            eventStore.saveState(eventState)
+            saveEventState()
         }
         if alarms != diskAlarms {
             diskAlarms = alarms

@@ -21,11 +21,23 @@ extension DaemonCore {
         case .new(let event):
             // The next position is written before the event is, so a daemon killed
             // between the two leaves a gap, never one position given out twice (R6).
+            // A block at a time (#218): the file says the end of the block, and is
+            // written again only when the block is used up.
             eventState.nextPosition = event.position + 1
-            eventStore.saveState(eventState)
+            if eventState.nextPosition > eventPositionsReserved {
+                eventPositionsReserved = eventState.nextPosition + Self.eventPositionBlock
+                saveEventState()
+            }
             eventStore.append(.event(event))
+            // Held to the maximum as it grows, not only at load and on the hour (#218).
+            if eventLog.events.count > EventLog.maximumEvents + Self.eventCapMargin { pruneEvents() }
         case .repeated(let event):
             eventStore.append(.repeatOf(event.position, at: event.latest, count: event.count))
+            // A repeat is a line each time; the file is written afresh, one line for
+            // each event's repeats, before they outgrow the events (#218).
+            if eventStore.linesSinceRewrite > EventLog.maximumEvents + Self.eventCapMargin {
+                eventStore.rewrite(eventLog)
+            }
         }
         let event = appended.event
         broadcastEvents(event)
@@ -203,12 +215,41 @@ extension DaemonCore {
         // A state file lost or older than the log must never hand out a position the
         // log already has.
         if eventState.nextPosition <= eventLog.head { eventState.nextPosition = eventLog.head + 1 }
+        eventPositionsReserved = eventState.nextPosition
         pruneEvents()
         startPruningEvents()
     }
 
     func pruneEvents() {
         if eventLog.prune(now: now()) { eventStore.rewrite(eventLog) }
+    }
+
+    /// How many positions are reserved at a time.
+    static let eventPositionBlock: EventPosition = 64
+    /// How far past `EventLog.maximumEvents` the log may grow before it is cut back,
+    /// so a log at the maximum is not rewritten on every event.
+    static let eventCapMargin = 500
+
+    /// `events-state.json`, saying the end of the reserved block as the next position,
+    /// so a restart never hands out one already given. Written only when it changed.
+    func saveEventState() {
+        var saved = eventState
+        saved.nextPosition = max(eventState.nextPosition, eventPositionsReserved)
+        eventStore.saveState(saved)
+    }
+
+    /// Drop what the sources remember of what has gone (#218): publishes past their
+    /// hour, and the branch tips of folders that are no longer projects.
+    func pruneEventState() {
+        loadEventsIfNeeded()
+        let at = now()
+        let projects = Set(projectFolders().map { Project.standardize($0).path })
+        eventState.publishes = eventState.publishes.compactMapValues { dates in
+            let recent = dates.filter { at.timeIntervalSince($0) < 3600 }
+            return recent.isEmpty ? nil : recent
+        }
+        eventState.branchTips = eventState.branchTips.filter { projects.contains($0.key) }
+        saveEventState()
     }
 
     private func startPruningEvents() {

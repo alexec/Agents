@@ -445,6 +445,10 @@ public actor DaemonCore {
     /// The next position, and what the sources remember between runs.
     var eventState = EventState()
     var eventLogIsLoaded = false
+    /// The position `events-state.json` has handed out up to (#218): positions are
+    /// reserved a block at a time, so the file is written once per block rather than
+    /// once per event.
+    var eventPositionsReserved: EventPosition = 0
     /// `wait_for_event` calls still open, by the agent that made them. One each at
     /// most, as an agent has one wait at most (FR-007).
     var openEventWaits: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
@@ -566,6 +570,10 @@ public actor DaemonCore {
     /// Every project's workflows, by folder and then by id. Read from disk, kept here
     /// so a tick does not touch the file system once per workflow per fifteen seconds.
     var workflows: [URL: [String: Workflow]] = [:]
+    /// Each workflow file's SHA-256 by path, with the stamp it was taken at (#218).
+    var workflowDigests: [String: (stamp: DigestStamp, digest: String)] = [:]
+    /// How many workflow files have been read and hashed, for the tests.
+    var workflowDigestReads = 0
     /// One watch per live project, for its workflows, Dashboard, settings, pins and
     /// branches alike (#173). What makes a file written by hand appear without the app
     /// being restarted.

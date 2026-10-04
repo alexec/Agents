@@ -20,6 +20,14 @@ public final class EventStore: @unchecked Sendable {
     private let locations: StoreLocations
     private let lock = NSLock()
     private var handle: FileHandle?
+    /// Lines appended since the file was last written whole, and the repeat lines it
+    /// held when read: what tells a log of repeats it is due to be compacted (#218).
+    private var appendedLines = 0
+    /// `events-state.json` as last read or written, so the same state is not written
+    /// twice (#218).
+    private var savedState: EventState?
+    /// How many times `events-state.json` has been written, for the tests.
+    private(set) var stateWrites = 0
 
     public init(locations: StoreLocations) {
         self.locations = locations
@@ -70,8 +78,11 @@ public final class EventStore: @unchecked Sendable {
 
     // MARK: The log
 
+    public var linesSinceRewrite: Int { lock.withLock { appendedLines } }
+
     public func load() -> EventLog {
         lock.lock(); defer { lock.unlock() }
+        appendedLines = 0
         // A read error is tried again, then holds the log for the run: the hourly prune's
         // rewrite would otherwise replace it with nothing (#205). Appends still land.
         guard case .read(let data) = StoreFile.read(at: locations.events, meaning: "starting with no events",
@@ -79,6 +90,7 @@ public final class EventStore: @unchecked Sendable {
         var log = EventLog()
         var unreadable = 0
         var torn = false
+        var repeats = 0
         let lines = data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
         for (index, bytes) in lines.enumerated() {
             guard let line = try? StoreCoding.decoder.decode(Line.self, from: Data(bytes)) else {
@@ -89,9 +101,14 @@ public final class EventStore: @unchecked Sendable {
             switch line {
             case .event(let event): log.insert(event)
             case .consequence(let consequence, let position): log.addConsequence(consequence, to: position)
-            case .repeatOf(let position, let at, let count): log.applyRepeat(of: position, at: at, count: count)
+            case .repeatOf(let position, let at, let count):
+                log.applyRepeat(of: position, at: at, count: count)
+                repeats += 1
             }
         }
+        // Repeat lines read are counted as appended: a file grown long on them is
+        // compacted at the next repeat.
+        appendedLines = repeats
         if unreadable > 0 && log.events.isEmpty {
             try? handle?.close()
             handle = nil
@@ -118,6 +135,7 @@ public final class EventStore: @unchecked Sendable {
         do {
             // One write: with O_APPEND the line lands at the end whole, or not at all.
             try openHandle().write(contentsOf: data)
+            appendedLines += 1
         } catch {
             try? self.handle?.close()
             self.handle = nil
@@ -143,6 +161,7 @@ public final class EventStore: @unchecked Sendable {
             try? handle?.close()
             handle = nil
             try StoreFile.write(data, to: locations.events)
+            appendedLines = 0
         } catch {
             DaemonLog.shared.write("events.jsonl: could not rewrite: \(error.localizedDescription)")
         }
@@ -175,13 +194,20 @@ public final class EventStore: @unchecked Sendable {
     // MARK: The sources' memory
 
     public func loadState() -> EventState {
-        return StoreFile.load(EventState.self, at: locations.eventState, empty: EventState(), meaning: "starting afresh")
+        let state = StoreFile.load(EventState.self, at: locations.eventState, empty: EventState(), meaning: "starting afresh")
+        lock.withLock { savedState = state }
+        return state
     }
 
+    /// Written only when it differs from what was last read or written.
     public func saveState(_ state: EventState) {
+        lock.lock(); defer { lock.unlock() }
+        guard state != savedState else { return }
         do {
             try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
             try StoreFile.write(StoreCoding.encoder.encode(state), to: locations.eventState)
+            savedState = state
+            stateWrites += 1
         } catch {
             DaemonLog.shared.write("events-state.json: could not save: \(error.localizedDescription)")
         }

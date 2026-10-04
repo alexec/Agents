@@ -42,6 +42,8 @@ extension DaemonCore {
             }
             record.keeperChanges.append(KeeperChange(at: at, from: keeperWords(held, in: project),
                                                      to: keeperWords(keeper, in: project)))
+            // The latest few, not every change there has ever been (#218).
+            record.keeperChanges = Array(record.keeperChanges.suffix(DashboardState.keeperChangesKept))
             notes.append("You keep this tile now; it was \(keeperWords(held, in: project))'s.")
         }
         if existing == nil {
@@ -89,6 +91,11 @@ extension DaemonCore {
         record.set = at
         record.hash = written.hash
         state.tiles[check.id] = record
+        // Every agent's sets past their hour go with this one's (#218).
+        state.sets = state.sets.compactMapValues { dates in
+            let kept = dates.filter { at.timeIntervalSince($0) < 3600 }
+            return kept.isEmpty ? nil : kept
+        }
         state.sets[callerKey] = recent + [at]
         if let removal = state.removals.removeValue(forKey: check.id),
            at.timeIntervalSince(removal.at) < TileLimits.removalKept {
