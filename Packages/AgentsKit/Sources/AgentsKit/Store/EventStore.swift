@@ -10,8 +10,11 @@ import AgentsKitCore
 /// the oldest events are dropped, through a temporary file and a rename, so a daemon
 /// killed mid-rewrite leaves the old file whole.
 ///
-/// A torn last line — a daemon killed mid-append — is dropped on reading. A file that
-/// cannot be read at all is set aside and the log starts empty: losing the record of
+/// Each line goes to the file in one `write` on a descriptor opened with `O_APPEND`, so
+/// a line is never split by another and always lands at the end. A torn last line — a
+/// daemon killed mid-write — is skipped on reading, with one line in the log, and ended
+/// with a newline before the next append, so it never swallows the event after it
+/// (#177). A file that cannot be read at all is set aside and the log starts empty: losing the record of
 /// what happened is the lesser failure, beside a daemon that will not start.
 public final class EventStore: @unchecked Sendable {
     private let locations: StoreLocations
@@ -72,11 +75,12 @@ public final class EventStore: @unchecked Sendable {
         guard let data = try? Data(contentsOf: locations.events) else { return EventLog() }
         var log = EventLog()
         var unreadable = 0
+        var torn = false
         let lines = data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
         for (index, bytes) in lines.enumerated() {
             guard let line = try? StoreCoding.decoder.decode(Line.self, from: Data(bytes)) else {
                 // The last line may be torn; anything else unreadable is counted.
-                if index != lines.count - 1 { unreadable += 1 }
+                if index == lines.count - 1 { torn = true } else { unreadable += 1 }
                 continue
             }
             switch line {
@@ -94,6 +98,9 @@ public final class EventStore: @unchecked Sendable {
         if unreadable > 0 {
             DaemonLog.shared.write("events.jsonl: skipped \(unreadable) unreadable line(s)")
         }
+        if torn {
+            DaemonLog.shared.write("events.jsonl: skipped a torn last line (\(lines.last?.count ?? 0) bytes), from a daemon stopped mid-write")
+        }
         return log
     }
 
@@ -102,9 +109,8 @@ public final class EventStore: @unchecked Sendable {
         guard var data = try? StoreCoding.encoder.encode(line) else { return }
         data.append(UInt8(ascii: "\n"))
         do {
-            let handle = try openHandle()
-            try handle.seekToEnd()
-            try handle.write(contentsOf: data)
+            // One write: with O_APPEND the line lands at the end whole, or not at all.
+            try openHandle().write(contentsOf: data)
         } catch {
             try? self.handle?.close()
             self.handle = nil
@@ -135,15 +141,28 @@ public final class EventStore: @unchecked Sendable {
         }
     }
 
+    /// The log, opened for appending. A file that does not end with a newline ends with
+    /// a torn line, and is given one first, so the next line starts on a line of its own.
     private func openHandle() throws -> FileHandle {
         if let handle { return handle }
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        if !FileManager.default.fileExists(atPath: locations.events.path) {
-            _ = FileManager.default.createFile(atPath: locations.events.path, contents: nil)
+        let fd = open(locations.events.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o644)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        let opened = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        if Self.endsTorn(locations.events) {
+            try opened.write(contentsOf: Data([UInt8(ascii: "\n")]))
         }
-        let opened = try FileHandle(forWritingTo: locations.events)
         handle = opened
         return opened
+    }
+
+    /// Whether the file has bytes and its last is not a newline.
+    static func endsTorn(_ url: URL) -> Bool {
+        guard let reading = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? reading.close() }
+        guard let end = try? reading.seekToEnd(), end > 0 else { return false }
+        try? reading.seek(toOffset: end - 1)
+        return (try? reading.read(upToCount: 1)) != Data([UInt8(ascii: "\n")])
     }
 
     // MARK: The sources' memory
