@@ -53,6 +53,11 @@ public enum DaemonAPI {
         /// `permissions/pending` and for the same reason: a surface that was not
         /// listening is put right rather than left guessing.
         public static let attentionPending = "attention/pending"
+        /// What a client catching up after a connection needs before anything else, in
+        /// one answer (#175): the live projects, the first page of live agents, and what is
+        /// waiting on a person. A host from before it answers method-not-found, and the
+        /// client asks for each part on its own.
+        public static let clientCatchUp = "client/catchUp"
         /// A remote saying which device it is, once, right after it connects. The
         /// server takes the identity from this and then owns it: every later request
         /// on the connection is that device's, and `presence/report` never carries it

@@ -47,6 +47,14 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         total == other.total && sessions == other.sessions
     }
 
+    /// Whether this replaces `existing` on disk: when it says something else, or says the
+    /// same but `existing` is old enough that the widget would soon call it stale while
+    /// the app is connected and knows it is still true (#175).
+    public func needsWriting(over existing: AttentionSnapshot?) -> Bool {
+        guard let existing, saysTheSame(as: existing) else { return true }
+        return writtenAt.timeIntervalSince(existing.writtenAt) >= Self.staleness / 3
+    }
+
     /// Whether this number is old enough that claiming it is current would be a lie
     /// (FR-017).
     public func isStale(at now: Date = Date()) -> Bool {

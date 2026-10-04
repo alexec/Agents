@@ -56,7 +56,12 @@ struct FilesPane: View {
                 }
             }
         }
-        .task { await start() }
+        .task {
+            await start()
+            // The folder is watched while the pane shows it, and let go when it goes (#175).
+            await untilCancelled()
+            await model.files.unwatch(agentID: agent.id, folder: agent.cwd)
+        }
         .onChange(of: state.openFile) { _, url in
             guard let url else { return }
             state.place.opened(url, fromRow: url == chosenFromRow)

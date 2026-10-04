@@ -14,6 +14,11 @@ struct EventsListView: View {
     @State private var scope: EventScope?
     @State private var picked: Event?
 
+    private struct Ask: Equatable {
+        var filter: EventFilter
+        var connected: Bool
+    }
+
     private var filter: EventFilter { EventFilter(scope: scope) }
 
     /// The Mac sends pages already narrowed; narrowing here too keeps the list right in
@@ -70,7 +75,11 @@ struct EventsListView: View {
             }
         }
         .refreshable { await model.refreshEvents(filter) }
-        .task(id: filter) { await model.refreshEvents(filter) }
+        // Read as it opens, as the filter changes, and as the Mac is back (#175): not on
+        // every connection while it is shut.
+        .task(id: Ask(filter: filter, connected: model.isConnected)) {
+            if model.isConnected { await model.refreshEvents(filter) }
+        }
         .sheet(item: $picked) { event in
             EventSheet(event: event, scopeName: scopeName(event.scope))
         }
