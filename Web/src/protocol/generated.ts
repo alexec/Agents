@@ -1262,6 +1262,7 @@ export interface RuntimeStatus {
   checkedAt: WireDate;
   outdated: boolean;
   poolNote?: string;
+  isOut?: boolean;
 }
 
 export type SandboxChoice = "runtime" | "on" | "off";
@@ -1272,6 +1273,10 @@ export interface SandboxFailureRecord {
   hang: boolean;
   recoveryOffered: boolean;
   completedToolCalls: number;
+}
+
+export interface SandboxSettings {
+  defaults: Record<string, SandboxChoice>;
 }
 
 export type SandboxState = "on" | "off" | "runtimeControlled" | "none";
@@ -1984,6 +1989,7 @@ export interface Methods {
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
+  "sandbox/state": { params: Empty; result: SandboxSettings };
   "store/notes": { params: Empty; result: StoreNotes };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
   "views/call": { params: ViewCallRequest; result: JSONValue };
@@ -2072,6 +2078,7 @@ export const MethodTarget = {
   "projects/list": "host",
   "runtimes/accounts": "host",
   "runtimes/list": "host",
+  "sandbox/state": "host",
   "store/notes": "host",
   "surface/identify": "host",
   "views/call": "host",
@@ -2246,8 +2253,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RetiredRequest: { required: [], optional: ["folder", "ids", "limit"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
-  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote"] },
+  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
+  SandboxSettings: { required: ["defaults"], optional: [] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
