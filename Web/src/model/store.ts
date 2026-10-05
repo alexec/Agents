@@ -21,6 +21,7 @@ import { sortedRuntimes } from "./runtimes";
 import { blockLines, openBlock } from "./block";
 import { DashboardOrderSync } from "./dashboardOrderSync";
 import { Drafts } from "./drafts";
+import { scopeRoot, WatchCounts } from "./fileWatch";
 
 export { folderKey } from "./groups";
 
@@ -1267,12 +1268,40 @@ export class Store extends Work {
     return this.link.call("files/read", { agentID: agentID as UUID, path, ...(knownStamp ? { knownStamp } : {}) }, host);
   }
 
+  /** Panes holding one folder watch. The host watches the agent's folder, so two paths inside it are one watch. */
+  private fileWatches = new WatchCounts();
+  /** The root each watch was given, newest last, so leaving releases that one if the agent's folder has since moved. */
+  private watchedRoot = new Map<string, string[]>();
+
+  /**
+   * Watch the agent's folder that holds `folder`. Counted, so a file open under Files and the
+   * tree beside it share one watch, and closing the file does not stop the tree's (#258).
+   */
   watchFolder(host: string, agentID: string, folder: string): void {
-    void this.link.call("files/watch", { agentID: agentID as UUID, folder }, host).catch(() => {});
+    const root = this.watchRoot(host, agentID, folder);
+    const caller = `${host}|${agentID}|${folder}`;
+    const held = this.watchedRoot.get(caller) ?? [];
+    held.push(root);
+    this.watchedRoot.set(caller, held);
+    if (this.fileWatches.watch(`${host}|${agentID}|${root}`)) {
+      void this.link.call("files/watch", { agentID: agentID as UUID, folder: root }, host).catch(() => {});
+    }
   }
 
   unwatchFolder(host: string, agentID: string, folder: string): void {
-    void this.link.call("files/unwatch", { agentID: agentID as UUID, folder }, host).catch(() => {});
+    const caller = `${host}|${agentID}|${folder}`;
+    const held = this.watchedRoot.get(caller);
+    const root = held?.pop() ?? this.watchRoot(host, agentID, folder);
+    if (held && held.length === 0) this.watchedRoot.delete(caller);
+    if (this.fileWatches.unwatch(`${host}|${agentID}|${root}`)) {
+      void this.link.call("files/unwatch", { agentID: agentID as UUID, folder: root }, host).catch(() => {});
+    }
+  }
+
+  /** The folder the host actually watches for this path: the agent's own, or an extra one it was given. */
+  private watchRoot(host: string, agentID: string, folder: string): string {
+    const agent = (this.agents.peek()[host] ?? []).find((item) => item.id === agentID);
+    return agent ? scopeRoot(agent.cwd, agent.additionalDirectories ?? [], folder) : folder;
   }
 
   changes(host: string, agentID: string) {

@@ -25,6 +25,7 @@ import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
 import { CallActionsContext, detailSummaries, detailTitles, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
 import { setPane } from "./files/paneState";
+import { focusedEntry } from "../model/focus";
 import { ViewLayerContext } from "./chat/AppView";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { BackToList } from "./BackToList";
@@ -188,6 +189,27 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     }
     if (el.scrollTop < 400) void earlier();
   };
+
+  // Asked for from Exchanged. A message is drawn with its entry's id. Being sent to one
+  // is being sent away from the end, or the pane would scroll straight back off it.
+  const focus = focusedEntry.value;
+  useLayoutEffect(() => {
+    if (!focus) return;
+    const root = scroller.current;
+    const mark = root && [...root.querySelectorAll("[data-entry]")].find((el) => el.getAttribute("data-entry") === focus);
+    const target = mark && getComputedStyle(mark).display === "contents" ? mark.firstElementChild ?? mark : mark;
+    if (target) {
+      follow(false);
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+      focusedEntry.value = null;
+      return;
+    }
+    const turn = rows.find((item) => item.ask?.id === focus || item.items.some((part) => part.id === focus));
+    if (turn && (chosen.value[turn.id] ?? level.value) === "outcome") {
+      follow(false);
+      chosen.value = { ...chosen.value, [turn.id]: "steps" };
+    }
+  }, [focus, rows, level.value, chosen.value]);
 
   const toEnd = () => {
     const el = scroller.current;

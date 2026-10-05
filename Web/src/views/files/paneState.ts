@@ -3,7 +3,7 @@
 // where it was.
 import { signal } from "@preact/signals";
 
-export type Tab = "files" | "changes" | "page";
+export type Tab = "files" | "changes" | "page" | "exchanged";
 
 export interface PaneState {
   tab: Tab;
@@ -64,7 +64,18 @@ export type TextShownAs = "picture" | "page" | "source" | "text";
 export function textShownAs(path: string): TextShownAs {
   const ext = extensionOf(path);
   if (ext === "svg") return "picture";
-  if (ext === "md" || ext === "markdown") return "page";
+  // The same names the window treats as a page (ShownFile.markdownExtensions).
+  if (ext === "md" || ext === "markdown" || ext === "mdown" || ext === "mkd") return "page";
   if (ext === "html" || ext === "htm" || ext === "xhtml") return "source";
   return "text";
+}
+
+/**
+ * The open file the Files bar can pin (#159, #258): a page on the Page tab, or a file open
+ * under Files, HTML included. The button itself still refuses anything that is not a page.
+ */
+export function fileToPin(pane: PaneState): string | undefined {
+  if (pane.tab === "files") return pane.file;
+  if (pane.tab === "page") return pane.page;
+  return undefined;
 }

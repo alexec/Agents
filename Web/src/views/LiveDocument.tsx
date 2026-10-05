@@ -4,12 +4,13 @@
 // they type is merged with whatever the agent wrote meanwhile (PassageMerge) and written back
 // through `artifact/write`, as the window writes it. While they type, the page doesn't move.
 import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { FileReading, FileStamp } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
+import { pictureFromReading } from "../model/pageImage";
 import { indexContaining, merge, split, type Passage } from "../model/passages";
-import { Markdown } from "../render/markdown";
+import { Markdown, type PageImages } from "../render/markdown";
 import { nameOf } from "./files/paneState";
 
 type Loaded =
@@ -168,6 +169,12 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
     if (el && document.activeElement !== el) el.focus();
   };
 
+  // Pictures beside this page, read again when its folder changes. A remote one stays a placeholder.
+  const images: PageImages = useMemo(() => ({
+    document: path,
+    revision: page.changed ?? 0,
+    read: (file) => store.readFile(host, agentID, file).then((r) => pictureFromReading(file, r), () => null),
+  }), [path, page.changed, host, agentID, store]);
   const state = loaded.value;
   const text = state.kind === "text" ? state.text : state.kind === "gone" ? state.last : "";
   const passages = split(text);
@@ -182,7 +189,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
       {theirs.value && (
         <div class="note switch" role="status">
           <p class="strong">The agent changed this passage while you were typing. What it wrote:</p>
-          <div class="quiet"><Markdown text={theirs.value} /></div>
+          <div class="quiet"><Markdown text={theirs.value} images={images} /></div>
           <button class="link" onClick={() => (theirs.value = null)}>OK</button>
         </div>
       )}
@@ -213,7 +220,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
                   editing.value = { base: text, mine: passage, index, draft: passage.source };
                 }
               }}>
-              <Markdown text={passage.source} />
+              <Markdown text={passage.source} images={images} />
             </div>
           );
         })}
