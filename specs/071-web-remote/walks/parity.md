@@ -225,11 +225,11 @@ The deltas are tracked by 31 issues:
 |---|---|---|---|---|
 | Dashboard row and page (#122) | `A/Dashboard/DashboardPage.swift` | `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx` | **same** |
 | Tile kinds, sparklines, greying when stale | `S/Dashboard/TileCard.swift` | Shared | `W/views/Dashboard.tsx:259-305` | **same** |
-| Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | None | All but *Greyed after*: `W/views/Dashboard.tsx:356-381` | **delta**: Remote #246; web #246 |
-| Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Hide and Remove; nothing brings one back: `R/Dashboard/DashboardPage.swift:70-74, 187-193` | `W/views/Dashboard.tsx:75-79, 241-244` | **delta**: Remote #246 |
-| Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items; no section moves: `R/Dashboard/DashboardPage.swift:198-223` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **delta**: Remote #246 (section moves). No drag on the Remote: **by design** |
+| Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | Details… in the tile's long-press menu; same detail and History rows: `R/Dashboard/DashboardPage.swift` | All rows, including *Greyed after*: `W/views/Dashboard.tsx` | **same** |
+| Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Toggle above tiles; Hide, Show and Remove in the long-press menu: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:75-79, 241-244` | **same** |
+| Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items and section heading's Move Section Up / Down; no drag: `R/Dashboard/DashboardPage.swift` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **same** (no drag on the Remote: **by design**) |
 | Update now (#146) | `A/Dashboard/DashboardPage.swift:98-136` | In the toolbar: `R/Dashboard/DashboardPage.swift:103-158` | `W/views/Dashboard.tsx:137-169` | **same** |
-| *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | None | `W/views/Dashboard.tsx:87-88` | **delta**: Remote #246 |
+| *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | Under the update line: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:87-88` | **same** |
 | A store file set aside, said (#171); the footer sentence (#127) | `A/Dashboard/DashboardPage.swift:24-29, 47-50` | `R/Dashboard/DashboardPage.swift:65-69, 88-92` | `W/views/Dashboard.tsx:90, 129` | **same** |
 | Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
 | A pinned Markdown page, live | `A/Dashboard/PinnedPage.swift:104-106` | `R/Dashboard/PinnedPage.swift:100-131` | `W/views/Pins.tsx:111-133` | **same** |
