@@ -1053,9 +1053,10 @@ public actor DaemonCore {
             // Held open only while a runtime is writing to it (#209).
             bytes = try await store.append(entry, for: agentID, keepOpen: live[agentID] != nil)
         } catch {
-            // The window still shows it; a restart would not. Said, so a full disk is
-            // found out rather than as lines missing from a conversation (073, #88).
-            lost(error, keeping: "a line of \(agents[agentID]?.title ?? "a session")'s chat")
+            // The store holds it until there is space (#212), but only in memory: a
+            // restart would lose it. Said, so a full disk is found out rather than as
+            // lines missing from a conversation (073, #88).
+            lost(error, keeping: "the newest lines of \(agents[agentID]?.title ?? "a session")'s chat (held until there is space)")
         }
         if var agent = agents[agentID] {
             agent.lastActivityAt = entry.at

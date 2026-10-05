@@ -378,18 +378,7 @@ extension StoreCoding {
         let folder = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let temporary = folder.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
-        /// What Foundation's own write throws, with the errno underneath, so a refusal
-        /// still says why (`WriteFailure`: full, not allowed, read-only).
-        func failure(_ code: Int32) -> CocoaError {
-            let kind: CocoaError.Code = switch code {
-            case ENOSPC, EDQUOT: .fileWriteOutOfSpace
-            case EACCES, EPERM: .fileWriteNoPermission
-            case EROFS: .fileWriteVolumeReadOnly
-            default: .fileWriteUnknown
-            }
-            return CocoaError(kind, userInfo: [NSFilePathErrorKey: url.path,
-                                               NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(code))])
-        }
+        func failure(_ code: Int32) -> CocoaError { writeError(code, at: url) }
         let fd = open(temporary.path, O_CREAT | O_EXCL | O_WRONLY, mode_t(permissions ?? 0o644))
         guard fd >= 0 else { throw failure(errno) }
         var code: Int32 = 0
@@ -408,6 +397,30 @@ extension StoreCoding {
             try? FileManager.default.removeItem(at: temporary)
             throw failure(code)
         }
+    }
+
+    /// What Foundation's own write throws, with the errno underneath, so a refusal
+    /// still says why (`WriteFailure`: full, not allowed, read-only).
+    public static func writeError(_ code: Int32, at url: URL) -> CocoaError {
+        let kind: CocoaError.Code = switch code {
+        case ENOSPC, EDQUOT: .fileWriteOutOfSpace
+        case EACCES, EPERM: .fileWriteNoPermission
+        case EROFS: .fileWriteVolumeReadOnly
+        default: .fileWriteUnknown
+        }
+        return CocoaError(kind, userInfo: [NSFilePathErrorKey: url.path,
+                                           NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(code))])
+    }
+
+    /// A file opened to add to, made if it is not there. One call, so a disk that cannot
+    /// make it says why (#212): `createFile` then `FileHandle(forWritingTo:)` turned a full
+    /// disk into "doesn't exist", which no alert recognised. Appending puts every write
+    /// at the end; otherwise it is opened to read too, at the start.
+    public static func openForAdding(_ url: URL, appending: Bool = true) throws -> FileHandle {
+        let flags = (appending ? O_WRONLY | O_APPEND : O_RDWR) | O_CREAT | O_CLOEXEC
+        let fd = open(url.path, flags, 0o644)
+        guard fd >= 0 else { throw writeError(errno, at: url) }
+        return FileHandle(fileDescriptor: fd, closeOnDealloc: true)
     }
 }
 

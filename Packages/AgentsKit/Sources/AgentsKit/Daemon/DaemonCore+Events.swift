@@ -28,15 +28,15 @@ extension DaemonCore {
                 eventPositionsReserved = eventState.nextPosition + Self.eventPositionBlock
                 saveEventState()
             }
-            eventStore.append(.event(event))
+            appendEvent(.event(event))
             // Held to the maximum as it grows, not only at load and on the hour (#218).
             if eventLog.events.count > EventLog.maximumEvents + Self.eventCapMargin { pruneEvents() }
         case .repeated(let event):
-            eventStore.append(.repeatOf(event.position, at: event.latest, count: event.count))
+            appendEvent(.repeatOf(event.position, at: event.latest, count: event.count))
             // A repeat is a line each time; the file is written afresh, one line for
             // each event's repeats, before they outgrow the events (#218).
             if eventStore.linesSinceRewrite > EventLog.maximumEvents + Self.eventCapMargin {
-                eventStore.rewrite(eventLog)
+                if let error = eventStore.rewrite(eventLog) { lost(error, keeping: "the pruned list of events") }
             }
         }
         let event = appended.event
@@ -46,10 +46,15 @@ extension DaemonCore {
         return eventLog.event(at: event.position) ?? event
     }
 
+    /// A line of the event log, written; a refusal is told (#212).
+    func appendEvent(_ line: EventStore.Line) {
+        if let error = eventStore.append(line) { lost(error, keeping: "an event") }
+    }
+
     /// Write down what came of an event, and tell the windows.
     func addConsequence(_ consequence: Consequence, to position: EventPosition) {
         guard let event = eventLog.addConsequence(consequence, to: position) else { return }
-        eventStore.append(.consequence(consequence, position: position))
+        appendEvent(.consequence(consequence, position: position))
         broadcastEvents(event)
     }
 
@@ -221,7 +226,8 @@ extension DaemonCore {
     }
 
     func pruneEvents() {
-        if eventLog.prune(now: now()) { eventStore.rewrite(eventLog) }
+        guard eventLog.prune(now: now()) else { return }
+        if let error = eventStore.rewrite(eventLog) { lost(error, keeping: "the pruned list of events") }
     }
 
     /// How many positions are reserved at a time.
@@ -235,7 +241,8 @@ extension DaemonCore {
     func saveEventState() {
         var saved = eventState
         saved.nextPosition = max(eventState.nextPosition, eventPositionsReserved)
-        eventStore.saveState(saved)
+        // A refusal is told, not only logged (#212).
+        if let error = eventStore.saveState(saved) { lost(error, keeping: "where the events have got to") }
     }
 
     /// Drop what the sources remember of what has gone (#218): publishes past their

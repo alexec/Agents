@@ -97,14 +97,10 @@ extension DaemonCore {
             var line = try StoreCoding.encoder.encode(call)
             line.append(0x0A)
             let url = locations.appTools(agentID)
-            if !FileManager.default.fileExists(atPath: url.path) {
-                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
-                                                        withIntermediateDirectories: true)
-                _ = FileManager.default.createFile(atPath: url.path, contents: nil)
-            }
-            let handle = try FileHandle(forWritingTo: url)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            let handle = try StoreCoding.openForAdding(url)
             defer { try? handle.close() }
-            try handle.seekToEnd()
             try handle.write(contentsOf: line)
         }
     }

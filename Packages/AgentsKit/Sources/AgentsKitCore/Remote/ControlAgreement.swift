@@ -35,27 +35,61 @@ public enum ControlAgreement {
     }
 
     /// The key in `file`, or a new one written `0600` the way `DeviceKey.load(file:)` does.
-    public static func loadOrMake(file: URL) throws -> Data {
+    ///
+    /// The new key is written whole to a file of its own, synced, and only then linked
+    /// into place (#212). Writing it in place left an empty file when the disk was full,
+    /// and every later start waited a second and called that file corrupt: the host was
+    /// blocked for good. A file too short to be a key, and older than a moment, is one of
+    /// those, and is made again.
+    public static func loadOrMake(file: URL, now: Date = Date()) throws -> Data {
         if let stored = try? Data(contentsOf: file), let key = valid(stored) { return key }
-        let made = generate().privateKey
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
-                                                attributes: [.posixPermissions: 0o700])
-        // Created only if absent: two processes making the key at once (Agents Host and
-        // the launcher it just started) must end up with one key, the first one written.
-        let fd = open(file.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
-        if fd >= 0 {
-            let written = made.withUnsafeBytes { write(fd, $0.baseAddress, made.count) }
-            fsync(fd)
-            close(fd)
-            guard written == made.count else { throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: file.path]) }
-            return made
+        if let torn = tornFile(file, now: now) {
+            // Only the file found torn: another process mending it at the same moment may
+            // already have linked its key in its place, and that one is the key.
+            var current = stat()
+            if lstat(file.path, &current) == 0, current.st_ino == torn.st_ino, current.st_dev == torn.st_dev {
+                unlink(file.path)
+            }
         }
-        // Another got there first: theirs is the key, once it is all written.
+        let made = generate().privateKey
+        let folder = file.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        let temporary = folder.appendingPathComponent(".\(file.lastPathComponent).\(UUID().uuidString).tmp")
+        let fd = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+        guard fd >= 0 else { throw StoreCoding.writeError(errno, at: file) }
+        var code: Int32 = 0
+        let written = made.withUnsafeBytes { write(fd, $0.baseAddress, made.count) }
+        if written != made.count { code = written < 0 ? errno : ENOSPC }
+        if code == 0, fsync(fd) != 0 { code = errno }
+        close(fd)
+        defer { unlink(temporary.path) }
+        guard code == 0 else { throw StoreCoding.writeError(code, at: file) }
+        // Linked only if absent: two processes making the key at once (Agents Host and
+        // the launcher it just started) must end up with one key, the first one linked.
+        if link(temporary.path, file.path) == 0 { return made }
+        guard errno == EEXIST else { throw StoreCoding.writeError(errno, at: file) }
+        // Another got there first: theirs is the key, and a link is never half written.
+        // A moment's grace still, for one written in place by an older build.
         for _ in 0..<50 {
             if let stored = try? Data(contentsOf: file), let key = valid(stored) { return key }
             usleep(20_000)
         }
         throw CocoaError(.fileReadCorruptFile, userInfo: [NSFilePathErrorKey: file.path])
+    }
+
+    /// A key file a write never finished: shorter than a key, and not being written now.
+    static func isTorn(_ file: URL, now: Date) -> Bool { tornFile(file, now: now) != nil }
+
+    private static func tornFile(_ file: URL, now: Date) -> stat? {
+        var found = stat()
+        guard lstat(file.path, &found) == 0, found.st_size < 32 else { return nil }
+        #if canImport(Darwin)
+        let modified = Date(timeIntervalSince1970: TimeInterval(found.st_mtimespec.tv_sec))
+        #else
+        let modified = Date(timeIntervalSince1970: TimeInterval(found.st_mtim.tv_sec))
+        #endif
+        return now.timeIntervalSince(modified) > 5 ? found : nil
     }
 
     public static func publicKey(privateKey: Data) throws -> Data {

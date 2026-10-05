@@ -736,6 +736,36 @@ struct WorktreeStartTests {
         #expect(try await git(["rev-parse", "--abbrev-ref", "review/pr-12@{upstream}"], in: root) == "origin/review/pr-12")
     }
 
+    /// A start that fails after its worktree is made takes the worktree back, and the
+    /// branch it made (#212): a retry on a full disk made a new pair every time.
+    @Test func aStartThatFailsAfterItsWorktreeTakesItBack() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let error = await failure {
+            try await core.start(.init(runtimeID: "no-such-runtime", cwd: repo.project,
+                                       prompt: "Fix the login redirect on Safari", worktree: .new))
+        }
+        #expect(error?.code == DaemonAPI.Failure.runtimeNotFound)
+        let folder = repo.top.appending(path: ".agents/worktrees/fix-login-redirect-safari")
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
+        #expect(!(try await git(["worktree", "list", "--porcelain"], in: repo.top)).contains("fix-login-redirect-safari"))
+        #expect(!(await GitWorktrees.branchExists("agents/fix-login-redirect-safari", in: repo.top)))
+    }
+
+    /// The branch of a worktree made on a branch already there is someone's, and stays.
+    @Test func aFailedStartOnSomeonesBranchKeepsTheBranch() async throws {
+        let repo = try await repository()
+        try await withBranches(repo)
+        let core = try await makeCore(repo, FakeLauncher())
+        let error = await failure {
+            try await core.start(.init(runtimeID: "no-such-runtime", cwd: repo.project, prompt: "x",
+                                       worktree: .branch("feature/login")))
+        }
+        #expect(error?.code == DaemonAPI.Failure.runtimeNotFound)
+        #expect(!FileManager.default.fileExists(atPath: repo.top.appending(path: ".agents/worktrees/feature-login").path))
+        #expect(await GitWorktrees.branchExists("feature/login", in: repo.top))
+    }
+
     @Test func aBranchCheckedOutElsewhereIsRefused() async throws {
         let repo = try await repository()
         let launcher = FakeLauncher()

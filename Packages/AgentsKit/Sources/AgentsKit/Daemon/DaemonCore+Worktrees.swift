@@ -35,6 +35,28 @@ extension DaemonCore {
         }
     }
 
+    /// Take back the worktree a start made, when the start then failed (#212). Left, it
+    /// was a folder and branch nobody held, and a retry picked a new name each time: on a
+    /// full disk, the worst thing to keep doing. One chosen from what was there is left
+    /// alone, and so is the branch of one made on a branch that was already there.
+    func undoWorktree(_ placed: (cwd: URL, worktree: AgentWorktree)?, for choice: WorktreeChoice?) async {
+        guard let worktree = placed?.worktree, let choice else { return }
+        let madeBranch: Bool
+        switch choice {
+        case .existing: return
+        case .branch: madeBranch = false
+        case .new, .named: madeBranch = true
+        }
+        do {
+            try await GitWorktrees.remove(worktree.root, force: true, in: worktree.project)
+            if madeBranch, let branch = worktree.branch {
+                try await GitWorktrees.deleteBranch(branch, force: true, in: worktree.project)
+            }
+        } catch {
+            DaemonLog.shared.write("could not take back the worktree \(worktree.name) of a start that failed: \(error)")
+        }
+    }
+
     /// Where a move should put an agent (053): the folder to work in, and the worktree
     /// it is in, or none for the project folder. Makes the worktree for a new one.
     func prepareMoveTarget(_ target: MoveTarget, for agent: Agent) async throws -> (cwd: URL, worktree: AgentWorktree?) {

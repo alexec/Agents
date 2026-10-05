@@ -128,9 +128,11 @@ public final class EventStore: @unchecked Sendable {
         return log
     }
 
-    public func append(_ line: Line) {
+    /// The refusal comes back for the daemon to tell (#212); nothing waits on it.
+    @discardableResult
+    public func append(_ line: Line) -> (any Error)? {
         lock.lock(); defer { lock.unlock() }
-        guard var data = try? StoreCoding.encoder.encode(line) else { return }
+        guard var data = try? StoreCoding.encoder.encode(line) else { return nil }
         data.append(UInt8(ascii: "\n"))
         do {
             // One write: with O_APPEND the line lands at the end whole, or not at all.
@@ -140,11 +142,14 @@ public final class EventStore: @unchecked Sendable {
             try? self.handle?.close()
             self.handle = nil
             DaemonLog.shared.write("events.jsonl: could not append: \(error.localizedDescription)")
+            return error
         }
+        return nil
     }
 
     /// Write the whole log afresh, as the lines it would have been appended as.
-    public func rewrite(_ log: EventLog) {
+    @discardableResult
+    public func rewrite(_ log: EventLog) -> (any Error)? {
         lock.lock(); defer { lock.unlock() }
         var data = Data()
         for event in log.events {
@@ -164,7 +169,9 @@ public final class EventStore: @unchecked Sendable {
             appendedLines = 0
         } catch {
             DaemonLog.shared.write("events.jsonl: could not rewrite: \(error.localizedDescription)")
+            return error
         }
+        return nil
     }
 
     /// The log, opened for appending. A file that does not end with a newline ends with
@@ -173,7 +180,7 @@ public final class EventStore: @unchecked Sendable {
         if let handle { return handle }
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         let fd = open(locations.events.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o644)
-        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        guard fd >= 0 else { throw StoreCoding.writeError(errno, at: locations.events) }
         let opened = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
         if Self.endsTorn(locations.events) {
             try opened.write(contentsOf: Data([UInt8(ascii: "\n")]))
@@ -200,9 +207,10 @@ public final class EventStore: @unchecked Sendable {
     }
 
     /// Written only when it differs from what was last read or written.
-    public func saveState(_ state: EventState) {
+    @discardableResult
+    public func saveState(_ state: EventState) -> (any Error)? {
         lock.lock(); defer { lock.unlock() }
-        guard state != savedState else { return }
+        guard state != savedState else { return nil }
         do {
             try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
             try StoreFile.write(StoreCoding.encoder.encode(state), to: locations.eventState)
@@ -210,7 +218,9 @@ public final class EventStore: @unchecked Sendable {
             stateWrites += 1
         } catch {
             DaemonLog.shared.write("events-state.json: could not save: \(error.localizedDescription)")
+            return error
         }
+        return nil
     }
 }
 
