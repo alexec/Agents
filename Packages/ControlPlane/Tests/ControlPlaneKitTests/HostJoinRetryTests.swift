@@ -32,10 +32,10 @@ struct HostJoinRetryTests {
     }
 
     /// `agentsd`'s join, as `Daemon` puts it together, with a short backoff.
-    func host(in root: URL, key: Data) -> Host {
+    func host(in root: URL, key: Data, membershipFile: URL? = nil) -> Host {
         let said = Said()
         let hello = DaemonAPI.HostHello(host: .mac, version: "1", platform: "macOS arm64", machineID: "m", name: "This Mac")
-        let dialer = HostDialer(membershipFile: root.appendingPathComponent("control-host.json"),
+        let dialer = HostDialer(membershipFile: membershipFile ?? root.appendingPathComponent("control-host.json"),
                                 codeFile: root.appendingPathComponent("control-join-code"), given: nil,
                                 privateKey: key, hello: hello, say: { said.add($0) })
         let server = DaemonServer(url: URL(fileURLWithPath: "/tmp/unused-\(UUID()).sock")) { _, method, _ in
@@ -110,6 +110,121 @@ struct HostJoinRetryTests {
         await eventually { await service.router.state(of: .mac)?.isOnline == true }
         #expect(await service.records.hosts.count == 1)
         #expect(again.said.statuses.allSatisfy { $0.problem == nil })
+    }
+
+    // MARK: A join the disk refuses (#212)
+
+    /// A folder this may not write to, standing in for a full disk: the membership's.
+    func refusing(_ root: URL) throws -> URL {
+        let folder = root.appendingPathComponent("refused", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
+        return folder
+    }
+
+    func allow(_ folder: URL) throws {
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
+    }
+
+    /// Joined and not saved: it dials anyway, says why, keeps the code, and saves (and only
+    /// then spends the code) once the disk takes it.
+    @Test func aJoinTheDiskRefusesIsDialledAndSavedOnceThereIsSpace() async throws {
+        let root = try root()
+        let refused = try refusing(root)
+        defer { try? allow(refused); try? FileManager.default.removeItem(at: root) }
+        let port = try await freePort()
+        let service = try service(port: port, store: MemoryStore())
+        try await service.start()
+        defer { Task { await service.stop() } }
+        let codeFile = root.appendingPathComponent("control-join-code")
+        try Data(try await service.codes.issue(.host).text.utf8).write(to: codeFile)
+        let membershipFile = refused.appendingPathComponent("control-host.json")
+
+        let host = host(in: root, key: ControlAgreement.generate().privateKey, membershipFile: membershipFile)
+        host.uplink.start()
+        defer { host.uplink.stop() }
+        await eventually { await service.router.state(of: .mac)?.isOnline == true }
+        #expect(host.dialer.isMember)
+        #expect(FileManager.default.fileExists(atPath: codeFile.path), "the code is kept until the join is saved")
+        #expect(!FileManager.default.fileExists(atPath: membershipFile.path))
+        #expect(host.said.statuses.contains { $0.problem?.contains("this host's membership could not be saved") == true })
+
+        try allow(refused)
+        let again = try await host.dialer.dial()
+        again.close()
+        #expect(ControlMembership.load(membershipFile)?.host == .mac)
+        #expect(!FileManager.default.fileExists(atPath: codeFile.path))
+    }
+
+    /// A restart before the join was saved joins again with the same code and key, and is
+    /// the same host, not a second one, and not refused as spent.
+    @Test func aRestartBeforeTheJoinWasSavedJoinsAgainAsTheSameHost() async throws {
+        let root = try root()
+        let refused = try refusing(root)
+        defer { try? allow(refused); try? FileManager.default.removeItem(at: root) }
+        let port = try await freePort()
+        let service = try service(port: port, store: MemoryStore())
+        try await service.start()
+        defer { Task { await service.stop() } }
+        let codeFile = root.appendingPathComponent("control-join-code")
+        try Data(try await service.codes.issue(.host).text.utf8).write(to: codeFile)
+        let membershipFile = refused.appendingPathComponent("control-host.json")
+        let key = ControlAgreement.generate().privateKey
+
+        let first = host(in: root, key: key, membershipFile: membershipFile)
+        first.uplink.start()
+        await eventually { await service.router.state(of: .mac)?.isOnline == true }
+        first.uplink.stop()
+        await eventually { await service.router.state(of: .mac)?.isOnline == false }
+
+        try allow(refused)
+        let again = host(in: root, key: key, membershipFile: membershipFile)
+        again.uplink.start()
+        defer { again.uplink.stop() }
+        await eventually { await service.router.state(of: .mac)?.isOnline == true }
+        #expect(await service.records.hosts.count == 1)
+        #expect(ControlMembership.load(membershipFile)?.host == .mac)
+        #expect(!FileManager.default.fileExists(atPath: codeFile.path))
+        #expect(!again.said.statuses.contains { $0.problem?.contains("used already") == true })
+    }
+
+    /// The same key is the same join while the code lasts; any other key is refused.
+    @Test func aSpentCodeIsTheSameJoinOnlyForTheKeyThatSpentIt() async throws {
+        let service = try service(port: try await freePort(), store: MemoryStore())
+        let codes = service.codes
+        let made = try #require(ControlCode(text: try await codes.issue(.host).text))
+        let id = try #require(ControlAuth.codeID(secret: made.secret))
+        let key = Data(repeating: 1, count: 32)
+        let first = try await codes.spend(id, by: .init(publicKey: key, host: .mac))
+        #expect(!first.replayed)
+        let replayed = try await codes.spend(id, by: .init(publicKey: key, host: HostID.make()))
+        #expect(replayed.replayed && replayed.host == .mac, "given what it was given the first time")
+        await #expect(throws: ControlAuth.Refusal.self) {
+            _ = try await codes.spend(id, by: .init(publicKey: Data(repeating: 2, count: 32), host: .mac))
+        }
+        await #expect(throws: ControlAuth.Refusal.self) { _ = try await codes.stored(id) }
+        #expect(try await codes.stored(id, spentToo: true).purpose == .host)
+    }
+
+    /// A window or phone that paired and could not keep it pairs again with the same code
+    /// as the same client, though it made a new id.
+    @Test func aClientPairingAgainWithItsSpentCodeIsTheSameClient() async throws {
+        let port = try await freePort()
+        let service = try service(port: port, store: MemoryStore())
+        try await service.start()
+        defer { Task { await service.stop() } }
+        let code = try #require(ControlCode(text: try await service.codes.issue(.client).text))
+        let key = ControlAgreement.generate().privateKey
+        let first = try await ControlCodeUse.pairClient(code, privateKey: key, id: UUID(), name: "phone",
+                                                        kind: .iPhone, dial: ControlJoin.nio)
+        let again = try await ControlCodeUse.pairClient(code, privateKey: key, id: UUID(), name: "phone",
+                                                        kind: .iPhone, dial: ControlJoin.nio)
+        #expect(again.client == first.client)
+        #expect(await service.records.clients.count == 1)
+        await #expect(throws: (any Error).self) {
+            _ = try await ControlCodeUse.pairClient(code, privateKey: ControlAgreement.generate().privateKey, id: UUID(),
+                                                    name: "another", kind: .iPhone, dial: ControlJoin.nio)
+        }
     }
 
     /// A name nothing answers for, as `macos-<serial>.local` was on the Mac in the issue:

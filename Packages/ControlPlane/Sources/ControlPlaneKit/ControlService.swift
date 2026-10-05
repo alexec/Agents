@@ -611,7 +611,8 @@ public final class ControlService: @unchecked Sendable {
             guard let host = await records.host(id), let key = host.publicKey else { throw ControlAuth.Refusal(.unknown) }
             return (try ControlAuth.hostKey(privateKey: privateKey, peer: key, host: id), Admitted(host: id))
         case .pairing(let id), .enrolling(let id):
-            let stored = try await codes.stored(id)
+            // Spent or not: a join replayed by the key that spent it is told apart in `announce`.
+            let stored = try await codes.stored(id, spentToo: true)
             let wanted: Bool = if case .enrolling = identity { stored.purpose == .host } else { stored.purpose != .host }
             guard wanted, let secret = ControlAuth.codeSecret(controlPrivateKey: privateKey, id: id) else {
                 throw ControlAuth.Refusal(.unknown)
@@ -678,7 +679,7 @@ public final class ControlService: @unchecked Sendable {
               case .request(let request, let method, let params)? = try? JSONRPCCodec.decode(line: line) else { return }
         let reply: JSONRPCMessage
         do {
-            let stored = try await codes.stored(id)
+            let stored = try await codes.stored(id, spentToo: true)
             let admitted: DaemonAPI.Admitted
             switch (stored.purpose, method) {
             case (.client, DaemonAPI.Method.clientsAnnounce):
@@ -697,10 +698,16 @@ public final class ControlService: @unchecked Sendable {
                         : "That code is for a window or a phone. Get one from Pair a Browser….")
                 }
                 let name = announce.kind == .browser ? Self.browserName(announce.name) : announce.name
-                try await codes.spend(id)
-                try await methods.admit(ClientRecord(id: announce.id, name: name, kind: announce.kind,
+                let spent = try await codes.spend(id, by: .init(publicKey: announce.publicKey, client: announce.id))
+                let client = spent.client ?? announce.id
+                admitted = DaemonAPI.Admitted(client: client)
+                // The same join again (#212): it paired, and could not keep it.
+                if spent.replayed, await records.client(client)?.publicKey == announce.publicKey {
+                    log("\(name) paired again with the code it spent (\(announce.kind.rawValue))")
+                    break
+                }
+                try await methods.admit(ClientRecord(id: client, name: name, kind: announce.kind,
                                                      publicKey: announce.publicKey, paired: Date()))
-                admitted = DaemonAPI.Admitted(client: announce.id)
                 log("\(name) paired (\(announce.kind.rawValue))")
                 // Known at every copy at once: the relay host may be held at another.
                 await self.announce(ControlEvent(kind: .clientPaired, subject: announce.id.uuidString, at: Date(), by: "code"))
@@ -709,13 +716,20 @@ public final class ControlService: @unchecked Sendable {
                 guard let announce = try? params?.decode(DaemonAPI.HostAnnounce.self) else {
                     throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Say which host you are.")
                 }
-                try await codes.spend(id)
                 // The host on the control plane's own machine is its home host, `mac`, as
                 // a moved set-up's is: the window's own client is that host (data-model.md).
                 let macTaken = await records.host(.mac) != nil
                 let home = !configuration.machineID.isEmpty && announce.machineID == configuration.machineID && !macTaken
                     && announce.relay != true
-                let host = home ? HostID.mac : HostID.make()
+                let spent = try await codes.spend(id, by: .init(publicKey: announce.publicKey,
+                                                                host: home ? HostID.mac : HostID.make()))
+                guard let host = spent.host else { throw ControlAuth.Refusal(.spent) }
+                admitted = DaemonAPI.Admitted(host: host)
+                // The same join again (#212): it enrolled, and could not keep it.
+                if spent.replayed, await records.host(host)?.publicKey == announce.publicKey {
+                    log("host \(announce.name) enrolled again as \(host) with the code it spent")
+                    break
+                }
                 try await methods.enroll(HostRecord(id: host, name: announce.name, publicKey: announce.publicKey,
                                                     platform: announce.platform, version: announce.version,
                                                     machineID: announce.machineID, relay: announce.relay == true ? true : nil))
@@ -724,7 +738,6 @@ public final class ControlService: @unchecked Sendable {
                 // there either, and a host must be reachable before the next re-list.
                 await self.announce(ControlEvent(kind: .hostEnrolled, subject: host.rawValue, at: Date(), by: "code"))
                 await router.know(host)
-                admitted = DaemonAPI.Admitted(host: host)
                 log("host \(announce.name) enrolled as \(host)")
             default:
                 throw JSONRPCError(code: DaemonAPI.Failure.notPermitted, message: "That code is not for \(method).")
@@ -734,6 +747,11 @@ public final class ControlService: @unchecked Sendable {
             reply = .failure(id: request, error: error)
         } catch let error as StoreError {
             reply = .failure(id: request, error: error.rpcError)
+        } catch let refusal as ControlAuth.Refusal where refusal.reason == .spent {
+            // A spent code reaches here, not the handshake, so the key that spent it can
+            // replay it (#212): said in the words every client uses for it.
+            reply = .failure(id: request, error: JSONRPCError(code: DaemonAPI.Failure.notPermitted,
+                                                               message: Self.spentWords))
         } catch let refusal as ControlAuth.Refusal {
             reply = .failure(id: request, error: JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                                                message: "That code can't be used: \(refusal.reason.rawValue)."))
@@ -745,6 +763,9 @@ public final class ControlService: @unchecked Sendable {
         // Give the reply time to leave before the socket closes.
         try? await Task.sleep(for: .milliseconds(200))
     }
+
+    /// A code used already, as the page says it (Web/src/session.ts).
+    static let spentWords = "This code has been used. Ask for a new one."
 
     /// "Safari on Alex's MacBook": the page can't learn the Mac's name, and the loopback
     /// listener only ever runs on the Mac it names (071, FR-010).
@@ -912,23 +933,53 @@ public actor ControlCodes {
         return DaemonAPI.ControlCodeShown(text: code.text, expires: expires, command: command)
     }
 
-    /// A code as stored, refused if unknown, expired or spent.
-    public func stored(_ id: String) async throws -> Stored {
+    /// Who spent a code, and as what (#212), so the same join tried again while the code
+    /// lasts is given what it was given the first time. A code spent before this was kept
+    /// says nothing, and is never taken as the same join.
+    public struct Spent: Codable, Sendable, Equatable {
+        public var publicKey: Data
+        public var client: UUID?
+        public var host: HostID?
+        /// Not stored: whether this is the earlier spend, read back.
+        public var replayed = false
+
+        public init(publicKey: Data, client: UUID? = nil, host: HostID? = nil) {
+            self.publicKey = publicKey
+            self.client = client
+            self.host = host
+        }
+
+        enum CodingKeys: String, CodingKey { case publicKey, client, host }
+    }
+
+    /// A code as stored, refused if unknown, expired or spent; `spentToo` lets a spent one
+    /// through, for `spend` to tell a replayed join from another.
+    public func stored(_ id: String, spentToo: Bool = false) async throws -> Stored {
         guard let object = try await store.get(Self.key(id)),
               let stored = try? ControlRecords.decoder.decode(Stored.self, from: object.data) else {
             throw ControlAuth.Refusal(.unknown)
         }
         guard stored.expires > Date() else { throw ControlAuth.Refusal(.expired) }
-        if try await store.get(Self.spentKey(id)) != nil { throw ControlAuth.Refusal(.spent) }
+        if !spentToo, try await store.get(Self.spentKey(id)) != nil { throw ControlAuth.Refusal(.spent) }
         return stored
     }
 
-    /// Uses a code: the first copy to write its `.spent` wins (rule on codes, US3-3).
-    public func spend(_ id: String) async throws {
+    /// Uses a code: the first copy to write its `.spent` wins (rule on codes, US3-3). The
+    /// same key spending it again before it runs out is the same join, tried again after it
+    /// could not be saved (#212): given the earlier spend, `replayed`. Any other key is
+    /// refused.
+    public func spend(_ id: String, by spender: Spent) async throws -> Spent {
         do {
-            _ = try await store.put(Self.spentKey(id), Data("{}".utf8), when: .absent)
+            _ = try await store.put(Self.spentKey(id), try ControlRecords.encoder.encode(spender), when: .absent)
+            return spender
         } catch StoreError.conflict {
-            throw ControlAuth.Refusal(.spent)
+            guard let object = try await store.get(Self.spentKey(id)),
+                  var earlier = try? ControlRecords.decoder.decode(Spent.self, from: object.data),
+                  !spender.publicKey.isEmpty, earlier.publicKey == spender.publicKey else {
+                throw ControlAuth.Refusal(.spent)
+            }
+            earlier.replayed = true
+            return earlier
         }
     }
 }

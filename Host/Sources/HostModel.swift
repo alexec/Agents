@@ -314,12 +314,23 @@ final class HostModel {
         }
         busy = "Joining…"
         defer { busy = nil }
+        // The code first, the role last (#212): a code the disk refuses leaves this Mac
+        // as it was, with its own control plane and membership.
+        do { try services.leaveCode(code) } catch { problem = "\(error)"; return }
+        let membership = paths.hostLocations.controlHostMembership
+        // A membership of this Mac's own control plane would be dialled instead.
+        if FileManager.default.fileExists(atPath: membership.path) {
+            do {
+                try FileManager.default.removeItem(at: membership)
+            } catch {
+                try? FileManager.default.removeItem(at: paths.hostLocations.controlJoinCode)
+                problem = "This Mac's host could not leave its control plane: \(error.localizedDescription)"
+                return
+            }
+        }
         settings.role = .joinElsewhere
         settings.save(paths)
         await services.unregister(.control)
-        // A membership of this Mac's own control plane would be dialled instead.
-        try? FileManager.default.removeItem(at: paths.hostLocations.controlHostMembership)
-        do { try services.leaveCode(code) } catch { problem = "\(error)"; return }
         let wasRunning = await services.running(.daemon) != nil
         guard await start(.daemon) else { return }
         if wasRunning { _ = await services.restart(.daemon) }
@@ -369,19 +380,25 @@ final class HostModel {
     private(set) var returnForwarding: HandoverStatus?
 
     /// This Mac's copy, ready to receive: forwarding stops, the store from before the move
-    /// is kept aside, and the copy starts empty. Returns the name it was kept under.
-    func prepareReturn() async -> String? {
+    /// is kept aside, and the copy starts empty. Returns the name it was kept under. A store
+    /// that cannot be kept aside stops it there, forwarding as before (#212): an empty copy
+    /// must never be the old store.
+    func prepareReturn() async throws -> String? {
         await services.unregister(.control)
         for _ in 0..<20 where await services.running(.control) != nil { try? await Task.sleep(for: .milliseconds(250)) }
-        settings.forwardingUntil = nil
         var aside: String?
         if FileManager.default.fileExists(atPath: paths.folderStore.path) {
             let day = Date().formatted(.iso8601.year().month().day())
             let name = "store-before-\(day)-\(Int(Date().timeIntervalSince1970) % 100_000)"
-            if (try? FileManager.default.moveItem(at: paths.folderStore, to: paths.controlHome.appendingPathComponent(name))) != nil {
-                aside = name
+            do {
+                try FileManager.default.moveItem(at: paths.folderStore, to: paths.controlHome.appendingPathComponent(name))
+            } catch {
+                _ = await start(.control)
+                throw ControlService.Failure("This Mac's store could not be kept aside, so nothing was changed: \(error.localizedDescription)")
             }
+            aside = name
         }
+        settings.forwardingUntil = nil
         settings.store = .thisMac
         settings.receiving = true
         settings.save(paths)
@@ -598,7 +615,15 @@ final class HostModel {
         // this Mac starts from an empty folder rather than a stale one.
         if to.url == paths.folderStore.absoluteString, FileManager.default.fileExists(atPath: paths.folderStore.path) {
             let aside = paths.controlHome.appendingPathComponent("store-before-\(Int(Date().timeIntervalSince1970))")
-            try? FileManager.default.moveItem(at: paths.folderStore, to: aside)
+            do {
+                try FileManager.default.moveItem(at: paths.folderStore, to: aside)
+            } catch {
+                // Copied over a stale store, records would mix (#212): stop, on the old store.
+                problem = "The old store on this Mac could not be kept aside, so the store was not switched: \(error.localizedDescription)"
+                _ = await start(.control)
+                await refresh()
+                return
+            }
         }
         let bucket = from.needsKeys ? from : to
         let copied = await ControlTool.run(["store", "copy", "--from", from.url, "--to", to.url], paths: paths,

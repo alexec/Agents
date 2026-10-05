@@ -98,9 +98,15 @@ public final class ControlRelay: @unchecked Sendable {
         guard !membership.endpointsToDial.isEmpty else { return }
         let dial = self.dial, file = files.membership, log = self.log
         let book = EndpointBook(membership) { newer in
-            // The control plane moved or changed its certificate (R16).
-            try? newer.save(file)
+            // The control plane moved or changed its certificate (R16). A save the disk
+            // refuses is tried again at the next answer (#212).
             log("relay: the control plane is now at \(newer.url ?? "?")")
+            do {
+                try newer.save(file)
+            } catch {
+                log("relay: \(WriteFailure(error, keeping: "the control plane's new address")?.message ?? "could not save the control plane's new address: \(error)")")
+                throw error
+            }
         }
         // A device's session: a socket of its own to the control plane, nothing proved
         // on it here. The device's first line is its answer to the control plane's hello.

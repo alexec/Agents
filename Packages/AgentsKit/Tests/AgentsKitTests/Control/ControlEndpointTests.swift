@@ -64,6 +64,27 @@ struct ControlEndpointTests {
         #expect(kept.get?.epoch == 3)
     }
 
+    @Test func aNewerListTheDiskRefusedIsSavedAtTheNextAnswer() throws {
+        let a = ControlEndpoint(url: "https://mac.local:8791", pin: pin)
+        let b = ControlEndpoint(url: "https://agents.example.com")
+        let kept = Kept()
+        let full = Kept.Flag()
+        let book = EndpointBook(membership()) { newer in
+            if full.on { throw POSIXError(.ENOSPC) }  // #212: a full disk
+            kept.set(newer)
+        }
+        full.on = true
+        book.answered(at: a, ok: ControlAuth.OK(mac: "", endpoints: [a, b], epoch: 2))
+        #expect(book.order == [a, b], "taken all the same")
+        #expect(kept.get == nil)
+        #expect(book.holdsUnsaved)
+
+        full.on = false
+        book.answered(at: a, ok: ControlAuth.OK(mac: ""))
+        #expect(kept.get?.endpoints == [a, b], "an answer with nothing new still saves what was held")
+        #expect(!book.holdsUnsaved)
+    }
+
     @Test func settingsWithNoListAnswerAtTheirOneAddress() {
         var settings = ControlSettings(name: "home", machineID: "m", url: "https://mac.local:8791", pin: pin)
         #expect(settings.currentEndpoints == [ControlEndpoint(url: "https://mac.local:8791", pin: pin)])
@@ -105,4 +126,13 @@ private final class Kept: @unchecked Sendable {
     private var membership: ControlMembership?
     func set(_ value: ControlMembership) { lock.withLock { membership = value } }
     var get: ControlMembership? { lock.withLock { membership } }
+
+    final class Flag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        var on: Bool {
+            get { lock.withLock { value } }
+            set { lock.withLock { value = newValue } }
+        }
+    }
 }

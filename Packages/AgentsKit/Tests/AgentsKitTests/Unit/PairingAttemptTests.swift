@@ -51,6 +51,10 @@ struct PairingAttemptTests {
             .hasPrefix("Couldn’t reach the control plane."))
         #expect(PairingAttempt.sentence(for: JSONRPCError(code: 1, message: "That code was used."), device: "this Mac")
             == "That code was used.")
+        // Paired, and the disk would not keep it (#212): said as that, not as a code refused.
+        let full = PairingAttempt.sentence(for: POSIXError(.ENOSPC), device: "this Mac")
+        #expect(full.hasPrefix("This Mac is out of disk space, so the pairing could not be saved."))
+        #expect(full.hasSuffix("The same code works until it runs out."))
         // Anything else is never Swift's description of the error.
         let other = PairingAttempt.sentence(for: ControlCodeUse.Failure("refused: unknown code"), device: "this Mac")
         #expect(!other.contains("refused"))
