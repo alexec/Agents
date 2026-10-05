@@ -16,7 +16,7 @@ import { CallFailed } from "../wire/link";
 import { describe } from "../model/errors";
 import { Failure } from "../protocol/generated";
 import { isSafeLink } from "../render/markdown";
-import { elicitationTitle } from "./chat/Rows";
+import { Blocks, EditDiff, elicitationTitle } from "./chat/Rows";
 import { askerFor } from "../model/asker";
 import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
@@ -228,6 +228,12 @@ function PermissionCard({ request, asker, hold, answer, active, showPlan }: {
             <button onClick={() => showPlan(plan.file!)}>Show plan</button></p>
         )}
         {plan?.text && !plan.file && <div class="plan-text"><Markdown text={plan.text} /></div>}
+        {/* What it actually wants to do, shown rather than summarised, as the Remote's (#266). */}
+        {!plan?.file && !plan?.text && request.toolCall.content.map((piece, index) =>
+          piece.type === "diff" ? <EditDiff key={index} diff={piece} />
+          : piece.type === "content" && piece.content.type === "text" ? <Markdown key={index} text={piece.content.text} />
+          : piece.type === "content" ? <Blocks key={index} blocks={[piece.content]} text="" />
+          : null)}
       </div>
       <div class="options">
         {request.options.map((option, index) => {

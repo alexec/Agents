@@ -32,7 +32,7 @@ export const detailSummaries: Record<TurnDetail, string> = {
 };
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
-function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
+export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
   if (!blocks?.length) return <Markdown text={text} />;
   return (
     <>
@@ -134,7 +134,7 @@ export interface CallActions {
 export const CallActionsContext = createContext<CallActions | null>(null);
 
 /** An edit (DiffView): its path at the fine step, then its lines marked + and −, in a well. */
-function EditDiff({ diff }: { diff: Extract<ToolCallContent, { type: "diff" }> }) {
+export function EditDiff({ diff }: { diff: Extract<ToolCallContent, { type: "diff" }> }) {
   return (
     <div class="call-diff">
       <p class="path faint small" title={diff.path}><bdi>{diff.path}</bdi></p>

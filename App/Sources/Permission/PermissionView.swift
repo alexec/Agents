@@ -65,8 +65,8 @@ struct PermissionView: View {
         .chatColumn()
     }
 
-    /// Title, kind and plan — everything above the answers. Scrolls when tall so the
-    /// buttons stay reachable.
+    /// Title, kind and plan, or what the call will do — everything above the answers.
+    /// Scrolls when tall so the buttons stay reachable.
     private var question: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
@@ -107,6 +107,22 @@ struct PermissionView: View {
                 .appText(.reading)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+        } else if !request.toolCall.content.isEmpty {
+            // What it actually wants to do: the change, or what it said with it, as the
+            // Remote's card shows it (#266). The card's own scroll keeps the answers in reach.
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(request.toolCall.content.enumerated()), id: \.offset) { _, piece in
+                    switch piece {
+                    case .diff(let diff):
+                        DiffView(diff: diff)
+                    case .content(let block):
+                        BlocksView(blocks: [block])
+                            .appText(.reading)
+                    case .terminal, .unknown:
+                        EmptyView()
+                    }
+                }
+            }
         }
     }
 
