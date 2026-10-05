@@ -85,22 +85,32 @@ private struct DiskRows: View {
 
     var body: some View {
         ForEach(model.work.disk.alarms) { alarm in
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Circle().tinted(alarm.level == .critical ? .failure : .attention)
-                    .frame(width: 7, height: 7)
-                    .accessibilityHidden(true)
-                Text(alarm.line)
-                    .appText(.fine)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
-            .background(Paper.wash)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(alarm.line)
+            row(alarm.line, alarm.level)
         }
+        ForEach(model.serverDisks.keys.sorted { model.hostName($0) < model.hostName($1) }, id: \.self) { host in
+            ForEach(model.serverDisks[host]?.alarms ?? []) { alarm in
+                row("\(model.hostName(host)): \(alarm.line)", alarm.level,
+                    label: "\(model.hostName(host)), \(alarm.line)")
+            }
+        }
+    }
+
+    private func row(_ line: String, _ level: DiskLevel, label: String? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Circle().tinted(level == .critical ? .failure : .attention)
+                .frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(line)
+                .appText(.fine)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(Paper.wash)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label ?? line)
     }
 }
 

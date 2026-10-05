@@ -9,18 +9,27 @@ struct DiskStrip: View {
 
     var body: some View {
         ForEach(model.work.disk.alarms) { alarm in
-            HStack(spacing: 10) {
-                Circle().tinted(alarm.level == .critical ? .failure : .attention).frame(width: 7, height: 7)
-                Text(alarm.line)
-                    .appText(.supporting)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                Spacer(minLength: 8)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Paper.wash)
-            .accessibilityElement(children: .combine)
+            row(alarm.line, alarm.level)
         }
+        ForEach(model.serverDisks.keys.sorted { model.hosts.label($0) < model.hosts.label($1) }, id: \.self) { host in
+            ForEach(model.serverDisks[host]?.alarms ?? []) { alarm in
+                row("\(model.hosts.label(host)): \(alarm.line)", alarm.level)
+            }
+        }
+    }
+
+    private func row(_ line: String, _ level: DiskLevel) -> some View {
+        HStack(spacing: 10) {
+            Circle().tinted(level == .critical ? .failure : .attention).frame(width: 7, height: 7)
+            Text(line)
+                .appText(.supporting)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+            Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Paper.wash)
+        .accessibilityElement(children: .combine)
     }
 }

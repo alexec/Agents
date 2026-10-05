@@ -144,6 +144,8 @@ final class RemoteModel {
     /// Each connected server's local daily ledger, matching the window's combined
     /// Today figure. Limits remain local to the host that owns them.
     private(set) var serverCosts: [HostID: DaemonAPI.CostState] = [:]
+    /// Each other host's disk alarms, kept separate from this Mac's strip (#263).
+    private(set) var serverDisks: [HostID: DiskState] = [:]
 
     var serversToday: [String: Decimal] {
         serverCosts.values.reduce(into: [:]) { sum, state in
@@ -1263,6 +1265,7 @@ final class RemoteModel {
             }
             await refreshServerRuntimes(id)
             await refreshServerCost(id)
+            await refreshServerDisk(id)
             let notes = other.notifications()
             let shown = work.shown
             // Read off the main actor, once, and applied there (#203).
@@ -1275,6 +1278,12 @@ final class RemoteModel {
                         await self?.received(note.method, note.params, fromOther: id)
                         continue
                     }
+                    if note.method == DaemonAPI.Notification.diskChanged {
+                        await self?.received(note.method, note.params, fromOther: id)
+                        continue
+                    }
+                    if note.method == DaemonAPI.Notification.leasesChanged
+                        || note.method == DaemonAPI.Notification.eventsChanged { continue }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
                     await self?.work.apply(update, from: id)
                 }
@@ -1296,6 +1305,7 @@ final class RemoteModel {
                 work.replaceAgents([], from: id)
                 serverRuntimes[id] = nil
                 serverCosts[id] = nil
+                serverDisks[id] = nil
             }
         }
     }
@@ -1308,6 +1318,8 @@ final class RemoteModel {
             await refreshServerRuntimes(host)
         case DaemonAPI.Notification.costChanged:
             await refreshServerCost(host)
+        case DaemonAPI.Notification.diskChanged:
+            if let state = try? params?.decode(DiskState.self) { serverDisks[host] = state }
         case DaemonAPI.Notification.draftOptions:
             guard host == startDraftHost,
                   let change = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
@@ -2016,6 +2028,13 @@ final class RemoteModel {
                                                 Optional<String>.none,
                                                 returning: DaemonAPI.CostState.self) else { return }
         serverCosts[host] = state
+    }
+
+    private func refreshServerDisk(_ host: HostID) async {
+        guard let other = otherHosts[host], reachableHosts.contains(host),
+              let state = try? await other.call(DaemonAPI.Method.diskState,
+                                                Optional<String>.none, returning: DiskState.self) else { return }
+        serverDisks[host] = state
     }
 
     // MARK: The pool (052)

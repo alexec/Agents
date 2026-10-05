@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 206 rows: **101 same**, **37 by design**, **68 delta** (after #221, #238–#244, #249, #255–#261, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 206 rows: **102 same**, **37 by design**, **67 delta** (after #221, #238–#244, #249, #255–#261, #263–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -32,15 +32,15 @@ Of 206 rows: **101 same**, **37 by design**, **68 delta** (after #221, #238–#2
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
 | Notifications and badges | 3 | 0 | 1 |
-| Disk strip | 1 | 1 | 1 |
+| Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
 | MCP Apps views | 1 | 0 | 0 |
 
-The deltas are tracked by 30 issues:
+The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
 - **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249.
 - **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #260, #261, #262.
-- **The window to change, or more than one side:** #263, #264, #265, #266.
+- **The window to change, or more than one side:** #264, #265, #266.
 - **Alex to decide** (one client only, nothing says whether that is meant): #267.
 
 ## Sidebar and project list
@@ -309,7 +309,7 @@ The deltas are tracked by 30 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | The strip while a volume is low or critical (#195, #196) | `A/Sidebar/DiskStrip.swift` | Under the connection banner: `R/StaleBanner.swift:83-104` | `W/views/DiskStrip.tsx`, words held to `Fixtures/web/disk/lines.json` | **same** (words) |
-| A server's disk | A server's `disk/changed` replaces the Mac's, unnamed: `A/AppModel.swift:2040-2076`, `K/Client/AgentsModel.swift:481-482` | This Mac's only | Per host, a server's named: `W/views/DiskStrip.tsx:6-23` | **delta**: Mac and Remote #263 |
+| A server's disk | Per host, a server's rows named: `A/Sidebar/DiskStrip.swift`; `A/AppModel.swift` | Per host, a server's rows named: `R/StaleBanner.swift`; `R/RemoteModel.swift` | Per host, a server's named: `W/views/DiskStrip.tsx:6-23` | **same** |
 | Low and Critical settings | Project Settings | None | None | **by design** |
 
 ## Hosts, connection and pairing
