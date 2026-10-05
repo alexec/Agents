@@ -68,7 +68,14 @@ public final class HostDialer: @unchecked Sendable {
             let problem = Self.words(for: error)
             let member = isMember
             // The uplink logs every failed dial; this says it is the join that failed.
-            if !member { DaemonLog.shared.write("uplink: could not join the control plane yet; the host code is kept") }
+            // A start with no code has nothing to keep (#303): the next dial reads one
+            // Agents Host leaves.
+            if !member {
+                let why = problem.contains("no host code")
+                    ? "no host code yet; Agents Host Try Again leaves one"
+                    : "could not join the control plane yet; the host code is kept"
+                DaemonLog.shared.write("uplink: \(why)")
+            }
             say(.init(member: member, connected: false, problem: problem))
             throw error
         }

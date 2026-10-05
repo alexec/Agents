@@ -545,6 +545,11 @@ final class AppModel {
     private(set) var controlPlaneHosts: [DaemonAPI.ControlHost]? = ControlConfig.endpoint == nil ? nil : []
     /// The control plane's list has arrived at least once, so an empty one means none.
     private var controlPlaneListed = false
+    /// `control/status.thisMacHost` (#303): how this Mac's host says its join stands.
+    /// Nil when that process is not writing one, or this plane is not beside it.
+    private(set) var macHostJoin: DaemonAPI.HostJoinStatus?
+    /// `control/status.machineID`, so a missing host on this Mac is not a plane elsewhere.
+    private var controlPlaneMachine: String?
 
     /// Whether this window has a host on this Mac (058, T093a). Always without a control
     /// plane, and until its first list arrives; after that, only if it lists `.mac`. A
@@ -622,6 +627,24 @@ final class AppModel {
         return (try? await client(for: id).call(
             DaemonAPI.Method.credentialsLend,
             DaemonAPI.CredentialsLend(runtime: runtime, secret: secret))) != nil
+    }
+
+    /// Why this Mac's host is quiet (#303), once the control plane has listed its hosts.
+    /// Nil while the window is connected to it, while the control plane itself is away,
+    /// and while the first list is still on its way (that is *Connecting…*).
+    var macHostNotice: MacHostNotice? {
+        guard !isConnected, !controlPlaneAway else { return nil }
+        guard controlLink != nil else { return hosts.isOffline(.mac) ? .notAnswering : nil }
+        guard controlPlaneListed else { return nil }
+        return MacHostNotice.decide(planeOnThisMac: controlPlaneMachine == MachineID.current,
+                                    macState: controlPlaneHosts?.first { $0.id == .mac }?.state,
+                                    join: macHostJoin)
+    }
+
+    /// A button's tooltip when `host` cannot be asked. This Mac's names the reason (#303).
+    func offlineHelp(for host: HostID) -> String {
+        if host == .mac, let notice = macHostNotice { return notice.tooltip }
+        return hosts.offlineHelp(host)
     }
 
     /// The control plane was reached and then was not, or the first try failed (frame H).
@@ -2028,9 +2051,17 @@ final class AppModel {
                     backoff.connected()
                     self?.controlPlaneDidAnswer()
                     await self?.syncControlHosts(control)
-                    for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
-                        self?.hostCameOnline(note.params)
-                        await self?.syncControlHosts(control)
+                    for await note in control.notifications() {
+                        switch note.method {
+                        case DaemonAPI.Notification.controlHostChanged:
+                            self?.hostCameOnline(note.params)
+                            await self?.syncControlHosts(control)
+                        case DaemonAPI.Notification.controlThisMacHostChanged:
+                            // The join file changed and the host list may not have (#303).
+                            await self?.refreshMacHostJoin(control)
+                        default:
+                            break
+                        }
                     }
                     if !Task.isCancelled { self?.controlPlaneWent() }
                 } else if !Task.isCancelled {
@@ -2060,6 +2091,16 @@ final class AppModel {
         controlPlaneMissed = true
     }
 
+    /// The host's own join changed (#303). A host that just connected is dialled now,
+    /// rather than at the end of the window's backoff.
+    private func refreshMacHostJoin(_ control: DaemonClient) async {
+        guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self) else { return }
+        let connected = status.thisMacHost?.connected == true
+        macHostJoin = status.thisMacHost
+        controlPlaneMachine = status.machineID
+        if connected, !isConnected { backoff.nudge() }
+    }
+
     private func syncControlHosts(_ control: DaemonClient) async {
         guard let controlLink,
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self),
@@ -2068,6 +2109,8 @@ final class AppModel {
         controlPlaneHosts = listed
         controlPlaneListed = true
         controlPlaneName = status.name
+        macHostJoin = status.thisMacHost
+        controlPlaneMachine = status.machineID
         // `.mac` is `client`, already. Every other host, including another machine's
         // home host, gets a client of its own on the same link.
         // A relay host (`agents-relay`) runs no agents: nothing to reach there.
@@ -3602,10 +3645,10 @@ final class AppModel {
 
     @discardableResult
     func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
-        // Already known to be down: said now, not after waiting out a connect that
-        // the reconnect loop is already making (#83). The strip has Try Again.
-        if host == .mac, hosts.isOffline(.mac), !controlPlaneAway {
-            problem = HostSet.macDownProblem
+        // Already known to be quiet: said now, naming why, not after waiting out a
+        // connect the reconnect loop is already making (#83, #303). The strip has Try Again.
+        if host == .mac, !controlPlaneAway, hosts.isOffline(.mac) || macHostNotice != nil {
+            problem = macHostNotice?.action ?? HostSet.macDownProblem
             return false
         }
         do {
@@ -3669,7 +3712,7 @@ final class AppModel {
         if let error = error as? DaemonClient.ConnectError {
             switch error {
             case .couldNotConnect:
-                return HostSet.macDownProblem
+                return macHostNotice?.action ?? HostSet.macDownProblem
             case .socketPathTooLong(let path):
                 // Only ever seen by somebody who passed `--root`, and the fix is in
                 // their hands: a shorter path.

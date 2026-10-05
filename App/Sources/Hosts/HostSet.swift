@@ -41,8 +41,9 @@ final class HostSet {
 
     func host(_ id: HostID) -> ServerHost? { nil }
 
-    /// What an action aimed at this Mac's host says when it is down (#83).
-    static let macDownProblem = "This Mac’s host isn’t answering, so that didn’t happen. The window is trying again by itself; Try Again tries now."
+    /// What an action aimed at this Mac's host says when it enrolled and then went quiet
+    /// (#83). A host that never enrolled, or is not running, says so instead (#303).
+    static let macDownProblem = MacHostNotice.notAnswering.action
 
     /// Why a button aimed at `id` does nothing now, in a tooltip's few words.
     func offlineHelp(_ id: HostID) -> String {

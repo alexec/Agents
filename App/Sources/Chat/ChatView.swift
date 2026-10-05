@@ -188,7 +188,7 @@ struct ChatView: View {
     }
 
     private var offlineHelp: String {
-        model.hosts.offlineHelp(model.selectedAgent?.host ?? .mac)
+        model.offlineHelp(for: model.selectedAgent?.host ?? .mac)
     }
 
     private var form: some View {

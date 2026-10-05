@@ -532,7 +532,7 @@ struct PromptBar: View {
                 // on the cards (#86); `send()` refuses the press meanwhile.
                 .disabled(!canSend && !isGoing)
                 .keyboardShortcut(.return, modifiers: .command)
-                .help(targetOffline ? model.hosts.offlineHelp(targetHost)
+                .help(targetOffline ? model.offlineHelp(for: targetHost)
                                     : PromptWords.sendHelp(willQueue: willQueue))
                 .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
             }

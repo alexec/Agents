@@ -82,7 +82,7 @@ struct HostWindow: View {
     private var thisMac: some View {
         card {
             HStack(alignment: .center, spacing: 12) {
-                Circle().fill(model.daemonRunning ? Color.green : Color.secondary.opacity(0.4)).frame(width: 9, height: 9)
+                Circle().fill(thisMacDot).frame(width: 9, height: 9)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("This Mac").font(.headline)
                     Text(thisMacLine).font(.callout).foregroundStyle(.secondary)
@@ -142,9 +142,19 @@ struct HostWindow: View {
         .accessibilityLabel("This Mac")
     }
 
+    /// Grey when the process is down, orange when it is up and has no membership (#303).
+    private var thisMacDot: Color {
+        guard model.daemonRunning else { return Color.secondary.opacity(0.4) }
+        if model.hostJoin?.member == false { return .orange }
+        return .green
+    }
+
     private var thisMacLine: String {
         guard model.daemonRunning else {
             return model.settings.role == .none ? "Not running agents yet · Agents Host \(model.version)" : "Starting… · Agents Host \(model.version)"
+        }
+        if model.hostJoin?.member == false {
+            return "Running, and not joined to the control plane · Agents Host \(model.version)"
         }
         var parts = ["Running your agents"]
         if let working = model.working { parts.append("\(working) working") }
