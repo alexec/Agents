@@ -20,6 +20,10 @@ public final class FolderWatch: @unchecked Sendable {
     public static let maximumExclusions = 8
 
     private let fd: Int32
+    private let stopReadFD: Int32
+    private let stopWriteFD: Int32
+    private let readerFinished = DispatchSemaphore(value: 0)
+    private let stopCompleted = DispatchSemaphore(value: 0)
     /// Folders never watched, nor anything below them (#173): a build there would take a
     /// watch per output folder and wake us for every file.
     private let excluded: [String]
@@ -39,9 +43,22 @@ public final class FolderWatch: @unchecked Sendable {
         // inotify has no limit of its own: every folder left out is one never watched (#216).
         excluded = excluding.map { $0.standardizedFileURL.path }
         fd = inotify_init1(Int32(IN_CLOEXEC))
-        guard fd >= 0 else { return }
+        var pipeFDs: [Int32] = [0, 0]
+        guard fd >= 0, pipe2(&pipeFDs, Int32(O_CLOEXEC | O_NONBLOCK)) == 0 else {
+            if fd >= 0 { _ = close(fd) }
+            stopReadFD = -1
+            stopWriteFD = -1
+            stopped = true
+            return
+        }
+        stopReadFD = pipeFDs[0]
+        stopWriteFD = pipeFDs[1]
         addTree(root.path)
-        let thread = Thread { [weak self] in self?.readLoop() }
+        let finished = readerFinished
+        let thread = Thread { [weak self] in
+            defer { finished.signal() }
+            self?.readLoop()
+        }
         thread.name = "AgentsKit.FolderWatch"
         thread.stackSize = 256 * 1024
         thread.start()
@@ -61,10 +78,26 @@ public final class FolderWatch: @unchecked Sendable {
 
     public func stop() {
         lock.lock()
-        guard !stopped else { lock.unlock(); return }
+        guard !stopped else {
+            let alreadyStopped = stopReadFD < 0
+            lock.unlock()
+            if !alreadyStopped { stopCompleted.wait(); stopCompleted.signal() }
+            return
+        }
         stopped = true
         lock.unlock()
-        if fd >= 0 { _ = close(fd) }
+        if stopWriteFD >= 0 {
+            var byte: UInt8 = 1
+            _ = withUnsafePointer(to: &byte) { write(stopWriteFD, $0, 1) }
+            readerFinished.wait()
+            _ = close(fd)
+            _ = close(stopReadFD)
+            _ = close(stopWriteFD)
+            lock.lock()
+            directories.removeAll()
+            lock.unlock()
+            stopCompleted.signal()
+        }
     }
 
     deinit { stop() }
@@ -102,6 +135,11 @@ public final class FolderWatch: @unchecked Sendable {
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 8)
         defer { buffer.deallocate() }
         while true {
+            var descriptors = [pollfd(fd: fd, events: Int16(POLLIN), revents: 0),
+                               pollfd(fd: stopReadFD, events: Int16(POLLIN), revents: 0)]
+            let ready = poll(&descriptors, nfds_t(descriptors.count), -1)
+            if ready < 0 && errno == EINTR { continue }
+            guard ready > 0, descriptors[1].revents == 0 else { return }
             let n = read(fd, buffer, size)
             if n < 0 && errno == EINTR { continue }
             guard n > 0 else { return }
