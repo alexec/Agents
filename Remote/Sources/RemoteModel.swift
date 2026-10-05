@@ -368,11 +368,21 @@ final class RemoteModel {
     /// repository until the Mac says otherwise, which keeps the row hidden.
     private(set) var startWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var startDraftID: UUID?
+    /// The host `startDraftID` was made on: the sheet's project's (#240).
+    private var startDraftHost: HostID = .mac
     /// Bumped by every fetch of a runtime's choices, so an answer for a runtime the
     /// person has since moved off is recognised as that and let go.
     private var startGeneration = 0
 
-    var startRuntime: RuntimeStatus? { runtimes.first { $0.runtime.id == startRuntimeID } }
+    var startRuntime: RuntimeStatus? { startRuntimes.first { $0.runtime.id == startRuntimeID } }
+
+    /// What the sheet offers: the runtimes of the project's own host, the Mac's or a
+    /// server's, as the window lists them (#240).
+    var startRuntimes: [RuntimeStatus] { runtimes(on: startHost) }
+
+    private var startAvailableRuntimeIDs: [String] {
+        startRuntimes.filter(\.availability.isAvailable).map(\.runtime.id)
+    }
 
     /// What the sheet reads: the runtimes to choose from, and, for its runtime menu, what
     /// the Mac's allowances say, before it is opened rather than after whoever happens to
@@ -389,8 +399,8 @@ final class RemoteModel {
             await showing(Self.startParts)
         }
         guard startingIn == folder else { return }
-        if startRuntimeID == nil || !availableRuntimeIDs.contains(startRuntimeID ?? "") {
-            startRuntimeID = work.defaultRuntimeID(available: availableRuntimeIDs)
+        if startRuntimeID == nil || !startAvailableRuntimeIDs.contains(startRuntimeID ?? "") {
+            startRuntimeID = work.defaultRuntimeID(available: startAvailableRuntimeIDs)
         }
         await loadStartChoices()
     }
@@ -414,9 +424,9 @@ final class RemoteModel {
 
     /// The repository's worktrees for the sheet. Asked once when it opens, never polled.
     private func loadStartWorktrees(in folder: URL) async {
-        let answer = (try? await client.call(DaemonAPI.Method.worktreesList,
-                                             DaemonAPI.WorktreesListRequest(folder: folder),
-                                             returning: DaemonAPI.WorktreesListResponse.self))
+        let request = DaemonAPI.WorktreesListRequest(folder: folder)
+        let answer = (try? await client(for: request).call(DaemonAPI.Method.worktreesList, request,
+                                                           returning: DaemonAPI.WorktreesListResponse.self))
             ?? .notARepository
         guard startingIn == folder else { return }
         startWorktrees = answer
@@ -456,9 +466,10 @@ final class RemoteModel {
         guard let folder = startOptionsFolder else { return }
         guard let runtimeID = startRuntimeID else {
             // Not "asking": there is nobody to ask.
-            startChoicesState = .failed(runtimes.isEmpty
-                ? "No runtimes are set up on the Mac. Set one up there to start an agent."
-                : "None of the Mac's runtimes can start right now.")
+            let host = startHost == .mac ? "the Mac" : hostName(startHost)
+            startChoicesState = .failed(startRuntimes.isEmpty
+                ? "No runtimes are set up on \(host). Set one up there to start an agent."
+                : "None of \(host)'s runtimes can start right now.")
             return
         }
         startGeneration += 1
@@ -467,12 +478,15 @@ final class RemoteModel {
         startOptions = []
         startChosen = [:]
         startChoicesState = .loading
+        let host = startHost
         do {
-            let response = try await client.call(DaemonAPI.Method.agentsOptions,
-                                                 DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: folder),
-                                                 returning: DaemonAPI.OptionsResponse.self)
-            guard generation == startGeneration else { discard(draft: response.draftID); return }
+            // Made on the project's own host, where the agent will start (#240).
+            let request = DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: folder)
+            let response = try await client(for: request).call(DaemonAPI.Method.agentsOptions, request,
+                                                               returning: DaemonAPI.OptionsResponse.self)
+            guard generation == startGeneration else { discard(draft: response.draftID, on: host); return }
             startDraftID = response.draftID
+            startDraftHost = host
             showStart(response.options, opening: true)
         } catch {
             guard generation == startGeneration else { return }
@@ -520,13 +534,14 @@ final class RemoteModel {
     private func discardStartDraft() {
         guard let startDraftID else { return }
         self.startDraftID = nil
-        discard(draft: startDraftID)
+        discard(draft: startDraftID, on: startDraftHost)
     }
 
     /// Not waited on: the sheet has moved on, and a Mac too old to know the method has
-    /// nothing to be told.
-    private func discard(draft: UUID) {
-        Task { _ = try? await client.call(DaemonAPI.Method.agentsDiscardDraft,
+    /// nothing to be told. To the host the draft was made on (#240).
+    private func discard(draft: UUID, on host: HostID) {
+        let target = host == .mac ? client : otherHosts[host] ?? client
+        Task { _ = try? await target.call(DaemonAPI.Method.agentsDiscardDraft,
                                           DaemonAPI.DiscardDraftRequest(draftID: draft)) }
     }
 
@@ -684,6 +699,21 @@ final class RemoteModel {
     /// silently is not there reads as one the phone forgot.
     private(set) var runtimes: [RuntimeStatus] = []
     private var accounts: [String: RuntimeAccount] = [:]
+
+    /// Each other host's runtimes, as it last listed them (#240): a server project's
+    /// start sheet offers its server's, as the window's does (037).
+    private(set) var serverRuntimes: [HostID: [RuntimeStatus]] = [:]
+
+    func runtimes(on host: HostID) -> [RuntimeStatus] {
+        host == .mac ? runtimes : serverRuntimes[host] ?? []
+    }
+
+    private func refreshServerRuntimes(_ host: HostID) async {
+        guard let other = otherHosts[host],
+              let listed = try? await other.call(DaemonAPI.Method.runtimesList, Optional<String>.none,
+                                                 returning: [RuntimeStatus].self) else { return }
+        serverRuntimes[host] = RuntimeCatalog.sortedByName(listed)
+    }
 
     var availableRuntimeIDs: [String] {
         runtimes.filter(\.availability.isAvailable).map(\.runtime.id)
@@ -1111,11 +1141,18 @@ final class RemoteModel {
             if let agents = try? await other.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true)) {
                 work.replaceAgents(agents, from: id)
             }
+            await refreshServerRuntimes(id)
             let notes = other.notifications()
             let shown = work.shown
             // Read off the main actor, once, and applied there (#203).
             Task.detached(priority: .userInitiated) { [weak self] in
                 for await note in notes {
+                    // Its runtimes, and the start sheet's draft made there (#240).
+                    if note.method == DaemonAPI.Notification.runtimeChanged
+                        || note.method == DaemonAPI.Notification.draftOptions {
+                        await self?.received(note.method, note.params, fromOther: id)
+                        continue
+                    }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
                     await self?.work.apply(update, from: id)
                 }
@@ -1135,7 +1172,23 @@ final class RemoteModel {
             if !listed.contains(where: { $0.id == id }) {
                 work.replaceProjects([], from: id)
                 work.replaceAgents([], from: id)
+                serverRuntimes[id] = nil
             }
+        }
+    }
+
+    /// What another host says that the shared model does not claim, and the phone wants:
+    /// its runtimes changing, and the start sheet's draft settling there (#240).
+    private func received(_ method: String, _ params: JSONValue?, fromOther host: HostID) async {
+        switch method {
+        case DaemonAPI.Notification.runtimeChanged:
+            await refreshServerRuntimes(host)
+        case DaemonAPI.Notification.draftOptions:
+            guard host == startDraftHost,
+                  let change = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
+            settleStartDraft(change)
+        default:
+            break
         }
     }
 
@@ -2104,9 +2157,9 @@ final class RemoteModel {
     /// What a runtime last advertised for a folder, for the workflow page's menus.
     /// Empty is an answer: nothing has been remembered for it there yet.
     func rememberedOptions(runtimeID: String, cwd: URL) async -> [ConfigOption] {
-        (try? await client.call(DaemonAPI.Method.optionsRemembered,
-                                DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID, cwd: cwd),
-                                returning: [ConfigOption].self)) ?? []
+        let request = DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID, cwd: cwd)
+        return (try? await client(for: request).call(DaemonAPI.Method.optionsRemembered, request,
+                                                     returning: [ConfigOption].self)) ?? []
     }
 
     /// The mode last chosen for each runtime, on any device. `modes/changed` keeps it

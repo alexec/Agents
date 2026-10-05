@@ -171,7 +171,7 @@ The deltas are tracked by 32 issues:
 |---|---|---|---|---|
 | Its shape | A bar on the project: `A/Chat/PromptBar.swift:242-347` | A sheet: `R/StartAgent/StartAgentView.swift:25-46` | A bar: `W/views/NewAgent.tsx:154-210` | **by design** |
 | Runtimes listed by name (#154) | `RuntimeCatalog.sortedByName` | The same | `W/model/runtimes.ts` | **same** |
-| Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | Always, from the Mac's one list: `R/StartAgent/ChoiceRows.swift:57-129`, `R/RemoteModel.swift:682` | Startable only, flat: `W/views/NewAgent.tsx:45, 193-201` | **delta**: web #257; Remote per host #240 |
+| Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | The project's host's runtimes, split only for this Mac's projects: `R/StartAgent/ChoiceRows.swift:57-140`, `R/RemoteModel.swift` `startRuntimes` (#240) | Startable only, flat: `W/views/NewAgent.tsx:45, 193-201` | **delta**: web #257 |
 | Default runtime | The kept form's, else Claude: `A/Chat/PromptBar.swift:1109-1117` | The latest agent's, else Claude: `K/Client/AgentsModel.swift:1079-1086` | The latest agent's: `W/views/NewAgent.tsx:46-51` | **delta**: #264 |
 | A model out of the pool (#140) | In the chooser | In the menu row | A line under the menus | **by design** (#140) |
 | Model, effort, permission | `A/Chat/PromptBar.swift:788-887` | `R/StartAgent/ChoiceRows.swift:22-50, 186-290` | Pills: `W/views/NewAgent.tsx:203-206` | **same** |

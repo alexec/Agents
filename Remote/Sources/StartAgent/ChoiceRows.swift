@@ -64,16 +64,16 @@ struct ChoiceRows: View {
                     runtimeButtons(in: outRuntimes, out: true)
                 }
             } else {
-                runtimeButtons(in: model.runtimes)
+                runtimeButtons(in: model.startRuntimes)
             }
         } label: {
             LabeledContent("Runtime") {
-                Text(model.startRuntime?.runtime.name ?? "None set up on the Mac")
+                Text(model.startRuntime?.runtime.name ?? "None set up on \(model.startHost == .mac ? "the Mac" : model.hostName(model.startHost))")
                     .foregroundStyle(.secondary)
             }
             .appText(.reading)
         }
-        .disabled(model.runtimes.isEmpty)
+        .disabled(model.startRuntimes.isEmpty)
         .accessibilityLabel("Runtime, \(model.startRuntime?.runtime.name ?? "none")")
     }
 
@@ -95,6 +95,8 @@ struct ChoiceRows: View {
     /// which is a reason in the out run and a throttle in the other.
     private func detail(for status: RuntimeStatus, out: Bool) -> String? {
         if let reason = status.unavailableReason { return reason }
+        // The allowances are the Mac's, and say nothing of a server's runtime (#240).
+        guard splitsByAllowance else { return nil }
         return out ? outNote(status.runtime.id) : availableNote(status.runtime.id)
     }
 
@@ -104,12 +106,20 @@ struct ChoiceRows: View {
     /// until its plan is back, and hiding it would hide the only way back to it. Naming
     /// it as out is the whole of the change: a list of runtimes by name says nothing
     /// about which ones will turn a message down.
+    ///
+    /// A server project's runtimes are left in one run, as the window leaves them (#240):
+    /// the allowances are the Mac's own, and would label a server's runtime with the
+    /// Mac's state.
+    private var splitsByAllowance: Bool { model.startHost == .mac }
+
     private var availableRuntimes: [RuntimeStatus] {
-        model.runtimes.filter { !isOut($0.id) }
+        guard splitsByAllowance else { return model.startRuntimes }
+        return model.startRuntimes.filter { !isOut($0.id) }
     }
 
     private var outRuntimes: [RuntimeStatus] {
-        model.runtimes.filter { isOut($0.id) }
+        guard splitsByAllowance else { return [] }
+        return model.startRuntimes.filter { isOut($0.id) }
     }
 
     private func isOut(_ runtimeID: String) -> Bool {
