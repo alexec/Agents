@@ -21,6 +21,11 @@ for package in Packages/AgentsKit Packages/CodeText; do
     [ -n "$f" ] || continue
     if [ "${1:-}" = --filter ]; then echo "$package $f"; continue; fi
     echo "perf-tests: $package" >&2
-    AGENTS_RUN_PERF=1 swift test --package-path "$package" --filter "$f" || status=1
+    # One at a time, so the budgets do not compete with each other; CodeText in release,
+    # where its first-screen budget is compiled in.
+    config=
+    [ "$package" != Packages/CodeText ] || config="-c release -Xswiftc -enable-testing"
+    # shellcheck disable=SC2086
+    AGENTS_RUN_PERF=1 swift test --package-path "$package" $config --no-parallel --filter "$f" || status=1
 done
 exit $status

@@ -8,36 +8,39 @@ import Foundation
 /// to them when they come, rather than dropped, which left the session's event stream
 /// open for good (#225).
 final class ExitRelay: @unchecked Sendable {
+    enum Event: Sendable {
+        case error(String)
+        case exit(Int32)
+    }
+
     private let lock = NSLock()
     private var handler: (@Sendable (Int32) -> Void)?
     private var errorHandler: (@Sendable (String) -> Void)?
     private var earlyExit: Int32?
     private var earlyErrors: [String] = []
 
+    /// The handlers are called under the lock, so what was kept and what comes live are
+    /// handed on in one order, errors before the exit; they must only hand on, never wait.
     func setHandlers(exit: @escaping @Sendable (Int32) -> Void, error: @escaping @Sendable (String) -> Void) {
-        lock.lock()
+        lock.lock(); defer { lock.unlock() }
         handler = exit
         errorHandler = error
-        let errors = earlyErrors, status = earlyExit
+        for text in earlyErrors { error(text) }
+        if let earlyExit { exit(earlyExit) }
         earlyErrors = []
         earlyExit = nil
-        lock.unlock()
-        for text in errors { error(text) }
-        if let status { exit(status) }
     }
 
     func exited(_ status: Int32) {
-        lock.lock()
-        guard let h = handler else { earlyExit = status; lock.unlock(); return }
-        lock.unlock()
-        h(status)
+        lock.lock(); defer { lock.unlock() }
+        guard let handler else { earlyExit = status; return }
+        handler(status)
     }
 
     func errored(_ text: String) {
-        lock.lock()
-        guard let h = errorHandler else { earlyErrors.append(text); lock.unlock(); return }
-        lock.unlock()
-        h(text)
+        lock.lock(); defer { lock.unlock() }
+        guard let errorHandler else { earlyErrors.append(text); return }
+        errorHandler(text)
     }
 }
 
@@ -61,9 +64,22 @@ extension ACPSession {
         let session = ACPSession(transport: process.transport, process: process, program: executable,
                                  capabilities: capabilities, launch: launch,
                                  authMethodBeforeContinuing: authMethodBeforeContinuing)
+        // One stream and one task, so the session hears stderr and the exit in the order
+        // they came: a task each could end the session's events before its last words
+        // (#225 review).
+        let (events, sink) = AsyncStream<ExitRelay.Event>.makeStream()
         relay.setHandlers(
-            exit: { status in Task { await session.noteExit(status: status) } },
-            error: { text in Task { await session.note(standardError: text) } })
+            exit: { sink.yield(.exit($0)); sink.finish() },
+            error: { sink.yield(.error($0)) })
+        Task { [weak session] in
+            for await event in events {
+                guard let session else { return }
+                switch event {
+                case .error(let text): await session.note(standardError: text)
+                case .exit(let status): await session.noteExit(status: status)
+                }
+            }
+        }
         return session
     }
 
