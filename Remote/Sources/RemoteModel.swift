@@ -234,6 +234,25 @@ final class RemoteModel {
 
     var projects: [DaemonAPI.ProjectSummary] { work.liveProjects }
 
+    func addProject(folder path: String) async -> String? {
+        let request = DaemonAPI.ProjectRequest(folder: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
+        do {
+            let summary = try await client.call(DaemonAPI.Method.projectsAdd, request, returning: DaemonAPI.ProjectSummary.self)
+            await catchUp()
+            selectedProject = summary.project.folder
+            return nil
+        } catch { return sentence(for: error) }
+    }
+
+    func cloneProject(url: String) async -> String? {
+        let request = DaemonAPI.CloneRequest(url: url)
+        do {
+            _ = try await client.call(DaemonAPI.Method.projectsClone, request, returning: DaemonAPI.ProjectSummary.self)
+            await catchUp()
+            return nil
+        } catch { return sentence(for: error) }
+    }
+
     /// One host's heading in the project list. Several hosts, and the list is grouped
     /// under these; one host, and there is no heading, as on the Mac (058, frame H).
     struct HostSection: Identifiable {
@@ -413,10 +432,17 @@ final class RemoteModel {
     /// left on (#264), as the window's start form and the page's.
     private(set) var startRuntimeID: String?
     private static let keptStartRuntime = "startRuntimeID"
+    private func persistStartChoices() {
+        guard !startChosen.isEmpty, let startRuntimeID, let data = try? JSONEncoder().encode(startChosen) else { return }
+        UserDefaults.standard.set(data, forKey: "remote.startChoices.\(startRuntimeID)")
+    }
     /// What that runtime offers, in the order they are drawn.
     private(set) var startOptions: [ConfigOption] = []
     /// What has been chosen, by option id. Sent as the start's options.
-    private(set) var startChosen: [String: JSONValue] = [:]
+    private(set) var startChosen: [String: JSONValue] = [:] { didSet { persistStartChoices() } }
+    var startFolders: [URL] = UserDefaults.standard.stringArray(forKey: "remote.startFolders")?.map { URL(fileURLWithPath: $0) } ?? [] {
+        didSet { UserDefaults.standard.set(startFolders.map(\.path), forKey: "remote.startFolders") }
+    }
     /// The new agent's own sandbox choice (064). Nil follows its runtime's default.
     var startSandbox: SandboxChoice?
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
@@ -559,7 +585,8 @@ final class RemoteModel {
         let generation = startGeneration
         discardStartDraft()
         startOptions = []
-        startChosen = [:]
+        startChosen = UserDefaults.standard.data(forKey: "remote.startChoices.\(runtimeID)")
+            .flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
         startChoicesState = .loading
         let host = startHost
         do {
@@ -665,7 +692,7 @@ final class RemoteModel {
         let request = DaemonAPI.StartRequest(
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
-            worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
+            additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
             labels: labels)
         return await send(start: request)
     }

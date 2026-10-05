@@ -16,6 +16,7 @@ struct StartAgentView: View {
     @State private var text = ""
     @State private var attachments: [Attachment] = []
     @State private var draftLabels: [String] = []
+    @State private var folderPath = ""
     /// Why something picked could not be attached, or that a kept picture was too big
     /// to keep and needs picking again.
     @State private var attachNote: String?
@@ -25,6 +26,26 @@ struct StartAgentView: View {
         NavigationStack {
             Form {
                 ChoiceRows()
+                Section("Reach") {
+                    ForEach(model.startFolders, id: \.self) { folder in
+                        HStack {
+                            Text(folder.path).lineLimit(1)
+                            Spacer()
+                            Button("Remove") { model.startFolders.removeAll { $0 == folder } }
+                        }
+                    }
+                    HStack {
+                        TextField("Folder path", text: $folderPath)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        Button("Add") {
+                            let folder = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath)
+                            if !model.startFolders.contains(folder) { model.startFolders.append(folder) }
+                            folderPath = ""
+                        }
+                        .disabled(folderPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
                 Section("Labels") {
                     LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
                                   suggestions: model.labelSuggestions(in: project),

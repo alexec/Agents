@@ -114,6 +114,10 @@ struct SpendingRow: View {
 struct Waiting: View {
     @Environment(RemoteModel.self) private var model
     @State private var pairingAgain = false
+    @State private var folder = ""
+    @State private var gitURL = ""
+    @State private var problem: String?
+    @State private var adding = false
 
     var body: some View {
         if model.needsPairing {
@@ -131,7 +135,29 @@ struct Waiting: View {
             }
             .sheet(isPresented: $pairingAgain) { PairingView() }
         } else {
-            ProgressView()
+            VStack(spacing: 12) {
+                Text("No projects yet").appText(.title)
+                Text("Add a folder on your Mac or clone a Git repository to get started.")
+                    .appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                TextField("Folder path, such as ~/src/project", text: $folder)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+                Button("Add Folder…") {
+                    adding = true
+                    Task { problem = await model.addProject(folder: folder); adding = false }
+                }
+                .buttonStyle(.borderedProminent).disabled(folder.isEmpty || adding)
+                TextField("HTTPS or SSH Git URL", text: $gitURL)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+                Button("Clone Git URL…") {
+                    adding = true
+                    Task { problem = await model.cloneProject(url: gitURL); adding = false }
+                }
+                .buttonStyle(.bordered).disabled(gitURL.isEmpty || adding)
+                if let problem { Text(problem).appText(.fine).tinted(.failure) }
+            }
+            .padding()
         }
     }
 }
