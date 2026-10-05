@@ -371,11 +371,7 @@ extension DaemonCore {
 
     /// Save, tell every window, and re-aim the timer. After every change.
     func leasesChanged() {
-        do {
-            try leaseStore.save(leaseBook)
-        } catch {
-            DaemonLog.shared.write("could not save leases.json: \(error)")
-        }
+        keepQuietly("the resource leases") { try leaseStore.save(leaseBook) }
         broadcast(DaemonAPI.Notification.leasesChanged, buildLeaseSnapshot())
         armLeaseTimer()
         keepLeaseMinutesTicking()

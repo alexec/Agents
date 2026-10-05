@@ -42,10 +42,7 @@ public final class RetiredStore: @unchecked Sendable {
         line.append(UInt8(ascii: "\n"))
         let url = locations.retired
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        if !FileManager.default.fileExists(atPath: url.path) {
-            _ = FileManager.default.createFile(atPath: url.path, contents: nil)
-        }
-        let handle = try FileHandle(forUpdating: url)
+        let handle = try StoreCoding.openForAdding(url, appending: false)
         defer { try? handle.close() }
         let end = try handle.seekToEnd()
         // A line torn by a kill would glue itself to this one; end it first.

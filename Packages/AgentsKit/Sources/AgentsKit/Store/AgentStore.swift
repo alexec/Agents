@@ -174,8 +174,19 @@ public actor AgentStore {
         }
         try FileManager.default.createDirectory(at: locations.agent(agent.id), withIntermediateDirectories: true)
         let data = try StoreCoding.encoder.encode(agent)
-        try data.write(to: locations.record(agent.id), options: .atomic)
+        // Synced when the state moves (#212): a record a power cut left empty is an
+        // agent missing from every list. Not on every token in between, which only
+        // moves the activity time, and a sync each would be the disk's whole day.
+        if syncedStates[agent.id] != agent.state {
+            try StoreCoding.writeAtomically(data, to: locations.record(agent.id))
+            syncedStates[agent.id] = agent.state
+        } else {
+            try data.write(to: locations.record(agent.id), options: .atomic)
+        }
     }
+
+    /// The state each record was last synced to the disk in.
+    private var syncedStates: [UUID: AgentState] = [:]
 
     /// One record, mended if the rules require it.
     ///
@@ -237,12 +248,28 @@ public actor AgentStore {
     /// rather than held for the daemon's life (#209). The next write opens it again.
     /// Returns the bytes written, which is what decides whether the entry is sent
     /// whole (#203).
+    ///
+    /// A line the disk refuses is held, not dropped (#212): it goes ahead of the next one
+    /// to arrive, or when `keepHeld` finds space, so the chat keeps its order. The error
+    /// is still thrown, so the person hears the disk is full.
     @discardableResult
     public func append(_ entry: TranscriptEntry, for agentID: UUID, keepOpen: Bool = true) throws -> Int {
-        let handle = try appendHandle(for: agentID)
         defer { if !keepOpen { closeTranscript(for: agentID) } }
         var line = try StoreCoding.encoder.encode(entry)
         line.append(0x0A)
+        do {
+            try writeHeld(for: agentID)
+            try write(line, for: agentID)
+        } catch {
+            hold(line, for: agentID)
+            throw error
+        }
+        return line.count
+    }
+
+    private func write(_ line: Data, for agentID: UUID) throws {
+        if let refusal = refusingWrites { throw refusal }
+        let handle = try appendHandle(for: agentID)
         do {
             try handle.write(contentsOf: line)
         } catch {
@@ -251,7 +278,82 @@ public actor AgentStore {
             closeTranscript(for: agentID)
             throw error
         }
-        return line.count
+    }
+
+    // MARK: Lines the disk refused (#212)
+
+    /// One conversation's lines waiting for space, oldest first.
+    private struct Held {
+        var lines: [Data] = []
+        var bytes = 0
+        /// Lines let go because the hold was full, said in the chat when it is written.
+        var dropped = 0
+    }
+
+    private var held: [UUID: Held] = [:]
+    /// How much of one conversation is held while the disk is full. A streaming agent
+    /// writes a line a token; past this the oldest go, and the chat says how many.
+    static let heldBytesPerAgent = 1 << 20
+
+    /// For a test: every transcript write fails with this, as a full disk would.
+    private var refusingWrites: (any Error)?
+    func refuseWrites(_ error: (any Error)?) { refusingWrites = error }
+
+    /// How many lines of a conversation are held, and how many were let go. For a test.
+    func heldLines(of agentID: UUID) -> (lines: Int, dropped: Int) {
+        held[agentID].map { ($0.lines.count, $0.dropped) } ?? (0, 0)
+    }
+
+    /// Whether any conversation has lines waiting for space.
+    public var holdsLines: Bool { !held.isEmpty }
+
+    private func hold(_ line: Data, for agentID: UUID) {
+        var waiting = held[agentID] ?? Held()
+        waiting.lines.append(line)
+        waiting.bytes += line.count
+        while waiting.bytes > Self.heldBytesPerAgent, waiting.lines.count > 1 {
+            waiting.bytes -= waiting.lines.removeFirst().count
+            waiting.dropped += 1
+        }
+        held[agentID] = waiting
+    }
+
+    /// Write what one conversation holds, oldest first; what is written leaves the hold
+    /// as it goes, so a write that fails partway keeps only the rest.
+    private func writeHeld(for agentID: UUID) throws {
+        guard var waiting = held[agentID] else { return }
+        defer { held[agentID] = waiting.lines.isEmpty && waiting.dropped == 0 ? nil : waiting }
+        if waiting.dropped > 0 {
+            let lines = waiting.dropped
+            let at = waiting.lines.first.flatMap { try? StoreCoding.decoder.decode(TranscriptEntry.self, from: $0).at }
+            let gap = TranscriptEntry(at: at ?? Date(), kind: .notice(SessionNotice(
+                severity: "warning",
+                title: "\(lines) \(lines == 1 ? "line" : "lines") of this chat could not be kept",
+                detail: "The disk was full, and more was said than could be held until there was space.")))
+            var line = try StoreCoding.encoder.encode(gap)
+            line.append(0x0A)
+            try write(line, for: agentID)
+            waiting.dropped = 0
+        }
+        while let line = waiting.lines.first {
+            try write(line, for: agentID)
+            waiting.lines.removeFirst()
+            waiting.bytes -= line.count
+        }
+    }
+
+    /// Try every held conversation again: the disk may have space now. Returns the first
+    /// refusal, for the caller to tell; nothing is dropped by trying.
+    @discardableResult
+    public func keepHeld() -> (any Error)? {
+        var refusal: (any Error)?
+        for agentID in Array(held.keys) {
+            // A finished agent's transcript was let go (#163); written to, it is let go again.
+            let wasOpen = appendHandles[agentID] != nil
+            do { try writeHeld(for: agentID) } catch { refusal = refusal ?? error }
+            if !wasOpen { closeTranscript(for: agentID) }
+        }
+        return refusal
     }
 
     public func appendAll(_ entries: [TranscriptEntry], for agentID: UUID) throws {
@@ -262,10 +364,7 @@ public actor AgentStore {
         if let handle = appendHandles[agentID] { return handle }
         let url = locations.transcript(agentID)
         try FileManager.default.createDirectory(at: locations.agent(agentID), withIntermediateDirectories: true)
-        if !FileManager.default.fileExists(atPath: url.path) {
-            _ = FileManager.default.createFile(atPath: url.path, contents: nil)
-        }
-        let handle = try FileHandle(forUpdating: url)
+        let handle = try StoreCoding.openForAdding(url, appending: false)
         let end = try handle.seekToEnd()
         // A daemon killed mid-write leaves half a line. The next entry would be glued
         // to it and both lost to the reader, so the fragment is ended first — it stays
@@ -337,6 +436,8 @@ public actor AgentStore {
     /// is one `loadAll` cannot read, so a half-deleted agent is never listed as whole.
     private func deleteRetiredFiles(_ id: UUID) throws {
         closeTranscript(for: id)
+        held[id] = nil
+        syncedStates[id] = nil
         lineIndexes.remove(id)
         historyMarks.remove(id)
         try check(.closeTranscript)
@@ -359,6 +460,8 @@ public actor AgentStore {
     }
 
     public func closeAll() {
+        // The last chance for lines the disk refused: they live only here.
+        keepHeld()
         for (_, handle) in appendHandles { try? handle.close() }
         appendHandles.removeAll()
     }
@@ -687,12 +790,8 @@ public actor AgentStore {
 
     private func appendTurns(_ turns: [TurnSummary], for agentID: UUID) throws {
         let url = locations.turns(agentID)
-        if !FileManager.default.fileExists(atPath: url.path) {
-            _ = FileManager.default.createFile(atPath: url.path, contents: nil)
-        }
-        let handle = try FileHandle(forWritingTo: url)
+        let handle = try StoreCoding.openForAdding(url)
         defer { try? handle.close() }
-        try handle.seekToEnd()
         try handle.write(contentsOf: encoded(turns))
     }
 

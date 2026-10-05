@@ -272,7 +272,11 @@ extension DaemonCore {
             // The session may still be being made: a form shown from memory is quicker
             // than the runtime behind it. Waiting here is waiting for the start that
             // would otherwise have happened before the form appeared.
-            let made = try await usable.pending.value
+            let made: MadeSession
+            do { made = try await usable.pending.value } catch {
+                await undoWorktree(placed, for: request.worktree)
+                throw error
+            }
             session = made.session
             sessionID = made.sessionID
             appToken = made.appToken
@@ -281,11 +285,17 @@ extension DaemonCore {
             // in its own time: it may still be starting, and this start is not waiting
             // on a session it has already decided against.
             if let draft { Task { [self] in await endDraft(draft) } }
-            let made = try await freshSession(runtimeID: request.runtimeID, cwd: cwd,
+            let made: MadeSession
+            do {
+                made = try await freshSession(runtimeID: request.runtimeID, cwd: cwd,
                                               additionalDirectories: request.additionalDirectories,
                                               mcpServers: request.mcpServers,
                                               managesAgents: starter == nil,
                                               sandbox: sandbox.choice)
+            } catch {
+                await undoWorktree(placed, for: request.worktree)
+                throw error
+            }
             session = made.session
             sessionID = made.sessionID
             appToken = made.appToken
@@ -334,6 +344,7 @@ extension DaemonCore {
             try await store.save(agent)
         } catch {
             await session.end(gracePeriod: .seconds(2))
+            await undoWorktree(placed, for: request.worktree)
             throw couldNotSave(error, keeping: "the new session")
         }
         agents[agent.id] = agent

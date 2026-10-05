@@ -61,6 +61,11 @@ extension DaemonCore {
     /// Look at every volume once, and raise what crossed.
     func checkDiskSpace() async {
         loadEventsIfNeeded()
+        // Chat lines a full disk refused, tried again each look: an agent that has gone
+        // quiet writes no next line to carry them (#212).
+        if await store.holdsLines, let error = await store.keepHeld() {
+            lost(error, keeping: "the newest lines of a chat (held until there is space)")
+        }
         let folders = diskFolders()
         let reader = diskReader
         let override = diskOverride()
