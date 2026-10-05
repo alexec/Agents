@@ -84,6 +84,9 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
     : mention && mentions.value.length && putAway.value !== `@${mention.term}` ? "mentions"
     : null;
   const offered = !listing && suggestion && dismissed.value !== suggestion.id && text.value === "" ? suggestion : undefined;
+  // A different word, or none, ends what Escape put away, so the same word typed again lists again.
+  const word = command ? `/${command.term}` : mention ? `@${mention.term}` : null;
+  if (putAway.value !== null && putAway.value !== word) putAway.value = null;
 
   useEffect(() => {
     const turn = ++search.current;

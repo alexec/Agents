@@ -62,10 +62,13 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const runtimes = [...runs.available, ...runs.out];
   // The form as it was left, its runtime only while that can still start (DraftKeeper).
   const kept = useSignal(keptForm(storage));
-  const left = formFor(kept.value, runtimes.map((r) => r.runtime.id));
+  const startable = runtimes.map((r) => r.runtime.id);
+  const left = formFor(kept.value, startable);
   const runtimeID = useSignal<string | undefined>(undefined);
   // The one rule (#264): the kept runtime; else the default when it can start, else the first.
-  const chosenRuntime = runtimeID.value ?? newSessionRuntime(left.runtimeID, runtimes.map((r) => r.runtime.id));
+  // A runtime picked here counts only while this host offers it: the bar can move to another host.
+  const picked = runtimeID.value !== undefined && startable.includes(runtimeID.value) ? runtimeID.value : undefined;
+  const chosenRuntime = picked ?? newSessionRuntime(left.runtimeID, startable);
   const where = useSignal<Where>({ kind: "project" });
   const worktrees = useSignal<WorktreeSummary[]>([]);
   const branches = useSignal<BranchSummary[]>([]);
