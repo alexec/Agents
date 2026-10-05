@@ -174,7 +174,7 @@ struct BlockedTests {
     /// the lead waits on the rest again.
     @Test func wakingOnAnyResumesOnceWhenTheFirstFinishes() async throws {
         let (locations, work) = try temporary()
-        let gates = [TurnGate(), TurnGate(), TurnGate()]
+        let gates = [TurnGate(), TurnGate(), TurnGate()]  // index-ok: a literal of three
         let launcher = FakeLauncher(script: .init(), then: gates.map(Self.held))
         let core = try await makeCore(locations, launcher)
         let (a, aToken) = try await agent(core, in: work, "Lane A")

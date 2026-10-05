@@ -201,7 +201,7 @@ struct AppViewTests {
         #expect(views.first?.state == .done)
         #expect(views.first?.resultText == "Shown.")
         // Drawn where it began: between the two messages.
-        #expect(items.count == 3)
+        try #require(items.count == 3)
         if case .entry(let entry) = items[1], case .appView = entry.kind {} else { Issue.record("not where it began") }
         // And drawn at every level, as an outcome is.
         #expect(items[1].isOutcome)

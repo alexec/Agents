@@ -98,7 +98,7 @@ struct BackpressureTests {
             try one.request(1, DaemonAPI.Method.ping, host: nil)
             made.append(one)
         }
-        let clients = made
+        let clients = made  // index-ok: three, made above
         await eventually { host.openChannels.count == 3 && clients.allSatisfy { !$0.lines.isEmpty } }
         let channels = await clientChannels(router)
         try #require(channels.count == 3)

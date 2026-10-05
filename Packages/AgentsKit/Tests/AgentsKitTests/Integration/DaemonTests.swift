@@ -678,6 +678,7 @@ struct DaemonTests {
 
         await eventually("all four were started") { launcher.launchCount == 4 }
         let at = launcher.launches.map(\.at)
+        try #require(at.count == 4)
         // The first two together, and each after that a handshake behind the one two
         // before it: its lane was busy until then.
         #expect(at[1] - at[0] < .milliseconds(150), "the first two started together")

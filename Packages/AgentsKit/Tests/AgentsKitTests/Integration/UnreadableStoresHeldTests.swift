@@ -122,7 +122,7 @@ struct UnreadableStoresHeldTests {
             made.append(try #require(StoreCoding.setAside(url)))
         }
         let kept = StoreCoding.asides(of: url)
-        #expect(kept == Array(made.suffix(3)), "the newest three")
+        try #require(kept == Array(made.suffix(3)), "the newest three")
         #expect(try Data(contentsOf: kept[2]) == Data("garbage 4".utf8))
     }
 

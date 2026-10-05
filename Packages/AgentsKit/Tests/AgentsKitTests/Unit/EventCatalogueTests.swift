@@ -41,7 +41,7 @@ struct EventCatalogueTests {
         #expect(text.contains("agent.*"))
     }
 
-    @Test func everyAgentEventCarriesTheAgentsContext() {
+    @Test func everyAgentEventCarriesTheAgentsContext() throws {
         for kind in EventCatalogue.kinds(in: .agent) + [EventCatalogue.kind(named: "cost.limit_reached")!] {
             for key in ["labels", "runtime", "started_by"] { #expect(kind.details.contains(key), "\(kind.name) \(key)") }
         }
@@ -49,8 +49,10 @@ struct EventCatalogueTests {
         for name in ["agent.parked", "agent.archived", "workflow.completed"] {
             #expect(EventCatalogue.kind(named: name)!.details.contains("outcome"), "\(name)")
         }
-        #expect(EventCatalogue.kind(named: "agent.finished")!.detail("labels")?.isSet == true)
-        #expect(EventCatalogue.kind(named: "lease.granted")!.details == ["resource", "agent"])
+        let finished = try #require(EventCatalogue.kind(named: "agent.finished"))
+        let granted = try #require(EventCatalogue.kind(named: "lease.granted"))
+        #expect(finished.detail("labels")?.isSet == true)
+        #expect(granted.details == ["resource", "agent"])
     }
 
     @Test func theDescriptionListsFixedValuesAndTheContextOnce() {

@@ -32,7 +32,7 @@ struct StoreHousekeepingTests {
         let root = Self.root()
         defer { try? FileManager.default.removeItem(at: root) }
         let writer = FolderStore(root: root)
-        var records: [ClientRecord] = []
+        var records: [ClientRecord] = []  // index-ok: forty, made below
         for n in 0..<40 {
             let record = Self.client(n)
             records.append(record)
@@ -199,7 +199,7 @@ struct StoreHousekeepingTests {
         log.write("listening on 0.0.0.0:8791")
         log.write("store: one\ntwo")
         let lines = try String(contentsOf: file, encoding: .utf8).split(separator: "\n")
-        #expect(lines.count == 3)
+        try #require(lines.count == 3)
         for line in lines { #expect(line.firstMatch(of: Self.stamped) != nil, "\(line)") }
         #expect(lines[0].hasSuffix(" listening on 0.0.0.0:8791"))
         #expect(lines[2].hasSuffix(" two"))

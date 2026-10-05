@@ -18,7 +18,7 @@ struct DashboardOrderSyncTests {
 
     /// The race as the review found it: two quick drops while a refresh is out, and the
     /// replies landing in the worst order.
-    @Test func aRefreshThatLandsDuringADragDoesNotUndoIt() {
+    @Test func aRefreshThatLandsDuringADragDoesNotUndoIt() throws {
         var sync = DashboardOrderSync()
         var host = order("a", "b", "c")
         var shown = host
@@ -45,14 +45,14 @@ struct DashboardOrderSyncTests {
         #expect(shown == second)
 
         // The first send lands; its dashboard/changed asks again, and the host says first.
-        host = sent!
+        host = try #require(sent)
         let middle = sync.beginFetch(in: folder)
         let middleReply = snapshot(host)
 
         // Then the second is sent and lands, and the send is over.
         let next = sync.takeUnsent(in: folder)
         #expect(next == second)
-        host = next!
+        host = try #require(next)
         let more = sync.takeUnsent(in: folder)
         #expect(more == nil)
 

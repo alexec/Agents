@@ -103,7 +103,7 @@ struct TurnStoreTests {
         try await store.appendAll(entries, for: id)
         _ = try await store.turns(for: id)
         var kept = try keptTurns(locations, id)
-        #expect(kept.count == 5)
+        try #require(kept.count == 5)
 
         // Turns 3 and 4 off by one, as a build that skipped an unreadable line had them.
         kept[3].start += 1

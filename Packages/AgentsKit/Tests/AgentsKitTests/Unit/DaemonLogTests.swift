@@ -23,7 +23,7 @@ struct DaemonLogTests {
         log.setDestination(url)
         for n in 1...100 { log.write("line \(n)") }
         let written = lines(url)
-        #expect(written.count == 101, "appended to what was there")
+        try #require(written.count == 101, "appended to what was there")
         #expect(written.last?.hasSuffix(" line 100") == true)
         #expect(written[1].first?.isNumber == true, "each line starts with its time")
     }

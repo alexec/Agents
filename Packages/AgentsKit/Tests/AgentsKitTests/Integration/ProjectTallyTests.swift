@@ -112,7 +112,7 @@ struct ProjectTallyTests {
 
     @Test func pagesListWhatOneListWould() async throws {
         let (locations, root) = try temporary()
-        let folders = try folders(root, count: 3)
+        let folders = try folders(root, count: 3)  // index-ok: three, or it throws
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: FakeLauncher(script: FakeACPAgent.Script()))
         await core.loadFromDisk()

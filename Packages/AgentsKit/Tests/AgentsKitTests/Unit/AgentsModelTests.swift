@@ -588,7 +588,7 @@ struct AgentsModelTests {
         #expect(asked?.1 == big.id)
         #expect(asked?.2 == 7)
         model.fillOversized(big, for: id)
-        #expect(model.entries.map(\.id) == [before.id, big.id, after.id])
+        try #require(model.entries.map(\.id) == [before.id, big.id, after.id])
         #expect(model.entries[1] == big)
         guard case .toolRun? = model.transcriptItems.first(where: { $0.id == big.id }) else {
             Issue.record("the filled entry is not drawn as its tool call: \(model.transcriptItems)"); return

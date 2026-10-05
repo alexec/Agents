@@ -56,7 +56,7 @@ struct ImportedRecordTests {
 
     @Test func copiedRecordsAreShownStoppedAndNeverRun() async throws {
         let (locations, work) = try temporary()
-        let copies = try await seedCopies(try AgentStore(locations: locations), in: work, stamp: "another-root")
+        let copies = try await seedCopies(try AgentStore(locations: locations), in: work, stamp: "another-root")  // index-ok: three, or it throws
         let launcher = FakeLauncher()
         let core = try await core(launcher, locations: locations)
 

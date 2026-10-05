@@ -30,7 +30,7 @@ struct BoundedReadsTests {
     @Test func theCachesLetGoOfTheOldestOneNotAll() async throws {
         let (store, _) = try store()
         let kept = UUID()
-        let others = (0..<AgentStore.indexedTranscripts).map { _ in UUID() }
+        let others = (0..<AgentStore.indexedTranscripts).map { _ in UUID() }  // index-ok: one per transcript held, never none
         for id in [kept] + others { try await store.appendAll(turns(2), for: id) }
 
         _ = try await store.turns(for: kept)

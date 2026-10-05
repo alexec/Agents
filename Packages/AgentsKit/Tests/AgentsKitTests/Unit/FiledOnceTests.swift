@@ -52,7 +52,7 @@ struct FiledOnceTests {
 
     @Test func theBucketsAgreeWithAScanAfterEveryChange() throws {
         let model = AgentsModel()
-        var agents: [Agent] = []
+        var agents: [Agent] = []  // index-ok: three per state, made below
         for (index, state) in AgentState.allCases.enumerated() {
             agents.append(agent(api, state, at: Double(index)))
             agents.append(agent(web, state, at: Double(index) + 0.5))

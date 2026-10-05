@@ -84,7 +84,7 @@ struct DashboardTests {
         #expect(tile.number?.value == 4)
         #expect(tile.keeper == .agent(s.ids["Lead"]!))
         let snapshot = await s.core.dashboardSnapshot(s.project)
-        #expect(snapshot.tiles.map(\.id) == ["open_bugs"])
+        try #require(snapshot.tiles.map(\.id) == ["open_bugs"])
         #expect(snapshot.tiles[0].keeper.name == "Lead")
         #expect(snapshot.tiles[0].setAt == s.clock.now)
         #expect(snapshot.tiles[0].points.count == 1)
@@ -103,6 +103,7 @@ struct DashboardTests {
         let after = try FileManager.default.attributesOfItem(atPath: file(s, "open_bugs").path)[.modificationDate] as? Date
         #expect(after == modified)
         let snapshot = await s.core.dashboardSnapshot(s.project)
+        try #require(snapshot.tiles.count == 1)
         #expect(snapshot.tiles[0].setAt == s.clock.now)
         #expect(!snapshot.tiles[0].tile!.description.contains("1800"))
     }
@@ -164,9 +165,11 @@ struct DashboardTests {
         _ = try await set(s, "Lead", ["id": "live", "title": "Live", "type": "status", "level": "ok",
                                       "line": "f0711855", "stale_after_hours": 1])
         var snapshot = await s.core.dashboardSnapshot(s.project)
+        try #require(snapshot.tiles.count == 1)
         #expect(DashboardModel.shownLevel(snapshot.tiles[0], now: snapshot.now) == .ok)
         s.clock.advance(minutes: 61)
         snapshot = await s.core.dashboardSnapshot(s.project)
+        try #require(snapshot.tiles.count == 1)
         #expect(DashboardModel.isStale(snapshot.tiles[0], now: snapshot.now))
         #expect(DashboardModel.shownLevel(snapshot.tiles[0], now: snapshot.now) == .unknown)
         #expect(DashboardModel.ageWords(snapshot.tiles[0], now: snapshot.now) == "1 hour old")
@@ -174,6 +177,7 @@ struct DashboardTests {
         _ = try await set(s, "Lead", ["id": "live", "title": "Live", "type": "status", "level": "ok",
                                       "line": "f0711855", "stale_after_hours": 1])
         snapshot = await s.core.dashboardSnapshot(s.project)
+        try #require(snapshot.tiles.count == 1)
         #expect(!DashboardModel.isStale(snapshot.tiles[0], now: snapshot.now))
     }
 
@@ -225,7 +229,7 @@ struct DashboardTests {
         #expect(answer.contains("had been removed by the person, on the Mac"))
         #expect(answer.contains("posting has put it back"))
         let snapshot = await s.core.dashboardSnapshot(s.project)
-        #expect(snapshot.tiles.map(\.id) == ["open_bugs"])
+        try #require(snapshot.tiles.map(\.id) == ["open_bugs"])
         #expect(snapshot.tiles[0].points.count == 1, "its history went with it")
         let again = try await set(s, "Lead", number("open_bugs", 6))
         #expect(!again.contains("removed"), "told once")
@@ -252,6 +256,7 @@ struct DashboardTests {
         let answer = try await set(s, "New lead", arguments)
         #expect(answer.contains("You keep this tile now"))
         let snapshot = await s.core.dashboardSnapshot(s.project)
+        try #require(snapshot.tiles.count == 1)
         #expect(snapshot.tiles[0].keeper.name == "New lead")
         #expect(snapshot.tiles[0].keeperChanges.count == 1)
     }
@@ -342,7 +347,7 @@ struct DashboardTests {
 
     @Test func aRunOfEqualValuesIsKeptAsItsFirstPoint() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let points = [3.0, 3, 4, 4, 4, 3].enumerated().map {
+        let points = [3.0, 3, 4, 4, 4, 3].enumerated().map {  // index-ok: six, from a literal
             TilePoint(at: now.addingTimeInterval(Double($0.offset - 6) * 3600), value: $0.element)
         }
         #expect(DashboardStore.compacted(points, now: now).map(\.value) == [3, 4, 3])
@@ -403,7 +408,9 @@ struct DashboardTests {
         _ = try await set(s, "Lead", number("open_bugs", 5))
         s.clock.advance(minutes: 10)
         _ = try await set(s, "Lead", number("open_bugs", 7))
-        let points = await s.core.dashboardSnapshot(s.project).tiles[0].points.map(\.value)
+        let tiles = await s.core.dashboardSnapshot(s.project).tiles
+        try #require(tiles.count == 1)
+        let points = tiles[0].points.map(\.value)
         #expect(points == [6, 7])
         #expect(try Data(contentsOf: history(s, "open_bugs")) != first)
     }
@@ -574,7 +581,7 @@ struct DashboardTests {
         #expect(snapshot.note?.contains("_order.json could not be read") == true, "the page says so")
         #expect(asides(orderFile).isEmpty, "nothing set aside in the project, mid-merge")
         let kept = await outsideAsides(orderFile, s)
-        #expect(kept.count == 1)
+        try #require(kept.count == 1)
         #expect(try Data(contentsOf: kept[0]) == conflicted)
 
         // No arrange writes over it while it does not read (#205)…
