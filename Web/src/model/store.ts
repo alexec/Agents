@@ -7,7 +7,7 @@ import type {
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
-  DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
+  DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
@@ -1829,9 +1829,42 @@ export class Store extends Work {
   /** Each host's day of spending and its limits, for Spending (#151). */
   readonly costs = signal<Record<string, CostState>>({});
 
+  /** Finds a consequence's session by id when it is not already among the loaded rows. */
+  async loadEventAgent(host: string, agentID: string): Promise<Agent | undefined> {
+    const existing = this.agent(host, agentID);
+    if (existing) return existing;
+    const listed = await this.link.call("agents/list", {
+      includeArchived: true, archivedCommands: true, archivedOnly: false, lean: false,
+      agentID: agentID as UUID, limit: 1,
+    }, host).catch(() => null);
+    const agent = listed?.find((candidate: Agent) => candidate.id === agentID);
+    if (agent) this.addAgents([agent], host);
+    return agent;
+  }
+
   async loadEvents(host: string, limit = 50): Promise<void> {
     const page = await this.link.call("events/list", { limit }, host).catch(() => null);
-    if (page) this.events.value = { ...this.events.value, [host]: page };
+    if (page) {
+      const older = this.events.value[host]?.events ?? [];
+      const merged = [...page.events, ...older.filter((event) => !page.events.some((next: ActivityEvent) => next.position === event.position))]
+        .sort((a: ActivityEvent, b: ActivityEvent) => b.position - a.position);
+      this.events.value = { ...this.events.value, [host]: { ...page, events: merged } };
+    }
+  }
+
+  /** Appends one older page without losing the current head or waiting rows. */
+  async loadOlderEvents(host: string): Promise<void> {
+    const current = this.events.value[host];
+    const before = current?.events[current.events.length - 1]?.position;
+    if (!current?.hasMore || before === undefined) return;
+    const page = await this.link.call("events/list", { limit: 100, before }, host).catch(() => null);
+    if (!page) return;
+    const held = this.events.value[host];
+    if (!held) return;
+    const byPosition = new Map([...held.events, ...page.events].map((event: ActivityEvent) => [event.position, event]));
+    this.events.value = { ...this.events.value, [host]: {
+      ...held, events: [...byPosition.values()].sort((a, b) => b.position - a.position), hasMore: page.hasMore,
+    } };
   }
 
   async loadCost(host: string): Promise<void> {

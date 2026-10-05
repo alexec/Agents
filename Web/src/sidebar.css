@@ -96,6 +96,13 @@
 .with-sidebar .runtime-list li.out .strong { color: var(--tint-failure); }
 .with-sidebar .spending-today { font-size: 20px; margin: 8px 0 4px; }
 .with-sidebar .activity-body .close { color: var(--tint-failure); opacity: 1; }
+.with-sidebar .event-day { font-size: 12px; font-weight: 600; margin: 14px 8px 4px; opacity: 0.65; }
+.with-sidebar .event-list .event-name { font-family: var(--font-mono); font-size: 11px; }
+.with-sidebar .event-consequence { display: block; margin-left: 8px; }
+.with-sidebar .event-waiting { display: flex; width: 100%; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; border: 0; background: none; padding: 4px 8px; }
+.with-sidebar .event-waiting:hover { background: var(--paper-wash); }
+.with-sidebar .event-waiting .quiet { white-space: normal; }
+.with-sidebar .event-older { display: block; margin: 14px 8px; }
 
 /* A row's context menu, where it was opened. */
 .context-menu { position: fixed; top: 0; left: 0; display: flex; flex-direction: column; }
