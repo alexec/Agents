@@ -67,6 +67,9 @@ public final class Daemon: @unchecked Sendable {
         // The copies of this binary runtimes were once told to start as the MCP helper. The
         // daemon serves the app's tools itself now (#185), so nothing starts them.
         try? FileManager.default.removeItem(at: locations.helpers)
+        // Previews an earlier daemon fetched were held only in its memory (#211).
+        try? FileManager.default.removeItem(at: locations.catalogStaging)
+        Task.detached(priority: .utility) { DiskSweep.runtimeTemporaries(locations) }
         let store = try AgentStore(locations: locations)
         var discovery = discovery
         if serve, discovery.serverHome == nil { discovery.serverHome = ServerSignIn.home }

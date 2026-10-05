@@ -578,7 +578,7 @@ public actor DaemonCore {
     var catalogSession: URLSession = .shared
     var catalogEndpoints = CatalogEndpoints.from(environment: ProcessInfo.processInfo.environment)
     /// Previews fetched and not yet added, in `<root>/catalog-staging`.
-    lazy var catalogStaging = SkillStaging(root: locations.root.appending(path: "catalog-staging"))
+    lazy var catalogStaging = SkillStaging(root: locations.catalogStaging)
     /// When each source was last asked whether it has moved on, and what it said (FR-018).
     var catalogUpdateChecks: [String: SkillUpdates.Answer] = [:]
     /// Between an add's rename and its lock write, for the test that an add stopped there

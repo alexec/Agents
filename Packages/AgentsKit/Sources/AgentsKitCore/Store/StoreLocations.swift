@@ -120,6 +120,9 @@ public struct StoreLocations: Sendable {
     /// helper, until #185. Only named so a daemon starting can remove it.
     public var helpers: URL { root.appendingPathComponent("helpers", isDirectory: true) }
     public var agents: URL { root.appendingPathComponent("agents", isDirectory: true) }
+    /// Skill previews fetched and not yet added (059). Held in memory, so a daemon starting
+    /// removes what an earlier one left.
+    public var catalogStaging: URL { root.appendingPathComponent("catalog-staging", isDirectory: true) }
     /// Every project we have been told about. One file, because the only things in it
     /// are the two a project's folder cannot tell us: that it is archived, and that it
     /// was added before anything ran in it.

@@ -118,6 +118,22 @@ struct SessionLookupTests {
 
     // MARK: Listing
 
+    /// Retired sessions that left a worktree are a page's worth, newest first, and say how
+    /// many more there are: a project with hundreds does not answer with all of them (#211).
+    @Test func retiredWorktreesAreListedAPageAtATime() {
+        let left = (0..<12).map { n -> Tombstone in
+            var gone = Tombstone(from: agent("Left \(n)", state: .archived),
+                                 retiredAt: start.addingTimeInterval(Double(n) * 60), because: .age)
+            gone.worktreeRoot = URL(filePath: "/work/.worktrees/left-\(n)")
+            return gone
+        }
+        let text = SessionLookup.list(in: project, agents: [agent("Live")], caller: nil, limit: 5, leftBehind: left)
+        #expect(text.components(separatedBy: "/work/.worktrees/left-").count - 1 == 5)
+        #expect(text.contains("left-11."))
+        #expect(!text.contains("left-6."))
+        #expect(text.contains("7 more retired sessions still have their worktree"))
+    }
+
     @Test func listIncludesValuesAndOwners() {
         var labeled = agent("Review")
         labeled.labels = [SessionLabel(value: "Urgent", owner: .person),

@@ -56,7 +56,8 @@ extension DaemonCore {
 
     /// Keep a file attached on another machine where this agent can read it (037):
     /// `<its folder>/.agents/attachments/<uuid>-<name>`, private to the account. The
-    /// name is reduced to its last component so it can never climb out of there.
+    /// name is reduced to its last component so it can never climb out of there. Ones
+    /// older than `DiskSweep.attachmentAge` go as a new one comes (#211).
     public func writeAttachment(_ request: DaemonAPI.FilesWriteRequest) throws -> DaemonAPI.FilesWriteResponse {
         guard let agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
@@ -71,6 +72,7 @@ extension DaemonCore {
         let folder = agent.cwd.appendingPathComponent(".agents/attachments", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
+        DiskSweep.removeOlder(than: DiskSweep.attachmentAge, in: folder, within: agent.cwd, now: now())
         let file = folder.appendingPathComponent("\(UUID().uuidString.prefix(8))-\(name)")
         try request.data.write(to: file, options: .atomic)
         return DaemonAPI.FilesWriteResponse(path: file.path(percentEncoded: false))

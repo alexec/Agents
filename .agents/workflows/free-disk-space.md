@@ -26,7 +26,7 @@ this project's worktrees only.
 - **Only a folder `list_sessions` names** as a session's `Worktree:` is ever looked at.
   A worktree no session names (a review's, a merge's, the person's own) is left alone.
 - **Never a worktree any session is busy in.** Every session naming it must be `Done`,
-  `Parked` or `Archived`, and none may say `Holding:`. `Working`, `Waiting`, `Blocked`,
+  `Parked`, `Archived` or `Retired`, and none may say `Holding:`. `Working`, `Waiting`, `Blocked`,
   `Needs you` and `Paused` all leave it alone.
 - **Never source, and never uncommitted work.** `rm` only a folder that passes the check in
   step 3. Never `git worktree remove --force`, `git clean`, `git reset`, `git checkout`,
@@ -47,11 +47,14 @@ df -k "$P" | tail -1
 
 ## 2. Which worktrees
 
-1. Call `list_sessions`. A line with `Worktree: <path> on <branch>.` ties that folder to
-   that session. Group the lines by path.
-2. A path is **finished** if every session naming it is `Done`, `Parked` or `Archived`
-   and none says `Holding:`. It is **archived** if every session naming it is
-   `Archived` and none says `Holding:`. Every other path is kept.
+1. Call `list_sessions` with `limit: 100`, and again with the `after` each page ends with,
+   until a page says no more follow: a project has more sessions than one page (#210). A
+   line with `Worktree: <path> on <branch>.` ties that folder to that session. Group the lines by path. The lines after "Retired sessions whose
+   worktree is still there" are sessions retired with something uncommitted in their
+   worktree: they count like archived ones.
+2. A path is **finished** if every session naming it is `Done`, `Parked`, `Archived` or
+   `Retired` and none says `Holding:`. It is **archived** if every session naming it is
+   `Archived` or `Retired` and none says `Holding:`. Every other path is kept.
 3. Call `list_resources`. If a holder named there has the title of a session naming a
    finished path, keep that path too.
 4. Keep a finished path only if all of these pass; otherwise keep it and say which
@@ -70,7 +73,7 @@ df -k "$P" | tail -1
 
 ## 3. Free build output (low and critical)
 
-Call `list_sessions` again and drop any path whose sessions are no longer all finished,
+Call `list_sessions` again, every page, and drop any path whose sessions are no longer all finished,
 or now hold something. Then, for each finished path, with `W` set to it:
 
 ```sh

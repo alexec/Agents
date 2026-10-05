@@ -330,6 +330,34 @@ struct RetirementTests {
         #expect(!FileManager.default.fileExists(atPath: worktree.root.path))
     }
 
+    /// A worktree retiring cannot remove is not orphaned (#211): the tombstone keeps where
+    /// it is, and `list_sessions` names it as a retired session's, for the clean-up workflow.
+    @Test func aWorktreeRetiringCouldNotRemoveIsStillListed() async throws {
+        let (locations, work, worktree) = try await repositoryWithWorktree("locked")
+        // Clean and nothing unmerged, so nothing holds it; git refuses a locked worktree.
+        try await git(["worktree", "lock", worktree.root.path], in: work)
+        let old = archived(in: worktree, daysAgo: 0.1)
+        let caller = Agent(runtimeID: "claude", cwd: work, title: "asker", state: .finished, endedReason: .endTurn)
+        let core = try await core(locations, seeded: [old, caller])
+
+        _ = try await core.retireNow(.init(agentID: old.id, confirmed: true))
+
+        #expect(await core.agent(old.id) == nil)
+        #expect(FileManager.default.fileExists(atPath: worktree.root.path))
+        #expect(await core.retiredTombstones(.init(ids: [old.id])).first?.worktreeRoot == worktree.root)
+        let token = UUID().uuidString
+        await core.bindAppToken(token, to: caller.id)
+        let listed = try await core.listSessions(.init(token: token))
+        let line = try #require(listed.split(separator: "\n").first { $0.hasPrefix("- \(old.id.uuidString)") })
+        #expect(line.contains(SessionLookup.retiredStatus))
+        #expect(line.contains("Worktree: \(worktree.root.path) on agents/locked."))
+
+        // Once the folder is gone, nothing names it any more.
+        try await git(["worktree", "unlock", worktree.root.path], in: work)
+        try await git(["worktree", "remove", worktree.root.path], in: work)
+        #expect(!(try await core.listSessions(.init(token: token))).contains(old.id.uuidString))
+    }
+
     @Test func aWorktreeSharedWithALiveAgentIsNotAHoldAndIsLeftForIt() async throws {
         let (locations, _, worktree) = try await repositoryWithWorktree("shared")
         try "draft\n".write(to: worktree.root.appending(path: "draft.txt"), atomically: true, encoding: .utf8)
