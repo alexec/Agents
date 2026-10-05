@@ -375,6 +375,7 @@ function TileDetail({ tile, now, onClose }: { tile: TileView; now: number; onClo
         <dt>Kept by</dt><dd>{tile.keeper.name} ({tile.keeper.kind}){keeperNote(tile) ? `, ${keeperNote(tile)}` : ""}</dd>
         <dt>Set</dt><dd>{ageWords(tile, now)}</dd>
         {tile.tile?.source && <><dt>Source</dt><dd>{tile.tile.source}</dd></>}
+        {tile.tile?.stale_after_hours != null && <><dt>Greyed after</dt><dd>{tile.tile.stale_after_hours} h without a set</dd></>}
         {tile.changedOutside && <><dt>Changed</dt><dd>outside Agents: the file is not what this host last wrote</dd></>}
         {tile.problem && <><dt>Problem</dt><dd>{tile.problem}</dd></>}
         {tile.keeperChanges.map((c, i) => <><dt key={`k${i}`}>Handed over</dt><dd>{c.from} → {c.to}, {fromWireDate(c.at).toLocaleString()}</dd></>)}

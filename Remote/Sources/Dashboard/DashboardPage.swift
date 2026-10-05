@@ -52,6 +52,8 @@ struct DashboardPage: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.openURL) private var openURL
     @State private var wholeTable: TileView?
+    @State private var detail: TileView?
+    @State private var showsHidden = false
 
     private var folder: URL? { model.selectedProject }
 
@@ -61,15 +63,20 @@ struct DashboardPage: View {
             LazyVStack(alignment: .leading, spacing: 10) {
                 if let snapshot {
                     if let update = snapshot.update { updateLine(update) }
+                    Text(subtitle(snapshot)).appText(.fine).foregroundStyle(.secondary)
+                    Toggle("Show Hidden Tiles", isOn: $showsHidden)
+                        .appText(.fine)
                     // A file of this Dashboard's set aside as unreadable (#171).
                     if let note = snapshot.note {
                         Label(note, systemImage: "exclamationmark.triangle")
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                     }
-                    let sections = DashboardModel.sections(snapshot)
+                    let sections = DashboardModel.sections(snapshot, includeHidden: showsHidden)
                     if sections.isEmpty {
-                        Text("No tiles yet. Agents keep tiles here with set_tile.")
+                        Text(snapshot.tiles.contains(where: { $0.tile?.isHidden == true })
+                             ? "Every tile is hidden. Turn on Show Hidden Tiles above to bring them back."
+                             : "No tiles yet. Agents keep tiles here with set_tile.")
                             .appText(.reading).foregroundStyle(.secondary).padding(.vertical, 8)
                     }
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
@@ -77,6 +84,7 @@ struct DashboardPage: View {
                             Text(title.uppercased())
                                 .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                                 .padding(.top, 10)
+                                .contextMenu { sectionMoves(title, sections: sections, snapshot: snapshot) }
                         }
                         ForEach(Array(rows(section.tiles).enumerated()), id: \.offset) { _, row in
                             HStack(alignment: .top, spacing: 10) {
@@ -135,6 +143,23 @@ struct DashboardPage: View {
             }
             .paperSheet()
         }
+        .sheet(item: $detail) { tile in
+            NavigationStack {
+                ScrollView { RemoteTileDetail(tile: tile, now: snapshot?.now ?? .now) }
+                    .navigationTitle(tile.tile?.title ?? tile.id)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("Done") { detail = nil } }
+            }
+            .paperSheet()
+        }
+    }
+
+    private func subtitle(_ snapshot: DashboardSnapshot) -> String {
+        let name = model.selectedProject?.lastPathComponent ?? "Project"
+        guard let newest = snapshot.tiles.compactMap(\.setAt).max() else { return "\(name) · kept by its agents" }
+        let probe = TileView(id: "", tile: TileFile(title: "", type: .note, keeper: TileKeeper(), staleAfterHours: 168),
+                             setAt: newest, keeper: KeeperView(kind: .agent, id: "", name: "", state: .active))
+        return "\(name) · updated \(DashboardModel.ageWords(probe, now: snapshot.now))"
     }
 
     /// Update now's line (#146): what is going, why it can't, how the last one went.
@@ -179,15 +204,22 @@ struct DashboardPage: View {
             .onTapGesture {
                 if let rows = tile.tile?.table?.rows.count, rows > 5 { wholeTable = tile }
             }
+            .onTapGesture(count: 2) { detail = tile }
             .contextMenu {
                 if let folder {
+                    Button("Details…", systemImage: "info.circle") { detail = tile }
                     Button("Open Keeper", systemImage: "arrow.right") { model.openKeeper(tile.keeper, folder: folder) }
                         .disabled(tile.keeper.id.isEmpty)
                     moveItems(tile, folder: folder)
-                    Button("Hide", systemImage: "eye.slash") {
-                        Task { await model.actOnTile(DaemonAPI.Method.dashboardHide, folder: folder, id: tile.id) }
+                    if tile.tile?.isHidden == true {
+                        Button("Show", systemImage: "eye") {
+                            Task { await model.actOnTile(DaemonAPI.Method.dashboardShow, folder: folder, id: tile.id) }
+                        }
+                    } else {
+                        Button("Hide", systemImage: "eye.slash") {
+                            Task { await model.actOnTile(DaemonAPI.Method.dashboardHide, folder: folder, id: tile.id) }
+                        }.disabled(tile.tile == nil)
                     }
-                    .disabled(tile.tile == nil)
                     Button("Remove", systemImage: "trash", role: .destructive) {
                         Task { await model.actOnTile(DaemonAPI.Method.dashboardRemove, folder: folder, id: tile.id) }
                     }
@@ -195,18 +227,36 @@ struct DashboardPage: View {
             }
     }
 
+    @ViewBuilder
+    private func sectionMoves(_ title: String, sections: [(title: String?, tiles: [TileView])], snapshot: DashboardSnapshot) -> some View {
+        let index = sections.firstIndex { $0.title == title }
+        let order = DashboardModel.arrangement(snapshot)
+        if let index {
+            Button("Move Section Up", systemImage: "arrow.up") {
+                guard index > 0 else { return }
+                let before = sections[index - 1].title
+                Task { await model.arrangeDashboard(order.movingSection(title, before: .some(before)), folder: snapshot.folder) }
+            }.disabled(index == 0)
+            Button("Move Section Down", systemImage: "arrow.down") {
+                guard index + 1 < sections.count else { return }
+                let before = sections[index + 1].title
+                Task { await model.arrangeDashboard(order.movingSection(title, before: .some(before)), folder: snapshot.folder) }
+            }.disabled(index + 1 >= sections.count)
+        }
+    }
+
     /// Move Up, Move Down and Move to Section ▸, as the Mac's tile menu has them (#147).
     @ViewBuilder
     private func moveItems(_ tile: TileView, folder: URL) -> some View {
         if let snapshot = model.work.dashboards[Project.standardize(folder)] {
-            let shown = DashboardModel.sections(snapshot)
+            let shown = DashboardModel.sections(snapshot, includeHidden: showsHidden)
             let current = shown.first { $0.tiles.contains { $0.id == tile.id } }?.title
             Button("Move Up", systemImage: "arrow.up") {
-                arrange(DashboardModel.stepping(tile.id, by: -1, in: snapshot, includeHidden: false), folder: folder)
+                arrange(DashboardModel.stepping(tile.id, by: -1, in: snapshot, includeHidden: showsHidden), folder: folder)
             }
             .disabled(DashboardModel.neighbour(of: tile.id, in: shown, step: -1) == nil)
             Button("Move Down", systemImage: "arrow.down") {
-                arrange(DashboardModel.stepping(tile.id, by: 1, in: snapshot, includeHidden: false), folder: folder)
+                arrange(DashboardModel.stepping(tile.id, by: 1, in: snapshot, includeHidden: showsHidden), folder: folder)
             }
             .disabled(DashboardModel.neighbour(of: tile.id, in: shown, step: 1) == nil)
             let others = shown.map(\.title).filter { $0 != current }
@@ -237,6 +287,49 @@ struct DashboardPage: View {
         } else if let file = link.file.flatMap(PinRules.normalize), PinRules.kind(file) != nil {
             // A document or a page of the project's opens where a pinned one does (#159).
             model.openPin = file
+        }
+    }
+}
+
+/// Remote counterpart to the Mac's Dashboard tile detail (#127).
+private struct RemoteTileDetail: View {
+    let tile: TileView
+    let now: Date
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
+                row("File", ".agents/dashboard/\(tile.id).json")
+                if tile.tile?.type == .number { row("History", DashboardModel.historyFile(tile.id)) }
+                row("Kept by", "\(tile.keeper.name) (\(tile.keeper.kind.rawValue))" +
+                    (DashboardModel.keeperNote(tile.keeper).map { ", \($0)" } ?? ""))
+                row("Set", DashboardModel.ageWords(tile, now: now))
+                if let source = tile.tile?.source { row("Source", source) }
+                if let hours = tile.tile?.staleAfterHours { row("Greyed after", "\(hours) h without a set") }
+                if tile.changedOutside { row("Changed", "outside Agents: the file is not what this host last wrote") }
+                if let problem = tile.problem { row("Problem", problem) }
+                ForEach(Array(tile.keeperChanges.enumerated()), id: \.offset) { _, change in
+                    row("Handed over", "\(change.from) → \(change.to), \(change.at.formatted(date: .abbreviated, time: .shortened))")
+                }
+            }
+            if !tile.recent.isEmpty {
+                Text("Last values").appText(.supporting).fontWeight(.semibold)
+                ForEach(Array(tile.recent.reversed().enumerated()), id: \.offset) { _, point in
+                    HStack {
+                        Text(DashboardModel.numberWords(point.value)).monospacedDigit()
+                        Spacer()
+                        Text(point.at.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
+                    }.appText(.supporting)
+                }
+            }
+        }
+        .padding(24)
+    }
+
+    private func row(_ label: String, _ value: String) -> some View {
+        GridRow {
+            Text(label).appText(.fine).foregroundStyle(.secondary)
+            Text(value).appText(.supporting).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
         }
     }
 }
