@@ -1286,6 +1286,15 @@ public enum DaemonAPI {
     public struct TurnsRequest: Codable, Sendable {
         /// The most turns one page carries, whatever is asked for (#200).
         public static let limitCeiling = 200
+        /// How many finished turns a chat opens with, on the window and the Remote alike
+        /// (#90, #242); the page keeps the same number (`openingTurns`). A screen holds two
+        /// or three, and the rest come as the reader nears the top.
+        public static let openingTurns = 12
+
+        /// The first page of a chat's turns, as every client asks for it.
+        public static func opening(_ agentID: UUID) -> TurnsRequest {
+            TurnsRequest(agentID: agentID, limit: openingTurns)
+        }
 
         public var agentID: UUID
         /// Turns before this one, by its position among the finished turns.

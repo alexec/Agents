@@ -51,6 +51,9 @@ struct PromptBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if isShowingEverything {
+                // Where it works, its labels and its runtime, over the field as on the
+                // window and the page (#108, #242).
+                PromptHead(agent: agent)
                 PromptHeader(agent: agent,
                              leaseStatus: model.work.leaseStatus(of: agent.id),
                              waitStatus: agent.eventWait?.isOpen == true ? model.work.waitStatus(of: agent) : nil,
@@ -562,5 +565,51 @@ private struct SuggestionChip: View {
         .padding(.horizontal, 2)
         .frame(height: 36)
         .accessibilityHint("Puts this in the prompt. Nothing is sent yet.")
+    }
+}
+
+/// Over the field, as the window and the page have it (#108, #242): where the agent
+/// works, its labels, and the runtime it is on. The place is said, not offered: moving a
+/// session to another worktree (053) is the window's.
+private struct PromptHead: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+    /// The project folder's branch, for an agent working there rather than in a worktree.
+    @State private var projectBranch: String?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            if let place {
+                Text(place)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .appText(.fine)
+                    .paperRaised(in: .capsule)
+                    .accessibilityLabel("Worktree: \(place)")
+            }
+            RemoteSessionLabels(agent: agent, compact: false)
+            Spacer(minLength: 0)
+            Text(PromptWords.runtimeName(agent.runtimeID))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .appText(.fine)
+                .fixedSize()
+                .paperRaised(in: .capsule)
+                .accessibilityLabel("Runtime: \(PromptWords.runtimeName(agent.runtimeID))")
+        }
+        // Asked once a chat, as the window asks: the branch is not on the agent's record.
+        .task(id: "\(agent.id)-\(agent.cwd.path)") {
+            projectBranch = agent.worktree == nil ? await model.projectFolderBranch(of: agent) : nil
+        }
+    }
+
+    /// Its worktree, or the project folder's branch. None for an archived agent, whose
+    /// place may be gone, as on the window.
+    private var place: String? {
+        guard agent.state != .archived else { return nil }
+        return agent.worktree?.name ?? projectBranch
     }
 }
