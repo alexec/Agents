@@ -1247,14 +1247,9 @@ public final class AgentsModel {
         let folder = agent.projectFolder
         let group = group(of: agent)
         byID[agent.id] = agent
-        // The list of everything: out of its old place, into its new one.
-        var all = agents
-        if let old {
-            let at = ProjectShelf.place(of: old, in: all, by: ProjectShelf.byActivity)
-            if at < all.count, all[at].id == old.id { all.remove(at: at) } else { all.removeAll { $0.id == old.id } }
-        }
-        all.insert(agent, at: ProjectShelf.place(of: agent, in: all, by: ProjectShelf.byActivity))
-        agents = all
+        // The list of everything: out of its old place, into its new one, in place. A
+        // copy taken to change was every agent held copied for each change (#213).
+        Self.move(agent, from: old, in: &agents)
         if old == nil { agentCount = byID.count }
         if let old, old.state != .archived, agent.state == .archived { archivals &+= 1 }
         // Its shelves: in place when it stays where it was, moved when not.
@@ -1282,6 +1277,18 @@ public final class AgentsModel {
         }
     }
 
+    /// `agent` out of where `old` was and into its place by activity, in `all` itself:
+    /// one change to the array and one redraw of its readers, and no copy of it.
+    private static func move(_ agent: Agent, from old: Agent?, in all: inout [Agent]) {
+        if let old { remove(old, from: &all) }
+        all.insert(agent, at: ProjectShelf.place(of: agent, in: all, by: ProjectShelf.byActivity))
+    }
+
+    private static func remove(_ old: Agent, from all: inout [Agent]) {
+        let at = ProjectShelf.place(of: old, in: all, by: ProjectShelf.byActivity)
+        if at < all.count, all[at].id == old.id { all.remove(at: at) } else { all.removeAll { $0.id == old.id } }
+    }
+
     /// Agents let go of without being gone: an Archived fold closed, a search ended
     /// (#165). The host still has them, and lists them again when asked.
     public func forget(_ ids: some Sequence<UUID>) {
@@ -1291,7 +1298,7 @@ public final class AgentsModel {
     /// One agent out of everything (retired, 051).
     private func unfile(_ id: UUID) {
         guard let old = byID.removeValue(forKey: id) else { return }
-        agents.removeAll { $0.id == id }
+        Self.remove(old, from: &agents)
         agentCount = byID.count
         if let was = filedAs.removeValue(forKey: id) {
             shelves[ShelfKey(folder: was.folder, host: was.host)]?.remove(old, from: was.group)

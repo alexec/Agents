@@ -185,7 +185,8 @@ final class PagePictures {
 
     private let model: AppModel
     private let project: ProjectKey
-    private var held: [URL: Held] = [:]
+    /// About a page or two of diagrams, as the phone keeps (#175, #213).
+    private var held = LRUCache<URL, Held>(limit: 24)
 
     init(model: AppModel, project: ProjectKey) {
         self.model = model
@@ -195,12 +196,12 @@ final class PagePictures {
     func stamp(_ url: URL) async -> FileStamp? { await refresh(url)?.stamp }
 
     func image(_ url: URL) async -> NSImage? {
-        if let image = held[url]?.image { return image }
+        if let image = held.value(for: url)?.image { return image }
         return await refresh(url)?.image
     }
 
     private func refresh(_ url: URL) async -> Held? {
-        let known = held[url]
+        let known = held.peek(url)
         guard let reading = try? await model.readPage(url.path(percentEncoded: false), in: project,
                                                       known: known?.stamp) else { return known }
         switch reading {
@@ -208,11 +209,11 @@ final class PagePictures {
             return known
         case .image(let bytes, _, let stamp):
             let fresh = Held(stamp: stamp, image: NSImage(data: bytes))
-            held[url] = fresh
+            held.set(fresh, for: url)
             return fresh
         case .text(_, _, _, let stamp), .other(_, _, let stamp):
             let fresh = Held(stamp: stamp, image: nil)
-            held[url] = fresh
+            held.set(fresh, for: url)
             return fresh
         }
     }

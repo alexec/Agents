@@ -35,6 +35,13 @@ enum Perf {
         }
     }
 
+    /// Ends `interval` now, for one that will never be drawn: a chat that failed to open
+    /// or was left before it did (#213). Logged with why, so it is not read as a time.
+    static func end(_ interval: Interval, _ detail: String) {
+        signposter.endInterval(interval.name, interval.state)
+        log.notice("perf \(interval.name, privacy: .public) ended \(detail, privacy: .public)")
+    }
+
     /// A cost measured where it ran, logged as it is: for work that is not a wait for
     /// the screen, such as a sweep (#176).
     nonisolated static func measured(_ name: StaticString, _ took: Duration, _ detail: String = "") {
