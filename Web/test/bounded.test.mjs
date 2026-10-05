@@ -335,3 +335,71 @@ test("two quick drops are sent one at a time, and the host and page end with the
   assert.equal(shown(), "cba");
   assert.equal(link.out.length, 0);
 });
+
+function ran(n, id, extra = {}) {
+  return entry(n, { [n === id ? "toolCall" : "toolCallUpdate"]: { _0: { toolCallID: `c${id}`, title: "Run", status: "in_progress", ...extra } } });
+}
+
+test("a followed turn of few rows and many entries holds a bounded number of entries (#214)", () => {
+  const work = new Work();
+  work.watch("mac", "s");
+  work.replaceTranscript({ entries: [], firstIndex: 0 });
+  let n = 0;
+  work.apply("agent/entry", { agentID: "s", entry: asked(n++) }, "mac");
+  // Ten calls, each updated five hundred times: two rows, five thousand entries.
+  for (let c = 0; c < 10; c++) {
+    const id = n;
+    for (let u = 0; u <= 500; u++, n++) work.apply("agent/entry", { agentID: "s", entry: ran(n, id, { rawOutput: { out: `${n}` } }) }, "mac");
+  }
+  assert.equal(work.items.value.length, 2, "the ask and one run");
+  assert.ok(work.entries.value.length <= 800, `held ${work.entries.value.length}`);
+  assert.equal(work.firstEntryIndex.value + work.entries.value.length, n, "where it starts is counted");
+  assert.equal(work.hasMoreBefore.value, true);
+  const run = work.items.value[1];
+  assert.equal(run.calls.length, 10, "the rows stay as folded");
+  assert.equal(run.calls[9].rawOutput.out, `${n - 1}`, "and keep folding");
+  // Reaching the top pages the let-go entries back in, and the run is folded from all of them.
+  const before = work.firstEntryIndex.value;
+  const all = [asked(0)];
+  for (let c = 0, k = 1; c < 10; c++) { const id = k; for (let u = 0; u <= 500; u++, k++) all.push(ran(k, id, { rawOutput: { out: `${k}` } })); }
+  work.prepend({ entries: all.slice(0, before), firstIndex: 0 });
+  assert.equal(work.entries.value.length, n, "nothing held twice");
+  assert.equal(work.items.value[1].calls.length, 10);
+});
+
+test("entries heard are kept for a page only while one is on its way (#214)", () => {
+  const work = new Work();
+  work.watch("mac", "s");
+  work.apply("agent/entry", { agentID: "s", entry: said(1) }, "mac");
+  work.replaceTranscript({ entries: [asked(0)], firstIndex: 0 });
+  assert.deepEqual(work.entries.value.map((e) => e.id), ["e0", "e1"], "heard before the page, laid over it");
+  for (let i = 2; i < 50; i++) work.apply("agent/entry", { agentID: "s", entry: said(i) }, "mac");
+  // A page after that lays nothing heard before it over itself: none was collected.
+  work.replaceTranscript({ entries: [asked(100)], firstIndex: 100 });
+  assert.deepEqual(work.entries.value.map((e) => e.id), ["e100"]);
+});
+
+test("a heartbeat answered with an error keeps the link (#214)", async () => {
+  const sockets = [];
+  const l = new w.Link({ url: "ws://localhost:1/v1/connect", origin: "http://localhost:1",
+    keys: Object.assign(new w.MemoryKeyStore(), { record: { privateKey: {}, publicKey: {}, client: "C", control: "K", paired: "" } }),
+    open: () => {
+      const socket = { closed: null, onopen: null, onmessage: null, onclose: null, onerror: null,
+        send(line) {
+          const { m } = JSON.parse(line);
+          setTimeout(() => this.onmessage?.({ data: JSON.stringify({ m: { jsonrpc: "2.0", id: m.id, error: { code: -32000, message: "busy" } } }) }), 1);
+        },
+        close(code) { this.closed = code; } };
+      sockets.push(socket);
+      setTimeout(() => socket.onopen?.({}), 0);
+      return socket;
+    },
+    backoff: [0.01], heartbeat: { every: 10, within: 20 }, random: () => 0,
+    authenticate: async () => ({ name: "test" }) });
+  l.start();
+  await wait(120);
+  assert.equal(sockets.length, 1, "never redialled");
+  assert.equal(sockets[0].closed, null);
+  assert.equal(l.state.kind, "open");
+  l.stop();
+});

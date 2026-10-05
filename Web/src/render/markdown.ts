@@ -7,7 +7,7 @@
 // are links at all.
 import MarkdownIt, { type Token } from "markdown-it";
 import { memo } from "./memo";
-import { h, type ComponentChildren } from "preact";
+import { Fragment, h, type ComponentChildren } from "preact";
 
 const parser = new MarkdownIt({ html: false, linkify: true, typographer: false, breaks: false });
 
@@ -114,7 +114,74 @@ export function renderMarkdown(source: string): ComponentChildren[] {
   return build(parser.parse(source, {}));
 }
 
-/** A message's text, drawn; parsed again only when the text changes (#170). */
+const fenceOpen = /^ {0,3}(`{3,}|~{3,})/;
+const listMarker = /^([-+*]|\d{1,9}[.)])(\s|$)/;
+/** A link reference is the whole text's: one anywhere and the text is one block. */
+const linkReference = /^ {0,3}\[[^\]]+\]:/m;
+
+/** The blocks of the text last split, all but the last finished: a longer text starting with them is split from there. */
+let lastSplit: { done: string; blocks: string[]; linked: boolean } = { done: "", blocks: [], linked: false };
+
+/**
+ * Markdown cut where it parses the same in pieces as whole (#214): before a line that starts at
+ * the margin after a blank one, outside a fence, and that is no list item or quote, so no list,
+ * quote, indented code or paragraph runs across the cut. Every block but the last is finished: a
+ * message growing chunk by chunk parses only its last block again.
+ *
+ * A cut is remembered only once the line it cuts before has ended. Until then a longer line may
+ * become a list item ("2" becoming "2. item"), and keeping the cut would parse differently from
+ * the whole text.
+ */
+export function markdownBlocks(source: string): string[] {
+  const continues = lastSplit.done !== "" && source.startsWith(lastSplit.done);
+  // A link reference is resolved from anywhere, so once one is in the text it stays one block.
+  if (lastSplit.linked && continues) return [source];
+  if (linkReference.test(continues ? source.slice(lastSplit.done.length) : source)) {
+    lastSplit = { done: source, blocks: [], linked: true };
+    return [source];
+  }
+  const reuse = continues;
+  const blocks = reuse ? [...lastSplit.blocks] : [];
+  let start = reuse ? lastSplit.done.length : 0;
+  let remembered = start;
+  const rememberedBlocks = [...blocks];
+  let fence: string | null = null;
+  let blank = false;
+  let at = start;
+  while (at < source.length) {
+    const end = source.indexOf("\n", at);
+    const next = end < 0 ? source.length : end + 1;
+    const line = source.slice(at, end < 0 ? source.length : end);
+    const ended = end >= 0;
+    if (fence) {
+      if (ended && line.trimStart().startsWith(fence) && line.trim().replaceAll(fence[0]!, "") === "" && line.length - line.trimStart().length < 4) fence = null;
+    } else {
+      const isBlank = line.trim() === "";
+      if (blank && !isBlank && at > start && !/^\s/.test(line) && !line.startsWith(">") && !listMarker.test(line)) {
+        blocks.push(source.slice(start, at));
+        start = at;
+        if (ended) {
+          rememberedBlocks.push(blocks[blocks.length - 1]!);
+          remembered = at;
+        }
+      }
+      blank = isBlank;
+      const opened = fenceOpen.exec(line);
+      if (opened) fence = opened[1]!;
+    }
+    at = next;
+  }
+  lastSplit = { done: source.slice(0, remembered), blocks: rememberedBlocks, linked: false };
+  blocks.push(source.slice(start));
+  return blocks;
+}
+
+/** One finished block, parsed once. */
+const MarkdownBlock = memo(function MarkdownBlock({ text }: { text: string }): ComponentChildren {
+  return h(Fragment, null, ...renderMarkdown(text));
+});
+
+/** A message's text, drawn; only a block whose text changed is parsed again (#170, #214). */
 export const Markdown = memo(function Markdown({ text }: { text: string }): ComponentChildren {
-  return h("div", { class: "markdown" }, ...renderMarkdown(text));
+  return h("div", { class: "markdown" }, ...markdownBlocks(text).map((block, index) => h(MarkdownBlock, { key: index, text: block })));
 });
