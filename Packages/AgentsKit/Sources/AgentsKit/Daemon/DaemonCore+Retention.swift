@@ -216,6 +216,8 @@ extension DaemonCore {
         pendingPermissions = pendingPermissions.filter { $0.value.agentID != id }
         elicitations = elicitations.filter { $0.value.agentID != id }
         appTokens = appTokens.filter { $0.value != id }
+        // Nothing writes to it now until it is unarchived (#209).
+        Task { [store] in await store.closeTranscript(for: id) }
     }
 
     /// Which of those maps still hold something for this agent. For the test that keeps

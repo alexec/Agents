@@ -870,6 +870,13 @@ public actor ACPSession {
             return
         }
         lastHeard = .now
+        if method == LineSplitter.cutMethod {
+            // A message too long to read, left out (#209). Said in the conversation, as
+            // the gap it leaves there would otherwise be a silence.
+            let bytes = params?["bytes"]?.intValue ?? 0
+            eventsContinuation.yield(.entry(.runtimeNote(RuntimeNote.messageCut(bytes: bytes))))
+            return
+        }
         if method == ACP.ClientMethod.completeElicitation {
             // Finished somewhere else. The form comes down.
             if let id = params?["elicitationId"]?.stringValue {

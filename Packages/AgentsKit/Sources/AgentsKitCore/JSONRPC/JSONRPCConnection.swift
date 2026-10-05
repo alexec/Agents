@@ -21,9 +21,15 @@ public actor JSONRPCConnection {
     private let notifications: AsyncStream<(method: String, params: JSONValue?)>
     private let notificationsContinuation: AsyncStream<(method: String, params: JSONValue?)>.Continuation
 
-    /// Lines that could not be decoded. Kept rather than dropped so a runtime sending
-    /// us something unexpected is a thing we can see rather than a silence.
+    /// Lines that could not be decoded: the last few, each cut short. Kept rather than
+    /// dropped so a runtime sending us something unexpected is a thing we can see rather
+    /// than a silence, and only the last few because a runtime printing banners to stdout
+    /// does so for as long as it lives (#209).
     public private(set) var malformedLines: [String] = []
+    /// Every line that could not be decoded, over the connection's life.
+    public private(set) var malformedCount = 0
+    static let malformedKept = 8
+    static let malformedLineKept = 1024
 
     public init(transport: any LineTransport, handler: @escaping RequestHandler = { method, _ in
         .failure(.methodNotFound(method))
@@ -88,7 +94,13 @@ public actor JSONRPCConnection {
         do {
             message = try JSONRPCCodec.decode(line: line)
         } catch {
-            malformedLines.append(line)
+            malformedCount += 1
+            malformedLines.append(String(decoding: line.utf8.prefix(Self.malformedLineKept), as: UTF8.self))
+            if malformedLines.count > Self.malformedKept { malformedLines.removeFirst() }
+            return
+        }
+        if case .notification(LineSplitter.cutMethod, let params) = message {
+            answerForCutLine(params)
             return
         }
         switch message {
@@ -120,6 +132,35 @@ public actor JSONRPCConnection {
                 case .failure(let error): try? await self.send(.failure(id: id, error: error))
                 }
             }
+        }
+    }
+
+    /// A line the transport would not hold, too long to read (#209). What it was is read
+    /// from its top level as it went by, wherever its keys came: a reply to one of our
+    /// calls fails that call, a request is refused so the far end is not left waiting,
+    /// and a notification goes on as the cut notification itself, for whoever reads
+    /// them to note. A reply whose id was never found cannot be matched to its call, so
+    /// the connection is closed, failing every call, rather than leave one waiting for good.
+    private func answerForCutLine(_ params: JSONValue?) {
+        let bytes = params?["bytes"]?.intValue ?? 0
+        let id: JSONRPCID? = params?["id"].flatMap { value in
+            value.intValue.map(JSONRPCID.number) ?? value.stringValue.map(JSONRPCID.string)
+        }
+        let method = params?["method"]?.stringValue
+        let isReply = params?["reply"] == .bool(true)
+        let error = JSONRPCError(code: JSONRPCError.invalidRequest,
+                                 message: "A message of \(bytes) bytes was too long to read.")
+        WireLog.write("json-rpc: cut a line of \(bytes) bytes (\(method ?? (isReply ? "a reply" : "?")))")
+        switch (id, method) {
+        case (let id?, nil):
+            pending.removeValue(forKey: id)?.resume(throwing: error)
+        case (let id?, _?):
+            try? send(.failure(id: id, error: error))
+        case (nil, _) where isReply && params?["id"] == nil:
+            finish(with: error)
+            transport.close()
+        case (nil, _):
+            notificationsContinuation.yield((LineSplitter.cutMethod, params))
         }
     }
 

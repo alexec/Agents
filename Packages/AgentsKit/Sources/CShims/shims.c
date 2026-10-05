@@ -1,4 +1,6 @@
+#define _GNU_SOURCE
 #include "CShims.h"
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <string.h>
@@ -23,4 +25,17 @@ int agents_has_exited(pid_t pid) {
     memset(&info, 0, sizeof info);
     if (waitid(P_PID, (id_t)pid, &info, WEXITED | WNOHANG | WNOWAIT) != 0) return -1;
     return info.si_pid == pid ? 1 : 0;
+}
+
+int agents_spawn_chdir(posix_spawn_file_actions_t *actions, const char *path) {
+    return posix_spawn_file_actions_addchdir_np(actions, path);
+}
+
+int agents_wait_for_exit(pid_t pid) {
+    siginfo_t info;
+    for (;;) {
+        memset(&info, 0, sizeof info);
+        if (waitid(P_PID, (id_t)pid, &info, WEXITED | WNOWAIT) == 0) return 0;
+        if (errno != EINTR) return -1;
+    }
 }

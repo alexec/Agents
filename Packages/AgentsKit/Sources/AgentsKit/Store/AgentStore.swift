@@ -231,11 +231,16 @@ public actor AgentStore {
     // MARK: Transcripts
 
     /// Appended, never rewritten. The handle is kept open because this is called for
-    /// every chunk a runtime emits. Returns the bytes written, which is what decides
-    /// whether the entry is sent whole (#203).
+    /// every chunk a runtime emits, and only while one does: `keepOpen` false is a line
+    /// for an agent with no runtime behind it — an archive's state line, a failed
+    /// pick-up's note, a fork's copy — and its handle is let go once it is written,
+    /// rather than held for the daemon's life (#209). The next write opens it again.
+    /// Returns the bytes written, which is what decides whether the entry is sent
+    /// whole (#203).
     @discardableResult
-    public func append(_ entry: TranscriptEntry, for agentID: UUID) throws -> Int {
+    public func append(_ entry: TranscriptEntry, for agentID: UUID, keepOpen: Bool = true) throws -> Int {
         let handle = try appendHandle(for: agentID)
+        defer { if !keepOpen { closeTranscript(for: agentID) } }
         var line = try StoreCoding.encoder.encode(entry)
         line.append(0x0A)
         do {
@@ -282,6 +287,9 @@ public actor AgentStore {
     func heldTranscripts() -> (indexed: Set<UUID>, turns: Set<UUID>) {
         (Set(lineIndexes.keys), Set(turnCache.keys))
     }
+
+    /// How many transcripts are held open. For a test (#209).
+    var openTranscripts: Int { appendHandles.count }
 
     /// Let go of an agent's handle: it is finished, or archived, or the daemon is going.
     public func closeTranscript(for agentID: UUID) {

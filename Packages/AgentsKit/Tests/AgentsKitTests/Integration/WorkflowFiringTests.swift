@@ -297,12 +297,27 @@ struct WorkflowFiringTests {
               state: .running, endedReason: nil, restartPickUps: pickUps)
     }
 
-    /// There used to be a test here that a restart fires the stopped workflow for an
-    /// agent left alone after a second cut-off. Alex removed the "left alone" rule on
-    /// 2026-09-21 — every chat the daemon took is picked back up — so a restart never
-    /// ends an agent for good any more, and the trigger it owed is owed by the run
-    /// that carries on instead. The deferral itself is tested below by raising the
-    /// event by hand.
+    /// A restart picks every chat back up but one whose pick-ups keep taking the daemon
+    /// down (#209). That one is left stopped for good, so it is owed its ending: the
+    /// stopped workflow fires, as for any chat that stops.
+    @Test func anAgentLeftStoppedByACrashLoopFires() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(onStopped(), as: "on-stop", in: work)
+
+        let core = try await core(locations, seeded: [wasWorking(in: work, pickUps: Agent.pickUpsBeforeLeavingAlone)])
+        await core.holdWorkflowEventsUntilStarted()
+        let recovered = await core.recover()
+        await core.startWorkflows()
+
+        #expect(recovered.isEmpty, "it is not picked up")
+        let left = try #require(await core.allAgents().first { $0.startedByWorkflow == nil })
+        #expect(left.state == .stopped)
+        #expect(left.mayBePickedUpAfterRestart == false)
+        await eventually("the stopped workflow fired for it") {
+            await core.allAgents().contains { $0.startedByWorkflow == "on-stop" }
+        }
+    }
 
     /// FR-016. An agent about to carry on has not finished stopping.
     ///

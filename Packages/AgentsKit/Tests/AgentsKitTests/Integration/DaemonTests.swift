@@ -705,6 +705,50 @@ struct DaemonTests {
         await eventually("and counted") { await core.agent(tried.id)?.restartPickUps == 2 }
     }
 
+    /// A chat whose last pick-ups each went down with the daemon is the likeliest reason
+    /// the daemon keeps going down, and launchd's KeepAlive would start it again to pick
+    /// that chat up again for good (#209). It is left stopped, and says why.
+    @Test func aChatWhosePickUpsKeepTakingTheDaemonDownIsLeftStopped() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let looping = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s",
+                            restartPickUps: Agent.pickUpsBeforeLeavingAlone)
+        let fine = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "t",
+                         restartPickUps: Agent.pickUpsBeforeLeavingAlone - 1)
+        try await store.save(looping)
+        try await store.save(fine)
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        let recovered = await core.recover()
+        #expect(recovered == [fine.id], "only the other one is picked up")
+        await core.pickUpAfterRestart(recovered)
+
+        await eventually("the other one was started again") { launcher.launchCount == 1 }
+        let left = await core.agent(looping.id)
+        #expect(left?.state == .stopped)
+        #expect(left?.endedReason == .daemonGone, "stopped by the daemon going, which is Needs attention")
+        let entries = try await core.transcript(.init(agentID: looping.id)).entries
+        #expect(entries.contains {
+            if case .runtimeNote(let text) = $0.kind { text.hasPrefix("Not picked back up") } else { false }
+        })
+    }
+
+    /// A ship stops the daemon cleanly, and that is not the chat taking it down: three
+    /// ships during one long turn must not leave it stopped (#209).
+    @Test func aCleanShutdownClearsTheCount() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let tried = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s",
+                          restartPickUps: Agent.pickUpsBeforeLeavingAlone - 1)
+        try await store.save(tried)
+
+        let core = try core(FakeLauncher(), locations: locations)
+        _ = await core.recover()
+        await core.shutDown()
+        #expect(try await AgentStore(locations: locations).load(tried.id).agent.restartPickUps == 0)
+    }
+
     /// Reaching the end of a turn is the whole of what the count asks about.
     @Test func aTurnThatEndsClearsTheCount() async throws {
         let (locations, work) = try temporary()
