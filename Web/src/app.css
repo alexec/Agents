@@ -852,6 +852,14 @@ button.remove:hover { opacity: 1; }
 .row.entry { display: flex; align-items: center; gap: 6px; }
 .row.entry .title { flex: 1; min-width: 0; }
 .changes-head { margin: 4px 8px 6px; }
+.changes-note { margin: 0 8px 8px; line-height: 1.35; }
+.diff-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 8px 6px; }
+.diff-choice { display: inline-flex; border: 1px solid var(--paper-rule); border-radius: 999px; overflow: hidden; }
+.diff-choice button { border: 0; background: none; border-radius: 0; padding: 2px 10px; font-size: 12px; }
+.diff-choice button[aria-pressed="true"] { background: var(--paper-selection); }
+.diff-steps { display: inline-flex; gap: 4px; }
+.diff-steps button { font-size: 12px; padding: 2px 8px; }
+.diff-bar .link { margin-left: auto; font-size: 12px; }
 
 /* New project (#115): the + over the projects column, its menu, and the window's two sheets. */
 .menu-anchor.new-project { margin-right: 0; }
