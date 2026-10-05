@@ -258,9 +258,10 @@ public final class ControlRelay: @unchecked Sendable {
         while !Task.isCancelled, !stopped.isSet {
             await backoff.wait()
             for item in lock.withLock({ pending.waiting }) {
+                guard let current = lock.withLock({ pending.current(item) }) else { continue }
                 do {
-                    try await post(item)
-                    log("relay: posted again for \(item.device)")
+                    try await post(current)
+                    log("relay: posted again for \(current.device)")
                 } catch {
                     log("relay: posting again failed: \(error)")
                     break

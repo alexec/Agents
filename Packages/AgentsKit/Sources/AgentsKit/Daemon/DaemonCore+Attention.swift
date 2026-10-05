@@ -41,6 +41,7 @@ extension DaemonCore {
         needRaisedAt = Dictionary(usable.raised.map { ($0.need, $0.at) },
                                   uniquingKeysWith: { first, _ in first })
         pendingWithdrawals = usable.withdrawing
+        forwardedNeeds = Set(usable.forwarded)
         lastWrittenAttention = usable
         // What was dropped is dropped now rather than at the next thing that happens to
         // move, so the file does not keep offering a device that has gone.
@@ -64,7 +65,8 @@ extension DaemonCore {
                 .map { RaisedNote(need: $0.key, at: $0.value) }
                 .sorted { $0.need.token < $1.need.token },
             deliveries: deliveries.values.sorted { $0.needID.token < $1.needID.token },
-            withdrawing: pendingWithdrawals.sorted { $0.need.token < $1.need.token })
+            withdrawing: pendingWithdrawals.sorted { $0.need.token < $1.need.token },
+            forwarded: forwardedNeeds.sorted { $0.token < $1.token })
         // Nothing is written by a core that has not read the file. Without this, a
         // decision taken before `loadAttention()` — by anything driving a `DaemonCore`
         // without recovering it first — writes its empty memory over what the last
@@ -276,12 +278,15 @@ extension DaemonCore {
         // Met: answered anywhere, or the agent stopped or archived. Every surface hears
         // it, so the losers withdraw too (FR-016); a withdrawal names only the id.
         for id in deliveries.keys where !live.contains(id) {
-            if hostsForControlPlane { tellControlPlane(.withdraw(id)) }
+            if hostsForControlPlane { withdrawForwarded(id) }
             if let device = deliveries[id]?.to?.deviceID { withdraw(id, from: device, at: now) }
             deliveries.removeValue(forKey: id)
             cancelSettling(id)
             broadcast(DaemonAPI.Notification.attentionChanged,
                       DaemonAPI.AttentionNotification(needID: id, need: nil, to: nil, alert: false))
+        }
+        if hostsForControlPlane {
+            for id in forwardedNeeds where !live.contains(id) { withdrawForwarded(id) }
         }
         for id in settlingTimers.keys where !live.contains(id) { cancelSettling(id) }
 
@@ -354,11 +359,28 @@ extension DaemonCore {
     private func forward(_ need: Need, decision: Decision, presences: [Surface: Presence]) {
         let watched = presences.values.contains { $0.isWatching(need.agentID) }
         if decision.wait || decision.to?.isMac == true || watched {
-            tellControlPlane(.withdraw(need.id))
+            withdrawForwarded(need.id)
             return
         }
         // Nowhere this host can see is still somewhere another host's client might be.
+        guard !forwardedNeeds.contains(need.id) else { return }
         tellControlPlane(.offer(need, buzz: decision.alert || decision.to == nil))
+        forwardedNeeds.insert(need.id)
+    }
+
+    /// A restored uplink has no knowledge of offers dropped while it was down. Re-send
+    /// every live need, and clear stale offers left at the control plane.
+    func controlUplinkChanged(_ up: Bool) {
+        guard up, hostsForControlPlane else { return }
+        let live = Set(needs().map(\.id))
+        for id in forwardedNeeds where !live.contains(id) { withdrawForwarded(id) }
+        forwardedNeeds.subtract(live)
+        reconsider()
+    }
+
+    private func withdrawForwarded(_ id: NeedID) {
+        guard forwardedNeeds.remove(id) != nil else { return }
+        tellControlPlane(.withdraw(id))
     }
 
     private func tellControlPlane(_ message: DaemonAPI.AttentionNeed) {

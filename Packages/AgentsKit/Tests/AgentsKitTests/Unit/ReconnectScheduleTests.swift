@@ -172,6 +172,16 @@ struct ReconnectScheduleTests {
         #expect(pending.count == 1)
     }
 
+    @Test func aRetrySnapshotIsReplacedByAWithdrawalBeforeItIsPosted() {
+        var pending = PendingPosts()
+        let phone = UUID(), need = NeedID.permission(UUID())
+        let offered = item(phone, need, envelope: true, at: 1)
+        pending.keep(offered)
+        pending.keep(item(phone, need, envelope: false, at: 2))
+        #expect(pending.current(offered)?.envelope == nil)
+        #expect(pending.current(item(phone, need, envelope: false, at: 2))?.envelope == nil)
+    }
+
     @Test func whatIsKeptIsBounded() {
         var pending = PendingPosts(limit: 3)
         let phone = UUID()

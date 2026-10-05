@@ -47,16 +47,19 @@ public struct AttentionRecords: Codable, Hashable, Sendable {
     public var raised: [RaisedNote]
     public var deliveries: [Delivery]
     public var withdrawing: [PendingWithdrawal]
+    /// Need ids offered to the control plane, including needs with no local delivery.
+    public var forwarded: [NeedID]
 
     /// How long a withdrawal keeps trying. A retry, not a queue: seven days matches the
     /// spend ledger's horizon and exists so this cannot grow without end.
     public static let withdrawalHorizon: TimeInterval = 7 * 24 * 60 * 60
 
     public init(raised: [RaisedNote] = [], deliveries: [Delivery] = [],
-                withdrawing: [PendingWithdrawal] = []) {
+                withdrawing: [PendingWithdrawal] = [], forwarded: [NeedID] = []) {
         self.raised = raised
         self.deliveries = deliveries
         self.withdrawing = withdrawing
+        self.forwarded = forwarded
     }
 
     /// One bad entry costs that entry, not the file — the rule `Lossy` already gives the
@@ -70,10 +73,12 @@ public struct AttentionRecords: Codable, Hashable, Sendable {
             .compactMap(\.value)
         withdrawing = (try c.decodeIfPresent([Lossy<PendingWithdrawal>].self, forKey: .withdrawing) ?? [])
             .compactMap(\.value)
+        forwarded = (try c.decodeIfPresent([Lossy<NeedID>].self, forKey: .forwarded) ?? [])
+            .compactMap(\.value)
     }
 
     enum CodingKeys: String, CodingKey {
-        case raised, deliveries, withdrawing
+        case raised, deliveries, withdrawing, forwarded
     }
 
     /// What may actually be acted on, given the devices this daemon knows and the time.
@@ -96,7 +101,7 @@ public struct AttentionRecords: Codable, Hashable, Sendable {
             withdrawing: withdrawing.filter { withdrawal in
                 knownDevices.contains(withdrawal.device)
                     && now.timeIntervalSince(withdrawal.decidedAt) < Self.withdrawalHorizon
-            })
+            }, forwarded: forwarded)
     }
 }
 
