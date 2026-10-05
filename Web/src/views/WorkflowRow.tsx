@@ -1,13 +1,13 @@
 // One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark, its
 // name, what it is in one line, and Run Now. Chosen, it opens its page in the chat's place, as the
 // window's list does (#98); its ··· menu turns it off or on (#100). A workflow waiting for its OK
-// is approved on its page, which shows what it would run (#142); the row says so instead of
+// can be approved, archived or brought back in its menu, as in the window (#260).
 // offering to run it. One turned off still runs now, as the window's does.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { isOn, workflowStatus, workflowSummary } from "../model/workflows";
+import { isOn, waitsItsTurn, workflowStatus, workflowSummary } from "../model/workflows";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
@@ -28,7 +28,7 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick }: 
         </span>
       </button>
       <RunNow store={store} host={host} summary={summary} disabled={disabled} />
-      {!summary.isArchived && <WorkflowMenu store={store} host={host} summary={summary} disabled={disabled} />}
+      <WorkflowMenu store={store} host={host} summary={summary} disabled={disabled} />
     </div>
   );
 }
@@ -50,7 +50,7 @@ export function RunNow({ store, host, summary, disabled, wide }: {
   );
 }
 
-/** The row's menu: Turn Off or Turn On (#100), as the window's row and the Remote's have it. */
+/** The row's workflow actions, as the window's row menu has them. */
 function WorkflowMenu({ store, host, summary, disabled }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean;
 }) {
@@ -71,11 +71,18 @@ function WorkflowMenu({ store, host, summary, disabled }: {
         aria-expanded={open.value} disabled={disabled} onClick={() => (open.value = !open.value)}>···</button>
       {open.value && (
         <div class="popover right" role="menu">
-          <button role="menuitem" title={on ? "None of its triggers run it until it is turned on again; Run Now still does"
-            : "Let its triggers run it again"}
-            onClick={() => { open.value = false; void store.setWorkflowEnabled(host, summary, !on); }}>
-            {on ? "Turn Off" : "Turn On"}
-          </button>
+          {summary.isArchived ? (
+            <button role="menuitem" disabled={disabled} onClick={() => { open.value = false; void store.setWorkflowArchived(host, summary, false); }}>Bring Back</button>
+          ) : <>
+            {summary.awaitingApproval && !waitsItsTurn(summary) && <button role="menuitem" disabled={disabled || summary.overLimit !== undefined}
+              onClick={() => { open.value = false; void store.approveWorkflow(host, summary); }}>Approve</button>}
+            <button role="menuitem" disabled={disabled} title={on ? "None of its triggers run it until it is turned on again; Run Now still does"
+              : "Let its triggers run it again"}
+              onClick={() => { open.value = false; void store.setWorkflowEnabled(host, summary, !on); }}>
+              {on ? "Turn Off" : "Turn On"}
+            </button>
+            <button role="menuitem" disabled={disabled} onClick={() => { open.value = false; void store.setWorkflowArchived(host, summary, true); }}>Archive</button>
+          </>}
         </div>
       )}
     </span>

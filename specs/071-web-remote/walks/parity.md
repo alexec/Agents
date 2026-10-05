@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 205 rows: **88 same**, **38 by design**, **79 delta** (after #238–#244, #255–#259, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 205 rows: **93 same**, **38 by design**, **74 delta** (after #238–#244, #255–#260, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -27,7 +27,7 @@ Of 205 rows: **88 same**, **38 by design**, **79 delta** (after #238–#244, #25
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 12 | 6 | 3 |
 | Dashboard and pins | 8 | 0 | 6 |
-| Workflows page | 6 | 1 | 7 |
+| Workflows page | 11 | 1 | 2 |
 | Settings and Project Settings | 1 | 6 | 0 |
 | Pool, runtimes and spending | 2 | 1 | 7 |
 | Events and resources | 1 | 1 | 3 |
@@ -244,12 +244,12 @@ The deltas are tracked by 30 issues:
 |---|---|---|---|---|
 | Status card (#142) | `A/Projects/WorkflowPage.swift:225-273`, `S/WorkflowStatus.swift` | `R/Projects/WorkflowPage.swift:120-165` | `W/views/WorkflowPage.tsx:83-95` | **same** |
 | An unreadable workflow file | Its text under *The file is below*: `A/Projects/WorkflowPage.swift:211-218` | Its text under *The file is below*: `R/Projects/WorkflowPage.swift` | *Fix its file*: `W/model/workflows.ts:541` | **delta**: web #260 |
-| Triggers, next runs, last ran (#98, #99) | `A/Projects/WorkflowPage.swift:285-452` | `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx:109-150` | **delta**: web #260 |
-| An event trigger's words | Its catalogue meaning | n/a | The event's name: `W/model/workflows.ts:70-75` | **delta**: web #260 |
-| Recent runs | Asked of the host, archived included, Show more: `A/Projects/WorkflowPage.swift:848-879` | The same: `R/Projects/WorkflowPage.swift:547-567` | Loaded ones, up to 6: `W/views/WorkflowPage.tsx:47-49, 153` | **delta**: web #260 |
+| Triggers, next runs, last ran (#98, #99) | `A/Projects/WorkflowPage.swift:285-452` | `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx` | **same** |
+| An event trigger's words | Its catalogue meaning | n/a | Catalogue meaning, including “An agent here publishes custom.<name>” | **same** |
+| Recent runs | Asked of the host, archived included, Show more: `A/Projects/WorkflowPage.swift:848-879` | The same: `R/Projects/WorkflowPage.swift:547-567` | Asked of the host, archived included, 3 then Show more | **same** |
 | Enabled switch, in the file (#100, #125) | `A/Projects/WorkflowPage.swift:177-186` | `R/Projects/WorkflowPage.swift:194-196` | `W/views/WorkflowPage.tsx:71-75` | **same** |
-| Approve | Page and row menu: `A/Projects/ProjectWorkRows.swift:166-168` | Page and row menu: `R/Projects/WorkflowPage.swift`, `R/Sidebar/SidebarRows.swift` | Page: `W/views/WorkflowPage.tsx:64-68` | **delta**: web #260 |
-| Archive and Bring Back | Page, row menu, swipe | Toolbar, long press | Page: `W/views/WorkflowPage.tsx:58-78`; not the row | **delta**: web #260 |
+| Approve | Page and row menu: `A/Projects/ProjectWorkRows.swift:166-168` | Page and row menu: `R/Projects/WorkflowPage.swift`, `R/Sidebar/SidebarRows.swift` | Page and row menu: `W/views/WorkflowPage.tsx`, `W/views/WorkflowRow.tsx` | **same** |
+| Archive and Bring Back | Page, row menu, swipe | Toolbar, long press | Page and row menu | **same** |
 | Run Now | Page and row menu | Page and long press | Page and the row | **same** |
 | The row's second line | Summary | Next run and last outcome: `R/Projects/WorkflowsSection.swift:142-162` | Summary | **by design** (the card has room) |
 | Settings: runtime, permission, model, effort, labels (#162) | `A/Projects/WorkflowPage.swift:479-592` | A row each: `R/Projects/WorkflowPage.swift:291-512` | Pills: `W/views/WorkflowSettings.tsx:44-139` | **same** |
