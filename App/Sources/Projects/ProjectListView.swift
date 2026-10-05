@@ -23,6 +23,8 @@ struct ProjectListView: View {
     /// What the folds filter by: the field's words once typing pauses, so a keystroke
     /// costs the field and not a pass over every project (#176).
     @State private var searched = ""
+    /// Bumped to make the list again when its outline has drifted from the model (#237).
+    @State private var outlineRebuilds = 0
     /// Projects whose every match is on show, past the first few (#176).
     @State private var showingAllMatches: Set<ProjectKey> = []
     @FocusState private var searchFocused: Bool
@@ -93,6 +95,13 @@ struct ProjectListView: View {
                     Text("Archived projects")
                 }
             }
+        }
+        // AppKit swallows the exception a drifted outline throws, and the rows stay wrong
+        // until the list is made again (#237): once per drift, keeping folds, selection
+        // and search, which live outside it. The scroll goes back to the top.
+        .id(outlineRebuilds)
+        .onReceive(NotificationCenter.default.publisher(for: .outlineListDrifted)) { _ in
+            outlineRebuilds &+= 1
         }
         .listStyle(.sidebar)
         .focused($listFocused)
@@ -360,8 +369,8 @@ private struct ProjectFold: View {
         return DisclosureGroup(isExpanded: Binding(
             get: { isOpen },
             set: { folds.set(key, .group(group), open: $0) })) {
-            ForEach(part.agents) { agent in
-                SessionSidebarRow(agent: agent)
+            ForEach(FoldedRow.rows(isOpen ? part.agents : [], in: .group(group))) { row in
+                SessionSidebarRow(agent: row.item)
             }
         } label: {
             SidebarSubheading(title: part.title, count: part.agents.count,
@@ -376,8 +385,8 @@ private struct ProjectFold: View {
         return DisclosureGroup(isExpanded: Binding(
             get: { isOpen },
             set: { folds.set(key, .pinned, open: $0) })) {
-            ForEach(pinned) { agent in
-                SessionSidebarRow(agent: agent)
+            ForEach(FoldedRow.rows(isOpen ? pinned : [], in: .pinned)) { row in
+                SessionSidebarRow(agent: row.item)
             }
             // Among the pinned only, and the whole order: a search shows only some.
             .onMove { from, to in
@@ -410,8 +419,8 @@ private struct ProjectFold: View {
                 get: { isOpen },
                 set: { folds.set(key, .archivedSessions, open: $0) })) {
                 let cap = query.isEmpty ? AppModel.archivedShown : showsAllMatches ? archived.count : Self.matchesShown
-                ForEach(archived.prefix(cap)) { agent in
-                    SessionSidebarRow(agent: agent)
+                ForEach(FoldedRow.rows(isOpen ? archived.prefix(cap) : [], in: .archivedSessions)) { row in
+                    SessionSidebarRow(agent: row.item)
                 }
                 if !query.isEmpty, archived.count > cap {
                     Button("Show all \(archived.count)", action: showAllMatches)

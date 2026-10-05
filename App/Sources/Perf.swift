@@ -1,3 +1,4 @@
+import AgentsKitCore
 import Foundation
 import os
 
@@ -20,8 +21,9 @@ enum Perf {
     }
 
     static func begin(_ name: StaticString) -> Interval {
-        Interval(name: name, state: signposter.beginInterval(name, id: signposter.makeSignpostID()),
-                 started: .now)
+        HangWatchdog.note("\(name)")
+        return Interval(name: name, state: signposter.beginInterval(name, id: signposter.makeSignpostID()),
+                        started: .now)
     }
 
     /// Ends `interval` once what it changed is on screen.

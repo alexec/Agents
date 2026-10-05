@@ -116,6 +116,24 @@ enum CrashHook {
         pending = kept
         os_unfair_lock_unlock(&lock)
         if let old { free(old.path); free(old.note) }
+        // One AppKit catches and goes on from can leave a view half-updated, the window
+        // still running and no longer answering clicks (#237). Its reason, which AppKit's
+        // own log line redacts, goes to the log and to the next hang's file.
+        let said = "\(exception.name.rawValue): \((exception.reason ?? "").prefix(400))"
+        log.error("exception \(said, privacy: .public)")
+        HangWatchdog.note("exception \(said)")
+        if isOutlineDrift(exception) {
+            // After the update that threw, not inside it.
+            log.error("an outline list drifted from its model; the sidebar is made again")
+            DispatchQueue.main.async { NotificationCenter.default.post(name: .outlineListDrifted, object: nil) }
+        }
+    }
+
+    /// SwiftUI's outline list told `NSOutlineView` to take out or put in rows it does not
+    /// have (#237). AppKit catches it and goes on, and the list stays wrong from then on:
+    /// rows drawn twice or missing, clicks landing on the wrong one.
+    static func isOutlineDrift(_ exception: NSException) -> Bool {
+        exception.name.rawValue == "NSOutlineView" || (exception.reason ?? "").hasPrefix("NSOutlineView error")
     }
 
     /// Writes the last exception kept, once, and says whether it did. Safe in a signal
@@ -142,4 +160,10 @@ enum CrashHook {
         close(file)
         return written == kept.length
     }
+}
+
+extension Notification.Name {
+    /// An outline list's rows no longer match what it was told it has (#237): the
+    /// sidebar is made again from the model.
+    static let outlineListDrifted = Notification.Name("AgentsOutlineListDrifted")
 }
