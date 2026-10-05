@@ -186,9 +186,11 @@ struct SidebarWorkflowRow: View {
                     Task { await model.setWorkflowArchived(summary, false) }
                 }
             } else {
-                // Approving is the Mac's, for now; running a file nobody has approved
-                // would only be refused.
-                if summary.awaitingApproval == nil {
+                if summary.canBeApproved {
+                    Button("Approve", systemImage: "checkmark.shield") {
+                        Task { await model.approveWorkflow(summary) }
+                    }
+                } else if summary.awaitingApproval == nil {
                     Button("Run now", systemImage: "play") { Task { await model.runWorkflow(summary) } }
                         .disabled(summary.isRunning)
                 }
