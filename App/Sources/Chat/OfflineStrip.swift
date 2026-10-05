@@ -3,19 +3,19 @@ import SwiftUI
 
 /// Across the top of a chat whose server has gone (037, wireframes/mac-offline.svg).
 ///
-/// What the chat shows is what the window last had. The server's agents carry on
-/// regardless; the window is simply not hearing them until it is back, which it will
-/// try again for by itself.
+/// What the chat shows is what the window last had. A server's agents carry on; the
+/// window tries that host again by itself. This Mac's host says whether it is down,
+/// not enrolled, or quiet after it had joined (#303).
 struct OfflineStrip: View {
     @Environment(AppModel.self) private var model
     let host: HostID
 
     var body: some View {
         // The control plane being away is the window's own strip, above everything.
-        if model.hosts.isOffline(host), !model.controlPlaneAway, case .offline(let since) = model.hosts.state(host) {
+        if let text = line {
             HStack(spacing: 10) {
                 Circle().tinted(.attention).frame(width: 7, height: 7)
-                Text(line(since: since.formatted(date: .omitted, time: .shortened)))
+                Text(text)
                     .appText(.supporting)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
@@ -42,8 +42,20 @@ struct OfflineStrip: View {
         }
     }
 
-    /// In the same words as the Remote's strip (`OfflineWords`).
-    private func line(since: String) -> String {
-        OfflineWords.line(host: host, name: model.hosts.label(host), since: since)
+    /// This Mac's host names why it is quiet (#303). A server's strip stays the shared
+    /// words, which the Remote uses too.
+    private var line: String? {
+        guard !model.controlPlaneAway else { return nil }
+        if host == .mac, let notice = model.macHostNotice {
+            return notice.strip(since: offlineSince)
+        }
+        guard model.hosts.isOffline(host), case .offline(let since) = model.hosts.state(host) else { return nil }
+        return OfflineWords.line(host: host, name: model.hosts.label(host),
+                                 since: since.formatted(date: .omitted, time: .shortened))
+    }
+
+    private var offlineSince: String? {
+        guard case .offline(let since) = model.hosts.state(host) else { return nil }
+        return since.formatted(date: .omitted, time: .shortened)
     }
 }

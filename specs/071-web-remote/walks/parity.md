@@ -60,7 +60,7 @@ The deltas are tracked by 30 issues:
 | Archived sessions fold | *Archived sessions*, 50, *Show all N* while searching: `A/Projects/ProjectListView.swift:401-441` | *Archived*, 10 at a time: `R/Projects/ProjectPageView.swift:207-234` | As the window: `W/views/Sidebar.tsx:265-283` | **delta**: Remote #226 |
 | Workflows and Archived workflows folds | Siblings: `A/Projects/ProjectWorkRows.swift:33-55` | `R/Projects/WorkflowsSection.swift` | Archived nested inside Workflows: `W/views/Sidebar.tsx:284-314` | **delta**: web #250 |
 | Search (#176) | After a 150 ms pause, every project, capped pages per host, *More matches…*: `A/Projects/ProjectListView.swift:106-120` | One project's page: `R/Projects/ProjectPageView.swift:34, 53-57` | As the window (#193): `W/views/Sidebar.tsx:52-68` | **delta**: Remote #226 |
-| Sidebar foot: host notices | *Connecting…*, or the host-down notice with Try Again; *X is offline*: `A/Projects/ProjectListView.swift:551-577` | *offline* on the host heading | *This Mac's host isn't answering* even while only connecting: `W/views/Sidebar.tsx:74, 108-117` | **delta**: web #250 (connecting). Try Again on the page: **by design** (#83, nothing of its own to redial) |
+| Sidebar foot: host notices | *Connecting…*; or this Mac’s host hasn’t joined (open Agents Host and press Try Again), isn’t running, or isn’t answering, with Try Again: `A/Projects/ProjectListView.swift:518-534, 804-826` | *offline* on the host heading | *This Mac's host isn't answering* even while only connecting: `W/views/Sidebar.tsx:74, 108-117` | **delta**: web #250 (connecting). Try Again on the page: **by design** (#83, nothing of its own to redial) |
 | Files the host couldn't read (`store/notes`, #205) | Sidebar foot: `A/Projects/ProjectListView.swift:580-587` | A section at the foot of the projects list, asked on each catch-up: `R/Projects/ProjectListView.swift:42-55` | Sidebar foot, a server's named: `W/views/Sidebar.tsx:117-125` | **same** (#223) |
 | Keeping this Mac awake | Wake row: `A/Projects/ProjectListView.swift:745-809` | None | None | **by design** (the Mac's setting; the page isn't told the wake state, #151) |
 | Forget this client | None (the window is paired by its Mac) | Only when the control plane refuses it: `R/Link/ControlPlaneLink.swift:70-75` | *Forget This Browser…*: `W/views/Sidebar.tsx:118-128` | **delta**: decide, #267 |
@@ -316,11 +316,11 @@ The deltas are tracked by 30 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| A down host over a chat (#83) | `A/Chat/OfflineStrip.swift:9-50`, with Try Again | `R/Chat/HostOfflineStrip.swift`, in the window's words (`S/OfflineWords.swift`), no button; the Mac link is `R/StaleBanner.swift` | `W/views/OfflineStrip.tsx`, no button | **by design**: no button on the Remote or the page, which dial the host again by themselves |
+| A down host over a chat (#83) | This Mac’s strip names hasn’t joined, isn’t running, or hasn’t answered, with Try Again: `A/Chat/OfflineStrip.swift:9-61` | `R/Chat/HostOfflineStrip.swift`, in the window's words (`S/OfflineWords.swift`), no button; the Mac link is `R/StaleBanner.swift` | `W/views/OfflineStrip.tsx`, no button | **by design**: no button on the Remote or the page, which dial the host again by themselves |
 | The control plane away | `A/Sidebar/ControlAwayStrip.swift` | `R/StaleBanner.swift` | `W/views/Banner.tsx` | **same** |
 | Reconnect on wake and network change (#82) | `A/WakeAndNetwork.swift` | Yes (its hangs are #208, not parity) | Yes, and the `online` event | **same** |
 | A refused write said in words (#88) | `storage/writeFailed` | `storage/writeFailed`: `R/RemoteModel.swift` | `storage/writeFailed` (unit-tested) | **same** |
-| Hosts and servers | Settings ▸ Control plane: `A/Control/ControlSettingsView.swift:247-269` | Host headings | Names in the sidebar, the foot | **by design** (managing hosts is the Mac's) |
+| Hosts and servers | Settings ▸ Control plane overview names not joined or not running: `A/Control/ControlSettingsView.swift:140-156`; hosts: `237-268` | Host headings | Names in the sidebar, the foot | **by design** (managing hosts is the Mac's) |
 | Pairing | Shows the codes: `A/Control/ControlClientsPane.swift` | Scans: `R/Link/PairingView.swift` | Pastes, or `#code=`: `W/views/Pairing.tsx`, `W/pairLink.ts` | **by design** (#105, #109, #111) |
 
 ## MCP Apps views

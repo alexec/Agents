@@ -138,12 +138,20 @@ struct ControlOverviewPage: View {
                         .foregroundStyle(.secondary)
                 }
                 // This Mac's host trying to join, as it says it (#113): not only in daemon.log.
-                if let join = control.status?.thisMacHost, join.failed {
+                // No membership is said even before a dial has failed. A process that is
+                // not writing a join, on this Mac's own plane, is down (#303).
+                if let join = control.status?.thisMacHost, !join.member || join.failed {
                     Divider()
                     ControlRow(dot: .attention, title: "This Mac’s host", detail: join.summary) {
                         Text(join.member ? "Reconnecting" : "Not joined yet")
                             .appText(.reading)
                             .foregroundStyle(.secondary)
+                    }
+                } else if control.isOnThisMac, control.thisMacHost == nil, control.status?.thisMacHost == nil {
+                    Divider()
+                    ControlRow(dot: .attention, title: "This Mac’s host",
+                               detail: "It isn’t running, so it has not joined. Open Agents Host.") {
+                        Text("Not running").appText(.reading).foregroundStyle(.secondary)
                     }
                 }
             }

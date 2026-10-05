@@ -515,13 +515,13 @@ private struct SidebarFoot: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !model.isConnected, !model.controlPlaneAway, model.hasMacHost {
+            if !model.controlPlaneAway, model.macHostNotice != nil || (!model.isConnected && model.hasMacHost) {
                 // Said rather than left to look like a quiet afternoon: what is listed
-                // may have moved on, and the window is going back for it by itself.
-                // The control plane being away is the strip's sentence, and the projects
-                // stay listed under it (058, frame H).
+                // may have moved on. A host that never enrolled, or is not running, says
+                // so (#303). The control plane being away is the strip's sentence, and
+                // the projects stay listed under it (058, frame H).
                 Group {
-                    if model.hosts.isOffline(.mac) {
+                    if model.macHostNotice != nil {
                         MacHostDownNotice()
                     } else {
                         Text("Connecting…")
@@ -798,24 +798,25 @@ private struct GoneProjectRows: View {
     }
 }
 
-/// In the projects list while this Mac's host does not answer (#83): said whole, in a
-/// person's words, with a way to try at once. The projects under it stay listed, greyed:
-/// what they show is what the window last heard.
+/// In the projects list while this Mac's host is quiet (#83, #303): said whole, in a
+/// person's words, naming why and the step that fixes it. The projects under it stay
+/// listed, greyed: what they show is what the window last heard.
 private struct MacHostDownNotice: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        let notice = model.macHostNotice ?? .notAnswering
         VStack(alignment: .leading, spacing: 6) {
             // A sidebar row is one line unless told otherwise, and cut off this said
             // nothing (the walk on 2026-10-01 saw "Not connected to the daemon. Tr…").
-            Label("This Mac’s host isn’t answering", systemImage: "exclamationmark.triangle")
+            Label(notice.title, systemImage: "exclamationmark.triangle")
                 .appText(.supporting).fontWeight(.semibold)
                 .tinted(.attention)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("What’s listed is what it last said. The window is trying again by itself.")
+            Text(notice.detail)
                 .appText(.fine).foregroundStyle(.secondary)
-                .lineLimit(4)
+                .lineLimit(8)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Try Again") { model.tryMacHostAgain() }
                 .controlSize(.small)

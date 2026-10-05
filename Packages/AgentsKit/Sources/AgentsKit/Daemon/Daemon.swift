@@ -241,21 +241,22 @@ public final class Daemon: @unchecked Sendable {
     private func join(_ control: Control, server: DaemonServer, hello: DaemonAPI.HostHello) async {
         let kept = ControlMembership.load(locations.controlHostMembership)
         if let kept, kept.url == nil {
-            // The first build's TLS-PSK membership: that wire is gone (T042).
-            DaemonLog.shared.write("uplink: this host's membership is from before the control plane's WebSocket; enrol it again with a new host code")
+            // The first build's TLS-PSK membership: that wire is gone (T042). Said, so the
+            // window can tell a live host that cannot enrol from one that is not running.
+            let problem = "this host's membership is from before the control plane's WebSocket; open Agents Host and press Try Again"
+            DaemonLog.shared.write("uplink: \(problem)")
+            sayJoin(.init(member: false, connected: false, problem: problem))
             return
         }
-        if kept == nil {
-            let code = (control.code ?? readLeftCode()).flatMap(ControlCode.init(text:))
-            guard let code else {
-                DaemonLog.shared.write("uplink: no control plane to join; start with --control <code>")
-                return
-            }
-            if code.url == nil {
-                DaemonLog.shared.write("uplink: that host code is from before the control plane's WebSocket; ask for a new one")
-                return
-            }
+        if kept == nil, let code = (control.code ?? readLeftCode()).flatMap(ControlCode.init(text:)), code.url == nil {
+            let problem = "that host code is from before the control plane's WebSocket; ask Agents Host for a new one"
+            DaemonLog.shared.write("uplink: \(problem)")
+            sayJoin(.init(member: false, connected: false, problem: problem))
+            return
         }
+        // No code yet still dials (#303). Returning here left `control-join.json` unwritten
+        // and ignored Agents Host's Try Again, which leaves a code and then signals. The
+        // dial says there is no host code, keeps trying, and reads a code left later.
         await joinOverWebSocket(given: control.code, server: server, hello: hello)
     }
 
