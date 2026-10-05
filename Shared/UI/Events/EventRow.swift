@@ -12,8 +12,8 @@ import SwiftUI
 /// Nothing is tinted: an event is a fact, not a state (wireframes §5). "Refused by"
 /// and "Could not wake" are words, not red — a refusal is the safety rules working.
 ///
-/// What differs by app comes in as closures. `openAgent` is both apps'. `openWorkflow`
-/// is only the Mac's: the phone has no workflow page, so there the name is plain text.
+/// What differs by app comes in as closures. Both apps can open agents and workflows;
+/// the web page implements its own event rows.
 struct EventRow: View {
     let event: Event
     /// "This Mac", or the project's name.

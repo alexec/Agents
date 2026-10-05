@@ -141,6 +141,16 @@ final class RemoteModel {
     /// The host this phone's own connection reaches. Its projects are stamped `.mac`.
     private(set) var controlHome: HostID?
 
+    /// Each connected server's local daily ledger, matching the window's combined
+    /// Today figure. Limits remain local to the host that owns them.
+    private(set) var serverCosts: [HostID: DaemonAPI.CostState] = [:]
+
+    var serversToday: [String: Decimal] {
+        serverCosts.values.reduce(into: [:]) { sum, state in
+            for (currency, amount) in state.today { sum[currency, default: 0] += amount }
+        }
+    }
+
     init(link: any DaemonLink) {
         baseLink = link
         client = DaemonClient(link: link)
@@ -1252,6 +1262,7 @@ final class RemoteModel {
                 work.replaceAgents(agents, from: id)
             }
             await refreshServerRuntimes(id)
+            await refreshServerCost(id)
             let notes = other.notifications()
             let shown = work.shown
             // Read off the main actor, once, and applied there (#203).
@@ -1259,6 +1270,7 @@ final class RemoteModel {
                 for await note in notes {
                     // Its runtimes, and the start sheet's draft made there (#240).
                     if note.method == DaemonAPI.Notification.runtimeChanged
+                        || note.method == DaemonAPI.Notification.costChanged
                         || note.method == DaemonAPI.Notification.draftOptions {
                         await self?.received(note.method, note.params, fromOther: id)
                         continue
@@ -1283,6 +1295,7 @@ final class RemoteModel {
                 work.replaceProjects([], from: id)
                 work.replaceAgents([], from: id)
                 serverRuntimes[id] = nil
+                serverCosts[id] = nil
             }
         }
     }
@@ -1293,6 +1306,8 @@ final class RemoteModel {
         switch method {
         case DaemonAPI.Notification.runtimeChanged:
             await refreshServerRuntimes(host)
+        case DaemonAPI.Notification.costChanged:
+            await refreshServerCost(host)
         case DaemonAPI.Notification.draftOptions:
             guard host == startDraftHost,
                   let change = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
@@ -1983,6 +1998,23 @@ final class RemoteModel {
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.CostState.self) else { return }
         work.replaceCostState(state)
+        for host in reachableHosts { await refreshServerCost(host) }
+    }
+
+    /// Cancel the wait shown in Waiting now, then refresh the authoritative list.
+    func cancelWait(of agentID: UUID) async {
+        _ = try? await client.call(DaemonAPI.Method.eventsCancelWait,
+                                   DaemonAPI.CancelWaitRequest(agentID: agentID),
+                                   returning: [DaemonAPI.WaitingAgent].self)
+        await refreshEvents()
+    }
+
+    private func refreshServerCost(_ host: HostID) async {
+        guard let other = otherHosts[host], reachableHosts.contains(host),
+              let state = try? await other.call(DaemonAPI.Method.costState,
+                                                Optional<String>.none,
+                                                returning: DaemonAPI.CostState.self) else { return }
+        serverCosts[host] = state
     }
 
     // MARK: The pool (052)

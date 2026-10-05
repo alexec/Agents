@@ -19,6 +19,14 @@ struct TotalsView: View {
 
     private var spending: Spending { Spending(model.allProjects) }
 
+    private var costStates: [(String, DaemonAPI.CostState)] {
+        var states: [(String, DaemonAPI.CostState)] = []
+        if let state = model.costState { states.append(("This Mac", state)) }
+        states += model.serverCosts.map { (model.hostLabel($0.key), $0.value) }
+            .sorted { $0.0.localizedCaseInsensitiveCompare($1.0) == .orderedAscending }
+        return states
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -38,6 +46,20 @@ struct TotalsView: View {
                     if spending.unmeasuredAgents > 0 { unmeasured }
                 }
                 today
+                ForEach(costStates, id: \.0) { host, state in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(host).appText(.supporting).foregroundStyle(.secondary)
+                        if let daily = state.limits.daily {
+                            Text("Daily limit \(daily.amount.formatted(.currency(code: daily.currency))) · \((state.dayHeadroom ?? 0).money(in: daily.currency)) left")
+                                .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        if let perAgent = state.limits.perAgent {
+                            Text("Each agent up to \(perAgent.amount.formatted(.currency(code: perAgent.currency)))")
+                                .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.top, 8)
+                }
                 // Where each runtime's allowance stands, a tap away (065).
                 RuntimesLink()
             }
@@ -94,7 +116,8 @@ struct TotalsView: View {
     /// spec's Out of scope).
     @ViewBuilder
     private var today: some View {
-        if let state = model.costState, !state.today.isEmpty {
+        if let state = model.costState,
+           !state.today.merging(model.serversToday, uniquingKeysWith: +).isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Today")
                     .appText(.supporting)
@@ -115,9 +138,9 @@ struct TotalsView: View {
     }
 
     private func todayLine(_ state: DaemonAPI.CostState) -> String {
-        let spent = Cost.total(of: state.today) ?? ""
-        guard let daily = state.limits.daily else { return spent }
-        return "\(spent) of \(daily.amount.formatted(.currency(code: daily.currency)))"
+        let today = state.today.merging(model.serversToday, uniquingKeysWith: +)
+        let spent = Cost.total(of: today) ?? ""
+        return spent
     }
 
     /// So the grand total reads as a floor rather than as the whole.
