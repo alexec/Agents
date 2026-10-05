@@ -136,6 +136,61 @@ struct PairingCodeTests {
         #expect(refusal(await announce(setup, id: id, as: .device)) == nil)
     }
 
+    /// A Remote paired through the control plane reaches this Mac on a channel the
+    /// control plane opened and bound to it. Its announce records it here, so it is told
+    /// things, rather than being refused as unpaired (#232). Its key still never changes.
+    @Test func aDeviceTheControlPlaneVouchesForRecordsItself() async throws {
+        let setup = try await setUp()
+        let id = UUID()
+        let reply = try await setup.core.handle(
+            method: DaemonAPI.Method.devicesAnnounce,
+            params: try JSONValue.encoding(DaemonAPI.DeviceAnnouncement(id: id, publicKey: phoneKey,
+                                                                        name: "iPad", kind: .iPad)),
+            connection: UUID(), role: .device, vouched: true).get().decode(DaemonAPI.AnnounceReply.self)
+        #expect(reply.device.id == id)
+        #expect(try await call(setup, DaemonAPI.Method.devicesList, Optional<String>.none).get()
+            .decode([Device].self).map(\.id) == [id])
+        let otherKey = DeviceKey.ephemeral().publicKey
+        let rekeyed = await setup.core.handle(
+            method: DaemonAPI.Method.devicesAnnounce,
+            params: try JSONValue.encoding(DaemonAPI.DeviceAnnouncement(id: id, publicKey: otherKey,
+                                                                        name: "iPad", kind: .iPad)),
+            connection: UUID(), role: .device, vouched: true)
+        #expect(refusal(rekeyed) == DaemonAPI.Failure.notSupported)
+    }
+
+    /// Only the uplink vouches: a channel it opens for a device says so, and one the
+    /// bridge gives to a device never does.
+    @Test func onlyAControlPlaneChannelIsVouchedFor() async throws {
+        final class Seen: @unchecked Sendable {
+            let lock = NSLock()
+            var vouched: [Bool] = []
+        }
+        let seen = Seen()
+        let server = DaemonServer(url: URL(fileURLWithPath: "/tmp/unused-\(UUID()).sock")) { context, method, _ in
+            if method == DaemonAPI.Method.devicesAnnounce { seen.lock.withLock { seen.vouched.append(context.vouched) } }
+            return .success([:])
+        }
+        let ipad = UUID()
+        let announcement = try JSONValue.encoding(DaemonAPI.DeviceAnnouncement(id: ipad, publicKey: phoneKey,
+                                                                               name: "iPad", kind: .iPad))
+        let (uplinkOurs, uplinkTheirs) = PairedTransport.pair()
+        server.acceptVirtual(uplinkOurs, device: ipad)
+        let fromUplink = JSONRPCConnection(transport: uplinkTheirs)
+        await fromUplink.start()
+        try await fromUplink.call(DaemonAPI.Method.devicesAnnounce, announcement)
+
+        let (bridgeOurs, bridgeTheirs) = PairedTransport.pair()
+        server.acceptVirtual(bridgeOurs, device: nil)
+        let fromBridge = JSONRPCConnection(transport: bridgeTheirs)
+        await fromBridge.start()
+        try await fromBridge.call(DaemonAPI.Method.connectionBindDevice,
+                                  try JSONValue.encoding(DaemonAPI.DeviceBinding(id: nil)))
+        try await fromBridge.call(DaemonAPI.Method.devicesAnnounce, announcement)
+
+        #expect(seen.lock.withLock { seen.vouched } == [true, false])
+    }
+
     /// Forgetting ends what the device has open now, not only what it opens next.
     @Test func forgettingADeviceClosesItsConnections() async throws {
         let setup = try await setUp()
