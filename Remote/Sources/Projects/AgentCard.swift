@@ -87,6 +87,12 @@ struct AgentCard: View {
                             .appText(.reading)
                             .fontWeight(agent.showsUnread ? .semibold : .regular)
                             .lineLimit(2)
+                        if let workflowName = startedByWorkflowName {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .appText(.fine)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityLabel("started by the workflow \(workflowName)")
+                        }
                         // Started by another agent (028), marked as the Mac's row
                         // marks it.
                         if model.startedByAgentLabel(agent) != nil {
@@ -109,6 +115,10 @@ struct AgentCard: View {
                             }
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
+                            .strikethrough(agent.missingFolder != nil)
+                            .help(agent.missingFolder != nil
+                                  ? "\(worktree.branch ?? "detached") — \(worktree.root.path), which is not there any more"
+                                  : "\(worktree.branch ?? "detached") — \(worktree.root.path)")
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel("in worktree \(worktree.name)")
                         }
@@ -129,6 +139,14 @@ struct AgentCard: View {
                     }
                     if !agent.labels.isEmpty {
                         RemoteSessionLabels(agent: agent, compact: true)
+                    }
+                    if let running = BackgroundWords.mark(agent.background) {
+                        Label(running, systemImage: "apple.terminal")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(running)
                     }
                     // When it will be retired, or why it is kept, in the Mac row's
                     // words (051). The phone has no settings, so the cap goes unnamed.
@@ -178,14 +196,18 @@ struct AgentCard: View {
         .buttonStyle(.plain)
         .contextMenu { AgentMenuItems(agent: agent) }
         .swipeActions(edge: .leading) {
-            if agent.state != .archived {
+            if agent.state == .archived {
+                BringBackAgentButton(agent: agent).tint(Paper.accent)
+            } else {
                 PinAgentButton(agent: agent).tint(Paper.accent)
             }
         }
         // As a row in Mail: a swipe uncovers Archive, and a long one archives. The page
         // is a `swipeActionsContainer`.
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            if agent.state != .archived {
+            if agent.state == .archived {
+                BringBackAgentButton(agent: agent).tint(Paper.accent)
+            } else {
                 ArchiveAgentButton(agent: agent).tint(.gray)
             }
         }
@@ -200,15 +222,16 @@ struct AgentCard: View {
     /// Whether the Mac is bringing this chat back by itself after a restart.
     private var isComingBack: Bool { model.isComingBack(agent) }
 
+    private var startedByWorkflowName: String? {
+        guard let id = agent.startedByWorkflow else { return nil }
+        return model.work.workflows(in: agent.projectFolder)
+            .first { $0.workflow.workflowID == id }?.workflow.name ?? id
+    }
+
     /// The state said in words, because the icon beside it is not one VoiceOver reads.
     /// Precise where the shape is not: which outcome, and why it stopped.
     private var accessibilityLabel: String {
-        var words = isComingBack
-            ? AgentsModel.comingBackDescription
-            : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
-                               isWaiting: agent.isWaiting,
-                               isUnaccountedFor: agent.endingIsUnaccountedFor)
-        if agent.state == .stopped, let why = agent.endedReason?.summary { words = why }
+        let words = StatusShape.words(row: agent, isComingBack: isComingBack)
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
             .compactMap { $0 } + model.blockLines(agent) + [ParkWords.line(agent.parking)].compactMap { $0 })
             .joined(separator: ", ")
@@ -223,6 +246,12 @@ struct AgentMenuItems: View {
     let agent: Agent
 
     var body: some View {
+        if model.canStop(agent) {
+            Button("Stop", systemImage: "stop.circle") {
+                Task { await model.stop(agent.id) }
+            }
+            .disabled(isActing)
+        }
         if model.isBlocked(agent) {
             Button {
                 Task { await model.carryOn(agent.id) }

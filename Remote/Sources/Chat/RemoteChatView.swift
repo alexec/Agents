@@ -90,12 +90,6 @@ struct RemoteChatView: View {
                 StaleBanner()
                 // A server's agent whose host has gone: which, and since when (#239).
                 if let agent { HostOfflineStrip(host: agent.host) }
-                if let agent {
-                    RemoteSessionLabels(agent: agent, compact: false)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
                 // Its folder gone (#119): which, and the ways on, before anything is typed.
                 if let agent, agent.missingFolder != nil, agent.state != .archived {
                     RemoteMissingFolderStrip(agent: agent)
@@ -209,14 +203,17 @@ struct RemoteChatView: View {
                 }
                 .frame(maxHeight: 300)
                 .fixedSize(horizontal: false, vertical: true)
-            } else if let form = model.formForSelection {
+            }
+            // A form waits the same way a permission does and floats with it, never
+            // hidden behind one (#243), as on the Mac.
+            if let form = model.formForSelection {
                 ElicitationSheet(request: form)
                     .id(form.id)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            if let agent, agent.state != .archived {
-                // Nothing to say to an agent that has been put away. Bringing it back is
-                // in the menu, and that is the move to make first.
+            if let agent {
+                // Kept on an archived chat, as on the window and the page (#242): what is
+                // typed there brings it back ("Say what next, and this comes back").
                 PromptBar(agent: agent, isQuestionUp: isQuestionUp)
             }
         }
@@ -246,6 +243,9 @@ struct RemoteChatView: View {
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
             acting: { [model] agentID in model.acting(agentID) },
+            // Show in Changes under an edit (#242): what the agent did to that file, the
+            // phone's sheet of its edits, until the Remote has a Changes of its own (#245).
+            showEdit: { [model] diff, _ in model.fileOnScreen = diff.path },
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },

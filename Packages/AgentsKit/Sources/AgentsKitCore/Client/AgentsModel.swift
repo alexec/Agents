@@ -1041,6 +1041,15 @@ public final class AgentsModel {
     /// The symbol that mark is drawn with.
     public static let startedByAgentSymbol = "person.2"
 
+    /// Who started a retired agent, for its page's Started by (051): the starter's title,
+    /// or "Another agent". `nil` when the person or a workflow started it. Here so the
+    /// window and the Remote say it alike (#242).
+    public func retiredStarterLabel(_ tombstone: Tombstone) -> String? {
+        guard let starter = tombstone.startedByAgent else { return nil }
+        let title = agent(starter)?.title ?? tombstones[starter]?.title
+        return LeaseWords.agentName(title).replacingOccurrences(of: "another agent", with: "Another agent")
+    }
+
     /// Who is asking, at the head of a question or permission card (#121): the agent's
     /// title and runtime, and for a helper who started it. A card read beside others,
     /// on a phone, then has a named asker even when the question says "I" and "you".

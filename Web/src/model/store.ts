@@ -216,7 +216,8 @@ export class Work {
   private filesSettling = new Map<string, { folders: Set<string>; many: boolean; timer: ReturnType<typeof setTimeout> }>();
   private display = new DisplayBuilder();
   private entryIDs = new Set<string>();
-  private heardSincePage: TranscriptEntry[] = [];
+  /** What was heard while a page is on its way, to lay over it; null when none is (#214). */
+  protected heardSincePage: TranscriptEntry[] | null = [];
 
   /** One notification from one host. Returns false for one this does not know. */
   apply(method: string, params: unknown, host: string): boolean {
@@ -493,8 +494,8 @@ export class Work {
   fillOversized(entry: TranscriptEntry, host: string, agentID: string): void {
     const watching = this.watching.value;
     if (!watching || watching.host !== host || watching.session !== agentID) return;
-    const heard = this.heardSincePage.findIndex((e) => e.id === entry.id);
-    if (heard >= 0) this.heardSincePage[heard] = entry;
+    const heard = this.heardSincePage?.findIndex((e) => e.id === entry.id) ?? -1;
+    if (heard >= 0) this.heardSincePage![heard] = entry;
     const at = this.entries.value.findIndex((e) => e.id === entry.id);
     if (at < 0) return;
     const entries = [...this.entries.value];
@@ -506,9 +507,10 @@ export class Work {
     const watching = this.watching.value;
     if (!watching || watching.host !== host || watching.session !== note.agentID) return;
     if (note.oversized !== undefined) this.oversized(host, note.agentID, note.entry.id, note.index);
-    this.heardSincePage.push(note.entry);
-    if (this.heardSincePage.length > heardSincePageLimit) {
-      this.heardSincePage.splice(0, this.heardSincePage.length - heardSincePageLimit);
+    const heard = this.heardSincePage;
+    if (heard) {
+      heard.push(note.entry);
+      if (heard.length > heardSincePageLimit) heard.splice(0, heard.length - heardSincePageLimit);
     }
     // Already on the page: written before the host read it, and heard after.
     if (this.entryIDs.has(note.entry.id)) return;
@@ -535,17 +537,26 @@ export class Work {
     const latest = starts.length > itemsKept ? starts[starts.length - itemsKept]! : 0;
     const wanted = starts.find((start) => start >= entries.length - entriesKept) ?? latest;
     const cut = Math.min(wanted, latest);
-    if (cut <= 0) {
-      this.entries.value = entries;
+    if (cut > 0) {
+      entries = entries.slice(cut);
+      this.firstEntryIndex.value += cut;
+      this.hasMoreBefore.value = true;
+      this.refold(entries);
+    } else {
       this.items.value = items;
-      this.nextTrimAt = entries.length + entriesTrimmedAt - entriesKept;
-      return;
     }
-    const kept = entries.slice(cut);
-    this.firstEntryIndex.value += cut;
-    this.hasMoreBefore.value = true;
-    this.refold(kept);
-    this.nextTrimAt = Math.max(entriesTrimmedAt, kept.length + entriesTrimmedAt - entriesKept);
+    // Few rows can fold thousands of entries, a long turn's tool updates (#214): the oldest go
+    // even so. The rows already folded from them stay as drawn, and reaching the top pages them
+    // back in, so a row is only ever folded again from all of its entries.
+    if (entries.length > entriesTrimmedAt) {
+      const drop = entries.length - entriesKept;
+      for (let i = 0; i < drop; i++) this.entryIDs.delete(entries[i]!.id);
+      entries = entries.slice(drop);
+      this.firstEntryIndex.value += drop;
+      this.hasMoreBefore.value = true;
+    }
+    this.entries.value = entries;
+    this.nextTrimAt = Math.max(entriesTrimmedAt, entries.length + entriesTrimmedAt - entriesKept);
   }
 
   /**
@@ -584,8 +595,8 @@ export class Work {
   /** The first page of the conversation, with what was heard and is not on it laid after it. */
   replaceTranscript(page: TranscriptPage): void {
     const onPage = new Set(page.entries.map((e) => e.id));
-    const entries = [...page.entries, ...this.heardSincePage.filter((e) => !onPage.has(e.id))];
-    this.heardSincePage = [];
+    const entries = [...page.entries, ...(this.heardSincePage ?? []).filter((e) => !onPage.has(e.id))];
+    this.heardSincePage = null;
     batch(() => {
       this.firstEntryIndex.value = page.firstIndex;
       this.hasMoreBefore.value = page.firstIndex > this.openTurnStart.value;
@@ -604,6 +615,7 @@ export class Work {
   }
 
   private clearTranscript(): void {
+    // A chat chosen is a page on its way.
     this.heardSincePage = [];
     this.firstEntryIndex.value = 0;
     this.hasMoreBefore.value = false;
@@ -1031,6 +1043,7 @@ export class Store extends Work {
   /** The finished turns first, as summaries, then the transcript from where the open turn starts. */
   private async loadTranscript(host: string, session: string): Promise<void> {
     void this.loadWhole(host, session);
+    this.heardSincePage ??= [];
     const agentID = session as never;
     // The last 12, as the window opens a chat (#90); the rest come as the top is reached.
     const turns = await this.link.call("agents/turns", { agentID, limit: openingTurns }, host)
@@ -1039,7 +1052,11 @@ export class Store extends Work {
       .catch(() => null);
     // A chat opened since is not this one.
     const now = this.watching.value;
-    if (!page || now?.host !== host || now.session !== session) return;
+    if (now?.host !== host || now.session !== session) return;
+    if (!page) {
+      this.heardSincePage = null;
+      return;
+    }
     batch(() => {
       this.replaceTurns(turns);
       this.replaceTranscript(page);

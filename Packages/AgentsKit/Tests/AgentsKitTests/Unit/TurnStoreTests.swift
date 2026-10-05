@@ -124,6 +124,18 @@ struct TurnStoreTests {
 
     /// Only the person's asks start a turn: not the app's own prompt, and not the word
     /// turning up in what an agent said or a tool printed.
+    /// The window and the Remote open a chat with the same few turns (#242), not the
+    /// request's default page.
+    @Test func aChatOpensWithItsLastTwelveTurns() async throws {
+        let (store, locations) = try store()
+        let id = UUID()
+        try await store.appendAll((0..<20).flatMap { [ask("Q\($0)"), said("a\($0)")] }, for: id)
+        let core = DaemonCore(store: store, locations: locations)
+        let page = try await core.turns(.opening(id))
+        #expect(DaemonAPI.TurnsRequest.opening(id).limit == 12)
+        #expect(page.turns.map { $0.ask?.text } == (7..<19).map { "Q\($0)" })
+    }
+
     @Test func onlyThePersonsAskStartsATurn() async throws {
         let (store, locations) = try store()
         let id = UUID()

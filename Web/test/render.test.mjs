@@ -86,3 +86,23 @@ test("a task list draws a box, ticked or not, and never a control (#252)", () =>
   assert.doesNotMatch(md("- [x] done"), /<input/);
   assert.equal(md("[ ] not in a list"), "<p>[ ] not in a list</p>");
 });
+
+test("Markdown in blocks draws as it does whole, at every length a reply grows through (#214)", async () => {
+  const { markdownBlocks } = await load("src/render/markdown.ts");
+  const texts = [
+    "# Title\n\nA paragraph\nrunning on.\n\n- one\n- two\n\n  more of two\n\n- three\n\nAfter the list.\n\n1. a\n\n2. b\n\nText\n\n> quoted\n\n> again\n\nlazy\n\n    indented code\n\n    still code\n\nEnd.",
+    "Before\n\n```js\nconst a = 1;\n\nconst b = 2;\n```\n\nAfter\n\n~~~\nx\n\n~~~~\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n---\n\nSetext\n===\n\nlast",
+    "See [the docs][d].\n\nMore.\n\n[d]: https://example.com",
+  ];
+  for (const text of texts) {
+    for (let at = 1; at <= text.length; at++) {
+      const prefix = text.slice(0, at);
+      const blocks = markdownBlocks(prefix);
+      assert.equal(blocks.join(""), prefix);
+      assert.equal(show(blocks.map((block) => renderMarkdown(block))), md(prefix), `at ${at}: ${JSON.stringify(prefix)}`);
+    }
+  }
+  const long = Array.from({ length: 50 }, (_, i) => `Paragraph ${i}.`).join("\n\n");
+  assert.equal(markdownBlocks(long).length, 50, "a reply of paragraphs is a block each");
+  assert.equal(markdownBlocks(long + " more").slice(0, 49).join(""), markdownBlocks(long).slice(0, 49).join(""), "the finished ones stay");
+});

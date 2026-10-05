@@ -702,12 +702,6 @@ final class AppModel {
     var selectedAgent: Agent? { work.agent(selection) }
     /// What is left of an agent that has been retired, when this window has asked (051).
     func retiredTombstone(_ id: UUID) -> Tombstone? { work.tombstones[id] }
-    /// "Started by …" for a retired agent, named as a live one's would be.
-    func retiredStarterLabel(_ tombstone: Tombstone) -> String? {
-        guard let starter = tombstone.startedByAgent else { return nil }
-        let title = work.agent(starter)?.title ?? work.tombstones[starter]?.title
-        return LeaseWords.agentName(title).replacingOccurrences(of: "another agent", with: "Another agent")
-    }
 
     var permissionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
 
@@ -2597,9 +2591,6 @@ final class AppModel {
         work.setResuming(response?.agentIDs ?? [])
     }
 
-    /// How many finished turns a chat opens with (#90).
-    static let firstTurns = 12
-
     /// The open chat's record whole, with the menus and plan a lean list leaves out (#107).
     /// A host too old to know `agentID` lists its newest instead, which is not this one.
     func loadWholeAgent(_ id: UUID) async {
@@ -2630,8 +2621,7 @@ final class AppModel {
             // come as the reader nears the top, and fifty replies were a quarter of a
             // megabyte to carry and decode before anything could be drawn (#90).
             let turns = (try? await client.call(DaemonAPI.Method.agentsTurns,
-                                                DaemonAPI.TurnsRequest(agentID: selection,
-                                                                       limit: Self.firstTurns),
+                                                DaemonAPI.TurnsRequest.opening(selection),
                                                 returning: TurnsPage.self))
                 ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
             let page = try await client.call(DaemonAPI.Method.agentsTranscript,

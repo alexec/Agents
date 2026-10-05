@@ -75,8 +75,9 @@ enum RemoteControl {
     }
 
     /// A newer list of the control plane's endpoints, given when it moved or changed its
-    /// certificate (R16): kept, so the next launch dials there.
-    static let keepNewer: EndpointBook.Keep = { newer in try? newer.save(membershipFile) }
+    /// certificate (R16): kept, so the next launch dials there. One the disk refused is tried
+    /// again at the next answer (#212).
+    static let keepNewer: EndpointBook.Keep = { newer in try newer.save(membershipFile) }
 
     /// The link the Remote's model is built on while paired with a control plane.
     static func link() -> (any DaemonLink)? {

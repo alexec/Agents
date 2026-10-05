@@ -114,11 +114,12 @@ final class MachineMove {
         panel.nameFieldStringValue = "control-key"
         panel.message = "Save the control plane's key, then copy it to the other machine as deploy/secrets/control-key."
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        problem = nil
         do {
-            let key = try HostSecrets.controlKey(model.paths)
-            FileManager.default.createFile(atPath: url.path, contents: key, attributes: [.posixPermissions: 0o600])
+            try HostSecrets.saveControlKey(model.paths, to: url)
         } catch {
-            problem = "The key could not be saved: \(error)"
+            // Said, so a missing or empty key is never copied to the other machine (#212).
+            problem = WriteFailure(error, keeping: "the control plane's key")?.message ?? "The key could not be saved: \(error)"
         }
     }
 

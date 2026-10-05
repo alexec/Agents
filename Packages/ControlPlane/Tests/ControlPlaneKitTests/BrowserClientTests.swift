@@ -140,13 +140,22 @@ struct BrowserClientTests {
         }
     }
 
-    /// Another account on this Mac reaches the listener, but a code works once.
+    /// Another account on this Mac reaches the listener, but a code works once: a second
+    /// key is refused at its announce, in the page's words (#212 lets only the key that
+    /// spent it through again).
     @Test func aBrowserCodeWorksOnceOnTheLoopbackListener() async throws {
         let running = try await start()
         defer { Task { await running.service.stop() } }
         let code = try await running.service.codes.issue(.client, browser: true).text
         #expect(await announceRefusal(code, running) == nil)
-        #expect(await announceRefusal(code, running) == .spent)
+        do {
+            _ = try await announce(code, kind: .browser, publicKey: ControlAgreement.generate().publicKey) {
+                try await joinWeb(running, $0)
+            }
+            Issue.record("a second key paired with a spent code")
+        } catch let error as JSONRPCError {
+            #expect(error.message == ControlService.spentWords)
+        }
         #expect(await running.service.records.clients.count == 1)
     }
 

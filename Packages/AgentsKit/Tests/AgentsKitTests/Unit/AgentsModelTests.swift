@@ -616,6 +616,21 @@ struct AgentsModelTests {
         model.takeTombstones([Tombstone(from: named, retiredAt: Date(), because: .age)])
         #expect(model.startedByAgentLabel(started) == "Started by \u{201C}Plan the release\u{201D} (retired)")
     }
+
+    /// A retired agent's page names who started it on the window and the Remote alike
+    /// (#242), from what is left of the starter once it has gone too.
+    @Test func aRetiredAgentsPageNamesItsStarter() {
+        let model = AgentsModel()
+        var starter = agent(state: .archived)
+        starter.title = "Plan the release"
+        var started = agent(state: .archived)
+        started.startedByAgent = starter.id
+        let gone = Tombstone(from: started, retiredAt: Date(), because: .age)
+        #expect(model.retiredStarterLabel(gone) == "Another agent")
+        model.takeTombstones([Tombstone(from: starter, retiredAt: Date(), because: .age)])
+        #expect(model.retiredStarterLabel(gone) == LeaseWords.agentName("Plan the release"))
+        #expect(model.retiredStarterLabel(Tombstone(from: starter, retiredAt: Date(), because: .age)) == nil)
+    }
 }
 
 @MainActor

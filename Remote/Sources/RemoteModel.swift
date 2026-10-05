@@ -505,6 +505,15 @@ final class RemoteModel {
         startWorktrees = answer
     }
 
+    /// The branch an agent's project folder is on, for the place over its prompt (#242).
+    /// Nil outside a repository or when its host does not answer.
+    func projectFolderBranch(of agent: Agent) async -> String? {
+        let request = DaemonAPI.WorktreesListRequest(folder: agent.projectFolder)
+        return (try? await client(for: request).call(DaemonAPI.Method.worktreesList, request,
+                                                     returning: DaemonAPI.WorktreesListResponse.self))?
+            .projectFolderBranch
+    }
+
     /// Where the draft is made: in a worktree already there when one is chosen, so the
     /// start can use it; otherwise the project folder (030, research R2).
     private var startOptionsFolder: URL? {
@@ -2361,9 +2370,10 @@ final class RemoteModel {
         guard let selection else { work.clearTranscript(); return }
         // Beside the transcript rather than before it, and not cancelled by its returns.
         Task { await loadWholeAgent(selection) }
-        // The finished turns as summaries, then the turn in progress. A Mac too old to
-        // keep turns gives the lot. Both from the chat's own host (058).
-        let turnsRequest = DaemonAPI.TurnsRequest(agentID: selection)
+        // The last few finished turns as summaries, as the window opens with (#242), then
+        // the turn in progress. A Mac too old to keep turns gives the lot. Both from the
+        // chat's own host (058).
+        let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
         let turns = (try? await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
                                                                returning: TurnsPage.self))
             ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)

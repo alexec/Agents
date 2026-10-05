@@ -10,6 +10,11 @@ import Foundation
 /// yet, a name that doesn't resolve yet, or a network that blipped is tried again on the
 /// uplink's backoff rather than given up after once. A code Agents Host replaces while
 /// this waits is the one the next try uses.
+///
+/// A join the disk will not save (#212) is held here and dialled with, and the save is
+/// tried again at every dial; the code is kept until it saves. A restart before then
+/// joins again with the same code and key, which the control plane takes as the same
+/// join while the code lasts.
 public final class HostDialer: @unchecked Sendable {
     public typealias Dial = @Sendable () async throws -> any LineTransport
     public typealias Enroll = @Sendable (ControlCode, Data, DaemonAPI.HostHello) async throws -> ControlMembership
@@ -30,6 +35,10 @@ public final class HostDialer: @unchecked Sendable {
     private let makeDial: MakeDial
     private let lock = NSLock()
     private var ready: Dial?
+    /// Joined, and not saved yet: the membership, and whether the code was the root's.
+    private var held: (membership: ControlMembership, codeFromFile: Bool)?
+    /// Why the held membership could not be saved, said with every status until it is.
+    private var unsaved: String?
 
     public init(membershipFile: URL, codeFile: URL, given: String?, privateKey: Data, hello: DaemonAPI.HostHello,
          say: @escaping @Sendable (DaemonAPI.HostJoinStatus) -> Void,
@@ -46,7 +55,9 @@ public final class HostDialer: @unchecked Sendable {
     }
 
     /// Whether this host has a membership to dial with.
-    public var isMember: Bool { lock.withLock { ready != nil } || ControlMembership.load(membershipFile) != nil }
+    public var isMember: Bool {
+        lock.withLock { ready != nil || held != nil } || ControlMembership.load(membershipFile) != nil
+    }
 
     /// The uplink's dial. A failure is said, for Agents Host and the window, and thrown
     /// for the uplink to wait and try again.
@@ -65,13 +76,16 @@ public final class HostDialer: @unchecked Sendable {
 
     /// The uplink came up or went.
     public func connected(_ up: Bool) {
-        say(.init(member: true, connected: up))
+        say(.init(member: true, connected: up, problem: lock.withLock { unsaved }))
     }
 
     private func dialAsMember() async throws -> Dial {
-        if let ready = lock.withLock({ ready }) { return ready }
+        if let ready = lock.withLock({ ready }) {
+            saveHeld()
+            return ready
+        }
         let membershipFile = self.membershipFile
-        var membership = ControlMembership.load(membershipFile)
+        var membership = lock.withLock { held?.membership } ?? ControlMembership.load(membershipFile)
         if membership == nil {
             let fromFile = given == nil
             guard let text = given ?? Self.read(codeFile) else {
@@ -81,20 +95,51 @@ public final class HostDialer: @unchecked Sendable {
                 throw Failure(description: "that host code can't be read; ask for a new one")
             }
             let joined = try await enroll(code, privateKey, hello)
-            try joined.save(membershipFile)
-            // Spent now: a restart dials as this host and never enrols twice.
-            if fromFile { try? FileManager.default.removeItem(at: codeFile) }
             DaemonLog.shared.write("uplink: enrolled with \(joined.name) as \(joined.host?.rawValue ?? "?")")
+            lock.withLock { held = (joined, fromFile) }
+            saveHeld()
             membership = joined
         }
         guard let membership else { throw Failure(description: "no membership") }
-        let made = try makeDial(membership, privateKey) { newer in
+        let made = try makeDial(membership, privateKey) { [weak self] newer in
             // The control plane moved or changed its certificate (R16).
-            try? newer.save(membershipFile)
             DaemonLog.shared.write("uplink: the control plane is now at \(newer.url ?? "?")")
+            guard let self else { return }
+            let joining = lock.withLock { () -> Bool in
+                guard held != nil else { return false }
+                held?.membership = newer
+                return true
+            }
+            if joining { saveHeld() } else { try save(newer, what: "the control plane's new address") }
         }
         lock.withLock { ready = made }
         return made
+    }
+
+    /// The join held in memory, saved if the disk takes it now; the code is spent only then,
+    /// so a restart dials as this host and never enrols twice.
+    private func saveHeld() {
+        guard let (joined, fromFile) = lock.withLock({ held }) else { return }
+        guard (try? save(joined, what: "this host's membership")) != nil else { return }
+        lock.withLock { if held?.membership == joined { held = nil } }
+        if fromFile { try? FileManager.default.removeItem(at: codeFile) }
+    }
+
+    /// Saves the membership, or says why it could not and throws.
+    private func save(_ membership: ControlMembership, what: String) throws {
+        do {
+            try membership.save(membershipFile)
+            lock.withLock { unsaved = nil }
+        } catch {
+            let words = WriteFailure(error, keeping: what)?.message ?? "\(what) could not be saved: \(error)"
+            let first = lock.withLock { () -> Bool in
+                defer { unsaved = words }
+                return unsaved == nil
+            }
+            if first { DaemonLog.shared.write("uplink: \(words); kept in memory and tried again at the next dial") }
+            say(.init(member: true, connected: lock.withLock { ready != nil }, problem: words))
+            throw error
+        }
     }
 
     private static func read(_ file: URL) -> String? {

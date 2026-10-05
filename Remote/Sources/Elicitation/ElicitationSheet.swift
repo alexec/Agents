@@ -135,7 +135,7 @@ struct ElicitationSheet: View {
                 .buttonStyle(.paper)
                 .controlSize(.large)
             }
-            declineButton
+            declineButton()
         }
         .disabled(isStale)
     }
@@ -151,7 +151,8 @@ struct ElicitationSheet: View {
             Button { send("Done", action: .accept) } label: { label("Done", note: nil) }
                 .buttonStyle(.paper)
                 .controlSize(.large)
-            declineButton
+            // The link's own way out, worded as the window and the page word it (#243).
+            declineButton("Gave up")
         }
         .disabled(isStale)
     }
@@ -161,8 +162,8 @@ struct ElicitationSheet: View {
         model.isStale(on: model.work.agent(request.agentID)?.host ?? .mac)
     }
 
-    private var declineButton: some View {
-        Button { send("No thanks", action: .decline) } label: { label("No thanks", note: nil) }
+    private func declineButton(_ title: String = "No thanks") -> some View {
+        Button { send(title, action: .decline) } label: { label(title, note: nil) }
             .buttonStyle(.paper)
             .controlSize(.large)
     }

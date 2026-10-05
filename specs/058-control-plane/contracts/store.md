@@ -26,7 +26,7 @@ All keys are under `<prefix>/v1/` (the prefix is set when the copy is started):
 | `clients/<uuid>.json` | pairing, setGrant, lastSeen (hourly) | `absent` on pairing, `matching` after | start, every 15 s, on event |
 | `hosts/<id>.json` | enrolment, hello (version change), remove | `absent` / `matching` | the same |
 | `codes/<id>.json` | startPairing, startEnroll | `absent` | on use |
-| `codes/<id>.spent` | first use | `absent`: the winner admits | on use |
+| `codes/<id>.spent` | first use: the public key and the id it was given | `absent`: the winner admits; the same key again is the same join (#212) | on use |
 | `leases/<host>.json` | the holding copy | `absent`, or `matching` to renew or take over | on routing, on `gone` |
 | `copies/<id>.json` | each copy, every 10 s | `always` (only its own key) | peer discovery, every 10 s |
 | `events/<day>/<ulid>.json` | whichever copy made the change | `absent` | on (re)joining peers |
