@@ -21,13 +21,13 @@ struct ControlServiceTests {
     }
 
     func start(store: any ControlStore = MemoryStore(), port: Int? = nil, tls: NIOSSLContext? = nil,
-               pin: String? = nil) async throws -> Running {
+               pin: String? = nil, bind: String = "127.0.0.1") async throws -> Running {
         let chosen: Int
         if let port { chosen = port } else { chosen = try await freePort() }
         let port = chosen
         let url = URL(string: "\(tls == nil ? "http" : "https")://127.0.0.1:\(port)")!
         let service = try ControlService(.init(store: store, privateKey: control.privateKey, url: url, pin: pin, tls: tls,
-                                               bind: "127.0.0.1", port: port, name: "test", machineID: "m"))
+                                               bind: bind, port: port, name: "test", machineID: "m"))
         try await service.start()
         return Running(service: service, url: url, port: port)
     }
@@ -256,6 +256,13 @@ struct ControlServiceTests {
         await store.setDown(true)
         await running.service.refresh()
         #expect(try await status(running.url.appendingPathComponent("readyz")) == 503)
+    }
+
+    @Test func theDefaultListenerAcceptsIPv4AndIPv6() async throws {
+        let running = try await start(bind: "0.0.0.0")
+        defer { Task { await running.service.stop() } }
+        #expect(try await status(URL(string: "http://127.0.0.1:\(running.port)/healthz")!) == 200)
+        #expect(try await status(URL(string: "http://[::1]:\(running.port)/healthz")!) == 200)
     }
 
     /// A self-signed copy, reached by pin; a wrong pin gets nowhere.

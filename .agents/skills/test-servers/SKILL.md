@@ -183,6 +183,11 @@ $T/server-rpc.sh $ROOT --stop
 $S/stop.sh $ROOT
 ```
 
+If this walk started a Linux scratch host with `--serve`, stop that host before ending the
+walk: run `$T/devbox.sh fresh` (or `$T/bare.sh fresh`) to stop the pid recorded in its
+daemon lock and remove its scratch `~/.agents-server` root. Do not leave a detached server
+daemon behind after the control plane is stopped.
+
 The server's daemon is meant to outlive the control plane and keeps running on the box. That is
 correct, and `devbox.sh fresh` clears it. Leave the box up unless you started Colima and nobody
 else is using it.

@@ -450,7 +450,9 @@ public final class DaemonServer: @unchecked Sendable {
                 // A reader that has fallen this far behind is closed rather than queued for
                 // without end; it reconnects and reads everything afresh (#167).
                 guard connections.reserve(size, for: connection, limit: backlogLimit) else {
-                    DaemonLog.shared.write("socket: closing a connection \(backlogLimit >> 20) MB behind")
+                    if connections.contains(connection) {
+                        DaemonLog.shared.write("socket: closing a connection \(backlogLimit >> 20) MB behind")
+                    }
                     Task { await connection.close() }
                     continue
                 }
@@ -544,6 +546,11 @@ final class ConnectionSet: @unchecked Sendable {
     func remove(_ connection: JSONRPCConnection) {
         lock.lock(); defer { lock.unlock() }
         entries.removeValue(forKey: ObjectIdentifier(connection))
+    }
+
+    func contains(_ connection: JSONRPCConnection) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return entries[ObjectIdentifier(connection)] != nil
     }
 
     /// Counts `size` more bytes queued for `connection`, or says no once that would take a
