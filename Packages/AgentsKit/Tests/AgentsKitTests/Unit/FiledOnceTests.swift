@@ -180,7 +180,7 @@ struct FiledOnceTests {
     /// never held, does not leave cells behind (#285).
     @Test func aForgottenAgentLeavesNoCellBehind() {
         let model = AgentsModel()
-        let held = (0..<6).map { agent(api, .archived, at: Double($0)) }
+        let held = (0..<6).map { agent(api, .archived, at: Double($0)) }  // index-ok: six agents made here
         model.takeListed(held)
         for one in held { _ = model.agent(one.id) }
         #expect(model.heldCellCount == held.count)
