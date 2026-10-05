@@ -37,7 +37,9 @@ public final class AgentsModel {
 
     /// Every project's workflows, newest state winning. Here rather than in the Mac's
     /// own model because a workflow is about the work, and the phone will want them.
-    public private(set) var workflows: [WorkflowSummary] = []
+    /// Not observed: a fold reads its project's shelf, so one workflow changing does
+    /// not redraw every other project's (#285). The array stays, for a one-off read.
+    @ObservationIgnored public private(set) var workflows: [WorkflowSummary] = []
 
     /// Each project's Dashboard row (074), by its standardized folder: kept current by
     /// `dashboard/changed`, which carries it.
@@ -48,11 +50,12 @@ public final class AgentsModel {
     public private(set) var dashboardRevisions: [URL: Int] = [:]
 
     /// Each project's pinned pages (#159), by its standardized folder: kept current by
-    /// `pins/changed`, which carries them. A project with none is absent.
-    public private(set) var pins: [URL: [PinView]] = [:]
+    /// `pins/changed`, which carries them. A project with none is absent. Not observed:
+    /// a project reads its own shelf (#285).
+    @ObservationIgnored public private(set) var pins: [URL: [PinView]] = [:]
     /// Each project's pinned sessions (#180), by its standardized folder, in their order:
     /// kept current by `pins/changed` as the pages are. A project with none is absent.
-    public private(set) var sessionPins: [URL: [UUID]] = [:]
+    @ObservationIgnored public private(set) var sessionPins: [URL: [UUID]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: Int] = [:]
@@ -104,7 +107,13 @@ public final class AgentsModel {
     /// megabytes, so what streams in cannot simply pile up. But the rows at the top are
     /// the ones somebody who scrolled up is reading, and taking them away would move
     /// the page under them, so while they are away from the end nothing goes.
-    @ObservationIgnored public var isFollowingEnd = true
+    @ObservationIgnored public var isFollowingEnd = true {
+        didSet {
+            // Back at the end, the turns gathered while reading up are let go (#285).
+            // The entries have their own trim, and it stays where it was.
+            if isFollowingEnd, !oldValue { trimTurns() }
+        }
+    }
     /// How many entries a followed page keeps: three of the daemon's 200-entry pages,
     /// many screens more than a pane shows. Trimmed only once a further page has
     /// piled up past it, so the fold is done again once a page rather than per entry.
@@ -114,6 +123,11 @@ public final class AgentsModel {
     /// calls is one row however many entries it took, and a page trimmed to a few rows
     /// would not fill the pane: the chat would ask for the page before straight back.
     static let itemsKept = 100
+    /// Finished turns a followed chat keeps, and how many it may hold before the
+    /// oldest go. Four of the host's opening pages, then a further page, so a chat
+    /// left at its end does not keep every turn it ever paged in (#285).
+    static let turnsKept = 48
+    static let turnsTrimmedAt = 72
     /// Told the entries that go when the front of the page is trimmed, for anything
     /// that folds the whole conversation into something (the phone's marks on the
     /// files the agent touched) and would lose them otherwise.
@@ -127,8 +141,13 @@ public final class AgentsModel {
     /// Each project's agents, by folder and host, and again by folder alone (#165).
     @ObservationIgnored private var shelves: [ShelfKey: ProjectShelf] = [:]
     @ObservationIgnored private var folderShelves: [URL: ProjectShelf] = [:]
-    /// One per agent a view has looked up by id.
+    /// One per agent a view has looked up by id. Let go when the agent is (#285).
     @ObservationIgnored private var cells: [UUID: AgentCell] = [:]
+    /// How many cells are held. A forgotten agent must not leave one behind (#285).
+    var heldCellCount: Int { cells.count }
+    /// Workflows and pins per project, made when a fold first asks (#285).
+    @ObservationIgnored private var workflowShelves: [URL: WorkflowShelf] = [:]
+    @ObservationIgnored private var pinShelves: [URL: PinShelf] = [:]
     /// Every agent's title by id, and a count that moves only when one of them does.
     @ObservationIgnored private var titles: [UUID: String] = [:]
     private var titlesRevision = 0
@@ -283,7 +302,14 @@ public final class AgentsModel {
     /// that sent it shows it is on its way, and every control that would send another is
     /// held. Kept here, not in a view, so the menu, the row, the swipe and the strip all
     /// hold together, and both apps the same way.
+    ///
+    /// Kept as a dictionary the phone still reads whole (`work.acting[id]`, #215).
+    /// A Mac row reads `act(of:)`, which is the agent's cell copied from `actMirror`,
+    /// so one act does not redraw every row (#285).
     public private(set) var acting: [UUID: AgentAct] = [:]
+    @ObservationIgnored private var actMirror: [UUID: AgentAct] = [:]
+    /// Each agent's lease, worked out once per snapshot. A row reads its cell (#285).
+    @ObservationIgnored private var leaseByAgent: [UUID: LeaseStatus] = [:]
 
     public init() {}
 
@@ -497,6 +523,7 @@ public final class AgentsModel {
             workflows.removeAll {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
+            refillWorkflowShelf(folder)
 
         case .dashboardChanged(let notification):
             let folder = Project.standardize(notification.folder)
@@ -505,11 +532,11 @@ public final class AgentsModel {
 
         case .pinsChanged(let notification):
             let folder = Project.standardize(notification.folder)
-            pins[folder] = notification.pins.isEmpty ? nil : notification.pins
             let sessions = notification.sessions ?? []
-            if sessionPins[folder] != (sessions.isEmpty ? nil : sessions) {
-                sessionPins[folder] = sessions.isEmpty ? nil : sessions
-            }
+            pins[folder] = notification.pins.isEmpty ? nil : notification.pins
+            sessionPins[folder] = sessions.isEmpty ? nil : sessions
+            pinShelves[folder]?.setPins(notification.pins)
+            pinShelves[folder]?.setSessions(sessions)
 
         case .pagesChanged(let notification):
             pageRevisions[Project.standardize(notification.folder), default: 0] += 1
@@ -534,7 +561,7 @@ public final class AgentsModel {
             elicitations.removeAll { $0.agentID == notification.agentID }
 
         case .leasesChanged(let snapshot):
-            leases = snapshot
+            replaceLeases(snapshot)
 
         case .diskChanged(let state):
             disk = state
@@ -611,15 +638,26 @@ public final class AgentsModel {
         } else {
             workflows.append(summary)
         }
-        workflows.sort {
-            $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending
-        }
+        workflows.sort(by: Self.workflowName)
+        refillWorkflowShelf(summary.folder)
     }
 
     public func replaceWorkflows(_ summaries: [WorkflowSummary]) {
-        workflows = summaries.sorted {
-            $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending
-        }
+        workflows = summaries.sorted(by: Self.workflowName)
+        let folders = Set(workflowShelves.keys)
+        for folder in folders { refillWorkflowShelf(folder) }
+    }
+
+    private static func workflowName(_ a: WorkflowSummary, _ b: WorkflowSummary) -> Bool {
+        a.workflow.name.localizedCaseInsensitiveCompare(b.workflow.name) == .orderedAscending
+    }
+
+    /// The shelf a fold already holds, filled from the array. One that nobody has
+    /// opened is left unmade, so a change does not build a shelf for every project.
+    private func refillWorkflowShelf(_ folder: URL) {
+        let key = Project.standardize(folder)
+        guard let shelf = workflowShelves[key] else { return }
+        shelf.replace(workflows.filter { $0.folder == key })
     }
 
     public func replacePlugins(_ list: DaemonAPI.PluginsList) {
@@ -651,9 +689,10 @@ public final class AgentsModel {
         dashboardSummaries[folder] = DashboardModel.summary(snapshot)
     }
 
-    /// One project's pinned pages, in their order.
+    /// One project's pinned pages, in their order. Read from that project's shelf.
     public func pins(in folder: URL?) -> [PinView] {
-        folder.map { pins[Project.standardize($0)] ?? [] } ?? []
+        guard let folder else { return [] }
+        return pinShelf(folder).pins
     }
 
     public func replacePins(_ listed: [ProjectPins]) {
@@ -663,22 +702,43 @@ public final class AgentsModel {
             listed.sessions.map { (Project.standardize(listed.folder), $0) }
         }, uniquingKeysWith: { $1 })
         if sessionPins != sessions { sessionPins = sessions }
+        for (folder, shelf) in pinShelves {
+            shelf.setPins(pins[folder] ?? [])
+            shelf.setSessions(sessionPins[folder] ?? [])
+        }
     }
 
     /// One project's pinned sessions (#180), in their order: ids, whether or not this
     /// client holds them.
     public func pinnedSessions(in folder: URL?) -> [UUID] {
-        folder.map { sessionPins[Project.standardize($0)] ?? [] } ?? []
+        guard let folder else { return [] }
+        return pinShelf(folder).sessions
     }
 
     /// A project's pinned sessions as a screen left them, before the host says so.
     public func setSessionPins(_ ids: [UUID], in folder: URL) {
-        sessionPins[Project.standardize(folder)] = ids.isEmpty ? nil : ids
+        let key = Project.standardize(folder)
+        sessionPins[key] = ids.isEmpty ? nil : ids
+        pinShelves[key]?.setSessions(ids)
     }
 
     /// A project's pins as a screen left them, before the host says so: a drop, an Unpin.
     public func setPins(_ list: [PinView], in folder: URL) {
-        pins[Project.standardize(folder)] = list.isEmpty ? nil : list
+        let key = Project.standardize(folder)
+        pins[key] = list.isEmpty ? nil : list
+        pinShelves[key]?.setPins(list)
+    }
+
+    /// The shelf for a project, filled from what is already held the first time a
+    /// screen asks. A later change updates it in place.
+    private func pinShelf(_ folder: URL) -> PinShelf {
+        let key = Project.standardize(folder)
+        if let shelf = pinShelves[key] { return shelf }
+        let shelf = PinShelf()
+        shelf.setPins(pins[key] ?? [])
+        shelf.setSessions(sessionPins[key] ?? [])
+        pinShelves[key] = shelf
+        return shelf
     }
 
     public func pageRevision(in folder: URL?) -> Int {
@@ -689,11 +749,16 @@ public final class AgentsModel {
         folder.map { dashboardRevisions[Project.standardize($0)] ?? 0 } ?? 0
     }
 
-    /// The workflows of one project, which is what a project page shows.
+    /// The workflows of one project, which is what a project page shows. The first
+    /// ask makes the shelf; later changes write that shelf and no other (#285).
     public func workflows(in folder: URL?) -> [WorkflowSummary] {
         guard let folder else { return [] }
-        let standardized = Project.standardize(folder)
-        return workflows.filter { $0.folder == standardized }
+        let key = Project.standardize(folder)
+        if let shelf = workflowShelves[key] { return shelf.summaries }
+        let shelf = WorkflowShelf()
+        shelf.replace(workflows.filter { $0.folder == key })
+        workflowShelves[key] = shelf
+        return shelf.summaries
     }
 
     public func upsert(_ summary: DaemonAPI.ProjectSummary) {
@@ -713,18 +778,12 @@ public final class AgentsModel {
     /// runs, the open chat's record), filed beside the rest. A lean one keeps the lists
     /// held for it (#107), as a lean `agent/changed` does (#203).
     ///
-    /// Merged in one go and sorted once, as `replaceAgents` does: filed one at a time it
-    /// was a search and a sort of everything held for each one listed (#136).
+    /// Filed in place, however long the page. Rebuilding every shelf for a long page
+    /// redrew every open fold (#285). The copy that made one-at-a-time expensive was
+    /// the list of everything (#136); `file` no longer takes one (#213).
     public func takeListed(_ listed: [Agent]) {
         guard !listed.isEmpty else { return }
-        // A few, one at a time; many, filed again in one go.
-        if listed.count <= 8 {
-            for agent in listed { file(agent.keepingLists(of: byID[agent.id])) }
-            return
-        }
-        var merged = byID
-        for agent in listed { merged[agent.id] = agent.keepingLists(of: merged[agent.id]) }
-        refile(Array(merged.values))
+        for agent in listed { file(agent.keepingLists(of: byID[agent.id])) }
     }
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
@@ -764,7 +823,34 @@ public final class AgentsModel {
     public func takeTombstones(_ found: [Tombstone]) {
         for tombstone in found { tombstones[tombstone.id] = tombstone }
     }
-    public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) { leases = snapshot }
+    public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) {
+        leases = snapshot
+        reindexLeases()
+    }
+
+    /// Each hold and each wait, once, onto the agent that has it. A row then reads
+    /// its cell rather than the whole snapshot (#285).
+    private func reindexLeases() {
+        guard let leases else {
+            let had = leaseByAgent
+            leaseByAgent = [:]
+            for id in had.keys where cells[id]?.lease != nil { cells[id]?.lease = nil }
+            return
+        }
+        var affected = Set(leaseByAgent.keys)
+        for state in leases.resources {
+            for hold in state.holds { affected.insert(hold.holder) }
+            for wait in state.line { affected.insert(wait.agentID) }
+        }
+        var next: [UUID: LeaseStatus] = [:]
+        next.reserveCapacity(affected.count)
+        for id in affected {
+            let status = LeaseStatus.of(id, in: leases, titles: titles)
+            if let status { next[id] = status }
+            if let cell = cells[id], cell.lease != status { cell.lease = status }
+        }
+        leaseByAgent = next
+    }
     public func replaceDisk(_ state: DiskState) { disk = state }
 
     /// A page of events from `events/list`, asked for with `filter`. The first page
@@ -831,10 +917,15 @@ public final class AgentsModel {
     }
 
     /// What an agent holds and waits for, in the words the row, the card and the chat
-    /// use. Nil when it is nothing, or the daemon has no leases to say.
+    /// use. Nil when it is nothing, or the daemon has no leases to say. The agent's
+    /// own cell, so a lease changing redraws the rows it touches (#285).
     public func leaseStatus(of agentID: UUID) -> LeaseStatus? {
-        guard let leases else { return nil }
-        return LeaseStatus.of(agentID, in: leases, titles: agentTitles)
+        cell(for: agentID).lease
+    }
+
+    /// The act in flight for one agent, from its cell (#285).
+    public func act(of agentID: UUID) -> AgentAct? {
+        cell(for: agentID).act
     }
 
     /// Every agent's title by id, for naming whoever holds what another is waiting for.
@@ -890,14 +981,19 @@ public final class AgentsModel {
     /// still going, and is not to be sent: whichever surface it came from (menu, row,
     /// swipe, strip, key), it is one agent and one answer at a time.
     public func begin(_ act: AgentAct, on agentID: UUID) -> Bool {
-        guard acting[agentID] == nil else { return false }
+        guard actMirror[agentID] == nil else { return false }
+        actMirror[agentID] = act
         acting[agentID] = act
+        cells[agentID]?.act = act
         return true
     }
 
     /// The call came back, sent or not. The record arriving says what became of it.
     public func end(_ act: AgentAct, on agentID: UUID) {
-        if acting[agentID] == act { acting[agentID] = nil }
+        guard actMirror[agentID] == act else { return }
+        actMirror[agentID] = nil
+        acting[agentID] = nil
+        cells[agentID]?.act = nil
     }
 
     /// What this agent has left before it stops, under the limits as they stand.
@@ -930,12 +1026,25 @@ public final class AgentsModel {
         turns = page.turns.keepingLastTurnWithEachID()
         firstTurn = page.firstTurn
         openTurnStart = page.openStart
+        trimTurns()
     }
 
-    /// Earlier finished turns, put in front.
+    /// Earlier finished turns, put in front. While the reader is up the page, they
+    /// stay; back at the end, the cap lets the oldest go (#285).
     public func prependTurns(_ page: TurnsPage) {
         turns = (page.turns + turns).keepingLastTurnWithEachID()
         firstTurn = page.firstTurn
+        trimTurns()
+    }
+
+    /// The oldest finished turns let go, down to `turnsKept`, while the chat follows
+    /// the end. `firstTurn` moves with them, so reaching the top pages them back.
+    private func trimTurns() {
+        guard isFollowingEnd, turns.count > Self.turnsTrimmedAt else { return }
+        let drop = turns.count - Self.turnsKept
+        guard drop > 0 else { return }
+        turns.removeFirst(drop)
+        firstTurn += drop
     }
 
     /// The first page of the conversation being read: the end of it.
@@ -1151,10 +1260,22 @@ public final class AgentsModel {
     /// agent changes and no other (#165).
     public func agent(_ id: UUID?) -> Agent? {
         guard let id else { return nil }
-        if let cell = cells[id] { return cell.agent }
-        let cell = AgentCell(byID[id])
+        return cell(for: id).agent
+    }
+
+    /// The cell a row is tied to. One that is not held, and has no act and no lease,
+    /// is not stored: a lookup of an agent that has gone must not leave a cell (#285).
+    /// It reads the mirrors, never the observed dictionaries, so a row asking is not
+    /// subscribed to every act and every lease.
+    private func cell(for id: UUID) -> AgentCell {
+        if let cell = cells[id] { return cell }
+        let agent = byID[id]
+        let act = actMirror[id]
+        let lease = leaseByAgent[id]
+        guard agent != nil || act != nil || lease != nil else { return AgentCell(nil) }
+        let cell = AgentCell(agent, act: act, lease: lease)
         cells[id] = cell
-        return cell.agent
+        return cell
     }
 
     /// Which runtime a new agent gets when nobody has said: `RuntimeCatalog.newSessionRuntime`,
@@ -1296,6 +1417,8 @@ public final class AgentsModel {
         if titles[agent.id] != agent.title {
             titles[agent.id] = agent.title
             titlesRevision &+= 1
+            // A waiter's words name the holder. The snapshot did not change; the name did.
+            if leases != nil { reindexLeases() }
         }
     }
 
@@ -1314,7 +1437,25 @@ public final class AgentsModel {
     /// Agents let go of without being gone: an Archived fold closed, a search ended
     /// (#165). The host still has them, and lists them again when asked.
     public func forget(_ ids: some Sequence<UUID>) {
-        for id in ids { unfile(id) }
+        var gone = Set<UUID>()
+        for id in ids { gone.insert(id) }
+        if gone.count <= 1 {
+            for id in gone { unfile(id) }
+            return
+        }
+        // One pass of the list. A search ending used to walk it once per id (#285).
+        var removed: [Agent] = []
+        removed.reserveCapacity(gone.count)
+        for id in gone {
+            guard let old = byID.removeValue(forKey: id) else { continue }
+            removed.append(old)
+        }
+        guard !removed.isEmpty else { return }
+        agents.removeAll { gone.contains($0.id) }
+        agentCount = byID.count
+        var titlesChanged = false
+        for old in removed { detach(old, titlesChanged: &titlesChanged) }
+        if titlesChanged { noteTitlesChanged() }
     }
 
     /// One agent out of everything (retired, 051).
@@ -1322,12 +1463,29 @@ public final class AgentsModel {
         guard let old = byID.removeValue(forKey: id) else { return }
         Self.remove(old, from: &agents)
         agentCount = byID.count
-        if let was = filedAs.removeValue(forKey: id) {
+        var titlesChanged = false
+        detach(old, titlesChanged: &titlesChanged)
+        if titlesChanged { noteTitlesChanged() }
+    }
+
+    /// Out of its shelves and its cell. The act stays: an agent let go of and listed
+    /// again is still the one a press is in flight for (#285).
+    private func detach(_ old: Agent, titlesChanged: inout Bool) {
+        if let was = filedAs.removeValue(forKey: old.id) {
             shelves[ShelfKey(folder: was.folder, host: was.host)]?.remove(old, from: was.group)
             folderShelves[was.folder]?.remove(old, from: was.group)
         }
-        cells[id]?.agent = nil
-        if titles.removeValue(forKey: id) != nil { titlesRevision &+= 1 }
+        if let cell = cells.removeValue(forKey: old.id) {
+            cell.agent = nil
+            cell.act = nil
+            cell.lease = nil
+        }
+        if titles.removeValue(forKey: old.id) != nil { titlesChanged = true }
+    }
+
+    private func noteTitlesChanged() {
+        titlesRevision &+= 1
+        if leases != nil { reindexLeases() }
     }
 
     /// Everything filed again from a list: what a connect, a host's re-list or a big
@@ -1354,12 +1512,23 @@ public final class AgentsModel {
         for (key, groups) in byKey { shelf(ProjectKey(host: key.host, folder: key.folder)).replaceAll(groups) }
         for (folder, shelf) in folderShelves where byFolder[folder] == nil { shelf.replaceAll([:]) }
         for (folder, groups) in byFolder { shelf(folder).replaceAll(groups) }
-        for (id, cell) in cells where cell.agent != unique[id] { cell.agent = unique[id] }
         let titles = unique.compactMapValues(\.title)
         if titles != self.titles {
             self.titles = titles
             titlesRevision &+= 1
+            if leases != nil { reindexLeases() }
         }
+        var drop: [UUID] = []
+        for (id, cell) in cells {
+            let agent = unique[id]
+            if cell.agent != agent { cell.agent = agent }
+            let act = actMirror[id]
+            if cell.act != act { cell.act = act }
+            let lease = leaseByAgent[id]
+            if cell.lease != lease { cell.lease = lease }
+            if agent == nil, act == nil, lease == nil { drop.append(id) }
+        }
+        for id in drop { cells[id] = nil }
     }
 
     /// Where an agent sits, counting a file it has asked the person to look at.

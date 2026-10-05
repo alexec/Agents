@@ -155,12 +155,47 @@ public final class ProjectShelf {
 
 /// One agent as a client holds it, for a row that looks its agent up by id on every
 /// render (`AgentRow`, `AgentCard`): reading it ties the row to this agent and no other.
+/// Its act and its lease live here too, so one row's "on its way" or its hold is not
+/// every row's redraw (#285).
 @MainActor
 @Observable
 final class AgentCell {
     var agent: Agent?
+    var act: AgentAct?
+    var lease: LeaseStatus?
 
-    init(_ agent: Agent?) {
+    init(_ agent: Agent?, act: AgentAct? = nil, lease: LeaseStatus? = nil) {
         self.agent = agent
+        self.act = act
+        self.lease = lease
+    }
+}
+
+/// One project's workflows, so a fold that reads them is not redrawn by a workflow
+/// in any other project (#285).
+@MainActor
+@Observable
+final class WorkflowShelf {
+    private(set) var summaries: [WorkflowSummary] = []
+
+    func replace(_ summaries: [WorkflowSummary]) {
+        if self.summaries != summaries { self.summaries = summaries }
+    }
+}
+
+/// One project's pins, pages and sessions apart, so a session pin does not redraw
+/// the page list (#285).
+@MainActor
+@Observable
+final class PinShelf {
+    private(set) var pins: [PinView] = []
+    private(set) var sessions: [UUID] = []
+
+    func setPins(_ pins: [PinView]) {
+        if self.pins != pins { self.pins = pins }
+    }
+
+    func setSessions(_ sessions: [UUID]) {
+        if self.sessions != sessions { self.sessions = sessions }
     }
 }

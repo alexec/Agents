@@ -147,6 +147,8 @@ struct PaneView: View {
                 PagePane(agent: agent)
             case .files:
                 FilesPane(agent: agent)
+            case .changes:
+                RemoteChangesPane(agent: agent)
             case .terminal:
                 TerminalPane(agent: agent)
             case .exchanged:

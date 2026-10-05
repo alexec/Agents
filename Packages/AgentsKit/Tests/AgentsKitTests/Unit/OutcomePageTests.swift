@@ -128,4 +128,26 @@ struct OutcomePageTests {
         #expect(openStart == 9)
         #expect(closed.map { $0.last?.text } == ["a", "b"])
     }
+
+    /// A chunk on the tail keeps the turns in front as the same values (#285).
+    @Test func aChunkOnTheTailReusesTheTurnsInFront() throws {
+        let page = TranscriptEntry.display([ask("One"), said("a"), ask("Two"), said("b")])
+        var earlier = page.turns()
+        earlier[0].storedStepCount = 99
+        let grown = (page + [TranscriptItem.entry(said("more"))]).turns(reusing: earlier)
+        #expect(grown.count == 2)
+        let grownFirst = try #require(grown.first)
+        let grownSecond = try #require(grown.dropFirst().first)
+        #expect(grownFirst.storedStepCount == 99)
+        #expect(grownSecond.storedStepCount == nil)
+        #expect(text(grownSecond.items.last) == "more")
+
+        let changed = TranscriptEntry.display([ask("One"), said("CHANGED"), ask("Two"), said("b")])
+        let rebuilt = changed.turns(reusing: grown)
+        let rebuiltFirst = try #require(rebuilt.first)
+        let rebuiltSecond = try #require(rebuilt.dropFirst().first)
+        #expect(rebuiltFirst.storedStepCount == nil)
+        #expect(text(rebuiltFirst.items.first) == "CHANGED")
+        #expect(text(rebuiltSecond.items.last) == "b")
+    }
 }
