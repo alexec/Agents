@@ -29,7 +29,7 @@ jobs:
           AGENTS_RUN_FLAKY: "1"
         run: |
           status=0
-          for package in Packages/CodeText Packages/AgentsKit; do
+          for package in Packages/CodeText Packages/AgentsKit Packages/ControlPlane; do
             filter=$(scripts/flaky-tests.sh "$package")
             [ -n "$filter" ] || continue
             swift test --package-path "$package" --filter "$filter" || status=1

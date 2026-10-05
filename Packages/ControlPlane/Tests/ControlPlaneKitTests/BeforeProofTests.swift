@@ -83,7 +83,7 @@ struct BeforeProofTests {
 
     /// One connection that never sends a byte is closed within the idle time, and gives
     /// back its place.
-    @Test func aSilentConnectionIsClosedWithinTheIdleTime() async throws {
+    @Test(.flakyUnderLoad) func aSilentConnectionIsClosedWithinTheIdleTime() async throws {
         let running = try await base.start()
         defer { Task { await running.service.stop() } }
         let fd = try Raw.connect(port: running.port)
