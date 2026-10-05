@@ -2,12 +2,23 @@
 //
 // markdown-it parses with `html: false`, so raw HTML in a message arrives as text. Its tokens are
 // turned into Preact nodes here, never into an HTML string, so nothing an agent says can reach an
-// HTML sink. Images become a placeholder naming them: the page loads nothing from anywhere but
-// itself (the CSP says so too). A link opens in a new tab, and only http, https and mailto links
-// are links at all.
+// HTML sink. An image in a chat, or any image that is not a file beside a Markdown page, becomes
+// a placeholder naming it: the page loads nothing from anywhere but itself (the CSP says so too).
+// A picture beside a page is drawn from bytes `files/read` returns. A link opens in a new tab,
+// and only http, https and mailto links are links at all.
 import MarkdownIt, { type Token } from "markdown-it";
+import { pageImagePath } from "../model/pageImage";
+import { LocalPicture } from "./LocalPicture";
 import { memo } from "./memo";
 import { Fragment, h, type ComponentChildren } from "preact";
+
+/** A Markdown page's pictures: read from beside the document, never from an address. */
+export interface PageImages {
+  document: string;
+  /** Bumped when the folder changes, so a picture is read again. */
+  revision: number;
+  read: (path: string) => Promise<{ bytes: Uint8Array; type: string } | null>;
+}
 
 const parser = new MarkdownIt({ html: false, linkify: true, typographer: false, breaks: false });
 
@@ -34,7 +45,7 @@ interface Frame {
 }
 
 /** Builds nodes from a flat token list with nesting, as markdown-it hands them over. */
-function build(tokens: readonly Token[]): ComponentChildren[] {
+function build(tokens: readonly Token[], images?: PageImages): ComponentChildren[] {
   const root: Frame = { tag: "", props: {}, children: [] };
   const stack: Frame[] = [root];
   const top = () => stack[stack.length - 1]!;
@@ -85,7 +96,7 @@ function build(tokens: readonly Token[]): ComponentChildren[] {
             done ? "☑" : "☐"));
           push(" ");
         }
-        top().children.push(...build(token.children ?? []));
+        top().children.push(...build(token.children ?? [], images));
         break;
       }
       case "text":
@@ -110,9 +121,16 @@ function build(tokens: readonly Token[]): ComponentChildren[] {
         push(h("hr", null));
         break;
       case "image": {
-        const alt = token.children?.map((child) => child.content).join("") || token.attrGet("alt") || "";
-        push(h("span", { class: "image-placeholder", title: token.attrGet("src") ?? "" },
-          alt ? `[image: ${alt}]` : "[image]"));
+        const alt = token.children?.map((child) => child.content).join("") || String(token.attrGet("alt") ?? "");
+        const src = String(token.attrGet("src") ?? "");
+        // Beside the document, and only there. A chat has no document, so every image stays
+        // a placeholder, and a remote one does even on a page (FR-031).
+        const path = images ? pageImagePath(src, images.document) : null;
+        if (path && images) {
+          push(h(LocalPicture, { path, alt, revision: images.revision, read: images.read }));
+        } else {
+          push(h("span", { class: "image-placeholder", title: src }, alt ? `[image: ${alt}]` : "[image]"));
+        }
         break;
       }
       default:
@@ -123,9 +141,9 @@ function build(tokens: readonly Token[]): ComponentChildren[] {
   return root.children;
 }
 
-/** Markdown as Preact nodes. */
-export function renderMarkdown(source: string): ComponentChildren[] {
-  return build(parser.parse(source, {}));
+/** Markdown as Preact nodes. `images` draws pictures from beside a document; without it, none are fetched. */
+export function renderMarkdown(source: string, images?: PageImages): ComponentChildren[] {
+  return build(parser.parse(source, {}), images);
 }
 
 const fenceOpen = /^ {0,3}(`{3,}|~{3,})/;
@@ -191,11 +209,11 @@ export function markdownBlocks(source: string): string[] {
 }
 
 /** One finished block, parsed once. */
-const MarkdownBlock = memo(function MarkdownBlock({ text }: { text: string }): ComponentChildren {
-  return h(Fragment, null, ...renderMarkdown(text));
+const MarkdownBlock = memo(function MarkdownBlock({ text, images }: { text: string; images?: PageImages | undefined }): ComponentChildren {
+  return h(Fragment, null, ...renderMarkdown(text, images));
 });
 
 /** A message's text, drawn; only a block whose text changed is parsed again (#170, #214). */
-export const Markdown = memo(function Markdown({ text }: { text: string }): ComponentChildren {
-  return h("div", { class: "markdown" }, ...markdownBlocks(text).map((block, index) => h(MarkdownBlock, { key: index, text: block })));
+export const Markdown = memo(function Markdown({ text, images }: { text: string; images?: PageImages | undefined }): ComponentChildren {
+  return h("div", { class: "markdown" }, ...markdownBlocks(text).map((block, index) => h(MarkdownBlock, { key: index, text: block, images })));
 });

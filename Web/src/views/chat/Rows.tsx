@@ -260,8 +260,12 @@ function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
   );
 }
 
-/** One entry, drawn as its kind is (EntryRow). */
+/** One entry, drawn as its kind is (EntryRow). Marked so Exchanged can bring it into view. */
 export function EntryRow({ entry }: { entry: TranscriptEntry }) {
+  return <div class="entry-mark" data-entry={entry.id}>{entryBody(entry)}</div>;
+}
+
+function entryBody(entry: TranscriptEntry) {
   switch (kindOf(entry)) {
     case "userMessage": {
       const message = fields(entry, "userMessage")!;

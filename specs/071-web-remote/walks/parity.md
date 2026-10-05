@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 205 rows: **81 same**, **38 by design**, **86 delta** (after #238–#244 and #255–#257, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 205 rows: **87 same**, **38 by design**, **80 delta** (after #238–#244, #255–#258, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -25,7 +25,7 @@ Of 205 rows: **81 same**, **38 by design**, **86 delta** (after #238–#244 and 
 | Prompt bar and queued prompts | 7 | 2 | 11 |
 | Question and permission cards | 10 | 4 | 1 |
 | Start sheet and new project | 17 | 5 | 0 |
-| Worktrees and Files | 5 | 6 | 10 |
+| Worktrees and Files | 11 | 6 | 4 |
 | Dashboard and pins | 8 | 0 | 6 |
 | Workflows page | 6 | 1 | 7 |
 | Settings and Project Settings | 1 | 6 | 0 |
@@ -36,10 +36,10 @@ Of 205 rows: **81 same**, **38 by design**, **86 delta** (after #238–#244 and 
 | Hosts, connection and pairing | 3 | 3 | 0 |
 | MCP Apps views | 1 | 0 | 0 |
 
-The deltas are tracked by 32 issues:
+The deltas are tracked by 31 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
 - **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249.
-- **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #258, #259, #260, #261, #262.
+- **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #259, #260, #261, #262.
 - **The window to change, or more than one side:** #263, #264, #265, #266.
 - **Alex to decide** (one client only, nothing says whether that is meant): #267.
 
@@ -204,17 +204,17 @@ The deltas are tracked by 32 issues:
 | Changes: tree, squares, total (#63) | `A/Sidebar/ChangesPane.swift:93-199` | No Changes pane: `R/Panes/PaneState.swift:10-11` | `W/views/Changes.tsx:69-143` | **delta**: Remote #245 |
 | Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | n/a | None | **delta**: web #259 |
 | Diff view | Edits / Whole file, Previous / Next, Open in Files, changed words marked: `A/Sidebar/ChangeFileView.swift` | The agent's edits only: `R/Chat/ChangesView.swift` | Chosen by itself, no controls: `W/views/Changes.tsx:47-67` | **delta**: web #259, Remote #245 |
-| An open file follows the disk | `A/Sidebar/FilesPane.swift:94-99` | `R/Panes/FilesPane.swift:75-77` | Read once: `W/views/files/FileView.tsx:55-64` | **delta**: web #258 |
-| Code with line numbers | `S/Page/FileLines.swift` | Shared | No numbers: `W/views/files/FileView.tsx:37-48` | **delta**: web #258 |
-| Markdown in Files | The live page in place: `A/Sidebar/FilesPane.swift:480-514` | To the Page pane: `R/Panes/PaneState.swift:67-70` | Rendered, *Open as Page*: `W/views/FilesPane.tsx:38-40` | **delta**: web #258 |
-| Pictures, zoom | `A/Sidebar/ImageFile.swift:68-84` | Pinch: `R/Panes/FilesPane.swift:378-474` | No zoom: `W/views/files/FileView.tsx:26-34` | **delta**: web #258 |
-| Pictures inside a Markdown page | `S/Page/MarkdownText.swift:144, 214` | Shared | *[image: alt]*: `W/render/markdown.ts:98-101` | **delta**: web #258 |
+| An open file follows the disk | `A/Sidebar/FilesPane.swift:94-99` | `R/Panes/FilesPane.swift:75-77` | Read again when anything under the agent changes: `W/views/files/FileView.tsx` | **same** |
+| Code with line numbers | `S/Page/FileLines.swift` | Shared | `W/views/files/FileLines.tsx` | **same** |
+| Markdown in Files | The live page in place: `A/Sidebar/FilesPane.swift:480-514` | To the Page pane: `R/Panes/PaneState.swift:67-70` | The live page in place: `W/views/FilesPane.tsx` | **same** |
+| Pictures, zoom | `A/Sidebar/ImageFile.swift:68-84` | Pinch: `R/Panes/FilesPane.swift:378-474` | Zoom, actual size, fit and a pinch: `W/views/files/ZoomPicture.tsx` | **same** |
+| Pictures inside a Markdown page | `S/Page/MarkdownText.swift:144, 214` | Shared | From beside the document: `W/render/markdown.ts` | **same** |
 | HTML file (#67) | Page / Source, scripts off: `A/Sidebar/FilesPane.swift:232-261` | The same: `R/Panes/FilesPane.swift:140-165` | Source: `W/views/files/FileView.tsx:83-90` | **by design** (071 FR-031, Trusted Types) |
 | Back finds where it was (#66) | `A/Sidebar/FilesPane.swift:76-86` | `R/Panes/FilesPane.swift:47-57` | `W/views/FilesPane.tsx:36, 60-65` | **same** |
 | A folder ends on its contents or a sentence (#62); stale reads dropped (#89) | Yes | Yes | Yes | **same** |
 | Writing a file: the live Markdown page only | `A/Sidebar/FilesPane.swift:501-506` | `R/Panes/PagePane.swift` | `W/views/LiveDocument.tsx` | **same** |
 | Search in files | None | None | None | **same** |
-| Exchanged documents | `A/Sidebar/ArtifactsPane.swift` | `R/Chat/DocumentView.swift` | None | **delta**: web #258 |
+| Exchanged documents | `A/Sidebar/ArtifactsPane.swift` | `R/Chat/DocumentView.swift` | `W/views/Exchanged.tsx` (a web address is a link) | **same** |
 | Terminal | Tabs (055): `A/Sidebar/TerminalPane.swift` | One shell: `R/Panes/TerminalPane.swift` | None | Web: **by design** (071). The Remote's one shell: #267 |
 | Browser pane | `A/Sidebar/BrowserPane.swift` | None (FR-030) | None | **by design** (local servers only listen on the Mac) |
 | Open in another app, Show in Finder | `A/Sidebar/OpenElsewhere.swift` | *It can't be shown here.* | *It can't be shown here.* | **by design** |
@@ -234,7 +234,7 @@ The deltas are tracked by 32 issues:
 | Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
 | A pinned Markdown page, live | `A/Dashboard/PinnedPage.swift:104-106` | `R/Dashboard/PinnedPage.swift:100-131` | `W/views/Pins.tsx:111-133` | **same** |
 | A pinned HTML page | Page / Source: `A/Dashboard/PinnedPage.swift:54-61` | Page only: `R/Dashboard/PinnedPage.swift:94-99` | Source: `W/views/Pins.tsx:139-142` | **delta**: Remote #245. Web: **by design** (Trusted Types) |
-| Pin from the Files bar | Any Markdown or HTML file: `A/Sidebar/FilesPane.swift:192-230` | None | The Page tab; not HTML under Files: `W/views/FilesPane.tsx:139, 157-173` | **delta**: Remote #245, web #258 |
+| Pin from the Files bar | Any Markdown or HTML file: `A/Sidebar/FilesPane.swift:192-230` | None | Any Markdown or HTML file open under Files: `W/views/FilesPane.tsx` | **delta**: Remote #245 |
 | A missing pin | `A/Dashboard/PinnedPage.swift:85-99` | `R/Dashboard/PinnedPage.swift:83-92` | `W/views/Pins.tsx:125-131` | **same** |
 | A page tile | `A/Dashboard/PinnedPage.swift:222-273` | `R/Dashboard/PinnedPage.swift:158-215` | `W/views/Dashboard.tsx:330-354` | **same** (HTML as source on the page: **by design**) |
 

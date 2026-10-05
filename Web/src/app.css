@@ -536,8 +536,8 @@ button.link.reading:hover { text-decoration: underline; }
 }
 .send { background: var(--accent); color: var(--paper-ground); }
 
-.files .tabs { flex: 1; display: flex; gap: 4px; }
-.files .tab { padding: 3px 10px; border-radius: var(--radius-control); }
+.files .tabs { flex: 1; display: flex; gap: 4px; min-width: 0; overflow-x: auto; }
+.files .tab { padding: 3px 10px; border-radius: var(--radius-control); white-space: nowrap; }
 .files .tab.chosen { background: var(--paper-raised); }
 .files ul { list-style: none; }
 .files li { padding: 3px 8px; }
@@ -722,8 +722,33 @@ button.remove:hover { opacity: 1; }
   white-space: pre;
   overflow-x: auto;
 }
+/* Numbers come from the counter, so the text itself stays the file (#258). The newline
+   that keeps that text is not drawn: a row is already its own line, and drawing it too
+   would leave a blank line between every line. */
+.file-text.file-lines { counter-reset: line; white-space: pre-wrap; }
+.file-line { counter-increment: line; display: grid; grid-template-columns: 2.6em 1fr; column-gap: 0.8em; }
+.file-line::before {
+  content: counter(line);
+  text-align: right;
+  color: color-mix(in srgb, currentColor 45%, transparent);
+  user-select: none;
+}
+.file-lines.wide .file-line { grid-template-columns: 4.2em 1fr; }
+.file-line.named { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.file-line .nl { display: none; }
+.file-line .code { white-space: pre-wrap; min-width: 0; }
 .file-page { line-height: 1.55; }
 .picture { max-width: 100%; height: auto; border-radius: var(--radius-control); background: var(--paper-well); }
+.picture-view { display: flex; flex-direction: column; gap: 8px; }
+.picture-view .picture { max-width: none; cursor: zoom-in; }
+.picture-bar { display: flex; align-items: center; gap: 4px; }
+.picture-bar .caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-picture { max-width: 100%; height: auto; border-radius: var(--radius-control); }
+.entry-mark { display: contents; }
+.exchanged-empty { display: flex; flex-direction: column; gap: 8px; padding: 24px 8px; text-align: center; }
+.exchanged-empty p { margin: 0; }
+.exchanged .subtitle { white-space: normal; }
+.exchanged-doc .page { line-height: 1.6; max-width: 70ch; }
 .changed-files > li { margin-bottom: 4px; }
 .row.changed .added, .row.changed .removed { font-variant-numeric: tabular-nums; }
 .hunk { margin: 4px 0 10px; }

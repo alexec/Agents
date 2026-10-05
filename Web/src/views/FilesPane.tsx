@@ -1,6 +1,6 @@
-// The files pane (071 US4; frame B): a fourth column from 1440, over the chat below that. Three
-// tabs, as the window's pane has: Files (the session's folder, browsed, a file opened), Changes
-// (what the agent changed), and Page (a live page the agent shows, or one opened from Files).
+// The files pane (071 US4; frame B): a fourth column from 1440, over the chat below that. Four
+// tabs: Files (the session's folder, browsed, a file opened), Changes (what the agent changed),
+// Page (a live page the agent shows), and Exchanged (what the conversation handed over, #258).
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Agent, DirectoryEntry } from "../protocol/generated";
@@ -13,11 +13,13 @@ import type { ChangesList } from "../protocol/generated";
 import { FileView } from "./files/FileView";
 import { Tree } from "./files/Tree";
 import { sorted } from "../model/fileTree";
-import { extensionOf, nameOf, paneOf, pathOf, setPane, type Tab } from "./files/paneState";
+import { fileToPin, nameOf, paneOf, pathOf, setPane, textShownAs, type Tab } from "./files/paneState";
 import { LiveDocument } from "./LiveDocument";
+import { Exchanged } from "./Exchanged";
 
 const tabs: { tab: Tab; label: string }[] = [
   { tab: "files", label: "Files" }, { tab: "changes", label: "Changes" }, { tab: "page", label: "Page" },
+  { tab: "exchanged", label: "Exchanged" },
 ];
 
 /** Below 760 the page is the phone's one column at a time, and Files lists one folder at a time, as the Remote does. */
@@ -35,11 +37,11 @@ function OpenFile({ store, host, session, file, line, back }: {
         {/* Back finds the folder with this file marked (#66). */}
         <button class="link" onClick={() => setPane(session, { file: undefined, fileLine: undefined, last: file })}>‹ {nameOf(back)}</button>
         <span class="title">{nameOf(file)}</span>
-        {(extensionOf(file) === "md" || extensionOf(file) === "markdown") && (
-          <button class="link" onClick={() => setPane(session, { tab: "page", page: file, line: undefined })}>Open as Page</button>
-        )}
       </div>
-      <FileView store={store} host={host} agentID={session} path={file} line={line} />
+      {/* Markdown reads as the live page, in place, and follows the file as the agent writes it. */}
+      {textShownAs(file) === "page"
+        ? <LiveDocument store={store} host={host} agentID={session} path={file} line={line} />
+        : <FileView store={store} host={host} agentID={session} path={file} line={line} />}
     </div>
   );
 }
@@ -127,6 +129,7 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
   const agent = store.agent(host, session);
   const pane = paneOf(session);
   const root = agent ? pathOf(agent.cwd) : null;
+  const pin = fileToPin(pane);
   return (
     <aside class="files" aria-label="Files">
       <header class="column-head">
@@ -136,7 +139,7 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
               onClick={() => setPane(session, { tab })}>{label}</button>
           ))}
         </span>
-        {agent && pane.tab === "page" && pane.page && <PinButton store={store} host={host} agent={agent} file={pane.page} />}
+        {agent && pin && <PinButton store={store} host={host} agent={agent} file={pin} />}
         <button class="icon" aria-label="Close Files" onClick={() => replace({ ...route.value, files: false })}>✕</button>
       </header>
       <div class="scroll pane-body">
@@ -144,7 +147,8 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
         {pane.tab === "changes" && <Changes store={store} host={host} session={session} />}
         {pane.tab === "page" && (pane.page
           ? <LiveDocument store={store} host={host} agentID={session} path={pane.page} line={pane.line} />
-          : <p class="hint">A Markdown file the agent shows, or one you open from Files, reads here.</p>)}
+          : <p class="hint">A Markdown file the agent shows reads here.</p>)}
+        {pane.tab === "exchanged" && <Exchanged store={store} host={host} session={session} />}
       </div>
     </aside>
   );
