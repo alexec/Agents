@@ -20,6 +20,7 @@ import { elicitationTitle } from "./chat/Rows";
 import { askerFor } from "../model/asker";
 import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
+import { inputType, momentFromInput, momentToInput, placeholder } from "../model/formInputs";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -484,14 +485,19 @@ function Field({ property, value, inert, set, chose }: {
     );
   }
   const numeric = "number" in kind || "integer" in kind;
+  // A date, a date-time, an email address or a link gets the browser's own input for it (#265).
+  const format = "string" in kind ? kind.string.format : undefined;
+  const type = numeric ? "number" : inputType(format);
+  const shown = typeof value === "string" || typeof value === "number" ? String(value) : "";
   return (
     <label class="field">
       {asked}
-      <input type={(numeric ? "number" : "text") as "text"} disabled={inert}
-        value={typeof value === "string" || typeof value === "number" ? String(value) : ""}
+      <input type={type as "text"} disabled={inert} placeholder={placeholder(format)}
+        value={type === "datetime-local" ? momentToInput(shown) : shown}
         onInput={(e) => {
           const text = (e.currentTarget as HTMLInputElement).value;
-          if (!numeric || text === "") set(text);
+          if (type === "datetime-local") set(text === "" ? "" : momentFromInput(text));
+          else if (!numeric || text === "") set(text);
           else set("integer" in kind ? (Number.isInteger(Number(text)) ? Number(text) : text) : Number(text));
         }} />
       {property.description && <span class="quiet small">{property.description}</span>}
