@@ -2307,13 +2307,13 @@ final class RemoteModel {
     /// answers with what it now says; a refusal has to reach the person, and the list
     /// is asked again so the menu goes back to what the file still holds (FR-025).
     func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
-                             labels: [String]? = nil) async {
+                             cooldown: String? = nil, labels: [String]? = nil) async {
         do {
             let updated: WorkflowSummary = try await client.call(
                 DaemonAPI.Method.workflowsSettings,
                 DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
                                                   workflowID: summary.workflowID,
-                                                  settings: settings, labels: labels),
+                                                  settings: settings, cooldown: cooldown, labels: labels),
                 returning: WorkflowSummary.self)
             work.upsert(updated)
         } catch {
