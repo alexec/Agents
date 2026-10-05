@@ -69,7 +69,7 @@ test("an Activity page is in the address on its own, and an unknown one is ignor
 });
 
 test("Activity rows: spending added up by currency, headroom, out of the pool", async () => {
-  const { todayTotals, totalWords, headroom, closeToFull, isOut } = await load("src/views/Activity.tsx");
+  const { todayTotals, totalWords, headroom, closeToFull, dayLimitReached, isOut, lifetimeTotals } = await load("src/views/Activity.tsx");
   const costs = {
     mac: { day: "2026-10-03", today: { USD: 1.5 }, limits: { daily: { amount: 2, currency: "USD" } } },
     box: { day: "2026-10-03", today: { USD: 0.25, GBP: 1 }, limits: {} },
@@ -80,7 +80,13 @@ test("Activity rows: spending added up by currency, headroom, out of the pool", 
   assert.match(headroom(costs.mac), /0\.50 left$/);
   assert.equal(headroom(costs.box), null, "no limit, nothing left to say");
   assert.equal(closeToFull(costs.mac), false);
-  assert.equal(closeToFull({ ...costs.mac, today: { USD: 1.7 } }), true);
+  assert.equal(closeToFull({ ...costs.mac, today: { USD: 1.69 } }), false, "80% is not close to full");
+  assert.equal(closeToFull({ ...costs.mac, today: { USD: 1.7 } }), true, "85% matches the other clients");
+  assert.equal(dayLimitReached({ ...costs.mac, today: { USD: 1.99 } }), false);
+  assert.equal(dayLimitReached({ ...costs.mac, today: { USD: 2 } }), true);
+  assert.deepEqual(lifetimeTotals([
+    { costToDate: { USD: 2, GBP: 1 } }, { costToDate: { USD: 3 } },
+  ]), { USD: 5, GBP: 1 });
   const runtime = { id: "codex", name: "Codex" };
   assert.equal(isOut({ runtime, availability: { missing: { lookedIn: [] } } }), false, "never in is not out");
   assert.equal(isOut({ runtime, availability: { available: { path: "/x", supportsResume: true } }, poolNote: "Out until 4pm" }), true);

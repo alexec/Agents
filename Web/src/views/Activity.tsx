@@ -3,7 +3,7 @@
 // place. The pages are read-only: what each page lets you change is the Mac's.
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
-import type { ControlHost, CostState, Event, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
+import type { AllowanceState, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
@@ -49,8 +49,42 @@ export function headroom(state: CostState | undefined): string | null {
 export function closeToFull(state: CostState | undefined): boolean {
   const daily = state?.limits.daily;
   if (!state || !daily || daily.amount <= 0) return false;
-  return (state.today[daily.currency] ?? 0) / daily.amount >= 0.8;
+  return (state.today[daily.currency] ?? 0) / daily.amount >= 0.85;
 }
+
+export function dayLimitReached(state: CostState | undefined): boolean {
+  const daily = state?.limits.daily;
+  return !!daily && daily.amount > 0 && (state?.today[daily.currency] ?? 0) >= daily.amount;
+}
+
+/** All time, folded from the projects' cost ledgers as Spending does on the other clients. */
+export function lifetimeTotals(projects: ProjectSummary[]): Record<string, number> {
+  const total: Record<string, number> = {};
+  for (const project of projects) for (const [currency, amount] of Object.entries(project.costToDate)) {
+    total[currency] = (total[currency] ?? 0) + amount;
+  }
+  return total;
+}
+
+function allowanceLine(state: AllowanceState): string {
+  if ("available" in state.status) return "Available";
+  if ("rateLimited" in state.status) return `Rate limited · trying again at ${runtimeTime(state.status.rateLimited.until)}`;
+  const out = state.status.out;
+  return out.until ? `Out · reset ${runtimeTime(out.until)}${out.retryAfter ? ` · checking after ${runtimeTime(out.retryAfter)}` : ""}`
+    : `Out since ${runtimeTime(state.since)}${out.retryAfter ? ` · checking after ${runtimeTime(out.retryAfter)}` : ""}`;
+}
+
+function allowanceReading(state: AllowanceState, now: Date): string | null {
+  const reading = state.reading;
+  if (!reading || (reading.resetsAt && fromWireDate(reading.resetsAt).getTime() <= now.getTime())) return null;
+  const left = reading.spent ? 0 : reading.used == null ? null : Math.round((1 - reading.used) * 100);
+  const text = left === null ? (reading.nearlySpent ? "Nearly used up" : reading.window ?? "")
+    : left === 0 ? "None left" : `${left}% left`;
+  if (!text) return null;
+  return [text, reading.resetsAt && `resets ${runtimeTime(reading.resetsAt)}`, `as of ${runtimeTime(reading.at)}`].filter(Boolean).join(" · ");
+}
+
+const runtimeTime = (wire: number) => fromWireDate(wire as never).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 /**
  * Whether the pool has left a runtime, or one of its models, out (#140): what the window's row
@@ -101,7 +135,8 @@ export function ActivityRows({ store, chosen, onPick }: {
   const resources = Object.values(store.leases.value).flatMap((s) => s.resources);
   const held = resources.reduce((n, r) => n + (r.holds ?? (r.lease ? [r.lease] : [])).length, 0);
   const waiting = resources.reduce((n, r) => n + r.line.length, 0);
-  const out = Object.values(store.runtimes.value).flat().filter(isOut).length;
+  const out = Object.values(store.runtimeAllowances.value).flatMap((a) => a.rows)
+    .filter((row) => "out" in row.state.status).length;
   const costs = store.costs.value;
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
@@ -121,7 +156,7 @@ export function ActivityRows({ store, chosen, onPick }: {
         held + waiting > 0 && `${held} held · ${waiting} waiting`)}
       {row("runtimes", "Runtimes", "What each runtime can be started on right now",
         out > 0 && <><span class="dot failure" aria-hidden="true" /> {out} out</>)}
-      {row("spending", today ? "Today" : "Spending", today ? "What every agent has cost today. Opens Spending." : "What all of the work has cost",
+      {row("spending", "Spending", "What all of the work has cost, and what it cost today",
         (today || left) && (
           <span class={`spending${closeToFull(mac) && chosen !== "spending" ? " close" : ""}`}>
             {today && <span>{today}</span>}{left && <span>{left}</span>}
@@ -168,17 +203,23 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
             <section key={host.id}>
               {several && <h2 class="section-head">{hostName(host.id)}</h2>}
               <ul class="runtime-list">
-                {(store.runtimes.value[host.id] ?? []).map((status) => (
-                  <li key={status.runtime.id} class={isOut(status) ? "out" : ""}>
+                {(store.runtimes.value[host.id] ?? []).map((status) => {
+                  const allowanceSet = store.runtimeAllowances.value[host.id];
+                  const allowance = allowanceSet?.rows.find((row) => row.credentialKey.split(":", 1)[0] === status.runtime.id);
+                  const isAllowanceOut = !!allowance && "out" in allowance.state.status && !allowance.unusable;
+                  const now = allowanceSet ? fromWireDate(allowanceSet.at) : new Date();
+                  return <li key={status.runtime.id} class={isAllowanceOut || isOut(status) ? "out" : ""}>
                     <p><span class="strong">{status.runtime.name}</span>{" "}
-                      <span class="quiet small">{availabilityWords(status.availability)}{status.outdated ? " · an update is out" : ""}</span></p>
+                      <span class="quiet small">{allowance?.unusable ? `Not usable: ${allowance.unusable}` : allowance ? allowanceLine(allowance.state) : availabilityWords(status.availability)}{status.outdated ? " · an update is out" : ""}</span></p>
+                    {allowance && !allowance.unusable && allowanceReading(allowance.state, now) && <p class="quiet small">{allowanceReading(allowance.state, now)}</p>}
                     {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
+                    {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
                   </li>
-                ))}
+                })}
               </ul>
             </section>
           ))}
-          {page === "runtimes" && <p class="hint">Installing, signing in and allowances are the Mac’s, in Settings ▸ Agent Runtimes.</p>}
+          {page === "runtimes" && <p class="hint">Installing and signing in are managed on the Mac, in Settings ▸ Agent Runtimes.</p>}
           {page === "spending" && <SpendingPage store={store} hostName={hostName} />}
         </div>
       </div>
@@ -225,17 +266,37 @@ function EventsList({ store, hostName }: { store: Store; hostName: ((host: strin
 }
 
 function SpendingPage({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
+  const projects = Object.values(store.projects.value).flat();
+  const totals = lifetimeTotals(projects);
+  const currencies = Object.keys(totals).sort();
+  const unmeasured = projects.reduce((count, project) => count + project.unmeasuredAgents, 0);
   const costs = Object.entries(store.costs.value);
   const today = totalWords(todayTotals(store.costs.value));
   return (
     <>
-      <p class="spending-today"><span class="quiet">Today</span> <span class="strong">{today ?? money(0, "USD")}</span></p>
+      <p class="spending-today"><span class="quiet">All time</span> <span class="strong">{totalWords(totals) ?? "Nothing has been spent yet"}</span></p>
+      {currencies.map((currency) => (
+        <section key={currency}>
+          {currencies.length > 1 && <h2 class="section-head">{currency}</h2>}
+          {projects.filter((project) => project.costToDate[currency] !== undefined)
+            .sort((a, b) => (b.costToDate[currency] ?? 0) - (a.costToDate[currency] ?? 0) || a.name.localeCompare(b.name))
+            .map((project) => (
+              <p key={project.project.folder}>
+                {project.name}{project.project.archivedAt ? <span class="quiet small"> · Archived</span> : ""}
+                <span class="detail">{money(project.costToDate[currency] ?? 0, currency)}</span>
+              </p>
+            ))}
+        </section>
+      ))}
+      {unmeasured > 0 && <p class="quiet small">At least this much: {unmeasured} {unmeasured === 1 ? "chat" : "chats"} ran on a runtime that reported no price.</p>}
+      <h2 class="section-head">Today</h2>
+      <p class="spending-today"><span class="strong">{today ?? money(0, "USD")}</span></p>
       {costs.map(([host, state]) => (
         <section key={host}>
           <h2 class="section-head">{hostName(host)}</h2>
           <p>{totalWords(state.today) ?? "Nothing spent today"}</p>
           {state.limits.daily && <p class={`quiet small${closeToFull(state) ? " close" : ""}`}>
-            Daily limit {money(state.limits.daily.amount, state.limits.daily.currency)} · {headroom(state)}</p>}
+            Daily limit {money(state.limits.daily.amount, state.limits.daily.currency)} · {headroom(state)}{dayLimitReached(state) && " · Nothing new will start until tomorrow"}</p>}
           {state.limits.perAgent && <p class="quiet small">
             Each agent up to {money(state.limits.perAgent.amount, state.limits.perAgent.currency)}</p>}
           {state.note && <p class="quiet small">⚠︎ {state.note}</p>}

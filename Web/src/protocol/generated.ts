@@ -175,6 +175,48 @@ export interface AgentWorktree {
   madeByApp: boolean;
 }
 
+export interface AllowanceReading {
+  window?: string;
+  used?: number;
+  resetsAt?: WireDate;
+  spent: boolean;
+  nearlySpent: boolean;
+  at: WireDate;
+}
+
+export interface AllowanceState {
+  credentialKey: string;
+  entryID: UUID;
+  status: AllowanceStateStatus;
+  since: WireDate;
+  learnedFrom: AllowanceStateSource;
+  lastRateLimit?: RateLimitInfo;
+  reading?: AllowanceReading;
+  spent: AllowanceStateSpent;
+  rateLimitStreak: WireDate[];
+  modelsOut?: AllowanceStateModelOut[];
+}
+
+export interface AllowanceStateModelOut {
+  model: string;
+  name?: string;
+  since: WireDate;
+  retryAfter: WireDate;
+}
+
+export type AllowanceStateOutReason = "allowanceSpent" | "overage" | "creditUsedUp" | "creditExpired" | "rateLimitPersisted" | "runtimeFailed";
+
+export type AllowanceStateSource = "typedFailure" | "words" | "overageReport" | "ledger" | "expiry" | "person" | "runtimeFailure";
+
+export type AllowanceStateSpent =
+  | { known: { _0?: Cost } }
+  | { unknown: Record<string, never> };
+
+export type AllowanceStateStatus =
+  | { available: Record<string, never> }
+  | { rateLimited: { until: WireDate } }
+  | { out: { until?: WireDate; retryAfter?: WireDate; why: AllowanceStateOutReason } };
+
 export interface AnswerElicitationRequest {
   requestID: UUID;
   action: AnswerElicitationRequestAction;
@@ -914,6 +956,10 @@ export type MCPServerTransport =
   | { http: { url: string; headers: Record<string, string> } }
   | { sse: { url: string; headers: Record<string, string> } };
 
+export interface MarkRuntimeAvailable {
+  credentialKey: string;
+}
+
 export interface MissingFolder {
   branchKept: boolean;
 }
@@ -1149,6 +1195,18 @@ export interface QueuedPrompt {
   preface?: string;
 }
 
+export interface RateLimitInfo {
+  status?: string;
+  resetsAt?: WireDate;
+  rateLimitType?: string;
+  utilization?: number;
+  overageStatus?: string;
+  overageResetsAt?: WireDate;
+  isUsingOverage?: boolean;
+  overageInUse?: boolean;
+  overageDisabledReason?: string;
+}
+
 export interface RememberedOptionsRequest {
   runtimeID: string;
   cwd: URLString;
@@ -1242,6 +1300,18 @@ export interface RuntimeAccount {
 }
 
 export type RuntimeAccountState = "ready" | "needsSignIn" | "unknown";
+
+export interface RuntimeAllowances {
+  rows: RuntimeAllowancesRow[];
+  at: WireDate;
+  shared?: AllowanceState[];
+}
+
+export interface RuntimeAllowancesRow {
+  credentialKey: string;
+  state: AllowanceState;
+  unusable?: string;
+}
 
 export type RuntimeAvailability =
   | { available: { path: string; supportsResume: boolean } }
@@ -1988,7 +2058,9 @@ export interface Methods {
   "projects/clones": { params: Empty; result: CloneSummary[] };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
+  "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
+  "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "store/notes": { params: Empty; result: StoreNotes };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
@@ -2077,7 +2149,9 @@ export const MethodTarget = {
   "projects/clones": "host",
   "projects/list": "host",
   "runtimes/accounts": "host",
+  "runtimes/allowances": "host",
   "runtimes/list": "host",
+  "runtimes/markAvailable": "host",
   "sandbox/state": "host",
   "store/notes": "host",
   "surface/identify": "host",
@@ -2130,6 +2204,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
+  AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
+  AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
+  AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
@@ -2216,6 +2293,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
+  MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   Need: { required: ["id", "agentID", "folder", "kind", "raisedAt", "headline"], optional: [] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
@@ -2246,6 +2324,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface"] },
+  RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
@@ -2253,6 +2332,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RetiredRequest: { required: [], optional: ["folder", "ids", "limit"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
+  RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
+  RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: [] },
