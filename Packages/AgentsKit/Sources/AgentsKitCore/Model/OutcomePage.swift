@@ -194,13 +194,30 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
 extension Array where Element == TranscriptItem {
     /// The page cut into turns. A turn starts at each thing the person typed.
     public func turns() -> [ChatTurn] {
+        turns(reusing: [])
+    }
+
+    /// The same cut, keeping a turn from `earlier` while the items it was folded from
+    /// are still the ones in front. A streamed chunk changes the tail; the turns
+    /// before it are the same values, so a row that compares them has nothing to
+    /// redraw (#285). The first turn that differs, and everything after it, is folded
+    /// again: a page put in front shifts the rest.
+    public func turns(reusing earlier: [ChatTurn]) -> [ChatTurn] {
         var turns: [ChatTurn] = []
         var current: [TranscriptItem] = []
+        var reuse = true
         func close() {
             guard let first = current.first else { return }
-            let ask = first.isPersonsAsk ? first : nil
-            turns.append(ChatTurn(id: first.id, ask: ask,
-                                  items: Array(current.dropFirst(ask == nil ? 0 : 1))))
+            let index = turns.count
+            if reuse, index < earlier.count, earlier[index].matches(current) {
+                turns.append(earlier[index])
+            } else {
+                reuse = false
+                let ask = first.isPersonsAsk ? first : nil
+                turns.append(ChatTurn(id: first.id, ask: ask,
+                                      items: Array(current.dropFirst(ask == nil ? 0 : 1))))
+            }
+            current = []
         }
         for item in self {
             if item.isPersonsAsk {
@@ -212,6 +229,16 @@ extension Array where Element == TranscriptItem {
         }
         close()
         return turns
+    }
+}
+
+extension ChatTurn {
+    /// Whether this turn is the fold of `slice`, ask and all.
+    fileprivate func matches(_ slice: [TranscriptItem]) -> Bool {
+        if let ask {
+            return slice.first == ask && Array(slice.dropFirst()) == items
+        }
+        return slice == items
     }
 }
 

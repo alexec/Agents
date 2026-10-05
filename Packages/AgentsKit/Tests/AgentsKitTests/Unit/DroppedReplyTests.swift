@@ -53,6 +53,43 @@ struct DroppedReplyTests {
         return (client, host)
     }
 
+    /// Two connects at once open one connection (#285).
+    @Test func twoConnectsAtOnceOpenOnce() async throws {
+        let link = CountingLink()
+        let client = DaemonClient(link: link)
+        async let first: Void = client.connect(startIfNeeded: false)
+        async let second: Void = client.connect(startIfNeeded: false)
+        try await first
+        try await second
+        #expect(link.opens == 1)
+        #expect(await client.isConnected)
+        try await client.connect(startIfNeeded: false)
+        #expect(link.opens == 1)
+    }
+
+    /// A host that counts every transport it hands out, and answers pings slowly
+    /// enough that a second connect is in flight beside the first.
+    private final class CountingLink: DaemonLink, @unchecked Sendable {
+        private let lock = NSLock()
+        private var opened = 0
+        var opens: Int { lock.withLock { opened } }
+
+        func transport() async throws -> any LineTransport {
+            lock.withLock { opened += 1 }
+            try await Task.sleep(for: .milliseconds(150))
+            let (near, far) = PairedTransport.pair()
+            _ = Task {
+                for try await line in far.lines() {
+                    guard let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                          let id = object["id"] as? Int,
+                          object["method"] as? String == DaemonAPI.Method.ping else { continue }
+                    try? far.write(line: #"{"jsonrpc":"2.0","id":\#(id),"result":{}}"#)
+                }
+            }
+            return near
+        }
+    }
+
     @Test func aDroppedReplyEndsInNoAnswerAndTheConnectionStays() async throws {
         let (client, _) = try await connected(.drop)
         let started = ContinuousClock.now

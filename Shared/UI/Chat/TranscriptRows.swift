@@ -51,20 +51,20 @@ struct TurnView: View, Equatable {
         a.turn == b.turn && a.detail == b.detail && a.fetched == b.fetched && a.isLive == b.isLive
     }
 
-    private var isWaitingForEntries: Bool { turn.isSummaryOnly && fetched == nil }
-    private var items: [TranscriptItem] { turn.isSummaryOnly ? (fetched ?? []) : turn.items }
-    private var parts: TurnParts? { isWaitingForEntries ? nil : TurnParts(items, isLive: isLive) }
-    private var outcome: [TranscriptItem] { parts?.outcome ?? turn.storedOutcome ?? [] }
-    /// Nil for a summary written before 069 (after the #58 cut-off), whose steps are not counted.
-    private var stepCount: Int? { parts?.stepCount ?? turn.storedStepCount }
-    /// Open, the steps are drawn in order above the outcome; thinking only at Details.
-    private var steps: [TranscriptItem] {
-        let outcome = Set((parts?.outcome ?? []).map(\.id))
-        return TurnParts.drawn(items, isLive: isLive)
-            .filter { !outcome.contains($0.id) && (detail == .details || !$0.isThought) }
-    }
-
     var body: some View {
+        // Once. Each of these used to fold the turn again (#285).
+        let waiting = turn.isSummaryOnly && fetched == nil
+        let items = turn.isSummaryOnly ? (fetched ?? []) : turn.items
+        let parts = waiting ? nil : TurnParts(items, isLive: isLive)
+        let outcome = parts?.outcome ?? turn.storedOutcome ?? []
+        // Nil for a summary written before 069 (after the #58 cut-off), whose steps are not counted.
+        let stepCount = parts?.stepCount ?? turn.storedStepCount
+        let steps: [TranscriptItem] = {
+            guard detail.showsSteps, parts != nil else { return [] }
+            let shown = Set(outcome.map(\.id))
+            return TurnParts.drawn(items, isLive: isLive)
+                .filter { !shown.contains($0.id) && (detail == .details || !$0.isThought) }
+        }()
         VStack(alignment: .leading, spacing: 14) {
             if let ask = turn.ask {
                 TranscriptRow(item: ask)
@@ -73,7 +73,7 @@ struct TurnView: View, Equatable {
                 StepsControl(count: stepCount, isOpen: detail.showsSteps, toggle: toggle)
             }
             if detail.showsSteps, stepCount != 0 {
-                if isWaitingForEntries {
+                if waiting {
                     ProgressView().controlSize(.small)
                 } else {
                     // In the turn's own margin: no rule and no indent (#148).
@@ -90,7 +90,7 @@ struct TurnView: View, Equatable {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task(id: detail.showsSteps) {
-            if detail.showsSteps, isWaitingForEntries { await fetch() }
+            if detail.showsSteps, waiting { await fetch() }
         }
     }
 }

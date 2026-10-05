@@ -454,13 +454,80 @@ struct AgentsModelTests {
         #expect(!model.begin(.stop, on: id))
         #expect(model.begin(.stop, on: other))
         #expect(model.acting[id] == .archive)
+        #expect(model.act(of: id) == .archive)
         // An end for something that is not what is in flight leaves it be.
         model.end(.stop, on: id)
         #expect(model.acting[id] == .archive)
+        #expect(model.act(of: id) == .archive)
         model.end(.archive, on: id)
         #expect(model.acting[id] == nil)
+        #expect(model.act(of: id) == nil)
         #expect(model.begin(.park, on: id))
         #expect(AgentAct(.unpark) == .unpark)
+    }
+
+    /// A followed chat lets old turns go. One being read does not (#285).
+    @Test func followedTurnsAreTrimmedAndAReaderUpThePageKeepsTheirs() {
+        let model = AgentsModel()
+        let page = (0..<80).map { turnSummary($0) }
+        model.replaceTurns(with: TurnsPage(turns: page, firstTurn: 0, openStart: 80))
+        #expect(model.turns.count == AgentsModel.turnsKept)
+        #expect(model.firstTurn == 80 - AgentsModel.turnsKept)
+        #expect(model.hasMoreTurns)
+
+        model.isFollowingEnd = false
+        let earlier = (0..<40).map { turnSummary(1_000 + $0) }
+        model.prependTurns(TurnsPage(turns: earlier, firstTurn: 5, openStart: 80))
+        #expect(model.turns.count == AgentsModel.turnsKept + 40)
+        #expect(model.firstTurn == 5)
+
+        model.isFollowingEnd = true
+        #expect(model.turns.count == AgentsModel.turnsKept)
+        #expect(model.firstTurn == 5 + 40)
+    }
+
+    /// One project's workflows changing leaves another's list as it was (#285).
+    @Test func aWorkflowInOneProjectLeavesTheOther() {
+        let model = AgentsModel()
+        let api = URL(filePath: "/tmp/work/api")
+        let web = URL(filePath: "/tmp/work/web")
+        model.upsert(WorkflowSummary(workflow: Workflow(workflowID: "build", folder: api, name: "Build")))
+        model.upsert(WorkflowSummary(workflow: Workflow(workflowID: "ship", folder: web, name: "Ship")))
+        let webBefore = model.workflows(in: web)
+        model.upsert(WorkflowSummary(workflow: Workflow(workflowID: "lint", folder: api, name: "Lint")))
+        #expect(model.workflows(in: web) == webBefore)
+        #expect(model.workflows(in: api).map(\.workflow.name) == ["Build", "Lint"])
+        model.replaceWorkflows([WorkflowSummary(workflow: Workflow(workflowID: "ship", folder: web, name: "Ship"))])
+        #expect(model.workflows(in: web).map(\.workflowID) == ["ship"])
+        #expect(model.workflows(in: api).isEmpty)
+    }
+
+    /// A lease is the holder's and the waiter's, and the next snapshot moves it (#285).
+    @Test func aLeaseIsReadFromTheAgentItBelongsTo() {
+        let model = AgentsModel()
+        let holder = UUID(), waiter = UUID(), other = UUID()
+        let at = Date(timeIntervalSince1970: 1_800_000_000)
+        let screen = ResourceName.screen
+        func snapshot(heldBy holder: UUID, waitedBy waiter: UUID) -> DaemonAPI.LeaseSnapshot {
+            DaemonAPI.LeaseSnapshot(resources: [
+                .init(name: screen, kind: .screen, displayName: "Screen",
+                      lease: Lease(resource: screen, displayName: "Screen", holder: holder,
+                                   grantedAt: at, expiresAt: at.addingTimeInterval(600)),
+                      line: [.init(agentID: waiter, askedAt: at, isCallOpen: true)]),
+            ], at: at)
+        }
+        model.replaceLeases(snapshot(heldBy: holder, waitedBy: waiter))
+        #expect(model.leaseStatus(of: holder) == LeaseStatus.of(holder, in: snapshot(heldBy: holder, waitedBy: waiter), titles: [:]))
+        #expect(model.leaseStatus(of: waiter) != nil)
+        #expect(model.leaseStatus(of: other) == nil)
+        model.replaceLeases(snapshot(heldBy: waiter, waitedBy: holder))
+        #expect(model.leaseStatus(of: waiter)?.holding.isEmpty == false)
+        #expect(model.leaseStatus(of: holder)?.waiting.isEmpty == false)
+        #expect(model.leaseStatus(of: other) == nil)
+    }
+
+    private func turnSummary(_ start: Int) -> TurnSummary {
+        TurnSummary(id: UUID(), start: start, end: start + 1, ask: nil, last: nil)
     }
 
     @Test func aCommandsOutputIsKeptPerTerminalAndByItsTail() throws {

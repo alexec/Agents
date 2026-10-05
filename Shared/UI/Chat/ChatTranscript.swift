@@ -44,8 +44,22 @@ struct ChatTranscript: View {
 
     /// The turns opened or closed by hand, by id. Kept until the chat is left (069).
     @State private var turnViews: [UUID: TurnDetail] = [:]
-    /// Every entry of a stored turn once it has been opened, folded.
+    /// Every entry of a stored turn once it has been opened, folded. Eight at a time:
+    /// opening one lets the oldest opened one go (#285).
     @State private var fetchedTurns: [UUID: [TranscriptItem]] = [:]
+    @State private var fetchedOrder: [UUID] = []
+    private static let fetchedKept = 8
+    /// Turns already folded. A chunk changes the tail; the turns before it stay the
+    /// same values, so those rows are not drawn again (#285). A class, so folding
+    /// during the pass does not write the view's state.
+    @State private var folded = FoldedTurns()
+
+    private final class FoldedTurns {
+        var stored: [TurnSummary] = []
+        var storedTurns: [ChatTurn] = []
+        var items: [TranscriptItem] = []
+        var itemTurns: [ChatTurn] = []
+    }
     /// Set once the pane is sitting at the foot of the conversation. Until then the
     /// top of the list is on screen only because nothing has moved yet, and taking
     /// that for "the reader scrolled up" would pull the whole transcript in at once.
@@ -92,8 +106,19 @@ struct ChatTranscript: View {
         (agent.state == .running || agent.state == .waitingOnUser) && actions.canSendNow(agent.runtimeID)
     }
 
-    /// The conversation as turns: the stored ones, then those in hand.
-    private var rows: [ChatTurn] { stored.map(ChatTurn.init) + items.turns() }
+    /// The conversation as turns: the stored ones, then those in hand. Each is folded
+    /// again only when its own summary or items changed (#285).
+    private var rows: [ChatTurn] {
+        if folded.stored != stored {
+            folded.storedTurns = stored.map(ChatTurn.init)
+            folded.stored = stored
+        }
+        if folded.items != items {
+            folded.itemTurns = items.turns(reusing: folded.itemTurns)
+            folded.items = items
+        }
+        return folded.storedTurns + folded.itemTurns
+    }
 
     var body: some View {
         // Once per pass. Read inside the row closure, `rows` was the whole conversation
@@ -341,8 +366,19 @@ struct ChatTranscript: View {
     /// the turn's own and is drawn already.
     private func fetch(_ turn: ChatTurn) async {
         guard turn.isSummaryOnly, let range = turn.range, fetchedTurns[turn.id] == nil else { return }
-        let items = TranscriptEntry.display(await actions.turnEntries(agent.id, range))
+        let loaded = await actions.turnEntries(agent.id, range)
+        guard !Task.isCancelled else { return }
+        let items = TranscriptEntry.display(loaded)
         fetchedTurns[turn.id] = items.first?.isPersonsAsk == true ? Array(items.dropFirst()) : items
+        fetchedOrder.removeAll { $0 == turn.id }
+        fetchedOrder.append(turn.id)
+        while fetchedOrder.count > Self.fetchedKept {
+            let dropped = fetchedOrder.removeFirst()
+            fetchedTurns[dropped] = nil
+            // Still open, it would ask again and push another one out. Closed, it
+            // shows the summary it already had (#285).
+            if turnViews[dropped]?.showsSteps == true { turnViews[dropped] = .outcome }
+        }
     }
 
     /// Whether the conversation's last turn is still going.
@@ -389,6 +425,7 @@ struct ChatTranscript: View {
     private func settle(_ scroller: ScrollViewProxy) async {
         turnViews = [:]
         fetchedTurns = [:]
+        fetchedOrder = []
         hasSettled = false
         isFollowing = true
         isUserScrolling = false

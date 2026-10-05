@@ -193,7 +193,17 @@ struct PromptBar: View {
         }
         .onAppear { prepare() }
         .onChange(of: model.availableRuntimes.map(\.id)) { prepare() }
-        .onChange(of: model.work.agentCount) { prepare() }
+        // Until a folder is chosen, the first agent to arrive names it. After that,
+        // another project's agent arriving is not a reason to list this one's
+        // worktrees again (#285).
+        .onChange(of: model.work.agentCount) {
+            guard isNew, model.draftCwd == nil else { return }
+            prepare()
+        }
+        .onChange(of: draftProjectAgentCount) {
+            guard isNew, model.draftCwd != nil else { return }
+            Task { await model.loadDraftWorktrees() }
+        }
         .modifier(KeepsDrafts(text: $text, attachments: $attachments,
                               lostSomething: $draftLostSomething, key: draftKey))
     }
@@ -1109,6 +1119,14 @@ struct PromptBar: View {
 
     private func runtimeName(_ id: String) -> String {
         PromptWords.runtimeName(id)
+    }
+
+    /// How many agents the draft's project holds. Moves when that project does, and
+    /// not when any other does (#285).
+    private var draftProjectAgentCount: Int {
+        guard isNew, let folder = model.draftCwd else { return 0 }
+        let counts = model.work.counts(in: ProjectKey(host: model.selectedProjectHost, folder: folder))
+        return counts.values.reduce(0, +)
     }
 
     /// Open on the runtime and folder already in use. An empty chooser is a click

@@ -68,7 +68,9 @@ enum CrashHook {
         }
         NSSetUncaughtExceptionHandler { exception in
             // Not a signal handler yet: the process aborts when this returns.
-            CrashHook.keep(exception)
+            // Still not a signal handler: symbolicate, then write. The preprocessor
+            // kept the addresses only; this replaces that note with the symbols (#285).
+            CrashHook.keep(exception, symbolicated: true)
             if CrashHook.writePending() {
                 CrashHook.log.fault("uncaught \(exception.name.rawValue, privacy: .public): \(exception.reason ?? "", privacy: .public)")
             }
@@ -85,14 +87,22 @@ enum CrashHook {
     }
 
     /// The note for an exception, as it will be written if it is the one that crashes.
-    static func note(for exception: NSException, at date: Date = .now, onMain: Bool = Thread.isMainThread) -> String {
-        """
+    ///
+    /// Symbols only when `symbolicated`. The preprocessor runs for every exception
+    /// AppKit catches, and symbolication there is the slow part (#285). The addresses
+    /// are enough until the one that is not caught is written.
+    static func note(for exception: NSException, at date: Date = .now, onMain: Bool = Thread.isMainThread,
+                     symbolicated: Bool = false) -> String {
+        let stack = symbolicated
+            ? exception.callStackSymbols.joined(separator: "\n")
+            : exception.callStackReturnAddresses.map { String(format: "0x%llx", $0.uint64Value) }.joined(separator: "\n")
+        return """
         The window crashed on an exception it did not catch.
         Thrown: \(date.formatted(.iso8601)) on \(onMain ? "the main thread" : "a background thread")
         Name: \(exception.name.rawValue)
         Reason: \(exception.reason ?? "(none given)")
 
-        \(exception.callStackSymbols.joined(separator: "\n"))
+        \(stack)
 
         """
     }
@@ -104,12 +114,12 @@ enum CrashHook {
         return now.tv_sec
     }
 
-    private static func keep(_ exception: NSException) {
+    private static func keep(_ exception: NSException, symbolicated: Bool = false) {
         guard let folder else { return }
         let date = Date.now
         let stamp = date.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false).timeSeparator(.omitted))
         let path = strdup(folder.appendingPathComponent("crash-\(stamp).txt").path)!
-        let note = strdup(note(for: exception, at: date))!
+        let note = strdup(note(for: exception, at: date, symbolicated: symbolicated))!
         let kept = Pending(path: path, note: note, length: strlen(note), thrown: uptime())
         os_unfair_lock_lock(&lock)
         let old = pending

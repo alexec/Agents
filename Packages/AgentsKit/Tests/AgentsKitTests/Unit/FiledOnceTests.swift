@@ -163,6 +163,36 @@ struct FiledOnceTests {
         #expect(model.agents.count == 3)
     }
 
+    /// A long page used to rebuild every shelf. It is filed beside what is held, and
+    /// what was held stays (#285).
+    @Test func aLongListIsFiledBesideWhatIsHeld() {
+        let model = AgentsModel()
+        let held = (0..<12).map { agent(api, .finished, at: Double($0)) }
+        model.replaceAgents(held)
+        let page = (0..<12).map { agent(web, .archived, at: Double(100 + $0)) }
+        model.takeListed(page)
+        let wanted = (held + page).sorted(by: ProjectShelf.byActivity)
+        #expect(model.agents.map(\.id) == wanted.map(\.id))
+        expectAgreement(model, "a long page")
+    }
+
+    /// Looking an agent up makes a cell. Letting it go, and looking up one that was
+    /// never held, does not leave cells behind (#285).
+    @Test func aForgottenAgentLeavesNoCellBehind() {
+        let model = AgentsModel()
+        let held = (0..<6).map { agent(api, .archived, at: Double($0)) }
+        model.takeListed(held)
+        for one in held { _ = model.agent(one.id) }
+        #expect(model.heldCellCount == held.count)
+        _ = model.agent(UUID())
+        #expect(model.heldCellCount == held.count)
+        model.forget(held.map(\.id))
+        #expect(model.agents.isEmpty)
+        #expect(model.heldCellCount == 0)
+        #expect(model.agent(held[0].id) == nil)
+        #expect(model.heldCellCount == 0)
+    }
+
     private func event(_ position: EventPosition, _ folder: URL, at offset: Double) -> Event {
         Event(EventDraft(name: "agent.finished", at: t0.addingTimeInterval(offset),
                          scope: .project(folder: folder), sentence: "finished", details: [:]),

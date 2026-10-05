@@ -25,6 +25,20 @@ struct ArtifactsPane: View {
     /// whether every file was still there.
     @State private var artifacts: [Artifact] = []
     @State private var missing: Set<String> = []
+    /// How far into `entries` has been folded, and the first entry that fold started
+    /// from. A page put in front, or one trimmed, starts again (#285).
+    @State private var scanned = 0
+    @State private var anchor: UUID?
+    /// Artifacts already asked about, so a new entry does not stat every earlier one.
+    @State private var checked: Set<String> = []
+    /// A server directory's names, listed once per parent. Unknown when the list
+    /// failed or was cut short: that is not "gone".
+    @State private var parentLists: [String: ParentNames] = [:]
+
+    private enum ParentNames {
+        case names(Set<String>)
+        case unknown
+    }
 
     var body: some View {
         Group {
@@ -41,14 +55,72 @@ struct ArtifactsPane: View {
         // Only while shown, and once more on being shown: hidden, each new entry was a
         // pass over the chat and a look at the disk for nobody (#213).
         .task(id: frame.pane == .artifacts ? model.entries.count : -1) {
-            if frame.pane == .artifacts { fold() }
+            if frame.pane == .artifacts { await fold() }
         }
     }
 
-    private func fold() {
-        let found = Artifact.all(in: model.entries)
-        artifacts = found
-        missing = Set(found.filter(\.isMissing).map(\.id))
+    /// The artifacts in entries not yet folded, then whether each new file is still
+    /// there. A file on a server is asked of that host, once per directory (#285).
+    private func fold() async {
+        let entries = model.entries
+        let grewAtEnd = anchor != nil && entries.first?.id == anchor && entries.count >= scanned
+        if grewAtEnd {
+            let found = Artifact.all(in: entries.dropFirst(scanned))
+            var known = Set(artifacts.map(\.id))
+            let added = found.filter { known.insert($0.id).inserted }
+            if !added.isEmpty {
+                artifacts = (added + artifacts).sorted { $0.arrivedAt > $1.arrivedAt }
+            }
+        } else {
+            artifacts = Artifact.all(in: entries)
+            missing = missing.filter { id in artifacts.contains { $0.id == id } }
+        }
+        scanned = entries.count
+        anchor = entries.first?.id
+        for artifact in artifacts where !checked.contains(artifact.id) {
+            await markMissing(artifact)
+            if Task.isCancelled { return }
+        }
+    }
+
+    private func markMissing(_ artifact: Artifact) async {
+        guard checked.insert(artifact.id).inserted else { return }
+        if model.isOnThisMac(agent.host) {
+            if artifact.isMissing(onThisMac: true) { missing.insert(artifact.id) }
+            return
+        }
+        guard case .file(let url) = artifact.destination else { return }
+        let parent = url.deletingLastPathComponent()
+        let known: ParentNames
+        if let cached = parentLists[parent.path] {
+            known = cached
+        } else {
+            // A newer entry cancels this ask. Remembering it as unknown would never
+            // look again, so a cancelled ask is left unchecked (#285).
+            guard let listed = await parentNames(parent) else {
+                checked.remove(artifact.id)
+                return
+            }
+            parentLists[parent.path] = listed
+            known = listed
+        }
+        // A name the host's listing did not have. A truncated or failed list stays
+        // `.unknown`, which is not "gone" (`Artifact.isAbsent`).
+        if case .names(let names) = known, !names.contains(url.lastPathComponent) {
+            missing.insert(artifact.id)
+        }
+    }
+
+    /// Nil when the ask was cancelled. A failed or truncated list is `.unknown`.
+    private func parentNames(_ parent: URL) async -> ParentNames? {
+        do {
+            let listing = try await model.serverFiles(agent.host).list(agentID: agent.id, folder: parent)
+            guard !Task.isCancelled else { return nil }
+            guard !listing.isTruncated else { return .unknown }
+            return .names(Set(listing.entries.map(\.name)))
+        } catch {
+            return Task.isCancelled ? nil : .unknown
+        }
     }
 
     private func row(_ artifact: Artifact) -> some View {

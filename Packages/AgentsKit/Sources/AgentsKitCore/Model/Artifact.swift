@@ -59,11 +59,18 @@ public struct Artifact: Sendable, Hashable, Identifiable {
         }
     }
 
-    /// Whether the thing it points at is still there. Only answerable for a file; a
-    /// web address is not something to check by fetching it.
-    public var isMissing: Bool {
-        guard case .file(let url) = destination else { return false }
+    /// Whether a file on this Mac is gone. A server's file is on that host, and this
+    /// Mac's disk cannot say (#285). A web address is not something to check by fetching it.
+    public func isMissing(onThisMac: Bool) -> Bool {
+        guard onThisMac, case .file(let url) = destination else { return false }
         return !FileManager.default.fileExists(atPath: url.path)
+    }
+
+    /// A file name against a directory listing from the host that has it. A truncated
+    /// listing is not enough to say the name is gone (#285). Nil when it cannot be said.
+    public static func isAbsent(_ name: String, from listing: DirectoryListing) -> Bool? {
+        guard !listing.isTruncated else { return nil }
+        return !listing.entries.contains { $0.name == name }
     }
 }
 
