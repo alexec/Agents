@@ -617,12 +617,7 @@
         {
           "entry" : "00000000-0000-0000-0000-000000001004",
           "kind" : "agentMessage",
-          "text" : "on the page"
-        },
-        {
-          "entry" : "00000000-0000-0000-0000-000000001005",
-          "kind" : "agentMessage",
-          "text" : "late and more"
+          "text" : "on the pagelate and more"
         }
       ],
       "permissions" : [

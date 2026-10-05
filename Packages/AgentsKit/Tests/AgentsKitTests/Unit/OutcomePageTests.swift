@@ -135,16 +135,19 @@ struct OutcomePageTests {
         var earlier = page.turns()
         earlier[0].storedStepCount = 99
         let grown = (page + [TranscriptItem.entry(said("more"))]).turns(reusing: earlier)
-        try #require(grown.count == 2)
-        #expect(grown[0].storedStepCount == 99)
-        #expect(grown[1].storedStepCount == nil)
-        #expect(text(grown[1].items.last) == "more")
+        #expect(grown.count == 2)
+        let grownFirst = try #require(grown.first)
+        let grownSecond = try #require(grown.dropFirst().first)
+        #expect(grownFirst.storedStepCount == 99)
+        #expect(grownSecond.storedStepCount == nil)
+        #expect(text(grownSecond.items.last) == "more")
 
         let changed = TranscriptEntry.display([ask("One"), said("CHANGED"), ask("Two"), said("b")])
         let rebuilt = changed.turns(reusing: grown)
-        try #require(rebuilt.count == 2)
-        #expect(rebuilt[0].storedStepCount == nil)
-        #expect(text(rebuilt[0].items.first) == "CHANGED")
-        #expect(text(rebuilt[1].items.last) == "b")
+        let rebuiltFirst = try #require(rebuilt.first)
+        let rebuiltSecond = try #require(rebuilt.dropFirst().first)
+        #expect(rebuiltFirst.storedStepCount == nil)
+        #expect(text(rebuiltFirst.items.first) == "CHANGED")
+        #expect(text(rebuiltSecond.items.last) == "b")
     }
 }

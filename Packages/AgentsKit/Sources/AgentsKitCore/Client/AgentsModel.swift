@@ -462,12 +462,21 @@ public final class AgentsModel {
             if notification.oversized != nil {
                 onOversized(notification.agentID, notification.entry.id, notification.index)
             }
-            heardSincePage.append(notification.entry)
-            if heardSincePage.count > Self.heardSincePageLimit {
-                heardSincePage.removeFirst(heardSincePage.count - Self.heardSincePageLimit)
+            if let heard = heardSincePage.firstIndex(where: { $0.id == notification.entry.id }) {
+                heardSincePage[heard] = notification.entry
+            } else {
+                heardSincePage.append(notification.entry)
+                if heardSincePage.count > Self.heardSincePageLimit {
+                    heardSincePage.removeFirst(heardSincePage.count - Self.heardSincePageLimit)
+                }
             }
-            // Already on the page: written before the daemon read it, and heard after.
-            guard entryIDs.insert(notification.entry.id).inserted else { return }
+            // Catch-up can repeat an id with newer contents. Replace the held copy in place.
+            if let held = entries.firstIndex(where: { $0.id == notification.entry.id }) {
+                entries[held] = notification.entry
+                refold()
+                return
+            }
+            entryIDs.insert(notification.entry.id)
             entries.append(notification.entry)
             display.add(notification.entry)
             if isFollowingEnd, entries.count > nextTrimAt {
@@ -1014,7 +1023,7 @@ public final class AgentsModel {
     /// The finished turns at the end of the conversation, and where the one in progress
     /// starts. Asked for before the transcript, which then starts there.
     public func replaceTurns(with page: TurnsPage) {
-        turns = page.turns
+        turns = page.turns.keepingLastTurnWithEachID()
         firstTurn = page.firstTurn
         openTurnStart = page.openStart
         trimTurns()
@@ -1023,8 +1032,7 @@ public final class AgentsModel {
     /// Earlier finished turns, put in front. While the reader is up the page, they
     /// stay; back at the end, the cap lets the oldest go (#285).
     public func prependTurns(_ page: TurnsPage) {
-        let held = Set(turns.map(\.id))
-        turns = page.turns.filter { !held.contains($0.id) } + turns
+        turns = (page.turns + turns).keepingLastTurnWithEachID()
         firstTurn = page.firstTurn
         trimTurns()
     }
@@ -1041,14 +1049,27 @@ public final class AgentsModel {
 
     /// The first page of the conversation being read: the end of it.
     public func replaceTranscript(with page: TranscriptPage) {
-        // What was heard and is not on the page was written after the page was read, so
-        // it goes after it, in the order it was heard.
-        let onPage = Set(page.entries.map(\.id))
-        entries = page.entries + heardSincePage.filter { !onPage.contains($0.id) }
+        // What was heard was written after the page was read. When an id overlaps, its
+        // notification is the newer copy of that entry.
+        entries = Self.entriesKeepingLatest(page.entries + heardSincePage)
         heardSincePage = []
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
         refold()
+    }
+
+    private static func entriesKeepingLatest(_ entries: [TranscriptEntry]) -> [TranscriptEntry] {
+        var positions: [UUID: Int] = [:]
+        var unique: [TranscriptEntry] = []
+        for entry in entries {
+            if let position = positions[entry.id] {
+                unique[position] = entry
+            } else {
+                positions[entry.id] = unique.count
+                unique.append(entry)
+            }
+        }
+        return unique
     }
 
     /// An earlier page, put in front of what is already held.

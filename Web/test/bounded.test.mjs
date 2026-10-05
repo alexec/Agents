@@ -102,6 +102,32 @@ test("an entry keeps every turn it did not land in the same object", () => {
   assert.deepEqual(keepingTurns(after, after), after);
 });
 
+test("reconnect turns keep one latest copy and one row across stored and live turns", () => {
+  const work = new Work();
+  const summary = (id, steps) => ({ id, start: 0, end: 2, steps });
+  work.replaceTurns({ turns: [summary("t-old", 1), summary("t-later", 1)], firstTurn: 1, openStart: 4 });
+  work.prependTurns({ turns: [summary("t-first", 1), summary("t-old", 2), summary("t-old", 3)], firstTurn: 0 });
+  assert.deepEqual(work.turns.value.map((turn) => turn.id), ["t-first", "t-old", "t-later"]);
+  assert.equal(work.turns.value[1].steps, 1, "the already-held copy is newer than the earlier page");
+
+  work.replaceTurns({ turns: [summary("e1", 1)], firstTurn: 0, openStart: 0 });
+  work.replaceTranscript({ entries: [asked(1), said(2)], firstIndex: 0 });
+  assert.equal(work.chatTurns.value.filter((turn) => turn.id === "e1").length, 1);
+  assert.equal(work.chatTurns.value[0].items.length, 1, "the live copy carries its current entries");
+});
+
+test("a repeated catch-up entry updates the held entry and the incoming page copy", () => {
+  const work = new Work();
+  work.watch("mac", "s");
+  const original = { ...said(1), id: "same" };
+  const updated = { ...original, kind: { agentMessage: { text: "newer", messageID: "m1" } } };
+  work.apply("agent/entry", { agentID: "s", entry: original }, "mac");
+  work.apply("agent/entry", { agentID: "s", entry: updated }, "mac");
+  work.replaceTranscript({ entries: [original], firstIndex: 0 });
+  assert.deepEqual(work.entries.value.map((entry) => entry.id), ["same"]);
+  assert.equal(work.entries.value[0].kind.agentMessage.text, "newer");
+});
+
 test("a followed chat is trimmed at the front, and one scrolled up is not", () => {
   const work = new Work();
   work.watch("mac", "s");
