@@ -1262,6 +1262,13 @@ final class AppModel {
         work.replaceDisk(state)
     }
 
+    private func refreshServerDisk(_ host: HostID) async {
+        guard let state = try? await client(for: host).call(DaemonAPI.Method.diskState,
+                                                            Optional<String>.none,
+                                                            returning: DiskState.self) else { return }
+        serverDisks[host] = state
+    }
+
     /// The newest page of events and who is waiting (042), narrowed by `filter`, or as
     /// the page last narrowed it. A daemon too old to know the method leaves the list
     /// empty, and the Events page says there is nothing yet.
@@ -1558,6 +1565,8 @@ final class AppModel {
 
     /// Each server's spending, as it last said (037).
     private(set) var serverCosts: [HostID: DaemonAPI.CostState] = [:]
+    /// Each server's disk alarms, kept beside the Mac's own disk strip (#263).
+    private(set) var serverDisks: [HostID: DiskState] = [:]
 
     /// What the servers have spent today, together, per currency. Empty when nothing.
     var serversToday: [String: Decimal] {
@@ -2175,6 +2184,12 @@ final class AppModel {
             serverCosts[host] = try? params?.decode(DaemonAPI.CostState.self)
             noteServerSpent(host)
             return
+        case DaemonAPI.Notification.diskChanged:
+            serverDisks[host] = try? params?.decode(DiskState.self)
+            return
+        case DaemonAPI.Notification.leasesChanged, DaemonAPI.Notification.eventsChanged:
+            // These describe the Mac's shared resources and event feed in this window.
+            return
         case DaemonAPI.Notification.credentialRefused:
             // The key in Settings was refused: Settings turns red, and says why (043).
             if let refused = try? params?.decode(DaemonAPI.CredentialRefused.self) {
@@ -2222,6 +2237,7 @@ final class AppModel {
         work.replaceAgents([], from: host)
         work.replaceProjects([], from: host)
         serverRuntimes[host] = nil
+        serverDisks[host] = nil
         serverFilesByHost[host] = nil
         if selectedProjectHost == host { select(liveProjects.first?.key) }
     }
@@ -2232,6 +2248,7 @@ final class AppModel {
         // for again, and everything it shows is read again.
         await serverFilesByHost[host]?.reconnected()
         await refreshServerRuntimes(host)
+        await refreshServerDisk(host)
         // And its retention settings (051).
         if let settings = work.retentionState?.settings {
             _ = try? await server.call(DaemonAPI.Method.retentionSet,
