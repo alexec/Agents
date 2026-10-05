@@ -62,7 +62,8 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
       store.watchFolder(host, agentID, folder);
       return () => store.unwatchFolder(host, agentID, folder);
     },
-    changed: change && change.agentID === agentID && change.folders.some((f) => f.replace(/\/+$/, "") === folder)
+    changed: change && change.agentID === agentID
+      && (change.many || change.folders.some((f) => f.replace(/\/+$/, "") === folder))
       ? change.at : undefined,
   };
 

@@ -113,6 +113,12 @@ public final class RemoteFiles {
     /// `files/changed`, from the notification switch.
     public func apply(_ change: DaemonAPI.FilesChangedNotification) {
         anyChange[change.agentID, default: 0] += 1
+        // Too many to name (#216): every folder shown for the agent reads again.
+        if change.many == true {
+            for request in watched.keys where request.agentID == change.agentID {
+                changes[Self.key(request.agentID, request.folder), default: 0] += 1
+            }
+        }
         for folder in change.folders {
             changes[Self.key(change.agentID, Self.standard(folder)), default: 0] += 1
         }

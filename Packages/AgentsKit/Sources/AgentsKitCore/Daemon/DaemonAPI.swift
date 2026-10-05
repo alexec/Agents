@@ -1138,10 +1138,18 @@ public enum DaemonAPI {
         /// Directories, as FSEvents names them: re-list one being shown, re-read a file
         /// whose folder is here.
         public var folders: [String]
+        /// More folders changed than `folders` names (#216): at most `folderLimit` are
+        /// sent, and a client treats every folder it shows for the agent as changed.
+        /// Absent from a host before it, which always sent them all.
+        public var many: Bool?
 
-        public init(agentID: UUID, folders: [String]) {
+        /// The most folders one notice names; a build in a lane changes thousands.
+        public static let folderLimit = 64
+
+        public init(agentID: UUID, folders: [String], many: Bool? = nil) {
             self.agentID = agentID
             self.folders = folders
+            self.many = many
         }
     }
 

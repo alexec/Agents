@@ -788,6 +788,7 @@ export interface FilesBrowseRequest {
 export interface FilesChangedNotification {
   agentID: UUID;
   folders: string[];
+  many?: boolean;
 }
 
 export interface FilesListRequest {
@@ -2141,7 +2142,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FileMentionRequest: { required: ["agentID", "term"], optional: [] },
   FileStamp: { required: ["size", "modifiedAt"], optional: [] },
   FilesBrowseRequest: { required: [], optional: ["path"] },
-  FilesChangedNotification: { required: ["agentID", "folders"], optional: [] },
+  FilesChangedNotification: { required: ["agentID", "folders"], optional: ["many"] },
   FilesListRequest: { required: ["agentID", "folder"], optional: [] },
   FilesReadRequest: { required: ["agentID", "path"], optional: ["knownStamp"] },
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
