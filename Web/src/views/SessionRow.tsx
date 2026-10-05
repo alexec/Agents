@@ -6,7 +6,7 @@ import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { eventWaitMark, leaseMark, retirementNote, startedByAgentLabel, worktreeHelp, type LeaseMark } from "../model/rowLines";
 import { backgroundMark } from "../model/background";
-import { folderKey, parkedAt, projectFolder, showsUnread } from "../model/groups";
+import { parkedAt, projectFolder, showsUnread } from "../model/groups";
 import { rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
@@ -75,7 +75,7 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
     comingBack: store.isComingBack(host, agent.id),
     // Its id when the file has since gone, so the mark never goes with it, as the window's.
     startedByWorkflow: workflowID === undefined ? null
-      : (store.workflows.value[`${host}|${folderKey(projectFolder(agent))}`] ?? [])
+      : store.projectWorkflows(host, projectFolder(agent))
         .find((w) => w.workflow.workflowID === workflowID)?.workflow.name ?? workflowID,
     startedByAgent: startedByAgentLabel(agent, title),
     leases: leaseMark(agent.id, store.leases.value[host], title),

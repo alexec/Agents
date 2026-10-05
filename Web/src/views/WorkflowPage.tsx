@@ -6,8 +6,8 @@
 // the sessions it started. Every attribute is shown; the settings, labels and cooldown are edited
 // here as in the window (#162), what the workflow is (name, triggers, prompt, agent mode) is not.
 import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
-import { folderKey } from "../model/groups";
 import {
   cooldownSentence, labelsNote, agentModeWords, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   triggerSummary, workflowSummary,
@@ -21,10 +21,24 @@ import { BackToList } from "./BackToList";
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
   store: Store; host: string; folder: string; projectName: string; workflowID: string; down: boolean;
 }) {
-  const summary = (store.workflows.value[`${host}|${folderKey(folder)}`] ?? []).find((w) => w.workflow.workflowID === workflowID);
+  // Held while the page is open, shared with the sidebar's fold, and let go by the last of them (#291).
+  useEffect(() => {
+    store.holdWorkflows(host, folder);
+    return () => store.releaseWorkflows(host, folder);
+  }, [host, folder]);
+  const known = store.workflowsKnown(host, folder);
+  const summary = store.projectWorkflows(host, folder).find((w) => w.workflow.workflowID === workflowID);
   // The daemon's refusal of the last change, said beside the controls until the next one.
   const problem = useSignal<{ workflowID: string; text: string } | null>(null);
   const back = <BackToList />;
+  if (!known) {
+    return (
+      <section class="chat workflow-page" aria-label="Workflow">
+        <header class="column-head">{back}<h1>Workflow</h1></header>
+        <p class="hint">Loading…</p>
+      </section>
+    );
+  }
   if (!summary) {
     return (
       <section class="chat workflow-page" aria-label="Workflow">

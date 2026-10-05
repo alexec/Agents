@@ -18,7 +18,7 @@ import type { Attachment, BranchSummary, ConfigOption, JSONValue, RuntimeStatus,
 import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn, choices, same } from "../model/options";
 import { folderKey } from "../model/groups";
-import { newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
+import { formRuntime, newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout } from "../model/sandbox";
@@ -65,10 +65,17 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const startable = runtimes.map((r) => r.runtime.id);
   const left = formFor(kept.value, startable);
   const runtimeID = useSignal<string | undefined>(undefined);
-  // The one rule (#264): the kept runtime; else the default when it can start, else the first.
+  // The one rule (#264), frozen when the form opens (#291): a later listing, or another agent's
+  // activity, does not move it and so does not discard the draft runtime and start another.
+  const openedRuntime = useRef<{ host: string; folder: string; runtimeID?: string }>({ host, folder });
+  if (openedRuntime.current.host !== host || openedRuntime.current.folder !== folder) openedRuntime.current = { host, folder };
+  if (openedRuntime.current.runtimeID === undefined) {
+    const opening = newSessionRuntime(left.runtimeID, startable);
+    if (opening !== undefined) openedRuntime.current = { host, folder, runtimeID: opening };
+  }
   // A runtime picked here counts only while this host offers it: the bar can move to another host.
   const picked = runtimeID.value !== undefined && startable.includes(runtimeID.value) ? runtimeID.value : undefined;
-  const chosenRuntime = picked ?? newSessionRuntime(left.runtimeID, startable);
+  const chosenRuntime = formRuntime(openedRuntime.current.runtimeID, picked, startable, left.runtimeID);
   const where = useSignal<Where>({ kind: "project" });
   const worktrees = useSignal<WorktreeSummary[]>([]);
   const branches = useSignal<BranchSummary[]>([]);
@@ -169,7 +176,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       ...(w.kind === "new" ? { worktree: { new: {} } } : w.kind === "existing" ? { worktree: { existing: { _0: w.root as never } } }
         : w.kind === "branch" ? { worktree: { branch: { _0: w.name } } } : {}),
       ...(override ? { sandbox: override } : {}),
-      requestID: crypto.randomUUID().toUpperCase() as UUID,
+      // Kept until this start succeeds, so a retry after a timeout is the same start (#291).
+      requestID: store.startRequestID(host, folder),
     };
     const id = await store.start(host, request);
     if (!id) return false;
@@ -177,6 +185,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       refusal.value = id;
       return false;
     }
+    store.finishStartRequest(host, folder);
     note({ runtimeID: chosenRuntime, chosen: form.value.chosen, folders: folders.value });
     sandbox.value = undefined;
     // The runtime behind the form is the agent's now.

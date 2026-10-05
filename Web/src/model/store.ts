@@ -35,8 +35,38 @@ function isSandboxRefusal(data: unknown): data is Omit<SandboxWillNotStart, "mes
 /** How many finished turns a chat opens with, as the window's (#90). */
 const openingTurns = 12;
 
-/** The most entries a host gives in one `agents/transcript` answer (TranscriptRequest.limitCeiling, #200). */
-const transcriptCeiling = 1_000;
+/** How many entries one opened turn asks for, the last of them first (#291). Earlier ones come on ask. */
+export const turnPage = 200;
+
+/** How many opened turns' entries a chat keeps. A turn closed, or past this, is read again when opened. */
+export const openTurnsHeld = 8;
+
+/**
+ * How much history a chat keeps while the reader is scrolled up (#291). Past this, earlier pages
+ * wait until they go back to the end, which lets the front go.
+ */
+export const historyEntriesCap = 1_600;
+export const historyTurnsCap = 200;
+
+/** A page of a finished turn's entries (#291). */
+export interface TurnDetailPage {
+  entries: TranscriptEntry[];
+  /** Where this page starts. Earlier steps of the turn exist when this is past the turn's start. */
+  firstIndex: number;
+}
+
+/** Puts `id` among the newest `cap` entries of `held`, letting the oldest go (#291). */
+export function rememberOpen<T>(held: Readonly<Record<string, T>>, order: readonly string[], id: string, value: T,
+                                cap = openTurnsHeld): { held: Record<string, T>; order: string[] } {
+  const next: Record<string, T> = { ...held, [id]: value };
+  const ids = order.filter((kept) => kept !== id);
+  ids.push(id);
+  while (ids.length > cap) {
+    const drop = ids.shift();
+    if (drop !== undefined) delete next[drop];
+  }
+  return { held: next, order: ids };
+}
 
 /** How many entries heard as they happened are kept to lay over a page that arrives late. */
 const heardSincePageLimit = 1_000;
@@ -53,8 +83,9 @@ const turnsKept = 100;
 
 /** The most folders a settling burst keeps by name before it is "many", as the host's own limit. */
 const filesNamedAtMost = 64;
-/** How long `files/changed` has to be quiet before the panes read the folders again. */
-const filesSettle = 250;
+/** How long a burst has to be quiet before the panes, a dashboard or a page read again (#170, #291). */
+export const quietSettle = 250;
+const filesSettle = quietSettle;
 
 /** How many archived sessions an open Archived fold lists: as many as it shows (#170). */
 export const archivedPage = 50;
@@ -172,13 +203,50 @@ export class Work {
   /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
   readonly pageRevisions = signal<Record<string, number>>({});
 
-  /** Each project's workflows by `host|folder`, listed when the project is chosen. */
+  /** Each project's workflows by `host|folder`, listed while that project is open. */
   readonly workflows = signal<Record<string, WorkflowSummary[]>>({});
+  /** One project's list, so a change redraws that fold and no other (#291). */
+  private workflowSlices = new Map<string, Signal<WorkflowSummary[]>>();
+  /** Projects whose workflow list is on screen, and how many views hold it. */
+  protected workflowHolds = new Map<string, number>();
+  /** Lists a fetch has answered, so a page can tell "loading" from "gone". */
+  protected workflowsLoaded = new Set<string>();
+
+  /** One project's workflows: a reader redraws only when this project's list changes. */
+  projectWorkflows(host: string, folder: string): WorkflowSummary[] {
+    const key = `${host}|${folderKey(folder)}`;
+    let slice = this.workflowSlices.get(key);
+    if (!slice) {
+      slice = signal(this.workflows.peek()[key] ?? []);
+      this.workflowSlices.set(key, slice);
+    }
+    return slice.value;
+  }
+
+  /** Whether `loadWorkflows` has answered for this project since it was opened. */
+  workflowsKnown(host: string, folder: string): boolean {
+    return this.workflowsLoaded.has(`${host}|${folderKey(folder)}`);
+  }
+
+  protected writeWorkflows(key: string, list: WorkflowSummary[] | undefined): void {
+    if (list === undefined) {
+      if (key in this.workflows.peek()) {
+        const { [key]: _gone, ...rest } = this.workflows.value;
+        this.workflows.value = rest;
+      }
+    } else {
+      this.workflows.value = { ...this.workflows.value, [key]: list };
+    }
+    const slice = this.workflowSlices.get(key);
+    if (slice) slice.value = list ?? [];
+  }
 
   upsertWorkflow(summary: WorkflowSummary, host: string): void {
     const key = `${host}|${folderKey(summary.workflow.folder)}`;
-    const list = (this.workflows.value[key] ?? []).filter((w) => w.workflow.workflowID !== summary.workflow.workflowID);
-    this.workflows.value = { ...this.workflows.value, [key]: [...list, summary] };
+    // A project not on screen keeps no list: the next open asks for the whole of it (#291).
+    if (this.workflows.peek()[key] === undefined && !this.workflowHolds.has(key)) return;
+    const list = (this.workflows.peek()[key] ?? []).filter((w) => w.workflow.workflowID !== summary.workflow.workflowID);
+    this.writeWorkflows(key, [...list, summary]);
   }
 
   /** The latest correction to a new agent's form, for the form holding that draft. */
@@ -214,6 +282,22 @@ export class Work {
   }
 
   private filesSettling = new Map<string, { folders: Set<string>; many: boolean; timer: ReturnType<typeof setTimeout> }>();
+  private pageSettle = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** A dashboard on screen changed: the store fetches it once the burst settles (#291). */
+  protected dashboardChanged(_host: string, _folder: string): void {}
+
+  /** Lists and timers keyed by a host, let go with it (#291). */
+  protected dropHostRecords(host: string): void {
+    const prefix = `${host}|`;
+    for (const [key, timer] of this.pageSettle) if (key.startsWith(prefix)) { clearTimeout(timer); this.pageSettle.delete(key); }
+    for (const key of [...this.workflowHolds.keys()]) if (key.startsWith(prefix)) this.workflowHolds.delete(key);
+    for (const key of [...this.workflowsLoaded]) if (key.startsWith(prefix)) this.workflowsLoaded.delete(key);
+    for (const [key, slice] of this.workflowSlices) if (key.startsWith(prefix)) slice.value = [];
+    for (const key of [...this.slices.keys()]) if (key.startsWith(prefix)) this.slices.delete(key);
+    for (const key of [...this.views.keys()]) if (key.startsWith(prefix)) this.views.delete(key);
+    for (const key of [...this.byID.keys()]) if (key.startsWith(prefix)) this.byID.delete(key);
+  }
   private display = new DisplayBuilder();
   private entryIDs = new Set<string>();
   /** What was heard while a page is on its way, to lay over it; null when none is (#214). */
@@ -269,6 +353,7 @@ export class Work {
           this.dashboardSummaries.value = { ...this.dashboardSummaries.value, [key]: note.summary };
           this.dashboardRevisions.value = { ...this.dashboardRevisions.value, [key]: (this.dashboardRevisions.value[key] ?? 0) + 1 };
         });
+        this.dashboardChanged(host, note.folder);
         return true;
       }
       case "pins/changed": {
@@ -278,16 +363,21 @@ export class Work {
         return true;
       }
       case "pages/changed": {
+        // A burst of writes: the pages read again once it is quiet, and with the stamp they hold (#291).
         const note = params as PagesChangedNotification;
         const key = `${host}|${folderKey(note.folder)}`;
-        this.pageRevisions.value = { ...this.pageRevisions.value, [key]: (this.pageRevisions.value[key] ?? 0) + 1 };
+        clearTimeout(this.pageSettle.get(key));
+        this.pageSettle.set(key, setTimeout(() => {
+          this.pageSettle.delete(key);
+          this.pageRevisions.value = { ...this.pageRevisions.value, [key]: (this.pageRevisions.peek()[key] ?? 0) + 1 };
+        }, quietSettle));
         return true;
       }
       case "workflow/removed": {
         const note = params as WorkflowRemovedNotification;
         const key = `${host}|${folderKey(note.folder)}`;
-        this.workflows.value = { ...this.workflows.value,
-          [key]: (this.workflows.value[key] ?? []).filter((w) => w.workflow.workflowID !== note.workflowID) };
+        const held = this.workflows.peek()[key];
+        if (held) this.writeWorkflows(key, held.filter((w) => w.workflow.workflowID !== note.workflowID));
         return true;
       }
       case "agent/showFile": {
@@ -583,8 +673,9 @@ export class Work {
     });
   }
 
-  /** Earlier finished turns, put in front. */
+  /** Earlier finished turns, put in front. Past the cap, they wait until the reader is back at the end (#291). */
   prependTurns(page: TurnsPage): void {
+    if (this.turns.value.length >= historyTurnsCap) return;
     const held = new Set(this.turns.value.map((t) => t.id));
     batch(() => {
       this.turns.value = [...page.turns.filter((t) => !held.has(t.id)), ...this.turns.value];
@@ -604,8 +695,9 @@ export class Work {
     });
   }
 
-  /** An earlier page, put in front of what is held. */
+  /** An earlier page, put in front of what is held. Past the cap, it waits (#291). */
   prepend(page: TranscriptPage): void {
+    if (this.entries.value.length >= historyEntriesCap) return;
     const entries = [...page.entries.filter((e) => !this.entryIDs.has(e.id)), ...this.entries.value];
     batch(() => {
       this.firstEntryIndex.value = page.firstIndex;
@@ -634,9 +726,13 @@ export class Work {
     this.nextTrimAt = entriesTrimmedAt;
   }
 
-  /** Whether anything at all of the conversation comes before what is in hand. */
+  /**
+   * Whether anything of the conversation comes before what is in hand, and the chat will still
+   * take it. At the history cap it waits until the reader is back at the end (#291).
+   */
   get hasMoreOfTheConversation(): boolean {
-    return this.hasMoreBefore.value || this.firstTurn.value > 0;
+    if (this.hasMoreBefore.value) return this.entries.value.length < historyEntriesCap;
+    return this.firstTurn.value > 0 && this.turns.value.length < historyTurnsCap;
   }
 
   /**
@@ -741,10 +837,27 @@ export class Store extends Work {
     return this.once("*", async () => {
       const hosts = await this.link.call("hosts/list", {});
       this.takeHosts(hosts);
-      await Promise.all(hosts.filter((host) => host.state === "online").map((host) => this.loadHost(host.id)));
+      await Promise.all(this.hosts.value.filter((host) => host.state === "online").map((host) => this.onHost(host.id, async () => {
+        // A removal that landed while this waited is not loaded back (#291).
+        if (!this.hostIsOnline(host.id)) return;
+        await this.loadHost(host.id);
+      })));
       const watching = this.watching.value;
       if (watching) await this.loadTranscript(watching.host, watching.session);
     });
+  }
+
+  /** One load of a host at a time: `load` and `reloadHost` queue here rather than running together (#291). */
+  private hostChain = new Map<string, Promise<void>>();
+
+  private onHost(host: string, work: () => Promise<void>): Promise<void> {
+    const prev = this.hostChain.get(host) ?? Promise.resolve();
+    const run = prev.then(work, work);
+    const done = run.finally(() => {
+      if (this.hostChain.get(host) === done) this.hostChain.delete(host);
+    });
+    this.hostChain.set(host, done);
+    return run;
   }
 
   /** What is running, by host or "*" for everything, and whether it was asked for again meanwhile. */
@@ -795,18 +908,25 @@ export class Store extends Work {
   private async reloadHost(host: string): Promise<void> {
     const hosts = await this.link.call("hosts/list", {});
     this.takeHosts(hosts);
-    const now = hosts.find((h) => h.id === host);
-    if (!now) return this.forgetHost(host);
-    if (now.state !== "online") return;
-    await this.loadHost(host);
-    const watching = this.watching.value;
-    if (watching?.host === host) await this.loadTranscript(host, watching.session);
+    await this.onHost(host, async () => {
+      const now = this.hosts.value.find((h) => h.id === host);
+      if (!now) return this.forgetHost(host);
+      if (now.state !== "online") return;
+      await this.loadHost(host);
+      const watching = this.watching.value;
+      if (watching?.host === host) await this.loadTranscript(host, watching.session);
+    });
   }
 
-  /** A host removed: what was held of it goes with it. */
+  /** A host removed: what was held of it goes with it, the dashboards and runtimes included (#291). */
   private forgetHost(host: string): void {
+    const prefix = `${host}|`;
     const without = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => key !== host));
-    const notOf = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => !key.startsWith(`${host}|`)));
+    const notOf = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => !key.startsWith(prefix)));
+    this.dropHostRecords(host);
+    for (const [key, timer] of this.dashboardSettle) if (key.startsWith(prefix)) { clearTimeout(timer); this.dashboardSettle.delete(key); }
+    for (const key of [...this.dashboardsOpen]) if (key.startsWith(prefix)) { this.dashboardsOpen.delete(key); this.dashboardOrders.forget(key); }
+    for (const key of [...this.startRequests.keys()]) if (key.startsWith(prefix)) this.startRequests.delete(key);
     batch(() => {
       this.setAgents(host, []);
       this.agents.value = without(this.agents.value);
@@ -816,12 +936,24 @@ export class Store extends Work {
       this.elicitations.value = without(this.elicitations.value);
       this.workflows.value = notOf(this.workflows.value);
       this.dashboardSummaries.value = notOf(this.dashboardSummaries.value);
+      this.dashboards.value = notOf(this.dashboards.value);
+      this.dashboardRevisions.value = notOf(this.dashboardRevisions.value);
+      this.pageRevisions.value = notOf(this.pageRevisions.value);
       this.pins.value = notOf(this.pins.value);
       this.sessionPins.value = notOf(this.sessionPins.value);
+      this.leases.value = without(this.leases.value);
+      this.runtimes.value = without(this.runtimes.value);
+      this.accounts.value = without(this.accounts.value);
+      this.sandboxDefaults.value = without(this.sandboxDefaults.value);
+      this.rememberedModes.value = without(this.rememberedModes.value);
+      this.tombstones.value = notOf(this.tombstones.value);
+      this.resuming.value = without(this.resuming.value);
+      this.events.value = without(this.events.value);
+      this.costs.value = without(this.costs.value);
       this.disk.value = without(this.disk.value);
       this.storeNotes.value = without(this.storeNotes.value);
     });
-    for (const key of [...this.archivedLoaded]) if (key.startsWith(`${host}|`)) this.archivedLoaded.delete(key);
+    for (const key of [...this.archivedLoaded]) if (key.startsWith(prefix)) this.archivedLoaded.delete(key);
     this.searched.delete(host);
     if (this.searchNext.value[host]) this.searchNext.value = without(this.searchNext.value);
   }
@@ -844,8 +976,9 @@ export class Store extends Work {
       this.archivedLoaded.delete(key);
       void this.loadArchived(host, key.slice(prefix.length));
     }
-    for (const key of Object.keys(this.workflows.value)) if (key.startsWith(prefix)) void this.loadWorkflows(host, key.slice(prefix.length));
-    for (const key of Object.keys(this.dashboards.value)) if (key.startsWith(prefix)) void this.loadDashboard(host, key.slice(prefix.length));
+    // Only what is on screen: a list or a dashboard left behind is not asked for again (#291).
+    for (const key of this.workflowHolds.keys()) if (key.startsWith(prefix)) void this.loadWorkflows(host, key.slice(prefix.length));
+    for (const key of this.dashboardsOpen) if (key.startsWith(prefix)) void this.loadDashboard(host, key.slice(prefix.length));
     // A search on show: the live list just let its archived matches go, so they are asked again.
     if (this.searchWords) {
       this.searched.delete(host);
@@ -924,9 +1057,33 @@ export class Store extends Work {
   private archivedLoaded = new Set<string>();
 
 
+  /** The project's workflow list is on screen. The first holder asks for it. */
+  holdWorkflows(host: string, folder: string): void {
+    const key = `${host}|${folderKey(folder)}`;
+    const count = this.workflowHolds.get(key) ?? 0;
+    this.workflowHolds.set(key, count + 1);
+    if (count === 0) void this.loadWorkflows(host, folder);
+  }
+
+  /** A view of the list went away. The last one lets the list go (#291). */
+  releaseWorkflows(host: string, folder: string): void {
+    const key = `${host}|${folderKey(folder)}`;
+    const left = (this.workflowHolds.get(key) ?? 1) - 1;
+    if (left > 0) {
+      this.workflowHolds.set(key, left);
+      return;
+    }
+    this.workflowHolds.delete(key);
+    this.workflowsLoaded.delete(key);
+    this.writeWorkflows(key, undefined);
+  }
+
   async loadWorkflows(host: string, folder: string): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
     const listed = await this.link.call("workflows/list", { folder: folder as never }, host).catch(() => null);
-    if (listed) this.workflows.value = { ...this.workflows.value, [`${host}|${folderKey(folder)}`]: listed };
+    if (!this.workflowHolds.has(key)) return;
+    this.workflowsLoaded.add(key);
+    if (listed) this.writeWorkflows(key, listed);
   }
 
   /** One project's newest archived sessions, a page of them, asked for when its fold opens (#170). */
@@ -1074,30 +1231,37 @@ export class Store extends Work {
       .catch(() => {});
   }
 
-  /** Further back: the open turn's earlier entries, then the turns before it. */
+  /** Further back: the open turn's earlier entries, then the turns before it. A chat scrolled up
+   * stops once it holds a bounded history (#291). */
   async loadEarlier(): Promise<void> {
     const watching = this.watching.value;
     if (!watching || !this.hasMoreOfTheConversation) return;
     const agentID = watching.session as never;
     if (!this.hasMoreBefore.value) {
+      if (this.turns.value.length >= historyTurnsCap) return;
       const turns = await this.link.call("agents/turns", { agentID, before: this.firstTurn.value, limit: 50 }, watching.host)
         .catch(() => null);
       if (turns && this.watching.value === watching) this.prependTurns(turns);
       return;
     }
+    if (this.entries.value.length >= historyEntriesCap) return;
     const page = await this.link.call("agents/transcript", {
       agentID, before: this.firstEntryIndex.value, limit: 200, from: this.openTurnStart.value,
     }, watching.host).catch(() => null);
     if (page && this.watching.value === watching) this.prepend(page);
   }
 
-  /** A finished turn's entries, for the chat to open it: the last page of them when the turn is
-   * longer than a host gives in one answer (#200). */
-  async turnEntries(host: string, session: string, range: { start: number; end: number }): Promise<TranscriptEntry[]> {
+  /**
+   * One page of a finished turn, the last `turnPage` entries before `range.end` (#291).
+   * `firstIndex` is past `range.start` when the turn has earlier steps.
+   */
+  async turnEntries(host: string, session: string, range: { start: number; end: number }): Promise<TurnDetailPage> {
+    const span = range.end - range.start;
+    if (span <= 0) return { entries: [], firstIndex: range.start };
     const page = await this.link.call("agents/transcript", {
-      agentID: session as never, before: range.end, limit: Math.min(range.end - range.start, transcriptCeiling), from: range.start,
+      agentID: session as never, before: range.end, limit: Math.min(span, turnPage), from: range.start,
     }, host).catch(() => null);
-    return page?.entries ?? [];
+    return { entries: page?.entries ?? [], firstIndex: page?.firstIndex ?? range.start };
   }
 
   // MARK: What the browser sends (071 US3)
@@ -1345,6 +1509,39 @@ export class Store extends Work {
 
   /** The order writes and fetches of each Dashboard, kept in step (#176, #193). */
   private dashboardOrders = new DashboardOrderSync();
+  /** Dashboards on screen, by `host|folder`. A closed one is dropped and not fetched again (#291). */
+  private dashboardsOpen = new Set<string>();
+  private dashboardSettle = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** The dashboard is on screen: ask for it, and again when it changes. */
+  openDashboard(host: string, folder: string): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    this.dashboardsOpen.add(key);
+    return this.loadDashboard(host, folder);
+  }
+
+  /** The dashboard left the screen. What it held goes with it (#291). */
+  closeDashboard(host: string, folder: string): void {
+    const key = `${host}|${folderKey(folder)}`;
+    this.dashboardsOpen.delete(key);
+    const timer = this.dashboardSettle.get(key);
+    if (timer) clearTimeout(timer);
+    this.dashboardSettle.delete(key);
+    this.dashboardOrders.forget(key);
+    if (!(key in this.dashboards.peek())) return;
+    const { [key]: _gone, ...rest } = this.dashboards.value;
+    this.dashboards.value = rest;
+  }
+
+  protected override dashboardChanged(host: string, folder: string): void {
+    const key = `${host}|${folderKey(folder)}`;
+    if (!this.dashboardsOpen.has(key)) return;
+    clearTimeout(this.dashboardSettle.get(key));
+    this.dashboardSettle.set(key, setTimeout(() => {
+      this.dashboardSettle.delete(key);
+      if (this.dashboardsOpen.has(key)) void this.loadDashboard(host, folder);
+    }, quietSettle));
+  }
 
   /**
    * One project's Dashboard (074), asked for when it opens and on each dashboard/changed for it.
@@ -1352,8 +1549,10 @@ export class Store extends Work {
    */
   async loadDashboard(host: string, folder: string): Promise<void> {
     const key = `${host}|${folderKey(folder)}`;
+    if (!this.dashboardsOpen.has(key)) return;
     const ticket = this.dashboardOrders.beginFetch(key);
     const snapshot = await this.link.call("dashboard/get", { folder: folder as never }, host).catch(() => null);
+    if (!this.dashboardsOpen.has(key)) return;
     const shown = snapshot && this.dashboardOrders.accept(key, snapshot, ticket);
     if (shown) this.dashboards.value = { ...this.dashboards.value, [key]: shown };
   }
@@ -1502,6 +1701,23 @@ export class Store extends Work {
 
   async worktrees(host: string, folder: string): Promise<WorktreesListResponse | null> {
     return this.link.call("worktrees/list", { folder: folder as never }, host).catch(() => null);
+  }
+
+  /** One start's id per project, kept until that start succeeds, so a retry is not a second agent (#291). */
+  private startRequests = new Map<string, UUID>();
+
+  startRequestID(host: string, folder: string): UUID {
+    const key = `${host}|${folderKey(folder)}`;
+    const held = this.startRequests.get(key);
+    if (held) return held;
+    const id = crypto.randomUUID().toUpperCase() as UUID;
+    this.startRequests.set(key, id);
+    return id;
+  }
+
+  /** The start went through. The next one from this project is a new request. */
+  finishStartRequest(host: string, folder: string): void {
+    this.startRequests.delete(`${host}|${folderKey(folder)}`);
   }
 
   /** A runtime started behind the new-agent form, so its choices are real ones. */

@@ -51,6 +51,19 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
   const theirs = useSignal<string | null>(null);
   const marked = useSignal<Set<number>>(new Set());
   const saving = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const later = (run: () => void, ms: number) => {
+    const timer = setTimeout(() => {
+      timers.current = timers.current.filter((t) => t !== timer);
+      run();
+    }, ms);
+    timers.current.push(timer);
+  };
+  useEffect(() => () => {
+    for (const timer of timers.current) clearTimeout(timer);
+    timers.current = [];
+    if (saving.current) clearTimeout(saving.current);
+  }, []);
   const container = useRef<HTMLDivElement>(null);
   const folder = path.slice(0, path.lastIndexOf("/")) || "/";
   const name = nameOf(path);
@@ -86,7 +99,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
       const changed = after.map((p, i) => (before[i]?.source === p.source ? -1 : i)).filter((i) => i >= 0);
       if (changed.length && was.kind === "text") {
         marked.value = new Set(changed);
-        setTimeout(() => (marked.value = new Set()), markFor);
+        later(() => (marked.value = new Set()), markFor);
         if (!editing.peek()) go(changed[0]!);
       }
     } catch (error) {
@@ -132,7 +145,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
       if (index !== null) {
         go(index);
         marked.value = new Set([index]);
-        setTimeout(() => (marked.value = new Set()), markFor);
+        later(() => (marked.value = new Set()), markFor);
       }
     }
   }, [line, loaded.value.kind]);
