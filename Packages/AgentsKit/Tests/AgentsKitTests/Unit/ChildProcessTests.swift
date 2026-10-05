@@ -25,7 +25,7 @@ struct ChildProcessTests {
         #expect(outcome.errorText == "oops")
     }
 
-    @Test func aChildPastItsDeadlineIsStopped() async throws {
+    @Test(.flakyUnderLoad) func aChildPastItsDeadlineIsStopped() async throws {
         // Asserted by what happened to the child rather than by the wall clock, which a
         // loaded machine stretches (9 s against a 5 s bar, #225). The child would sleep
         // for ten minutes: the run comes back without it, and it is stopped rather than

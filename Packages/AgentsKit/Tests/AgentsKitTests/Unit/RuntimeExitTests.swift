@@ -31,7 +31,7 @@ struct RuntimeExitTests {
         process.cleanUp()
     }
 
-    @Test func aSessionWhoseRuntimeDiesGivesBackEveryDescriptor() async throws {
+    @Test(.flakyUnderLoad) func aSessionWhoseRuntimeDiesGivesBackEveryDescriptor() async throws {
         let session = try ACPSession.launch(executable: Self.dies.0, arguments: Self.dies.1,
                                             cwd: URL(filePath: "/tmp", directoryHint: .isDirectory),
                                             environment: [:])
@@ -52,7 +52,7 @@ struct RuntimeExitTests {
     }
 
     /// Ten in a row, the review's measurement: nothing accumulates.
-    @Test func tenDeathsLeaveNothingBehind() async throws {
+    @Test(.flakyUnderLoad) func tenDeathsLeaveNothingBehind() async throws {
         var all: Set<Identity> = []
         for _ in 0..<10 {
             let session = try ACPSession.launch(executable: Self.dies.0, arguments: Self.dies.1,

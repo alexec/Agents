@@ -91,7 +91,7 @@ struct SessionToolsTests {
     }
 
     /// The clean-up workflow (#199) leaves alone a worktree whose session holds a lease.
-    @Test func aSessionHoldingALeaseSaysSo() async throws {
+    @Test(.flakyUnderLoad) func aSessionHoldingALeaseSaysSo() async throws {
         let (locations, root) = try temporary()
         let api = try project(root)
         let core = try await makeCore(locations)

@@ -66,7 +66,7 @@ struct EventStreamHandoverTests {
     /// Stopped mid-sentence. Everything the agent had already said is the user's, and
     /// a stop is not a reason to lose any of it — nor to go on writing it down after
     /// the daemon has said the agent is stopped and gone quiet.
-    @Test func nothingAlreadySaidIsLostWhenTheUserStops() async throws {
+    @Test(.flakyUnderLoad) func nothingAlreadySaidIsLostWhenTheUserStops() async throws {
         let (locations, work) = try temporary()
         var script = FakeACPAgent.Script()
         // A turn that will not end on its own, so the stop is what ends it.

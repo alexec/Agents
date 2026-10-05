@@ -253,7 +253,7 @@ struct ConnectionRoleTests {
 
     /// After a move (058, T085): a device that connects the old way is told where the
     /// control plane is now; a device still pairing is not.
-    @Test func aMovedDeviceIsToldWhereTheControlPlaneIs() async throws {
+    @Test(.flakyUnderLoad) func aMovedDeviceIsToldWhereTheControlPlaneIs() async throws {
         let folder = "/tmp/ag-mv-\(UUID().uuidString.prefix(6))"
         try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: folder) }

@@ -65,7 +65,7 @@ struct GitBoundsTests {
         #expect(FileManager.default.fileExists(atPath: holder.appending(path: "after/README").path))
     }
 
-    @Test func aChildWhoseGrandchildHoldsItsPipeEndsWithItsOwnStatus() async {
+    @Test(.flakyUnderLoad) func aChildWhoseGrandchildHoldsItsPipeEndsWithItsOwnStatus() async {
         // The backgrounded sleep keeps stdout open after the shell has gone, as an ssh
         // ControlPersist master started by git does. It would hold it for ten minutes:
         // coming back inside the deadline at all is the proof, not a wall-clock bar a
