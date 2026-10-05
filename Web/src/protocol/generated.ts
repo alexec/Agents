@@ -1351,6 +1351,10 @@ export interface StopBackgroundRequest {
   itemID: string;
 }
 
+export interface StoreNotes {
+  notes: string[];
+}
+
 export interface SuggestedPrompt {
   id: UUID;
   label: string;
@@ -1940,6 +1944,7 @@ export interface Methods {
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
+  "store/notes": { params: Empty; result: StoreNotes };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
   "views/call": { params: ViewCallRequest; result: JSONValue };
   "views/context": { params: ViewContextRequest; result: Empty };
@@ -2025,6 +2030,7 @@ export const MethodTarget = {
   "projects/list": "host",
   "runtimes/accounts": "host",
   "runtimes/list": "host",
+  "store/notes": "host",
   "surface/identify": "host",
   "views/call": "host",
   "views/context": "host",
@@ -2060,6 +2066,7 @@ export interface Notifications {
   "pins/changed": PinsChangedNotification;
   "project/changed": ProjectSummary;
   "storage/writeFailed": WriteFailure;
+  "store/notesChanged": StoreNotes;
   "workflow/changed": WorkflowSummary;
   "workflow/removed": WorkflowRemovedNotification;
 }
@@ -2208,6 +2215,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox"] },
   StartingPoint: { required: ["repository", "commit"], optional: [] },
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },
+  StoreNotes: { required: ["notes"], optional: [] },
   SuggestedPrompt: { required: ["id", "label", "prompt"], optional: [] },
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },

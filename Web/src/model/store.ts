@@ -6,7 +6,7 @@ import type {
   Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState,
+  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest,
 } from "../protocol/generated";
@@ -178,6 +178,8 @@ export class Work {
   readonly leases = signal<Record<string, LeaseSnapshot>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
   readonly disk = signal<Record<string, DiskState>>({});
+  /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
+  readonly storeNotes = signal<Record<string, string[]>>({});
   /** The mode last chosen for each runtime, by host (029). */
   readonly rememberedModes = signal<Record<string, Record<string, JSONValue>>>({});
 
@@ -304,6 +306,9 @@ export class Work {
         return true;
       case "disk/changed":
         this.disk.value = { ...this.disk.value, [host]: params as DiskState };
+        return true;
+      case "store/notesChanged":
+        this.storeNotes.value = { ...this.storeNotes.value, [host]: (params as StoreNotes).notes };
         return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
@@ -778,6 +783,7 @@ export class Store extends Work {
       this.pins.value = notOf(this.pins.value);
       this.sessionPins.value = notOf(this.sessionPins.value);
       this.disk.value = without(this.disk.value);
+      this.storeNotes.value = without(this.storeNotes.value);
     });
     for (const key of [...this.archivedLoaded]) if (key.startsWith(`${host}|`)) this.archivedLoaded.delete(key);
     this.searched.delete(host);
@@ -839,6 +845,10 @@ export class Store extends Work {
     void this.link.call("disk/state", {}, host).then((state) => {
       this.disk.value = { ...this.disk.value, [host]: state };
     }).catch(failed("disk/state"));
+    // A host too old to know store/notes says nothing, as one with nothing to say.
+    void this.link.call("store/notes", {}, host).then((state) => {
+      this.storeNotes.value = { ...this.storeNotes.value, [host]: state.notes };
+    }).catch(failed("store/notes"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
       this.link.call("elicitations/pending", {}, host).catch(failed("elicitations/pending")),

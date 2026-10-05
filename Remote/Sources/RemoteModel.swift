@@ -1328,6 +1328,8 @@ final class RemoteModel {
         // The low-disk strip is under the banner on every page (#196), so it is read
         // on every catch-up, not when a page asks for it.
         await refreshDisk()
+        // What the Mac could not read (#205, #223), at the foot of the projects list.
+        await refreshStoreNotes()
         await settleUnsettledStart()
         settleSelection()
         // Once the counts have landed, so the widget's number is this refresh's number.
@@ -1798,6 +1800,15 @@ final class RemoteModel {
         guard let state = try? await client.call(DaemonAPI.Method.diskState, Optional<String>.none,
                                                  returning: DiskState.self) else { return }
         work.replaceDisk(state)
+    }
+
+    /// The files the Mac's host could not read in this run (#205, #223), then heard as
+    /// they change. A Mac too old to know the method leaves the list empty, as it would
+    /// be with nothing to say.
+    private func refreshStoreNotes() async {
+        guard let notes = try? await client.call(DaemonAPI.Method.storeNotes, Optional<String>.none,
+                                                 returning: DaemonAPI.StoreNotes.self) else { return }
+        work.replaceStoreNotes(notes)
     }
 
     /// The newest events and who is waiting (042). The phone only reads them.

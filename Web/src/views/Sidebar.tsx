@@ -115,6 +115,13 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
             <span aria-hidden="true">⚡︎</span> {host.name} is {host.state === "connecting" ? "connecting…" : "offline"}
           </p>
         ))}
+        {/* A file a host keeps that could not be read (#205, #223): why paired devices or projects
+            may have gone from view, and that what they held is kept. A server's are named. */}
+        {store.hosts.value.flatMap((host) => (store.storeNotes.value[host.id] ?? []).map((note) => (
+          <p class="foot-line store-note" role="status" key={`${host.id}|${note}`}>
+            <span aria-hidden="true">⚠︎</span> {host.id === "mac" ? note : `${host.name}: ${note}`}
+          </p>
+        )))}
         <div class="identity">
           <span>{browserName()} on this Mac</span>
           {confirming.value ? (
