@@ -37,6 +37,10 @@ struct WorkflowPage: View {
     @State private var remembered: [ConfigOption]?
     /// How many of its runs are on show. Three to begin with, and more on request.
     @State private var shownRuns = Self.runsAtFirst
+    /// The workflow whose archived runs this page brought in, so leaving it — or
+    /// opening another in this same view — lets those go (#285). A bigger page of the
+    /// same workflow is not a leaving.
+    @State private var runsHeld: RunsHeld?
 
     private static let runsAtFirst = 3
     private static let runsPerMore = 6
@@ -72,9 +76,31 @@ struct WorkflowPage: View {
         // agents (#165). One more than shown, so Show more knows there is more.
         .task(id: RunsWanted(workflowID: workflowID, shown: shownRuns)) {
             guard let workflow = summary?.workflow else { return }
+            let host = model.selectedProjectHost
+            let next = RunsHeld(workflowID: workflow.workflowID, folder: workflow.folder, host: host)
+            if let held = runsHeld, held.workflowID != next.workflowID || held.folder != next.folder
+                || held.host != next.host {
+                model.letGoOfRuns(of: held.workflowID, in: held.folder, on: held.host)
+            }
+            runsHeld = next
             await model.loadRuns(of: workflow.workflowID, in: workflow.folder,
-                                 on: model.selectedProjectHost, limit: shownRuns + 1)
+                                 on: host, limit: shownRuns + 1)
         }
+        .onDisappear {
+            guard let held = runsHeld else { return }
+            runsHeld = nil
+            Task { @MainActor in
+                model.letGoOfRuns(of: held.workflowID, in: held.folder, on: held.host)
+            }
+        }
+    }
+
+    /// Which workflow's runs this page is responsible for. The number on show is not
+    /// part of it: Show more asks for a longer page of the same runs.
+    private struct RunsHeld: Equatable {
+        var workflowID: String
+        var folder: URL
+        var host: HostID
     }
 
     private struct RunsWanted: Hashable {

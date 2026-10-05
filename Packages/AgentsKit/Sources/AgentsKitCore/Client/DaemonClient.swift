@@ -20,6 +20,10 @@ public actor DaemonClient {
 
     private let link: any DaemonLink
     private var connection: JSONRPCConnection?
+    /// One connect at a time. Two at once used to each open, and the first connection
+    /// was dropped without being closed (#285).
+    private var connecting: Task<Void, Error>?
+    private var connectGeneration = 0
 
     /// What answers a server's `credentialWanted` (043): lends a credential on this
     /// connection, asking the person first if there is none, and says whether it did.
@@ -41,7 +45,36 @@ public actor DaemonClient {
     public var isConnected: Bool { connection.map { !$0.isClosed } ?? false }
 
     /// Connect, starting the far end if nothing answers and there is anything to start.
+    ///
+    /// One flight. A second caller waits for it rather than opening another connection
+    /// the first assignment would orphan (#285). The flight is cleared by the attempt
+    /// itself, and only if it is still that attempt: a waiter being cancelled must not
+    /// drop a connection that is still opening.
     public func connect(startIfNeeded: Bool = true, timeout: Duration = .seconds(8)) async throws {
+        if let connecting {
+            try await connecting.value
+            return
+        }
+        let generation = connectGeneration + 1
+        connectGeneration = generation
+        let task = Task { () throws -> Void in
+            do {
+                try await self.connectBody(startIfNeeded: startIfNeeded, timeout: timeout)
+            } catch {
+                self.finishConnecting(generation)
+                throw error
+            }
+            self.finishConnecting(generation)
+        }
+        connecting = task
+        try await task.value
+    }
+
+    private func finishConnecting(_ generation: Int) {
+        if connectGeneration == generation { connecting = nil }
+    }
+
+    private func connectBody(startIfNeeded: Bool, timeout: Duration) async throws {
         if let connection {
             // A connection that has quietly died still looks like one, so it is asked
             // before it is trusted — and a quiet one is not waited on for ever.
@@ -229,13 +262,19 @@ public actor DaemonClient {
 
     public nonisolated func notifications() -> AsyncStream<(method: String, params: JSONValue?)> {
         AsyncStream { continuation in
-            Task {
-                guard let connection = await self.connection else { continuation.finish(); return }
+            let task = Task {
+                guard let connection = await self.connection else {
+                    continuation.finish()
+                    return
+                }
                 for await notification in connection.incomingNotifications() {
+                    if Task.isCancelled { break }
                     continuation.yield(notification)
                 }
                 continuation.finish()
             }
+            // The listener going away used to leave this task reading for good (#285).
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 

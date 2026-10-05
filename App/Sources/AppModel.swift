@@ -45,6 +45,10 @@ final class AppModel {
     private var presence: PresenceReporter?
     /// The loop going back for a lost daemon, while there is one.
     private var reconnecting: Task<Void, Never>?
+    /// One connect at a time. `attempt` can call `connect` while the reconnect loop's
+    /// own is still opening, and the first connection was left open (#285).
+    @ObservationIgnored private var connecting: Task<Void, Never>?
+    @ObservationIgnored private var connectGeneration = 0
     /// Its wait, and the control plane watch's, both cut short by a wake or a network
     /// change (#82).
     @ObservationIgnored private let backoff = Backoff()
@@ -777,13 +781,15 @@ final class AppModel {
     /// Ask every host for the sessions matching `words`, archived ones included, a capped
     /// page each (#165): the sidebar holds the live ones and filters those itself.
     func searchSessions(_ words: String) async {
-        let earlier = searched.filter { $0 != selection }
+        // Let the last page go before the next is asked, including a refinement.
+        // Forgetting only when the field was cleared left every query's matches held (#285).
+        let earlier = searched.filter { id in
+            id != selection && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
+        }
         searched = []
         searchNext = [:]
-        guard !words.isEmpty else {
-            work.forget(earlier.filter { work.agent($0)?.state == .archived && !isInOpenArchivedFold($0) })
-            return
-        }
+        work.forget(earlier)
+        guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [HostID] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
         for host in hosts { await search(request, on: host) }
@@ -801,27 +807,69 @@ final class AppModel {
                                                              returning: [Agent].self) else { return }
         // A search ended or changed while this was on its way: not what is asked now.
         guard !Task.isCancelled else { return }
-        let fresh = found.filter { $0.state == .archived && work.agent($0.id) == nil }.map(\.id)
+        let fresh = found.filter { $0.state == .archived && heldAgent($0.id) == nil }.map(\.id)
         searched.formUnion(fresh)
         work.takeListed(found.filter { $0.state == .archived }.map { var agent = $0; agent.host = host; return agent })
         searchNext[host] = request.next(after: found)
     }
 
     /// Whether an archived session is on show in its project's open Archived fold.
+    /// Held, without making a cell: a search or a history page asking must not leave
+    /// one behind for every id it looked at (#285).
+    private func heldAgent(_ id: UUID) -> Agent? {
+        work.agents.first { $0.id == id }
+    }
+
     private func isInOpenArchivedFold(_ id: UUID) -> Bool {
-        guard let agent = work.agent(id) else { return false }
+        guard let agent = heldAgent(id) else { return false }
         // As the sidebar keeps them: in defaults, read here once per search ended.
         return SidebarFolds().isOpen(ProjectKey(host: agent.host, folder: agent.projectFolder), .archivedSessions)
     }
 
     /// A workflow's newest runs, archived ones included, for its History (#164).
+    /// Archived runs this page brought in are remembered, so a larger page can let go
+    /// of the ones that left it, and closing the page lets go of the rest (#285).
     func loadRuns(of workflowID: String, in folder: URL, on host: HostID, limit: Int) async {
+        let key = RunsKey(host: host, folder: Project.standardize(folder), workflowID: workflowID)
         let request = DaemonAPI.ListRequest(archivedCommands: false, folder: folder,
                                             startedByWorkflow: workflowID, limit: limit, lean: true)
         guard let listed = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
                                                               returning: [Agent].self) else { return }
-        work.takeListed(listed.map { var agent = $0; agent.host = host; return agent })
+        guard !Task.isCancelled else { return }
+        let stamped = listed.map { var agent = $0; agent.host = host; return agent }
+        let previous = runsIntroduced[key] ?? []
+        var introduced = Set<UUID>()
+        for agent in stamped where agent.state == .archived {
+            // Already held by a fold, or live, is not this page's to drop later.
+            if previous.contains(agent.id) || heldAgent(agent.id) == nil {
+                introduced.insert(agent.id)
+            }
+        }
+        let left = previous.subtracting(introduced).filter { id in
+            id != selection && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
+        }
+        work.forget(left)
+        work.takeListed(stamped)
+        runsIntroduced[key] = introduced
     }
+
+    /// The archived runs one History page brought in, let go when that page closes.
+    func letGoOfRuns(of workflowID: String, in folder: URL, on host: HostID) {
+        let key = RunsKey(host: host, folder: Project.standardize(folder), workflowID: workflowID)
+        guard let ids = runsIntroduced.removeValue(forKey: key) else { return }
+        work.forget(ids.filter { id in
+            id != selection && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
+        })
+    }
+
+    private struct RunsKey: Hashable {
+        var host: HostID
+        var folder: URL
+        var workflowID: String
+    }
+
+    /// Archived agents a History page introduced, by the workflow they belong to.
+    @ObservationIgnored private var runsIntroduced: [RunsKey: Set<UUID>] = [:]
 
     /// This window's own counts for a project, from the grouping its panel uses.
     func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
@@ -1747,6 +1795,23 @@ final class AppModel {
     }
 
     func connect() async {
+        if let connecting {
+            await connecting.value
+            return
+        }
+        let generation = connectGeneration + 1
+        connectGeneration = generation
+        let task = Task { @MainActor in
+            await self.connectBody()
+            // Cleared here, still on this turn, so a waiter ending does not open a
+            // second flight beside one that has not finished (#285).
+            if self.connectGeneration == generation { self.connecting = nil }
+        }
+        connecting = task
+        await task.value
+    }
+
+    private func connectBody() async {
         // Never the old way's daemon while first run is still deciding the new way, or
         // while the move across is handing it to launchd.
         guard !needsFirstRun, !holdingForMove else { return }
@@ -3097,8 +3162,8 @@ final class AppModel {
     }
 
     /// What is on its way to this agent, if anything: for the control that sent it to
-    /// show, and the others to hold.
-    func acting(_ id: UUID) -> AgentAct? { work.acting[id] }
+    /// show, and the others to hold. Its own cell, so one row's is not every row's (#285).
+    func acting(_ id: UUID) -> AgentAct? { work.act(of: id) }
 
     /// What the runtime behind the current agent, or the draft, says it will take.
     /// Nothing is refused on a guess: this is what the runtime advertised.

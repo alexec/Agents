@@ -140,11 +140,23 @@ struct ArtifactTests {
         let block = ContentBlock.resourceLink(uri: url.absoluteString, name: url.lastPathComponent,
                                               mimeType: nil, size: nil)
         var artifact = try #require(Artifact.all(in: [message([block])]).first)
-        #expect(artifact.isMissing == false)
+        #expect(artifact.isMissing(onThisMac: true) == false)
+        // A server's file is not on this Mac's disk to check.
+        #expect(artifact.isMissing(onThisMac: false) == false)
 
         try FileManager.default.removeItem(at: url)
         artifact = try #require(Artifact.all(in: [message([block])]).first)
-        #expect(artifact.isMissing)
+        #expect(artifact.isMissing(onThisMac: true))
+    }
+
+    @Test func aNameMissingFromAListingIsGoneAndACutShortListingIsNot() {
+        let folder = URL(filePath: "/srv/work")
+        let there = DirectoryEntry(url: folder.appending(path: "a.md"), name: "a.md", isDirectory: false)
+        let whole = DirectoryListing(url: folder, entries: [there])
+        #expect(Artifact.isAbsent("a.md", from: whole) == false)
+        #expect(Artifact.isAbsent("gone.md", from: whole) == true)
+        let cut = DirectoryListing(url: folder, entries: [there], omitted: 4)
+        #expect(Artifact.isAbsent("gone.md", from: cut) == nil)
     }
 
     @Test func annotationsSurviveBeingWrittenAndReadBack() throws {
