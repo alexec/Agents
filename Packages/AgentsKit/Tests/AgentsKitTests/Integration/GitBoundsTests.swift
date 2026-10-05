@@ -68,14 +68,18 @@ struct GitBoundsTests {
 
     @Test func aChildWhoseGrandchildHoldsItsPipeEndsWithItsOwnStatus() async {
         // The backgrounded sleep keeps stdout open after the shell has gone, as an ssh
-        // ControlPersist master started by git does.
-        let started = Date()
-        let outcome = await ChildProcess.run(URL(fileURLWithPath: "/bin/sh"), ["-c", "sleep 20 & printf done"],
-                                             deadline: .seconds(15))
+        // ControlPersist master started by git does. It would hold it for ten minutes:
+        // coming back inside the deadline at all is the proof, not a wall-clock bar a
+        // loaded machine stretches (#225).
+        let outcome = await ChildProcess.run(URL(fileURLWithPath: "/bin/sh"),
+                                             ["-c", "sleep 600 & echo $! >&2; printf done"],
+                                             deadline: Eventually.timeout)
+        if let grandchild = pid_t(outcome.errorText.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            kill(grandchild, SIGKILL)
+        }
         #expect(!outcome.timedOut)
         #expect(outcome.status == 0)
         #expect(outcome.text == "done")
-        #expect(Date().timeIntervalSince(started) < 6)
     }
 
     @Test func outputPastTheLimitIsDroppedAndSaid() async {
@@ -86,12 +90,16 @@ struct GitBoundsTests {
         #expect(outcome.truncated)
     }
 
-    @Test func aBlockingRunHasADeadlineToo() {
-        let started = Date()
-        let outcome = ChildProcess.runBlocking(URL(fileURLWithPath: "/bin/sh"), ["-c", "exec sleep 30"],
+    @Test func aBlockingRunHasADeadlineToo() async throws {
+        // The child would sleep for ten minutes: the run comes back without it, and it is
+        // stopped rather than left to run its length (#225, as ChildProcessTests).
+        let outcome = ChildProcess.runBlocking(URL(fileURLWithPath: "/bin/sh"), ["-c", "exec sleep 600"],
                                                deadline: .milliseconds(500))
         #expect(outcome.timedOut)
-        #expect(Date().timeIntervalSince(started) < 5)
+        let pid = try #require(outcome.pid)
+        if !(await eventually("the child was stopped", { kill(pid, 0) != 0 && errno == ESRCH })) {
+            kill(pid, SIGKILL)
+        }
     }
 
     // MARK: Read-only

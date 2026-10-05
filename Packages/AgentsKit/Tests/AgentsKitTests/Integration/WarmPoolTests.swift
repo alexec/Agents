@@ -522,9 +522,12 @@ extension DaemonCore {
         warm[id] != nil || live[id] == nil
     }
 
-    /// Runtimes of these agents held by the pool: warm, or being started for it.
+    /// Runtimes of these agents held by the pool: warm, or being started for it. Counted
+    /// by runtime, not by the prewarm's place: a prewarm that is making room holds its
+    /// place while the one it outranks is let go, and launches only after. Under load
+    /// that letting go is slow enough to be seen, and is not a fourth runtime (#225).
     func poolRuntimesForTest(_ ids: [UUID]) -> Int {
-        Set(ids.filter { live[$0] != nil && turnTasks[$0] == nil }).union(prewarming).count
+        ids.filter { (live[$0] != nil || launching[$0] != nil) && turnTasks[$0] == nil }.count
     }
 
     func isWarmForTest(_ id: UUID) -> Bool {

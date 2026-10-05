@@ -672,8 +672,7 @@ struct HelperAgentTests {
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher())
         let (_, token) = try await caller(core, in: work)
-        let helper = try await start(core, token)
-        _ = await eventually("the helper finished") { await core.agent(helper)?.state == .finished }
+        let helper = try await settledHelper(core, token, "Count the files")
 
         let note = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: helper.uuidString)) }
 
@@ -686,8 +685,7 @@ struct HelperAgentTests {
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher())
         let (_, token) = try await caller(core, in: work)
-        let helper = try await start(core, token)
-        _ = await eventually("the helper finished") { await core.agent(helper)?.state == .finished }
+        let helper = try await settledHelper(core, token, "Count the files")
 
         let note = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: helper.uuidString)) }
 
@@ -910,9 +908,8 @@ struct HelperAgentTests {
         let core = try await makeCore(locations, FakeLauncher())
         let (_, token) = try await caller(core, in: work)
         let (_, otherToken) = try await caller(core, in: work, title: "Other")
-        let mine = try await start(core, token, "Alpha")
+        let mine = try await settledHelper(core, token, "Alpha")
         let theirs = try await start(core, otherToken, "Beta")
-        _ = await eventually("Alpha finished") { await core.agent(mine)?.state == .finished }
 
         let list = try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
 

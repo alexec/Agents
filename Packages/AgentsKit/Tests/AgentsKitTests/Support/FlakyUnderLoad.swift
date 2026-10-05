@@ -3,9 +3,11 @@ import Testing
 
 extension Trait where Self == ConditionTrait {
     /// A test that holds a wall-clock budget, which a shared runner cannot promise.
-    /// Skipped where `CI` is set, so the build fails only on real failures;
-    /// `.github/workflows/ci.yml` runs them again on their own, allowed to fail, with
-    /// `AGENTS_RUN_FLAKY=1`. They always run on a Mac.
+    /// Skipped where `CI` is set, or `AGENTS_QUARANTINE=1`, which
+    /// `scripts/build-cache.sh swift test` sets unless it is already set (`AGENTS_QUARANTINE=0`
+    /// runs them); so a run fails only on real failures.
+    /// `.github/workflows/slow-tests.yml` runs them again on their own, allowed to fail,
+    /// with `AGENTS_RUN_FLAKY=1`.
     ///
     /// Not for a race. A test that races a fake runtime's turn holds the turn with a
     /// `TurnGate` instead, and one that acts as soon as an agent's turn ends waits with
@@ -43,7 +45,8 @@ extension Trait where Self == ConditionTrait {
     ///   real login Keychain in a completed CI run.
     static var flakyUnderLoad: Self {
         let environment = ProcessInfo.processInfo.environment
-        return .disabled(if: environment["CI"] != nil && environment["AGENTS_RUN_FLAKY"] != "1",
+        return .disabled(if: (environment["CI"] != nil || environment["AGENTS_QUARANTINE"] == "1")
+                         && environment["AGENTS_RUN_FLAKY"] != "1",
                          "flaky under load; quarantined in CI (see FlakyUnderLoad.swift)")
     }
 
@@ -51,7 +54,8 @@ extension Trait where Self == ConditionTrait {
     /// `AGENTS_RUN_SLOW=1` through `.github/workflows/slow-tests.yml`.
     static var slowUnderLoad: Self {
         let environment = ProcessInfo.processInfo.environment
-        return .disabled(if: environment["CI"] != nil && environment["AGENTS_RUN_SLOW"] != "1",
+        return .disabled(if: (environment["CI"] != nil || environment["AGENTS_QUARANTINE"] == "1")
+                         && environment["AGENTS_RUN_SLOW"] != "1",
                          "slow under load; quarantined from main CI")
     }
 }
