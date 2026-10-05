@@ -15,16 +15,16 @@
 
 ## Counts
 
-Of 204 rows: **64 same**, **37 by design**, **103 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
+Of 204 rows: **74 same**, **38 by design**, **92 delta** (after #238–#240 and #255–#257, #264–#266). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
 | Session rows and states | 10 | 2 | 11 |
 | Chat turns and turn detail | 4 | 3 | 15 |
-| Prompt bar and queued prompts | 5 | 2 | 13 |
-| Question and permission cards | 4 | 3 | 8 |
-| Start sheet and new project | 8 | 5 | 9 |
+| Prompt bar and queued prompts | 7 | 2 | 11 |
+| Question and permission cards | 8 | 4 | 3 |
+| Start sheet and new project | 12 | 5 | 5 |
 | Worktrees and Files | 5 | 6 | 10 |
 | Dashboard and pins | 8 | 0 | 6 |
 | Workflows page | 6 | 1 | 7 |
@@ -138,8 +138,8 @@ The deltas are tracked by 32 issues:
 | Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |
 | Attachments | Picker, drag, paste: `A/Chat/PromptBar.swift:455-463` | `R/Chat/PromptBar.swift:214` | Picker, drop, paste: `W/views/Prompt.tsx:122-171` | **same** |
 | Dictation (#69) | `S/Chat/Dictation.swift` | Shared | None | **by design** (071) |
-| Slash commands | `S/Chat/CommandList.swift` | Shared | None | **delta**: web #255 |
-| @ file mentions | `A/Chat/PromptBar.swift:644-690` | `R/Chat/PromptBar.swift:418-454` | None | **delta**: web #255 |
+| Slash commands | `S/Chat/CommandList.swift` | Shared | Over the field: `W/views/Prompt.tsx:223`, `W/model/completions.ts` | **same** (#255) |
+| @ file mentions | `A/Chat/PromptBar.swift:644-690` | `R/Chat/PromptBar.swift:418-454` | Asks the host (`files/mention`): `W/views/Prompt.tsx:236`; none on a new session, as the Remote (no agent to ask yet) | **same** (#255) |
 | Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | None | **delta**: web #254. Placeholder against chip: **by design** (touch) |
 | Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Memory only, lost on reload: `W/model/store.ts:1009` | **delta**: web #254 |
 | Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | To the agent's host: `R/RemoteModel.swift:2480-2490` | `W/views/Chat.tsx:50, 229` | **same** (#238) |
@@ -153,16 +153,16 @@ The deltas are tracked by 32 issues:
 | Asker line and title (#121) | `A/Elicitation/ElicitationView.swift:28-34` | `R/Elicitation/ElicitationSheet.swift:28-42` | `W/views/Cards.tsx:117-120` | **same** |
 | One-tap single choice | One property only: `A/Elicitation/ElicitationView.swift:37, 303-333` | Also with the optional Other box: `R/Elicitation/ElicitationSheet.swift:79-141` | The window's rule | **by design** (one tap on a phone; `ElicitationSheet.swift:79-89`) |
 | Multi-page forms | *1/3*: `A/Elicitation/ElicitationView.swift:89-150` | *Question 1 of 3*: `R/Elicitation/FormPages.swift:50-55` | *1/3*: `W/views/Cards.tsx:209-218` | **same** |
-| Date, date-time, email, URL fields | Plain text: `A/Elicitation/ElicitationView.swift:437` | DatePicker, keyboards: `R/Elicitation/FormPages.swift:125-133, 329-357` | Text or number: `W/views/Cards.tsx:416-426` | **delta**: Mac and web #265 |
-| A field's problem in place | Under every field | Under every part | Text and number only: `W/views/Cards.tsx:387-428` | **delta**: web #256 |
+| Date, date-time, email, URL fields | DatePicker: `A/Elicitation/ElicitationView.swift:436-444` | DatePicker, keyboards: `R/Elicitation/FormPages.swift:125-133, 329-357` | The browser's date, datetime-local, email and url inputs: `W/views/Cards.tsx:430`, `W/model/formInputs.ts` | **same** (#265) |
+| A field's problem in place | Under every field | Under every part | Under every field: `W/views/Cards.tsx:441` | **same** (#256) |
 | Held while sending (#86) | The answer bright, *telling* the host | *telling* the host: `R/Elicitation/ElicitationSheet.swift:188-203` | The host's name: `W/views/Cards.tsx:96-116` | **by design**: buttons replaced on the Remote (layout); the host's name the same since #239 |
 | Greyed while the host is down (#83) | `A/Chat/ChatView.swift:179-193` | The agent's host: `R/Elicitation/ElicitationSheet.swift:159-162`, `R/Permission/PermissionSheet.swift:126` | `W/views/Chat.tsx:45-46` | **same** (#239) |
 | Decline; a link question | *No thanks*; *Gave up*: `A/Elicitation/ElicitationView.swift:46-62` | *No thanks* for both: `R/Elicitation/ElicitationSheet.swift:154` | As the window: `W/views/Cards.tsx:277-285` | **delta**: Remote #243 |
-| Answered elsewhere | Disappears | Disappears | 4 s, *Answered on another device.*: `W/views/Cards.tsx:35-38, 78-84` | **delta**: #266 |
-| Keyboard answers | ⌘1…9, Return: `A/Elicitation/ElicitationView.swift:528-540` | n/a | None | **delta**: web #256 |
+| Answered elsewhere | Disappears | Disappears | 4 s, *Answered on another device.*: `W/views/Cards.tsx:145-146` | **by design** (#266): the page may be one of several browsers on one person's devices, and says why the card it was looking at went (spec 071 US2 scenario 5) |
+| Keyboard answers | ⌘1…9, Return: `A/Elicitation/ElicitationView.swift:528-540` | n/a | ⌥1…9, Return: `W/views/Cards.tsx:177` | **same** (#256); ⌥ for ⌘ **by design** (a browser keeps ⌘1…9 for its tabs) |
 | Permission options | `A/Permission/PermissionView.swift:41-48` | `R/Permission/PermissionSheet.swift:110-127` | `W/views/Cards.tsx:176-184` | **same** |
-| What the call will do | Title and kind: `A/Permission/PermissionView.swift:78-81` | Plus the diffs and content: `R/Permission/PermissionSheet.swift:66-106` | Title and kind; *switch_mode* on a plan: `W/views/Cards.tsx:173-174` | **delta**: #266 (diff); web #256 (kind) |
-| Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file only: `R/Permission/PermissionSheet.swift:89-91` | No plan: `W/views/Cards.tsx:166-188` | **delta**: Remote #243, web #256 |
+| What the call will do | Title and kind, plus the diffs and content: `A/Permission/PermissionView.swift:110-125` | Plus the diffs and content: `R/Permission/PermissionSheet.swift:66-106` | Title, kind, diffs and content; a plan instead of *switch_mode*: `W/views/Cards.tsx:224-236` | **same** (#256, #266) |
+| Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file only: `R/Permission/PermissionSheet.swift:89-91` | Show plan: the file or the text: `W/views/Cards.tsx:226-231` | **delta**: Remote #243 (web #256 done) |
 | A server key ask | `A/Chat/TokenAskCard.swift`, `A/Hosts/Lending.swift:79-87` | None | None | **by design** (the key is lent from the Mac's Keychain); what the others see: #267 |
 
 ## Start sheet and new project
@@ -171,25 +171,25 @@ The deltas are tracked by 32 issues:
 |---|---|---|---|---|
 | Its shape | A bar on the project: `A/Chat/PromptBar.swift:242-347` | A sheet: `R/StartAgent/StartAgentView.swift:25-46` | A bar: `W/views/NewAgent.tsx:154-210` | **by design** |
 | Runtimes listed by name (#154) | `RuntimeCatalog.sortedByName` | The same | `W/model/runtimes.ts` | **same** |
-| Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | The project's host's runtimes, split only for this Mac's projects: `R/StartAgent/ChoiceRows.swift:57-140`, `R/RemoteModel.swift` `startRuntimes` (#240) | Startable only, flat: `W/views/NewAgent.tsx:45, 193-201` | **delta**: web #257 |
-| Default runtime | The kept form's, else Claude: `A/Chat/PromptBar.swift:1109-1117` | The latest agent's, else Claude: `K/Client/AgentsModel.swift:1079-1086` | The latest agent's: `W/views/NewAgent.tsx:46-51` | **delta**: #264 |
+| Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | The project's host's runtimes, split only for this Mac's projects: `R/StartAgent/ChoiceRows.swift:57-140`, `R/RemoteModel.swift` `startRuntimes` (#240) | Available, Out and Can't start, from the host's `isOut`, in runs only when one is out: `W/views/NewAgent.tsx:289-292`, `W/model/runtimes.ts` | **same** (#240, #257) |
+| Default runtime | `RuntimeCatalog.newSessionRuntime`: the kept form's, else Claude, else the first: `A/Chat/PromptBar.swift:1119`, `K/Runtimes/RuntimeCatalog.swift:127-136` | The same rule, on this project's host, its kept choice in its defaults: `R/RemoteModel.swift:472-479, 527` | Its twin, held to the same fixture: `W/model/runtimes.ts`, `W/views/NewAgent.tsx` | **same** (#264) |
 | A model out of the pool (#140) | In the chooser | In the menu row | A line under the menus | **by design** (#140) |
 | Model, effort, permission | `A/Chat/PromptBar.swift:788-887` | `R/StartAgent/ChoiceRows.swift:22-50, 186-290` | Pills: `W/views/NewAgent.tsx:203-206` | **same** |
-| Sandbox choice, and *Start without sandbox* | `A/Chat/PromptBar.swift:854-878, 952-974` | The choice; words, no button: `R/RemoteModel.swift:613-618` | Neither | **delta**: Remote #244, web #257 |
-| Options that fail to load | Retry: `A/Chat/PromptBar.swift:745-751` | *Try again*: `R/StartAgent/ChoiceRows.swift:28-33` | Words only: `W/views/NewAgent.tsx:150` | **delta**: web #257 |
+| Sandbox choice, and *Start without sandbox* | `A/Chat/PromptBar.swift:854-878, 952-974` | The choice; words, no button: `R/RemoteModel.swift:613-618` | Both: `W/views/NewAgent.tsx:363` | **delta**: Remote #244 (web #257 done) |
+| Options that fail to load | Retry: `A/Chat/PromptBar.swift:745-751` | *Try again*: `R/StartAgent/ChoiceRows.swift:28-33` | *Try again*: `W/views/NewAgent.tsx:219` | **same** (#257) |
 | Labels (tag input) | `S/LabelTagField.swift` | Shared | `W/views/Labels.tsx` | **same** |
-| Where it runs | Folder; new worktree (or why not); worktrees, missing ones off, *· N agents*; on a branch: `A/Chat/PromptBar.swift:1129-1178` | The same, with git status: `R/StartAgent/ChoiceRows.swift:133-182` | No branches, no why-not, missing ones hidden: `W/views/NewAgent.tsx:66-70, 170-185` | **delta**: web #257 |
+| Where it runs | Folder; new worktree (or why not); worktrees, missing ones off, *· N agents*; on a branch: `A/Chat/PromptBar.swift:1129-1178` | The same, with git status: `R/StartAgent/ChoiceRows.swift:133-182` | The window's: `W/views/NewAgent.tsx:250-266` | **same** (#257) |
 | Reach: extra folders | `A/StartAgent/AgentReachView.swift` | None | Typed paths: `W/views/Reach.tsx` | **delta**: Remote #244 |
 | Reach: MCP servers | `A/StartAgent/AgentReachView.swift` | None | *chosen in the window* | **by design** (the window's) |
 | The project's host offline | Send off: `A/Chat/PromptBar.swift:365-372` | Send off, with the strip: `R/StartAgent/StartAgentView.swift:45, 135-139` | Off: `W/views/NewAgent.tsx:144-146` | **same** (#239) |
 | Starting, in flight (#87) | Words held, *Starting — telling …* | Spinner, *telling* the project's host | Held: `W/views/Prompt.tsx:92-120` | **same** |
 | Attachments, refused before sending | `A/Chat/AttachmentStrip.swift` | `R/StartAgent/PhoneAttachments.swift` | `W/model/attachments.ts` | **same** |
-| The form kept between starts | Text, attachments, folder, runtime, reach, options: `A/Chat/DraftKeeper.swift:125-170` | Text and attachments | Text only: `W/views/NewAgent.tsx:60-71` | **delta**: Remote #244, web #257 |
+| The form kept between starts | Text, attachments, folder, runtime, reach, options: `A/Chat/DraftKeeper.swift:125-170` | Text, attachments and runtime | Text, runtime, reach, options: `W/model/startForm.ts` | **delta**: Remote #244 (web #257 done; the folder is not kept, as the window keeps none for the page's places) |
 | Prewarm on typing (#183) | Yes | Yes, to the agent's host | Yes | **same** (#238) |
 | Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | None | `W/views/NewProject.tsx:34-260` | **delta**: Remote #244 |
 | Add Server… | `A/Control/ControlAddServerSheet.swift` | None | None | **by design** (installs over ssh from the Mac) |
 | Add Folder on this Mac: Finder drag, the clipboard's URL | Yes | n/a | Browses the host instead | **by design** (#115: no drag from Finder, no clipboard read) |
-| No projects yet | Words and buttons, or *No agent runtime found*: `A/Projects/ProjectListView.swift:81-84, 636-655` | A spinner that never ends: `R/Projects/ProjectListView.swift:52-54` | *No projects yet* only: `W/views/NewProject.tsx:85-103` | **delta**: Remote #244, web #257 |
+| No projects yet | Words and buttons, or *No agent runtime found*: `A/Projects/ProjectListView.swift:81-84, 636-655` | A spinner that never ends: `R/Projects/ProjectListView.swift:52-54` | *No projects yet* only: `W/views/NewProject.tsx:85-103` | **delta**: Remote #244, web #257 (*No agent runtime found* left) |
 | Continue in the project folder (#119, 065) | `A/AppModel.swift:2944-2958` | `R/RemoteModel.swift:2387-2407` | `W/model/store.ts:1088-1091` | **same** |
 
 ## Worktrees and Files
