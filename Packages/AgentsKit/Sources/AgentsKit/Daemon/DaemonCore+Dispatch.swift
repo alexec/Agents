@@ -10,9 +10,12 @@ extension DaemonCore {
     ///
     /// `peer` is the process on the other end of the socket, `-1` when the kernel would
     /// not say, and nil only for a caller inside this process.
+    ///
+    /// `vouched`: a device's channel the control plane opened, for a device it paired (#232).
     public func handle(method: String, params: JSONValue?,
                        from surface: Surface? = nil, connection: UUID? = nil,
-                       peer: Int32? = nil, role: ConnectionRole = .control) async -> Result<JSONValue, JSONRPCError> {
+                       peer: Int32? = nil, role: ConnectionRole = .control,
+                       vouched: Bool = false) async -> Result<JSONValue, JSONRPCError> {
         if let refusal = await tokenRefusal(params, peer: peer) { return .failure(refusal) }
         // An agent's call to the app's own tools, kept as answered (#47). Read before the
         // call, which may be the last one its token is good for.
@@ -24,7 +27,8 @@ extension DaemonCore {
         // with what that connection lent (043).
         let answer = await RequestConnection.$current.withValue(connection) {
             await RequestConnection.$role.withValue(role) {
-                await dispatch(method: method, params: params, from: surface, connection: connection, role: role)
+                await dispatch(method: method, params: params, from: surface, connection: connection, role: role,
+                               vouched: vouched)
             }
         }
         if let caller { keepAppToolCall(caller, method: method, params: params, answer: answer, began: began) }
@@ -63,7 +67,7 @@ extension DaemonCore {
 
     private func dispatch(method: String, params: JSONValue?,
                           from surface: Surface?, connection: UUID?,
-                          role: ConnectionRole) async -> Result<JSONValue, JSONRPCError> {
+                          role: ConnectionRole, vouched: Bool) async -> Result<JSONValue, JSONRPCError> {
         do {
             switch method {
             case DaemonAPI.Method.ping:
@@ -155,7 +159,8 @@ extension DaemonCore {
             case DaemonAPI.Method.devicesAnnounce:
                 let announcement = try require(params, as: DaemonAPI.DeviceAnnouncement.self)
                 return .success(try JSONValue.encoding(
-                    DaemonAPI.AnnounceReply(device: try announce(announcement, role: role), macKey: relayKey())))
+                    DaemonAPI.AnnounceReply(device: try announce(announcement, role: role, vouched: vouched),
+                                            macKey: relayKey())))
 
             case DaemonAPI.Method.devicesStartPairing:
                 return .success(try JSONValue.encoding(try startPairing()))

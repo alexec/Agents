@@ -25,12 +25,18 @@ public final class DaemonServer: @unchecked Sendable {
         /// What the connection is, as the server has it now: a device's rights, or a
         /// pairing phone's, reach the daemon with the request so it can tell them apart.
         public var role: ConnectionRole
+        /// A device's channel the control plane opened (058): the control plane paired the
+        /// device and vouches for it, so it may record itself here without this Mac's
+        /// code (#232).
+        public var vouched: Bool
 
-        public init(id: UUID, surface: Surface?, peer: Int32? = nil, role: ConnectionRole = .control) {
+        public init(id: UUID, surface: Surface?, peer: Int32? = nil, role: ConnectionRole = .control,
+                    vouched: Bool = false) {
             self.id = id
             self.surface = surface
             self.peer = peer
             self.role = role
+            self.vouched = vouched
         }
     }
 
@@ -71,8 +77,12 @@ public final class DaemonServer: @unchecked Sendable {
         let id = UUID()
         let peer: Int32?
 
-        init(peer: Int32?, role: ConnectionRole = .control) {
+        /// Set once, before a line is read, by the uplink alone.
+        let vouched: Bool
+
+        init(peer: Int32?, role: ConnectionRole = .control, vouched: Bool = false) {
             self.peer = peer
+            self.vouched = vouched
             _role = role
         }
 
@@ -117,7 +127,9 @@ public final class DaemonServer: @unchecked Sendable {
             return true
         }
 
-        var context: ConnectionContext { ConnectionContext(id: id, surface: surface, peer: peer, role: role) }
+        var context: ConnectionContext {
+            ConnectionContext(id: id, surface: surface, peer: peer, role: role, vouched: vouched)
+        }
     }
 
     private let url: URL
@@ -279,7 +291,7 @@ public final class DaemonServer: @unchecked Sendable {
     /// `fanOut`, when the control plane reads fan-out frames: how broadcasts reach it.
     public func acceptVirtual(_ transport: any LineTransport, device: UUID?, fanOut: FanOutRoute? = nil,
                               ended: @escaping @Sendable () -> Void = {}) {
-        let identity = ConnectionIdentity(peer: nil, role: .control)
+        let identity = ConnectionIdentity(peer: nil, role: .control, vouched: device != nil)
         if let device { _ = identity.bindDevice(device) }
         DaemonLog.shared.write("uplink: a channel opened for \(device.map { "device \($0.uuidString)" } ?? "a window")")
         serve(transport, identity: identity, fanOut: fanOut, ended: ended)

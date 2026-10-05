@@ -177,7 +177,7 @@ public final class Daemon: @unchecked Sendable {
             handler: { context, method, params in
                 await core.handle(method: method, params: params,
                                   from: context.surface, connection: context.id, peer: context.peer ?? -1,
-                                  role: context.role)
+                                  role: context.role, vouched: context.vouched)
             })
         self.server = server
         await core.setBroadcaster { method, params in

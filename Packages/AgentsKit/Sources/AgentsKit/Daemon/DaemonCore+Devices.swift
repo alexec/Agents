@@ -44,15 +44,19 @@ extension DaemonCore {
     ///
     /// A device not yet on record is taken only from a connection locked with the pairing
     /// code the Mac is showing, and that code is then spent. The Mac's own window may
-    /// still record one, as it always could; a device's connection never.
-    func announce(_ announcement: DaemonAPI.DeviceAnnouncement, role: ConnectionRole = .control) throws -> Device {
+    /// still record one, as it always could; a device's connection never — unless the
+    /// control plane opened it (`vouched`): the device paired there, the control plane
+    /// bound the channel to its id, and a refusal left it with no record here and so no
+    /// notifications (#232).
+    func announce(_ announcement: DaemonAPI.DeviceAnnouncement, role: ConnectionRole = .control,
+                  vouched: Bool = false) throws -> Device {
         if role == .pairing {
             guard let code = pendingPairing, code.expires > now() else {
                 throw JSONRPCError(code: DaemonAPI.Failure.notAllowed,
                                    message: "That pairing code has run out. Show a new one on the Mac.")
             }
         }
-        if device(announcement.id) == nil, role == .device {
+        if device(announcement.id) == nil, role == .device, !vouched {
             throw JSONRPCError(code: DaemonAPI.Failure.notAllowed,
                                message: "Pair this device by scanning the code in the Mac's Settings.")
         }
