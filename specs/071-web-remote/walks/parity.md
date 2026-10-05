@@ -31,7 +31,7 @@ Of 205 rows: **88 same**, **38 by design**, **79 delta** (after #238–#244, #25
 | Settings and Project Settings | 1 | 6 | 0 |
 | Pool, runtimes and spending | 2 | 1 | 7 |
 | Events and resources | 1 | 1 | 3 |
-| Notifications and badges | 2 | 1 | 1 |
+| Notifications and badges | 3 | 0 | 1 |
 | Disk strip | 1 | 1 | 1 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
 | MCP Apps views | 1 | 0 | 0 |
@@ -299,7 +299,7 @@ The deltas are tracked by 30 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Notifications | `A/Notifications/MacNotifier.swift:37-79` | Local and push: `R/Notifications/DeviceNotifier.swift:34-98` | None: `W/presence.ts:5` | **by design** (071: the page takes no notices) |
-| The needs-you count | Dock badge: `A/ContentView.swift:267-268` | No icon badge, though it asks for one: `R/Notifications/DeviceNotifier.swift:116, 130` | The tab's title: `W/presence.ts:16-30` | **delta**: Remote #249 |
+| The needs-you count | Dock badge: `A/ContentView.swift:267-268` | App icon badge, from the widget's count: `R/RemoteModel.swift` | The tab's title: `W/presence.ts:16-30` | **same** |
 | Presence: watching and active | Every host; *watching* to the owner: `A/AppModel.swift:2531-2549` | The same: `R/RemoteModel.swift:1604-1618` | The same: `W/presence.ts:36-47` | **same** (#203, checked in #238) |
 | Unread counts on project rows and folds (#70) | Yes | Yes | Yes | **same** |
 

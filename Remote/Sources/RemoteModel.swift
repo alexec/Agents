@@ -1732,6 +1732,7 @@ final class RemoteModel {
     /// rather than waiting for the person to open the app.
     func publishAttention() {
         let snapshot = AttentionSnapshot.make(model: work, at: Date())
+        notifier.setBadgeCount(snapshot.total)
         guard AttentionSnapshotStore.write(snapshot, over: lastPublished) else { return }
         lastPublished = snapshot
         WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)

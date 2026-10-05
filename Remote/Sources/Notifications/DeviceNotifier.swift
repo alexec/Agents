@@ -26,6 +26,15 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
     private var showing: [String: NeedID] = [:]
     private var authorised: Bool?
 
+    /// Keep the app icon in step with the same needs-you count the widget shows.
+    /// Badge permission is requested with notification permission because iOS uses
+    /// that setting to allow app icon badges.
+    func setBadgeCount(_ count: Int) {
+        center.setBadgeCount(max(0, count)) { error in
+            if let error { note("notifier: could not set app icon badge: \(error)") }
+        }
+    }
+
     override init() {
         super.init()
         center.delegate = self
