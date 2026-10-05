@@ -91,7 +91,7 @@ struct PromptBar: View {
                     .transition(.opacity)
             }
             if sending > 0, sendingIsSlow {
-                Telling(host: "your Mac", doing: "Sending")
+                Telling(host: model.answerRecipient(agent.id), doing: "Sending")
             }
             field
             if isShowingEverything { options }
@@ -230,7 +230,7 @@ struct PromptBar: View {
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
-            if model.canStop(agent), !model.isStale, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                sending == 0 {
                 let acting = model.acting(agent.id)
                 Button {
@@ -281,7 +281,7 @@ struct PromptBar: View {
     }
 
     private var canSend: Bool {
-        !model.isStale && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !model.isStale(agent) && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Whether what is typed now will wait for the turn to end rather than go.
@@ -463,7 +463,7 @@ struct PromptBar: View {
     /// Only while the field is empty: half a typed thought is already an answer to what
     /// was suggested. Only while no list is up.
     private var suggestion: SuggestedPrompt? {
-        guard !dismissedSuggestions, text.isEmpty, !isCompleting, !isMentioning, !model.isStale else {
+        guard !dismissedSuggestions, text.isEmpty, !isCompleting, !isMentioning, !model.isStale(agent) else {
             return nil
         }
         return agent.suggestedPrompts.first
@@ -526,7 +526,7 @@ struct PromptBar: View {
         .scrollBounceBehavior(.basedOnSize)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { optionsWidth = $0 }
-        .disabled(model.isStale)
+        .disabled(model.isStale(agent))
     }
 
     private func binding(for option: ConfigOption) -> Binding<JSONValue?> {

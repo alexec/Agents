@@ -37,7 +37,7 @@ struct PermissionSheet: View {
             question
 
             if let chosen {
-                Sending(option: chosen)
+                Sending(option: chosen, host: model.answerRecipient(request.agentID))
             } else {
                 choices
             }
@@ -123,7 +123,7 @@ struct PermissionSheet: View {
         }
         // An answer that cannot be delivered is refused at the moment it is taken
         // rather than appearing to be accepted (FR-033).
-        .disabled(model.isStale)
+        .disabled(model.isStale(on: model.work.agent(request.agentID)?.host ?? .mac))
     }
 
     /// Full width and wrapping rather than truncating, because the largest Dynamic
@@ -150,11 +150,13 @@ struct PermissionSheet: View {
 /// What was sent, where the buttons were. Never a second answer.
 private struct Sending: View {
     let option: PermissionOption
+    /// Who it is going to: your Mac, or the agent's server (#239).
+    let host: String
 
     var body: some View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
-            Text("\(option.name) — telling your Mac")
+            Text(Telling.words(doing: option.name, host: host))
                 .appText(.reading)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)

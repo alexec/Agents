@@ -42,6 +42,7 @@ struct StartAgentView: View {
                     Button("Cancel") { model.startingIn = nil }
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) { HostOfflineStrip(host: model.startHost) }
             .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
         }
         .onAppear {
@@ -86,7 +87,7 @@ struct StartAgentView: View {
             // In words as well as the spinner, as the Mac's bar says it (#87): a
             // worktree and a runtime to start can take seconds.
             if model.isStarting {
-                Telling(host: "your Mac", doing: AgentState.startingLabel)
+                Telling(host: model.recipient(on: model.startHost), doing: AgentState.startingLabel)
             }
             // The chat's prompt bar: one raised card holding the words, attach, and send
             // in ink, so starting an agent and talking to one look like the same act.
@@ -132,7 +133,9 @@ struct StartAgentView: View {
     }
 
     private var canSend: Bool {
-        !model.isStarting && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        // Off while the project's host is not answering, the Mac or its server (#239).
+        !model.isStarting && !model.isStale(on: model.startHost)
+            && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func keep() {

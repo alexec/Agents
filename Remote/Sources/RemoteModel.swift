@@ -662,7 +662,8 @@ final class RemoteModel {
     }
 
     private func startRefusalBeforeSending(in folder: URL) -> String? {
-        if isStale { return "Your Mac is not answering, so nothing was started." }
+        let host = work.project(folder)?.host ?? .mac
+        if isStale(on: host) { return notAnswering(host, "nothing was started.") }
         guard let summary = work.project(folder) else { return nil }
         if summary.project.isArchived { return "This project was archived on the Mac, so nothing was started." }
         if !summary.exists { return "This project's folder is not on the Mac any more, so nothing was started." }
@@ -988,7 +989,14 @@ final class RemoteModel {
 
     /// The other hosts this phone has a live connection to now (058, #208): an agent on
     /// one that is not is stale on its own, whatever the home host is doing.
-    private(set) var reachableHosts: Set<HostID> = []
+    private(set) var reachableHosts: Set<HostID> = [] {
+        didSet {
+            for host in oldValue.subtracting(reachableHosts) where hostDownSince[host] == nil {
+                hostDownSince[host] = Date()
+            }
+            for host in reachableHosts.subtracting(oldValue) { hostDownSince[host] = nil }
+        }
+    }
 
     /// Whether what is shown of `host`'s work can be trusted, and acted on: the home host's
     /// staleness for its own, that host's link for another's (#208).
@@ -997,6 +1005,26 @@ final class RemoteModel {
     }
 
     func isStale(_ agent: Agent) -> Bool { isStale(on: agent.host) }
+
+    /// Who something sent to `host` goes to, as the in-flight mark (`Telling`) names it:
+    /// the Mac as "your Mac", a server by its name, as the window says it (#239).
+    func recipient(on host: HostID) -> String {
+        host == .mac ? "your Mac" : hostName(host)
+    }
+
+    /// Who something sent to this agent goes to (#239).
+    func answerRecipient(_ agentID: UUID) -> String {
+        recipient(on: work.agent(agentID)?.host ?? .mac)
+    }
+
+    /// The host of the project the start sheet is open on: where the new agent starts.
+    var startHost: HostID {
+        startingIn.flatMap { work.project($0)?.host } ?? .mac
+    }
+
+    /// When each other host was last seen to go, for the strip over its chats (#239):
+    /// set as it leaves `reachableHosts`, cleared as it comes back.
+    private(set) var hostDownSince: [HostID: Date] = [:]
 
     /// Ask whether a control plane is on the other end, and follow its other hosts if so.
     /// A bridge with no control plane answers `control/status` with methodNotFound, and
@@ -2228,8 +2256,9 @@ final class RemoteModel {
     /// quietly dropped (FR-033). An answer that cannot be delivered is not an answer.
     @discardableResult
     func answer(_ request: PermissionRequest, optionID: String) async -> Bool {
-        guard !isStale else {
-            problem = "Your Mac is not answering, so that could not be sent."
+        let host = work.agent(request.agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that could not be sent.")
             return false
         }
         do {
@@ -2252,8 +2281,9 @@ final class RemoteModel {
     func answer(_ request: ElicitationRequest,
                 action: DaemonAPI.AnswerElicitationRequest.Action,
                 content: [String: JSONValue] = [:]) async -> Bool {
-        guard !isStale else {
-            problem = "Your Mac is not answering, so that could not be sent."
+        let host = work.agent(request.agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that could not be sent.")
             return false
         }
         do {
@@ -2281,8 +2311,9 @@ final class RemoteModel {
     /// from here. What is attached is checked first, by the same rules as a start from
     /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
     func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID) async -> Bool {
-        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
-            problem = "Your Mac is not answering, so that was not sent."
+        let host = work.agent(agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that was not sent.")
             return false
         }
         let capabilities = promptCapabilities(for: work.agent(agentID)?.runtimeID)

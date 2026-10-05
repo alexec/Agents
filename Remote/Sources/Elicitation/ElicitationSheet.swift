@@ -43,7 +43,7 @@ struct ElicitationSheet: View {
             }
 
             if let chosen {
-                Sending(what: chosen)
+                Sending(what: chosen, host: model.answerRecipient(request.agentID))
             } else {
                 answers
             }
@@ -67,7 +67,7 @@ struct ElicitationSheet: View {
                 FormPages(request: request, schema: schema) { what, action, content in
                     send(what, action: action, content: content)
                 }
-                .disabled(model.isStale)
+                .disabled(isStale)
             }
         case .url(let link):
             page(link)
@@ -137,7 +137,7 @@ struct ElicitationSheet: View {
             }
             declineButton
         }
-        .disabled(model.isStale)
+        .disabled(isStale)
     }
 
     /// Go and look at something, then say how it went.
@@ -153,7 +153,12 @@ struct ElicitationSheet: View {
                 .controlSize(.large)
             declineButton
         }
-        .disabled(model.isStale)
+        .disabled(isStale)
+    }
+
+    /// The agent's own host not answering, the Mac or its server (#239).
+    private var isStale: Bool {
+        model.isStale(on: model.work.agent(request.agentID)?.host ?? .mac)
     }
 
     private var declineButton: some View {
@@ -182,11 +187,13 @@ struct ElicitationSheet: View {
 /// What was sent, where the buttons were. Never a second answer.
 private struct Sending: View {
     let what: String
+    /// Who it is going to: your Mac, or the agent's server (#239).
+    let host: String
 
     var body: some View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
-            Text("\(what) — telling your Mac")
+            Text(Telling.words(doing: what, host: host))
                 .appText(.reading)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
