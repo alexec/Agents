@@ -41,6 +41,11 @@ struct TombstoneTable {
     var count: Int { byID.count }
     var isEmpty: Bool { byID.isEmpty }
 
+    /// One project's tombstones, by its folder, without walking anybody else's.
+    func inProject(_ folder: URL) -> [Tombstone] {
+        (members[Project.standardize(folder)] ?? []).compactMap { byID[$0] }
+    }
+
     private mutating func file(_ tombstone: Tombstone) {
         let folder = Project.standardize(tombstone.project)
         if members[folder] == nil { foldersVersion += 1 }

@@ -52,7 +52,8 @@ extension DaemonCore {
     /// The project's retired sessions whose worktree folder is still on disk (#211):
     /// retiring keeps a worktree with anything uncommitted in it, and nothing else names it.
     func worktreesLeftByRetired(in project: URL) -> [Tombstone] {
-        (tombstonesByProject()[Project.standardize(project)] ?? []).filter {
+        loadRetentionIfNeeded()
+        return retired.inProject(project).filter {
             guard let root = $0.worktreeRoot else { return false }
             return FileManager.default.fileExists(atPath: root.path)
         }
