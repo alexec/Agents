@@ -175,21 +175,21 @@ The deltas are tracked by 32 issues:
 | Default runtime | `RuntimeCatalog.newSessionRuntime`: the kept form's, else Claude, else the first: `A/Chat/PromptBar.swift:1119`, `K/Runtimes/RuntimeCatalog.swift:127-136` | The same rule, on this project's host, its kept choice in its defaults: `R/RemoteModel.swift:472-479, 527` | Its twin, held to the same fixture: `W/model/runtimes.ts`, `W/views/NewAgent.tsx` | **same** (#264) |
 | A model out of the pool (#140) | In the chooser | In the menu row | A line under the menus | **by design** (#140) |
 | Model, effort, permission | `A/Chat/PromptBar.swift:788-887` | `R/StartAgent/ChoiceRows.swift:22-50, 186-290` | Pills: `W/views/NewAgent.tsx:203-206` | **same** |
-| Sandbox choice, and *Start without sandbox* | `A/Chat/PromptBar.swift:854-878, 952-974` | The choice; words, no button: `R/RemoteModel.swift:613-618` | Both: `W/views/NewAgent.tsx:363` | **delta**: Remote #244 (web #257 done) |
+| Sandbox choice, and *Start without sandbox* | `A/Chat/PromptBar.swift:854-878, 952-974` | Choice menu, including *Start without sandbox*: `R/StartAgent/ChoiceRows.swift` | Both: `W/views/NewAgent.tsx:363` | **same** (web #257) |
 | Options that fail to load | Retry: `A/Chat/PromptBar.swift:745-751` | *Try again*: `R/StartAgent/ChoiceRows.swift:28-33` | *Try again*: `W/views/NewAgent.tsx:219` | **same** (#257) |
 | Labels (tag input) | `S/LabelTagField.swift` | Shared | `W/views/Labels.tsx` | **same** |
 | Where it runs | Folder; new worktree (or why not); worktrees, missing ones off, *· N agents*; on a branch: `A/Chat/PromptBar.swift:1129-1178` | The same, with git status: `R/StartAgent/ChoiceRows.swift:133-182` | The window's: `W/views/NewAgent.tsx:250-266` | **same** (#257) |
-| Reach: extra folders | `A/StartAgent/AgentReachView.swift` | None | Typed paths: `W/views/Reach.tsx` | **delta**: Remote #244 |
+| Reach: extra folders | `A/StartAgent/AgentReachView.swift` | Folder paths in the start sheet: `R/StartAgent/StartAgentView.swift` | Typed paths: `W/views/Reach.tsx` | **same** |
 | Reach: MCP servers | `A/StartAgent/AgentReachView.swift` | None | *chosen in the window* | **by design** (the window's) |
 | The project's host offline | Send off: `A/Chat/PromptBar.swift:365-372` | Send off, with the strip: `R/StartAgent/StartAgentView.swift:45, 135-139` | Off: `W/views/NewAgent.tsx:144-146` | **same** (#239) |
 | Starting, in flight (#87) | Words held, *Starting — telling …* | Spinner, *telling* the project's host | Held: `W/views/Prompt.tsx:92-120` | **same** |
 | Attachments, refused before sending | `A/Chat/AttachmentStrip.swift` | `R/StartAgent/PhoneAttachments.swift` | `W/model/attachments.ts` | **same** |
-| The form kept between starts | Text, attachments, folder, runtime, reach, options: `A/Chat/DraftKeeper.swift:125-170` | Text, attachments and runtime | Text, runtime, reach, options: `W/model/startForm.ts` | **delta**: Remote #244 (web #257 done; the folder is not kept, as the window keeps none for the page's places) |
+| The form kept between starts | Text, attachments, folder, runtime, reach, options: `A/Chat/DraftKeeper.swift:125-170` | Text, attachments, runtime, reach folders and options: `R/StartAgent/StartDraftKeeper.swift`, `R/RemoteModel.swift` | Text, runtime, reach, options: `W/model/startForm.ts` | **same** (web #257; the folder is not kept, as the window keeps none for the page's places) |
 | Prewarm on typing (#183) | Yes | Yes, to the agent's host | Yes | **same** (#238) |
-| Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | None | `W/views/NewProject.tsx:34-260` | **delta**: Remote #244 |
+| Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | Actions on the empty-project screen: `R/Sidebar/ProjectRow.swift`, `R/RemoteModel.swift` | `W/views/NewProject.tsx:34-260` | **same** |
 | Add Server… | `A/Control/ControlAddServerSheet.swift` | None | None | **by design** (installs over ssh from the Mac) |
 | Add Folder on this Mac: Finder drag, the clipboard's URL | Yes | n/a | Browses the host instead | **by design** (#115: no drag from Finder, no clipboard read) |
-| No projects yet | Words and buttons, or *No agent runtime found*: `A/Projects/ProjectListView.swift:81-84, 636-655` | A spinner that never ends: `R/Projects/ProjectListView.swift:52-54` | *No projects yet* only: `W/views/NewProject.tsx:85-103` | **delta**: Remote #244, web #257 (*No agent runtime found* left) |
+| No projects yet | Words and buttons, or *No agent runtime found*: `A/Projects/ProjectListView.swift:81-84, 636-655` | Empty-state words and Add Folder / Clone Git URL actions: `R/Sidebar/ProjectRow.swift` | *No projects yet* only: `W/views/NewProject.tsx:85-103` | **same** (web #257; *No agent runtime found* remains window-only) |
 | Continue in the project folder (#119, 065) | `A/AppModel.swift:2944-2958` | `R/RemoteModel.swift:2387-2407` | `W/model/store.ts:1088-1091` | **same** |
 
 ## Worktrees and Files

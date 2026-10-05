@@ -222,7 +222,7 @@ struct ChoiceRows: View {
                                 model.choose("agent-full-access", for: "mode")
                             }
                         } label: {
-                            choiceLabel(SandboxWords.choice(choice, runtimeID: runtimeID),
+                            choiceLabel(choice == .off ? SandboxWords.startWithout : SandboxWords.choice(choice, runtimeID: runtimeID),
                                         chosen: model.startSandbox == choice)
                             Text(SandboxWords.explanation(choice, runtimeID: runtimeID,
                                                           name: model.startRuntime?.runtime.name ?? runtimeID))
