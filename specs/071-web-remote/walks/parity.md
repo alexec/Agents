@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 206 rows: **100 same**, **37 by design**, **69 delta** (after #221, #238–#244, #249, #255–#261, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 206 rows: **101 same**, **37 by design**, **68 delta** (after #221, #238–#244, #249, #255–#261, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -30,7 +30,7 @@ Of 206 rows: **100 same**, **37 by design**, **69 delta** (after #221, #238–#2
 | Workflows page | 11 | 1 | 2 |
 | Settings and Project Settings | 1 | 6 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
-| Events and resources | 1 | 1 | 3 |
+| Events and resources | 2 | 1 | 2 |
 | Notifications and badges | 3 | 0 | 1 |
 | Disk strip | 1 | 1 | 1 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
@@ -290,7 +290,7 @@ The deltas are tracked by 30 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Events ▸ Waiting now | Openable, with ✕: `A/Events/EventsView.swift:58-61, 281-325` | None: `R/Events/EventsListView.swift:31-58` | Titles only: `W/views/Activity.tsx:237-243` | **delta**: Remote #248, web #262 |
-| Event rows: consequences, name, scope, days, Show older | `S/Events/EventRow.swift`, `A/Events/EventsView.swift:89, 161-173` | Shared (no kind filter) | A flat list: `W/views/Activity.tsx:245-264` | **delta**: web #262 |
+| Event rows: consequences, name, scope, days, Show older | `S/Events/EventRow.swift`, `A/Events/EventsView.swift:89, 161-173` | Shared (no kind filter) | Same consequence lines, event name and scope, day headings and Show older; older pages append per host. | **same** |
 | A workflow in a consequence | A link: `A/Events/EventsView.swift:151` | Plain text: `R/Events/EventsListView.swift:8-10, 45-46` | n/a | **delta**: Remote #248 |
 | Resources, counted holders (#116) | `A/Resources/ResourcesView.swift` | Read-only: `R/Resources/ResourcesListView.swift` | Read-only: `W/views/Resources.tsx` | **same** (reading) |
 | Declaring resources, ending leases (#116) | Settings ▸ Resources, the Resources page | None | None | **by design** (the Mac's) |

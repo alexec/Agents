@@ -3,11 +3,19 @@
 // place. The pages are read-only: what each page lets you change is the Mac's.
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
-import type { AllowanceState, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
+import type { AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
 import { BackToList } from "./BackToList";
+import { folderKey, projectFolder } from "../model/groups";
+
+function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
+  const parts = ["h", destination.host, "p", destination.project];
+  if (destination.session) parts.push("s", destination.session);
+  else if (destination.workflow) parts.push("w", destination.workflow);
+  location.hash = "#/" + parts.map(encodeURIComponent).join("/");
+}
 
 /** "14:05", twenty-four hours, as the window's Events row says it. */
 function clock(date: Date): string {
@@ -185,7 +193,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
       <header class="column-head"><BackToList /><h1>{pageTitles[page]}</h1></header>
       <div class="scroll">
         <div class="activity-body">
-          {page === "events" && <EventsList store={store} hostName={several ? hostName : null} />}
+          {page === "events" && <EventsList store={store} hostName={hostName} />}
           {page === "resources" && (
             <>
               {store.hosts.value.map((host) => (
@@ -227,42 +235,87 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
   );
 }
 
-function EventsList({ store, hostName }: { store: Store; hostName: ((host: string) => string) | null }) {
+function EventsList({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
   const events: { host: string; event: Event }[] = Object.entries(store.events.value)
     .flatMap(([host, page]) => page.events.map((event) => ({ host, event })))
     .sort((a, b) => (b.event.lastAt ?? b.event.at) - (a.event.lastAt ?? a.event.at));
   const waiting = Object.entries(store.events.value).flatMap(([host, page]) => page.waiting.map((w) => ({ host, w })));
+  const days = new Map<string, { title: string; items: { host: string; event: Event }[] }>();
+  for (const item of events) {
+    const date = fromWireDate(item.event.lastAt ?? item.event.at);
+    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    let day = days.get(key);
+    if (!day) {
+      const today = new Date();
+      const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+      const same = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+      day = { title: same(date, today) ? "Today" : same(date, yesterday) ? "Yesterday" : date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }), items: [] };
+      days.set(key, day);
+    }
+    day.items.push(item);
+  }
+  const openAgent = async (host: string, id: string) => {
+    const agent = await store.loadEventAgent(host, id);
+    if (agent) navigate({ host, project: projectFolder(agent), session: id });
+  };
+  const showOlder = () => { for (const [host, page] of Object.entries(store.events.value)) if (page.hasMore) void store.loadOlderEvents(host); };
+  const hasOlder = Object.values(store.events.value).some((page) => page.hasMore);
   return (
     <>
       {waiting.length > 0 && (
         <section>
           <h2 class="section-head">Waiting</h2>
           <ul class="event-list">
-            {waiting.map(({ host, w }) => <li key={`${host}|${w.agentID}`}><span class="strong">{w.title}</span></li>)}
+            {waiting.map(({ host, w }) => <li key={`${host}|${w.agentID}`}>
+              <button class="event-waiting" onClick={() => navigate({ host, project: w.folder, session: w.agentID })}>
+                <span class="strong">{w.title}</span><span class="quiet small">{w.status.line}</span>
+              </button>
+            </li>)}
           </ul>
         </section>
       )}
       <h2 class="section-head">What happened</h2>
       {events.length === 0 && <p class="hint">Nothing yet.</p>}
-      <ul class="event-list">
-        {events.map(({ host, event }) => {
-          const at = fromWireDate(event.lastAt ?? event.at);
-          return (
-            <li key={`${host}|${event.position}`}>
-              <time class="when" dateTime={at.toISOString()} title={at.toLocaleString()}>{clock(at)}</time>
-              <span class="body">
-                <span>{event.sentence}{event.count > 1 && <span class="quiet"> ×{event.count}</span>}</span>
-                {(event.publisher || hostName) && (
-                  <span class="quiet small">{[event.publisher && `by “${event.publisher.title}”`, hostName?.(host)].filter(Boolean).join(" · ")}</span>
-                )}
-                {event.message && <span class="quiet small">{event.message}</span>}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      {[...days.entries()].map(([key, day]) => <section key={key}>
+        <h3 class="event-day">{day.title}</h3>
+        <ul class="event-list">{day.items.map(({ host, event }) => {
+          const at = fromWireDate(event.at);
+          const projectScope = "project" in event.scope ? event.scope.project._0 : null;
+          const scope = projectScope ? store.hosts.value
+            .flatMap((known) => store.projects.value[known.id] ?? [])
+            .find((project) => folderKey(project.project.folder) === folderKey(projectScope))?.name
+            ?? decodeURIComponent(projectScope.split("/").pop() ?? "Project") : "This Mac";
+          return <li key={`${host}|${event.position}`}>
+            <time class="when" dateTime={at.toISOString()} title={at.toLocaleString()}>{clock(at)}</time>
+            <span class="body">
+              <span>{event.sentence}{event.count > 1 && <span class="quiet"> ×{event.count}</span>}</span>
+              <span class="quiet small event-name">{event.name} · {scope}{hostName(host) !== scope && ` · ${hostName(host)}`}</span>
+              {event.publisher && <span class="quiet small">by “{event.publisher.title}”</span>}
+              {event.message && <span class="quiet small">“{event.message}”</span>}
+              {event.consequences.map((consequence, index) => <ConsequenceLine key={index} consequence={consequence} host={host} store={store} openAgent={openAgent} />)}
+            </span>
+          </li>;
+        })}</ul>
+      </section>)}
+      {hasOlder && <button class="link event-older" onClick={showOlder}>Show older</button>}
     </>
   );
+}
+
+function ConsequenceLine({ consequence, host, store, openAgent }: {
+  consequence: Consequence; host: string; store: Store; openAgent: (host: string, id: string) => void;
+}) {
+  if ("woke" in consequence) return <span class="quiet small event-consequence">↳ Woke <button class="link" onClick={() => openAgent(host, consequence.woke.agentID)}>{consequence.woke.title}</button></span>;
+  if ("couldNotWake" in consequence) return <span class="quiet small event-consequence">↳ Could not wake {consequence.couldNotWake.title} — {consequence.couldNotWake.reason}</span>;
+  if ("fired" in consequence) {
+    const item = consequence.fired;
+    const openWorkflow = () => navigate({ host, project: item.folder, workflow: item.workflowID });
+    return <span class="quiet small event-consequence">↳ Fired <button class="link" onClick={openWorkflow}>{item.workflowID}</button>{item.agentID && <> · <button class="link" onClick={() => openAgent(host, item.agentID!)}>{store.agent(host, item.agentID)?.title ?? "Open agent"}</button></>}</span>;
+  }
+  const item = consequence.refused;
+  const openWorkflow = () => navigate({ host, project: item.folder, workflow: item.workflowID });
+  const reason = Object.keys(item.reason)[0]?.replace(/([A-Z])/g, " $1").toLowerCase() ?? "unknown reason";
+  return <span class="quiet small event-consequence">↳ Refused by <button class="link" onClick={openWorkflow}>{item.workflowID}</button> — {reason}</span>;
 }
 
 function SpendingPage({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
