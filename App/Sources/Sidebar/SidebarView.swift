@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// It is the user's, not the agent's. What it shows follows the selected agent, and
 /// when it is closed none of it is running: no folder watch, no web view, no shell
-/// attached. That is FR-006 kept by construction rather than by care, because the whole
+/// attached. Nor is a pane never chosen for the agent (#213). That is FR-006 kept by construction rather than by care, because the whole
 /// subtree is absent rather than hidden.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
@@ -85,30 +85,48 @@ struct SidebarView: View {
     @ViewBuilder
     private func pane(for agent: Agent) -> some View {
         let state = states.state(for: agent.id)
-        // Every pane is built, and the hidden ones are kept alive rather than torn
-        // down, so moving between panes does not lose a page, a folder or a shell
-        // (FR-022, FR-031). Only the chosen one is on screen.
+        // Each pane is built the first time it is chosen for this agent, and kept alive
+        // hidden from then on, so moving between panes does not lose a page, a folder or
+        // a shell (FR-022, FR-031). Only the chosen one is on screen. One never chosen is
+        // never built: no shell attached, no web view made (#213).
         ZStack {
-            FilesPane(agent: agent, state: state)
-                .opacity(frame.pane == .files ? 1 : 0)
-                .allowsHitTesting(frame.pane == .files)
-            ChangesPane(agent: agent, state: state)
-                .opacity(frame.pane == .changes ? 1 : 0)
-                .allowsHitTesting(frame.pane == .changes)
-            TerminalPane(agent: agent, state: state)
-                .opacity(frame.pane == .terminal ? 1 : 0)
-                .allowsHitTesting(frame.pane == .terminal)
-            BrowserPane(agent: agent, state: state)
-                .opacity(frame.pane == .browser ? 1 : 0)
-                .allowsHitTesting(frame.pane == .browser)
-            ArtifactsPane(agent: agent, state: state)
-                .opacity(frame.pane == .artifacts ? 1 : 0)
-                .allowsHitTesting(frame.pane == .artifacts)
-            BackgroundPane(agent: agent, state: state)
-                .opacity(frame.pane == .background ? 1 : 0)
-                .allowsHitTesting(frame.pane == .background)
+            if shows(.files, state) {
+                FilesPane(agent: agent, state: state)
+                    .opacity(frame.pane == .files ? 1 : 0)
+                    .allowsHitTesting(frame.pane == .files)
+            }
+            if shows(.changes, state) {
+                ChangesPane(agent: agent, state: state)
+                    .opacity(frame.pane == .changes ? 1 : 0)
+                    .allowsHitTesting(frame.pane == .changes)
+            }
+            if shows(.terminal, state) {
+                TerminalPane(agent: agent, state: state)
+                    .opacity(frame.pane == .terminal ? 1 : 0)
+                    .allowsHitTesting(frame.pane == .terminal)
+            }
+            if shows(.browser, state) {
+                BrowserPane(agent: agent, state: state)
+                    .opacity(frame.pane == .browser ? 1 : 0)
+                    .allowsHitTesting(frame.pane == .browser)
+            }
+            if shows(.artifacts, state) {
+                ArtifactsPane(agent: agent, state: state)
+                    .opacity(frame.pane == .artifacts ? 1 : 0)
+                    .allowsHitTesting(frame.pane == .artifacts)
+            }
+            if shows(.background, state) {
+                BackgroundPane(agent: agent, state: state)
+                    .opacity(frame.pane == .background ? 1 : 0)
+                    .allowsHitTesting(frame.pane == .background)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: frame.pane, initial: true) { _, pane in state.opened.insert(pane) }
+    }
+
+    private func shows(_ pane: SidebarPane, _ state: AgentPaneState) -> Bool {
+        frame.pane == pane || state.opened.contains(pane)
     }
 }
 

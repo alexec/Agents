@@ -183,6 +183,10 @@ final class AgentPaneState {
     /// A tab the user just chose or opened, whose screen should take the keyboard.
     var shellToFocus: Int?
     var shellsLoaded = false
+    /// The panes shown for this agent so far. A pane is built the first time it is
+    /// chosen and kept from then on, so clicking through agents with the Files pane up
+    /// starts no shell and no web view for any of them (#213).
+    var opened: Set<SidebarPane> = []
     /// False when the agent's daemon holds only one shell — a server not yet updated.
     var canOpenMoreShells = true
 

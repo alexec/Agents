@@ -169,6 +169,26 @@ struct FiledOnceTests {
               position: position)
     }
 
+    /// Filed in place (#213): the list of everything stays in activity order, each agent
+    /// once, through changes that move agents, a new one and agents let go of.
+    @Test func everythingStaysInOrderFiledInPlace() {
+        let model = AgentsModel()
+        var held = (0..<40).map { agent($0 % 2 == 0 ? api : web, .finished, at: Double($0)) }
+        model.replaceAgents(held)
+        for step in 0..<60 {
+            let at = (step * 7) % held.count
+            held[at].lastActivityAt = t0.addingTimeInterval(Double(100 + (step * 13) % 50))
+            held[at].state = step % 3 == 0 ? .running : .finished
+            model.upsert(held[at])
+        }
+        let fresh = agent(api, .running, at: 75)
+        model.upsert(fresh)
+        model.forget([held[3].id, held[10].id, fresh.id])
+        let kept = held.enumerated().filter { ![3, 10].contains($0.offset) }.map(\.element)
+        #expect(model.agents.map(\.id) == kept.sorted(by: ProjectShelf.byActivity).map(\.id))
+        #expect(model.agentCount == kept.count)
+    }
+
     @Test func shownEventsFollowTheEventsAndTheFilter() {
         let model = AgentsModel()
         var calendar = Calendar(identifier: .gregorian)

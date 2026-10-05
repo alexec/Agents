@@ -586,6 +586,9 @@ struct WorkflowPage: View {
                               remove: { value in
                                   setLabels(summary, labels.filter { SessionLabelPolicy.key($0) != SessionLabelPolicy.key(value) })
                               })
+                .task(id: ProjectKey(host: model.selectedProjectHost, folder: summary.folder)) {
+                    await model.loadLabelVocabulary(in: summary.folder, on: model.selectedProjectHost)
+                }
             }
             note(summary.workflow.labelsNote)
         }

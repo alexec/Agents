@@ -130,16 +130,21 @@ private struct Failed: View {
     }
 }
 
-/// One web view per agent, for the life of the window.
+/// One web view per agent, for the last few agents whose page was looked at (#213).
+/// One let go of loads its page again from `browserURL` when its agent comes back; its
+/// history and scroll position go with it. Only the chosen agent's pane is on screen,
+/// so the one let go of is never one in view.
 @MainActor
 @Observable
 final class WebHolders {
-    private var holders: [UUID: WebHolder] = [:]
+    static let kept = 4
+
+    @ObservationIgnored private var holders = LRUCache<UUID, WebHolder>(limit: WebHolders.kept)
 
     func holder(for agentID: UUID) -> WebHolder {
-        if let existing = holders[agentID] { return existing }
+        if let existing = holders.value(for: agentID) { return existing }
         let fresh = WebHolder()
-        holders[agentID] = fresh
+        holders.set(fresh, for: agentID)
         return fresh
     }
 }

@@ -38,7 +38,11 @@ struct ArtifactsPane: View {
                 .scrollContentBackground(.hidden)
             }
         }
-        .task(id: model.entries.count) { fold() }
+        // Only while shown, and once more on being shown: hidden, each new entry was a
+        // pass over the chat and a look at the disk for nobody (#213).
+        .task(id: frame.pane == .artifacts ? model.entries.count : -1) {
+            if frame.pane == .artifacts { fold() }
+        }
     }
 
     private func fold() {

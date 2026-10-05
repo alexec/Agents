@@ -402,6 +402,7 @@ final class AppModel {
                 openPin = nil
                 composing = false
             }
+            if let left = chatOpening { Perf.end(left.timing, "left before it opened") }
             chatOpening = selection.map { (agent: $0, timing: Perf.begin("chat-open")) }
             Task { await loadTranscript() }
         }
@@ -685,6 +686,8 @@ final class AppModel {
     /// window, so each one keeps only the shells it is actually showing and ignores
     /// the rest.
     @ObservationIgnored private var shellClients: [ShellKey: ShellClient] = [:]
+    /// How many screens show each of those shells (#213).
+    @ObservationIgnored private var shellScreens: [ShellKey: Int] = [:]
 
     struct ShellKey: Hashable {
         var agentID: UUID
@@ -2610,6 +2613,13 @@ final class AppModel {
 
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
+        // A failed open ends its timing too, rather than leaving it open (#213).
+        defer {
+            if let opening = chatOpening, opening.agent == selection {
+                chatOpening = nil
+                Perf.end(opening.timing, "failed")
+            }
+        }
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole: Void = loadWholeAgent(selection)
         await attempt {
@@ -3036,9 +3046,30 @@ final class AppModel {
         }
     }
 
+    /// A project's labels as its host keeps them, archived sessions' included, read when
+    /// a label input appears and when its session's labels change (#213). Not worked out here from the
+    /// agents held: that was a pass over every one of them on each redraw of the chat,
+    /// and it missed what only archived sessions carry.
     func labelSuggestions(in folder: URL, on host: HostID) -> [String] {
-        SessionLabelPolicy.vocabulary(
-            in: folder, agents: work.agents.filter { $0.host == host }).map(\.value)
+        labelVocabularies[ProjectKey(host: host, folder: Project.standardize(folder))] ?? []
+    }
+
+    /// Each project's label vocabulary, by host and folder, as last read.
+    private(set) var labelVocabularies: [ProjectKey: [String]] = [:]
+
+    func loadLabelVocabulary(in folder: URL, on host: HostID) async {
+        let key = ProjectKey(host: host, folder: Project.standardize(folder))
+        let values: [String]
+        if let read = try? await client(for: host).call(
+            DaemonAPI.Method.agentsLabelVocabulary, DaemonAPI.LabelVocabularyRequest(folder: key.folder),
+            returning: [String].self) {
+            values = read
+        } else {
+            // A host too old to say: once from what is held, not once per redraw.
+            values = SessionLabelPolicy.vocabulary(
+                in: key.folder, agents: AgentGroup.allCases.flatMap { work.agents(in: key, group: $0) }).map(\.value)
+        }
+        if labelVocabularies[key] != values { labelVocabularies[key] = values }
     }
 
     /// Which runtime a new agent gets when nobody has said. The rule is the kit's, so
@@ -3235,10 +3266,34 @@ final class AppModel {
         return response?.shells
     }
 
+    /// A shell's screen took this window's end of it: counted, so the end is let go of
+    /// when the last screen showing it goes (#213).
+    func acquireShell(for agentID: UUID, shell: Int) -> ShellClient {
+        let client = shellClient(for: agentID, shell: shell)
+        shellScreens[ShellKey(agentID: agentID, shell: shell), default: 0] += 1
+        return client
+    }
+
+    /// A shell's screen went (another agent chosen, the inspector closed). With no other
+    /// screen on it, this window lets go of its end, so it holds one only for a screen
+    /// there is (#213). The shell runs on (FR-026), and the next screen attaches again
+    /// and replays what it printed.
+    func releaseShell(_ client: ShellClient) {
+        let key = ShellKey(agentID: client.agentID, shell: client.shell)
+        guard shellClients[key] === client else { return }
+        let left = (shellScreens[key] ?? 1) - 1
+        guard left <= 0 else { shellScreens[key] = left; return }
+        shellScreens[key] = nil
+        shellClients[key] = nil
+        client.onOutput = nil
+        Task { await client.detach() }
+    }
+
     /// The user closed a terminal tab: the shell ends, and this window forgets it.
     func closeShell(agentID: UUID, shell: Int) async {
         let client = shellClient(for: agentID, shell: shell)
         shellClients[ShellKey(agentID: agentID, shell: shell)] = nil
+        shellScreens[ShellKey(agentID: agentID, shell: shell)] = nil
         await client.close()
     }
 

@@ -982,6 +982,9 @@ struct PromptBar: View {
                       suggestions: model.draftCwd.map { model.labelSuggestions(in: $0, on: model.selectedProjectHost) } ?? [],
                       add: { draftLabels += $0 },
                       remove: { value in draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) } })
+            .task(id: model.draftCwd.map { ProjectKey(host: model.selectedProjectHost, folder: $0) }) {
+                if let folder = model.draftCwd { await model.loadLabelVocabulary(in: folder, on: model.selectedProjectHost) }
+            }
     }
 
     private func send() {

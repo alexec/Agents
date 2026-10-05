@@ -206,9 +206,13 @@ private struct ShellScreen: View {
             }
         }
         .task(id: agent.id) {
-            let fresh = model.shellClient(for: agent.id, shell: shell)
-            client = fresh
-            await fresh.attach(rows: rows, cols: cols)
+            let held = client ?? model.acquireShell(for: agent.id, shell: shell)
+            client = held
+            await held.attach(rows: rows, cols: cols)
+        }
+        .onDisappear {
+            if let client { model.releaseShell(client) }
+            client = nil
         }
     }
 

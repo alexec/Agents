@@ -32,7 +32,8 @@ final class ServerPictures {
     }
 
     private let files: RemoteFiles
-    private var held: [URL: Held] = [:]
+    /// About a page or two of diagrams, as the phone keeps (#175, #213).
+    private var held = LRUCache<URL, Held>(limit: 24)
 
     init(files: RemoteFiles) { self.files = files }
 
@@ -41,12 +42,12 @@ final class ServerPictures {
     }
 
     func image(agentID: UUID, url: URL) async -> NSImage? {
-        if let image = held[url]?.image { return image }
+        if let image = held.value(for: url)?.image { return image }
         return await refresh(agentID: agentID, url: url)?.image
     }
 
     private func refresh(agentID: UUID, url: URL) async -> Held? {
-        let known = held[url]
+        let known = held.peek(url)
         guard let reading = try? await files.read(agentID: agentID, path: url.path(percentEncoded: false),
                                                   known: known?.stamp) else { return known }
         switch reading {
@@ -54,11 +55,11 @@ final class ServerPictures {
             return known
         case .image(let bytes, _, let stamp):
             let fresh = Held(stamp: stamp, image: NSImage(data: bytes))
-            held[url] = fresh
+            held.set(fresh, for: url)
             return fresh
         case .text(_, _, _, let stamp), .other(_, _, let stamp):
             let fresh = Held(stamp: stamp, image: nil)
-            held[url] = fresh
+            held.set(fresh, for: url)
             return fresh
         }
     }
