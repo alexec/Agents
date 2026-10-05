@@ -17,9 +17,13 @@ for (const { name, input, expected } of cases("workflows/summaries.json")) {
   });
 }
 
-test("an event trigger is said by its name and filters, the page having no catalogue", () => {
-  const trigger = { unrecognised: { name: "ci.finished", keys: { branch: "main", attempt: 2 } } };
-  assert.equal(w.triggerSummary(trigger), "When ci.finished (attempt 2, branch main)");
+test("an event trigger uses the catalogue meaning and includes its filters", () => {
+  const trigger = { unrecognised: { name: "custom.build_green", keys: { branch: "main", attempt: 2 } } };
+  assert.equal(w.triggerSummary(trigger), "An agent here publishes custom.build_green (attempt 2, branch main)");
+  assert.equal(w.triggerSummary({ unrecognised: { name: "custom.build_green", keys: {} } }),
+    "An agent here publishes custom.build_green");
+  assert.equal(w.triggerSummary({ unrecognised: { name: "agent.finished", keys: {} } }),
+    "An agent in this project ended a turn having done its work");
   assert.equal(w.canFire({ triggers: [trigger], mode: "new", settings: { options: {}, labels: [] } }), true);
 });
 
@@ -123,25 +127,25 @@ test("a waiting workflow past the three says why, with no Approve (#132)", () =>
 });
 
 // Finer matching (073): filters in words, lists included, held to EventPatternFinerTests.swift's
-// summaries. The page names the event where the Mac says its meaning; the filters read the same.
+// summaries, with the page using catalogue meanings as the Mac does.
 test("an event trigger's filters are said in the Mac's words, lists included", () => {
   const runtime = (id) => ({ claude: "Claude", gemini: "Gemini", grok: "Grok" })[id];
   const say = (name, keys) => w.triggerSummary(event(name, keys), runtime);
-  assert.equal(say("agent.finished", { labels: "bug", afterwards: "park" }), "When agent.finished (labelled bug, and parked)");
-  assert.equal(say("agent.finished", { outcome: ["done", "nothing_to_do"] }), "When agent.finished (done or nothing to do)");
-  assert.equal(say("agent.failed", { runtime: ["gemini", "grok"] }), "When agent.failed (on Gemini or Grok)");
+  assert.equal(say("agent.finished", { labels: "bug", afterwards: "park" }), "An agent in this project ended a turn having done its work (labelled bug, and parked)");
+  assert.equal(say("agent.finished", { outcome: ["done", "nothing_to_do"] }), "An agent in this project ended a turn having done its work (done or nothing to do)");
+  assert.equal(say("agent.failed", { runtime: ["gemini", "grok"] }), "An agent in this project ended in an error (on Gemini or Grok)");
   assert.equal(say("agent.failed", { runtime: "claude", reason: ["allowance_spent", "rate_limited"] }),
-    "When agent.failed (its allowance ran out or rate limited, and still limited after retrying, on Claude)");
-  assert.equal(say("agent.*", { started_by: "workflow" }), "When agent.* (started by a workflow)");
-  assert.equal(say("agent.finished", { afterwards: "stay" }), "When agent.finished (not parked)");
+    "An agent in this project ended in an error (its allowance ran out or rate limited, and still limited after retrying, on Claude)");
+  assert.equal(say("agent.*", { started_by: "workflow" }), "Anything about agents (started by a workflow)");
+  assert.equal(say("agent.finished", { afterwards: "stay" }), "An agent in this project ended a turn having done its work (not parked)");
   assert.equal(say("agent.archived", { by: "you", labels: ["bug", "regression"] }),
-    "When agent.archived (by you, labelled bug or regression)");
+    "An agent in this project was archived (by you, labelled bug or regression)");
   assert.equal(say("workflow.completed", { workflow: "nightly", outcome: ["stuck", "partly_done"] }),
-    "When workflow.completed (stuck or partly done, workflow nightly)");
-  assert.equal(say("workflow.refused", { reason: "run_in_flight" }), "When workflow.refused (a run is still going)");
+    "A workflow's run in this project finished (stuck or partly done, workflow nightly)");
+  assert.equal(say("workflow.refused", { reason: "run_in_flight" }), "A workflow in this project did not run, and why (a run is still going)");
   assert.equal(say("lease.released", { resource: "simulator", how: "expired" }),
-    "When lease.released (how expired, resource simulator)");
-  assert.equal(say("custom.ship", { labels: "bug" }), "When custom.ship (labels bug)");
+    "A lease was given back, ended or ran out (how expired, resource simulator)");
+  assert.equal(say("custom.ship", { labels: "bug" }), "An agent here publishes custom.ship (labels bug)");
 });
 
 test("a list is a capsule joined by | and a cause joined by |", () => {

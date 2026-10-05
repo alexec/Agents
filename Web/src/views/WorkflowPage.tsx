@@ -7,6 +7,7 @@
 // here as in the window (#162), what the workflow is (name, triggers, prompt, agent mode) is not.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
   cooldownSentence, labelsNote, agentModeWords, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
@@ -28,6 +29,17 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   }, [host, folder]);
   const known = store.workflowsKnown(host, folder);
   const summary = store.projectWorkflows(host, folder).find((w) => w.workflow.workflowID === workflowID);
+  const runLimit = useSignal(3);
+  const runs = useSignal<Agent[]>([]);
+  const loadingRuns = useSignal(false);
+  useEffect(() => {
+    let current = true;
+    loadingRuns.value = true;
+    void store.loadWorkflowRuns(host, folder, workflowID, runLimit.value).then((listed) => {
+      if (current) { runs.value = listed; loadingRuns.value = false; }
+    });
+    return () => { current = false; };
+  }, [host, folder, workflowID, runLimit.value]);
   // The daemon's refusal of the last change, said beside the controls until the next one.
   const problem = useSignal<{ workflowID: string; text: string } | null>(null);
   const back = <BackToList />;
@@ -59,9 +71,6 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   const locked = down || workflow.problem !== undefined;
   const change = (what: Parameters<Store["setWorkflowSettings"]>[2]) =>
     void store.setWorkflowSettings(host, summary, what).then((refusal) => { problem.value = refusal ? { workflowID, text: refusal } : null; });
-  const runs = store.projectAgents(host, folder)
-    .filter((a) => a.startedByWorkflow === workflowID)
-    .sort((a, b) => b.createdAt - a.createdAt);
   return (
     <section class="chat workflow-page" aria-label="Workflow">
       <header class="column-head">{back}<h1>{workflow.name}</h1></header>
@@ -164,11 +173,13 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           <h2 class="section-head">History</h2>
           <p class="last-ran quiet small">{lastRanLine(summary)}</p>
 
-          {runs.length === 0 && <p class="hint">Nothing has run yet.</p>}
-          {runs.slice(0, 6).map((agent) => (
+          {!loadingRuns.value && runs.value.length === 0 && <p class="hint">Nothing has run yet.</p>}
+          {runs.value.map((agent) => (
             <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
               waits={store.waitsOf(host, agent)} extras={rowExtras(store, host, agent)} />
           ))}
+          {runs.value.length === runLimit.value && <button class="link" disabled={loadingRuns.value}
+            onClick={() => { runLimit.value += 3; }}>Show more</button>}
         </div>
       </div>
     </section>
