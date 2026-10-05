@@ -25,6 +25,7 @@ struct WorkflowPage: View {
     /// What the workflow's runtime last advertised for this project, out of the
     /// daemon's memory. Nil until asked; empty when it has nothing.
     @State private var remembered: [ConfigOption]?
+    @State private var rawWorkflowText: String?
     @State private var shownRuns = Self.runsAtFirst
     /// Whether the Mac has runs past the ones shown. Archived runs are not in the
     /// phone's list until this page asks for them, so it cannot count them itself.
@@ -66,6 +67,17 @@ struct WorkflowPage: View {
             moreRuns = await model.loadRuns(of: summary.workflowID, in: summary.workflow.folder,
                                             limit: shownRuns)
         }
+        .task(id: summary?.workflow) {
+            guard let workflow = summary?.workflow, workflow.problem?.needsAPerson == true else {
+                rawWorkflowText = nil
+                return
+            }
+            guard case .text(let text, let isTruncated, let size, _)? = try? await model.readPage(
+                ".agents/workflows/\(workflow.workflowID).md", in: workflow.folder) else { return }
+            rawWorkflowText = isTruncated
+                ? text + "\n\n" + FileReading.truncationNote(shown: text.utf8.count, of: size)
+                : text
+        }
     }
 
     /// The agents it started that the phone holds, newest first.
@@ -82,7 +94,9 @@ struct WorkflowPage: View {
             heading(summary)
             runButton(summary)
             status(summary)
+            if workflow.problem?.needsAPerson == true { unreadableFile() }
             prompt(summary)
+            triggers(summary)
             settings(summary)
             labels(summary)
             unknownKeys(workflow)
@@ -280,6 +294,134 @@ struct WorkflowPage: View {
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// The workflow source is useful when its front matter cannot be parsed.
+    private func unreadableFile() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("The file is below")
+            if let rawWorkflowText {
+                Text(rawWorkflowText)
+                    .appText(.code)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(14)
+                    .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+            } else {
+                note("The workflow file could not be read from the host.")
+            }
+        }
+    }
+
+    // MARK: Triggers and cooldown
+
+    private func triggers(_ summary: WorkflowSummary) -> some View {
+        let triggers = summary.workflow.triggers
+        return VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("Triggers")
+            if triggers.isEmpty {
+                note("None could be read from the file.")
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(triggers.enumerated()), id: \.offset) { index, trigger in
+                        if index > 0 { Divider() }
+                        triggerRow(trigger, at: index, summary)
+                    }
+                }
+                .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+            }
+            cooldown(summary)
+            if let at = summary.lastFiredAt {
+                note(["Last ran \(at.formatted(.relative(presentation: .named)))", summary.lastFiredBy?.phrase]
+                    .compactMap { $0 }.joined(separator: ", ") + ".")
+            } else {
+                note("Has not run yet.")
+            }
+        }
+    }
+
+    private static let cooldownChoices: [TimeInterval] = [5, 15, 30, 60, 240, 1440].map { $0 * 60 }
+
+    private func cooldown(_ summary: WorkflowSummary) -> some View {
+        let current = summary.workflow.cooldown
+        let choices = Self.cooldownChoices + (current.map { Self.cooldownChoices.contains($0) ? [] : [$0] } ?? [])
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            note(summary.cooldownSentence { $0.formatted(date: .omitted, time: .shortened) }
+                 ?? "No cooldown: every trigger runs it, one run at a time.")
+            Spacer(minLength: 8)
+            Picker("Cooldown", selection: Binding<TimeInterval?>(
+                get: { current },
+                set: { chosen in
+                    guard chosen != current else { return }
+                    Task { await model.setWorkflowSettings(summary, summary.workflow.settings,
+                                                           cooldown: chosen.map(WorkflowCooldown.fileText) ?? "") }
+                })) {
+                Text("No cooldown").tag(TimeInterval?.none)
+                ForEach(choices.sorted(), id: \.self) { length in
+                    Text("Cooldown: \(WorkflowCooldown.words(length))").tag(TimeInterval?.some(length))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+            .disabled(summary.workflow.settingsLocked || model.isStale)
+        }
+    }
+
+    private func triggerRow(_ trigger: WorkflowTrigger, at index: Int, _ summary: WorkflowSummary) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: trigger.schedule != nil ? "clock" : "bolt")
+                .appText(.reading).foregroundStyle(.secondary).frame(width: 18)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(trigger.summary).appText(.reading).fixedSize(horizontal: false, vertical: true)
+                if !trigger.isSupported {
+                    Text("Unknown")
+                        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+                        .padding(.horizontal, 6).overlay(Capsule().strokeBorder(.secondary.opacity(0.5)))
+                }
+                ForEach(trigger.filters.sorted { $0.key < $1.key }, id: \.key) { key, value in
+                    Text("\(key): \(value.capsule)").appText(.fine).monospaced()
+                }
+                if let scope = scopeLine(trigger) { note(scope) }
+                if trigger.schedule != nil {
+                    note(nextLine(at: index, summary))
+                }
+                if summary.workflow.mode == .triggering && trigger.isSupported { note(trigger.resumedAgent) }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+    }
+
+    private func scopeLine(_ trigger: WorkflowTrigger) -> String? {
+        let project = summaryProjectName
+        if trigger.schedule != nil { return "By the host's clock" }
+        switch trigger.listensIn {
+        case .project?: return "In \(project)"
+        case .mac?: return "Anywhere on this host, so it runs in every project"
+        case .either?: return "In \(project), or anywhere on this host"
+        case nil: return nil
+        }
+    }
+
+    private var summaryProjectName: String {
+        model.selectedProject?.lastPathComponent ?? "this project"
+    }
+
+    private func nextLine(at index: Int, _ summary: WorkflowSummary) -> String {
+        if summary.isArchived { return "Archived — no next time" }
+        if !summary.isEnabled { return "Off — no next time" }
+        if summary.workflow.problem != nil { return "Never, until the file is fixed" }
+        if summary.awaitingApproval != nil { return "No next time until you approve it" }
+        if summary.overLimit != nil { return "Over the limit — no next time" }
+        let due = summary.nextFireAtByTrigger.indices.contains(index)
+            ? summary.nextFireAtByTrigger[index]
+            : (summary.workflow.schedules.count == 1 ? summary.nextFireAt : nil)
+        guard let due else { return "No next time" }
+        return "Next \(due.formatted(.relative(presentation: .named)))\n"
+            + due.formatted(date: .abbreviated, time: .shortened)
     }
 
     // MARK: What it may do
