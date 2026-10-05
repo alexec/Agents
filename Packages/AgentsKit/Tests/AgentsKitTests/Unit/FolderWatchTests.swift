@@ -56,6 +56,16 @@ struct FolderWatchTests {
         return root
     }
 
+    #if os(Linux)
+    private func folderWatchThreads() -> Set<String> {
+        let tasks = (try? FileManager.default.contentsOfDirectory(atPath: "/proc/self/task")) ?? []
+        return Set(tasks.filter { task in
+            let name = (try? String(contentsOfFile: "/proc/self/task/\(task)/comm", encoding: .utf8)) ?? ""
+            return name.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("AgentsKit.Folde")
+        })
+    }
+    #endif
+
     @Test func aWrittenFileIsReported() async throws {
         let root = try makeFolder()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -207,4 +217,21 @@ struct FolderWatchTests {
         watch.stop()
         #expect(watch.isWatching == false)
     }
+
+    #if os(Linux)
+    @Test func stoppingJoinsTheInotifyReaderThread() async throws {
+        let root = try makeFolder()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let before = folderWatchThreads()
+        let watch = FolderWatch(root: root) { _ in }
+        await eventually("the inotify reader thread started") { !folderWatchThreads().subtracting(before).isEmpty }
+
+        watch.stop()
+        #expect(watch.isWatching == false)
+        await eventually("the inotify reader thread exited") {
+            folderWatchThreads().subtracting(before).isEmpty
+        }
+    }
+    #endif
 }
