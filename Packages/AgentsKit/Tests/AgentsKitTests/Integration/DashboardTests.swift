@@ -271,8 +271,9 @@ struct DashboardTests {
             _ = try await set(s, name, arguments)
         }
         let snapshot = await s.core.dashboardSnapshot(s.project)
-        #expect(snapshot.tiles[0].keeperChanges.count == DashboardState.keeperChangesKept)
-        #expect(snapshot.tiles[0].keeperChanges.last?.to.contains("Lead 12") == true)
+        let tile = try #require(snapshot.tiles.first)
+        #expect(tile.keeperChanges.count == DashboardState.keeperChangesKept)
+        #expect(tile.keeperChanges.last?.to.contains("Lead 12") == true)
     }
 
     /// Each agent's sets are kept for their hour, and every agent's past it go with the
