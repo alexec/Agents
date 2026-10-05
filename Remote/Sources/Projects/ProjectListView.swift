@@ -39,6 +39,19 @@ struct ProjectListView: View {
                         .paperListRow()
                 }
             }
+            // A file the Mac keeps that could not be read (#205, #223), as the window's
+            // sidebar foot: why paired devices or projects may have gone from view.
+            if !model.work.storeNotes.isEmpty {
+                Section {
+                    ForEach(model.work.storeNotes, id: \.self) { note in
+                        Label(note, systemImage: "exclamationmark.triangle")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .accessibilityElement(children: .combine)
+                            .paperListRow()
+                    }
+                }
+            }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)

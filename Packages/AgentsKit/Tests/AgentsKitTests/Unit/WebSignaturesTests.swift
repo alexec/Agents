@@ -26,4 +26,13 @@ struct WebSignaturesTests {
         #expect(notifications.isDisjoint(with: Set(ControlGrantTests.everyMethod)))
         #expect(notifications.contains(DaemonAPI.Notification.agentEntry))
     }
+
+    /// The page asks what the host could not read and hears it change, as the window does (#223).
+    @Test func thePageAsksAndHearsStoreNotes() {
+        let rows = Rows.rows
+        #expect(rows.contains { $0.method == DaemonAPI.Method.storeNotes && $0.kind == .hostRequest
+            && $0.result == DaemonAPI.StoreNotes.self })
+        #expect(rows.contains { $0.method == DaemonAPI.Notification.storeNotesChanged && $0.kind == .hostNotification
+            && $0.params == DaemonAPI.StoreNotes.self })
+    }
 }

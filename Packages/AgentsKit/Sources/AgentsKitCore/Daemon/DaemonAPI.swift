@@ -3066,7 +3066,6 @@ public enum DaemonAPI {
 }
 
 public extension DaemonAPI {
-    /// `daemon/status` (037).
     /// What this host keeps that could not be read in this run (#205), one sentence a
     /// file: set aside and started afresh, held and not written, or kept in part. Empty
     /// when everything read.
@@ -3078,6 +3077,7 @@ public extension DaemonAPI {
         }
     }
 
+    /// `daemon/status` (037).
     struct DaemonStatus: Codable, Hashable, Sendable {
         /// Agents starting, running or waiting on the person: an update waits for zero.
         public var turnsInFlight: Int

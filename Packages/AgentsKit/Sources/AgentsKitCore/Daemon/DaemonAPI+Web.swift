@@ -70,6 +70,8 @@ public extension DaemonAPI {
                 Row(Method.leasesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
                 // The low disk space strip (#195, #196), as the window draws it.
                 Row(Method.diskState, params: Empty.self, result: DiskState.self, kind: .hostRequest),
+                // The files the host could not read in this run (#205, #223), as the window's sidebar foot.
+                Row(Method.storeNotes, params: Empty.self, result: StoreNotes.self, kind: .hostRequest),
                 // The Dashboard (074), as the window's row and page have it.
                 Row(Method.dashboardGet, params: DashboardRequest.self, result: DashboardSnapshot.self, kind: .hostRequest),
                 Row(Method.dashboardSummaries, params: Empty.self, result: [DashboardSummary].self, kind: .hostRequest),
@@ -177,6 +179,8 @@ public extension DaemonAPI {
                 // Who holds what, for the page's read-only Resources list (#116).
                 Row(Notification.leasesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,
+                    kind: .hostNotification),
                 Row(Notification.dashboardChanged, params: DashboardChangedNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.pinsChanged, params: PinsChangedNotification.self, result: Empty.self,

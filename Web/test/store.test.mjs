@@ -123,3 +123,11 @@ test("files/changed: a host's `many`, or a burst past 64 folders, settles as eve
   assert.equal(work.filesChanged.value.many, true);
   assert.deepEqual(work.filesChanged.value.folders, []);
 });
+
+test("store/notesChanged replaces a host's unreadable files whole, and touches only that host (#223)", () => {
+  const work = new Work();
+  work.apply("store/notesChanged", { notes: ["devices.json could not be read; it was set aside."] }, "A");
+  work.apply("store/notesChanged", { notes: ["projects.json is held."] }, "B");
+  work.apply("store/notesChanged", { notes: [] }, "A");
+  assert.deepEqual(work.storeNotes.value, { A: [], B: ["projects.json is held."] });
+});
