@@ -42,11 +42,8 @@ struct OfflineStrip: View {
         }
     }
 
-    /// This Mac's host down is not the same news as a server's: nothing of this
-    /// Mac's moves until it is back, so it does not say the agents keep working (#83).
+    /// In the same words as the Remote's strip (`OfflineWords`).
     private func line(since: String) -> String {
-        host == .mac
-            ? "This Mac’s host hasn’t answered since \(since). Nothing here can change until it’s back. Trying again…"
-            : "\(model.hosts.label(host)) is offline since \(since). Agents there keep working."
+        OfflineWords.line(host: host, name: model.hosts.label(host), since: since)
     }
 }

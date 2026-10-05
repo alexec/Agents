@@ -88,6 +88,8 @@ struct RemoteChatView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 StaleBanner()
+                // A server's agent whose host has gone: which, and since when (#239).
+                if let agent { HostOfflineStrip(host: agent.host) }
                 if let agent {
                     RemoteSessionLabels(agent: agent, compact: false)
                         .padding(.horizontal, 12)
@@ -161,7 +163,7 @@ struct RemoteChatView: View {
                     } label: {
                         Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
                     }
-                    .disabled(model.isStale)
+                    .disabled(model.isStale(agent))
                     .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
                 }
             }
@@ -298,7 +300,7 @@ private struct ChatMenu: View {
                 Button("Bring Back", systemImage: "tray.and.arrow.up") {
                     Task { await model.unarchive(agent.id) }
                 }
-                .disabled(model.isStale)
+                .disabled(model.isStale(agent))
             }
         } label: {
             Label("Actions", systemImage: "ellipsis.circle")

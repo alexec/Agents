@@ -119,7 +119,7 @@ struct AgentCard: View {
                     // is doing is the title, which the agent keeps current.
                     // Stop, park or archive on its way, as on the Mac's row (#87).
                     if let acting = model.acting(agent.id) {
-                        Telling(host: "your Mac", doing: acting.doing)
+                        Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                     } else if let report = agent.report?.message {
                         Text(report)
                             .appText(.supporting)

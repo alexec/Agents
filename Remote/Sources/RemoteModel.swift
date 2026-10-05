@@ -215,8 +215,8 @@ final class RemoteModel {
     func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
         guard !isStale else { return "Your Mac is not answering. What you typed is kept here." }
         do {
-            try await client.call(DaemonAPI.Method.artifactWrite,
-                                  DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text))
+            let request = DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text)
+            try await client(for: request).call(DaemonAPI.Method.artifactWrite, request)
             return nil
         } catch let error as JSONRPCError {
             return error.message
@@ -368,11 +368,21 @@ final class RemoteModel {
     /// repository until the Mac says otherwise, which keeps the row hidden.
     private(set) var startWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var startDraftID: UUID?
+    /// The host `startDraftID` was made on: the sheet's project's (#240).
+    private var startDraftHost: HostID = .mac
     /// Bumped by every fetch of a runtime's choices, so an answer for a runtime the
     /// person has since moved off is recognised as that and let go.
     private var startGeneration = 0
 
-    var startRuntime: RuntimeStatus? { runtimes.first { $0.runtime.id == startRuntimeID } }
+    var startRuntime: RuntimeStatus? { startRuntimes.first { $0.runtime.id == startRuntimeID } }
+
+    /// What the sheet offers: the runtimes of the project's own host, the Mac's or a
+    /// server's, as the window lists them (#240).
+    var startRuntimes: [RuntimeStatus] { runtimes(on: startHost) }
+
+    private var startAvailableRuntimeIDs: [String] {
+        startRuntimes.filter(\.availability.isAvailable).map(\.runtime.id)
+    }
 
     /// What the sheet reads: the runtimes to choose from, and, for its runtime menu, what
     /// the Mac's allowances say, before it is opened rather than after whoever happens to
@@ -389,8 +399,8 @@ final class RemoteModel {
             await showing(Self.startParts)
         }
         guard startingIn == folder else { return }
-        if startRuntimeID == nil || !availableRuntimeIDs.contains(startRuntimeID ?? "") {
-            startRuntimeID = work.defaultRuntimeID(available: availableRuntimeIDs)
+        if startRuntimeID == nil || !startAvailableRuntimeIDs.contains(startRuntimeID ?? "") {
+            startRuntimeID = work.defaultRuntimeID(available: startAvailableRuntimeIDs)
         }
         await loadStartChoices()
     }
@@ -414,9 +424,9 @@ final class RemoteModel {
 
     /// The repository's worktrees for the sheet. Asked once when it opens, never polled.
     private func loadStartWorktrees(in folder: URL) async {
-        let answer = (try? await client.call(DaemonAPI.Method.worktreesList,
-                                             DaemonAPI.WorktreesListRequest(folder: folder),
-                                             returning: DaemonAPI.WorktreesListResponse.self))
+        let request = DaemonAPI.WorktreesListRequest(folder: folder)
+        let answer = (try? await client(for: request).call(DaemonAPI.Method.worktreesList, request,
+                                                           returning: DaemonAPI.WorktreesListResponse.self))
             ?? .notARepository
         guard startingIn == folder else { return }
         startWorktrees = answer
@@ -456,9 +466,10 @@ final class RemoteModel {
         guard let folder = startOptionsFolder else { return }
         guard let runtimeID = startRuntimeID else {
             // Not "asking": there is nobody to ask.
-            startChoicesState = .failed(runtimes.isEmpty
-                ? "No runtimes are set up on the Mac. Set one up there to start an agent."
-                : "None of the Mac's runtimes can start right now.")
+            let host = startHost == .mac ? "the Mac" : hostName(startHost)
+            startChoicesState = .failed(startRuntimes.isEmpty
+                ? "No runtimes are set up on \(host). Set one up there to start an agent."
+                : "None of \(host)'s runtimes can start right now.")
             return
         }
         startGeneration += 1
@@ -467,12 +478,15 @@ final class RemoteModel {
         startOptions = []
         startChosen = [:]
         startChoicesState = .loading
+        let host = startHost
         do {
-            let response = try await client.call(DaemonAPI.Method.agentsOptions,
-                                                 DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: folder),
-                                                 returning: DaemonAPI.OptionsResponse.self)
-            guard generation == startGeneration else { discard(draft: response.draftID); return }
+            // Made on the project's own host, where the agent will start (#240).
+            let request = DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: folder)
+            let response = try await client(for: request).call(DaemonAPI.Method.agentsOptions, request,
+                                                               returning: DaemonAPI.OptionsResponse.self)
+            guard generation == startGeneration else { discard(draft: response.draftID, on: host); return }
             startDraftID = response.draftID
+            startDraftHost = host
             showStart(response.options, opening: true)
         } catch {
             guard generation == startGeneration else { return }
@@ -520,13 +534,14 @@ final class RemoteModel {
     private func discardStartDraft() {
         guard let startDraftID else { return }
         self.startDraftID = nil
-        discard(draft: startDraftID)
+        discard(draft: startDraftID, on: startDraftHost)
     }
 
     /// Not waited on: the sheet has moved on, and a Mac too old to know the method has
-    /// nothing to be told.
-    private func discard(draft: UUID) {
-        Task { _ = try? await client.call(DaemonAPI.Method.agentsDiscardDraft,
+    /// nothing to be told. To the host the draft was made on (#240).
+    private func discard(draft: UUID, on host: HostID) {
+        let target = host == .mac ? client : otherHosts[host] ?? client
+        Task { _ = try? await target.call(DaemonAPI.Method.agentsDiscardDraft,
                                           DaemonAPI.DiscardDraftRequest(draftID: draft)) }
     }
 
@@ -574,10 +589,9 @@ final class RemoteModel {
 
     func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async -> Bool {
         do {
-            let agent: Agent = try await client.call(
-                DaemonAPI.Method.agentsSetLabels,
-                DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove),
-                returning: Agent.self)
+            let request = DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove)
+            let agent: Agent = try await client(for: request).call(DaemonAPI.Method.agentsSetLabels, request,
+                                                                   returning: Agent.self)
             work.upsert(agent)
             await loadLabelVocabulary(in: agent.projectFolder)
             return true
@@ -594,9 +608,9 @@ final class RemoteModel {
 
     func loadLabelVocabulary(in folder: URL) async {
         let folder = Project.standardize(folder)
-        guard let values = try? await client.call(
-            DaemonAPI.Method.agentsLabelVocabulary,
-            DaemonAPI.LabelVocabularyRequest(folder: folder), returning: [String].self) else { return }
+        let request = DaemonAPI.LabelVocabularyRequest(folder: folder)
+        guard let values = try? await client(for: request).call(DaemonAPI.Method.agentsLabelVocabulary, request,
+                                                                returning: [String].self) else { return }
         labelVocabularies[folder] = values
     }
 
@@ -624,7 +638,7 @@ final class RemoteModel {
         } catch {
             // Out of patience too (#208): the sheet is let go, and the start is settled
             // when the host is back, by its `requestID`.
-            startRefusal = "\(hostName(of: error) ?? "Your Mac") stopped answering before it said whether the agent "
+            startRefusal = "\((error as? HostAway).map { hostName($0.host) } ?? "Your Mac") stopped answering before it said whether the agent "
                 + "started. This will be checked when it is back."
             return false
         }
@@ -663,7 +677,8 @@ final class RemoteModel {
     }
 
     private func startRefusalBeforeSending(in folder: URL) -> String? {
-        if isStale { return "Your Mac is not answering, so nothing was started." }
+        let host = work.project(folder)?.host ?? .mac
+        if isStale(on: host) { return notAnswering(host, "nothing was started.") }
         guard let summary = work.project(folder) else { return nil }
         if summary.project.isArchived { return "This project was archived on the Mac, so nothing was started." }
         if !summary.exists { return "This project's folder is not on the Mac any more, so nothing was started." }
@@ -684,6 +699,21 @@ final class RemoteModel {
     /// silently is not there reads as one the phone forgot.
     private(set) var runtimes: [RuntimeStatus] = []
     private var accounts: [String: RuntimeAccount] = [:]
+
+    /// Each other host's runtimes, as it last listed them (#240): a server project's
+    /// start sheet offers its server's, as the window's does (037).
+    private(set) var serverRuntimes: [HostID: [RuntimeStatus]] = [:]
+
+    func runtimes(on host: HostID) -> [RuntimeStatus] {
+        host == .mac ? runtimes : serverRuntimes[host] ?? []
+    }
+
+    private func refreshServerRuntimes(_ host: HostID) async {
+        guard let other = otherHosts[host],
+              let listed = try? await other.call(DaemonAPI.Method.runtimesList, Optional<String>.none,
+                                                 returning: [RuntimeStatus].self) else { return }
+        serverRuntimes[host] = RuntimeCatalog.sortedByName(listed)
+    }
 
     var availableRuntimeIDs: [String] {
         runtimes.filter(\.availability.isAvailable).map(\.runtime.id)
@@ -989,7 +1019,14 @@ final class RemoteModel {
 
     /// The other hosts this phone has a live connection to now (058, #208): an agent on
     /// one that is not is stale on its own, whatever the home host is doing.
-    private(set) var reachableHosts: Set<HostID> = []
+    private(set) var reachableHosts: Set<HostID> = [] {
+        didSet {
+            for host in oldValue.subtracting(reachableHosts) where hostDownSince[host] == nil {
+                hostDownSince[host] = Date()
+            }
+            for host in reachableHosts.subtracting(oldValue) { hostDownSince[host] = nil }
+        }
+    }
 
     /// Whether what is shown of `host`'s work can be trusted, and acted on: the home host's
     /// staleness for its own, that host's link for another's (#208).
@@ -998,6 +1035,26 @@ final class RemoteModel {
     }
 
     func isStale(_ agent: Agent) -> Bool { isStale(on: agent.host) }
+
+    /// Who something sent to `host` goes to, as the in-flight mark (`Telling`) names it:
+    /// the Mac as "your Mac", a server by its name, as the window says it (#239).
+    func recipient(on host: HostID) -> String {
+        host == .mac ? "your Mac" : hostName(host)
+    }
+
+    /// Who something sent to this agent goes to (#239).
+    func answerRecipient(_ agentID: UUID) -> String {
+        recipient(on: work.agent(agentID)?.host ?? .mac)
+    }
+
+    /// The host of the project the start sheet is open on: where the new agent starts.
+    var startHost: HostID {
+        startingIn.flatMap { work.project($0)?.host } ?? .mac
+    }
+
+    /// When each other host was last seen to go, for the strip over its chats (#239):
+    /// set as it leaves `reachableHosts`, cleared as it comes back.
+    private(set) var hostDownSince: [HostID: Date] = [:]
 
     /// Ask whether a control plane is on the other end, and follow its other hosts if so.
     /// A bridge with no control plane answers `control/status` with methodNotFound, and
@@ -1084,11 +1141,18 @@ final class RemoteModel {
             if let agents = try? await other.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true)) {
                 work.replaceAgents(agents, from: id)
             }
+            await refreshServerRuntimes(id)
             let notes = other.notifications()
             let shown = work.shown
             // Read off the main actor, once, and applied there (#203).
             Task.detached(priority: .userInitiated) { [weak self] in
                 for await note in notes {
+                    // Its runtimes, and the start sheet's draft made there (#240).
+                    if note.method == DaemonAPI.Notification.runtimeChanged
+                        || note.method == DaemonAPI.Notification.draftOptions {
+                        await self?.received(note.method, note.params, fromOther: id)
+                        continue
+                    }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
                     await self?.work.apply(update, from: id)
                 }
@@ -1108,7 +1172,23 @@ final class RemoteModel {
             if !listed.contains(where: { $0.id == id }) {
                 work.replaceProjects([], from: id)
                 work.replaceAgents([], from: id)
+                serverRuntimes[id] = nil
             }
+        }
+    }
+
+    /// What another host says that the shared model does not claim, and the phone wants:
+    /// its runtimes changing, and the start sheet's draft settling there (#240).
+    private func received(_ method: String, _ params: JSONValue?, fromOther host: HostID) async {
+        switch method {
+        case DaemonAPI.Notification.runtimeChanged:
+            await refreshServerRuntimes(host)
+        case DaemonAPI.Notification.draftOptions:
+            guard host == startDraftHost,
+                  let change = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
+            settleStartDraft(change)
+        default:
+            break
         }
     }
 
@@ -2077,9 +2157,9 @@ final class RemoteModel {
     /// What a runtime last advertised for a folder, for the workflow page's menus.
     /// Empty is an answer: nothing has been remembered for it there yet.
     func rememberedOptions(runtimeID: String, cwd: URL) async -> [ConfigOption] {
-        (try? await client.call(DaemonAPI.Method.optionsRemembered,
-                                DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID, cwd: cwd),
-                                returning: [ConfigOption].self)) ?? []
+        let request = DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID, cwd: cwd)
+        return (try? await client(for: request).call(DaemonAPI.Method.optionsRemembered, request,
+                                                     returning: [ConfigOption].self)) ?? []
     }
 
     /// The mode last chosen for each runtime, on any device. `modes/changed` keeps it
@@ -2106,8 +2186,8 @@ final class RemoteModel {
             return
         }
         do {
-            try await client.call(DaemonAPI.Method.agentsSetSandbox,
-                                  DaemonAPI.SetSandboxRequest(agentID: agentID, choice: choice))
+            let request = DaemonAPI.SetSandboxRequest(agentID: agentID, choice: choice)
+            try await client(for: request).call(DaemonAPI.Method.agentsSetSandbox, request)
         } catch {
             problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
         }
@@ -2116,8 +2196,8 @@ final class RemoteModel {
     /// The sandbox card's answer, from the phone (064, FR-007a).
     func answerSandbox(_ agentID: UUID, carryOn: Bool) async {
         do {
-            try await client.call(DaemonAPI.Method.agentsAnswerSandbox,
-                                  DaemonAPI.AnswerSandboxRequest(agentID: agentID, carryOn: carryOn))
+            let request = DaemonAPI.AnswerSandboxRequest(agentID: agentID, carryOn: carryOn)
+            try await client(for: request).call(DaemonAPI.Method.agentsAnswerSandbox, request)
         } catch {
             problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
         }
@@ -2229,8 +2309,9 @@ final class RemoteModel {
     /// quietly dropped (FR-033). An answer that cannot be delivered is not an answer.
     @discardableResult
     func answer(_ request: PermissionRequest, optionID: String) async -> Bool {
-        guard !isStale else {
-            problem = "Your Mac is not answering, so that could not be sent."
+        let host = work.agent(request.agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that could not be sent.")
             return false
         }
         do {
@@ -2253,8 +2334,9 @@ final class RemoteModel {
     func answer(_ request: ElicitationRequest,
                 action: DaemonAPI.AnswerElicitationRequest.Action,
                 content: [String: JSONValue] = [:]) async -> Bool {
-        guard !isStale else {
-            problem = "Your Mac is not answering, so that could not be sent."
+        let host = work.agent(request.agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that could not be sent.")
             return false
         }
         do {
@@ -2282,8 +2364,9 @@ final class RemoteModel {
     /// from here. What is attached is checked first, by the same rules as a start from
     /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
     func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID) async -> Bool {
-        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
-            problem = "Your Mac is not answering, so that was not sent."
+        let host = work.agent(agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that was not sent.")
             return false
         }
         let capabilities = promptCapabilities(for: work.agent(agentID)?.runtimeID)
@@ -2336,8 +2419,8 @@ final class RemoteModel {
         let sequence = work.beginOption(agentID: agentID, optionID: optionID, value: value)
         Task {
             do {
-                try await client.call(DaemonAPI.Method.agentsSetOption,
-                                      DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
+                let request = DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value)
+                try await client(for: request).call(DaemonAPI.Method.agentsSetOption, request)
             } catch {
                 problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
             }
@@ -2365,10 +2448,9 @@ final class RemoteModel {
             return
         }
         do {
-            let changed = try await client.call(
-                DaemonAPI.Method.agentsSetCeiling,
-                DaemonAPI.SetCeilingRequest(agentID: agent.id, ceiling: agent.ceilingToGoOn(under: costLimits)),
-                returning: Agent.self)
+            let request = DaemonAPI.SetCeilingRequest(agentID: agent.id, ceiling: agent.ceilingToGoOn(under: costLimits))
+            let changed = try await client(for: request).call(DaemonAPI.Method.agentsSetCeiling, request,
+                                                              returning: Agent.self)
             work.upsert(changed)
         } catch {
             problem = "That did not reach your Mac."
@@ -2491,25 +2573,30 @@ final class RemoteModel {
     /// opened, or somebody is typing in it. Once per session and reason in a while,
     /// however many keys; the Mac debounces too. Silent: nothing is said if it fails.
     func prewarm(_ agentID: UUID, _ why: DaemonAPI.PrewarmRequest.Why) async {
-        guard !isStale, let agent = agent(agentID), agent.state == .finished || agent.state == .stopped else { return }
+        guard let agent = agent(agentID), !isStale(agent),
+              agent.state == .finished || agent.state == .stopped else { return }
         let key = "\(agentID) \(why.rawValue)"
         if let last = prewarmed[key], Date().timeIntervalSince(last) < 15 { return }
         prewarmed[key] = Date()
         if prewarmed.count > 64 { prewarmed = prewarmed.filter { Date().timeIntervalSince($0.value) < 15 } }
-        _ = try? await client.call(DaemonAPI.Method.agentsPrewarm, DaemonAPI.PrewarmRequest(agentID: agentID, why: why))
+        // To the agent's own host, which is the one with its runtime to start (#238).
+        let request = DaemonAPI.PrewarmRequest(agentID: agentID, why: why)
+        _ = try? await client(for: request).call(DaemonAPI.Method.agentsPrewarm, request)
     }
 
     /// Mark as Unread / Mark as Read, from the card's menu (#70).
     func setUnread(_ agentID: UUID, _ unread: Bool) async {
-        guard !isStale else {
-            problem = "Your Mac is not answering, so that could not be sent."
+        let host = work.agent(agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that could not be sent.")
             return
         }
         do {
-            try await client.call(DaemonAPI.Method.agentsSetUnread,
-                                  DaemonAPI.SetUnreadRequest(agentID: agentID, unread: unread))
+            // The mark is kept by the agent's own host, and told from there (#238).
+            let request = DaemonAPI.SetUnreadRequest(agentID: agentID, unread: unread)
+            try await client(for: request).call(DaemonAPI.Method.agentsSetUnread, request)
         } catch {
-            problem = "That did not reach your Mac."
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
 
@@ -2557,16 +2644,20 @@ final class RemoteModel {
     /// What to say when a send did not go because its host is away (#208): the home host
     /// or another of the control plane's, by name. Nil for any other failure.
     private func away(_ error: any Error, _ outcome: String) -> String? {
-        if error is MacAway { return "Your Mac is not answering, so \(outcome)" }
-        guard error is HostAway else { return nil }
-        return "\(hostName(of: error) ?? "That host") is not answering, so \(outcome)"
+        if error is MacAway { return notAnswering(.mac, outcome) }
+        guard let away = error as? HostAway else { return nil }
+        return notAnswering(away.host, outcome)
     }
 
-    /// The name of the other host a `HostAway` is about.
-    private func hostName(of error: any Error) -> String? {
-        guard let away = error as? HostAway else { return nil }
-        return controlHosts.first { $0.id == away.host }.map { $0.name.isEmpty ? $0.id.rawValue : $0.name }
-            ?? "That host"
+    /// "… is not answering, so …", naming the host: the home host as the Mac, another
+    /// by its name (#238).
+    private func notAnswering(_ host: HostID, _ outcome: String) -> String {
+        "\(host == .mac ? "Your Mac" : hostName(host)) is not answering, so \(outcome)"
+    }
+
+    /// Another of the control plane's hosts, by the name it was given.
+    func hostName(_ host: HostID) -> String {
+        controlHosts.first { $0.id == host }.map { $0.name.isEmpty ? $0.id.rawValue : $0.name } ?? "That host"
     }
 
     func dismissProblem() { problem = nil }

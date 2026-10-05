@@ -15,25 +15,25 @@
 
 ## Counts
 
-Of 204 rows: **56 same**, **35 by design**, **113 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
+Of 204 rows: **64 same**, **37 by design**, **103 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
-| Session rows and states | 8 | 2 | 13 |
+| Session rows and states | 10 | 2 | 11 |
 | Chat turns and turn detail | 4 | 3 | 15 |
-| Prompt bar and queued prompts | 3 | 2 | 15 |
-| Question and permission cards | 3 | 2 | 10 |
-| Start sheet and new project | 6 | 5 | 11 |
+| Prompt bar and queued prompts | 5 | 2 | 13 |
+| Question and permission cards | 4 | 3 | 8 |
+| Start sheet and new project | 8 | 5 | 9 |
 | Worktrees and Files | 5 | 6 | 10 |
 | Dashboard and pins | 8 | 0 | 6 |
 | Workflows page | 6 | 1 | 7 |
 | Settings and Project Settings | 1 | 6 | 0 |
 | Pool, runtimes and spending | 2 | 1 | 7 |
 | Events and resources | 1 | 1 | 3 |
-| Notifications and badges | 1 | 1 | 2 |
+| Notifications and badges | 2 | 1 | 1 |
 | Disk strip | 1 | 1 | 1 |
-| Hosts, connection and pairing | 3 | 2 | 1 |
+| Hosts, connection and pairing | 3 | 3 | 0 |
 | MCP Apps views | 1 | 0 | 0 |
 
 The deltas are tracked by 32 issues:
@@ -85,12 +85,12 @@ The deltas are tracked by 32 issues:
 | Folder is missing (#119) | On the row | On the row | On the row | **same** |
 | Labels | Every chip: `A/AgentList/AgentRow.swift:138-148` | Two, then *+N*: `R/Projects/AgentCard.swift:22-45` | Every chip: `W/views/SessionRow.tsx:85` | **by design** (phone width) |
 | Last-activity time in the corner | None | None | *5m*, *3h*, *2d*: `W/views/SessionRow.tsx:93` | **delta**: decide, #267 |
-| In flight, "telling …" (#87) | The host's name: `A/Permission/AnswerRecipient.swift:6-9` | *your Mac*, hard-coded: `R/Projects/AgentCard.swift:122` and four more | `store.recipient(host)`: `W/model/store.ts:1111-1113` | **delta**: Remote #239 |
+| In flight, "telling …" (#87) | The host's name: `A/Permission/AnswerRecipient.swift:6-9` | The host's name: `R/RemoteModel.swift` `answerRecipient`, at `R/Projects/AgentCard.swift:122` and four more | `store.recipient(host)`: `W/model/store.ts:1111-1113` | **same** (#239) |
 | One action at a time, held while telling (#87) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx` | **same** |
 | Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268` | No Stop, no Bring Back on an archived card, no Branch: `R/Projects/AgentCard.swift:179-222` | Stop, Park / Unpark, Mark, Pin, Bring Back / Archive, Move: `W/views/SessionMenu.tsx:16-44` | **delta**: Remote #241 (Stop, Bring Back); Branch #267. Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
 | Swipe | Pin; Archive, or Bring Back when archived: `A/Projects/ProjectListView.swift:487-506` | Pin; Archive; nothing on an archived card: `R/Projects/AgentCard.swift:223-234` | None | **delta**: Remote #241. Web: **by design** (no swipe) |
 | Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
-| Mark Read / Unread reaches the agent's host | Per host | The home host always: `R/RemoteModel.swift:2451-2461` | Per host: `W/views/SessionMenu.tsx:78` | **delta**: Remote #238 |
+| Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |
 | Rename | None | None | None | **same** |
 
 ## Chat turns and turn detail
@@ -134,7 +134,7 @@ The deltas are tracked by 32 issues:
 | Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | None | **delta**: web #254 |
 | Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | *Reply…*: `W/views/Chat.tsx:225` | **delta**: web #254 |
 | Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | Always *↑ Send*; Stop in ···: `W/views/Prompt.tsx:173-176` | **delta**: web #254 |
-| Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | *your Mac*: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **delta**: Remote #239 |
+| Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | The host's name: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **same** (#239) |
 | Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |
 | Attachments | Picker, drag, paste: `A/Chat/PromptBar.swift:455-463` | `R/Chat/PromptBar.swift:214` | Picker, drop, paste: `W/views/Prompt.tsx:122-171` | **same** |
 | Dictation (#69) | `S/Chat/Dictation.swift` | Shared | None | **by design** (071) |
@@ -142,7 +142,7 @@ The deltas are tracked by 32 issues:
 | @ file mentions | `A/Chat/PromptBar.swift:644-690` | `R/Chat/PromptBar.swift:418-454` | None | **delta**: web #255 |
 | Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | None | **delta**: web #254. Placeholder against chip: **by design** (touch) |
 | Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Memory only, lost on reload: `W/model/store.ts:1009` | **delta**: web #254 |
-| Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | Sent to the home host: `R/RemoteModel.swift:2441-2447` | `W/views/Chat.tsx:50, 229` | **delta**: Remote #238 |
+| Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | To the agent's host: `R/RemoteModel.swift:2480-2490` | `W/views/Chat.tsx:50, 229` | **same** (#238) |
 | The bar on an archived chat | Shown: *Say what next, and this comes back* | Hidden: `R/Chat/RemoteChatView.swift:202` | Shown | **delta**: Remote #242 |
 
 ## Question and permission cards
@@ -155,8 +155,8 @@ The deltas are tracked by 32 issues:
 | Multi-page forms | *1/3*: `A/Elicitation/ElicitationView.swift:89-150` | *Question 1 of 3*: `R/Elicitation/FormPages.swift:50-55` | *1/3*: `W/views/Cards.tsx:209-218` | **same** |
 | Date, date-time, email, URL fields | Plain text: `A/Elicitation/ElicitationView.swift:437` | DatePicker, keyboards: `R/Elicitation/FormPages.swift:125-133, 329-357` | Text or number: `W/views/Cards.tsx:416-426` | **delta**: Mac and web #265 |
 | A field's problem in place | Under every field | Under every part | Text and number only: `W/views/Cards.tsx:387-428` | **delta**: web #256 |
-| Held while sending (#86) | The answer bright, *telling* the host | *telling your Mac*: `R/Elicitation/ElicitationSheet.swift:183-195` | The host's name: `W/views/Cards.tsx:96-116` | **delta**: Remote #239. Buttons replaced on the Remote: **by design** (layout) |
-| Greyed while the host is down (#83) | `A/Chat/ChatView.swift:179-193` | The Mac link only: `R/Elicitation/ElicitationSheet.swift:70`, `R/Permission/PermissionSheet.swift:126` | `W/views/Chat.tsx:45-46` | **delta**: Remote #239 |
+| Held while sending (#86) | The answer bright, *telling* the host | *telling* the host: `R/Elicitation/ElicitationSheet.swift:188-203` | The host's name: `W/views/Cards.tsx:96-116` | **by design**: buttons replaced on the Remote (layout); the host's name the same since #239 |
+| Greyed while the host is down (#83) | `A/Chat/ChatView.swift:179-193` | The agent's host: `R/Elicitation/ElicitationSheet.swift:159-162`, `R/Permission/PermissionSheet.swift:126` | `W/views/Chat.tsx:45-46` | **same** (#239) |
 | Decline; a link question | *No thanks*; *Gave up*: `A/Elicitation/ElicitationView.swift:46-62` | *No thanks* for both: `R/Elicitation/ElicitationSheet.swift:154` | As the window: `W/views/Cards.tsx:277-285` | **delta**: Remote #243 |
 | Answered elsewhere | Disappears | Disappears | 4 s, *Answered on another device.*: `W/views/Cards.tsx:35-38, 78-84` | **delta**: #266 |
 | Keyboard answers | ⌘1…9, Return: `A/Elicitation/ElicitationView.swift:528-540` | n/a | None | **delta**: web #256 |
@@ -171,7 +171,7 @@ The deltas are tracked by 32 issues:
 |---|---|---|---|---|
 | Its shape | A bar on the project: `A/Chat/PromptBar.swift:242-347` | A sheet: `R/StartAgent/StartAgentView.swift:25-46` | A bar: `W/views/NewAgent.tsx:154-210` | **by design** |
 | Runtimes listed by name (#154) | `RuntimeCatalog.sortedByName` | The same | `W/model/runtimes.ts` | **same** |
-| Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | Always, from the Mac's one list: `R/StartAgent/ChoiceRows.swift:57-129`, `R/RemoteModel.swift:682` | Startable only, flat: `W/views/NewAgent.tsx:45, 193-201` | **delta**: web #257; Remote per host #240 |
+| Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | The project's host's runtimes, split only for this Mac's projects: `R/StartAgent/ChoiceRows.swift:57-140`, `R/RemoteModel.swift` `startRuntimes` (#240) | Startable only, flat: `W/views/NewAgent.tsx:45, 193-201` | **delta**: web #257 |
 | Default runtime | The kept form's, else Claude: `A/Chat/PromptBar.swift:1109-1117` | The latest agent's, else Claude: `K/Client/AgentsModel.swift:1079-1086` | The latest agent's: `W/views/NewAgent.tsx:46-51` | **delta**: #264 |
 | A model out of the pool (#140) | In the chooser | In the menu row | A line under the menus | **by design** (#140) |
 | Model, effort, permission | `A/Chat/PromptBar.swift:788-887` | `R/StartAgent/ChoiceRows.swift:22-50, 186-290` | Pills: `W/views/NewAgent.tsx:203-206` | **same** |
@@ -181,11 +181,11 @@ The deltas are tracked by 32 issues:
 | Where it runs | Folder; new worktree (or why not); worktrees, missing ones off, *· N agents*; on a branch: `A/Chat/PromptBar.swift:1129-1178` | The same, with git status: `R/StartAgent/ChoiceRows.swift:133-182` | No branches, no why-not, missing ones hidden: `W/views/NewAgent.tsx:66-70, 170-185` | **delta**: web #257 |
 | Reach: extra folders | `A/StartAgent/AgentReachView.swift` | None | Typed paths: `W/views/Reach.tsx` | **delta**: Remote #244 |
 | Reach: MCP servers | `A/StartAgent/AgentReachView.swift` | None | *chosen in the window* | **by design** (the window's) |
-| The project's host offline | Send off: `A/Chat/PromptBar.swift:365-372` | The Mac link only: `R/StartAgent/StartAgentView.swift:88-90` | Off: `W/views/NewAgent.tsx:144-146` | **delta**: Remote #239 |
-| Starting, in flight (#87) | Words held, *Starting — telling …* | Spinner, *telling your Mac* | Held: `W/views/Prompt.tsx:92-120` | **same** (apart from #239) |
+| The project's host offline | Send off: `A/Chat/PromptBar.swift:365-372` | Send off, with the strip: `R/StartAgent/StartAgentView.swift:45, 135-139` | Off: `W/views/NewAgent.tsx:144-146` | **same** (#239) |
+| Starting, in flight (#87) | Words held, *Starting — telling …* | Spinner, *telling* the project's host | Held: `W/views/Prompt.tsx:92-120` | **same** |
 | Attachments, refused before sending | `A/Chat/AttachmentStrip.swift` | `R/StartAgent/PhoneAttachments.swift` | `W/model/attachments.ts` | **same** |
 | The form kept between starts | Text, attachments, folder, runtime, reach, options: `A/Chat/DraftKeeper.swift:125-170` | Text and attachments | Text only: `W/views/NewAgent.tsx:60-71` | **delta**: Remote #244, web #257 |
-| Prewarm on typing (#183) | Yes | To the home host | Yes | **delta**: Remote #238 |
+| Prewarm on typing (#183) | Yes | Yes, to the agent's host | Yes | **same** (#238) |
 | Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | None | `W/views/NewProject.tsx:34-260` | **delta**: Remote #244 |
 | Add Server… | `A/Control/ControlAddServerSheet.swift` | None | None | **by design** (installs over ssh from the Mac) |
 | Add Folder on this Mac: Finder drag, the clipboard's URL | Yes | n/a | Browses the host instead | **by design** (#115: no drag from Finder, no clipboard read) |
@@ -299,7 +299,7 @@ The deltas are tracked by 32 issues:
 |---|---|---|---|---|
 | Notifications | `A/Notifications/MacNotifier.swift:37-79` | Local and push: `R/Notifications/DeviceNotifier.swift:34-98` | None: `W/presence.ts:5` | **by design** (071: the page takes no notices) |
 | The needs-you count | Dock badge: `A/ContentView.swift:267-268` | No icon badge, though it asks for one: `R/Notifications/DeviceNotifier.swift:116, 130` | The tab's title: `W/presence.ts:16-30` | **delta**: Remote #249 |
-| Presence: watching and active | Every host; *watching* to the owner: `A/AppModel.swift:2531-2549` | The home host only: `R/RemoteModel.swift:1586-1591` | One host: `W/presence.ts:39-42` | **delta**: Remote and web #238 |
+| Presence: watching and active | Every host; *watching* to the owner: `A/AppModel.swift:2531-2549` | The same: `R/RemoteModel.swift:1604-1618` | The same: `W/presence.ts:36-47` | **same** (#203, checked in #238) |
 | Unread counts on project rows and folds (#70) | Yes | Yes | Yes | **same** |
 
 ## Disk strip
@@ -314,7 +314,7 @@ The deltas are tracked by 32 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| A down host over a chat (#83) | `A/Chat/OfflineStrip.swift:9-50`, with Try Again | Nothing for a server: `R/StaleBanner.swift:22-37` covers the Mac link only | `W/views/OfflineStrip.tsx`, no button | **delta**: Remote #239. No button on the page: **by design** |
+| A down host over a chat (#83) | `A/Chat/OfflineStrip.swift:9-50`, with Try Again | `R/Chat/HostOfflineStrip.swift`, in the window's words (`S/OfflineWords.swift`), no button; the Mac link is `R/StaleBanner.swift` | `W/views/OfflineStrip.tsx`, no button | **by design**: no button on the Remote or the page, which dial the host again by themselves |
 | The control plane away | `A/Sidebar/ControlAwayStrip.swift` | `R/StaleBanner.swift` | `W/views/Banner.tsx` | **same** |
 | Reconnect on wake and network change (#82) | `A/WakeAndNetwork.swift` | Yes (its hangs are #208, not parity) | Yes, and the `online` event | **same** |
 | A refused write said in words (#88) | `storage/writeFailed` | `storage/writeFailed`: `R/RemoteModel.swift` | `storage/writeFailed` (unit-tested) | **same** |
@@ -330,7 +330,7 @@ The deltas are tracked by 32 issues:
 ## Live sync
 
 #233 asks whether "not in sync" also means one client showing stale state after another acts. From the code:
-- **#238:** the Remote sends Mark Read / Unread and presence for a server's agent to the Mac. A session opened on the phone may stay unread on its server, and so in the other clients.
+- **#238 (fixed):** the Remote sent Mark Read / Unread and prewarm for a server's agent to the Mac; they go to the agent's own host now, and presence already did since #203.
 - **#263:** a server's disk state overwrites the window's.
 - Catch-up and lean changes are #203, #175 and #208; this audit found nothing more there.
 
