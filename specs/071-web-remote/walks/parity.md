@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 204 rows: **64 same**, **37 by design**, **103 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
+Of 204 rows: **66 same**, **37 by design**, **101 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -23,7 +23,7 @@ Of 204 rows: **64 same**, **37 by design**, **103 delta**. A row with any open d
 | Session rows and states | 10 | 2 | 11 |
 | Chat turns and turn detail | 4 | 3 | 15 |
 | Prompt bar and queued prompts | 5 | 2 | 13 |
-| Question and permission cards | 4 | 3 | 8 |
+| Question and permission cards | 6 | 3 | 6 |
 | Start sheet and new project | 8 | 5 | 9 |
 | Worktrees and Files | 5 | 6 | 10 |
 | Dashboard and pins | 8 | 0 | 6 |
@@ -70,25 +70,25 @@ The deltas are tracked by 32 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Status shape and tint | `A/AgentList/AgentRow.swift:294-348` | The same shape: `R/Projects/AgentCard.swift:274-284` | Ported: `W/model/status.ts:44-92` | **same** |
-| Spoken status words | `StatusShape.words` (*Unread ·*, *Waiting for an allowance*) | Its own `StatusIcon.words`: `R/Projects/AgentCard.swift:330-345` | `W/model/status.ts` | **delta**: Remote #241 |
+| Spoken status words | `StatusShape.words` (*Unread ·*, *Waiting for an allowance*) | `StatusShape.words(row:)`: `R/Projects/AgentCard.swift` | `W/model/status.ts` | **same** |
 | Coming back after a restart | Spinner and words: `A/AgentList/AgentRow.swift:60, 277` | `R/Projects/AgentCard.swift:68, 270` | Never: `isComingBack` not passed, `W/views/SessionRow.tsx:16` | **delta**: web #251 |
 | Unread mark (#70) | Dot, semibold: `A/AgentList/AgentRow.swift:76-83` | `R/Projects/AgentCard.swift:80-89` | `W/views/SessionRow.tsx:74-75` | **same** |
 | Report line, title owning its line (#68) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx:69-92` | **same** |
-| Started-by mark (workflow, agent) | `A/AgentList/AgentRow.swift:84-208` | Agent yes, workflow no: `R/Projects/AgentCard.swift:90-168` | None | **delta**: Remote #241, web #251 |
-| Background line | `A/AgentList/AgentRow.swift` | None | `W/views/SessionRow.tsx:69-92` | **delta**: Remote #241 |
+| Started-by mark (workflow, agent) | `A/AgentList/AgentRow.swift:84-208` | Workflow and agent: `R/Projects/AgentCard.swift` | None | **delta**: web #251 |
+| Background line | `A/AgentList/AgentRow.swift` | `BackgroundWords.mark`: `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx:69-92` | **same** |
 | Lease mark | `A/AgentList/AgentRow.swift:153` | `R/Projects/AgentCard.swift:145` | None | **delta**: web #251 |
 | Event-wait line, retirement note | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | None | **delta**: web #251 |
 | Block lines (#152, #157) | Under the report: `A/AgentList/AgentRow.swift` | The same | Same words: `W/model/block.ts`, held to `Fixtures/web/block/lines.json` | **same** |
 | Carry on | Row button and row menu: `A/AgentList/AgentRow.swift:189-216` | Long press: `R/Projects/AgentCard.swift:180-187` | Chat strip only, not the row menu: `W/views/SessionMenu.tsx:16-44` | **delta**: web #250 (menu). The row button: **by design** (the page's row is itself a button, #157) |
 | Park line | `S/ParkWords.swift` on the row | The same | `W/views/SessionRow.tsx:40-66` | **same** |
-| Worktree badge | ⑂ name, struck when gone, help *branch — path*: `A/AgentList/AgentRow.swift:361-386` | Never struck: `R/Projects/AgentCard.swift:105-114` | Struck; help the branch only: `W/views/SessionRow.tsx:84`, `W/app.css:561` | **delta**: Remote #241, web #251 |
+| Worktree badge | ⑂ name, struck when gone, help *branch — path*: `A/AgentList/AgentRow.swift:361-386` | Struck when gone, help *branch — path*: `R/Projects/AgentCard.swift` | Struck; help the branch only: `W/views/SessionRow.tsx:84`, `W/app.css:561` | **same**; web #251 |
 | Folder is missing (#119) | On the row | On the row | On the row | **same** |
 | Labels | Every chip: `A/AgentList/AgentRow.swift:138-148` | Two, then *+N*: `R/Projects/AgentCard.swift:22-45` | Every chip: `W/views/SessionRow.tsx:85` | **by design** (phone width) |
 | Last-activity time in the corner | None | None | *5m*, *3h*, *2d*: `W/views/SessionRow.tsx:93` | **delta**: decide, #267 |
 | In flight, "telling …" (#87) | The host's name: `A/Permission/AnswerRecipient.swift:6-9` | The host's name: `R/RemoteModel.swift` `answerRecipient`, at `R/Projects/AgentCard.swift:122` and four more | `store.recipient(host)`: `W/model/store.ts:1111-1113` | **same** (#239) |
 | One action at a time, held while telling (#87) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx` | **same** |
-| Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268` | No Stop, no Bring Back on an archived card, no Branch: `R/Projects/AgentCard.swift:179-222` | Stop, Park / Unpark, Mark, Pin, Bring Back / Archive, Move: `W/views/SessionMenu.tsx:16-44` | **delta**: Remote #241 (Stop, Bring Back); Branch #267. Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
-| Swipe | Pin; Archive, or Bring Back when archived: `A/Projects/ProjectListView.swift:487-506` | Pin; Archive; nothing on an archived card: `R/Projects/AgentCard.swift:223-234` | None | **delta**: Remote #241. Web: **by design** (no swipe) |
+| Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268` | Stop, Bring Back, and the other card actions: `R/Projects/AgentCard.swift` | Stop, Park / Unpark, Mark, Pin, Bring Back / Archive, Move: `W/views/SessionMenu.tsx:16-44` | **same** for Stop and Bring Back; Branch #267. Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
+| Swipe | Pin; Archive, or Bring Back when archived: `A/Projects/ProjectListView.swift:487-506` | Pin; Archive, or Bring Back when archived: `R/Projects/AgentCard.swift` | None | **same**; web: **by design** (no swipe) |
 | Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
 | Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |
 | Rename | None | None | None | **same** |
@@ -100,7 +100,7 @@ The deltas are tracked by 32 issues:
 | Outcome / Steps / Details, and the chooser (069) | View ▸ Turns: `A/Commands/AgentsCommands.swift:113` | ··· ▸ Turns show: `R/Chat/RemoteChatView.swift:265` | A select in the chat's head, kept: `W/views/Chat.tsx:29-37, 193` | **same** |
 | Concise turn: prompt, *7 steps*, reply, report; no chevron (#148) | `S/Chat/TranscriptRows.swift:38-158` | Shared | `W/views/chat/Rows.tsx:345-399` (walked, #148) | **same** |
 | An open call: diff, Argument, Return (#153) | `S/Chat/TranscriptRows.swift:572-675` | Shared | `W/views/chat/Rows.tsx:128-187`; drops non-text content (`:165-167`) | **delta** (minor): web #252 |
-| Show in Changes under an edit (#153) | `A/Chat/ChatView.swift:82-88` | Hidden: `showEdit` not passed, `R/Chat/RemoteChatView.swift:221-240` | `W/views/Chat.tsx:76-79` | **delta**: Remote #242 |
+| Show in Changes under an edit (#153) | `A/Chat/ChatView.swift:82-88` | Opens what the agent did to that file, in a sheet (#242): `R/Chat/RemoteChatView.swift`; a Changes of its own is #245 | `W/views/Chat.tsx:76-79` | **same** |
 | A location in a call | Opens in the Mac's editor: `A/Chat/ChatView.swift:74` | Opens in Files at the line: `R/Chat/RemoteChatView.swift:222-228` | Opens in Files: `W/views/Chat.tsx:72-75` | **by design** (only the Mac has an editor) |
 | Terminal output in a call | `S/Chat/ChatBlocks.swift:151` | Shared | *shown in the Mac window*: `W/views/chat/Rows.tsx:166` | **by design** (no terminal on the page) |
 | Markdown: code colour, task lists | `S/Page/MarkdownText.swift:24, 204`, `S/Code/CodeBlockText.swift` | Shared | No colour, no checkboxes: `W/render/markdown.ts:89-93` | **delta**: web #252 |
@@ -108,9 +108,9 @@ The deltas are tracked by 32 issues:
 | Plan; a withdrawn plan | `S/Chat/ChatBlocks.swift:177-223` | Shared, plus a current-plan strip: `R/Chat/PlanView.swift:13-69` | Withdrawn ignored: `W/views/chat/Rows.tsx:87-96` | **delta**: web #252; the plan strip #267 |
 | Switch note and handoff | `S/Chat/SwitchNote.swift:7-24` | Shared | Headline only: `W/views/chat/Rows.tsx:198-212` | **delta**: web #252 |
 | Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Only on news, *New messages ↓*: `W/views/Chat.tsx:221` | **delta**: web #252 |
-| First open: the last 12 turns, earlier ones at the top (#90, #91) | `A/AppModel.swift:2577, 2602` | The default, 50: `R/RemoteModel.swift:2124` | 12: `W/model/store.ts:27, 962` | **delta**: Remote #242 |
+| First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts:27, 962` | **same** |
 | Coming back after a restart, in the chat | `S/Chat/ChatTranscript.swift:135-136` | Shared | Only *Working*: `W/views/Chat.tsx:216-218` | **delta**: web #251 |
-| A retired agent | `S/Retired/RetiredAgentPage.swift` with Started by: `A/ContentView.swift:106-108` | No Started by: `R/RemoteApp.swift:96` | *New session*, prompt off: `W/views/Chat.tsx:191, 225` | **delta**: Remote #242, web #253 |
+| A retired agent | `S/Retired/RetiredAgentPage.swift` with Started by: `A/ContentView.swift:106-108` | With Started by, worded by `K/Client/AgentsModel.swift` (`retiredStarterLabel`, #242) | *New session*, prompt off: `W/views/Chat.tsx:191, 225` | **delta**: web #253 |
 | Background work over the prompt, its ending line | Stop, Steps, Output: `S/Chat/BackgroundRows.swift:13-45, 228-262`, `A/Sidebar/BackgroundPane.swift` | Stop and Steps: `R/Chat/PromptBar.swift:54-63` | Names only; no Stop, no Steps: `W/views/Chat.tsx:309-328` | **delta**: web #253 |
 | Sandbox failure card (064) | `S/Chat/SandboxFailureCard.swift:19-68` | Shared: `R/Chat/RemoteChatView.swift:238-252` | Title and details only, no answers: `W/views/chat/Rows.tsx:294-302` | **delta**: web #253 |
 | Park line in the chat | `A/Chat/ChatView.swift:141-145` | At the chat's head: `R/Chat/RemoteChatView.swift:89-95` | Row only | **delta**: web #253 |
@@ -125,7 +125,7 @@ The deltas are tracked by 32 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Layout (#108) | `A/Chat/PromptBar.swift` | `R/Chat/PromptBar.swift` | `W/views/Prompt.tsx` (walked, `walks/108/`) | **same** (each to its width) |
-| The bar's head: place, labels, runtime | `A/Chat/PromptBar.swift:246-269, 353-363` | Labels at the chat's head; no place, no runtime: `R/Chat/RemoteChatView.swift:78-83` | `W/views/Chat.tsx:230-271` | **delta**: Remote #242 |
+| The bar's head: place, labels, runtime | `A/Chat/PromptBar.swift:246-269, 353-363` | Over the field: the place (said, not offered), labels, runtime: `R/Chat/PromptBar.swift` (`PromptHead`, #242) | `W/views/Chat.tsx:230-271` | **same** (moving a session stays the window's, 053) |
 | Moving a session to another place (053) | Worktree capsule: `A/Chat/PromptBar.swift:1185-1261` | None | Names the place, can't move: `W/views/Chat.tsx:249-264` | **by design** (moving is the window's) |
 | Model and effort | One `ModelPill`: `S/Chat/ModelPill.swift` | One `ModelPill` | A pill each: `W/views/PromptMenus.tsx:44-63` | **delta**: web #254 (or record by design) |
 | No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | Nothing: `W/views/PromptMenus.tsx:48` | **delta**: web #254 |
@@ -143,13 +143,13 @@ The deltas are tracked by 32 issues:
 | Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | None | **delta**: web #254. Placeholder against chip: **by design** (touch) |
 | Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Memory only, lost on reload: `W/model/store.ts:1009` | **delta**: web #254 |
 | Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | To the agent's host: `R/RemoteModel.swift:2480-2490` | `W/views/Chat.tsx:50, 229` | **same** (#238) |
-| The bar on an archived chat | Shown: *Say what next, and this comes back* | Hidden: `R/Chat/RemoteChatView.swift:202` | Shown | **delta**: Remote #242 |
+| The bar on an archived chat | Shown: *Say what next, and this comes back* | Shown (#242) | Shown | **same** |
 
 ## Question and permission cards
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Where they show | Together, over the prompt: `A/Chat/ChatView.swift:172-196` | A form hidden while any permission waits: `R/Chat/RemoteChatView.swift:184-200` | Together: `W/views/Cards.tsx:122-133` | **delta**: Remote #243 |
+| Where they show | Together, over the prompt: `A/Chat/ChatView.swift:172-196` | Together: `R/Chat/RemoteChatView.swift` (#243) | Together: `W/views/Cards.tsx:122-133` | **same** |
 | Asker line and title (#121) | `A/Elicitation/ElicitationView.swift:28-34` | `R/Elicitation/ElicitationSheet.swift:28-42` | `W/views/Cards.tsx:117-120` | **same** |
 | One-tap single choice | One property only: `A/Elicitation/ElicitationView.swift:37, 303-333` | Also with the optional Other box: `R/Elicitation/ElicitationSheet.swift:79-141` | The window's rule | **by design** (one tap on a phone; `ElicitationSheet.swift:79-89`) |
 | Multi-page forms | *1/3*: `A/Elicitation/ElicitationView.swift:89-150` | *Question 1 of 3*: `R/Elicitation/FormPages.swift:50-55` | *1/3*: `W/views/Cards.tsx:209-218` | **same** |
@@ -157,12 +157,12 @@ The deltas are tracked by 32 issues:
 | A field's problem in place | Under every field | Under every part | Text and number only: `W/views/Cards.tsx:387-428` | **delta**: web #256 |
 | Held while sending (#86) | The answer bright, *telling* the host | *telling* the host: `R/Elicitation/ElicitationSheet.swift:188-203` | The host's name: `W/views/Cards.tsx:96-116` | **by design**: buttons replaced on the Remote (layout); the host's name the same since #239 |
 | Greyed while the host is down (#83) | `A/Chat/ChatView.swift:179-193` | The agent's host: `R/Elicitation/ElicitationSheet.swift:159-162`, `R/Permission/PermissionSheet.swift:126` | `W/views/Chat.tsx:45-46` | **same** (#239) |
-| Decline; a link question | *No thanks*; *Gave up*: `A/Elicitation/ElicitationView.swift:46-62` | *No thanks* for both: `R/Elicitation/ElicitationSheet.swift:154` | As the window: `W/views/Cards.tsx:277-285` | **delta**: Remote #243 |
+| Decline; a link question | *No thanks*; *Gave up*: `A/Elicitation/ElicitationView.swift:46-62` | As the window: `R/Elicitation/ElicitationSheet.swift` (#243) | As the window: `W/views/Cards.tsx:277-285` | **same** |
 | Answered elsewhere | Disappears | Disappears | 4 s, *Answered on another device.*: `W/views/Cards.tsx:35-38, 78-84` | **delta**: #266 |
 | Keyboard answers | ⌘1…9, Return: `A/Elicitation/ElicitationView.swift:528-540` | n/a | None | **delta**: web #256 |
 | Permission options | `A/Permission/PermissionView.swift:41-48` | `R/Permission/PermissionSheet.swift:110-127` | `W/views/Cards.tsx:176-184` | **same** |
 | What the call will do | Title and kind: `A/Permission/PermissionView.swift:78-81` | Plus the diffs and content: `R/Permission/PermissionSheet.swift:66-106` | Title and kind; *switch_mode* on a plan: `W/views/Cards.tsx:173-174` | **delta**: #266 (diff); web #256 (kind) |
-| Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file only: `R/Permission/PermissionSheet.swift:89-91` | No plan: `W/views/Cards.tsx:166-188` | **delta**: Remote #243, web #256 |
+| Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file or the text: `R/Permission/PermissionSheet.swift` (#243) | No plan: `W/views/Cards.tsx:166-188` | **delta**: web #256 |
 | A server key ask | `A/Chat/TokenAskCard.swift`, `A/Hosts/Lending.swift:79-87` | None | None | **by design** (the key is lent from the Mac's Keychain); what the others see: #267 |
 
 ## Start sheet and new project

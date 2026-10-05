@@ -83,12 +83,20 @@ struct PermissionSheet: View {
     /// — the point of being asked is to see what is being asked.
     ///
     /// Except a plan the runtime wrote to a file: that is a page, opened as one, and a
-    /// whole plan in this card would push the answers off the screen.
+    /// whole plan in this card would push the answers off the screen. A plan it only
+    /// sent as text is shown here, as the window does (#243); the question's own
+    /// scroll keeps the answers in reach.
     @ViewBuilder
     private var detail: some View {
         if let plan = request.toolCall.planFile {
             Button("Show plan") { model.openPlan(plan) }
                 .buttonStyle(.paper)
+        } else if let text = request.toolCall.planText {
+            Text((try? AttributedString(markdown: text, options: .init(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text))
+                .appText(.reading)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
         } else if !request.toolCall.content.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(request.toolCall.content.enumerated()), id: \.offset) { _, piece in

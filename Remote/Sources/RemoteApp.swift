@@ -93,7 +93,8 @@ struct RemoteView: View {
                         case .agent(let id):
                             // Retired (051): nothing left to chat with, only who it was.
                             if model.selectedAgent == nil, let gone = model.work.tombstones[id] {
-                                RetiredAgentPage(tombstone: gone).paperGround()
+                                RetiredAgentPage(tombstone: gone,
+                                                 startedBy: model.work.retiredStarterLabel(gone)).paperGround()
                             } else {
                                 RemoteChatView().paperGround()
                                     .task(id: id) { await model.lookUpRetired(id) }

@@ -105,7 +105,7 @@ struct ContentView: View {
             .paperGround()
         } else if let id = model.selection, model.selectedAgent == nil, let gone = model.retiredTombstone(id) {
             // Retired (051): nothing left to chat with, only who it was.
-            RetiredAgentPage(tombstone: gone, startedBy: model.retiredStarterLabel(gone)).paperGround()
+            RetiredAgentPage(tombstone: gone, startedBy: model.work.retiredStarterLabel(gone)).paperGround()
         } else if model.selection != nil {
             chat(inWindowOf: width)
                 // Every route to an agent by id comes here — a workflow's run, a pull
