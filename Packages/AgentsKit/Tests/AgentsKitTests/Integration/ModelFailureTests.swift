@@ -59,6 +59,8 @@ struct ModelFailureTests {
             .line(now: Date())
         #expect(line.hasPrefix("Available · Model Ling 3.0 Flash out since "))
         #expect(await core.runtimeStatuses().first { $0.id == "opencode" }?.poolNote?.contains("Ling 3.0 Flash") == true)
+        // A model out is not the runtime out: the page's chooser keeps it in Available (#257).
+        #expect(await core.runtimeStatuses().first { $0.id == "opencode" }?.isOut == nil)
         let choices = await core.runtimeChoices(in: work)
         #expect(choices.contains("; Model Ling 3.0 Flash out since "), "\(choices)")
         #expect(!choices.contains("Not available on this Mac: opencode"))
@@ -76,6 +78,8 @@ struct ModelFailureTests {
         await eventually("the turn ended") { await core.agent(id)?.state.hasTurnInFlight == false }
         await eventually("opencode is out") { await state(core)?.isOut == true }
         #expect(await state(core)?.modelsOut == nil)
+        // And said with the runtime, for a chooser with no allowances of its own (#257).
+        #expect(await core.runtimeStatuses().first { $0.id == "opencode" }?.isOut == true)
     }
 
     @Test func aFailureOnOneModelThenAWorkingTurnOnAnotherStartsAHelperWithinThatTurn() async throws {

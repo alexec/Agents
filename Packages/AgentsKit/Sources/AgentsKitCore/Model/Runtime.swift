@@ -171,6 +171,10 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
     /// runtime, or one of its models (#140). Nil when all of it is in. For a client
     /// with no Pool page of its own, such as the web page's runtime picker.
     public var poolNote: String?
+    /// Out of the pool: its allowance is spent, so it takes no turn until it is back (065).
+    /// Nil when it is in, or when only some of its models are out. For a client with no
+    /// allowances of its own to split a chooser into Available and Out, as the page's (#257).
+    public var isOut: Bool?
 
     public var id: String { runtime.id }
 

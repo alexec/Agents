@@ -6,11 +6,11 @@ import { createContext } from "preact";
 import { useContext, useEffect } from "preact/hooks";
 import type {
   AgentState, BackgroundItem, ContentBlock, EndedReason, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
-  TranscriptEntry, WorkReport,
+  SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
 import { Lines } from "../Changes";
-import { backgroundEnding } from "../../model/background";
+import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, startingLabel } from "../../model/status";
 import {
@@ -18,6 +18,8 @@ import {
 } from "../../model/turns";
 import { Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
+import { switchNote } from "../../model/switchNote";
+import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { memo } from "../../render/memo";
 
 /** How much of a turn is drawn (TurnDetail). */
@@ -30,7 +32,7 @@ export const detailSummaries: Record<TurnDetail, string> = {
 };
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
-function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
+export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
   if (!blocks?.length) return <Markdown text={text} />;
   return (
     <>
@@ -38,7 +40,11 @@ function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: st
         if (block.type === "text") return <Markdown key={index} text={block.text} />;
         if (block.type === "resource_link") return <p key={index} class="attachment">📎 {block.name}</p>;
         if (block.type === "resource") return <p key={index} class="attachment">📎 {block.resource.uri.split("/").pop()}</p>;
-        if (block.type === "image") return <p key={index} class="attachment">[image]</p>;
+        // Drawn from its own bytes, as ChatBlocks does; a remote address stays unloaded (071 FR-030).
+        if (block.type === "image") {
+          return block.data && /^image\/[a-z0-9.+-]+$/i.test(block.mimeType) ? <img key={index} class="message-image" alt="Image" src={`data:${block.mimeType};base64,${block.data}`} />
+            : <p key={index} class="attachment">[image]</p>;
+        }
         return null;
       })}
     </>
@@ -86,14 +92,22 @@ function pretty(value: JSONValue): string {
   return JSON.stringify(value, null, 2);
 }
 
+/** ChatBlocks' PlanView: a withdrawn plan is struck through, and says the agent dropped it (#252). */
 function PlanView({ plan }: { plan: Plan }) {
   const marks = { pending: "○", in_progress: "◐", completed: "●" } as const;
+  const spoken = { pending: "To do", in_progress: "Doing now", completed: "Done" } as const;
+  const withdrawn = plan.state === "withdrawn";
   return (
-    <ul class="plan" aria-label="Plan">
-      {plan.entries.map((entry, index) => (
-        <li key={index} class={entry.status}><span class="mark" aria-hidden="true">{marks[entry.status]}</span> {entry.content}</li>
-      ))}
-    </ul>
+    <div class={`plan-block${withdrawn ? " withdrawn" : ""}`}>
+      <ul class="plan" aria-label="Plan">
+        {plan.entries.map((entry, index) => (
+          <li key={index} class={entry.status} aria-label={`${withdrawn ? "Dropped" : spoken[entry.status]}: ${entry.content}`}>
+            <span class="mark" aria-hidden="true">{marks[entry.status]}</span> <span class="content">{entry.content}</span>
+          </li>
+        ))}
+      </ul>
+      {withdrawn && <p class="quiet dropped">The agent dropped this plan</p>}
+    </div>
   );
 }
 
@@ -113,11 +127,14 @@ function ReportLine({ report }: { report: WorkReport }) {
 export interface CallActions {
   open: (location: ToolCallLocation) => void;
   showEdit: (diff: Extract<ToolCallContent, { type: "diff" }>, toolCallID: string | undefined) => void;
+  /** The sandbox failure the open agent waits on an answer to (Agent.pendingSandboxFailure, #253). */
+  waitingSandbox?: SandboxFailureRecord | undefined;
+  answerSandbox?: ((carryOn: boolean) => Promise<void>) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
 /** An edit (DiffView): its path at the fine step, then its lines marked + and −, in a well. */
-function EditDiff({ diff }: { diff: Extract<ToolCallContent, { type: "diff" }> }) {
+export function EditDiff({ diff }: { diff: Extract<ToolCallContent, { type: "diff" }> }) {
   return (
     <div class="call-diff">
       <p class="path faint small" title={diff.path}><bdi>{diff.path}</bdi></p>
@@ -165,8 +182,11 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
               );
             }
             if (piece.type === "content" && piece.content.type === "text") return <Markdown key={index} text={piece.content.text} />;
+            // Any other block as a message draws it: a picture, an attachment (#252).
+            if (piece.type === "content") return <div key={index} class="quiet"><Blocks blocks={[piece.content]} text="" /></div>;
             if (piece.type === "terminal") return <p key={index} class="quiet">Terminal output is shown in the Mac window.</p>;
-            return null;
+            // Kept rather than dropped: what the runtime sent, as the window shows it.
+            return <pre key={index} class="raw faint">{pretty(piece as unknown as JSONValue).split("\n").slice(0, 6).join("\n")}</pre>;
           })}
           {/* Where it did its work, each a way in, wrapped: file names are long. */}
           {(call.locations ?? []).length > 0 && (
@@ -197,20 +217,47 @@ function ToolRun({ calls, background }: { calls: ToolCall[]; background: readonl
   return <div class="run"><ToolCallLine call={calls[calls.length - 1]!} background={background} onClick={() => (expanded.value = true)} /></div>;
 }
 
-function poolSwitchLine(entry: TranscriptEntry): string {
-  const record = fields(entry, "poolSwitch")!._0;
-  const name = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
-  const from = name(record.from.runtimeID);
-  const to = name(record.to.runtimeID);
-  switch (record.reason) {
-    case "allowanceSpent": return `${from}’s allowance ran out. Carried on with ${to}.`;
-    case "overage": return `${from} started using paid extra usage. Carried on with ${to}.`;
-    case "creditUsedUp": return `${from}’s credit was used up. Carried on with ${to}.`;
-    case "rateLimitPersisted": return `${from} stayed rate limited. Carried on with ${to}.`;
-    case "runtimeFailed": return `${from} failed. Carried on with ${to}.`;
-    case "everyoneOutResumed": return `${to}’s allowance came back. Carried on.`;
-    default: return `Continued with ${to}.`;
-  }
+/** SwitchNote: the headline, then each line under it, as the window and the Remote draw it (#252). */
+function SwitchNote({ record }: { record: SwitchRecord }) {
+  const note = switchNote(record);
+  return (
+    <div class="note switch">
+      <p class="strong">⇄ {note.headline}</p>
+      {note.lines.map((line) => <p key={line} class="quiet">{line}</p>)}
+    </div>
+  );
+}
+
+/**
+ * SandboxFailureCard (064, #253): what happened, what Continue without sandbox would change, and
+ * the two answers while the card waits. An answered or superseded card keeps saying what happened.
+ */
+function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
+  const actions = useContext(CallActionsContext);
+  const sending = useSignal(false);
+  const waiting = actions?.answerSandbox !== undefined && actions.waitingSandbox !== undefined
+    && JSON.stringify(actions.waitingSandbox) === JSON.stringify(record);
+  const words = sandboxCard(record);
+  const answer = (carryOn: boolean) => {
+    sending.value = true;
+    void actions!.answerSandbox!(carryOn).finally(() => (sending.value = false));
+  };
+  return (
+    <div class={`note switch sandbox-failure${waiting ? " waiting" : ""}`} role={waiting ? "alert" : undefined}>
+      <p class="strong">{words.title}</p>
+      <p>{words.body}</p>
+      {record.detail && <details><summary class="quiet">Show error details</summary><pre>{record.detail}</pre></details>}
+      {(waiting || !record.recoveryOffered) && <p class="quiet">{words.offer}</p>}
+      {waiting && (
+        <p class="answers">
+          <button disabled={sending.value} onClick={() => answer(false)}>{keepStopped}</button>
+          {record.recoveryOffered && (
+            <button class="prominent" disabled={sending.value} onClick={() => answer(true)}>{continueWithout}</button>
+          )}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** One entry, drawn as its kind is (EntryRow). */
@@ -292,16 +339,9 @@ export function EntryRow({ entry }: { entry: TranscriptEntry }) {
     case "runtimeNote":
       return <p class="quiet">{fields(entry, "runtimeNote")!._0}</p>;
     case "poolSwitch":
-      return <div class="note switch"><p class="strong">⇄ {poolSwitchLine(entry)}</p></div>;
-    case "sandboxFailure": {
-      const record = fields(entry, "sandboxFailure")!._0;
-      return (
-        <div class="note switch">
-          <p class="strong">Its sandbox could not start</p>
-          <details><summary class="quiet">Show error details</summary><pre>{record.detail}</pre></details>
-        </div>
-      );
-    }
+      return <SwitchNote record={fields(entry, "poolSwitch")!._0} />;
+    case "sandboxFailure":
+      return <SandboxFailureCard record={fields(entry, "sandboxFailure")!._0} />;
     case "settingsChanged": {
       const record = fields(entry, "settingsChanged")!._0;
       const carried = record.carried.flatMap((s) => (typeof s.to === "string" ? [`${s.name} ${s.to}`] : []));
@@ -318,8 +358,11 @@ export function EntryRow({ entry }: { entry: TranscriptEntry }) {
     }
     case "appView":
       return <AppView call={fields(entry, "appView")!._0} />;
-    case "background":
-      return <p class="quiet">{backgroundEnding(fields(entry, "background")!._0)}</p>;
+    case "background": {
+      // As the window's line: how it started or ended, a failure in the failure tint (#253).
+      const item = fields(entry, "background")!._0;
+      return <p class={item.state === "failed" ? "failure" : "quiet"}>{backgroundEntryLine(item)}</p>;
+    }
     default:
       // Written by a newer build: kept in the record, drawn as nothing.
       return null;

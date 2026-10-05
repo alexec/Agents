@@ -91,7 +91,7 @@ struct ResourcesRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Label("Resources", systemImage: "lock")
+            Text("Resources")
             Spacer()
             if let counts {
                 Text(counts).monospacedDigit().appText(.fine).foregroundStyle(.secondary)

@@ -1,4 +1,3 @@
-import AgentsKitCore
 import Foundation
 import Observation
 
@@ -6,26 +5,26 @@ import Observation
 /// (#145), and which of their session groups and Workflows are folded (#181), kept
 /// across launches.
 ///
-/// In defaults, scoped by walk and by root: every copy of the app shares one defaults
-/// domain, and a scratch window's folds are not the real window's. A walk's window (run-app,
-/// `--walk`) is a client of a scratch control plane on the standard root, so the root alone
-/// does not tell it apart.
+/// The Mac's window and the Remote keep them the same way (#226), each in its own
+/// defaults: folds are where one screen was left, not something the work says.
+///
+/// `scope` keeps one copy's folds from another's that shares its defaults: on the Mac,
+/// every copy of the app shares one defaults domain, and a scratch window's folds are
+/// not the real window's (see the window's `SidebarFolds.window`).
 @MainActor
 @Observable
-final class SidebarFolds {
+public final class SidebarFolds {
     /// The folds that start closed and have been opened: projects, the Archived folds.
-    private(set) var open: Set<String>
+    public private(set) var open: Set<String>
     /// The folds that start open and have been closed: the groups and Workflows (#181).
     /// Kept apart so that a project nobody has touched shows its groups as it always has.
-    private(set) var closed: Set<String>
+    public private(set) var closed: Set<String>
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let key: String
     @ObservationIgnored private let closedKey: String
 
-    init(defaults: UserDefaults = .standard, locations: StoreLocations = .default,
-         walk: String? = ControlConfig.walk) {
+    public init(defaults: UserDefaults = .standard, scope: String) {
         self.defaults = defaults
-        let scope = walk.map { ".walk:\($0)" } ?? (locations.isStandard ? "" : ".root:\(locations.name)")
         key = "sidebar.folds" + scope
         closedKey = "sidebar.folded" + scope
         open = Set(defaults.stringArray(forKey: key) ?? [])
@@ -34,7 +33,7 @@ final class SidebarFolds {
 
     /// What can be folded: a project; one of its Archived folds; one of its session
     /// groups, its pinned sessions or its Workflows.
-    enum Fold: Hashable {
+    public enum Fold: Hashable, Sendable {
         case project, archivedSessions, archivedWorkflows
         case group(AgentGroup)
         /// The pinned sessions (#180).
@@ -42,7 +41,7 @@ final class SidebarFolds {
         case workflows
 
         /// A project and the Archived folds start folded; the rest start open.
-        var startsOpen: Bool {
+        public var startsOpen: Bool {
             switch self {
             case .project, .archivedSessions, .archivedWorkflows: false
             case .group, .pinned, .workflows: true
@@ -61,12 +60,12 @@ final class SidebarFolds {
         }
     }
 
-    func isOpen(_ project: ProjectKey, _ fold: Fold = .project) -> Bool {
+    public func isOpen(_ project: ProjectKey, _ fold: Fold = .project) -> Bool {
         let name = Self.name(project, fold)
         return fold.startsOpen ? !closed.contains(name) : open.contains(name)
     }
 
-    func set(_ project: ProjectKey, _ fold: Fold = .project, open isOpen: Bool) {
+    public func set(_ project: ProjectKey, _ fold: Fold = .project, open isOpen: Bool) {
         let name = Self.name(project, fold)
         if fold.startsOpen {
             guard closed.contains(name) == isOpen else { return }
@@ -77,6 +76,13 @@ final class SidebarFolds {
             if isOpen { open.insert(name) } else { open.remove(name) }
             defaults.set(open.sorted(), forKey: key)
         }
+    }
+
+    /// The projects whose Archived fold is open: the ones a client holds a page of
+    /// archived sessions for (#165).
+    public var openArchivedFolds: Set<ProjectKey> {
+        let prefix = Fold.archivedSessions.name + ":"
+        return Set(open.compactMap { $0.hasPrefix(prefix) ? ProjectKey(stored: String($0.dropFirst(prefix.count))) : nil })
     }
 
     private static func name(_ project: ProjectKey, _ fold: Fold) -> String {
@@ -98,18 +104,18 @@ final class SidebarFolds {
 /// A closed fold is given no rows at all, as a folded project already is. `NSOutlineView`
 /// does not follow the children of an item it has not expanded, so rows that came and
 /// went under a closed fold left the two counts apart the same way.
-struct FoldedRow<Item: Identifiable>: Identifiable {
-    struct ID: Hashable {
-        let fold: SidebarFolds.Fold
-        let item: Item.ID
+public struct FoldedRow<Item: Identifiable>: Identifiable {
+    public struct ID: Hashable {
+        public let fold: SidebarFolds.Fold
+        public let item: Item.ID
     }
 
-    let fold: SidebarFolds.Fold
-    let item: Item
+    public let fold: SidebarFolds.Fold
+    public let item: Item
 
-    var id: ID { ID(fold: fold, item: item.id) }
+    public var id: ID { ID(fold: fold, item: item.id) }
 
-    static func rows(_ items: some Sequence<Item>, in fold: SidebarFolds.Fold) -> [FoldedRow] {
+    public static func rows(_ items: some Sequence<Item>, in fold: SidebarFolds.Fold) -> [FoldedRow] {
         items.map { FoldedRow(fold: fold, item: $0) }
     }
 }

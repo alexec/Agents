@@ -1,12 +1,14 @@
-// A session's actions (071 FR-027): Stop while it holds a runtime or a block, Park or Unpark
+// A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
+// holds a runtime or a block, Park or Unpark
 // (Agent.parkAction), and Archive or Bring Back. In the chat header's ··· menu.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { isOpenBlock, projectFolder } from "../model/groups";
+import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/block";
 
-export type Action = "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
+export type Action = "carryOn" | "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
   | "markRead" | "markUnread" | "pin" | "unpin";
 
 /**
@@ -16,6 +18,8 @@ export type Action = "agents/stop" | "agents/park" | "agents/unpark" | "agents/a
 export function sessionActions(agent: Agent, pinned?: boolean): { action: Action; label: string; help: string }[] {
   const found: { action: Action; label: string; help: string }[] = [];
   const holds = agent.state === "starting" || agent.state === "running" || agent.state === "waitingOnUser";
+  // First, as the window's row menu has it (AgentRow's contextMenu); the strip in the chat has it too.
+  if (openBlock(agent)) found.push({ action: "carryOn", label: carryOnLabel, help: carryOnHelp(agent) });
   if (holds || (agent.state === "finished" && isOpenBlock(agent.report))) {
     found.push({ action: "agents/stop", label: "Stop", help: "Stop this session's turn" });
   }
@@ -75,7 +79,8 @@ export function SessionMenu({ store, host, agent, disabled }: { store: Store; ho
 
 /** One of `sessionActions`, done. */
 export function runSessionAction(store: Store, host: string, agent: Agent, action: Action): void {
-  if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
+  if (action === "carryOn") void store.prompt(host, agent.id, carryOnPrompt, []);
+  else if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
   else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
   else void store.perform(host, agent.id, action);
 }

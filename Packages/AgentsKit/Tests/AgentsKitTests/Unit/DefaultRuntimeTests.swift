@@ -13,17 +13,20 @@ struct DefaultRuntimeTests {
         return agent
     }
 
-    @Test func withNoAgentsItIsTheCatalogDefaultThenTheFirstAvailableInOrder() {
+    @Test func withNothingKeptItIsTheCatalogDefaultThenTheFirstAvailableInOrder() {
         let model = AgentsModel()
-        #expect(model.defaultRuntimeID(available: ["antigravity", "claude"]) == "claude")
-        #expect(model.defaultRuntimeID(available: ["gemini", "codex"]) == "gemini")
-        #expect(model.defaultRuntimeID(available: []) == nil)
+        #expect(model.defaultRuntimeID(available: ["antigravity", "claude"], kept: nil) == "claude")
+        #expect(model.defaultRuntimeID(available: ["gemini", "codex"], kept: nil) == "gemini")
+        #expect(model.defaultRuntimeID(available: [], kept: nil) == nil)
     }
 
-    @Test func theMostRecentAgentsRuntimeWinsWhenItIsAvailable() {
+    /// The start form's runtime, not the last agent's (#264): a helper an agent started on
+    /// another runtime is not the person choosing it.
+    @Test func theKeptRuntimeWinsAndTheLastAgentDoesNot() {
         let model = AgentsModel()
-        model.replaceAgents([agent("codex", minutesAgo: 30), agent("claude", minutesAgo: 1)])
-        #expect(model.defaultRuntimeID(available: ["codex", "claude"]) == "claude")
+        model.replaceAgents([agent("codex", minutesAgo: 1)])
+        #expect(model.defaultRuntimeID(available: ["claude", "codex", "grok"], kept: "grok") == "grok")
+        #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: nil) == "claude")
     }
 
     /// The mode is the daemon's memory, kept current by `modes/changed` (029).
@@ -37,11 +40,9 @@ struct DefaultRuntimeTests {
         #expect(model.rememberedMode(for: "codex") == nil)
     }
 
-    @Test func aRecentRuntimeThatCannotStartIsPassedOver() {
+    @Test func aKeptRuntimeThatCannotStartIsPassedOver() {
         let model = AgentsModel()
-        model.replaceAgents([agent("gemini", minutesAgo: 1), agent("codex", minutesAgo: 30)])
-        #expect(model.defaultRuntimeID(available: ["claude", "codex"]) == "codex")
-        model.replaceAgents([agent("gemini", minutesAgo: 1)])
-        #expect(model.defaultRuntimeID(available: ["claude", "codex"]) == "claude")
+        #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: "gemini") == "claude")
+        #expect(model.defaultRuntimeID(available: ["codex"], kept: "gemini") == "codex")
     }
 }

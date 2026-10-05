@@ -102,9 +102,9 @@ a { color: var(--accent); }
   font-size: 12px;
 }
 
-/* The three columns (071 US2, US6; frames A–D). Widths from look/README.md: three columns
-   from 1200, the files pane as a fourth from 1440 (over the chat below that), the projects
-   folded into a menu from 760, and one column at a time below 760. */
+/* The columns (071 US2, US6; #151, #235): the one sidebar and the chat, the files pane a third
+   from 1440 (over the chat below that), and below 760 the sidebar or what it picked. The widths
+   are in sidebar.css. */
 .app {
   height: 100vh;
   display: flex;
@@ -358,6 +358,8 @@ button.link.reading:hover { text-decoration: underline; }
 .locations { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0; }
 .locations > * { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note { display: flex; flex-direction: column; gap: 3px; }
+.sandbox-failure p { margin: 0; }
+.sandbox-failure .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 .note.switch {
   padding: 10px 12px;
   border-radius: var(--radius-card);
@@ -378,6 +380,12 @@ button.link.reading:hover { text-decoration: underline; }
 .plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .plan .mark { opacity: 0.6; }
 .plan .completed { opacity: 0.6; }
+.plan-block.withdrawn .plan .content { text-decoration: line-through; }
+.plan-block .dropped { margin: 2px 0 0; }
+.markdown li.task { list-style: none; margin-left: -1.2em; }
+.markdown .task-box { opacity: 0.45; }
+.markdown .task-box.done { opacity: 0.65; }
+.message-image { display: block; max-width: min(100%, 480px); max-height: 360px; border-radius: var(--radius-card); margin: 4px 0; }
 .thought { white-space: pre-wrap; }
 /* A queued prompt: the .bubble's place and shape, dashed and dimmed, its buttons underneath (#95). */
 .queued {
@@ -427,6 +435,9 @@ button.link.reading:hover { text-decoration: underline; }
 .background li { display: flex; gap: 6px; opacity: 0.75; }
 .background .noun { font-weight: 500; }
 .background .age { margin-left: auto; font-variant-numeric: tabular-nums; }
+.background li { align-items: baseline; }
+.background li.stopping { opacity: 0.5; }
+.background .stop { font-size: 11px; padding: 0 8px; }
 
 /* Cards above the prompt: a question or a permission, answered here or elsewhere. */
 .cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
@@ -442,6 +453,8 @@ button.link.reading:hover { text-decoration: underline; }
 }
 .card .question { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
 .card .options { display: flex; flex-direction: column; gap: 6px; }
+.card .plan-shown { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; }
+.card .plan-text { margin-top: 6px; user-select: text; }
 .card .row-options { flex-direction: row; flex-wrap: wrap; }
 .card .options button, .card .options .button {
   text-align: left;
@@ -492,6 +505,14 @@ button.link.reading:hover { text-decoration: underline; }
 }
 
 .prompt-field { display: flex; align-items: flex-end; gap: 8px; }
+
+/* The runtime's commands and the host's files, over the field (CommandList, MentionList; #255). */
+.completions { list-style: none; margin: 0 0 8px; padding: 6px; max-height: 220px; overflow-y: auto;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: 0 2px 8px var(--paper-shadow); }
+.completions li { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px; border-radius: 7px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; }
+.completions li > :last-child { overflow: hidden; text-overflow: ellipsis; }
+.completions li.chosen { background: var(--paper-wash); }
 
 .prompt textarea {
   flex: 1;
@@ -587,35 +608,13 @@ button.link.reading:hover { text-decoration: underline; }
   padding: 4px;
 }
 
-/* Below 1440 the files pane opens over the chat, with its close button. */
-@media (max-width: 1439px) {
-  .files-open .columns { grid-template-columns: 236px 320px minmax(0, 1fr); }
-  /* The chat and the pane share one cell; the pane lies over the chat. */
-  .chat, .files { grid-column: 3; grid-row: 1; }
-  .files { z-index: 5; }
-}
-
-/* 760–1200: the projects fold into a menu atop the sessions column. */
-@media (max-width: 1199px) {
-  .columns, .files-open .columns { grid-template-columns: 300px minmax(0, 1fr); }
-  .projects { display: none; }
-  .chat, .files { grid-column: 2; grid-row: 1; }
-  .medium-only { display: inline-block; }
-  /* Frame C: the menu, then the icons; the search field waits for the wide layout. */
-  .search.wide-only { display: none; }
-}
-
-/* Below 760: one column at a time, in the iPhone Remote's order, with a back control. */
+/* Below 760: the back control and the heading only a phone's width shows; sidebar.css lays out
+   the list or what it picked (#235). */
 @media (max-width: 759px) {
-  .columns, .files-open .columns { grid-template-columns: minmax(0, 1fr); }
-  .projects, .sessions, .chat { display: none; border-right: none; }
-  .depth-projects .projects, .depth-sessions .sessions, .depth-chat .chat { display: flex; }
-  .chat, .files, .sessions, .projects { grid-column: 1; grid-row: 1; }
   .medium-only, .wide-only { display: none; }
   .narrow-only { display: block; }
   button.back.narrow-only { display: inline-block; border: none; background: none; color: #2f6fd1; padding: 0; }
   .column-head h1.narrow-only { display: block; text-align: center; }
-  .projects .column-head h1 { text-align: left; font-size: 17px; }
 }
 
 /* US3: the prompt's menus, attachments, labels, the session menu, the new-session form. */
@@ -623,6 +622,11 @@ button.link.reading:hover { text-decoration: underline; }
 .prompt.off { opacity: 0.6; }
 .menus { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .menus .spacer { flex: 1; }
+/* A new session's sandbox would not start (064, #257): what it said, and the way on. */
+.sandbox-refusal { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 6px; border-radius: 8px;
+  background: color-mix(in srgb, var(--tint-attention) 7%, transparent); }
+.sandbox-refusal > div { flex: 1; min-width: 0; }
+.sandbox-refusal p { margin: 0; }
 .menus-right { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
 .pill {
   position: relative;
@@ -695,6 +699,9 @@ button.remove:hover { opacity: 1; }
 /* Unread (#70): a grey dot and a heavier title; never the attention colour. */
 .session .title { font-weight: 400; }
 .session .title.unread { font-weight: 600; }
+/* Started by a workflow or another agent (028, #251): quiet, after the title, as the window's mark. */
+.session .title .started-by { margin-left: 5px; font-size: 11px; font-weight: 400; opacity: 0.45; }
+.working.coming-back { opacity: 0.65; padding: 4px 0; }
 .unread-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.5; margin-right: 6px; vertical-align: middle; }
 
 /* US4: the files pane's tabs, the browser, a file, the changes and a live page. */
@@ -975,3 +982,16 @@ button.plain:hover { opacity: 1; }
 .view-ask .buttons { display: flex; gap: 8px; margin: 0; }
 .view-context { font-size: 12px; }
 .view-box[hidden] { display: none !important; }
+/* A retired agent's page (051, #253): who it was, and nothing to do. */
+.retired-body { max-width: 620px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+.retired-body p { margin: 0; }
+.retired-body .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 4px 0 0; font-size: 13px; }
+.retired-body .facts dd { margin: 0; user-select: text; }
+/* A parked chat's line under its head (040, #253). */
+.park-strip { margin: 0; padding: 4px 16px; font-size: 12px; border-bottom: 1px solid var(--paper-rule); }
+/* Over the prompt: what the open agent holds and waits for (036, 042, #254). Untinted. */
+.capsules { display: flex; flex-direction: column; gap: 4px; margin: 0 0 8px; }
+.capsule-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.capsule { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--paper-raised); border: 1px solid var(--paper-rule);
+  box-shadow: 0 1px 2px var(--paper-shadow); opacity: 0.85; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capsules .hint { margin: 0; }

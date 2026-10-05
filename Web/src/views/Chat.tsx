@@ -11,7 +11,7 @@ import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../mo
 import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
 import type { Agent } from "../protocol/generated";
-import { go, replace, route } from "../route";
+import { replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
@@ -27,6 +27,11 @@ import { CallActionsContext, detailSummaries, detailTitles, TurnView, type CallA
 import { setPane } from "./files/paneState";
 import { ViewLayerContext } from "./chat/AppView";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
+import { BackToList } from "./BackToList";
+import { comingBackDescription } from "../model/status";
+import { parkLine } from "./SessionRow";
+import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
+import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 
 const detailKey = "agents.turnDetail";
 
@@ -55,7 +60,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const timer = setTimeout(() => store.prewarm(host, session, "opened"), 1500);
     return () => clearTimeout(timer);
   }, [host, session]);
-  const project = r.project ? (store.projects.value[host] ?? []).find((p) => p.project.folder === r.project) : undefined;
+  // One search per session, so the prompt's file search is not started afresh on every render.
+  const findFiles = useMemo(() => (term: string) => store.mentions(host, session, term), [host, session]);
+  // Not held: perhaps retired, and then its page says who it was (051, #253).
+  useEffect(() => { if (!store.agent(host, session)) void store.lookUpRetired(host, session); }, [host, session]);
   const level = useSignal<TurnDetail>(defaultDetail.value);
   /** Turns opened or closed by hand, kept until the chat is left. */
   const chosen = useSignal<Record<string, TurnDetail>>({});
@@ -84,8 +92,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         setPane(session, { tab: "changes", changed: diff.path });
         showPane();
       },
+      // Answered only while the agent waits on it, and while its host answers (#253).
+      waitingSandbox: agent?.pendingSandboxFailure,
+      answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,
     };
-  }, [session]);
+  }, [session, agent?.pendingSandboxFailure, down]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const chatColumn = useRef<HTMLElement>(null);
@@ -109,9 +120,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   });
   const following = useRef(true);
   /** Following the end or not, told to the store: it trims the chat's front only while following. */
+  // Away from the end, where Jump to end is shown whether or not anything new has come (#252).
+  const away = useSignal(false);
   const follow = (on: boolean) => {
     if (following.current === on) return;
     following.current = on;
+    away.value = !on;
     store.setFollowingEnd(on);
   };
   const loadingEarlier = useRef(false);
@@ -213,7 +227,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   return (
     <section class="chat" aria-label="Chat" ref={chatColumn}>
       <header class="column-head">
-        <button class="back narrow-only" onClick={() => go({ host: r.host, project: r.project })}>‹ {project?.name ?? "Sessions"}</button>
+        <BackToList />
         <h1>{agent?.title ?? "New session"}</h1>
         <span class="actions">
           <select class="detail" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
@@ -229,6 +243,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {hostDown && <OfflineStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
+      {/* Why a parked chat is parked, and since when, as the window's strip says it (040, #253). */}
+      {agent && parkLine(agent) && <p class="park-strip quiet" role="status">{parkLine(agent)}</p>}
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
@@ -241,21 +257,35 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} />
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
-        {agent && (agent.state === "running" || agent.state === "starting") && (
+        {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
+        {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
+          : agent && (agent.state === "running" || agent.state === "starting") && (
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
       </div>
       </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
-      {newBelow.value && <button class="jump" onClick={toEnd}>New messages ↓</button>}
+      {/* As JumpToEnd: shown whenever the reader is away from the end; what came since, said in words. */}
+      {(away.value || newBelow.value) && (
+        <button class={`jump${newBelow.value ? " news" : ""}`} onClick={toEnd}
+          title={newBelow.value ? "Go to the end, where something new is" : "Go to the end"}
+          aria-label={newBelow.value ? "Go to the end of the conversation, where something new is" : "Go to the end of the conversation"}>
+          <span aria-hidden="true">↓</span>{newBelow.value && " Something new"}
+        </button>
+      )}
       <footer class="foot">
-        <BackgroundRows agent={agent} />
+        <BackgroundRows store={store} host={host} agent={agent} disabled={down} />
+        {agent && <Capsules store={store} host={host} agent={agent} />}
         <Cards store={store} host={host} session={session} down={down} />
-        <Prompt store={store} draftKey={`${host}|${session}`} placeholder="Reply…" disabled={down || !agent}
+        <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={down || !agent}
+          stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
+          queues={willQueue(agent)} suggestion={agent?.suggestedPrompts?.[0]}
           recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
           send={(text, attachments) => store.prompt(host, session, text, attachments)}
           onTyping={() => store.prewarm(host, session, "typing")}
+          commands={agent?.availableCommands}
+          findFiles={agent ? findFiles : undefined}
           where={agent && (
             <>
               <Place store={store} host={host} agent={agent} />
@@ -334,8 +364,37 @@ function Queued({ store, host, agent, disabled }: { store: Store; host: string; 
   );
 }
 
-/** What the agent left running, over the prompt (057). Stopping one is US3. */
-function BackgroundRows({ agent }: { agent: Agent | undefined }) {
+/**
+ * What the open agent holds and waits for, and the events it waits on, over the prompt (036,
+ * 042; LeaseRow and WaitCapsule, #254): one capsule each, and that sending takes a wait's place.
+ */
+function Capsules({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
+  const title = (id: string) => store.agent(host, id)?.title;
+  const leases = leaseMark(agent.id, store.leases.value[host], title);
+  const wait = eventWaitCapsule(agent, title);
+  if (!leases && !wait) return null;
+  return (
+    <div class="capsules">
+      {leases && (
+        <p class="capsule-row" role="note" aria-label={leases.full}>
+          {leases.capsules.map((text) => <span key={text} class="capsule" title={leases.full}>{text}</span>)}
+        </p>
+      )}
+      {wait && (
+        <>
+          <p class="capsule-row"><span class="capsule" title={wait.line}>{wait.line}</span></p>
+          <p class="faint small hint">{wait.hint}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What the agent left running, over the prompt (057): Stop on what the runtime can stop, and a
+ * subagent says it stops with the agent, as BackgroundItemRow (#253).
+ */
+function BackgroundRows({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
   const now = useSignal(toWireDate(new Date()));
   const items = (agent?.background ?? []).filter(isRunning);
   useEffect(() => {
@@ -347,9 +406,16 @@ function BackgroundRows({ agent }: { agent: Agent | undefined }) {
   return (
     <ul class="background" aria-label="In the background">
       {items.map((item) => (
-        <li key={item.id} title={item.command ?? item.detail ?? item.name}>
+        <li key={item.id} title={item.command ?? item.detail ?? item.name} class={item.isStopping ? "stopping" : undefined}>
           <span class="noun">{backgroundNoun(item)}</span> {item.name}
-          <span class="age">{backgroundEnded(item) ?? backgroundAge(item, now.value)}</span>
+          <span class="age">{item.isStopping ? "Stopping…" : backgroundEnded(item) ?? backgroundAge(item, now.value)}</span>
+          {item.canStop ? (
+            <button class="stop" disabled={disabled || item.isStopping} aria-label={`Stop ${item.name}`}
+              title={`Stop ${item.name}, and nothing else the agent is doing`}
+              onClick={() => agent && void store.stopBackground(host, agent.id, item.id)}>Stop</button>
+          ) : item.kind === "subagent" && (
+            <span class="faint" title="Neither Claude nor Codex can stop one subagent alone. Stop the agent to stop it.">stops with the agent</span>
+          )}
         </li>
       ))}
     </ul>

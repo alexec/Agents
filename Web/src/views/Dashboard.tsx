@@ -14,6 +14,7 @@ import { isSafeLink, Markdown } from "../render/markdown";
 import type { DashboardOrder, DashboardSnapshot, DashboardUpdate, TileCell, TileLink, TileView } from "../protocol/generated";
 import { go } from "../route";
 import { fromWireDate, toWireDate } from "../protocol/dates";
+import { BackToList } from "./BackToList";
 
 /** What is being dragged: a tile, by id, or a section, by its heading. In the page, not the
  *  DataTransfer, which a drop target can't read until the drop. */
@@ -43,7 +44,7 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
   const detail = useSignal<string | null>(null);
   useEffect(() => { void store.loadDashboard(host, folder); }, [host, folder, revision]);
   const snapshot = store.dashboards.value[key];
-  const back = <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>;
+  const back = <BackToList />;
   const groups = snapshot ? sections(snapshot, showsHidden.value) : [];
   const newest = snapshot ? Math.max(...snapshot.tiles.map((t) => t.setAt ?? -Infinity)) : -Infinity;
   const hiddenCount = snapshot ? snapshot.tiles.filter((t) => t.tile?.hidden).length : 0;

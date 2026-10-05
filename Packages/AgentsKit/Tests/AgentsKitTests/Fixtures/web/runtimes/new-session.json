@@ -1,0 +1,66 @@
+[
+  {
+    "expected" : "grok",
+    "input" : {
+      "available" : [
+        "claude",
+        "codex",
+        "grok"
+      ],
+      "kept" : "grok"
+    },
+    "name" : "kept and startable"
+  },
+  {
+    "expected" : "claude",
+    "input" : {
+      "available" : [
+        "claude",
+        "codex"
+      ],
+      "kept" : "gemini"
+    },
+    "name" : "kept but gone"
+  },
+  {
+    "expected" : "claude",
+    "input" : {
+      "available" : [
+        "codex",
+        "claude"
+      ],
+      "kept" : null
+    },
+    "name" : "nothing kept"
+  },
+  {
+    "expected" : "gemini",
+    "input" : {
+      "available" : [
+        "gemini",
+        "codex"
+      ],
+      "kept" : null
+    },
+    "name" : "no Claude"
+  },
+  {
+    "expected" : "codex",
+    "input" : {
+      "available" : [
+        "codex",
+        "gemini"
+      ],
+      "kept" : "opencode"
+    },
+    "name" : "kept, no Claude"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "available" : [],
+      "kept" : "claude"
+    },
+    "name" : "none can start"
+  }
+]

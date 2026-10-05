@@ -1,6 +1,7 @@
 // The menus under the prompt (071 FR-025; PromptBar.swift and OptionMenu.swift): what the runtime
 // advertises, in the window's order, permission on the left and the rest on the right. Nothing
 // here knows what a model or a mode is: the choices come from the runtime.
+import type { ComponentChildren } from "preact";
 import type { ConfigOption, JSONValue } from "../protocol/generated";
 import { choiceGroups, closedTitle, isAboutPermission, same } from "../model/options";
 
@@ -41,11 +42,13 @@ export function OptionControl({ option, value, onChange, disabled }: {
 }
 
 /** Every drawn option: permission first, then the rest, as the window lays them out. */
-export function PromptMenus({ options, value, onChange, disabled }: {
+export function PromptMenus({ options, value, onChange, disabled, besideMode }: {
   options: ConfigOption[]; value: (option: ConfigOption) => JSONValue | undefined;
   onChange: (option: ConfigOption, value: JSONValue) => void; disabled?: boolean | undefined;
+  /** Beside the permission mode, as the window draws the command sandbox there (064). */
+  besideMode?: ComponentChildren;
 }) {
-  if (!options.length) return null;
+  if (!options.length && !besideMode) return null;
   const permission = options.filter(isAboutPermission);
   const others = options.filter((o) => !isAboutPermission(o));
   const control = (option: ConfigOption) => (
@@ -55,6 +58,7 @@ export function PromptMenus({ options, value, onChange, disabled }: {
   return (
     <div class="menus" role="group" aria-label="Settings for this session">
       {permission.map(control)}
+      {besideMode}
       <span class="spacer" />
       {/* Together on the right, wrapping there rather than under the mode at phone width. */}
       {others.length > 0 && <span class="menus-right">{others.map(control)}</span>}

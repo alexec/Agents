@@ -178,9 +178,15 @@ public enum ClientHolding {
     /// outside the open project, unless it is the open chat. An Archived fold or a
     /// workflow's runs fetched them for a page, and that page has gone.
     public static func archivedToLetGo(_ agents: [Agent], project: URL?, chat: UUID?) -> [UUID] {
-        let project = project.map(Project.standardize)
+        archivedToLetGo(agents, projects: project.map { [$0] } ?? [], chat: chat)
+    }
+
+    /// The same, where several projects can show their archived sessions at once: the
+    /// open project and each open Archived fold of the Remote's sidebar (#226).
+    public static func archivedToLetGo(_ agents: [Agent], projects: Set<URL>, chat: UUID?) -> [UUID] {
+        let projects = Set(projects.map(Project.standardize))
         return agents.filter { agent in
-            agent.state == .archived && agent.id != chat && Project.standardize(agent.projectFolder) != project
+            agent.state == .archived && agent.id != chat && !projects.contains(Project.standardize(agent.projectFolder))
         }.map(\.id)
     }
 }

@@ -1,4 +1,5 @@
-// The page's one sidebar from 760 wide (#151), as the window's (#145, ProjectListView.swift):
+// The page's one sidebar (#151), as the window's (#145, ProjectListView.swift), and below 760 the
+// root list, as the iPhone Remote's (#226, #235):
 // Activity at the top, then every project, each a row that folds open on its sessions and
 // workflows, and at the foot what the hosts and this browser are doing. No host headings: a
 // server's project reads `host:Project`. A project's row opens its Dashboard.
@@ -19,7 +20,7 @@ import { browserName, type Session } from "../session";
 import { ActivityRows } from "./Activity";
 import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
-import { SessionRow } from "./SessionRow";
+import { rowExtras, SessionRow } from "./SessionRow";
 import { runSessionAction, sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
@@ -39,12 +40,15 @@ export function projectLabel(host: ControlHost | undefined, project: ProjectSumm
   return !host || host.id === "mac" ? project.name : `${host.name}:${project.name}`;
 }
 
-/** This Mac's projects, then each server's, each by name: no heading for a host. */
+/**
+ * This Mac's projects, then each server's, each with the latest worked on first, as the window's
+ * and the Remote's (SidebarOrder.projects, #250): no heading for a host.
+ */
 function orderedProjects(store: Store): { host: ControlHost; project: ProjectSummary }[] {
   const hosts = store.hosts.value;
   const ordered = [...hosts.filter((h) => h.id === "mac"), ...hosts.filter((h) => h.id !== "mac")];
   return ordered.flatMap((host) => [...(store.projects.value[host.id] ?? [])]
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
     .map((project) => ({ host, project })));
 }
 
@@ -75,6 +79,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   return (
     <nav class="sidebar" aria-label="Sidebar">
       <header class="column-head sidebar-head">
+        {/* The root list's title at a phone's width, as the iPhone's (#235). */}
+        <h1 class="narrow-only">Agents</h1>
         <input class="search" type="search" placeholder="Search sessions and workflows"
           aria-label="Search sessions and workflows" value={search.value}
           onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />
@@ -105,7 +111,10 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
           somewhere to go. Each is absent when there is nothing to say. */}
       <footer class="sidebar-foot">
-        {offline.map((host) => host.id === "mac" ? (
+        {/* This Mac's host still connecting is said as the window says it, not as down (#250). */}
+        {offline.map((host) => host.id === "mac" && host.state === "connecting" ? (
+          <p class="foot-line quiet" role="status" key={host.id}>Connecting…</p>
+        ) : host.id === "mac" ? (
           <div class="host-down" role="status" key={host.id}>
             <p class="strong">⚠︎ This Mac’s host isn’t answering</p>
             <p class="quiet small">What’s listed is what it last said. The control plane is trying again by itself.</p>
@@ -268,7 +277,8 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               </details>
             );
           })}
-          {!searching && groups.length === 0 && <p class="hint">No sessions yet</p>}
+          {/* Only with no live session at all, pinned ones counted, as the window's (#250). */}
+          {!searching && live.length === 0 && <p class="hint">No sessions yet</p>}
           {(archived.length > 0 || (project.counts.archived ?? 0) > 0 || project.retiredCount > 0) && (
             <details class="archived" open={showsArchived}
               onToggle={(e) => {
@@ -302,23 +312,24 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
                     onPick={() => go({ host: host.id, project: folder, workflow: summary.workflow.workflowID })} />
                 </div>
               ))}
-              {archivedWorkflows.length > 0 && (
-                <details class="archived" open={searching || folds.isOpen(host.id, folder, "archivedWorkflows")}
-                  onToggle={(e) => {
-                    if (!searching) folds.set(host.id, folder, (e.currentTarget as HTMLDetailsElement).open, "archivedWorkflows");
-                  }}>
-                  <summary class="subhead" data-fold="archivedWorkflows">Archived workflows <span class="count">{archivedWorkflows.length}</span></summary>
-                  {archivedWorkflows.map((summary) => (
-                    <div class="nav-item" key={summary.workflow.workflowID}>
-                      <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
-                        chosen={r.workflow === summary.workflow.workflowID}
-                        onPick={() => go({ host: host.id, project: folder, workflow: summary.workflow.workflowID })} />
-                    </div>
-                  ))}
-                </details>
-              )}
             </details>
           )}
+          {/* A sibling of Workflows, not inside it, so folding Workflows leaves it, as the window's (#250). */}
+          {archivedWorkflows.length > 0 && (
+            <details class="archived" open={searching || folds.isOpen(host.id, folder, "archivedWorkflows")}
+              onToggle={(e) => {
+                if (!searching) folds.set(host.id, folder, (e.currentTarget as HTMLDetailsElement).open, "archivedWorkflows");
+              }}>
+              <summary class="subhead" data-fold="archivedWorkflows">Archived workflows <span class="count">{archivedWorkflows.length}</span></summary>
+              {archivedWorkflows.map((summary) => (
+                <div class="nav-item" key={summary.workflow.workflowID}>
+                  <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
+                    chosen={r.workflow === summary.workflow.workflowID}
+                    onPick={() => go({ host: host.id, project: folder, workflow: summary.workflow.workflowID })} />
+                </div>
+                ))}
+              </details>
+            )}
         </div>
       )}
     </div>
@@ -357,7 +368,7 @@ const SidebarSession = memo(function SidebarSession({ store, host, folder, agent
     <div class="nav-item" onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }}>
       <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
-        waits={store.waitsOf(host, agent)} />
+        waits={store.waitsOf(host, agent)} extras={rowExtras(store, host, agent)} />
     </div>
   );
 });

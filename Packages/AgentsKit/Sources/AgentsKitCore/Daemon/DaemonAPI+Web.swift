@@ -50,12 +50,18 @@ public extension DaemonAPI {
                 Row(Method.agentsDiscardDraft, params: DiscardDraftRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.runtimesList, params: Empty.self, result: [RuntimeStatus].self, kind: .hostRequest),
                 Row(Method.runtimesAccounts, params: Empty.self, result: [RuntimeAccount].self, kind: .hostRequest),
+                // Each runtime's sandbox default, for the new session's "Use runtime default (…)" (#257).
+                Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
                 Row(Method.optionsRemembered, params: RememberedOptionsRequest.self, result: [ConfigOption].self,
                     kind: .hostRequest),
                 Row(Method.modesRemembered, params: Empty.self, result: RememberedModes.self, kind: .hostRequest),
                 Row(Method.permissionsPending, params: Empty.self, result: [PermissionRequest].self, kind: .hostRequest),
                 Row(Method.elicitationsPending, params: Empty.self, result: [ElicitationRequest].self, kind: .hostRequest),
                 Row(Method.attentionPending, params: Empty.self, result: AttentionPending.self, kind: .hostRequest),
+                // Which chats the host is bringing back after a restart, for Coming back (#251).
+                Row(Method.agentsResuming, params: Empty.self, result: ResumingResponse.self, kind: .hostRequest),
+                // Who a retired agent was, for the page a link to it opens (051, #253).
+                Row(Method.agentsRetired, params: RetiredRequest.self, result: [Tombstone].self, kind: .hostRequest),
                 Row(Method.worktreesList, params: WorktreesListRequest.self, result: WorktreesListResponse.self,
                     kind: .hostRequest),
                 Row(Method.workflowsList, params: WorkflowsListRequest.self, result: [WorkflowSummary].self, kind: .hostRequest),
@@ -155,6 +161,8 @@ public extension DaemonAPI {
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentRemoved, params: AgentRemovedNotification.self, result: Empty.self,
+                    kind: .hostNotification),
+                Row(Notification.agentResuming, params: ResumingNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.agentPermission, params: PermissionNotification.self, result: Empty.self,
                     kind: .hostNotification),

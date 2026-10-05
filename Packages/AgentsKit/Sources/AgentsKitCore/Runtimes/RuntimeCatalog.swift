@@ -124,6 +124,16 @@ public enum RuntimeCatalog {
     /// The runtime an agent or workflow gets when it names none.
     public static var defaultRuntime: Runtime { claude }
 
+    /// The runtime a new session opens on, the one rule the window, the Remote and the web
+    /// page follow (#264): the one its start form was left on, while that can still start;
+    /// else the default when it can; else the first that can, in the order given (by name,
+    /// #154, so the first is not the default).
+    public static func newSessionRuntime(kept: String?, available: [String]) -> String? {
+        if let kept, available.contains(kept) { return kept }
+        if available.contains(defaultRuntime.id) { return defaultRuntime.id }
+        return available.first
+    }
+
     /// Runtimes or anything standing for one, alphabetical by the name shown: compared
     /// case-insensitively and as the person's language would (#154), with the id breaking
     /// a tie so the order is fixed. Within a runtime, models and modes keep their order.

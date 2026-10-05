@@ -1,6 +1,10 @@
 // Permission requests and question cards above the prompt (071 FR-024; PermissionView.swift and
 // ElicitationView.swift). Answering one here answers it everywhere. One answered somewhere else
 // while it is on screen says so, and its buttons do nothing (US2 scenario 5).
+//
+// The first card takes keys, as the window's do (#256): Return its first real answer when no field
+// has the keys, and ⌥1…9 its answers by position. The window's are ⌘1…9; a browser keeps those for
+// its tabs, so the page's are on Option.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type {
@@ -12,8 +16,11 @@ import { CallFailed } from "../wire/link";
 import { describe } from "../model/errors";
 import { Failure } from "../protocol/generated";
 import { isSafeLink } from "../render/markdown";
-import { elicitationTitle } from "./chat/Rows";
+import { Blocks, EditDiff, elicitationTitle } from "./chat/Rows";
 import { askerFor } from "../model/asker";
+import { planOf } from "../model/plan";
+import { Markdown } from "../render/markdown";
+import { inputType, momentFromInput, momentToInput, placeholder } from "../model/formInputs";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -120,12 +127,14 @@ export function Cards({ store, host, session, down = false }: {
     askerFor(store.agents.value[host] ?? [], agentID, runtimeName, subagent);
   return (
     <div class="cards" aria-label="Waiting for you">
-      {cards.map((card) => card.kind === "permission"
-        ? <PermissionCard key={card.request.id} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
+      {cards.map((card, index) => card.kind === "permission"
+        ? <PermissionCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
+            // Shown as the host shows it: the page beside the chat, read again (the window's Show plan).
+            showPlan={(path) => (store.shownFile.value = { host, agentID: card.request.agentID, path, at: Date.now() })}
             hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
             answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
               { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
-        : <ElicitationCard key={card.request.id} request={card.request} asker={asker(card.request.agentID)}
+        : <ElicitationCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID)}
             hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
             answer={(key, action, content) => send(card.request.id, key, (sendID) => store.link.call("elicitations/answer",
               { requestID: card.request.id, action, content, sendID }, host))} />)}
@@ -161,23 +170,77 @@ function holding(hold: Hold, key: string) {
 /** A card's own class: greyed whole only once it is settled somewhere else. */
 const cardClass = (hold: Hold) => `card${hold.answered === "elsewhere" || hold.answered === "withdrawn" ? " inert" : ""}`;
 
+/**
+ * The keys for a card while it is the first: ⌥1…9 press its `data-answer` buttons in order, and
+ * Return its `data-default` one, unless a field, a menu or a link has the keys.
+ */
+function useCardKeys(card: { current: HTMLElement | null }, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const press = (e: KeyboardEvent) => {
+      const here = card.current;
+      if (!here || e.defaultPrevented || e.isComposing) return;
+      const digit = /^Digit([1-9])$/.exec(e.code);
+      if (digit && e.altKey && !e.metaKey && !e.ctrlKey) {
+        const answer = here.querySelectorAll<HTMLElement>("[data-answer]")[Number(digit[1]) - 1];
+        if (answer) {
+          e.preventDefault();
+          answer.click();
+        }
+        return;
+      }
+      if (e.key !== "Enter" || e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused.closest("input, textarea, select, button, a, [contenteditable]")) return;
+      const answer = here.querySelector<HTMLElement>("[data-default]");
+      if (answer) {
+        e.preventDefault();
+        answer.click();
+      }
+    };
+    document.addEventListener("keydown", press);
+    return () => document.removeEventListener("keydown", press);
+  }, [active]);
+}
+
+/** The hint a numbered answer carries, as the window's ⌘n. */
+const numbered = (n: number) => (n < 9 ? { "data-answer": "", title: `⌥${n + 1}` } : {});
+
 const allows = (option: PermissionOption) => option.kind === "allow_once" || option.kind === "allow_always";
 
-function PermissionCard({ request, asker, hold, answer }: {
-  request: PermissionRequest; asker: string | null; hold: Hold; answer: (option: PermissionOption) => void;
+function PermissionCard({ request, asker, hold, answer, active, showPlan }: {
+  request: PermissionRequest; asker: string | null; hold: Hold; answer: (option: PermissionOption) => void; active: boolean;
+  showPlan: (path: string) => void;
 }) {
+  const card = useRef<HTMLElement>(null);
+  useCardKeys(card, active);
+  // A plan's kind is the runtime's word for it (switch_mode), so a plan says the plan instead.
+  const plan = planOf(request.toolCall);
+  const firstAllowing = request.options.find(allows);
   return (
-    <section class={cardClass(hold)} aria-label="Permission request">
+    <section ref={card} class={cardClass(hold)} aria-label="Permission request">
       <div class="question">
         {asker && <p class="quiet small asker">{asker}</p>}
         <p class="strong">{request.toolCall.title}</p>
-        {request.toolCall.kind && <p class="quiet small">{request.toolCall.kind}</p>}
+        {request.toolCall.kind && !plan && <p class="quiet small">{request.toolCall.kind}</p>}
+        {plan?.file && (
+          <p class="plan-shown quiet small">The plan is open beside this conversation.{" "}
+            <button onClick={() => showPlan(plan.file!)}>Show plan</button></p>
+        )}
+        {plan?.text && !plan.file && <div class="plan-text"><Markdown text={plan.text} /></div>}
+        {/* What it actually wants to do, shown rather than summarised, as the Remote's (#266). */}
+        {!plan?.file && !plan?.text && request.toolCall.content.map((piece, index) =>
+          piece.type === "diff" ? <EditDiff key={index} diff={piece} />
+          : piece.type === "content" && piece.content.type === "text" ? <Markdown key={index} text={piece.content.text} />
+          : piece.type === "content" ? <Blocks key={index} blocks={[piece.content]} text="" />
+          : null)}
       </div>
       <div class="options">
-        {request.options.map((option) => {
+        {request.options.map((option, index) => {
           const h = holding(hold, option.optionID);
           return (
             <button key={option.optionID} class={`${allows(option) ? "prominent" : ""} ${h.class}`.trim()} aria-disabled={h.disabled}
+              {...numbered(index)} {...(option === firstAllowing ? { "data-default": "" } : {})}
               onClick={() => !h.disabled && answer(option)}>{option.name}{h.telling}</button>
           );
         })}
@@ -255,9 +318,12 @@ function defaultsOf(request: ElicitationRequest): Record<string, JSONValue> {
   return defaults;
 }
 
-function ElicitationCard({ request, asker, hold, answer }: {
+function ElicitationCard({ request, asker, hold, answer, active }: {
   request: ElicitationRequest; asker: string | null; hold: Hold; answer: (key: string, action: Action, content: Record<string, JSONValue>) => void;
+  active: boolean;
 }) {
+  const card = useRef<HTMLElement>(null);
+  useCardKeys(card, active);
   const inert = hold.answered !== null || hold.down;
   // Each card is its own request (keyed by its id above), so its defaults are where it starts.
   // Filled in an effect instead, they landed after the first paint, and a choice made before
@@ -278,9 +344,9 @@ function ElicitationCard({ request, asker, hold, answer }: {
     const url = request.mode.url._0;
     body = (
       <div class="options row-options">
-        {isSafeLink(url) && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer">Open</a>}
-        <button class={done.class} aria-disabled={done.disabled} onClick={() => go("done", "accept")}>Done{done.telling}</button>
-        <button class={gaveUp.class} aria-disabled={gaveUp.disabled} onClick={() => go("gave-up", "decline")}>Gave up{gaveUp.telling}</button>
+        {isSafeLink(url) && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer" data-default="">Open</a>}
+        <button class={done.class} aria-disabled={done.disabled} {...numbered(0)} onClick={() => go("done", "accept")}>Done{done.telling}</button>
+        <button class={gaveUp.class} aria-disabled={gaveUp.disabled} {...numbered(1)} onClick={() => go("gave-up", "decline")}>Gave up{gaveUp.telling}</button>
       </div>
     );
   } else {
@@ -291,20 +357,23 @@ function ElicitationCard({ request, asker, hold, answer }: {
         <>
           {schema.description && <p class="quiet">{schema.description}</p>}
           <div class="options row-options">
-            {single.choices.map((choice) => {
+            {single.choices.map((choice, index) => {
               const b = button(`choice:${choice.value}`, "prominent");
               return (
                 <button key={choice.value} class={b.class} aria-disabled={b.disabled}
+                  {...numbered(index)} {...(index === 0 ? { "data-default": "" } : {})}
                   onClick={() => go(`choice:${choice.value}`, "accept", { [single.property.name]: choice.value })}>
                   {choice.title}{choice.description && <span class="small quiet">{choice.description}</span>}{b.telling}
                 </button>
               );
             })}
             {!single.property.isRequired && (
-              <button class={none.class} aria-disabled={none.disabled}
+              <button class={none.class} aria-disabled={none.disabled} {...numbered(single.choices.length)}
                 onClick={() => go("none", "accept", { [single.property.name]: "" })}>No answer{none.telling}</button>
             )}
-            <button class={decline.class} aria-disabled={decline.disabled} onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
+            <button class={decline.class} aria-disabled={decline.disabled}
+              {...numbered(single.choices.length + (single.property.isRequired ? 0 : 1))}
+              onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
           </div>
         </>
       );
@@ -338,7 +407,7 @@ function ElicitationCard({ request, asker, hold, answer }: {
             {page === last && (() => {
               const submit = button("submit", "prominent");
               return (
-                <button class={submit.class} disabled={problems.length > 0} aria-disabled={submit.disabled}
+                <button class={submit.class} disabled={problems.length > 0} aria-disabled={submit.disabled} data-default=""
                   onClick={() => go("submit", "accept", values.value)}>Submit{submit.telling}</button>
               );
             })()}
@@ -348,7 +417,7 @@ function ElicitationCard({ request, asker, hold, answer }: {
     }
   }
   return (
-    <section class={cardClass(hold)} aria-label="Question">
+    <section ref={card} class={cardClass(hold)} aria-label="Question">
       {asker && <p class="quiet small asker">{asker}</p>}
       <p class="strong">{title}</p>
       {request.message && request.message !== title && <p>{request.message}</p>}
@@ -368,19 +437,24 @@ function Field({ property, value, inert, set, chose }: {
   );
   const choices = choicesOf(property);
   const kind = property.kind;
+  // Under every field once it has an answer, as the window's (#256), not only in the footer.
+  const wrong = value !== undefined ? problem(property, value) : null;
+  const said = wrong && <span class="failure small">{wrong}</span>;
   if (choices) {
     return (
       <div class="field">
         {asked}
         {property.description && <p class="quiet small">{property.description}</p>}
         <div class="options">
-          {choices.map((choice) => (
+          {choices.map((choice, index) => (
             <button key={choice.value} class={value === choice.value ? "prominent" : ""} aria-pressed={value === choice.value}
+              {...numbered(index)}
               aria-disabled={inert} onClick={() => { if (!inert) { set(choice.value); chose(); } }}>
               {choice.title}{choice.description && <span class="small quiet">{choice.description}</span>}
             </button>
           ))}
         </div>
+        {said}
       </div>
     );
   }
@@ -395,12 +469,14 @@ function Field({ property, value, inert, set, chose }: {
             const on = picked.includes(item.value);
             return (
               <button key={item.value} class={on ? "prominent" : ""} aria-pressed={on} aria-disabled={inert}
+                {...numbered(kind.multiSelect.items.indexOf(item))}
                 onClick={() => !inert && set(on ? picked.filter((v) => v !== item.value) : [...picked, item.value])}>
                 {item.title}{item.description && <span class="small quiet">{item.description}</span>}
               </button>
             );
           })}
         </div>
+        {said}
       </div>
     );
   }
@@ -410,22 +486,28 @@ function Field({ property, value, inert, set, chose }: {
         <input type="checkbox" checked={value === true} disabled={inert}
           onChange={(e) => set((e.currentTarget as HTMLInputElement).checked)} /> {label}
         {property.description && <span class="quiet small"> {property.description}</span>}
+        {said}
       </label>
     );
   }
   const numeric = "number" in kind || "integer" in kind;
+  // A date, a date-time, an email address or a link gets the browser's own input for it (#265).
+  const format = "string" in kind ? kind.string.format : undefined;
+  const type = numeric ? "number" : inputType(format);
+  const shown = typeof value === "string" || typeof value === "number" ? String(value) : "";
   return (
     <label class="field">
       {asked}
-      <input type={(numeric ? "number" : "text") as "text"} disabled={inert}
-        value={typeof value === "string" || typeof value === "number" ? String(value) : ""}
+      <input type={type as "text"} disabled={inert} placeholder={placeholder(format)}
+        value={type === "datetime-local" ? momentToInput(shown) : shown}
         onInput={(e) => {
           const text = (e.currentTarget as HTMLInputElement).value;
-          if (!numeric || text === "") set(text);
+          if (type === "datetime-local") set(text === "" ? "" : momentFromInput(text));
+          else if (!numeric || text === "") set(text);
           else set("integer" in kind ? (Number.isInteger(Number(text)) ? Number(text) : text) : Number(text));
         }} />
       {property.description && <span class="quiet small">{property.description}</span>}
-      {value !== undefined && problem(property, value) && <span class="failure small">{problem(property, value)}</span>}
+      {said}
     </label>
   );
 }

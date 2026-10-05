@@ -164,6 +164,17 @@ function makePage(send, sessionId, targetId, listen) {
       await call("Input.insertText", { text });
     },
 
+    /**
+     * Presses one key as the keyboard would, to whatever has focus: `key` as KeyboardEvent.key,
+     * `code` as its .code, and `modifiers` Alt 1, Ctrl 2, Meta 4, Shift 8. No text is typed.
+     */
+    async key(key, { code = key, modifiers = 0 } = {}) {
+      const keyCode = { Enter: 13, Tab: 9, Escape: 27, ArrowDown: 40, ArrowUp: 38 }[key] ?? (/^Digit\d$/.test(code) ? 48 + Number(code.slice(5)) : 0);
+      for (const type of ["rawKeyDown", "keyUp"]) {
+        await call("Input.dispatchKeyEvent", { type, key, code, modifiers, windowsVirtualKeyCode: keyCode });
+      }
+    },
+
     async focus(selector) {
       const found = await page.eval(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el?.focus(); return !!el; })()`);
       if (!found) throw new Error(`nothing matches ${selector}`);

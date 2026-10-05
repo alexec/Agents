@@ -3,12 +3,12 @@
 // (research R7). Nothing here decides anything; the hosts do.
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, Tombstone, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest,
+  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest, FileMentionDTO, SandboxChoice,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -20,8 +20,17 @@ import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type It
 import { sortedRuntimes } from "./runtimes";
 import { blockLines, openBlock } from "./block";
 import { DashboardOrderSync } from "./dashboardOrderSync";
+import { Drafts } from "./drafts";
 
 export { folderKey } from "./groups";
+
+/** DaemonAPI.SandboxWillNotStart, a start's refusal when its runtime's sandbox will not start, with its sentence. */
+export interface SandboxWillNotStart { runtimeID: string; detail: string; offOffered: boolean; message: string }
+
+function isSandboxRefusal(data: unknown): data is Omit<SandboxWillNotStart, "message"> {
+  const d = data as Partial<SandboxWillNotStart> | null | undefined;
+  return typeof d?.runtimeID === "string" && typeof d.detail === "string" && typeof d.offOffered === "boolean";
+}
 
 /** How many finished turns a chat opens with, as the window's (#90). */
 const openingTurns = 12;
@@ -176,6 +185,10 @@ export class Work {
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
   /** Each host's resources and who holds them (036, #116): read-only on the page. */
   readonly leases = signal<Record<string, LeaseSnapshot>>({});
+  /** Retired agents a link led to, by `host|id`: who they were, for the retired page (051, #253). */
+  readonly tombstones = signal<Record<string, Tombstone>>({});
+  /** Each host's chats it is bringing back by itself after a restart: Coming back (#251). */
+  readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
   readonly disk = signal<Record<string, DiskState>>({});
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
@@ -302,6 +315,12 @@ export class Work {
         // writes. Said, as the window and the Remote say it (#88).
         this.say((params as WriteFailure).message);
         return true;
+      case "agent/resuming": {
+        const note = params as ResumingNotification;
+        const held = (this.resuming.value[host] ?? []).filter((id) => id !== note.agentID);
+        this.resuming.value = { ...this.resuming.value, [host]: note.isResuming ? [...held, note.agentID] : held };
+        return true;
+      }
       case "leases/changed":
         this.leases.value = { ...this.leases.value, [host]: params as LeaseSnapshot };
         return true;
@@ -662,6 +681,11 @@ export class Work {
     return openBlock(agent) ? blockLines(agent, this.agents.value[host] ?? []) : [];
   }
 
+  /** AgentsModel.isComingBack: whether the host is bringing this chat back by itself. */
+  isComingBack(host: string, agentID: string): boolean {
+    return (this.resuming.value[host] ?? []).includes(agentID);
+  }
+
   permissionsFor(host: string, session: string): PermissionRequest[] {
     return (this.permissions.value[host] ?? []).filter((p) => p.agentID === session);
   }
@@ -850,6 +874,10 @@ export class Store extends Work {
       this.pins.value = held;
       this.sessionPins.value = sessions;
     }).catch(failed("pins/list"));
+    // A host from before #251 doesn't answer, and nothing is said to be coming back.
+    void this.link.call("agents/resuming", {}, host).then((response) => {
+      this.resuming.value = { ...this.resuming.value, [host]: response.agentIDs };
+    }).catch(failed("agents/resuming"));
     void this.link.call("leases/snapshot", {}, host).then((snapshot) => {
       this.leases.value = { ...this.leases.value, [host]: snapshot };
     }).catch(failed("leases/snapshot"));
@@ -1076,11 +1104,13 @@ export class Store extends Work {
 
   /** Each runtime and what each says it can take, by host. */
   readonly runtimes = signal<Record<string, RuntimeStatus[]>>({});
+  /** Each host's sandbox default per runtime (SandboxSettings); absent means its runtime decides. */
+  readonly sandboxDefaults = signal<Record<string, Record<string, SandboxChoice>>>({});
   readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
   /** A choice made on a menu that the host hasn't confirmed, by agent then option. */
   readonly pendingOptions = signal<Record<string, Record<string, JSONValue>>>({});
-  /** What is typed and attached, per session or per new-agent form, kept in memory only. */
-  readonly drafts = new Map<string, { text: string; attachments: Attachment[] }>();
+  /** What is typed and attached, per session or per new-agent form, kept across a reload (#254). */
+  readonly drafts = new Drafts(typeof localStorage === "undefined" ? undefined : localStorage);
 
   /** Calls `method`, and on failure says why in `problem` and answers null. */
   async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string): Promise<Methods[M]["result"] | null> {
@@ -1120,12 +1150,15 @@ export class Store extends Work {
 
   /** What runs on a host, and what each runtime takes; asked once a connection. */
   async loadRuntimes(host: string): Promise<void> {
-    const [runtimes, accounts, modes] = await Promise.all([
+    const [runtimes, accounts, modes, sandbox] = await Promise.all([
       this.link.call("runtimes/list", {}, host).catch(() => null),
       this.link.call("runtimes/accounts", {}, host).catch(() => null),
       this.link.call("modes/remembered", {}, host).catch(() => null),
+      // A host on an older build is not asked by the page: every runtime then follows its own.
+      this.link.call("sandbox/state", {}, host).catch(() => null),
     ]);
     batch(() => {
+      if (sandbox) this.sandboxDefaults.value = { ...this.sandboxDefaults.value, [host]: sandbox.defaults };
       if (runtimes) this.runtimes.value = { ...this.runtimes.value, [host]: sortedRuntimes(runtimes) };
       if (accounts) this.accounts.value = { ...this.accounts.value, [host]: accounts };
       if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
@@ -1199,6 +1232,24 @@ export class Store extends Work {
 
   async unqueue(host: string, agentID: string, promptID: string): Promise<void> {
     await this.act("agents/unqueue", { agentID: agentID as UUID, promptID: promptID as UUID }, host);
+  }
+
+  /** Who an agent was, when it is not held and may have been retired; nothing when it wasn't. */
+  async lookUpRetired(host: string, agentID: string): Promise<void> {
+    if (this.tombstones.peek()[`${host}|${agentID}`]) return;
+    const found = await this.link.call("agents/retired", { ids: [agentID as UUID] }, host).catch(() => null);
+    const gone = found?.find((t) => t.id === agentID);
+    if (gone) this.tombstones.value = { ...this.tombstones.value, [`${host}|${agentID}`]: gone };
+  }
+
+  /** One task an agent left running, and nothing else it is doing (057, #253). */
+  async stopBackground(host: string, agentID: string, itemID: string): Promise<void> {
+    await this.act("agents/stopBackground", { agentID: agentID as UUID, itemID }, host);
+  }
+
+  /** A runtime's sandbox that could not start (064, #253): Continue without it, or Keep stopped. */
+  async answerSandbox(host: string, agentID: string, carryOn: boolean): Promise<void> {
+    await this.act("agents/answerSandbox", { agentID: agentID as UUID, carryOn }, host);
   }
 
   async perform(host: string, agentID: string,
@@ -1462,13 +1513,30 @@ export class Store extends Work {
     }
   }
 
+  /** Files under the agent's folders for an `@` (#255): the host walks its own disk, as for the Remote. */
+  async mentions(host: string, agentID: string, term: string): Promise<FileMentionDTO[]> {
+    return this.link.call("files/mention", { agentID: agentID as UUID, term }, host).catch(() => []);
+  }
+
   discardDraft(host: string, draftID: string): void {
     void this.link.call("agents/discardDraft", { draftID: draftID as UUID }, host).catch(() => {});
   }
 
-  /** Starts an agent; answers its id, or null with `problem` saying why. */
-  async start(host: string, request: StartRequest): Promise<string | null> {
-    return this.act("agents/start", request, host);
+  /**
+   * Starts an agent; answers its id, or null with `problem` saying why. A runtime whose sandbox
+   * will not start (064) answers what it said instead, for the form to offer Start without sandbox.
+   */
+  async start(host: string, request: StartRequest): Promise<string | SandboxWillNotStart | null> {
+    try {
+      return await this.link.call("agents/start", request, host);
+    } catch (error) {
+      if (error instanceof CallFailed && error.code === Failure.sandboxWillNotStart && isSandboxRefusal(error.data)) {
+        return { ...error.data, message: error.message };
+      }
+      log("call.failed", error instanceof CallFailed ? error.code : undefined);
+      this.say(describe(error));
+      return null;
+    }
   }
 
   /** The newest page of each host's events, for the sidebar's Events row and page (#151). */

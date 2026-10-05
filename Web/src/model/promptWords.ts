@@ -1,0 +1,26 @@
+// PromptWords (Shared/UI/Chat/PromptPieces.swift), for the page's prompt bar (#254): what the
+// empty field says, whether what is typed will wait, and Send's words.
+import type { Agent } from "../protocol/generated";
+
+/** AgentState.hasTurnInFlight. */
+export function hasTurnInFlight(agent: Agent): boolean {
+  return agent.state === "starting" || agent.state === "running" || agent.state === "waitingOnUser";
+}
+
+export const askPlaceholder = "What do you want to do?";
+
+/** PromptWords.placeholder: while it works, what happens to what is typed. */
+export function promptPlaceholder(agent: Agent | undefined): string {
+  if (!agent) return askPlaceholder;
+  if (hasTurnInFlight(agent)) return "What do you want to do next?";
+  return agent.state === "archived" ? "Say what next, and this comes back" : askPlaceholder;
+}
+
+/** PromptWords.willQueue: what is typed now will wait rather than go. */
+export function willQueue(agent: Agent | undefined): boolean {
+  return !!agent && (hasTurnInFlight(agent) || (agent.queuedPrompts ?? []).length > 0);
+}
+
+export const stopHelp = "Stop this agent and stay on the chat";
+export const sendLabel = (queues: boolean) => (queues ? "Queue" : "Send");
+export const sendHelp = (queues: boolean) => (queues ? "Queue this, to go when the turn ends" : "Send");

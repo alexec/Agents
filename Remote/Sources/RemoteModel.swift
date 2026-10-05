@@ -41,6 +41,8 @@ final class RemoteModel {
             selection = nil
             openWorkflow = nil
             openDashboard = false
+            openPin = nil
+            if selectedProject != nil { openActivity = nil }
             letGoOfProjects(keeping: selectedProject)
         }
     }
@@ -255,6 +257,11 @@ final class RemoteModel {
     }
 
     /// Whether `host`'s projects are last known rather than current (frame H greys them).
+    /// A host's name as a server project's row leads with it (#145): `devbox:api`.
+    func hostLabel(_ host: HostID) -> String {
+        hostSections.first { $0.id == host }?.title ?? host.rawValue
+    }
+
     func hostIsOffline(_ host: HostID) -> Bool {
         hostSections.first { $0.id == host }?.offline ?? false
     }
@@ -276,6 +283,67 @@ final class RemoteModel {
     var openDashboard = false
     /// The project's pinned page (#159) pushed over the project page, by its path in it.
     var openPin: String?
+    /// One of the pages about all the work, from the sidebar's Activity (#226): Events,
+    /// Resources, Runtimes or Spending. Nil, or one of those.
+    var openActivity: SidebarItem? {
+        didSet {
+            if openActivity != nil, selectedProject != nil { selectedProject = nil }
+        }
+    }
+
+    /// What the sidebar has picked (#226), the Mac's one value for it: the first of what is
+    /// open over the project — its Dashboard, a pinned page, a workflow, a chat — and what
+    /// was opened from that is pushed over it in the detail. A project chosen with nothing
+    /// open over it shows its Dashboard, as the Mac's project row does.
+    var sidebarItem: SidebarItem? {
+        get {
+            if let openActivity { return openActivity }
+            guard let folder = selectedProject else { return nil }
+            let key = ProjectKey(host: selectedSummary?.host ?? .mac, folder: folder)
+            if openDashboard { return .project(key) }
+            if let openPin { return .pin(openPin, in: key) }
+            if let openWorkflow { return .workflow(openWorkflow, in: key) }
+            if let selection { return .session(selection) }
+            return .project(key)
+        }
+        set {
+            switch newValue {
+            case nil:
+                openActivity = nil
+                selectedProject = nil
+                selection = nil
+                openWorkflow = nil
+                openPin = nil
+                openDashboard = false
+            case .project(let key):
+                selectedProject = key.folder
+                selection = nil
+                openPin = nil
+                openWorkflow = nil
+                openDashboard = true
+            case .session(let id):
+                if let folder = work.agent(id)?.projectFolder { selectedProject = folder }
+                openDashboard = false
+                openPin = nil
+                openWorkflow = nil
+                selection = id
+            case .workflow(let id, let key):
+                selectedProject = key.folder
+                openDashboard = false
+                openPin = nil
+                selection = nil
+                openWorkflow = id
+            case .pin(let path, let key):
+                selectedProject = key.folder
+                openDashboard = false
+                openWorkflow = nil
+                selection = nil
+                openPin = path
+            case .spending, .resources, .events, .runtimes:
+                openActivity = newValue
+            }
+        }
+    }
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
@@ -341,8 +409,10 @@ final class RemoteModel {
         case failed(String)
     }
 
-    /// The runtime the sheet will start. Seeded with the one the Mac would offer.
+    /// The runtime the sheet will start. Seeded by the kit's rule from the one it was last
+    /// left on (#264), as the window's start form and the page's.
     private(set) var startRuntimeID: String?
+    private static let keptStartRuntime = "startRuntimeID"
     /// What that runtime offers, in the order they are drawn.
     private(set) var startOptions: [ConfigOption] = []
     /// What has been chosen, by option id. Sent as the start's options.
@@ -400,7 +470,10 @@ final class RemoteModel {
         }
         guard startingIn == folder else { return }
         if startRuntimeID == nil || !startAvailableRuntimeIDs.contains(startRuntimeID ?? "") {
-            startRuntimeID = work.defaultRuntimeID(available: startAvailableRuntimeIDs)
+            // The one rule (#264): the runtime this sheet was last left on, kept across launches.
+            // The list is this project's host's (#240), not every runtime the Mac knows.
+            startRuntimeID = work.defaultRuntimeID(available: startAvailableRuntimeIDs,
+                                                   kept: UserDefaults.standard.string(forKey: Self.keptStartRuntime))
         }
         await loadStartChoices()
     }
@@ -459,6 +532,7 @@ final class RemoteModel {
     func chooseRuntime(_ runtimeID: String) async {
         guard runtimeID != startRuntimeID else { return }
         startRuntimeID = runtimeID
+        UserDefaults.standard.set(runtimeID, forKey: Self.keptStartRuntime)
         startSandbox = nil
         startRefusal = nil
         await loadStartChoices()
@@ -1569,26 +1643,19 @@ final class RemoteModel {
         notifier.show(headline, needID: pushed.needID, alert: pushed.alert)
     }
 
-    /// Open one conversation from a banner: its project first, then the chat.
-    ///
-    /// The chat is pushed on the next turn of the run loop, not in the same one as the
-    /// project change: on a phone the split view collapses, and a path set while the
-    /// detail column is still being pushed is dropped — the tap "went to the right
-    /// project" and stopped there (2026-09-21). A banner tapped before the agents have
-    /// arrived — a cold launch — is kept and honoured once they have.
+    /// Open one conversation from a banner, as the sidebar's pick (#226). A banner tapped
+    /// before the agents have arrived — a cold launch — is kept and honoured once they
+    /// have.
     func open(_ agentID: UUID) {
-        guard let agent = work.agent(agentID) else {
+        guard work.agent(agentID) != nil else {
             pendingOpen = agentID
             return
         }
         pendingOpen = nil
-        selectedProject = agent.projectFolder
-        // A banner is about the agent, not whatever page was open over the project.
-        openWorkflow = nil
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(80))
-            self.selection = agentID
-        }
+        // A banner is about the agent, not whatever page was open over the project. The
+        // chat is the detail's own page (#226), not a push over the project's, so there
+        // is no push for a collapsing split view to drop.
+        sidebarItem = .session(agentID)
     }
 
     private var pendingOpen: UUID?
@@ -1739,7 +1806,7 @@ final class RemoteModel {
         moreLiveAgents = page.next(after: listed) != nil
         filledProjects = []
         let live = Set(listed.map(\.id))
-        let letGo = Set(ClientHolding.archivedToLetGo(work.agents, project: selectedProject, chat: selection))
+        let letGo = Set(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
         // Only this host's: another host's agents come from that host (058, US4).
         let kept = work.agents.filter {
             $0.host == .mac && $0.state == .archived && !live.contains($0.id) && !letGo.contains($0.id)
@@ -1764,7 +1831,8 @@ final class RemoteModel {
     /// agents, its label suggestions, and the live agents beyond the first page that it
     /// filled in.
     private func letGoOfProjects(keeping folder: URL?) {
-        work.forget(ClientHolding.archivedToLetGo(work.agents, project: folder, chat: selection))
+        work.forget(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeld(keeping: folder), chat: selection)
+            .filter { !searched.contains($0) })
         labelVocabularies = labelVocabularies.filter { $0.key == folder.map(Project.standardize) }
         if let folder { Task { await fillProject(folder) } }
     }
@@ -1774,7 +1842,8 @@ final class RemoteModel {
     private func letGoOfChats(keeping agentID: UUID?) {
         touchedEarlier = touchedEarlier.filter { $0.key == agentID }
         touchedHistoryAsked = touchedHistoryAsked.filter { $0 == agentID }
-        work.forget(ClientHolding.archivedToLetGo(work.agents, project: selectedProject, chat: agentID))
+        work.forget(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: agentID)
+            .filter { !searched.contains($0) })
     }
 
     /// The newest `limit` archived agents in a project, for its Archived section when
@@ -1788,6 +1857,56 @@ final class RemoteModel {
                                                  DaemonAPI.RetiredRequest(ids: [agentID]),
                                                  returning: [Tombstone].self) else { return }
         work.takeTombstones(found)
+    }
+
+    /// The projects whose Archived fold is open in the sidebar (#226): each holds a page
+    /// of its archived sessions while it is, as on the Mac (#165).
+    private(set) var openArchivedFolds: Set<URL> = []
+
+    /// The projects whose archived sessions a screen can show: the open project, and
+    /// every open Archived fold.
+    private var archivedHeldFor: Set<URL> { archivedHeld(keeping: selectedProject) }
+
+    private func archivedHeld(keeping folder: URL?) -> Set<URL> {
+        openArchivedFolds.union(folder.map { [Project.standardize($0)] } ?? [])
+    }
+
+    /// A project's Archived fold has opened: a page of its newest archived sessions.
+    func loadArchived(in folder: URL) async {
+        openArchivedFolds.insert(Project.standardize(folder))
+        await loadArchivedAgents(in: folder, limit: SidebarProjectFold.archivedShown)
+    }
+
+    /// A project's Archived fold has closed: what it held is let go, but for the chat open
+    /// and whatever the open project's pages still show.
+    func letGoOfArchived(in folder: URL) {
+        let folder = Project.standardize(folder)
+        guard openArchivedFolds.remove(folder) != nil else { return }
+        work.forget(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection)
+            .filter { !searched.contains($0) })
+    }
+
+    /// The most a search brings back, a page from the Mac: the sidebar holds the live
+    /// sessions and filters those itself (#165, #176).
+    static let searchShown = 200
+    /// Archived sessions a search brought in, let go when the search ends.
+    private var searched: Set<UUID> = []
+
+    /// The archived sessions matching `words`, one capped page; nothing when it is empty.
+    func searchSessions(_ words: String) async {
+        let earlier = searched
+        searched = []
+        if !earlier.isEmpty {
+            let unseen = Set(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
+            work.forget(earlier.filter { unseen.contains($0) })
+        }
+        guard !words.isEmpty else { return }
+        let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
+        guard let found = try? await client.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self),
+              !Task.isCancelled else { return }
+        let archived = found.filter { $0.state == .archived }
+        searched = Set(archived.filter { work.agent($0.id) == nil }.map(\.id))
+        work.takeListed(archived)
     }
 
     func loadArchivedAgents(in folder: URL, limit: Int) async {

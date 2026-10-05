@@ -71,9 +71,23 @@ function build(tokens: readonly Token[]): ComponentChildren[] {
       continue;
     }
     switch (token.type) {
-      case "inline":
+      case "inline": {
+        // A task list item (`- [ ]`, `- [x]`): a box drawn and never ticked, as MarkdownText's (#252).
+        const item = stack[stack.length - 2];
+        const first = token.children?.[0];
+        const box = item?.tag === "li" && item.children.length === 0 && top().children.length === 0
+          && first?.type === "text" ? /^\[([ xX])\]\s+/.exec(first.content) : null;
+        if (box && first) {
+          const done = box[1] !== " ";
+          first.content = first.content.slice(box[0].length);
+          item!.props["class"] = "task";
+          push(h("span", { class: `task-box${done ? " done" : ""}`, role: "img", "aria-label": done ? "Done" : "Not done" },
+            done ? "☑" : "☐"));
+          push(" ");
+        }
         top().children.push(...build(token.children ?? []));
         break;
+      }
       case "text":
         push(token.content);
         break;

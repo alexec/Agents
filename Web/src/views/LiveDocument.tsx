@@ -112,6 +112,13 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
     return unwatch;
   }, [host, agentID, path]);
 
+  // Shown again (the agent asking for it, or Show plan): read again. A plan is shown as it starts
+  // being written, so the first read can come before there is anything, in a folder no watch covers.
+  const shown = store.shownFile.value;
+  useEffect(() => {
+    if (shown && shown.host === host && shown.agentID === agentID && shown.path === path) void read();
+  }, [shown?.at]);
+
   // The host says the folder changed: read again, with the stamp held so an unchanged file costs nothing.
   useEffect(() => {
     if (page.changed !== undefined) void read();

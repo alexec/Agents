@@ -1,0 +1,246 @@
+[
+  {
+    "expected" : null,
+    "input" : {
+      "availability" : {
+        "available" : {
+          "path" : "/bin/claude",
+          "supportsResume" : true
+        }
+      },
+      "checkedAt" : 812500000,
+      "outdated" : false,
+      "runtime" : {
+        "arguments" : [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ],
+        "executable" : "npx",
+        "id" : "claude",
+        "install" : {
+          "toolset" : {
+            "runtimeID" : "claude"
+          }
+        },
+        "installPage" : "https://code.claude.com/docs/en/setup",
+        "name" : "Claude",
+        "usesAppCopyOnly" : false
+      }
+    },
+    "name" : "available"
+  },
+  {
+    "expected" : "Looked for npx in /a, /b, /c, /d…",
+    "input" : {
+      "availability" : {
+        "missing" : {
+          "lookedIn" : [
+            "/a",
+            "/b",
+            "/c",
+            "/d",
+            "/e"
+          ]
+        }
+      },
+      "checkedAt" : 812500000,
+      "outdated" : false,
+      "runtime" : {
+        "arguments" : [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ],
+        "executable" : "npx",
+        "id" : "claude",
+        "install" : {
+          "toolset" : {
+            "runtimeID" : "claude"
+          }
+        },
+        "installPage" : "https://code.claude.com/docs/en/setup",
+        "name" : "Claude",
+        "usesAppCopyOnly" : false
+      }
+    },
+    "name" : "missing"
+  },
+  {
+    "expected" : "Signed out. Run claude login.",
+    "input" : {
+      "availability" : {
+        "needsSignIn" : {
+          "authMethods" : [
+
+          ],
+          "fixCommand" : "claude login"
+        }
+      },
+      "checkedAt" : 812500000,
+      "outdated" : false,
+      "runtime" : {
+        "arguments" : [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ],
+        "executable" : "npx",
+        "id" : "claude",
+        "install" : {
+          "toolset" : {
+            "runtimeID" : "claude"
+          }
+        },
+        "installPage" : "https://code.claude.com/docs/en/setup",
+        "name" : "Claude",
+        "usesAppCopyOnly" : false
+      }
+    },
+    "name" : "signed out with a command"
+  },
+  {
+    "expected" : "Signed out.",
+    "input" : {
+      "availability" : {
+        "needsSignIn" : {
+          "authMethods" : [
+
+          ]
+        }
+      },
+      "checkedAt" : 812500000,
+      "outdated" : false,
+      "runtime" : {
+        "arguments" : [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ],
+        "executable" : "npx",
+        "id" : "claude",
+        "install" : {
+          "toolset" : {
+            "runtimeID" : "claude"
+          }
+        },
+        "installPage" : "https://code.claude.com/docs/en/setup",
+        "name" : "Claude",
+        "usesAppCopyOnly" : false
+      }
+    },
+    "name" : "signed out"
+  },
+  {
+    "expected" : "It crashed.",
+    "input" : {
+      "availability" : {
+        "failed" : {
+          "reason" : "It crashed."
+        }
+      },
+      "checkedAt" : 812500000,
+      "outdated" : false,
+      "runtime" : {
+        "arguments" : [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ],
+        "executable" : "npx",
+        "id" : "claude",
+        "install" : {
+          "toolset" : {
+            "runtimeID" : "claude"
+          }
+        },
+        "installPage" : "https://code.claude.com/docs/en/setup",
+        "name" : "Claude",
+        "usesAppCopyOnly" : false
+      }
+    },
+    "name" : "failed"
+  },
+  {
+    "expected" : "Installing: 40%",
+    "input" : {
+      "availability" : {
+        "installing" : {
+          "progress" : "40%"
+        }
+      },
+      "checkedAt" : 812500000,
+      "outdated" : false,
+      "runtime" : {
+        "arguments" : [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ],
+        "executable" : "npx",
+        "id" : "claude",
+        "install" : {
+          "toolset" : {
+            "runtimeID" : "claude"
+          }
+        },
+        "installPage" : "https://code.claude.com/docs/en/setup",
+        "name" : "Claude",
+        "usesAppCopyOnly" : false
+      }
+    },
+    "name" : "installing with progress"
+  },
+  {
+    "expected" : "Installing…",
+    "input" : {
+      "availability" : {
+        "installing" : {
+
+        }
+      },
+      "checkedAt" : 812500000,
+      "outdated" : false,
+      "runtime" : {
+        "arguments" : [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ],
+        "executable" : "npx",
+        "id" : "claude",
+        "install" : {
+          "toolset" : {
+            "runtimeID" : "claude"
+          }
+        },
+        "installPage" : "https://code.claude.com/docs/en/setup",
+        "name" : "Claude",
+        "usesAppCopyOnly" : false
+      }
+    },
+    "name" : "installing"
+  },
+  {
+    "expected" : "The download failed. Install it from https://code.claude.com/docs/en/setup.",
+    "input" : {
+      "availability" : {
+        "installFailed" : {
+          "reason" : "The download failed."
+        }
+      },
+      "checkedAt" : 812500000,
+      "outdated" : false,
+      "runtime" : {
+        "arguments" : [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ],
+        "executable" : "npx",
+        "id" : "claude",
+        "install" : {
+          "toolset" : {
+            "runtimeID" : "claude"
+          }
+        },
+        "installPage" : "https://code.claude.com/docs/en/setup",
+        "name" : "Claude",
+        "usesAppCopyOnly" : false
+      }
+    },
+    "name" : "install failed"
+  }
+]

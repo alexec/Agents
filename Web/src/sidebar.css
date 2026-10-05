@@ -1,4 +1,4 @@
-/* The one sidebar from 760 wide (#151), as the window's (#145): Activity, the projects folding
+/* The one sidebar (#151), as the window's (#145): Activity, the projects folding
    open on their sessions and workflows, the hosts' state at the foot; then the chat. Every rule
    is under .with-sidebar, so it outweighs the three-column rules in app.css. */
 
@@ -111,3 +111,17 @@
 .row.pin.missing .title { opacity: 0.55; }
 .row.pin.dragging { opacity: 0.4; }
 .group.pins { margin-bottom: 2px; }
+
+/* Below 760 the sidebar is the page's root list, as the iPhone's is (#235): what it picks takes
+   its place, with ‹ Agents back to it, and the files pane lies over the chat. */
+@media (max-width: 759px) {
+  .columns.with-sidebar, .files-open .columns.with-sidebar { grid-template-columns: minmax(0, 1fr); }
+  .with-sidebar .sidebar, .with-sidebar .chat, .with-sidebar .files,
+  .files-open .with-sidebar .files { grid-column: 1; grid-row: 1; }
+  .depth-list .with-sidebar .chat, .depth-list .with-sidebar .files { display: none; }
+  .depth-chat .with-sidebar .sidebar { display: none; }
+  .with-sidebar .sidebar { border-right: none; }
+  .with-sidebar .sidebar-head { flex-wrap: wrap; padding-bottom: 6px; }
+  .with-sidebar .sidebar-head h1.narrow-only { flex-basis: 100%; margin: 10px 0 2px; text-align: left; font-size: 22px; }
+  .with-sidebar .sidebar-head .search { flex: 1; }
+}

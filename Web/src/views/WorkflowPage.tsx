@@ -14,8 +14,9 @@ import {
 } from "../model/workflows";
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
-import { SessionRow } from "./SessionRow";
+import { rowExtras, SessionRow } from "./SessionRow";
 import { CooldownMenu, RuntimeRow, WorkflowSettingsForm } from "./WorkflowSettings";
+import { BackToList } from "./BackToList";
 
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
   store: Store; host: string; folder: string; projectName: string; workflowID: string; down: boolean;
@@ -23,7 +24,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   const summary = (store.workflows.value[`${host}|${folderKey(folder)}`] ?? []).find((w) => w.workflow.workflowID === workflowID);
   // The daemon's refusal of the last change, said beside the controls until the next one.
   const problem = useSignal<{ workflowID: string; text: string } | null>(null);
-  const back = <button class="back narrow-only" onClick={() => go({ host, project: folder })}>‹ {projectName}</button>;
+  const back = <BackToList />;
   if (!summary) {
     return (
       <section class="chat workflow-page" aria-label="Workflow">
@@ -152,7 +153,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           {runs.length === 0 && <p class="hint">Nothing has run yet.</p>}
           {runs.slice(0, 6).map((agent) => (
             <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
-              waits={store.waitsOf(host, agent)} />
+              waits={store.waitsOf(host, agent)} extras={rowExtras(store, host, agent)} />
           ))}
         </div>
       </div>

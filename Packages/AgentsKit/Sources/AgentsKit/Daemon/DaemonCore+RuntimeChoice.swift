@@ -27,6 +27,13 @@ extension DaemonCore {
         PoolWords.modelsOut(allowanceState(for: Self.ownEntry(runtimeID: runtimeID)), now: now())
     }
 
+    /// Whether the runtime itself is out of the pool, as the choosers' Out run has it.
+    func isOutOfPool(runtimeID: String) -> Bool {
+        var state = allowanceState(for: Self.ownEntry(runtimeID: runtimeID))
+        state.settle(now: now())
+        return state.isOut
+    }
+
     /// Its Pool page line when the runtime or any of its models is out, else nil.
     func poolNote(runtimeID: String) -> String? {
         let at = now()

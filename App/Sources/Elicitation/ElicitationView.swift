@@ -433,6 +433,15 @@ struct ElicitationView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.radioGroup)
+                } else if case .string(.date?, _, _, _) = property.kind {
+                    // A date and a date-time are picked, as on the Remote (#265).
+                    DatePicker("", selection: date(for: property.name, format: Self.day), displayedComponents: .date)
+                        .labelsHidden()
+                        .fixedSize()
+                } else if case .string(.dateTime?, _, _, _) = property.kind {
+                    DatePicker("", selection: date(for: property.name, format: Self.moment))
+                        .labelsHidden()
+                        .fixedSize()
                 } else {
                     TextField("", text: text(for: property.name))
                         .textFieldStyle(.roundedBorder)
@@ -486,6 +495,28 @@ struct ElicitationView: View {
     private func text(for name: String) -> Binding<String> {
         Binding(get: { values[name]?.stringValue ?? numberText(name) },
                 set: { values[name] = .string($0) })
+    }
+
+    /// A date as the answer carries it, yyyy-MM-dd, as the Remote's FormPages writes it.
+    private static let day: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    /// A date-time as ISO 8601, as the Remote's.
+    private static let moment = ISO8601DateFormatter()
+
+    /// Today until something is picked; nothing is answered until it is.
+    private func date(for name: String, format: DateFormatter) -> Binding<Date> {
+        Binding(get: { values[name]?.stringValue.flatMap(format.date(from:)) ?? .now },
+                set: { values[name] = .string(format.string(from: $0)) })
+    }
+
+    private func date(for name: String, format: ISO8601DateFormatter) -> Binding<Date> {
+        Binding(get: { values[name]?.stringValue.flatMap(format.date(from:)) ?? .now },
+                set: { values[name] = .string(format.string(from: $0)) })
     }
 
     private func numberText(_ name: String) -> String {

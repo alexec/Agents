@@ -1,0 +1,489 @@
+[
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : null,
+      "matching" : [
+
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : ""
+    },
+    "name" : "empty"
+  },
+  {
+    "expected" : {
+      "command" : "",
+      "completedCommand" : "/review ",
+      "completedMention" : null,
+      "matching" : [
+        "review",
+        "compact",
+        "init",
+        "pr-comments",
+        "Release-Notes"
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "/"
+    },
+    "name" : "/"
+  },
+  {
+    "expected" : {
+      "command" : "re",
+      "completedCommand" : "/review ",
+      "completedMention" : null,
+      "matching" : [
+        "review",
+        "Release-Notes"
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "/re"
+    },
+    "name" : "/re"
+  },
+  {
+    "expected" : {
+      "command" : "RE",
+      "completedCommand" : "/review ",
+      "completedMention" : null,
+      "matching" : [
+        "review",
+        "Release-Notes"
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "/RE"
+    },
+    "name" : "/RE"
+  },
+  {
+    "expected" : {
+      "command" : "co",
+      "completedCommand" : "fix the /compact ",
+      "completedMention" : null,
+      "matching" : [
+        "compact",
+        "pr-comments"
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "fix the /co"
+    },
+    "name" : "fix the /co"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : null,
+      "matching" : [
+
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "a/b"
+    },
+    "name" : "a/b"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : null,
+      "matching" : [
+
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "/re view"
+    },
+    "name" : "/re view"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : null,
+      "matching" : [
+
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "path/to/re"
+    },
+    "name" : "path/to/re"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : "Prompt.tsx ",
+      "matching" : [
+
+      ],
+      "mention" : ""
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "@"
+    },
+    "name" : "@"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : "Prompt.tsx ",
+      "matching" : [
+
+      ],
+      "mention" : "Prompt"
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "@Prompt"
+    },
+    "name" : "@Prompt"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : null,
+      "matching" : [
+
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "mail me@x.y"
+    },
+    "name" : "mail me@x.y"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : "see Prompt.tsx ",
+      "matching" : [
+
+      ],
+      "mention" : "Web/src"
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "see @Web/src"
+    },
+    "name" : "see @Web/src"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : null,
+      "matching" : [
+
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "@a b"
+    },
+    "name" : "@a b"
+  },
+  {
+    "expected" : {
+      "command" : null,
+      "completedCommand" : null,
+      "completedMention" : "/init and Prompt.tsx ",
+      "matching" : [
+
+      ],
+      "mention" : "fo"
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "/init and @fo"
+    },
+    "name" : "/init and @fo"
+  },
+  {
+    "expected" : {
+      "command" : "in",
+      "completedCommand" : "two / slashes /init ",
+      "completedMention" : null,
+      "matching" : [
+        "init"
+      ],
+      "mention" : null
+    },
+    "input" : {
+      "commands" : [
+        {
+          "name" : "review"
+        },
+        {
+          "name" : "compact"
+        },
+        {
+          "name" : "init"
+        },
+        {
+          "name" : "pr-comments"
+        },
+        {
+          "name" : "Release-Notes"
+        }
+      ],
+      "text" : "two / slashes /in"
+    },
+    "name" : "two / slashes /in"
+  }
+]
