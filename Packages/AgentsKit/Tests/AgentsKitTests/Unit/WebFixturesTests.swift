@@ -717,6 +717,24 @@ struct WebFixturesTests {
         try pin("runtimes/reasons.json", cases) { input in
             try input.decode(RuntimeStatus.self).unavailableReason.map(JSONValue.string) ?? .null
         }
+
+        let starts: [(String, String?, [String])] = [
+            ("kept and startable", "grok", ["claude", "codex", "grok"]),
+            ("kept but gone", "gemini", ["claude", "codex"]),
+            ("nothing kept", nil, ["codex", "claude"]),
+            ("no Claude", nil, ["gemini", "codex"]),
+            ("kept, no Claude", "opencode", ["codex", "gemini"]),
+            ("none can start", "claude", []),
+        ]
+        let startCases = starts.map { name, kept, available in
+            Case(name: name, input: .object(["kept": kept.map(JSONValue.string) ?? .null,
+                                             "available": .array(available.map(JSONValue.string))]))
+        }
+        try pin("runtimes/new-session.json", startCases) { input in
+            RuntimeCatalog.newSessionRuntime(kept: input["kept"]?.stringValue,
+                                             available: (input["available"]?.arrayValue ?? []).compactMap(\.stringValue))
+                .map(JSONValue.string) ?? .null
+        }
     }
 
     // MARK: reducer/

@@ -1118,9 +1118,8 @@ struct PromptBar: View {
         // What was left on the form, before anything fills in a default over it.
         DraftKeeper.shared.putBackStartForm(into: model)
         if model.draftRuntimeID == nil || !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
-            // The catalog's default when it can start: the list is alphabetical (#154).
-            let available = model.availableRuntimes.map(\.id)
-            model.draftRuntimeID = available.first { $0 == RuntimeCatalog.defaultRuntime.id } ?? available.first
+            // The one rule (#264): what was put back, else the catalog's default, else the first.
+            model.draftRuntimeID = model.defaultRuntimeID
         }
         if model.draftCwd == nil { model.draftCwd = model.agents.first?.projectFolder }
         if model.draftCwd != nil, model.draftRuntimeID != nil, model.draftOptions.isEmpty {

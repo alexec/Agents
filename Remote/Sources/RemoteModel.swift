@@ -409,8 +409,10 @@ final class RemoteModel {
         case failed(String)
     }
 
-    /// The runtime the sheet will start. Seeded with the one the Mac would offer.
+    /// The runtime the sheet will start. Seeded by the kit's rule from the one it was last
+    /// left on (#264), as the window's start form and the page's.
     private(set) var startRuntimeID: String?
+    private static let keptStartRuntime = "startRuntimeID"
     /// What that runtime offers, in the order they are drawn.
     private(set) var startOptions: [ConfigOption] = []
     /// What has been chosen, by option id. Sent as the start's options.
@@ -468,7 +470,10 @@ final class RemoteModel {
         }
         guard startingIn == folder else { return }
         if startRuntimeID == nil || !startAvailableRuntimeIDs.contains(startRuntimeID ?? "") {
-            startRuntimeID = work.defaultRuntimeID(available: startAvailableRuntimeIDs)
+            // The one rule (#264): the runtime this sheet was last left on, kept across launches.
+            // The list is this project's host's (#240), not every runtime the Mac knows.
+            startRuntimeID = work.defaultRuntimeID(available: startAvailableRuntimeIDs,
+                                                   kept: UserDefaults.standard.string(forKey: Self.keptStartRuntime))
         }
         await loadStartChoices()
     }
@@ -518,6 +523,7 @@ final class RemoteModel {
     func chooseRuntime(_ runtimeID: String) async {
         guard runtimeID != startRuntimeID else { return }
         startRuntimeID = runtimeID
+        UserDefaults.standard.set(runtimeID, forKey: Self.keptStartRuntime)
         startSandbox = nil
         startRefusal = nil
         await loadStartChoices()

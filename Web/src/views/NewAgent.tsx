@@ -18,7 +18,7 @@ import type { Attachment, BranchSummary, ConfigOption, JSONValue, RuntimeStatus,
 import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn, choices, same } from "../model/options";
 import { folderKey } from "../model/groups";
-import { firstChoice, runtimeRuns, unavailableReason } from "../model/runtimes";
+import { newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout } from "../model/sandbox";
@@ -64,8 +64,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const kept = useSignal(keptForm(storage));
   const left = formFor(kept.value, runtimes.map((r) => r.runtime.id));
   const runtimeID = useSignal<string | undefined>(undefined);
-  // The kept runtime; else the default when it can start, else the first that can (#154).
-  const chosenRuntime = runtimeID.value ?? left.runtimeID ?? firstChoice(runtimes);
+  // The one rule (#264): the kept runtime; else the default when it can start, else the first.
+  const chosenRuntime = runtimeID.value ?? newSessionRuntime(left.runtimeID, runtimes.map((r) => r.runtime.id));
   const where = useSignal<Where>({ kind: "project" });
   const worktrees = useSignal<WorktreeSummary[]>([]);
   const branches = useSignal<BranchSummary[]>([]);

@@ -1127,23 +1127,15 @@ public final class AgentsModel {
         return cell.agent
     }
 
-    /// Which runtime a new agent gets when nobody has said.
+    /// Which runtime a new agent gets when nobody has said: `RuntimeCatalog.newSessionRuntime`,
+    /// so the Mac, a phone and the page cannot offer different ones (029, #264). Not the
+    /// last agent's runtime any more: a helper an agent started is not the person's choice.
     ///
-    /// Whatever the last agent used, when it is still available, because that is the
-    /// one already chosen in every other sense. Here rather than in either app so that
-    /// the Mac and a phone cannot offer different ones for the same work (029).
-    ///
-    /// - Parameter available: the runtimes that can be started now, in the Mac's order.
-    ///   With no agent to go by it is the catalog's default when that can start, and
-    ///   otherwise the first of these — by order, not whichever a set happened to hand
-    ///   back. The order is alphabetical (#154), so it is not what picks the default.
-    public func defaultRuntimeID(available: [String]) -> String? {
-        let startable = Set(available)
-        let recent = agents.filter { startable.contains($0.runtimeID) }
-            .max { $0.lastActivityAt < $1.lastActivityAt }
-        if let recent { return recent.runtimeID }
-        if startable.contains(RuntimeCatalog.defaultRuntime.id) { return RuntimeCatalog.defaultRuntime.id }
-        return available.first
+    /// - Parameters:
+    ///   - available: the runtimes that can be started now, in the host's order.
+    ///   - kept: the runtime the client's start form was last left on.
+    public func defaultRuntimeID(available: [String], kept: String?) -> String? {
+        RuntimeCatalog.newSessionRuntime(kept: kept, available: available)
     }
 
     /// The projects worth showing, newest activity first.

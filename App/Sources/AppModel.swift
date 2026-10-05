@@ -3072,10 +3072,10 @@ final class AppModel {
         if labelVocabularies[key] != values { labelVocabularies[key] = values }
     }
 
-    /// Which runtime a new agent gets when nobody has said. The rule is the kit's, so
-    /// a phone offers the same one (029). It can be changed from the chat.
+    /// Which runtime a new agent gets when nobody has said: the start form's, by the kit's
+    /// rule, so a phone and the page offer the same one (029, #264).
     var defaultRuntimeID: String? {
-        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id))
+        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id), kept: draftRuntimeID)
     }
 
     /// Take something back off the queue before it goes.

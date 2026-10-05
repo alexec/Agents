@@ -15,9 +15,14 @@ export function sortedRuntimes(runtimes: RuntimeStatus[]): RuntimeStatus[] {
   return [...runtimes].sort((a, b) => byName(a.runtime, b.runtime));
 }
 
-/** With no recent agent to go by: the default when it can start, else the first in order. */
-export function firstChoice(available: RuntimeStatus[]): string | undefined {
-  return available.find((r) => r.runtime.id === defaultRuntimeID)?.runtime.id ?? available[0]?.runtime.id;
+/**
+ * The runtime a new session opens on, RuntimeCatalog.newSessionRuntime (#264), the one rule the
+ * window, the Remote and the page follow: the start form's, while it can start; else the
+ * default; else the first, in order.
+ */
+export function newSessionRuntime(kept: string | undefined, available: readonly string[]): string | undefined {
+  if (kept !== undefined && available.includes(kept)) return kept;
+  return available.includes(defaultRuntimeID) ? defaultRuntimeID : available[0];
 }
 
 /** RuntimeStatus.unavailableReason: why it cannot be started, in the runtime's own terms, or null. */
