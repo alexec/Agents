@@ -8,7 +8,7 @@ import Observation
 /// the agent's local servers, which only listen on the Mac, and a pane that could never
 /// show anything is not offered (FR-030).
 enum Pane: String, CaseIterable, Identifiable, Hashable {
-    case page, files, terminal, exchanged
+    case page, files, changes, terminal, exchanged
 
     var id: String { rawValue }
 
@@ -16,6 +16,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .page: "Page"
         case .files: "Files"
+        case .changes: "Changes"
         case .terminal: "Terminal"
         case .exchanged: "Exchanged"
         }
@@ -55,6 +56,8 @@ final class PaneState {
     var htmlShowsSource = false
     /// HTML files the person let run scripts, by path. Off for every other file.
     var scriptsAllowed: Set<String> = []
+    /// A file the Changes pane should open when it appears.
+    var changesPath: String?
 
     /// Open a pane, remembering it as the one to come back to.
     func show(_ pane: Pane) {

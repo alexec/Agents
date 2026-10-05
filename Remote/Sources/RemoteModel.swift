@@ -2086,6 +2086,19 @@ final class RemoteModel {
 
     // MARK: Pinned pages (#159)
 
+    /// What this agent changed, from the daemon's bounded change list (#245).
+    func changes(for agentID: UUID) async throws -> ChangesList {
+        try await client.call(DaemonAPI.Method.changesList,
+                              DaemonAPI.ChangesListRequest(agentID: agentID),
+                              returning: ChangesList.self)
+    }
+
+    func changeDetail(for agentID: UUID, path: String, whole: Bool = false) async throws -> ChangedFileDetail {
+        try await client.call(DaemonAPI.Method.changesFile,
+                              DaemonAPI.ChangesFileRequest(agentID: agentID, path: path, whole: whole),
+                              returning: ChangedFileDetail.self)
+    }
+
     func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }
 
     func refreshPins() async {

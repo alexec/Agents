@@ -15,6 +15,7 @@ struct PinnedPage: View {
     @State private var stamp: FileStamp?
     @State private var problem: String?
     @State private var pictures: PhonePagePictures?
+    @State private var htmlShowsSource = false
 
     private var pin: PinView? { model.pins(in: folder).first { $0.path == path } }
     private var url: URL { folder.appending(path: path) }
@@ -34,11 +35,15 @@ struct PinnedPage: View {
                 }
             } else if let text {
                 if PinRules.kind(path) == .html {
-                    HTMLPage(text: text, path: url.path(percentEncoded: false),
-                             scope: HTMLPageScope(root: folder.path(percentEncoded: false)),
-                             allowsScripts: false, folderEvent: revision,
-                             read: { [model, folder] file in try await model.readPage(file, in: folder) },
-                             follow: { link in if case .openOutside(let url) = link { openURL(url) } })
+                    if htmlShowsSource {
+                        FileLines(text: text, line: nil, path: url.path(percentEncoded: false))
+                    } else {
+                        HTMLPage(text: text, path: url.path(percentEncoded: false),
+                                 scope: HTMLPageScope(root: folder.path(percentEncoded: false)),
+                                 allowsScripts: false, folderEvent: revision,
+                                 read: { [model, folder] file in try await model.readPage(file, in: folder) },
+                                 follow: { link in if case .openOutside(let url) = link { openURL(url) } })
+                    }
                 } else {
                     LivePage(text: text, url: url, line: nil, folderEvent: revision)
                         .environment(\.pageActions, actions)
@@ -50,6 +55,16 @@ struct PinnedPage: View {
         .navigationTitle(pin?.title ?? PinRules.defaultTitle(path))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if PinRules.kind(path) == .html {
+                ToolbarItem(placement: .principal) {
+                    Picker("Show", selection: $htmlShowsSource) {
+                        Text("Page").tag(false)
+                        Text("Source").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 if pin != nil {
                     Button("Unpin", systemImage: "pin.slash") { Task { await model.unpin(path, in: folder) } }

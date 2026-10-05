@@ -34,6 +34,7 @@ struct FilesPane: View {
     @State private var generation = 0
     /// The file the person just chose from a row, which is in view already.
     @State private var chosenFromRow: URL?
+    @State private var changeIndex = ChangeTree.Index()
 
     private var state: PaneState { model.panes.state(for: agent.id) }
     private var folder: URL { state.folder ?? agent.cwd }
@@ -62,6 +63,7 @@ struct FilesPane: View {
             await untilCancelled()
             await model.files.unwatch(agentID: agent.id, folder: agent.cwd)
         }
+        .task(id: model.entries.count) { await refreshChangeIndex() }
         .onChange(of: state.openFile) { _, url in
             guard let url else { return }
             state.place.opened(url, fromRow: url == chosenFromRow)
@@ -125,6 +127,10 @@ struct FilesPane: View {
             Spacer(minLength: 8)
             if let file = state.openFile, canDrawPage(file) {
                 pageControls(file)
+            }
+            if let file = state.openFile, PinRules.kind(file.path) == .html,
+               let path = PinRules.relative(file.path, in: agent.projectFolder) {
+                pinButton(path)
             }
             if let file = state.openFile, !ChangesView.changes(to: file.path, in: model.entries).isEmpty {
                 Button("What the agent did") { state.showingChanges = true }
@@ -194,7 +200,9 @@ struct FilesPane: View {
                 List {
                     ForEach(listing.entries) { entry in
                         let isMarked = !entry.isDirectory && state.place.marked == FileTree.key(entry.url)
-                        row(entry, touched: touched.contains(entry.url))
+                        row(entry, touched: touched.contains(entry.url),
+                            changed: changeIndex.files[entry.url.path],
+                            folderTotals: changeIndex.folders[entry.url.path])
                             // The file last open, so Back shows where it is (#66).
                             .listRowBackground(Paper.raised.overlay(isMarked ? Paper.accent.opacity(0.15) : .clear))
                             .accessibilityAddTraits(isMarked ? .isSelected : [])
@@ -225,7 +233,8 @@ struct FilesPane: View {
         Task { reader.scrollTo(id, anchor: .center) }
     }
 
-    private func row(_ entry: DirectoryEntry, touched: Bool) -> some View {
+    private func row(_ entry: DirectoryEntry, touched: Bool, changed: ChangedFile?,
+                     folderTotals: ChangeTree.Totals?) -> some View {
         Button {
             if entry.isDirectory {
                 state.folder = entry.url
@@ -245,8 +254,19 @@ struct FilesPane: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 8)
-                if touched {
-                    // The Mac's mark for "the agent changed this": the tint, as a dot.
+                if let changed {
+                    Image(systemName: ChangeTint.symbol(changed.state))
+                        .foregroundStyle(ChangeTint.color(changed.state))
+                        .accessibilityLabel(ChangeWords.status(changed.state))
+                    if let added = changed.added, let removed = changed.removed {
+                        Text("+\(added) −\(removed)").appText(.fine).monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                } else if entry.isDirectory, let folderTotals {
+                    Text("+\(folderTotals.added) −\(folderTotals.removed)")
+                        .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                } else if touched {
+                    // Older transcripts may know a touched path before the git list does.
                     Circle().fill(.tint).frame(width: 7, height: 7)
                         .accessibilityLabel("Changed by the agent")
                 }
@@ -257,6 +277,25 @@ struct FilesPane: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func refreshChangeIndex() async {
+        guard let list = try? await model.changes(for: agent.id) else { return }
+        changeIndex = ChangeTree.Index(list.files)
+    }
+
+    @ViewBuilder
+    private func pinButton(_ path: String) -> some View {
+        let pinned = model.pins(in: agent.projectFolder).contains { $0.path == path }
+        Button(pinned ? "Unpin" : "Pin") {
+            Task {
+                if pinned { await model.unpin(path, in: agent.projectFolder) }
+                else { await model.pin(path, in: agent.projectFolder) }
+            }
+        }
+        .appText(.fine)
+        .buttonStyle(.paper)
+        .disabled(!pinned && model.pins(in: agent.projectFolder).count >= PinLimits.perProject)
     }
 
     // MARK: One file
