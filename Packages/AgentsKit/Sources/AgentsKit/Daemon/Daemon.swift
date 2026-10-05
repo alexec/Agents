@@ -289,7 +289,10 @@ public final class Daemon: @unchecked Sendable {
         let dialer = HostDialer(membershipFile: membershipFile, codeFile: locations.controlJoinCode, given: given,
                                 privateKey: privateKey, hello: hello, say: { [weak self] in self?.sayJoin($0) })
         let uplink = ControlUplink(server: server, hello: hello,
-                                   onChange: { [dialer] up in dialer.connected(up) },
+                                   onChange: { [dialer, core] up in
+                                       dialer.connected(up)
+                                       Task { await core.controlUplinkChanged(up) }
+                                   },
                                    dial: { [dialer] in try await dialer.dial() })
         self.uplink = uplink
         await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }

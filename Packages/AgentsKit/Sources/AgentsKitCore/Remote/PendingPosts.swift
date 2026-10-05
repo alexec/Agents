@@ -50,4 +50,11 @@ public struct PendingPosts: Sendable {
 
     /// What is waiting, oldest first.
     public var waiting: [MailboxItem] { order.compactMap { items[$0] } }
+
+    /// The version still owed for this need. A retry snapshot may have been superseded
+    /// by a withdrawal while another mailbox post was suspended.
+    public func current(_ item: MailboxItem) -> MailboxItem? {
+        guard let current = items[Self.key(item)], current.postedAt >= item.postedAt else { return nil }
+        return current
+    }
 }

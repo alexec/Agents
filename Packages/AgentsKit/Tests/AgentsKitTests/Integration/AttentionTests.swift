@@ -7,6 +7,16 @@ import Testing
 /// thresholds of milliseconds so nothing here waits on the real ones.
 @Suite("Attention", .timeLimit(.minutes(1)))
 struct AttentionTests {
+    private final class ControlMessages: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [DaemonAPI.AttentionNeed] = []
+        func add(_ value: JSONValue) {
+            guard let message = try? value.decode(DaemonAPI.AttentionNeed.self) else { return }
+            lock.withLock { values.append(message) }
+        }
+        var all: [DaemonAPI.AttentionNeed] { lock.withLock { values } }
+        func clear() { lock.withLock { values.removeAll() } }
+    }
     /// Short enough to test in, long enough to observe: the pause is a tenth of a second.
     private let thresholds = AttentionThresholds(macIdle: 60, deviceStaleness: 60,
                                                  settlingPause: 0.15, reAlertInterval: 60)
@@ -45,6 +55,38 @@ struct AttentionTests {
 
     private func settled() async throws {
         try await Task.sleep(for: .milliseconds(400))
+    }
+
+    @Test func forwardedNeedRecordsRoundTripAndReadOlderFiles() throws {
+        let id = NeedID.permission(UUID())
+        let data = try StoreCoding.encoder.encode(AttentionRecords(forwarded: [id]))
+        let decoded = try StoreCoding.decoder.decode(AttentionRecords.self, from: data)
+        #expect(decoded.forwarded == [id])
+        let legacy = try StoreCoding.decoder.decode(AttentionRecords.self,
+            from: Data(#"{"raised":[],"deliveries":[],"withdrawing":[]}"#.utf8))
+        #expect(legacy.forwarded.isEmpty)
+    }
+
+    @Test func hostWithoutDevicesWithdrawsForwardedNeedAndReoffersAfterReconnect() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(asking(), locations: locations)
+        await core.setHostsForControlPlane(true)
+        let messages = ControlMessages()
+        await core.deliverNeeds { messages.add($0) }
+
+        let agent = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, agent)
+        await eventually("the need was offered without a local device") { messages.all.contains { $0.need != nil } }
+
+        // The control plane may have restarted while this host's uplink was down. Its
+        // posted state is empty, so reconnection must replay the still-live need.
+        messages.clear()
+        await core.controlUplinkChanged(true)
+        #expect(messages.all.contains { $0.need != nil })
+
+        let permission = try #require(await core.pendingPermissionRequests().first)
+        try await core.answerPermission(.init(permissionID: permission.id, optionID: "allow"))
+        await eventually("answering withdraws the host's offer") { messages.all.contains { $0.withdraw != nil } }
     }
 
     private func mintedToken(_ launcher: FakeLauncher) async -> String {

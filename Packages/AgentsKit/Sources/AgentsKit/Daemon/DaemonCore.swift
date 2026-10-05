@@ -72,6 +72,9 @@ public actor DaemonCore {
     /// On disk in `attention.json`, so a daemon that goes before a bridge arrives hands
     /// the debt to the next one. See `DaemonCore+Attention`.
     var pendingWithdrawals: [PendingWithdrawal] = []
+    /// Needs offered to the control plane, even when this host has no local delivery.
+    /// Persisted so answered needs can still be withdrawn after a restart/uplink outage.
+    var forwardedNeeds: Set<NeedID> = []
     /// The connections that have said they carry mail — in practice the bridge, and at
     /// most one. In memory only: a carrier is a live connection, and the next daemon
     /// learns of its own when the bridge reconnects and says so again.
