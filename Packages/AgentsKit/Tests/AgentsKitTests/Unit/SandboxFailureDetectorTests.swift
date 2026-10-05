@@ -48,6 +48,21 @@ struct SandboxFailureDetectorTests {
         }
     }
 
+    /// #224: the words quoted, as a test's argument or a log prints them, are not the failure.
+    @Test func quotedWordsAreNotTheFailure() {
+        let quoted = [
+            "case passing 3 arguments runtimeID → \"claude\", words → \"Sandbox required but unavailable\"",
+            "the detector looks for 'sandbox_apply: Operation not permitted'",
+            "It matched “Sandbox required but unavailable” in the output.",
+        ]
+        for text in quoted {
+            #expect(SandboxFailureDetector.match(runtimeID: "claude", text: text) == nil, "\(text)")
+        }
+        let both = "words → \"Sandbox required but unavailable\"\nerror result: Sandbox required but unavailable: no bwrap"
+        #expect(SandboxFailureDetector.match(runtimeID: "claude", text: both)
+                == "error result: Sandbox required but unavailable: no bwrap")
+    }
+
     @Test func aReplyRunIntoTheErrorIsTrimmedToIt() throws {
         let detail = SandboxFailureDetector.match(runtimeID: "codex", text: try fixture("codex-macos-nested-seatbelt-reply"))
         #expect(detail == "sandbox-exec: sandbox_apply: Operation not permitted")

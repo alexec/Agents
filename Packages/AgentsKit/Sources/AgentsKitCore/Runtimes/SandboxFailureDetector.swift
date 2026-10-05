@@ -15,7 +15,7 @@ public enum SandboxFailureDetector {
         let lines = plain.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
         var hits: [String] = []
         for line in lines {
-            guard let pattern = patterns.first(where: { line.localizedCaseInsensitiveContains($0) }) else { continue }
+            guard let pattern = patterns.first(where: { said(line, $0) }) else { continue }
             let hit = trimmed(line, to: pattern)
             if !hits.contains(hit) { hits.append(hit) }
         }
@@ -23,6 +23,24 @@ public enum SandboxFailureDetector {
         let detail = hits.joined(separator: "\n")
         return detail.count > 1200 ? String(detail.prefix(1200)) + "…" : detail
     }
+
+    /// Whether `line` says `pattern` itself rather than quoting it (#224): a test's
+    /// argument, a log line or an agent's own words put the failure in quotation marks
+    /// (`words → "Sandbox required but unavailable"`), and the runtime never does.
+    static func said(_ line: String, _ pattern: String) -> Bool {
+        var rest = line[...]
+        while let found = rest.range(of: pattern, options: .caseInsensitive) {
+            let before = found.lowerBound == line.startIndex ? nil : line[line.index(before: found.lowerBound)]
+            if let before, quotes.contains(before) {
+                rest = line[found.upperBound...]
+                continue
+            }
+            return true
+        }
+        return false
+    }
+
+    static let quotes: Set<Character> = ["\"", "'", "`", "\u{201C}", "\u{2018}", "\u{00AB}"]
 
     /// A line from an agent's reply can run its own words into the error, since chunks are
     /// joined without a break (Codex: "…the shell output.sandbox-exec: sandbox_apply…").

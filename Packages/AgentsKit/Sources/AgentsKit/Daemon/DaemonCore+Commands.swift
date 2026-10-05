@@ -1369,6 +1369,8 @@ extension DaemonCore {
         // What the turn's usage updates banked so far is on disk before the turn is
         // over; any still arriving follow within `spendSaveDelay`.
         flushSpend()
+        // Whether the agent recorded its ending with finish_turn this turn (#224).
+        let agentRecordedAnEnding = finishedTurns[agentID] != nil
         // Whether the app cancelled this turn because the agent had ended it (#139).
         let endedByTheAgent = endWatch(agentID)
         // Read before anything is awaited, so a stop in any of the waits below is seen.
@@ -1453,7 +1455,9 @@ extension DaemonCore {
         _ = retrying
         // A command whose sandbox could not be set up (064, FR-006a): the turn ran to its
         // end, and the agent stops there with the card.
-        if let runtimeID = agents[agentID]?.runtimeID,
+        // Never once the agent recorded its ending (#224): what it printed or said after
+        // that, or quoted on its way there, is not a sandbox that failed to start.
+        if !agentRecordedAnEnding, let runtimeID = agents[agentID]?.runtimeID,
            let failed = sandboxFailure(in: result.evidence, runtimeID: runtimeID) {
             await recordSandboxFailure(agentID: agentID, detail: failed.detail,
                                        completedToolCalls: failed.completedToolCalls)
@@ -1627,8 +1631,9 @@ extension DaemonCore {
         // person reading the conversation.
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
         // Its sandbox first (064): a runtime that fell over because it could not set one up.
+        // Not once the agent recorded its ending with finish_turn (#224).
         let evidence = await live[agentID]?.turnEvidence ?? TurnEvidence()
-        if let runtimeID = agents[agentID]?.runtimeID,
+        if finishedTurns[agentID] == nil, let runtimeID = agents[agentID]?.runtimeID,
            let detail = await sandboxStartFailure(runtimeID: runtimeID, error: error, session: live[agentID])
                 ?? sandboxFailure(in: evidence, runtimeID: runtimeID)?.detail {
             await recordSandboxFailure(agentID: agentID, detail: detail)
