@@ -98,6 +98,7 @@ The deltas are tracked by 31 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Outcome / Steps / Details, and the chooser (069) | View ▸ Turns: `A/Commands/AgentsCommands.swift:113` | ··· ▸ Turns show: `R/Chat/RemoteChatView.swift:265` | A select in the chat's head, kept: `W/views/Chat.tsx:29-37, 193` | **same** |
+| Reconnect catch-up keeps one row per turn and entry id (#221) | `K/Client/AgentsModel.swift`; rows deduplicated in `S/Chat/ChatTranscript.swift` | Shared | `W/model/store.ts` | **same** |
 | Concise turn: prompt, *7 steps*, reply, report; no chevron (#148) | `S/Chat/TranscriptRows.swift:38-158` | Shared | `W/views/chat/Rows.tsx:345-399` (walked, #148) | **same** |
 | An open call: diff, Argument, Return (#153) | `S/Chat/TranscriptRows.swift:572-675` | Shared | `W/views/chat/Rows.tsx:128-187`; drops non-text content (`:165-167`) | **delta** (minor): web #252 |
 | Show in Changes under an edit (#153) | `A/Chat/ChatView.swift:82-88` | Opens what the agent did to that file, in a sheet (#242): `R/Chat/RemoteChatView.swift`; a Changes of its own is #245 | `W/views/Chat.tsx:76-79` | **same** |

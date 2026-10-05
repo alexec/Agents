@@ -93,7 +93,9 @@ struct ChatTranscript: View {
     }
 
     /// The conversation as turns: the stored ones, then those in hand.
-    private var rows: [ChatTurn] { stored.map(ChatTurn.init) + items.turns() }
+    private var rows: [ChatTurn] {
+        (stored.map(ChatTurn.init) + items.turns()).keepingLastTurnWithEachID()
+    }
 
     var body: some View {
         // Once per pass. Read inside the row closure, `rows` was the whole conversation
