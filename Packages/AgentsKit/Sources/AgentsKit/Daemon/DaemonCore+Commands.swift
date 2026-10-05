@@ -142,7 +142,9 @@ extension DaemonCore {
             return try await start(request, startedBy: nil)
         }
         if let underWay = startsByRequest[requestID] { return try await underWay.value }
-        if let made = agents.values.first(where: { $0.startRequestID == requestID }) { return made.id }
+        // A retried start finds the agent its first try made, which is live: a start is
+        // not retried after archiving (#218).
+        if let made = agents.live.values.first(where: { $0.startRequestID == requestID }) { return made.id }
         let starting = Task { try await self.start(request, startedBy: nil) }
         startsByRequest[requestID] = starting
         defer { startsByRequest[requestID] = nil }

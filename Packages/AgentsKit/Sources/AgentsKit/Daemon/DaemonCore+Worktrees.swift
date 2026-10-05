@@ -532,8 +532,8 @@ extension DaemonCore {
                                message: "\(root.path) is not a worktree of \(project.lastPathComponent)'s repository.")
         }
         let inside = root.path + "/"
-        let blockedBy = agents.values
-            .filter { $0.state != .archived }
+        // Live agents only (#218): an archived agent is in no folder.
+        let blockedBy = agents.live.values
             .filter { let cwd = Self.canonicalPath($0.cwd); return cwd == root.path || cwd.hasPrefix(inside) }
             .sorted { $0.createdAt < $1.createdAt }
             .map(\.id)
@@ -545,7 +545,9 @@ extension DaemonCore {
         if let branch = entry.branch, Self.isAppBranch(branch) {
             // Measured against what it was made from, when an agent's record still
             // says; otherwise against what the project folder has checked out.
-            let recorded = agents.values.first { $0.worktree.map { Self.canonicalPath($0.root) } == root.path }?.worktree?.base
+            // This project's agents, archived too: the one that made it may be put away.
+            let recorded = agents.inProject(project)
+                .first { $0.worktree.map { Self.canonicalPath($0.root) } == root.path }?.worktree?.base
             let base: String? = if let recorded { recorded } else { await GitWorktrees.base(in: project) }
             if let base {
                 measuredAgainst = base

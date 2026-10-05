@@ -14,9 +14,24 @@ import Foundation
 extension DaemonCore {
     /// SHA-256 of the workflow's file as it is now, or nil when it cannot be read — a
     /// file that cannot be read is already refused as unreadable.
+    ///
+    /// Kept by the file's stamp (#218): every listing, summary and fire asks this of
+    /// every workflow, and a `stat` is all an unchanged file costs. The stamp holds the
+    /// change time, which no one can set back, so a file rewritten and given its old
+    /// modification date is still read and hashed afresh.
     func workflowDigest(_ workflow: Workflow) -> String? {
         let url = WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
-        return (try? Data(contentsOf: url)).map(ContentDigest.sha256)
+        guard let stamp = DigestStamp(url.path) else {
+            workflowDigests[url.path] = nil
+            return nil
+        }
+        if let known = workflowDigests[url.path], known.stamp == stamp { return known.digest }
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        let digest = ContentDigest.sha256(data)
+        workflowDigestReads += 1
+        // Kept only when the file did not move under the read.
+        if DigestStamp(url.path) == stamp { workflowDigests[url.path] = (stamp, digest) }
+        return digest
     }
 
     /// What a workflow is waiting on, or nil when the file is the one approved.
@@ -83,5 +98,29 @@ extension DaemonCore {
         // Its place among the waiting is free for the next in line.
         rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
         return summary
+    }
+}
+
+/// Which version of a file is on disk, as one `stat` tells it, for knowing a digest is
+/// still the file's (#218): inode, size, and the modification and change times to the
+/// nanosecond. The change time moves on every write and cannot be set by hand.
+struct DigestStamp: Equatable, Sendable {
+    var inode: UInt64
+    var size: Int64
+    var modified: [Int]
+    var changed: [Int]
+
+    init?(_ path: String) {
+        var info = stat()
+        guard stat(path, &info) == 0 else { return nil }
+        #if canImport(Darwin)
+        let modified = info.st_mtimespec, changed = info.st_ctimespec
+        #else
+        let modified = info.st_mtim, changed = info.st_ctim
+        #endif
+        inode = UInt64(info.st_ino)
+        size = Int64(info.st_size)
+        self.modified = [Int(modified.tv_sec), Int(modified.tv_nsec)]
+        self.changed = [Int(changed.tv_sec), Int(changed.tv_nsec)]
     }
 }

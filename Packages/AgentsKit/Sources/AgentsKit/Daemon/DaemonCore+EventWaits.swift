@@ -248,7 +248,8 @@ extension DaemonCore {
     /// hears it, and an agent whose turn has ended is started again to be told.
     func eventWaitDeadlinesPassed() {
         let at = now()
-        for id in Array(agents.keys) {
+        // Only the agents with a wait, not every agent there is (#218).
+        for id in Array(agents.withEventWait) {
             guard var agent = agents[id], var wait = agent.eventWait, wait.isDue(now: at) else { continue }
             if let call = openEventWaits.removeValue(forKey: id) {
                 openEventWaitStarted.removeValue(forKey: id)
@@ -314,8 +315,14 @@ extension DaemonCore {
                                message: message?.isEmpty == true ? nil : message,
                                chainDepth: workflowChainDepth(causedBy: caller.id))
         if let problem = draft.problem { throw eventRefusal(problem) }
+        // Every agent's past their hour go with this one's, so the map holds only the
+        // publishers of the last hour (#218).
+        eventState.publishes = eventState.publishes.compactMapValues { dates in
+            let kept = dates.filter { at.timeIntervalSince($0) < 3600 }
+            return kept.isEmpty ? nil : kept
+        }
         eventState.publishes[key] = recent + [at]
-        eventStore.saveState(eventState)
+        saveEventState()
         return EventWords.published(raise(draft))
     }
 

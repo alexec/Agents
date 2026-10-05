@@ -81,6 +81,11 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// cooling down or running, replaced by each one after it, and run once when the
     /// cooldown ends. Kept here so a restart in between still runs it.
     public var heldFire: HeldWorkflowFire?
+    /// When this host first saw its project without the file (#218). Cleared when the
+    /// file is back; past `WorkflowRecords.goneKept`, the state is let go, so a
+    /// workflow deleted for good does not stay in this file for ever. A branch
+    /// switched for a week and back keeps its history and its approval.
+    public var goneSince: Date?
 
     public var key: String { folder.path + "/" + workflowID }
 
@@ -101,7 +106,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case folder, workflowID, offBy, offDigest, standingAgentID, lastFiredAt, lastFiredBy
-        case lastOutcome, lastCausingEvent, approvedDigest, heldFire
+        case lastOutcome, lastCausingEvent, approvedDigest, heldFire, goneSince
         // Before #125.
         case isArchived, isDisabled, disabledByAgent, enabledChosen, writtenOffByAgent
     }
@@ -131,6 +136,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         lastCausingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .lastCausingEvent)
         approvedDigest = try c.decodeIfPresent(String.self, forKey: .approvedDigest)
         heldFire = try? c.decodeIfPresent(HeldWorkflowFire.self, forKey: .heldFire)
+        goneSince = try? c.decodeIfPresent(Date.self, forKey: .goneSince)
     }
 
     /// Written in the old keys while a migration is still owed, so an older build
@@ -155,6 +161,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         try c.encodeIfPresent(lastCausingEvent, forKey: .lastCausingEvent)
         try c.encodeIfPresent(approvedDigest, forKey: .approvedDigest)
         try c.encodeIfPresent(heldFire, forKey: .heldFire)
+        try c.encodeIfPresent(goneSince, forKey: .goneSince)
     }
 
     public init(folder: URL, workflowID: String,
@@ -170,7 +177,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
 
 /// Everything in the file, which is the states plus two things that belong to no single
 /// workflow.
-struct WorkflowRecords: Codable, Sendable {
+struct WorkflowRecords: Codable, Sendable, Equatable {
     var states: [WorkflowState] = []
     /// When the scheduler last looked. The heartbeat that makes a missed fire
     /// decidable: without it, "was anything listening at 9am?" has no honest answer.
@@ -193,6 +200,8 @@ struct WorkflowRecords: Codable, Sendable {
     /// How long a run is believed. A run in flight for a week is a run whose agent will
     /// not be finishing, and holding its workflow any longer only stops it firing.
     static let runHorizon: TimeInterval = 7 * 24 * 60 * 60
+    /// How long the state of a workflow whose file has gone is kept (#218).
+    static let goneKept: TimeInterval = 30 * 24 * 60 * 60
 
     enum CodingKeys: String, CodingKey {
         case states, lastTickAt, runs, approvalsBegan
@@ -226,13 +235,31 @@ extension WorkflowRecords {
 /// the same reasons: it is tens of entries for one person, it changes when somebody
 /// pauses something, and `cat` will show it to you.
 ///
+/// Held once read (#218), as `LimitStore` holds the limits: read again only when the
+/// file's stamp moved, so a tick, a listing or a fire costs one `stat` rather than a
+/// read and a decode. A save of what the file already holds writes nothing, and the
+/// scheduler's heartbeat (`noteTick`) is written at most once a minute, or with the
+/// next real change, rather than every fifteen seconds for ever.
+///
 /// A missing file is empty state, approval not yet begun. A file that is there and
 /// cannot be read approves nothing and is left as it is (#169, `ApprovalFile`): every
 /// workflow waits for the person, and only their Approve replaces the file, keeping a
 /// copy of the old one. Every workflow, and whether it is off or archived, is still in
 /// the repository.
-public struct WorkflowStore: Sendable {
+public final class WorkflowStore: @unchecked Sendable {
     private let locations: StoreLocations
+    private let lock = NSLock()
+    /// What the file holds, as last read or written, and its stamp then.
+    private var held: (records: WorkflowRecords, stamp: FileStamp?)?
+    /// The heartbeat not yet written: newer than `held`'s.
+    private var tickAt: Date?
+    /// How many times the file has been written, for the tests and the measurements.
+    private(set) var writes = 0
+
+    /// How stale the heartbeat on disk may be. After a restart the first tick measures
+    /// from it, so with the 15 s tick a stop of 75 s or more can count as the daemon
+    /// having been away (`workflowMissedThreshold`, two minutes); 105 s before #218.
+    static let tickWriteInterval: TimeInterval = 30
 
     public init(locations: StoreLocations) {
         self.locations = locations
@@ -241,6 +268,72 @@ public struct WorkflowStore: Sendable {
     var file: URL { locations.workflows }
 
     func load() -> WorkflowRecords {
+        lock.withLock {
+            var records = current()
+            if let tickAt { records.lastTickAt = tickAt }
+            return records
+        }
+    }
+
+    /// `replacing` is the person's own act, the only write that replaces a file that
+    /// could not be read; any other write leaves that file alone.
+    func save(_ records: WorkflowRecords, replacing: Bool = false) throws {
+        try lock.withLock {
+            var records = records
+            if let tickAt, records.lastTickAt.map({ $0 < tickAt }) ?? true { records.lastTickAt = tickAt }
+            try write(records, replacing: replacing)
+        }
+    }
+
+    /// The scheduler looked at `now`: held at once, written only when what is on disk is
+    /// a minute old. Answers when it last looked, as `load().lastTickAt` would have.
+    func noteTick(_ now: Date) -> Date? {
+        lock.withLock {
+            let records = current()
+            let since = tickAt ?? records.lastTickAt
+            tickAt = now
+            if let written = records.lastTickAt, now.timeIntervalSince(written) < Self.tickWriteInterval,
+               now >= written {
+                return since
+            }
+            var next = records
+            next.lastTickAt = now
+            do { try write(next, replacing: false) } catch {
+                DaemonLog.shared.write("workflows: the heartbeat could not be written: \(error.localizedDescription)")
+            }
+            return since
+        }
+    }
+
+    /// The file as it stands, read again only when its stamp moved. Under the lock.
+    private func current() -> WorkflowRecords {
+        let stamp = FileStamp(locations.workflows)
+        if let held, held.stamp == stamp { return held.records }
+        let records = read()
+        // The stamp from before the read, so a write between the two reads again. A file
+        // that could not be read is not held: a passing failure is read again next time.
+        held = records.unreadable ? nil : (records, stamp)
+        return records
+    }
+
+    /// Under the lock. Nothing is written when the file already says it.
+    private func write(_ records: WorkflowRecords, replacing: Bool) throws {
+        let onDisk = current()
+        if records == onDisk, !replacing || !records.unreadable { return }
+        let data = try StoreCoding.encoder.encode(records)
+        try ApprovalFile.write(data, to: locations.workflows, overUnreadable: records.unreadable,
+                               replacing: replacing, began: records.approvalsBegan != nil)
+        // A write over an unreadable file that is not the person's own leaves the file,
+        // so what is held stays what was read.
+        guard !records.unreadable || replacing else { return }
+        writes += 1
+        var written = records
+        written.unreadable = false
+        held = (written, FileStamp(locations.workflows))
+        if let tickAt, let at = written.lastTickAt, at >= tickAt { self.tickAt = nil }
+    }
+
+    private func read() -> WorkflowRecords {
         switch ApprovalFile.read(WorkflowRecords.self, at: locations.workflows, began: \.approvalsBegan) {
         case .missing: return WorkflowRecords()
         case .read(let records): return records
@@ -253,14 +346,6 @@ public struct WorkflowStore: Sendable {
             records.unreadable = true
             return records
         }
-    }
-
-    /// `replacing` is the person's own act, the only write that replaces a file that
-    /// could not be read; any other write leaves that file alone.
-    func save(_ records: WorkflowRecords, replacing: Bool = false) throws {
-        let data = try StoreCoding.encoder.encode(records)
-        try ApprovalFile.write(data, to: locations.workflows, overUnreadable: records.unreadable,
-                               replacing: replacing, began: records.approvalsBegan != nil)
     }
 }
 

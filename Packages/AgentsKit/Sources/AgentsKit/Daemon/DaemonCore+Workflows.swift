@@ -29,6 +29,7 @@ extension DaemonCore {
         // the held events are replayed, so nothing they fire collides with a run that is
         // already over.
         pruneWorkflowRuns()
+        pruneWorkflowStates()
         // After adoption, so every file already here is what gets approved as it stands.
         beginWorkflowApprovalsIfNeeded()
         // And the projects' plugins, on the same terms (security review, S2).
@@ -358,6 +359,7 @@ extension DaemonCore {
                       DaemonAPI.WorkflowRemovedNotification(folder: standardized, workflowID: id))
         }
         guard !moved.isEmpty || !gone.isEmpty else { return }
+        if !gone.isEmpty { pruneWorkflowStates() }
         // Every one, not only those whose file moved: a file arriving, changing or going
         // can move another across the waiting ceiling (#132).
         rebroadcastWorkflows(in: standardized)
@@ -600,6 +602,9 @@ extension DaemonCore {
             let rolled = lastSeenDay != nil
             lastSeenDay = today
             if rolled {
+                // What is kept about things that have gone, once a day (#218).
+                pruneWorkflowStates()
+                pruneEventState()
                 broadcastCostState()
                 await drainEverythingHolding()
             }
@@ -609,10 +614,9 @@ extension DaemonCore {
         // still owed its one run, and the first tick after starting is when to give it.
         await releaseHeldWorkflowFires(now: now)
 
-        var records = workflowStore.load()
-        let since = records.lastTickAt
-        records.lastTickAt = now
-        keepQuietly("workflow history") { try workflowStore.save(records) }
+        // Held at once and written at most once a minute (#218): a value that always
+        // differs used to rewrite the whole file every fifteen seconds for ever.
+        let since = workflowStore.noteTick(now)
 
         // The first tick after starting has no window to look at. Everything before the
         // daemon existed is somebody else's business.
@@ -1509,5 +1513,32 @@ extension DaemonCore {
                 broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow))
             }
         }
+    }
+
+    /// Let go of the states of workflows whose files have gone (#218): marked the first
+    /// time a project this daemon holds, or a project that is no longer one, is seen
+    /// without the file, and dropped once `goneKept` has passed. A project that is away
+    /// or archived has not been looked at, so its states are left as they are, as is a
+    /// state with a run in flight or a migration still owed.
+    func pruneWorkflowStates() {
+        var records = workflowStore.load()
+        guard !records.states.isEmpty else { return }
+        let now = now()
+        let projects = Set(projectFolders().map(Project.standardize))
+        let running = Set(workflowRuns.values.map { WorkflowState(folder: $0.folder, workflowID: $0.workflowID).key })
+        var kept: [WorkflowState] = []
+        for var state in records.states {
+            let held = workflows[state.folder]
+            if held?[state.workflowID] != nil || state.legacy != nil || running.contains(state.key) {
+                state.goneSince = nil
+            } else if held != nil || !projects.contains(state.folder) {
+                let since = state.goneSince ?? now
+                guard now.timeIntervalSince(since) < WorkflowRecords.goneKept else { continue }
+                state.goneSince = since
+            }
+            kept.append(state)
+        }
+        records.states = kept
+        keepQuietly("workflow history") { try workflowStore.save(records) }
     }
 }

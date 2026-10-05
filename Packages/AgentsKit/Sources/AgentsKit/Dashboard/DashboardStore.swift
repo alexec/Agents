@@ -546,6 +546,9 @@ struct DashboardState: Codable, Sendable, Hashable {
         var keeperChanges: [KeeperChange] = []
     }
 
+    /// How many of a tile's keeper changes are kept (#218).
+    static let keeperChangesKept = 10
+
     struct Removal: Codable, Sendable, Hashable {
         var at: Date
         var by: String

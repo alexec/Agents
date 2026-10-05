@@ -261,6 +261,32 @@ struct DashboardTests {
         #expect(snapshot.tiles[0].keeperChanges.count == 1)
     }
 
+    /// A tile handed between keepers keeps its latest changes only (#218).
+    @Test func keeperChangesAreCapped() async throws {
+        let names = (0..<13).map { "Lead \($0)" }
+        let s = try await setUp(names.map { ($0, false, nil, .archived) })
+        for name in names {
+            var arguments = number("open_bugs", 4)
+            if case .object(var fields) = arguments { fields["take_over"] = true; arguments = .object(fields) }
+            _ = try await set(s, name, arguments)
+        }
+        let snapshot = await s.core.dashboardSnapshot(s.project)
+        let tile = try #require(snapshot.tiles.first)
+        #expect(tile.keeperChanges.count == DashboardState.keeperChangesKept)
+        #expect(tile.keeperChanges.last?.to.contains("Lead 12") == true)
+    }
+
+    /// Each agent's sets are kept for their hour, and every agent's past it go with the
+    /// next set, not only the caller's (#218).
+    @Test func setsPastTheirHourAreDropped() async throws {
+        let s = try await setUp([("Old", false, nil, .finished), ("New", false, nil, .finished)])
+        _ = try await set(s, "Old", number("a", 1))
+        s.clock.advance(minutes: 61)
+        _ = try await set(s, "New", number("b", 1))
+        let sets = await s.core.dashboardStore.state(s.project).sets
+        #expect(Array(sets.keys) == [s.ids["New"]!.uuidString])
+    }
+
     @Test func readDashboardListsEveryTileWithItsKeeperAndPoints() async throws {
         let s = try await setUp([("Lead", false, nil, .finished), ("Helper", false, nil, .finished)])
         _ = try await set(s, "Lead", number("open_bugs", 6))

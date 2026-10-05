@@ -111,7 +111,7 @@ extension DaemonCore {
         // Written only when it moved: at start every project is looked at (#204).
         guard before != now else { return }
         eventState.branchTips[key] = now
-        eventStore.saveState(eventState)
+        saveEventState()
         guard let before else { return }
         for (branch, tip) in now.sorted(by: { $0.key < $1.key }) {
             guard let old = before[branch], old != tip else { continue }
@@ -201,7 +201,7 @@ extension DaemonCore {
         guard !(eventState.costCrossings[day] ?? []).contains(key) else { return }
         // Only today's are worth keeping.
         eventState.costCrossings = [day: (eventState.costCrossings[day] ?? []) + [key]]
-        eventStore.saveState(eventState)
+        saveEventState()
         if let agent {
             raise(EventDraft(name: "cost.limit_reached", at: now(), scope: .project(folder: agent.projectFolder),
                              sentence: "\(LeaseWords.agentName(agent.title)) reached its spending limit.",
