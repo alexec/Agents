@@ -412,7 +412,9 @@ struct HelperAgentTests {
     @Test func aFourthRunningIsRefusedAndTheThreeAreNamed() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        let core = try await makeCore(locations, longTurns())
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
         let (_, token) = try await caller(core, in: work)
         for name in ["Alpha", "Beta", "Gamma"] { _ = try await start(core, token, name) }
 
@@ -461,7 +463,9 @@ struct HelperAgentTests {
     @Test func thePersonsSettingTakesEffectAtTheNextStartAndIsKept() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        let core = try await makeCore(locations, longTurns())
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
         let (_, token) = try await caller(core, in: work)
         let summary = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(running: 1, notArchived: 2)))
         #expect(summary.project.helperLimits == HelperLimits(running: 1, notArchived: 2))
@@ -636,14 +640,8 @@ struct HelperAgentTests {
 
     // MARK: Stopping and archiving (US3)
 
-    private func longTurns() -> FakeLauncher {
-        var script = FakeACPAgent.Script()
-        script.turnDelay = .seconds(5)
-        return FakeLauncher(script: script)
-    }
-
-    /// Turns held until the test opens the gate: for a test that needs them still going
-    /// at its end, which five seconds is not on a busy machine (#225).
+    /// Turns held until the test opens the gate: for a test that needs them still going,
+    /// which a fixed five seconds is not on a busy machine (#225).
     private func heldTurns(_ gate: TurnGate) -> FakeLauncher {
         var script = FakeACPAgent.Script()
         script.gate = gate
@@ -653,7 +651,9 @@ struct HelperAgentTests {
     @Test func stoppingOneItStartedSaysWhoStoppedIt() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        let core = try await makeCore(locations, longTurns())
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
         let (_, token) = try await caller(core, in: work, title: "Lead")
         let helper = try await start(core, token)
         _ = await eventually("the helper is working") { await core.agent(helper)?.state == .running }
@@ -700,7 +700,9 @@ struct HelperAgentTests {
     @Test func parkingOneThatIsWorkingLetsTheTurnFinishThenParksIt() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        let core = try await makeCore(locations, longTurns())
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
         let (_, token) = try await caller(core, in: work)
         let helper = try await start(core, token)
         _ = await eventually("the helper is working") { await core.agent(helper)?.state == .running }
@@ -712,6 +714,7 @@ struct HelperAgentTests {
             Issue.record("expected the helper to be marked")
             return
         }
+        gate.open()
         _ = await eventually("the helper finished and parked") {
             await core.agent(helper)?.parking?.isParked == true
         }

@@ -41,28 +41,27 @@ struct GitBoundsTests {
 
     /// A checkout that hangs, as an LFS smudge on a dead network does: the add is stopped
     /// at its deadline, says so, and the next worktree change in the project goes ahead.
+    ///
+    /// The smudge sleeps past the suite's time limit, so the add coming back at all is the
+    /// proof it was stopped, without a wall-clock bar a loaded runner stretches (#225).
     @Test func aHungWorktreeAddIsStoppedAndFreesTheProjectsQueue() async throws {
         let (holder, top) = try await repository()
         defer { try? FileManager.default.removeItem(at: holder) }
         try "* filter=hang\n".write(to: top.appending(path: ".gitattributes"), atomically: true, encoding: .utf8)
         _ = try await git(["add", ".gitattributes"], in: top)
         _ = try await git(["commit", "-q", "-m", "attributes"], in: top)
-        _ = try await git(["config", "filter.hang.smudge", "sleep 20"], in: top)
+        _ = try await git(["config", "filter.hang.smudge", "sleep 150"], in: top)
 
-        let started = Date()
         let failure = await #expect(throws: GitWorktrees.Failure.self) {
             try await GitWorktrees.$deadlineOverride.withValue(.seconds(1)) {
                 try await GitWorktrees.add(branch: "hung", path: holder.appending(path: "hung"), in: top)
             }
         }
-        #expect(Date().timeIntervalSince(started) < 10, "stopped at its deadline, not when the smudge ended")
         #expect(failure?.message.contains("git worktree add was stopped after 1 second") == true,
                 "it says what happened: \(failure?.message ?? "")")
 
         _ = try await git(["config", "--unset", "filter.hang.smudge"], in: top)
-        let next = Date()
         try await GitWorktrees.add(branch: "after", path: holder.appending(path: "after"), in: top)
-        #expect(Date().timeIntervalSince(next) < 10, "the queue was freed")
         #expect(FileManager.default.fileExists(atPath: holder.appending(path: "after/README").path))
     }
 
