@@ -20,7 +20,7 @@ test("no old text is a file made; no new text a passage deleted", () => {
   assert.deepEqual(kinds(lineDiff("x\ny", "")), ["r x", "r y"]);
 });
 
-const { wantsWhole } = await load("src/model/diff.ts");
+const { wantsWhole, shownDiff, offersDiffChoice, otherAgentsNote, changeStops, changeStep, canOpenInFiles } = await load("src/model/diff.ts");
 
 test("a file with no edits to show is shown whole, where git can say (ChangeFileView)", () => {
   const git = { owned: { since: "abc" } };
@@ -32,4 +32,49 @@ test("a file with no edits to show is shown whole, where git can say (ChangeFile
   assert.equal(wantsWhole(file({ state: "binary" }), git), false);
   assert.equal(wantsWhole(file({}), { unavailable: { notARepository: {} } }), false);
   assert.equal(wantsWhole(undefined, git), false);
+});
+
+test("Edits or Whole file, only when both can be shown, and a chosen Whole file sticks", () => {
+  const git = { owned: { since: "abc" } };
+  const both = { path: "/w/a", state: "modified", editCount: 2, inProgress: false, outsideFolder: false };
+  const commandWrote = { ...both, editCount: 0, state: "untracked" };
+  assert.equal(offersDiffChoice(both, git), true);
+  assert.equal(shownDiff(undefined, both, git), "edits");
+  assert.equal(shownDiff("whole", both, git), "whole");
+  assert.equal(shownDiff("edits", both, git), "edits");
+  assert.equal(offersDiffChoice(commandWrote, git), false);
+  assert.equal(shownDiff("edits", commandWrote, git), "whole");
+  assert.equal(shownDiff("whole", { ...both, state: "binary" }, git), "edits");
+  assert.equal(offersDiffChoice(both, { shared: { since: "abc" } }), true);
+  assert.equal(offersDiffChoice(both, { unavailable: { notARepository: {} } }), false);
+});
+
+test("the other-agents note is the window's, for a shared folder and for no starting point", () => {
+  assert.equal(otherAgentsNote({ shared: { since: "abc" } }),
+    "Also shows what git sees changed in this folder since the agent started. That may include other agents' work, and yours.");
+  assert.equal(otherAgentsNote({ sharedFromHead: {} }),
+    "This agent started before its starting point was recorded, so git's part is only what is uncommitted, and may include others' work.");
+  assert.equal(otherAgentsNote({ owned: { since: "abc" } }), null);
+  assert.equal(otherAgentsNote({ unavailable: { folderGone: {} } }), null);
+  assert.equal(otherAgentsNote(undefined), null);
+});
+
+test("Previous and Next land on the first line of each change, as LineDiff.changeStops", () => {
+  const lines = lineDiff("a\nb\nc\nd\ne\nf", "a\nB\nc\nd\nE\nF");
+  assert.deepEqual(changeStops(lines), [1, 5]);
+  assert.deepEqual(changeStep([1, 5], undefined, "previous"), { to: 1, enabled: false });
+  assert.deepEqual(changeStep([1, 5], undefined, "next"), { to: 1, enabled: true });
+  assert.deepEqual(changeStep([1, 5], 1, "previous"), { to: 1, enabled: false });
+  assert.deepEqual(changeStep([1, 5], 1, "next"), { to: 5, enabled: true });
+  assert.deepEqual(changeStep([1, 5], 5, "previous"), { to: 1, enabled: true });
+  assert.deepEqual(changeStep([1, 5], 5, "next"), { to: 5, enabled: false });
+  assert.deepEqual(changeStops([{ kind: "added" }, { kind: "added" }, { kind: "context" }, { kind: "removed" }]), [0, 3]);
+});
+
+test("Open in Files is offered unless the file is gone", () => {
+  const file = (state) => ({ path: "/w/a", state, editCount: 1, inProgress: false, outsideFolder: false });
+  assert.equal(canOpenInFiles(file("modified")), true);
+  assert.equal(canOpenInFiles(file("added")), true);
+  assert.equal(canOpenInFiles(file("deleted")), false);
+  assert.equal(canOpenInFiles(undefined), true);
 });

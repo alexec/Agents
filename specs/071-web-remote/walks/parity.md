@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 205 rows: **87 same**, **38 by design**, **80 delta** (after #238–#244, #255–#258, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 205 rows: **88 same**, **38 by design**, **79 delta** (after #238–#244, #255–#259, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -25,7 +25,7 @@ Of 205 rows: **87 same**, **38 by design**, **80 delta** (after #238–#244, #25
 | Prompt bar and queued prompts | 7 | 2 | 11 |
 | Question and permission cards | 10 | 4 | 1 |
 | Start sheet and new project | 17 | 5 | 0 |
-| Worktrees and Files | 11 | 6 | 4 |
+| Worktrees and Files | 12 | 6 | 3 |
 | Dashboard and pins | 8 | 0 | 6 |
 | Workflows page | 6 | 1 | 7 |
 | Settings and Project Settings | 1 | 6 | 0 |
@@ -36,10 +36,10 @@ Of 205 rows: **87 same**, **38 by design**, **80 delta** (after #238–#244, #25
 | Hosts, connection and pairing | 3 | 3 | 0 |
 | MCP Apps views | 1 | 0 | 0 |
 
-The deltas are tracked by 31 issues:
+The deltas are tracked by 30 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
 - **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249.
-- **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #259, #260, #261, #262.
+- **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #260, #261, #262.
 - **The window to change, or more than one side:** #263, #264, #265, #266.
 - **Alex to decide** (one client only, nothing says whether that is meant): #267.
 
@@ -203,8 +203,8 @@ The deltas are tracked by 31 issues:
 | Files: a tree, or a folder at a time (#133) | A tree: `A/Sidebar/FilesPane.swift:292-375` | A folder at a time: `R/Panes/FilesPane.swift:103-260` | A tree from 760 px: `W/views/files/Tree.tsx:25` | **by design** (phone width). The iPad: #267 |
 | Change marks in Files (#63) | Square, +N −M, folder totals: `A/Sidebar/FilesPane.swift:420-474` | Square status marks, +N −M and folder totals: `R/Panes/FilesPane.swift` | `W/views/FilesPane.tsx:50-115` | **same** |
 | Changes: tree, squares, total (#63) | `A/Sidebar/ChangesPane.swift:93-199` | Tree, status marks and total: `R/Panes/RemoteChangesPane.swift` | `W/views/Changes.tsx:69-143` | **same** |
-| Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | Says git may include others' work: `R/Panes/RemoteChangesPane.swift` | None | **delta**: web #259 |
-| Diff view | Edits / Whole file, Previous / Next, Open in Files, changed words marked: `A/Sidebar/ChangeFileView.swift` | Reported edits: `R/Chat/ChangesView.swift` | Chosen by itself, no controls: `W/views/Changes.tsx:47-67` | **delta**: web #259; Remote's Changes pane uses reported edits |
+| Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | Says git may include others' work: `R/Panes/RemoteChangesPane.swift` | The window's two sentences: `W/views/Changes.tsx` | **same** |
+| Diff view | Edits / Whole file, Previous / Next, Open in Files, changed words marked: `A/Sidebar/ChangeFileView.swift` | Reported edits: `R/Chat/ChangesView.swift` | Edits / Whole file, Previous / Next, Open in Files: `W/views/Changes.tsx`. Changed words unmarked. | **delta**: changed words unmarked on the page (as #63); the Remote's Changes pane uses reported edits |
 | An open file follows the disk | `A/Sidebar/FilesPane.swift:94-99` | `R/Panes/FilesPane.swift:75-77` | Read once: `W/views/files/FileView.tsx:55-64` | **delta**: web #258 |
 | Code with line numbers | `S/Page/FileLines.swift` | Shared | No numbers: `W/views/files/FileView.tsx:37-48` | **delta**: web #258 |
 | Markdown in Files | The live page in place: `A/Sidebar/FilesPane.swift:480-514` | To the Page pane: `R/Panes/PaneState.swift:67-70` | Rendered, *Open as Page*: `W/views/FilesPane.tsx:38-40` | **delta**: web #258 |
@@ -226,11 +226,11 @@ The deltas are tracked by 31 issues:
 |---|---|---|---|---|
 | Dashboard row and page (#122) | `A/Dashboard/DashboardPage.swift` | `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx` | **same** |
 | Tile kinds, sparklines, greying when stale | `S/Dashboard/TileCard.swift` | Shared | `W/views/Dashboard.tsx:259-305` | **same** |
-| Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | None | All but *Greyed after*: `W/views/Dashboard.tsx:356-381` | **delta**: Remote #246; web #246 |
-| Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Hide and Remove; nothing brings one back: `R/Dashboard/DashboardPage.swift:70-74, 187-193` | `W/views/Dashboard.tsx:75-79, 241-244` | **delta**: Remote #246 |
-| Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items; no section moves: `R/Dashboard/DashboardPage.swift:198-223` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **delta**: Remote #246 (section moves). No drag on the Remote: **by design** |
+| Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | Details… in the tile's long-press menu; same detail and History rows: `R/Dashboard/DashboardPage.swift` | All rows, including *Greyed after*: `W/views/Dashboard.tsx` | **same** |
+| Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Toggle above tiles; Hide, Show and Remove in the long-press menu: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:75-79, 241-244` | **same** |
+| Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items and section heading's Move Section Up / Down; no drag: `R/Dashboard/DashboardPage.swift` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **same** (no drag on the Remote: **by design**) |
 | Update now (#146) | `A/Dashboard/DashboardPage.swift:98-136` | In the toolbar: `R/Dashboard/DashboardPage.swift:103-158` | `W/views/Dashboard.tsx:137-169` | **same** |
-| *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | None | `W/views/Dashboard.tsx:87-88` | **delta**: Remote #246 |
+| *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | Under the update line: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:87-88` | **same** |
 | A store file set aside, said (#171); the footer sentence (#127) | `A/Dashboard/DashboardPage.swift:24-29, 47-50` | `R/Dashboard/DashboardPage.swift:65-69, 88-92` | `W/views/Dashboard.tsx:90, 129` | **same** |
 | Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
 | A pinned Markdown page, live | `A/Dashboard/PinnedPage.swift:104-106` | `R/Dashboard/PinnedPage.swift:100-131` | `W/views/Pins.tsx:111-133` | **same** |

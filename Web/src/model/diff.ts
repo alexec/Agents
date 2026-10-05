@@ -43,11 +43,82 @@ export function lineDiff(old: string | undefined, next: string): DiffLine[] {
   return rows;
 }
 
+/** What the diff is showing: the agent's edits, or the file as it stands (ChangeFileView). */
+export type DiffShown = "edits" | "whole";
+
+/** The agent's own edits, or one still being made. */
+export function canShowEdits(file: ChangedFile | undefined): boolean {
+  return (file?.editCount ?? 0) > 0 || file?.inProgress === true;
+}
+
+/** The file as it stands, where git can say what changed in it. Binary and files outside the folder cannot. */
+export function canShowWhole(file: ChangedFile | undefined, git: GitView | undefined): boolean {
+  return file !== undefined && git !== undefined && !("unavailable" in git)
+    && file.outsideFolder === false && file.state !== "binary";
+}
+
+/** Both, so the page can offer the choice. One alone is just shown. */
+export function offersDiffChoice(file: ChangedFile | undefined, git: GitView | undefined): boolean {
+  return canShowEdits(file) && canShowWhole(file, git);
+}
+
 /**
- * The window's rule (ChangeFileView): the agent's edits, unless there are none, as for a file a
- * command wrote; then the file as it stands, where git can say what changed in it.
+ * The window's rule (ChangeFileView). Whole file sticks when it was chosen and can be shown.
+ * Otherwise the agent's edits, unless there are none, as for a file a command wrote; then the file.
  */
+export function shownDiff(choice: DiffShown | undefined, file: ChangedFile | undefined, git: GitView | undefined): DiffShown {
+  if (choice === "whole" && canShowWhole(file, git)) return "whole";
+  return canShowEdits(file) || !canShowWhole(file, git) ? "edits" : "whole";
+}
+
+/** The default, before anyone chooses: whole only when there are no edits to show. */
 export function wantsWhole(file: ChangedFile | undefined, git: GitView | undefined): boolean {
-  const edits = (file?.editCount ?? 0) > 0 || file?.inProgress === true;
-  return !edits && git !== undefined && !("unavailable" in git) && file?.outsideFolder === false && file?.state !== "binary";
+  return shownDiff(undefined, file, git) === "whole";
+}
+
+/**
+ * Said once above the list, and only where git's half could be read as this agent's when it may
+ * not be (ChangesPane.source). An agent's own worktree needs no word.
+ */
+export function otherAgentsNote(git: GitView | undefined): string | null {
+  if (git && "shared" in git) {
+    return "Also shows what git sees changed in this folder since the agent started. That may include other agents' work, and yours.";
+  }
+  if (git && "sharedFromHead" in git) {
+    return "This agent started before its starting point was recorded, so git's part is only what is uncommitted, and may include others' work.";
+  }
+  return null;
+}
+
+/** The first line of each run of changed lines: where Next and Previous go (LineDiff.changeStops). */
+export function changeStops(lines: readonly { kind: string }[]): number[] {
+  const stops: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]!.kind !== "context" && (i === 0 || lines[i - 1]!.kind === "context")) stops.push(i);
+  }
+  return stops;
+}
+
+/**
+ * Where Previous or Next goes, and whether that button is on (ChangeFileView.stepButtons).
+ * Before any change has been visited, Previous is off and Next goes to the first.
+ */
+export function changeStep(stops: readonly number[], current: number | undefined, direction: "previous" | "next"): { to: number; enabled: boolean } {
+  const index = current === undefined ? -1 : stops.indexOf(current);
+  const at = index < 0 ? undefined : index;
+  if (direction === "previous") {
+    return {
+      to: at === undefined ? stops[0]! : stops[Math.max(at - 1, 0)]!,
+      enabled: at !== undefined && at !== 0,
+    };
+  }
+  return {
+    to: at === undefined ? stops[0]! : stops[Math.min(at + 1, stops.length - 1)]!,
+    enabled: at !== stops.length - 1,
+  };
+}
+
+/** Open in Files, unless the file is gone (ChangeFileView). Unknown still offers it. */
+export function canOpenInFiles(file: ChangedFile | undefined): boolean {
+  return file?.state !== "deleted";
 }
