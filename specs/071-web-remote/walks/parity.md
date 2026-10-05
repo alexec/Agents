@@ -200,15 +200,15 @@ The deltas are tracked by 31 issues:
 | Worktree list, Remove…, Clean up | Project Settings ▸ Worktrees: `A/Projects/WorktreeRow.swift` | None | None | **by design** (Project Settings are the Mac's) |
 | Recreate a removed worktree (#119) | `A/Chat/MissingFolderStrip.swift:29-35` | `R/Chat/RemoteMissingFolderStrip.swift:24-26` | `W/views/MissingFolder.tsx:22-23` | **same** |
 | Files: a tree, or a folder at a time (#133) | A tree: `A/Sidebar/FilesPane.swift:292-375` | A folder at a time: `R/Panes/FilesPane.swift:103-260` | A tree from 760 px: `W/views/files/Tree.tsx:25` | **by design** (phone width). The iPad: #267 |
-| Change marks in Files (#63) | Square, +N −M, folder totals: `A/Sidebar/FilesPane.swift:420-474` | A touched dot only: `R/Panes/FilesPane.swift:248-252` | `W/views/FilesPane.tsx:50-115` | **delta**: Remote #245 |
-| Changes: tree, squares, total (#63) | `A/Sidebar/ChangesPane.swift:93-199` | No Changes pane: `R/Panes/PaneState.swift:10-11` | `W/views/Changes.tsx:69-143` | **delta**: Remote #245 |
-| Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | n/a | None | **delta**: web #259 |
-| Diff view | Edits / Whole file, Previous / Next, Open in Files, changed words marked: `A/Sidebar/ChangeFileView.swift` | The agent's edits only: `R/Chat/ChangesView.swift` | Chosen by itself, no controls: `W/views/Changes.tsx:47-67` | **delta**: web #259, Remote #245 |
-| An open file follows the disk | `A/Sidebar/FilesPane.swift:94-99` | `R/Panes/FilesPane.swift:75-77` | Read again when anything under the agent changes: `W/views/files/FileView.tsx` | **same** |
-| Code with line numbers | `S/Page/FileLines.swift` | Shared | `W/views/files/FileLines.tsx` | **same** |
-| Markdown in Files | The live page in place: `A/Sidebar/FilesPane.swift:480-514` | To the Page pane: `R/Panes/PaneState.swift:67-70` | The live page in place: `W/views/FilesPane.tsx` | **same** |
-| Pictures, zoom | `A/Sidebar/ImageFile.swift:68-84` | Pinch: `R/Panes/FilesPane.swift:378-474` | Zoom, actual size, fit and a pinch: `W/views/files/ZoomPicture.tsx` | **same** |
-| Pictures inside a Markdown page | `S/Page/MarkdownText.swift:144, 214` | Shared | From beside the document: `W/render/markdown.ts` | **same** |
+| Change marks in Files (#63) | Square, +N −M, folder totals: `A/Sidebar/FilesPane.swift:420-474` | Square status marks, +N −M and folder totals: `R/Panes/FilesPane.swift` | `W/views/FilesPane.tsx:50-115` | **same** |
+| Changes: tree, squares, total (#63) | `A/Sidebar/ChangesPane.swift:93-199` | Tree, status marks and total: `R/Panes/RemoteChangesPane.swift` | `W/views/Changes.tsx:69-143` | **same** |
+| Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | Says git may include others' work: `R/Panes/RemoteChangesPane.swift` | None | **delta**: web #259 |
+| Diff view | Edits / Whole file, Previous / Next, Open in Files, changed words marked: `A/Sidebar/ChangeFileView.swift` | Reported edits: `R/Chat/ChangesView.swift` | Chosen by itself, no controls: `W/views/Changes.tsx:47-67` | **delta**: web #259; Remote's Changes pane uses reported edits |
+| An open file follows the disk | `A/Sidebar/FilesPane.swift:94-99` | `R/Panes/FilesPane.swift:75-77` | Read once: `W/views/files/FileView.tsx:55-64` | **delta**: web #258 |
+| Code with line numbers | `S/Page/FileLines.swift` | Shared | No numbers: `W/views/files/FileView.tsx:37-48` | **delta**: web #258 |
+| Markdown in Files | The live page in place: `A/Sidebar/FilesPane.swift:480-514` | To the Page pane: `R/Panes/PaneState.swift:67-70` | Rendered, *Open as Page*: `W/views/FilesPane.tsx:38-40` | **delta**: web #258 |
+| Pictures, zoom | `A/Sidebar/ImageFile.swift:68-84` | Pinch: `R/Panes/FilesPane.swift:378-474` | No zoom: `W/views/files/FileView.tsx:26-34` | **delta**: web #258 |
+| Pictures inside a Markdown page | `S/Page/MarkdownText.swift:144, 214` | Shared | *[image: alt]*: `W/render/markdown.ts:98-101` | **delta**: web #258 |
 | HTML file (#67) | Page / Source, scripts off: `A/Sidebar/FilesPane.swift:232-261` | The same: `R/Panes/FilesPane.swift:140-165` | Source: `W/views/files/FileView.tsx:83-90` | **by design** (071 FR-031, Trusted Types) |
 | Back finds where it was (#66) | `A/Sidebar/FilesPane.swift:76-86` | `R/Panes/FilesPane.swift:47-57` | `W/views/FilesPane.tsx:36, 60-65` | **same** |
 | A folder ends on its contents or a sentence (#62); stale reads dropped (#89) | Yes | Yes | Yes | **same** |
@@ -233,8 +233,8 @@ The deltas are tracked by 31 issues:
 | A store file set aside, said (#171); the footer sentence (#127) | `A/Dashboard/DashboardPage.swift:24-29, 47-50` | `R/Dashboard/DashboardPage.swift:65-69, 88-92` | `W/views/Dashboard.tsx:90, 129` | **same** |
 | Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
 | A pinned Markdown page, live | `A/Dashboard/PinnedPage.swift:104-106` | `R/Dashboard/PinnedPage.swift:100-131` | `W/views/Pins.tsx:111-133` | **same** |
-| A pinned HTML page | Page / Source: `A/Dashboard/PinnedPage.swift:54-61` | Page only: `R/Dashboard/PinnedPage.swift:94-99` | Source: `W/views/Pins.tsx:139-142` | **delta**: Remote #245. Web: **by design** (Trusted Types) |
-| Pin from the Files bar | Any Markdown or HTML file: `A/Sidebar/FilesPane.swift:192-230` | None | Any Markdown or HTML file open under Files: `W/views/FilesPane.tsx` | **delta**: Remote #245 |
+| A pinned HTML page | Page / Source: `A/Dashboard/PinnedPage.swift:54-61` | Page / Source: `R/Dashboard/PinnedPage.swift` | Source: `W/views/Pins.tsx:139-142` | Web: **by design** (Trusted Types) |
+| Pin from the Files bar | Any Markdown or HTML file: `A/Sidebar/FilesPane.swift:192-230` | Markdown in Page and HTML in Files: `R/Panes/PagePane.swift`, `R/Panes/FilesPane.swift` | Any Markdown or HTML file open under Files: `W/views/FilesPane.tsx` | **same** |
 | A missing pin | `A/Dashboard/PinnedPage.swift:85-99` | `R/Dashboard/PinnedPage.swift:83-92` | `W/views/Pins.tsx:125-131` | **same** |
 | A page tile | `A/Dashboard/PinnedPage.swift:222-273` | `R/Dashboard/PinnedPage.swift:158-215` | `W/views/Dashboard.tsx:330-354` | **same** (HTML as source on the page: **by design**) |
 

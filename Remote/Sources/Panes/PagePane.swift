@@ -67,6 +67,7 @@ struct PagePane: View {
     @ViewBuilder
     private func page(_ url: URL) -> some View {
         VStack(spacing: 0) {
+            pageActionsBar(url)
             if let note = note(url) {
                 Text(note)
                     .appText(.fine)
@@ -94,6 +95,30 @@ struct PagePane: View {
                     .opacity(isGone ? 0.6 : 1)
                     .environment(\.pageActions, actions)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func pageActionsBar(_ url: URL) -> some View {
+        if let path = PinRules.relative(url.path, in: agent.projectFolder),
+           PinRules.kind(path) != nil {
+            let pinned = model.pins(in: agent.projectFolder).contains { $0.path == path }
+            HStack {
+                Text(url.lastPathComponent).appText(.fine).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                Spacer()
+                Button(pinned ? "Unpin" : "Pin to Project", systemImage: pinned ? "pin.slash" : "pin") {
+                    Task {
+                        if pinned { await model.unpin(path, in: agent.projectFolder) }
+                        else { await model.pin(path, in: agent.projectFolder) }
+                    }
+                }
+                .buttonStyle(.borderless)
+                .disabled(!pinned && model.pins(in: agent.projectFolder).count >= PinLimits.perProject)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            Divider()
         }
     }
 

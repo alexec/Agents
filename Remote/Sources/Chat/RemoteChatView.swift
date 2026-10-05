@@ -243,9 +243,13 @@ struct RemoteChatView: View {
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
             acting: { [model] agentID in model.acting(agentID) },
-            // Show in Changes under an edit (#242): what the agent did to that file, the
-            // phone's sheet of its edits, until the Remote has a Changes of its own (#245).
-            showEdit: { [model] diff, _ in model.fileOnScreen = diff.path },
+            // Show in Changes under an edit (#242), at that file in the new pane (#245).
+            showEdit: { [model] diff, _ in
+                guard let agentID = model.selection else { model.fileOnScreen = diff.path; return }
+                let panes = model.panes.state(for: agentID)
+                panes.changesPath = diff.path
+                panes.show(.changes)
+            },
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },
