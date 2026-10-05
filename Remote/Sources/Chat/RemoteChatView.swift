@@ -209,7 +209,10 @@ struct RemoteChatView: View {
                 }
                 .frame(maxHeight: 300)
                 .fixedSize(horizontal: false, vertical: true)
-            } else if let form = model.formForSelection {
+            }
+            // A form waits the same way a permission does and floats with it, never
+            // hidden behind one (#243), as on the Mac.
+            if let form = model.formForSelection {
                 ElicitationSheet(request: form)
                     .id(form.id)
                     .transition(.move(edge: .bottom).combined(with: .opacity))

@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 204 rows: **64 same**, **37 by design**, **103 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
+Of 204 rows: **66 same**, **37 by design**, **101 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -23,7 +23,7 @@ Of 204 rows: **64 same**, **37 by design**, **103 delta**. A row with any open d
 | Session rows and states | 10 | 2 | 11 |
 | Chat turns and turn detail | 4 | 3 | 15 |
 | Prompt bar and queued prompts | 5 | 2 | 13 |
-| Question and permission cards | 4 | 3 | 8 |
+| Question and permission cards | 6 | 3 | 6 |
 | Start sheet and new project | 8 | 5 | 9 |
 | Worktrees and Files | 5 | 6 | 10 |
 | Dashboard and pins | 8 | 0 | 6 |
@@ -149,7 +149,7 @@ The deltas are tracked by 32 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Where they show | Together, over the prompt: `A/Chat/ChatView.swift:172-196` | A form hidden while any permission waits: `R/Chat/RemoteChatView.swift:184-200` | Together: `W/views/Cards.tsx:122-133` | **delta**: Remote #243 |
+| Where they show | Together, over the prompt: `A/Chat/ChatView.swift:172-196` | Together: `R/Chat/RemoteChatView.swift` (#243) | Together: `W/views/Cards.tsx:122-133` | **same** |
 | Asker line and title (#121) | `A/Elicitation/ElicitationView.swift:28-34` | `R/Elicitation/ElicitationSheet.swift:28-42` | `W/views/Cards.tsx:117-120` | **same** |
 | One-tap single choice | One property only: `A/Elicitation/ElicitationView.swift:37, 303-333` | Also with the optional Other box: `R/Elicitation/ElicitationSheet.swift:79-141` | The window's rule | **by design** (one tap on a phone; `ElicitationSheet.swift:79-89`) |
 | Multi-page forms | *1/3*: `A/Elicitation/ElicitationView.swift:89-150` | *Question 1 of 3*: `R/Elicitation/FormPages.swift:50-55` | *1/3*: `W/views/Cards.tsx:209-218` | **same** |
@@ -157,12 +157,12 @@ The deltas are tracked by 32 issues:
 | A field's problem in place | Under every field | Under every part | Text and number only: `W/views/Cards.tsx:387-428` | **delta**: web #256 |
 | Held while sending (#86) | The answer bright, *telling* the host | *telling* the host: `R/Elicitation/ElicitationSheet.swift:188-203` | The host's name: `W/views/Cards.tsx:96-116` | **by design**: buttons replaced on the Remote (layout); the host's name the same since #239 |
 | Greyed while the host is down (#83) | `A/Chat/ChatView.swift:179-193` | The agent's host: `R/Elicitation/ElicitationSheet.swift:159-162`, `R/Permission/PermissionSheet.swift:126` | `W/views/Chat.tsx:45-46` | **same** (#239) |
-| Decline; a link question | *No thanks*; *Gave up*: `A/Elicitation/ElicitationView.swift:46-62` | *No thanks* for both: `R/Elicitation/ElicitationSheet.swift:154` | As the window: `W/views/Cards.tsx:277-285` | **delta**: Remote #243 |
+| Decline; a link question | *No thanks*; *Gave up*: `A/Elicitation/ElicitationView.swift:46-62` | As the window: `R/Elicitation/ElicitationSheet.swift` (#243) | As the window: `W/views/Cards.tsx:277-285` | **same** |
 | Answered elsewhere | Disappears | Disappears | 4 s, *Answered on another device.*: `W/views/Cards.tsx:35-38, 78-84` | **delta**: #266 |
 | Keyboard answers | ⌘1…9, Return: `A/Elicitation/ElicitationView.swift:528-540` | n/a | None | **delta**: web #256 |
 | Permission options | `A/Permission/PermissionView.swift:41-48` | `R/Permission/PermissionSheet.swift:110-127` | `W/views/Cards.tsx:176-184` | **same** |
 | What the call will do | Title and kind: `A/Permission/PermissionView.swift:78-81` | Plus the diffs and content: `R/Permission/PermissionSheet.swift:66-106` | Title and kind; *switch_mode* on a plan: `W/views/Cards.tsx:173-174` | **delta**: #266 (diff); web #256 (kind) |
-| Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file only: `R/Permission/PermissionSheet.swift:89-91` | No plan: `W/views/Cards.tsx:166-188` | **delta**: Remote #243, web #256 |
+| Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file or the text: `R/Permission/PermissionSheet.swift` (#243) | No plan: `W/views/Cards.tsx:166-188` | **delta**: web #256 |
 | A server key ask | `A/Chat/TokenAskCard.swift`, `A/Hosts/Lending.swift:79-87` | None | None | **by design** (the key is lent from the Mac's Keychain); what the others see: #267 |
 
 ## Start sheet and new project
