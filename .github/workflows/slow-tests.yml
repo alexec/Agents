@@ -35,3 +35,16 @@ jobs:
             swift test --package-path "$package" --filter "$filter" || status=1
           done
           exit $status
+
+  # The wall-clock budgets (#225): held only here and by scripts/perf-tests.sh on a quiet
+  # Mac. Everywhere else these tests check what they compute and print the time.
+  perf-tests:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run the performance budgets
+        run: scripts/perf-tests.sh

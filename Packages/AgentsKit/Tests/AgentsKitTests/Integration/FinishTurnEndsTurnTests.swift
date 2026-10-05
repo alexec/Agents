@@ -20,11 +20,13 @@ struct FinishTurnEndsTurnTests {
     }
 
     private func makeCore(_ locations: StoreLocations, _ launcher: FakeLauncher,
-                          grace: FinishGrace) async throws -> DaemonCore {
+                          grace: FinishGrace, quiet: QuietGate? = nil) async throws -> DaemonCore {
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: launcher)
         await core.loadFromDisk()
-        await core.setFinishGrace(grace)
+        var quietWait: (@Sendable () async -> Void)?
+        if let quiet { quietWait = { await quiet.wait() } }
+        await core.setFinishGrace(grace, quietWait: quietWait)
         return core
     }
 
@@ -133,6 +135,9 @@ struct FinishTurnEndsTurnTests {
 
     /// With the warm pool on (#183): a runtime that answered the cancel is idle, and may be
     /// kept for the reply; one that did not is still inside its turn, and never is.
+    ///
+    /// The one that answers is given a minute to do it, so a busy machine cannot make its
+    /// answer late; the wait is cut short only for the one that never answers (#225).
     @Test func aWarmPoolKeepsOnlyARuntimeThatAnsweredTheCancel() async throws {
         let (locations, work) = try temporary()
         let answered = TurnGate(), ignored = TurnGate()
@@ -141,14 +146,17 @@ struct FinishTurnEndsTurnTests {
                                            Self.keepsGoing(ignored, hearsCancel: false)],
                                     keepsRuntimesWarm: true)
         let core = try await makeCore(locations, launcher,
-                                      grace: FinishGrace(quiet: .milliseconds(200), afterCancel: .milliseconds(300)))
+                                      grace: FinishGrace(quiet: .milliseconds(200), afterCancel: .seconds(60)))
         let (heard, heardToken) = try await start(core, in: work, "Fix the login")
         await running(core, heard)
+        // In its turn before the cancel comes: a cancel before then is one it cannot hear.
+        await eventually("the fake is in its turn") { answered.turnsArrived == 1 }
         try await finish(core, heard, heardToken, "done", "Fixed.")
         await settled(core, heard, "the turn ended on the cancel")
         await eventually("the pool kept it") { await core.decidedForTest(heard) }
         #expect(await core.warm[heard] != nil, "idle after its cancel, so kept for the reply")
 
+        await core.setFinishGrace(FinishGrace(quiet: .milliseconds(200), afterCancel: .milliseconds(300)))
         let (deaf, deafToken) = try await start(core, in: work, "Port the model")
         await running(core, deaf)
         await eventually("the fake is in its turn") { ignored.turnsArrived == 1 }
@@ -191,23 +199,30 @@ struct FinishTurnEndsTurnTests {
     @Test func wordsAfterTheCallAreGivenTheirTime() async throws {
         let (locations, work) = try temporary()
         let gate = TurnGate()
+        let quiet = QuietGate()
         let launcher = FakeLauncher(script: Self.keepsGoing(gate, hearsCancel: true))
         let core = try await makeCore(locations, launcher,
-                                      grace: FinishGrace(quiet: .seconds(1), afterCancel: .seconds(20)))
+                                      grace: FinishGrace(afterCancel: .seconds(20)), quiet: quiet)
         let (id, token) = try await start(core, in: work, "Write the notes")
         await running(core, id)
         await eventually("the fake is in its turn") { gate.turnsArrived == 1 }
         let fake = try #require(launcher.lastAgent)
 
         try await finish(core, id, token, "done", "Notes written.")
-        // Four pieces of a closing message, each sooner than the quiet the app waits
-        // for, so together they run past it.
+        await eventually("the app waits for quiet") { quiet.waiting == 1 }
+        // A closing message in four pieces, all heard while the app waits for quiet, so
+        // the quiet it waited for is not quiet any more.
         for piece in ["All ", "done: ", "notes ", "written."] {
-            try await Task.sleep(for: .milliseconds(400))
             await fake.emit(["sessionUpdate": "agent_message_chunk",
                              "content": ["type": "text", "text": .string(piece)]])
         }
+        await eventually("the words are heard") {
+            (try? await said(core, id).contains("All done: notes written.")) == true
+        }
+        quiet.pass()
+        await eventually("the app waits for quiet again") { quiet.arrivals == 2 }
         #expect(await fake.cancels == 0, "still talking, so not cancelled")
+        quiet.pass()
         await settled(core, id, "ended once it went quiet")
         #expect(await fake.cancels == 1)
         #expect(try await said(core, id).contains("All done: notes written."))
@@ -220,8 +235,10 @@ struct FinishTurnEndsTurnTests {
         let (locations, work) = try temporary()
         let gate = TurnGate()
         let launcher = FakeLauncher(script: Self.keepsGoing(gate, hearsCancel: true))
+        // A quiet far longer than the turn takes to end once let go, however loaded the
+        // machine: half a second raced the gate opening (#225).
         let core = try await makeCore(locations, launcher,
-                                      grace: FinishGrace(quiet: .milliseconds(500), afterCancel: .seconds(20)))
+                                      grace: FinishGrace(quiet: .seconds(30), afterCancel: .seconds(20)))
         let (id, token) = try await start(core, in: work, "Quick one")
         await running(core, id)
         await eventually("the fake is in its turn") { gate.turnsArrived == 1 }
@@ -232,5 +249,33 @@ struct FinishTurnEndsTurnTests {
         #expect(await launcher.lastAgent?.cancels == 0)
         #expect(try await notes(core, id).allSatisfy { !$0.contains("still going") })
         #expect(await core.agent(id)?.endedReason == .endTurn)
+    }
+}
+
+/// The quiet after `finish_turn`, passed when the test says so (#225): the app waits
+/// here instead of on the clock, one wait at a time.
+final class QuietGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var held: [CheckedContinuation<Void, Never>] = []
+    private var count = 0
+
+    /// How many waits for quiet have begun.
+    var arrivals: Int { lock.withLock { count } }
+    /// How many are waiting now.
+    var waiting: Int { lock.withLock { held.count } }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            lock.withLock {
+                count += 1
+                held.append(continuation)
+            }
+        }
+    }
+
+    /// The quiet has passed, for the wait in progress.
+    func pass() {
+        let next = lock.withLock { held.isEmpty ? nil : held.removeFirst() }
+        next?.resume()
     }
 }

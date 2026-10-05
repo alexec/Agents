@@ -15,7 +15,7 @@ struct BigContentTests {
         return String(repeating: line, count: repeats)
     }
 
-    @Test(.flakyUnderLoad) func aMegabyteDiffIsReadQuickly() throws {
+    @Test(.perfBudget) func aMegabyteDiffIsReadQuickly() throws {
         let old = megabyte(of: "let value = 1\n")
         let new = megabyte(of: "let value = 2\n")
         let wire: JSONValue = ["type": "diff", "path": "/tmp/big.swift",
@@ -28,10 +28,10 @@ struct BigContentTests {
         let lines = diff.newText.split(separator: "\n", omittingEmptySubsequences: false).count
         let took = ContinuousClock.now - started
         #expect(lines > 70_000)
-        #expect(took < .milliseconds(500), "read a megabyte of diff in \(took)")
+        PerfBudget.expect(took, under: .milliseconds(500), "reading a megabyte of diff")
     }
 
-    @Test func aLongRunningCommandCannotGrowWithoutLimit() async throws {
+    @Test(.perfBudget) func aLongRunningCommandCannotGrowWithoutLimit() async throws {
         let service = TerminalService(scope: FolderScope(folders: [URL(filePath: "/tmp")]),
                                       defaultCWD: URL(filePath: "/tmp"))
         // Twenty times the cap, one chunk at a time, the way a chatty command arrives.
@@ -43,7 +43,7 @@ struct BigContentTests {
         let kept = output["output"]?.stringValue?.utf8.count ?? 0
         #expect(kept <= TerminalService.outputByteLimit)
         #expect(output["truncated"]?.boolValue == true, "truncation is flagged, not silent")
-        #expect(took < .seconds(2), "held \(kept) bytes of a much longer stream in \(took)")
+        PerfBudget.expect(took, under: .seconds(2), "holding \(kept) bytes of a much longer stream")
     }
 
     @Test func aHugeMessageIsStillOneEntry() {

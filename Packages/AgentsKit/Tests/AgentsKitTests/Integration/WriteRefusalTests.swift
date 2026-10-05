@@ -91,6 +91,9 @@ struct WriteRefusalTests {
         await heard.attach(to: core)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
         await eventually("the first turn ended") { await core.agent(id)?.state == .finished }
+        // The turn's own saves land first: under load one was still queued, met the
+        // read-only folder, and was the one told, under the agent's earlier title (#225).
+        await core.saveTail?.value
 
         await readOnly(locations.agent(id)) {
             guard var agent = await core.agent(id) else { Issue.record("the agent is gone"); return }

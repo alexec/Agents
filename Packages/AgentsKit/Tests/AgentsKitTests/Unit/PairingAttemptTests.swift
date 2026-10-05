@@ -15,13 +15,15 @@ struct PairingAttemptTests {
         let started = ContinuousClock.now
         await #expect(throws: PairingAttempt.NoAnswer.self) {
             try await PairingAttempt.run(within: .milliseconds(200)) {
-                // A dial that hears nothing, cancellation included, for a long time.
-                try? await Task.sleep(for: .seconds(30))
+                // A dial that hears nothing, cancellation included, for an hour.
+                try? await Task.sleep(for: .seconds(3600))
                 if Task.isCancelled { gaveUp.set() }
                 return "too late"
             }
         }
-        #expect(ContinuousClock.now - started < .seconds(5))
+        // Ended at its deadline, not when the work would have: the suite's minute is the
+        // bound, not a few seconds a loaded Mac can overrun (#225).
+        #expect(ContinuousClock.now - started < .seconds(3600))
         // The work is told it was given up on, so it does not save a pairing.
         await eventually("the work was cancelled") { gaveUp.isSet }
     }

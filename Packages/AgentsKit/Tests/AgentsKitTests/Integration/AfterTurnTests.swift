@@ -43,7 +43,7 @@ struct AfterTurnTests {
 
     /// Wait until the turn is over, nothing is queued, and the runtime has been let go.
     private func settle(_ core: DaemonCore, _ id: UUID) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        let deadline = ContinuousClock.now.advanced(by: Eventually.timeout)
         while ContinuousClock.now < deadline {
             if let agent = await core.agent(id),
                !agent.state.hasTurnInFlight, agent.queuedPrompts.isEmpty,

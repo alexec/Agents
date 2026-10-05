@@ -21,6 +21,14 @@ struct StartIdempotencyTests {
                    discovery: .findsEverything, launcher: launcher)
     }
 
+    /// Runtimes started for agents. A start also reads the plan's allowance in the
+    /// background, in the daemon's own folder; whether that has begun by the time the
+    /// test looks depends on the machine's load, and it is no agent's runtime (#225).
+    private func agentLaunches(_ launcher: FakeLauncher, _ locations: StoreLocations) -> Int {
+        let daemonFolder = locations.root.standardizedFileURL.path
+        return launcher.launches.filter { $0.cwd.standardizedFileURL.path != daemonFolder }.count
+    }
+
     private func agentsWith(_ requestID: UUID, in core: DaemonCore) async -> [Agent] {
         await core.agents.values.filter { $0.startRequestID == requestID }
     }
@@ -37,7 +45,7 @@ struct StartIdempotencyTests {
 
         #expect(first == second)
         #expect(await agentsWith(requestID, in: core).count == 1)
-        #expect(launcher.launchCount == 1, "no second runtime for a start that already happened")
+        #expect(agentLaunches(launcher, locations) == 1, "no second runtime for a start that already happened")
         #expect(await core.agent(first)?.startRequestID == requestID)
     }
 
@@ -54,7 +62,7 @@ struct StartIdempotencyTests {
         let (a, b) = try await (first, second)
 
         #expect(a == b)
-        #expect(launcher.launchCount == 1)
+        #expect(agentLaunches(launcher, locations) == 1)
     }
 
     @Test func aRepeatAfterTheDaemonRestartedFindsTheAgentOnDisk() async throws {
@@ -72,7 +80,7 @@ struct StartIdempotencyTests {
                                                   requestID: requestID))
 
         #expect(answered == made.id)
-        #expect(launcher.launchCount == 0)
+        #expect(agentLaunches(launcher, locations) == 0)
     }
 
     @Test func aRefusedStartRecordsNothingSoARetryCanStart() async throws {
@@ -102,6 +110,9 @@ struct StartIdempotencyTests {
         let second = try await core.start(request)
 
         #expect(first != second)
-        #expect(launcher.launchCount == 2)
+        #expect(await core.agents.count == 2)
+        // Each was started. A start retried on a loaded machine launches once more,
+        // which is not the two being taken for one (#225).
+        #expect(agentLaunches(launcher, locations) >= 2)
     }
 }

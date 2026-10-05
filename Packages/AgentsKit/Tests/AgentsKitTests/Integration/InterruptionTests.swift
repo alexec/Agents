@@ -32,10 +32,15 @@ struct InterruptionTests {
 
     /// Stop found nothing to cancel — no runtime yet, no turn — and the start that
     /// was already on its way went on to begin the turn anyway.
+    ///
+    /// The second runtime's handshake is held until the stop is in, rather than taking a
+    /// fixed half second the stop may miss on a busy machine (#225).
     @Test func aStopWhileTheRuntimeStartsIsHeard() async throws {
         let (locations, work) = try temporary()
+        let handshake = TurnGate()
+        defer { handshake.open() }
         var slow = FakeACPAgent.Script()
-        slow.handshakeDelay = .milliseconds(500)
+        slow.handshakeGate = handshake
         let launcher = FakeLauncher(script: slow, then: [.init()])
         let core = try core(launcher, locations: locations)
 
@@ -44,12 +49,14 @@ struct InterruptionTests {
 
         // On its own task, as a window's request is: `prompt` waits for the start,
         // and the stop has to be able to arrive while it does.
-        _ = Task { try await core.prompt(.init(agentID: id, text: "second")) }
-        await eventually("the runtime is on its way") { launcher.launchCount == 2 }
+        let second = Task { try await core.prompt(.init(agentID: id, text: "second")) }
+        await eventually("the runtime is in its handshake") { handshake.turnsArrived == 1 }
         try await core.stop(id)
 
-        // Longer than the handshake: time passing is the assertion.
-        try await Task.sleep(for: .milliseconds(900))
+        // The start goes on once the stop is in, and `prompt` returns once it has decided.
+        handshake.open()
+        _ = await second.result
+        await eventually("the runtime went back") { await core.live[id] == nil }
         let agent = await core.agent(id)
         #expect(agent?.state.holdsRuntime == false, "no turn began after the stop")
         #expect(agent?.queuedPrompts.map(\.text) == ["second"], "and the words are still waiting")

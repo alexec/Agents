@@ -3,8 +3,11 @@ import Testing
 
 extension Trait where Self == ConditionTrait {
     /// A test that holds a wall-clock budget, which a shared runner cannot promise.
-    /// Skipped where `CI` is set; `.github/workflows/slow-tests.yml` runs them again on
-    /// their own, allowed to fail, with `AGENTS_RUN_FLAKY=1`. Written on the same line as
+    /// Skipped where `CI` is set, or `AGENTS_QUARANTINE=1`, which
+    /// `scripts/build-cache.sh swift test` sets unless it is already set (`AGENTS_QUARANTINE=0`
+    /// runs them);
+    /// `.github/workflows/slow-tests.yml` runs them again on their own, allowed to fail,
+    /// with `AGENTS_RUN_FLAKY=1`. Written on the same line as
     /// `@Test`, where `scripts/flaky-tests.sh` finds them. AgentsKit and CodeText have
     /// their own copies.
     ///
@@ -16,7 +19,8 @@ extension Trait where Self == ConditionTrait {
     ///   connect, then take it out of here.
     static var flakyUnderLoad: Self {
         let environment = ProcessInfo.processInfo.environment
-        return .disabled(if: environment["CI"] != nil && environment["AGENTS_RUN_FLAKY"] != "1",
+        return .disabled(if: (environment["CI"] != nil || environment["AGENTS_QUARANTINE"] == "1")
+                         && environment["AGENTS_RUN_FLAKY"] != "1",
                          "flaky under load; quarantined in CI (see FlakyUnderLoad.swift)")
     }
 }

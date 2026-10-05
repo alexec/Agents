@@ -241,30 +241,48 @@ public final class PTY: @unchecked Sendable {
     /// child is ever reaped: a second waiter races the first and one of the two comes
     /// away with ECHILD and no status, which is how a shell that exited 3 was
     /// reported as having exited for no reason anyone could name.
+    ///
+    /// Nor does it let go the moment the process source fires. A child that is
+    /// already on its way out when the source is registered — which is what a loaded
+    /// machine makes of a short program — is refused by the kernel, and Dispatch
+    /// reports that as an exit straight away. The child is then still parked in
+    /// `exit` waiting for its last words to be read, with its own descriptors not yet
+    /// closed, and letting go of this side there makes the child's close the last
+    /// one: the kernel discards everything still queued, and the master reports end
+    /// of file with nothing in front of it. So the slave is held until the child can
+    /// be reaped, which is after the drain and the revoke.
     private func watchForExit() {
         #if canImport(Darwin)
         let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: queue)
         source.setEventHandler { [weak self] in
             guard let self else { return }
-            self.releaseSlave()
+            self.exitWatcher?.cancel()
+            self.releaseSlaveOnceReapable()
         }
         exitWatcher = source
         source.resume()
         #else
-        // Linux has no process source. Ask, without reaping, five times a second; on
-        // Linux this is the main path rather than the spare, because the master only
-        // reports end of file once the slave this side holds is let go (037).
+        // Linux has no process source, so this is the watch from the start; on Linux
+        // it is the main path rather than the spare, because the master only reports
+        // end of file once the slave this side holds is let go (037).
+        releaseSlaveOnceReapable()
+        #endif
+    }
+
+    /// Ask, without reaping, five times a second, and let go of the slave once the
+    /// child is waiting to be reaped.
+    private func releaseSlaveOnceReapable() {
         let pid = self.pid
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + .milliseconds(200), repeating: .milliseconds(200))
+        timer.schedule(deadline: .now(), repeating: .milliseconds(200))
         timer.setEventHandler { [weak self] in
             guard let self, agents_has_exited(pid) == 1 else { return }
-            timer.cancel()
+            self.exitWatcher?.cancel()
+            self.exitWatcher = nil
             self.releaseSlave()
         }
         exitWatcher = timer
         timer.resume()
-        #endif
     }
 
     private func releaseSlave() {

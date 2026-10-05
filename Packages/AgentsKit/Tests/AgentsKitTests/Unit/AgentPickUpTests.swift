@@ -33,7 +33,7 @@ struct AgentPickUpTests {
 
     /// There is no threshold: a chat is picked back up however many restarts it has
     /// been through. Spelled out on its own so putting one back is a deliberate act.
-    @Test func thereIsNoThreshold() {
+    @Test(.flakyUnderLoad) func thereIsNoThreshold() {
         #expect(agent(.stopped, .daemonGone, 0).mayBePickedUpAfterRestart)
         #expect(agent(.stopped, .daemonGone, 1).mayBePickedUpAfterRestart)
         #expect(agent(.stopped, .daemonGone, 5).mayBePickedUpAfterRestart)

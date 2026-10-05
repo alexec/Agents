@@ -22,15 +22,16 @@ extension DaemonCore {
     }
 
     /// One look at every turn under way. The pause before the next, or nil once there is
-    /// no turn to watch, which ends the watch.
-    private func lookForSilence() async -> Duration? {
+    /// no turn to watch, which ends the watch. Looked at from `instant`, which is now
+    /// unless a test looks from later rather than waiting (#225).
+    func lookForSilence(at instant: ContinuousClock.Instant = .now) async -> Duration? {
         let watched = turnTasks.keys.compactMap { id in live[id].map { (id, $0) } }
         guard !watched.isEmpty else {
             silenceWatch = nil
             return nil
         }
         for (id, session) in watched where !silencedTurns.contains(id) {
-            guard let quiet = await session.silence(), quiet >= session.deadlines.silence,
+            guard let quiet = await session.silence(at: instant), quiet >= session.deadlines.silence,
                   live[id] === session, turnTasks[id] != nil else { continue }
             await endSilentTurn(id, session: session)
         }

@@ -57,15 +57,35 @@ struct FakeSSH {
             for name in names where name.hasSuffix(".ctl.relay") || name.hasSuffix(".ctl") {
                 if let text = try? String(contentsOfFile: hosts.appendingPathComponent(name).path, encoding: .utf8),
                    let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) {
-                    kill(pid, SIGTERM)
+                    stopIfOurs(pid)
                 }
             }
         }
         let lock = home.appendingPathComponent(".agents-server/root/daemon.lock")
         if let text = try? String(contentsOf: lock, encoding: .utf8),
            let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) {
-            kill(pid, SIGTERM)
+            stopIfOurs(pid)
         }
         try? FileManager.default.removeItem(at: folder)
+    }
+
+    /// A pid left in a file here may be long gone and handed to another process, which a
+    /// busy run makes likely: another test's ssh was sent SIGTERM that way (#225). So only
+    /// a process whose arguments name this folder is stopped.
+    private func stopIfOurs(_ pid: Int32) {
+        guard pid > 0, let arguments = Self.arguments(of: pid), arguments.contains(folder.path) else { return }
+        kill(pid, SIGTERM)
+    }
+
+    /// A process's executable path and arguments, as one string; nil if it is gone.
+    private static func arguments(of pid: Int32) -> String? {
+        var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+        var size = 0
+        guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return nil }
+        // An argc, then NUL-separated strings; only whether the folder is named matters.
+        let text = buffer.dropFirst(MemoryLayout<Int32>.size).prefix(size).map { $0 == 0 ? 0x20 : $0 }
+        return String(decoding: text, as: UTF8.self)
     }
 }

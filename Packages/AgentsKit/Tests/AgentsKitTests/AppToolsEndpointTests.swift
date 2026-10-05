@@ -220,7 +220,7 @@ struct AppToolsEndpointTests {
 }
 
 /// The daemon's side: what a session is handed, and what happens without http.
-@Suite("App tools in sessions")
+@Suite("App tools in sessions", .timeLimit(.minutes(1)))
 struct AppToolsInSessionsTests {
     private func core() throws -> DaemonCore {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())

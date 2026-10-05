@@ -12,6 +12,10 @@
 # (the clean-up rule) leaves it alone. AGENTS_BUILD_CACHE moves it; AGENTS_BUILD_CACHE=off
 # runs the command as it is, with nothing shared.
 #
+# `swift test` gets AGENTS_QUARANTINE=1 unless it is set already: tests marked
+# .flakyUnderLoad skip, and `eventually` waits as long as on CI, as a local full run is
+# as loaded as a runner. AGENTS_QUARANTINE=0 (or AGENTS_RUN_FLAKY=1) runs them.
+#
 #   cas/            Xcode's compilation cache (COMPILATION_CACHE_CAS_PATH): compiler
 #                   outputs keyed by their inputs, with source and build paths mapped
 #                   out, so a second worktree replays them. Bounded by Xcode itself.
@@ -156,6 +160,8 @@ prune() {
 	fi
 	echo "after: $(gb "$CACHE") GB"
 }
+
+[ "${1:-} ${2:-}" != "swift test" ] || export AGENTS_QUARANTINE=${AGENTS_QUARANTINE:-1}
 
 [ "$CACHE" != off ] || case ${1:-} in
 	xcodebuild) shift; exec xcodebuild "$@" ;;

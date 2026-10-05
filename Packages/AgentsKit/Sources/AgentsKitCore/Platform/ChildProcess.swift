@@ -28,6 +28,8 @@ public enum ChildProcess {
         public var failure: String?
         /// Output went past the limit asked for; `output` is its first part.
         public var truncated = false
+        /// The child's process id, once it had started; nil when it never did.
+        public var pid: pid_t?
 
         public var text: String { String(decoding: output, as: UTF8.self) }
         public var errorText: String { String(decoding: errors, as: UTF8.self) }
@@ -110,13 +112,15 @@ public enum ChildProcess {
             }
         }
         process.terminationHandler = { finished in
-            let status = finished.terminationStatus
-            run.update { $0.status = status; $0.exited = true }
+            let status = finished.terminationStatus, pid = finished.processIdentifier
+            run.update { $0.status = status; $0.exited = true; $0.pid = pid }
             // Whatever still holds a pipe is not this child: two seconds, then done.
             DispatchQueue.global().asyncAfter(deadline: .now() + 2) { run.finish() }
         }
         do {
             try process.run()
+            let pid = process.processIdentifier
+            run.update { $0.pid = pid }
         } catch {
             process.terminationHandler = nil
             run.finish(failure: error.localizedDescription)
@@ -148,6 +152,7 @@ public enum ChildProcess {
         var output = Data(), errors = Data()
         var truncated = false
         var status: Int32 = -1
+        var pid: pid_t?
         var exited = false
         var open = 2
 
@@ -182,7 +187,7 @@ public enum ChildProcess {
             guard let finished else { lock.unlock(); return }
             self.finished = nil
             let outcome = Outcome(status: timedOut ? -1 : status, output: output, errors: errors,
-                                  timedOut: timedOut, failure: failure, truncated: truncated)
+                                  timedOut: timedOut, failure: failure, truncated: truncated, pid: pid)
             let process = self.process, pipes = self.pipes
             self.process = nil
             self.pipes = []

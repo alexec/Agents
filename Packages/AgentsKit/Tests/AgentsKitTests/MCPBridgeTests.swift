@@ -150,7 +150,7 @@ struct MCPBridgeTests {
         let pid = try #require(pid(try await post(route, call(1))))
 
         async let waiting = post(route, call(2, ["sleep": 30]))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the call is waiting on the server") { bridge.waitingCalls(for: "t") == 1 }
         bridge.endRoutes(for: "t")
         let answer = try await waiting
 
@@ -168,7 +168,7 @@ struct MCPBridgeTests {
         let first = try #require(pid(try await post(route, call(1))))
 
         async let waiting = post(route, call(2, ["sleep": 30]))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the call is waiting on the server") { bridge.waitingCalls(for: "t") == 1 }
         let exit = try await post(route, call(3, ["exit": true]))
         let failed = try await waiting
 

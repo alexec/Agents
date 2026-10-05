@@ -25,12 +25,19 @@ struct ChildProcessTests {
         #expect(outcome.errorText == "oops")
     }
 
-    @Test func aChildPastItsDeadlineIsStopped() async {
-        let started = Date()
-        let outcome = await ChildProcess.run(shell, ["-c", "printf begun; exec sleep 30"], deadline: .milliseconds(500))
+    @Test(.flakyUnderLoad) func aChildPastItsDeadlineIsStopped() async throws {
+        // Asserted by what happened to the child rather than by the wall clock, which a
+        // loaded machine stretches (9 s against a 5 s bar, #225). The child would sleep
+        // for ten minutes: the run comes back without it, and it is stopped rather than
+        // left to run its length.
+        let outcome = await ChildProcess.run(shell, ["-c", "printf begun; exec sleep 600"],
+                                             deadline: .milliseconds(500))
         #expect(outcome.timedOut)
         #expect(outcome.status == -1)
-        #expect(Date().timeIntervalSince(started) < 5)
+        let pid = try #require(outcome.pid)
+        if !(await eventually("the child was stopped", { kill(pid, 0) != 0 && errno == ESRCH })) {
+            kill(pid, SIGKILL)
+        }
     }
 
     @Test func aMissingProgramSaysWhy() async {

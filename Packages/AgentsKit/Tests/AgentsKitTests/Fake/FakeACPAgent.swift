@@ -105,6 +105,9 @@ actor FakeACPAgent {
         /// starting — which is the only window in which "one at a time" means
         /// anything, and the only one in which a crash mid-pick-up is reproducible.
         var handshakeDelay: Duration = .zero
+        /// Hold the handshake until the test opens this: "while it is still starting"
+        /// without a race against `handshakeDelay` (#225).
+        var handshakeGate: TurnGate?
         /// How long `session/new`, and `session/resume` or `session/load`, take (#166).
         var newSessionDelay: Duration = .zero
         var loadDelay: Duration = .zero
@@ -235,6 +238,7 @@ actor FakeACPAgent {
         case ACP.Method.initialize:
             clientCapabilities = params?["clientCapabilities"]
             if script.handshakeDelay > .zero { try? await Task.sleep(for: script.handshakeDelay) }
+            if let gate = script.handshakeGate { await gate.pass() }
             var sessionCapabilities = script.sessionCapabilities
             if script.supportsResume { sessionCapabilities["resume"] = [:] }
             var capabilities = script.agentCapabilities

@@ -8,7 +8,7 @@ import Testing
 /// read whole to show the start of it.
 @Suite("The files pane at awkward sizes")
 struct FilesPaneScaleTests {
-    @Test(.flakyUnderLoad) func aFolderOfFiftyThousandEntriesListsQuickly() throws {
+    @Test(.perfBudget) func aFolderOfFiftyThousandEntriesListsQuickly() throws {
         let root = URL.temporaryDirectory.appending(path: "scale-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -26,12 +26,11 @@ struct FilesPaneScaleTests {
 
         #expect(listing.entries.count == DirectoryReader.entryLimit)
         #expect(listing.omitted == 6_000 - DirectoryReader.entryLimit)
-        // Generous, because this runs on whatever machine happens to be building. The
-        // point is that it is bounded work, not that it hits a particular number.
-        #expect(took < .seconds(2), "listing took \(took)")
+        // The point is that it is bounded work, not that it hits a particular number.
+        PerfBudget.expect(took, under: .seconds(2), "listing 6,000 entries")
     }
 
-    @Test func aLargeFileIsNotReadWholeToShowItsStart() throws {
+    @Test(.perfBudget) func aLargeFileIsNotReadWholeToShowItsStart() throws {
         let root = URL.temporaryDirectory.appending(path: "big-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -53,10 +52,10 @@ struct FilesPaneScaleTests {
         // Only the prefix was read, whatever the file's size.
         #expect(probe.prefix.count == FileProbe.prefixLimit)
         #expect(probe.size == 200 * 1024 * 1024)
-        #expect(took < .milliseconds(500), "probe took \(took)")
+        PerfBudget.expect(took, under: .milliseconds(500), "probing a 200 MB file")
     }
 
-    @Test func theTreeIsNeverWalked() throws {
+    @Test(.perfBudget) func theTreeIsNeverWalked() throws {
         // A folder with something enormous nested inside it costs nothing until the
         // user opens that folder. This is why `node_modules` is not a problem.
         let root = URL.temporaryDirectory.appending(path: "nested-\(UUID().uuidString)")
@@ -74,6 +73,6 @@ struct FilesPaneScaleTests {
 
         // Two entries at this level, and the 2,000 below were never looked at.
         #expect(listing.entries.count == 2)
-        #expect(took < .milliseconds(100), "listing took \(took)")
+        PerfBudget.expect(took, under: .milliseconds(100), "listing a folder over 2,000 nested files")
     }
 }

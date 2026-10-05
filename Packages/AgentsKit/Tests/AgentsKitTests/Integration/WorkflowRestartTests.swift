@@ -219,7 +219,10 @@ struct WorkflowRestartTests {
         let core = try await core(locations, seeded: [agent])
         await startLikeTheDaemon(core)
 
-        let refused = await eventuallySome("the next link was refused for depth") { () -> WorkflowRefusal? in
+        // Two turns and a fire away: the words about the restart, the question about
+        // how that went, and only then the run's completion.
+        let refused = await eventuallySome("the next link was refused for depth",
+                                           within: Eventually.chain) { () -> WorkflowRefusal? in
             guard case .refused(let refusal, _, _) = await summary(core, "next", in: work)?.lastOutcome
             else { return nil }
             return refusal
@@ -245,7 +248,7 @@ struct WorkflowRestartTests {
         let core = try await core(locations, seeded: [agent])
         await startLikeTheDaemon(core)
 
-        await eventually("the next link ran") {
+        await eventually("the next link ran", within: Eventually.chain) {
             await core.allAgents().contains { $0.startedByWorkflow == "next" }
         }
     }

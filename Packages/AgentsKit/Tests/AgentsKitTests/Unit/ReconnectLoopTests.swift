@@ -18,10 +18,17 @@ struct ReconnectLoopTests {
         /// Run inside each attempt before it waits for its answer.
         var during: (@MainActor () async -> Void)?
 
+        /// Tests waiting for an attempt, told when one starts waiting rather than
+        /// spinning on the main actor, which a loaded run starves (#225).
+        private var watchers: [(number: Int, ready: CheckedContinuation<Void, Never>)] = []
+
         func attempt() async -> ReconnectLoop.Outcome {
             count += 1
             await during?()
-            return await withCheckedContinuation { waiting.append($0) }
+            return await withCheckedContinuation {
+                waiting.append($0)
+                tellWatchers()
+            }
         }
 
         func answer(_ outcome: ReconnectLoop.Outcome) {
@@ -29,7 +36,16 @@ struct ReconnectLoopTests {
         }
 
         func waitForAttempt(_ number: Int) async {
-            while count < number || waiting.isEmpty { await Task.yield() }
+            if arrived(number) { return }
+            await withCheckedContinuation { watchers.append((number, $0)) }
+        }
+
+        private func arrived(_ number: Int) -> Bool { count >= number && !waiting.isEmpty }
+
+        private func tellWatchers() {
+            let ready = watchers.filter { arrived($0.number) }
+            watchers.removeAll { arrived($0.number) }
+            for watcher in ready { watcher.ready.resume() }
         }
     }
 

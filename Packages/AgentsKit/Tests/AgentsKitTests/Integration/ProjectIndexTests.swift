@@ -202,7 +202,7 @@ struct ProjectIndexTests {
         #expect(await core.projectIndexBuilds == made)
     }
 
-    @Test func projectsListGrowsWithTheProjectsNotTheirSquare() async throws {
+    @Test(.perfBudget) func projectsListGrowsWithTheProjectsNotTheirSquare() async throws {
         func took(_ core: DaemonCore) async -> Double {
             let start = ContinuousClock.now
             _ = await core.allProjects()
@@ -218,7 +218,10 @@ struct ProjectIndexTests {
             at500 = min(at500, await took(large))
         }
         // Ten times the projects: about ten times the time when each costs the same, and a
-        // hundred when each costs as much as all of them, as it did (#204).
-        #expect(at500 < at50 * 30, "50 projects \(at50 * 1000) ms, 500 projects \(at500 * 1000) ms")
+        // hundred when each costs as much as all of them, as it did (#204). Held only in the
+        // perf check: beside three builds the two runs are not slowed alike (#225).
+        let what = "50 projects \(at50 * 1000) ms, 500 projects \(at500 * 1000) ms"
+        print("perf: \(what)")
+        if PerfBudget.held { #expect(at500 < at50 * 30, "\(what)") }
     }
 }

@@ -91,6 +91,12 @@ extension DaemonCore {
         let clock = ContinuousClock()
         while true {
             guard !Task.isCancelled, let watched = finishedTurns[agentID], turnTasks[agentID] == turn else { return }
+            if let finishQuietWait {
+                // The test's quiet: words heard while it waited start it again.
+                await finishQuietWait()
+                if finishedTurns[agentID]?.heardAt == watched.heardAt { break }
+                continue
+            }
             let due = min(watched.heardAt + finishGrace.quiet, watched.reportedAt + finishGrace.longest)
             if clock.now >= due { break }
             try? await clock.sleep(until: due)
@@ -138,5 +144,8 @@ extension DaemonCore {
 
 extension DaemonCore {
     /// For a test that cannot wait the real seconds.
-    func setFinishGrace(_ grace: FinishGrace) { finishGrace = grace }
+    func setFinishGrace(_ grace: FinishGrace, quietWait: (@Sendable () async -> Void)? = nil) {
+        finishGrace = grace
+        finishQuietWait = quietWait
+    }
 }

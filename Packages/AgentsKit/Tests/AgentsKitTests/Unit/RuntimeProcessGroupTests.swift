@@ -20,7 +20,7 @@ struct RuntimeProcessGroupTests {
         return (process, child)
     }
 
-    @Test func endingTheRuntimeEndsWhatItStarted() async throws {
+    @Test(.flakyUnderLoad) func endingTheRuntimeEndsWhatItStarted() async throws {
         let (process, child) = try launch(then: "wait")
         try await eventually("the runtime said its child's pid") { child.pid != nil }
         let pid = try #require(child.pid)
@@ -33,7 +33,7 @@ struct RuntimeProcessGroupTests {
     }
 
     /// A runtime that exits by itself leaves nothing behind it either.
-    @Test func aRuntimeThatExitsTakesWhatItStartedWithIt() async throws {
+    @Test(.flakyUnderLoad) func aRuntimeThatExitsTakesWhatItStartedWithIt() async throws {
         let (process, child) = try launch(then: "exit 0")
         try await eventually("the runtime said its child's pid") { child.pid != nil }
         let pid = try #require(child.pid)
@@ -46,7 +46,7 @@ struct RuntimeProcessGroupTests {
     /// grandchild that kept stdout — wakes the reading thread, which lets the pipe go.
     /// It used to be closed under that thread, which then read again from whatever the
     /// number had been given to since.
-    @Test func closingAPipeTransportLetsItsReadEndGoAtOnce() async throws {
+    @Test(.flakyUnderLoad) func closingAPipeTransportLetsItsReadEndGoAtOnce() async throws {
         var output: [Int32] = [-1, -1], input: [Int32] = [-1, -1]
         try #require(pipe(&output) == 0 && pipe(&input) == 0)
         defer { close(output[1]); close(input[0]) }

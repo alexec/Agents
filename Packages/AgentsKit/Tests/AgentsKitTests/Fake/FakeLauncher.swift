@@ -12,7 +12,13 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     private var agents: [FakeACPAgent] = []
     private var scripts: [FakeACPAgent.Script]
     private var defaultScript: FakeACPAgent.Script
-    private(set) var launches: [(runtime: String, cwd: URL, at: ContinuousClock.Instant)] = []
+    private var recorded: [(runtime: String, cwd: URL, at: ContinuousClock.Instant)] = []
+    /// Every launch so far, read under the lock: a start's background launches (the plan's
+    /// allowance, a follow-up turn) can land while a test reads (#225).
+    var launches: [(runtime: String, cwd: URL, at: ContinuousClock.Instant)] {
+        lock.lock(); defer { lock.unlock() }
+        return recorded
+    }
     /// What each launch was lent (043): `LentEnvironment.value` at the moment it started.
     private(set) var lent: [[String: String]] = []
     /// The sandbox choice each launch resolved to (064): `LaunchSandbox.value` as it started.
@@ -24,12 +30,17 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     /// The deadlines its sessions are given (#166): a test's milliseconds, or nil for the
     /// runtime's own.
     private let deadlines: RuntimeDeadlines?
+    /// When a deadline comes, for a test that says so rather than waiting on the clock
+    /// (#225); nil for the clock.
+    private let deadlineWait: (@Sendable (RuntimeDeadlines.Phase, Duration) async -> Void)?
     /// Off unless the test is about the warm pool (#183).
     let keepsRuntimesWarm: Bool
 
     init(script: FakeACPAgent.Script = .init(), then scripts: [FakeACPAgent.Script] = [],
          capabilities: ACP.ClientCapabilities = .none, deadlines: RuntimeDeadlines? = nil,
-         keepsRuntimesWarm: Bool = false) {
+         keepsRuntimesWarm: Bool = false,
+         deadlineWait: (@Sendable (RuntimeDeadlines.Phase, Duration) async -> Void)? = nil) {
+        self.deadlineWait = deadlineWait
         self.keepsRuntimesWarm = keepsRuntimesWarm
         self.defaultScript = script
         self.scripts = scripts
@@ -40,7 +51,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
         lock.lock()
         let script = scripts.isEmpty ? defaultScript : scripts.removeFirst()
-        launches.append((runtime.id, cwd, .now))
+        recorded.append((runtime.id, cwd, .now))
         lent.append(LentEnvironment.value)
         sandboxes.append(LaunchSandbox.value)
         lock.unlock()
@@ -49,7 +60,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
         let session = ACPSession(transport: mine, capabilities: capabilities,
                                  launch: RuntimeLaunchCatalog.launch(for: runtime.id),
                                  authMethodBeforeContinuing: ToolPolicyCatalog.policy(for: runtime.id).authMethodBeforeContinuing,
-                                 deadlines: deadlines)
+                                 deadlines: deadlines, deadlineWait: deadlineWait)
         let agent = FakeACPAgent(script: script, transport: theirs)
         lock.lock()
         agents.append(agent)
@@ -59,7 +70,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
 
     var launchCount: Int {
         lock.lock(); defer { lock.unlock() }
-        return launches.count
+        return recorded.count
     }
 
     var lastAgent: FakeACPAgent? {
@@ -72,7 +83,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     /// shorter than it mean two were starting at once.
     var gapsBetweenLaunches: [Duration] {
         lock.lock(); defer { lock.unlock() }
-        return zip(launches.dropFirst(), launches).map { $0.at - $1.at }
+        return zip(recorded.dropFirst(), recorded).map { $0.at - $1.at }
     }
 
     var allAgents: [FakeACPAgent] {

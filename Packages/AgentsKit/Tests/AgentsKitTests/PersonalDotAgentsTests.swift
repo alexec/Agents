@@ -184,9 +184,9 @@ struct PersonalDotAgentsTests {
         #expect(PersonalDotAgents.Record.load(from: home.appending(path: "missing.json"), home: home).home == home.path)
     }
 
-    // SC-005. A wall-clock budget, so quarantined in CI like the others; the best of
-    // three, so one scheduling hiccup on a loaded Mac is not a failure.
-    @Test(.flakyUnderLoad) func a100SkillReconcileIsQuick() throws {
+    // SC-005. A wall-clock budget, held only by the perf check; the best of three, so
+    // one scheduling hiccup is not a failure.
+    @Test(.perfBudget) func a100SkillReconcileIsQuick() throws {
         let home = try home()
         for index in 0..<100 { try skill(home, "skill-\(index)") }
         var record = PersonalDotAgents.Record(home: home.path)
@@ -195,7 +195,7 @@ struct PersonalDotAgentsTests {
         let clock = ContinuousClock()
         let took = (0..<3).map { _ in clock.measure { reconcile(home, record: &record) } }.min()!
 
-        #expect(took < .milliseconds(50))
+        PerfBudget.expect(took, under: .milliseconds(50), "reconciling 100 skills")
     }
 
     // MARK: - US2: instructions

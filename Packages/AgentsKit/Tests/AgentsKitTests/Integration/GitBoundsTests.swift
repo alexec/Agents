@@ -41,41 +41,44 @@ struct GitBoundsTests {
 
     /// A checkout that hangs, as an LFS smudge on a dead network does: the add is stopped
     /// at its deadline, says so, and the next worktree change in the project goes ahead.
+    ///
+    /// The smudge sleeps past the suite's time limit, so the add coming back at all is the
+    /// proof it was stopped, without a wall-clock bar a loaded runner stretches (#225).
     @Test func aHungWorktreeAddIsStoppedAndFreesTheProjectsQueue() async throws {
         let (holder, top) = try await repository()
         defer { try? FileManager.default.removeItem(at: holder) }
         try "* filter=hang\n".write(to: top.appending(path: ".gitattributes"), atomically: true, encoding: .utf8)
         _ = try await git(["add", ".gitattributes"], in: top)
         _ = try await git(["commit", "-q", "-m", "attributes"], in: top)
-        _ = try await git(["config", "filter.hang.smudge", "sleep 20"], in: top)
+        _ = try await git(["config", "filter.hang.smudge", "sleep 150"], in: top)
 
-        let started = Date()
         let failure = await #expect(throws: GitWorktrees.Failure.self) {
             try await GitWorktrees.$deadlineOverride.withValue(.seconds(1)) {
                 try await GitWorktrees.add(branch: "hung", path: holder.appending(path: "hung"), in: top)
             }
         }
-        #expect(Date().timeIntervalSince(started) < 10, "stopped at its deadline, not when the smudge ended")
         #expect(failure?.message.contains("git worktree add was stopped after 1 second") == true,
                 "it says what happened: \(failure?.message ?? "")")
 
         _ = try await git(["config", "--unset", "filter.hang.smudge"], in: top)
-        let next = Date()
         try await GitWorktrees.add(branch: "after", path: holder.appending(path: "after"), in: top)
-        #expect(Date().timeIntervalSince(next) < 10, "the queue was freed")
         #expect(FileManager.default.fileExists(atPath: holder.appending(path: "after/README").path))
     }
 
-    @Test func aChildWhoseGrandchildHoldsItsPipeEndsWithItsOwnStatus() async {
+    @Test(.flakyUnderLoad) func aChildWhoseGrandchildHoldsItsPipeEndsWithItsOwnStatus() async {
         // The backgrounded sleep keeps stdout open after the shell has gone, as an ssh
-        // ControlPersist master started by git does.
-        let started = Date()
-        let outcome = await ChildProcess.run(URL(fileURLWithPath: "/bin/sh"), ["-c", "sleep 20 & printf done"],
-                                             deadline: .seconds(15))
+        // ControlPersist master started by git does. It would hold it for ten minutes:
+        // coming back inside the deadline at all is the proof, not a wall-clock bar a
+        // loaded machine stretches (#225).
+        let outcome = await ChildProcess.run(URL(fileURLWithPath: "/bin/sh"),
+                                             ["-c", "sleep 600 & echo $! >&2; printf done"],
+                                             deadline: Eventually.timeout)
+        if let grandchild = pid_t(outcome.errorText.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            kill(grandchild, SIGKILL)
+        }
         #expect(!outcome.timedOut)
         #expect(outcome.status == 0)
         #expect(outcome.text == "done")
-        #expect(Date().timeIntervalSince(started) < 6)
     }
 
     @Test func outputPastTheLimitIsDroppedAndSaid() async {
@@ -86,12 +89,16 @@ struct GitBoundsTests {
         #expect(outcome.truncated)
     }
 
-    @Test func aBlockingRunHasADeadlineToo() {
-        let started = Date()
-        let outcome = ChildProcess.runBlocking(URL(fileURLWithPath: "/bin/sh"), ["-c", "exec sleep 30"],
+    @Test func aBlockingRunHasADeadlineToo() async throws {
+        // The child would sleep for ten minutes: the run comes back without it, and it is
+        // stopped rather than left to run its length (#225, as ChildProcessTests).
+        let outcome = ChildProcess.runBlocking(URL(fileURLWithPath: "/bin/sh"), ["-c", "exec sleep 600"],
                                                deadline: .milliseconds(500))
         #expect(outcome.timedOut)
-        #expect(Date().timeIntervalSince(started) < 5)
+        let pid = try #require(outcome.pid)
+        if !(await eventually("the child was stopped", { kill(pid, 0) != 0 && errno == ESRCH })) {
+            kill(pid, SIGKILL)
+        }
     }
 
     // MARK: Read-only

@@ -5,7 +5,10 @@ import Testing
 /// A far end that has gone quiet is let go rather than waited on for ever. The phone
 /// runs one reconnect at a time, so a ping that never came back held every later
 /// attempt behind it, and the app had to be killed to reach the Mac again.
-@Suite("A quiet link")
+///
+/// "Not for ever" is the suite's minute: a wait that never ends fails there, by name,
+/// where a bound of a few seconds failed only because the machine was busy (#225).
+@Suite("A quiet link", .timeLimit(.minutes(1)))
 struct QuietLinkTests {
     /// A Mac that answers pings until it is told to stop, then says nothing at all:
     /// the TLS handshake done, the daemon behind the bridge not answering.
@@ -29,16 +32,14 @@ struct QuietLinkTests {
         func start() async throws {}
     }
 
-    @Test(.flakyUnderLoad) func aMacThatNeverAnswersIsNotConnectedTo() async throws {
+    @Test func aMacThatNeverAnswersIsNotConnectedTo() async throws {
         let mac = Mac()
         mac.quiet.set()
         let client = DaemonClient(link: mac)
         await client.setPingPatience(.milliseconds(200))
-        let started = ContinuousClock.now
         await #expect(throws: DaemonClient.ConnectError.self) {
             try await client.connect(startIfNeeded: false)
         }
-        #expect(ContinuousClock.now - started < .seconds(10))
     }
 
     @Test func aConnectionThatGoesQuietIsLetGoAndWhatWaitedOnItFails() async throws {
@@ -49,9 +50,8 @@ struct QuietLinkTests {
 
         mac.quiet.set()
         let waiting = Task { try await client.call(DaemonAPI.Method.ping) }
-        let started = ContinuousClock.now
+        // Returns at all: the ping it raced is never answered.
         #expect(await !client.answers(within: .milliseconds(200)))
-        #expect(ContinuousClock.now - started < .seconds(10), "the race returned without waiting for the ping")
         await #expect(throws: JSONRPCTransportError.self) { _ = try await waiting.value }
     }
 

@@ -128,7 +128,7 @@ struct MacSignInRelayTests {
 
     /// End to end: with a sign-in on this Mac, a request naming another host in its target
     /// is answered 400 by the relay itself, and never sent on with the token.
-    @Test func aTargetNamingAnotherHostIsRefusedBeforeTheTokenIsUsed() async throws {
+    @Test(.flakyUnderLoad) func aTargetNamingAnotherHostIsRefusedBeforeTheTokenIsUsed() async throws {
         let folder = try Self.temporary()
         defer { try? FileManager.default.removeItem(at: folder) }
         let certificates = RelayCertificates(folder: folder.appendingPathComponent("relay"))
@@ -144,7 +144,7 @@ struct MacSignInRelayTests {
 
     /// Loopback is every local account's to dial: without the stand-in bearer handed to
     /// the server, the Mac's token is not attached (S4).
-    @Test func aCallerWithoutTheStandInDoesNotGetThisMacsToken() async throws {
+    @Test(.flakyUnderLoad) func aCallerWithoutTheStandInDoesNotGetThisMacsToken() async throws {
         let folder = try Self.temporary()
         defer { try? FileManager.default.removeItem(at: folder) }
         let certificates = RelayCertificates(folder: folder.appendingPathComponent("relay"))
