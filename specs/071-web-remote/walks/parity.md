@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 205 rows: **93 same**, **38 by design**, **74 delta** (after #238–#244, #255–#260, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 205 rows: **99 same**, **37 by design**, **69 delta** (after #238–#244, #249, #255–#261, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -29,7 +29,7 @@ Of 205 rows: **93 same**, **38 by design**, **74 delta** (after #238–#244, #25
 | Dashboard and pins | 8 | 0 | 6 |
 | Workflows page | 11 | 1 | 2 |
 | Settings and Project Settings | 1 | 6 | 0 |
-| Pool, runtimes and spending | 2 | 1 | 7 |
+| Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 1 | 1 | 3 |
 | Notifications and badges | 3 | 0 | 1 |
 | Disk strip | 1 | 1 | 1 |
@@ -273,23 +273,23 @@ The deltas are tracked by 30 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Runtimes page: availability, pool note (#140) | `A/Runtimes/RuntimesView.swift:73-122` | `R/Projects/RuntimesView.swift:61-77` | `W/views/Activity.tsx:166-180` | **same** |
-| Allowance readings | Yes | Yes | None: never asked | **delta**: web #261 |
-| Mark available | Button: `A/Runtimes/RuntimesView.swift:88-93` | Swipe: `R/Projects/RuntimesView.swift:23-28` | None | **delta**: web #261 |
-| *N out* in Activity | Allowances out: `A/Runtimes/RuntimesView.swift:131-133` | `anyOut`: `R/Projects/RuntimesView.swift:89` | Pool notes: `W/views/Activity.tsx:58-60` | **delta**: web #261 |
+| Runtimes page: availability, pool note (#140) | `A/Runtimes/RuntimesView.swift:73-122` | `R/Projects/RuntimesView.swift:61-77` | `W/views/Activity.tsx` | **same** |
+| Allowance readings | Yes | Yes | `runtimes/allowances`; since, next check and reading | **same** |
+| Mark available | Button: `A/Runtimes/RuntimesView.swift:88-93` | Swipe: `R/Projects/RuntimesView.swift:23-28` | Button: `runtimes/markAvailable` | **same** |
+| *N out* in Activity | Allowances out: `A/Runtimes/RuntimesView.swift:131-133` | `anyOut`: `R/Projects/RuntimesView.swift:89` | Allowances out: `W/views/Activity.tsx` | **same** |
 | Assess a runtime (#47) | Settings ▸ Agent Runtimes | *Assess in…* | None | **by design** (#47) |
-| Spending: all time, project shares | `A/Spending/SpendingView.swift:31-39` | `R/Projects/TotalsView.swift:31-42` | Today per host only: `W/views/Activity.tsx:226-246` | **delta**: web #261 |
+| Spending: all time, project shares | `A/Spending/SpendingView.swift:31-39` | `R/Projects/TotalsView.swift:31-42` | All time, project shares, unmeasured floor and today's host totals: `W/views/Activity.tsx` | **same** |
 | Today, in Activity | This Mac and every server: `A/Projects/ProjectListView.swift:719-722` | This Mac only: `R/Projects/ProjectListView.swift:189-191` | Every host: `W/views/Activity.tsx:26-32` | **delta**: Remote #248 |
-| Close to full | 0.85: `K/Model/Usage.swift:35` | The same | 0.8: `W/views/Activity.tsx:48-52` | **delta**: web #261 |
-| Daily limit read-outs | Settings ▸ Limits: `A/Settings/CostSettingsView.swift` | *Today X of limit*, *limit reached*; no per-agent line: `R/Projects/TotalsView.swift:96-121` | Daily and per-agent; no *limit reached*: `W/views/Activity.tsx:236-239` | **delta**: Remote #248, web #261. The setting: **by design** |
-| A store file set aside, said (#171) | `A/Spending/SpendingView.swift:26-30` | `R/Projects/TotalsView.swift:26-30` | `W/views/Activity.tsx:240` | **same** |
+| Close to full | 0.85: `K/Model/Usage.swift:35` | The same | 0.85: `W/views/Activity.tsx` | **same** |
+| Daily limit read-outs | Settings ▸ Limits: `A/Settings/CostSettingsView.swift` | *Today X of limit*, *limit reached*; no per-agent line: `R/Projects/TotalsView.swift:96-121` | Daily and per-agent; *Nothing new will start until tomorrow*: `W/views/Activity.tsx` | **delta**: Remote #248. The setting: **by design** |
+| A store file set aside, said (#171) | `A/Spending/SpendingView.swift:26-30` | `R/Projects/TotalsView.swift:26-30` | `W/views/Activity.tsx:302` | **same** |
 
 ## Events and resources
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Events ▸ Waiting now | Openable, with ✕: `A/Events/EventsView.swift:58-61, 281-325` | None: `R/Events/EventsListView.swift:31-58` | Titles only: `W/views/Activity.tsx:195-202` | **delta**: Remote #248, web #262 |
-| Event rows: consequences, name, scope, days, Show older | `S/Events/EventRow.swift`, `A/Events/EventsView.swift:89, 161-173` | Shared (no kind filter) | A flat list: `W/views/Activity.tsx:203-221` | **delta**: web #262 |
+| Events ▸ Waiting now | Openable, with ✕: `A/Events/EventsView.swift:58-61, 281-325` | None: `R/Events/EventsListView.swift:31-58` | Titles only: `W/views/Activity.tsx:237-243` | **delta**: Remote #248, web #262 |
+| Event rows: consequences, name, scope, days, Show older | `S/Events/EventRow.swift`, `A/Events/EventsView.swift:89, 161-173` | Shared (no kind filter) | A flat list: `W/views/Activity.tsx:245-264` | **delta**: web #262 |
 | A workflow in a consequence | A link: `A/Events/EventsView.swift:151` | Plain text: `R/Events/EventsListView.swift:8-10, 45-46` | n/a | **delta**: Remote #248 |
 | Resources, counted holders (#116) | `A/Resources/ResourcesView.swift` | Read-only: `R/Resources/ResourcesListView.swift` | Read-only: `W/views/Resources.tsx` | **same** (reading) |
 | Declaring resources, ending leases (#116) | Settings ▸ Resources, the Resources page | None | None | **by design** (the Mac's) |

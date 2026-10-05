@@ -8,7 +8,7 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest, FileMentionDTO, SandboxChoice,
+  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -1280,6 +1280,8 @@ export class Store extends Work {
 
   /** Each runtime and what each says it can take, by host. */
   readonly runtimes = signal<Record<string, RuntimeStatus[]>>({});
+  /** Allowance readings and out states for each host's Runtimes page. */
+  readonly runtimeAllowances = signal<Record<string, RuntimeAllowances>>({});
   /** Each host's sandbox default per runtime (SandboxSettings); absent means its runtime decides. */
   readonly sandboxDefaults = signal<Record<string, Record<string, SandboxChoice>>>({});
   readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
@@ -1326,19 +1328,26 @@ export class Store extends Work {
 
   /** What runs on a host, and what each runtime takes; asked once a connection. */
   async loadRuntimes(host: string): Promise<void> {
-    const [runtimes, accounts, modes, sandbox] = await Promise.all([
+    const [runtimes, accounts, modes, sandbox, allowances] = await Promise.all([
       this.link.call("runtimes/list", {}, host).catch(() => null),
       this.link.call("runtimes/accounts", {}, host).catch(() => null),
       this.link.call("modes/remembered", {}, host).catch(() => null),
       // A host on an older build is not asked by the page: every runtime then follows its own.
       this.link.call("sandbox/state", {}, host).catch(() => null),
+      this.link.call("runtimes/allowances", null, host).catch(() => null),
     ]);
     batch(() => {
       if (sandbox) this.sandboxDefaults.value = { ...this.sandboxDefaults.value, [host]: sandbox.defaults };
       if (runtimes) this.runtimes.value = { ...this.runtimes.value, [host]: sortedRuntimes(runtimes) };
+      if (allowances) this.runtimeAllowances.value = { ...this.runtimeAllowances.value, [host]: allowances };
       if (accounts) this.accounts.value = { ...this.accounts.value, [host]: accounts };
       if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
     });
+  }
+
+  async markRuntimeAvailable(host: string, credentialKey: string): Promise<void> {
+    const allowances = await this.link.call("runtimes/markAvailable", { credentialKey }, host).catch(() => null);
+    if (allowances) this.runtimeAllowances.value = { ...this.runtimeAllowances.value, [host]: allowances };
   }
 
   account(host: string, runtimeID: string): RuntimeAccount | undefined {

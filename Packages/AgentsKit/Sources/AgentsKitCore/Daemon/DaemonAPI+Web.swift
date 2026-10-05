@@ -49,6 +49,7 @@ public extension DaemonAPI {
                 Row(Method.agentsOptions, params: OptionsRequest.self, result: OptionsResponse.self, kind: .hostRequest),
                 Row(Method.agentsDiscardDraft, params: DiscardDraftRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.runtimesList, params: Empty.self, result: [RuntimeStatus].self, kind: .hostRequest),
+                Row(Method.runtimesAllowances, params: Optional<String>.self, result: RuntimeAllowances.self, kind: .hostRequest),
                 Row(Method.runtimesAccounts, params: Empty.self, result: [RuntimeAccount].self, kind: .hostRequest),
                 // Each runtime's sandbox default, for the new session's "Use runtime default (…)" (#257).
                 Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
@@ -91,6 +92,8 @@ public extension DaemonAPI {
                 Row(Method.viewsContext, params: ViewContextRequest.self, result: Empty.self, kind: .hostRequest),
                 // Acting
                 Row(Method.agentsStart, params: StartRequest.self, result: UUID.self, kind: .hostRequest),
+                Row(Method.runtimesMarkAvailable, params: MarkRuntimeAvailable.self, result: RuntimeAllowances.self,
+                    kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSendNow, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnqueue, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
