@@ -1514,6 +1514,7 @@ export interface Tombstone {
   startedByAgent?: UUID;
   worktreeName?: string;
   worktreeBranch?: string;
+  worktreeRoot?: URLString;
   retiredBecause: RetiredBecause;
 }
 
@@ -2277,7 +2278,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TileStatus: { required: ["level", "line"], optional: ["since"] },
   TileTable: { required: ["columns", "rows"], optional: [] },
   TileView: { required: ["id", "keeper", "changedOutside", "points", "recent", "keeperChanges"], optional: ["tile", "problem", "made", "setAt"] },
-  Tombstone: { required: ["id", "project", "runtimeID", "createdAt", "lastActivityAt", "archivedAt", "retiredAt", "archivedReason", "costToDate", "retiredBecause"], optional: ["title", "endedReason", "startedByWorkflow", "startedByRun", "startedByAgent", "worktreeName", "worktreeBranch"] },
+  Tombstone: { required: ["id", "project", "runtimeID", "createdAt", "lastActivityAt", "archivedAt", "retiredAt", "archivedReason", "costToDate", "retiredBecause"], optional: ["title", "endedReason", "startedByWorkflow", "startedByRun", "startedByAgent", "worktreeName", "worktreeBranch", "worktreeRoot"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
   ToolCallLocation: { required: ["path"], optional: ["line"] },
   TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID"] },
