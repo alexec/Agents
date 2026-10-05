@@ -215,8 +215,8 @@ final class RemoteModel {
     func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
         guard !isStale else { return "Your Mac is not answering. What you typed is kept here." }
         do {
-            try await client.call(DaemonAPI.Method.artifactWrite,
-                                  DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text))
+            let request = DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text)
+            try await client(for: request).call(DaemonAPI.Method.artifactWrite, request)
             return nil
         } catch let error as JSONRPCError {
             return error.message
@@ -574,10 +574,9 @@ final class RemoteModel {
 
     func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async -> Bool {
         do {
-            let agent: Agent = try await client.call(
-                DaemonAPI.Method.agentsSetLabels,
-                DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove),
-                returning: Agent.self)
+            let request = DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove)
+            let agent: Agent = try await client(for: request).call(DaemonAPI.Method.agentsSetLabels, request,
+                                                                   returning: Agent.self)
             work.upsert(agent)
             await loadLabelVocabulary(in: agent.projectFolder)
             return true
@@ -594,9 +593,9 @@ final class RemoteModel {
 
     func loadLabelVocabulary(in folder: URL) async {
         let folder = Project.standardize(folder)
-        guard let values = try? await client.call(
-            DaemonAPI.Method.agentsLabelVocabulary,
-            DaemonAPI.LabelVocabularyRequest(folder: folder), returning: [String].self) else { return }
+        let request = DaemonAPI.LabelVocabularyRequest(folder: folder)
+        guard let values = try? await client(for: request).call(DaemonAPI.Method.agentsLabelVocabulary, request,
+                                                                returning: [String].self) else { return }
         labelVocabularies[folder] = values
     }
 
@@ -624,7 +623,7 @@ final class RemoteModel {
         } catch {
             // Out of patience too (#208): the sheet is let go, and the start is settled
             // when the host is back, by its `requestID`.
-            startRefusal = "\(hostName(of: error) ?? "Your Mac") stopped answering before it said whether the agent "
+            startRefusal = "\((error as? HostAway).map { hostName($0.host) } ?? "Your Mac") stopped answering before it said whether the agent "
                 + "started. This will be checked when it is back."
             return false
         }
@@ -2106,8 +2105,8 @@ final class RemoteModel {
             return
         }
         do {
-            try await client.call(DaemonAPI.Method.agentsSetSandbox,
-                                  DaemonAPI.SetSandboxRequest(agentID: agentID, choice: choice))
+            let request = DaemonAPI.SetSandboxRequest(agentID: agentID, choice: choice)
+            try await client(for: request).call(DaemonAPI.Method.agentsSetSandbox, request)
         } catch {
             problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
         }
@@ -2116,8 +2115,8 @@ final class RemoteModel {
     /// The sandbox card's answer, from the phone (064, FR-007a).
     func answerSandbox(_ agentID: UUID, carryOn: Bool) async {
         do {
-            try await client.call(DaemonAPI.Method.agentsAnswerSandbox,
-                                  DaemonAPI.AnswerSandboxRequest(agentID: agentID, carryOn: carryOn))
+            let request = DaemonAPI.AnswerSandboxRequest(agentID: agentID, carryOn: carryOn)
+            try await client(for: request).call(DaemonAPI.Method.agentsAnswerSandbox, request)
         } catch {
             problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
         }
@@ -2336,8 +2335,8 @@ final class RemoteModel {
         let sequence = work.beginOption(agentID: agentID, optionID: optionID, value: value)
         Task {
             do {
-                try await client.call(DaemonAPI.Method.agentsSetOption,
-                                      DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
+                let request = DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value)
+                try await client(for: request).call(DaemonAPI.Method.agentsSetOption, request)
             } catch {
                 problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
             }
@@ -2365,10 +2364,9 @@ final class RemoteModel {
             return
         }
         do {
-            let changed = try await client.call(
-                DaemonAPI.Method.agentsSetCeiling,
-                DaemonAPI.SetCeilingRequest(agentID: agent.id, ceiling: agent.ceilingToGoOn(under: costLimits)),
-                returning: Agent.self)
+            let request = DaemonAPI.SetCeilingRequest(agentID: agent.id, ceiling: agent.ceilingToGoOn(under: costLimits))
+            let changed = try await client(for: request).call(DaemonAPI.Method.agentsSetCeiling, request,
+                                                              returning: Agent.self)
             work.upsert(changed)
         } catch {
             problem = "That did not reach your Mac."
@@ -2491,25 +2489,30 @@ final class RemoteModel {
     /// opened, or somebody is typing in it. Once per session and reason in a while,
     /// however many keys; the Mac debounces too. Silent: nothing is said if it fails.
     func prewarm(_ agentID: UUID, _ why: DaemonAPI.PrewarmRequest.Why) async {
-        guard !isStale, let agent = agent(agentID), agent.state == .finished || agent.state == .stopped else { return }
+        guard let agent = agent(agentID), !isStale(agent),
+              agent.state == .finished || agent.state == .stopped else { return }
         let key = "\(agentID) \(why.rawValue)"
         if let last = prewarmed[key], Date().timeIntervalSince(last) < 15 { return }
         prewarmed[key] = Date()
         if prewarmed.count > 64 { prewarmed = prewarmed.filter { Date().timeIntervalSince($0.value) < 15 } }
-        _ = try? await client.call(DaemonAPI.Method.agentsPrewarm, DaemonAPI.PrewarmRequest(agentID: agentID, why: why))
+        // To the agent's own host, which is the one with its runtime to start (#238).
+        let request = DaemonAPI.PrewarmRequest(agentID: agentID, why: why)
+        _ = try? await client(for: request).call(DaemonAPI.Method.agentsPrewarm, request)
     }
 
     /// Mark as Unread / Mark as Read, from the card's menu (#70).
     func setUnread(_ agentID: UUID, _ unread: Bool) async {
-        guard !isStale else {
-            problem = "Your Mac is not answering, so that could not be sent."
+        let host = work.agent(agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that could not be sent.")
             return
         }
         do {
-            try await client.call(DaemonAPI.Method.agentsSetUnread,
-                                  DaemonAPI.SetUnreadRequest(agentID: agentID, unread: unread))
+            // The mark is kept by the agent's own host, and told from there (#238).
+            let request = DaemonAPI.SetUnreadRequest(agentID: agentID, unread: unread)
+            try await client(for: request).call(DaemonAPI.Method.agentsSetUnread, request)
         } catch {
-            problem = "That did not reach your Mac."
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
 
@@ -2557,16 +2560,20 @@ final class RemoteModel {
     /// What to say when a send did not go because its host is away (#208): the home host
     /// or another of the control plane's, by name. Nil for any other failure.
     private func away(_ error: any Error, _ outcome: String) -> String? {
-        if error is MacAway { return "Your Mac is not answering, so \(outcome)" }
-        guard error is HostAway else { return nil }
-        return "\(hostName(of: error) ?? "That host") is not answering, so \(outcome)"
+        if error is MacAway { return notAnswering(.mac, outcome) }
+        guard let away = error as? HostAway else { return nil }
+        return notAnswering(away.host, outcome)
     }
 
-    /// The name of the other host a `HostAway` is about.
-    private func hostName(of error: any Error) -> String? {
-        guard let away = error as? HostAway else { return nil }
-        return controlHosts.first { $0.id == away.host }.map { $0.name.isEmpty ? $0.id.rawValue : $0.name }
-            ?? "That host"
+    /// "… is not answering, so …", naming the host: the home host as the Mac, another
+    /// by its name (#238).
+    private func notAnswering(_ host: HostID, _ outcome: String) -> String {
+        "\(host == .mac ? "Your Mac" : hostName(host)) is not answering, so \(outcome)"
+    }
+
+    /// Another of the control plane's hosts, by the name it was given.
+    func hostName(_ host: HostID) -> String {
+        controlHosts.first { $0.id == host }.map { $0.name.isEmpty ? $0.id.rawValue : $0.name } ?? "That host"
     }
 
     func dismissProblem() { problem = nil }

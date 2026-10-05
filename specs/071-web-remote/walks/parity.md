@@ -15,23 +15,23 @@
 
 ## Counts
 
-Of 204 rows: **56 same**, **35 by design**, **113 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
+Of 204 rows: **60 same**, **35 by design**, **109 delta**. A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
-| Session rows and states | 8 | 2 | 13 |
+| Session rows and states | 9 | 2 | 12 |
 | Chat turns and turn detail | 4 | 3 | 15 |
-| Prompt bar and queued prompts | 3 | 2 | 15 |
+| Prompt bar and queued prompts | 4 | 2 | 14 |
 | Question and permission cards | 3 | 2 | 10 |
-| Start sheet and new project | 6 | 5 | 11 |
+| Start sheet and new project | 7 | 5 | 10 |
 | Worktrees and Files | 5 | 6 | 10 |
 | Dashboard and pins | 8 | 0 | 6 |
 | Workflows page | 6 | 1 | 7 |
 | Settings and Project Settings | 1 | 6 | 0 |
 | Pool, runtimes and spending | 2 | 1 | 7 |
 | Events and resources | 1 | 1 | 3 |
-| Notifications and badges | 1 | 1 | 2 |
+| Notifications and badges | 2 | 1 | 1 |
 | Disk strip | 1 | 1 | 1 |
 | Hosts, connection and pairing | 3 | 2 | 1 |
 | MCP Apps views | 1 | 0 | 0 |
@@ -90,7 +90,7 @@ The deltas are tracked by 32 issues:
 | Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268` | No Stop, no Bring Back on an archived card, no Branch: `R/Projects/AgentCard.swift:179-222` | Stop, Park / Unpark, Mark, Pin, Bring Back / Archive, Move: `W/views/SessionMenu.tsx:16-44` | **delta**: Remote #241 (Stop, Bring Back); Branch #267. Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
 | Swipe | Pin; Archive, or Bring Back when archived: `A/Projects/ProjectListView.swift:487-506` | Pin; Archive; nothing on an archived card: `R/Projects/AgentCard.swift:223-234` | None | **delta**: Remote #241. Web: **by design** (no swipe) |
 | Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
-| Mark Read / Unread reaches the agent's host | Per host | The home host always: `R/RemoteModel.swift:2451-2461` | Per host: `W/views/SessionMenu.tsx:78` | **delta**: Remote #238 |
+| Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |
 | Rename | None | None | None | **same** |
 
 ## Chat turns and turn detail
@@ -142,7 +142,7 @@ The deltas are tracked by 32 issues:
 | @ file mentions | `A/Chat/PromptBar.swift:644-690` | `R/Chat/PromptBar.swift:418-454` | None | **delta**: web #255 |
 | Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | None | **delta**: web #254. Placeholder against chip: **by design** (touch) |
 | Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Memory only, lost on reload: `W/model/store.ts:1009` | **delta**: web #254 |
-| Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | Sent to the home host: `R/RemoteModel.swift:2441-2447` | `W/views/Chat.tsx:50, 229` | **delta**: Remote #238 |
+| Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | To the agent's host: `R/RemoteModel.swift:2480-2490` | `W/views/Chat.tsx:50, 229` | **same** (#238) |
 | The bar on an archived chat | Shown: *Say what next, and this comes back* | Hidden: `R/Chat/RemoteChatView.swift:202` | Shown | **delta**: Remote #242 |
 
 ## Question and permission cards
@@ -185,7 +185,7 @@ The deltas are tracked by 32 issues:
 | Starting, in flight (#87) | Words held, *Starting — telling …* | Spinner, *telling your Mac* | Held: `W/views/Prompt.tsx:92-120` | **same** (apart from #239) |
 | Attachments, refused before sending | `A/Chat/AttachmentStrip.swift` | `R/StartAgent/PhoneAttachments.swift` | `W/model/attachments.ts` | **same** |
 | The form kept between starts | Text, attachments, folder, runtime, reach, options: `A/Chat/DraftKeeper.swift:125-170` | Text and attachments | Text only: `W/views/NewAgent.tsx:60-71` | **delta**: Remote #244, web #257 |
-| Prewarm on typing (#183) | Yes | To the home host | Yes | **delta**: Remote #238 |
+| Prewarm on typing (#183) | Yes | Yes, to the agent's host | Yes | **same** (#238) |
 | Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | None | `W/views/NewProject.tsx:34-260` | **delta**: Remote #244 |
 | Add Server… | `A/Control/ControlAddServerSheet.swift` | None | None | **by design** (installs over ssh from the Mac) |
 | Add Folder on this Mac: Finder drag, the clipboard's URL | Yes | n/a | Browses the host instead | **by design** (#115: no drag from Finder, no clipboard read) |
@@ -299,7 +299,7 @@ The deltas are tracked by 32 issues:
 |---|---|---|---|---|
 | Notifications | `A/Notifications/MacNotifier.swift:37-79` | Local and push: `R/Notifications/DeviceNotifier.swift:34-98` | None: `W/presence.ts:5` | **by design** (071: the page takes no notices) |
 | The needs-you count | Dock badge: `A/ContentView.swift:267-268` | No icon badge, though it asks for one: `R/Notifications/DeviceNotifier.swift:116, 130` | The tab's title: `W/presence.ts:16-30` | **delta**: Remote #249 |
-| Presence: watching and active | Every host; *watching* to the owner: `A/AppModel.swift:2531-2549` | The home host only: `R/RemoteModel.swift:1586-1591` | One host: `W/presence.ts:39-42` | **delta**: Remote and web #238 |
+| Presence: watching and active | Every host; *watching* to the owner: `A/AppModel.swift:2531-2549` | The same: `R/RemoteModel.swift:1604-1618` | The same: `W/presence.ts:36-47` | **same** (#203, checked in #238) |
 | Unread counts on project rows and folds (#70) | Yes | Yes | Yes | **same** |
 
 ## Disk strip
@@ -330,7 +330,7 @@ The deltas are tracked by 32 issues:
 ## Live sync
 
 #233 asks whether "not in sync" also means one client showing stale state after another acts. From the code:
-- **#238:** the Remote sends Mark Read / Unread and presence for a server's agent to the Mac. A session opened on the phone may stay unread on its server, and so in the other clients.
+- **#238 (fixed):** the Remote sent Mark Read / Unread and prewarm for a server's agent to the Mac; they go to the agent's own host now, and presence already did since #203.
 - **#263:** a server's disk state overwrites the window's.
 - Catch-up and lean changes are #203, #175 and #208; this audit found nothing more there.
 
