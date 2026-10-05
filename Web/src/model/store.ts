@@ -849,6 +849,17 @@ export class Store extends Work {
     });
   }
 
+  /** A workflow's newest runs, including archived sessions, in a growing page. */
+  async loadWorkflowRuns(host: string, folder: string, workflowID: string, limit: number): Promise<Agent[]> {
+    const listed = await this.link.call("agents/list", {
+      includeArchived: true, archivedCommands: false, archivedOnly: false, folder: folder as never,
+      startedByWorkflow: workflowID, lean: true, limit,
+    }, host).catch(() => null);
+    if (!listed) return [];
+    this.addAgents(listed, host);
+    return listed;
+  }
+
   /**
    * Everything again, on every connection, in the window's order (refreshEverything): agents,
    * then projects, then the cards and the open conversation at once. No cursors on the wire.

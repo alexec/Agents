@@ -4,10 +4,8 @@ import SwiftUI
 /// What happened on the Mac, and what came of it, read on the phone or iPad (042 FR-029;
 /// wireframes §4).
 ///
-/// The same rows as the Mac's page, from the same view. The phone reads: there is no
-/// cancelling a wait, no Copy as trigger and no subject filters here, only one menu
-/// for where. An agent in a consequence is a way to its chat; a workflow is plain text,
-/// because the phone has no workflow page to go to.
+/// The same rows as the Mac's page, from the same view. The phone reads: no Copy as
+/// trigger and no subject filters here, only one menu for where.
 struct EventsListView: View {
     @Environment(RemoteModel.self) private var model
     /// Nil: every project and the Mac.
@@ -31,6 +29,36 @@ struct EventsListView: View {
     var body: some View {
         let shown = self.shown
         List {
+            if !model.work.waitingAgents.isEmpty {
+                Section("Waiting now") {
+                    ForEach(model.work.waitingAgents) { agent in
+                        HStack(spacing: 12) {
+                            Button {
+                                model.open(agent.agentID)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(agent.title).appText(.reading)
+                                    Text(agent.status.line).appText(.fine).foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            if agent.status.cancellable {
+                                Button {
+                                    Task { await model.cancelWait(of: agent.agentID) }
+                                } label: {
+                                    Image(systemName: "xmark").font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.secondary)
+                                .help("Stop waiting. Nothing will start it again for this wait.")
+                            }
+                        }
+                        .paperListRow()
+                    }
+                }
+            }
             if shown.events.isEmpty {
                 Text(model.work.eventsLoaded
                      ? "Nothing has happened yet. Events appear here as agents, workflows and the Mac do things."
@@ -43,7 +71,10 @@ struct EventsListView: View {
                 Section(EventDay.heading(for: day.day)) {
                     ForEach(day.events, id: \.position) { event in
                         EventRow(event: event, scopeName: scopeName(event.scope),
-                                 openAgent: { model.open($0) })
+                                 openAgent: { model.open($0) },
+                                 openWorkflow: { folder, workflow in
+                                     model.openWorkflow = Project.standardize(folder).path + "/" + workflow
+                                 })
                             .contentShape(Rectangle())
                             .onTapGesture { picked = event }
                             .paperListRow()

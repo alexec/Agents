@@ -50,11 +50,42 @@ function isEvent(trigger: WorkflowTriggerStored): boolean {
   return "unrecognised" in trigger && trigger.unrecognised.name.includes(".");
 }
 
+// EventCatalogue's catalogue meaning, kept in sync with EventPattern.summary.
+const eventMeanings: Record<string, string> = {
+  "agent.started": "An agent in this project started working",
+  "agent.finished": "An agent in this project ended a turn having done its work",
+  "agent.asked_permission": "An agent in this project is asking for permission",
+  "agent.asked_form": "An agent in this project raised a form to fill in",
+  "agent.blocked": "An agent in this project ended its turn waiting on something",
+  "agent.stopped": "An agent in this project was stopped before finishing",
+  "agent.failed": "An agent in this project ended in an error",
+  "agent.parked": "An agent in this project was parked: put down to come back to",
+  "agent.archived": "An agent in this project was archived",
+  "agent.retired": "An archived agent was retired and its conversation deleted",
+  "workflow.ran": "A workflow in this project started an agent",
+  "workflow.completed": "A workflow's run in this project finished",
+  "workflow.refused": "A workflow in this project did not run, and why",
+  "branch.moved": "A branch moved: the default branch, or one an agent works on",
+  "lease.granted": "An agent was given a lease",
+  "lease.released": "A lease was given back, ended or ran out",
+  "mac.sleep": "This Mac is going to sleep",
+  "mac.wake": "This Mac woke up",
+  "mac.disk_low": "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold",
+  "mac.disk_ok": "Free space on a volume that was low climbed back above its threshold",
+  "person.away": "You locked the screen or stepped away for 5 minutes",
+  "person.back": "You unlocked the screen or came back",
+  "cost.limit_reached": "A spending limit was reached",
+  "cost.allowance_out": "A runtime's allowance ran out",
+  "cost.allowance_back": "A runtime's allowance came back",
+  "server.offline": "A server went offline",
+  "server.online": "A server came back",
+};
+
 function scalar(value: JSONValue): string | null {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : null;
 }
 
-/** WorkflowTrigger.summary, with an event said by its name (see above) and its filters in words. */
+/** WorkflowTrigger.summary, with an event said by its catalogue meaning and filters in words. */
 export function triggerSummary(trigger: WorkflowTriggerStored,
   runtimeName: (id: string) => string | undefined = () => undefined): string {
   if ("schedule" in trigger) return scheduleSummary(trigger.schedule._0);
@@ -71,7 +102,10 @@ export function triggerSummary(trigger: WorkflowTriggerStored,
     const phrases = eventFilters(trigger).map(([k, values]) => filterWords(name, k, values, runtimeName));
     let filters = [...phrases.filter((p) => !p.startsWith("and ")), ...phrases.filter((p) => p.startsWith("and "))].join(", ");
     if (filters.startsWith("and ")) filters = filters.slice(4);
-    return filters ? `When ${name} (${filters})` : `When ${name}`;
+    const subject = name.endsWith(".*") ? name.slice(0, -2) : null;
+    const meaning = name.startsWith("custom.") ? `An agent here publishes ${name}`
+      : subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
+    return filters ? `${meaning} (${filters})` : meaning;
   }
   return `Waits for "${name}", which this version does not know about yet`;
 }
@@ -629,4 +663,3 @@ export function cooldownSentence(s: WorkflowSummary): string | null {
   }
   return sentence;
 }
-

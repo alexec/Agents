@@ -103,7 +103,9 @@ struct SpendingRow: View {
     }
 
     private var today: String? {
-        model.costState.flatMap { Cost.total(of: $0.today) }
+        model.costState.flatMap {
+            Cost.total(of: $0.today.merging(model.serversToday, uniquingKeysWith: +))
+        }
     }
 }
 
