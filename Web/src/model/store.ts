@@ -125,6 +125,20 @@ function sameAgents(a: readonly Agent[], b: readonly Agent[]): boolean {
   return a.length === b.length && a.every((agent, index) => agent === b[index]);
 }
 
+/** Keep stable row order while replacing each repeated id with its latest copy. */
+function keepingLatestByID<T extends { id: string }>(items: readonly T[]): T[] {
+  const positions = new Map<string, number>();
+  const unique: T[] = [];
+  for (const item of items) {
+    const position = positions.get(item.id);
+    if (position === undefined) {
+      positions.set(item.id, unique.length);
+      unique.push(item);
+    } else unique[position] = item;
+  }
+  return unique;
+}
+
 /** A stored turn as the chat draws it, made once per summary held. */
 const storedTurns = new WeakMap<TurnSummary, ChatTurn>();
 function storedTurnOf(summary: TurnSummary): ChatTurn {
@@ -171,7 +185,7 @@ export class Work {
    */
   readonly chatTurns: ReadonlySignal<ChatTurn[]> = computed(() => {
     this.heardTurns = keepingTurns(turns(this.items.value), this.heardTurns);
-    return [...this.turns.value.map(storedTurnOf), ...this.heardTurns];
+    return keepingLatestByID([...this.turns.value.map(storedTurnOf), ...this.heardTurns]);
   });
   private heardTurns: ChatTurn[] = [];
 
@@ -600,11 +614,19 @@ export class Work {
     if (note.oversized !== undefined) this.oversized(host, note.agentID, note.entry.id, note.index);
     const heard = this.heardSincePage;
     if (heard) {
-      heard.push(note.entry);
+      const prior = heard.findIndex((entry) => entry.id === note.entry.id);
+      if (prior >= 0) heard[prior] = note.entry;
+      else heard.push(note.entry);
       if (heard.length > heardSincePageLimit) heard.splice(0, heard.length - heardSincePageLimit);
     }
-    // Already on the page: written before the host read it, and heard after.
-    if (this.entryIDs.has(note.entry.id)) return;
+    // Catch-up can repeat an id with newer contents. Replace the held copy in place.
+    const held = this.entries.value.findIndex((entry) => entry.id === note.entry.id);
+    if (held >= 0) {
+      const entries = [...this.entries.value];
+      entries[held] = note.entry;
+      this.refold(entries);
+      return;
+    }
     this.entryIDs.add(note.entry.id);
     this.display.add(note.entry);
     const entries = [...this.entries.value, note.entry];
@@ -668,7 +690,7 @@ export class Work {
   /** The finished turns at the end of the conversation, and where the one in progress starts. */
   replaceTurns(page: TurnsPage): void {
     batch(() => {
-      this.turns.value = page.turns;
+      this.turns.value = keepingLatestByID(page.turns);
       this.firstTurn.value = page.firstTurn;
       this.openTurnStart.value = page.openStart;
     });
@@ -677,17 +699,15 @@ export class Work {
   /** Earlier finished turns, put in front. Past the cap, they wait until the reader is back at the end (#291). */
   prependTurns(page: TurnsPage): void {
     if (this.turns.value.length >= historyTurnsCap) return;
-    const held = new Set(this.turns.value.map((t) => t.id));
     batch(() => {
-      this.turns.value = [...page.turns.filter((t) => !held.has(t.id)), ...this.turns.value];
+      this.turns.value = keepingLatestByID([...page.turns, ...this.turns.value]);
       this.firstTurn.value = page.firstTurn;
     });
   }
 
   /** The first page of the conversation, with what was heard and is not on it laid after it. */
   replaceTranscript(page: TranscriptPage): void {
-    const onPage = new Set(page.entries.map((e) => e.id));
-    const entries = [...page.entries, ...(this.heardSincePage ?? []).filter((e) => !onPage.has(e.id))];
+    const entries = keepingLatestByID([...page.entries, ...(this.heardSincePage ?? [])]);
     this.heardSincePage = null;
     batch(() => {
       this.firstEntryIndex.value = page.firstIndex;

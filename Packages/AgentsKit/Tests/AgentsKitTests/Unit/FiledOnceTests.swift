@@ -178,7 +178,7 @@ struct FiledOnceTests {
 
     /// Looking an agent up makes a cell. Letting it go, and looking up one that was
     /// never held, does not leave cells behind (#285).
-    @Test func aForgottenAgentLeavesNoCellBehind() {
+    @Test func aForgottenAgentLeavesNoCellBehind() throws {
         let model = AgentsModel()
         let held = (0..<6).map { agent(api, .archived, at: Double($0)) }  // index-ok: six agents made here
         model.takeListed(held)
@@ -189,7 +189,8 @@ struct FiledOnceTests {
         model.forget(held.map(\.id))
         #expect(model.agents.isEmpty)
         #expect(model.heldCellCount == 0)
-        #expect(model.agent(held[0].id) == nil)
+        let firstHeld = try #require(held.first)
+        #expect(model.agent(firstHeld.id) == nil)
         #expect(model.heldCellCount == 0)
     }
 

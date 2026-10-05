@@ -287,12 +287,27 @@ jobs:
         env:
           TEST_FILTER: ${{ steps.test-selection.outputs.agentskit_filter }}
           TEST_MODE: ${{ steps.test-selection.outputs.agentskit }}
+          RESTORED: ${{ steps.agentskit-cache.outputs.cache-matched-key }}
         run: |
-          if [ "$TEST_MODE" = filter ]; then
-            swift test --skip-build --package-path Packages/AgentsKit --filter "$TEST_FILTER"
+          run_agentskit_tests() {
+            if [ "$TEST_MODE" = filter ]; then
+              swift test --skip-build --package-path Packages/AgentsKit --filter "$TEST_FILTER"
+            else
+              swift test --skip-build --package-path Packages/AgentsKit
+            fi
+          }
+
+          if run_agentskit_tests; then
+            exit 0
           else
-            swift test --skip-build --package-path Packages/AgentsKit
+            status=$?
           fi
+          if [ -z "$RESTORED" ]; then exit "$status"; fi
+
+          echo "::warning::AgentsKit tests failed on a restored build cache. Rebuilding and rerunning once from clean."
+          rm -rf Packages/AgentsKit/.build
+          swift build --build-tests --package-path Packages/AgentsKit
+          run_agentskit_tests
 
   # The web remote's generator and the control plane (071, research R6), in a job of their
   # own so they never press on the test job's time cap. WebTypes holds the checked-in

@@ -106,8 +106,7 @@ struct ChatTranscript: View {
         (agent.state == .running || agent.state == .waitingOnUser) && actions.canSendNow(agent.runtimeID)
     }
 
-    /// The conversation as turns: the stored ones, then those in hand. Each is folded
-    /// again only when its own summary or items changed (#285).
+    /// The conversation as turns: stored and in-hand turns, folded once per change.
     private var rows: [ChatTurn] {
         if folded.stored != stored {
             folded.storedTurns = stored.map(ChatTurn.init)
@@ -117,7 +116,7 @@ struct ChatTranscript: View {
             folded.itemTurns = items.turns(reusing: folded.itemTurns)
             folded.items = items
         }
-        return folded.storedTurns + folded.itemTurns
+        return (folded.storedTurns + folded.itemTurns).keepingLastTurnWithEachID()
     }
 
     var body: some View {

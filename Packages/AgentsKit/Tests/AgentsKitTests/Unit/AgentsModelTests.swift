@@ -161,6 +161,58 @@ struct AgentsModelTests {
         #expect(!model.hasMoreBefore)
     }
 
+    @Test func reconnectingTurnsKeepsOneLatestCopyOfEveryTurn() throws {
+        let model = AgentsModel()
+        let earlierID = UUID()
+        let overlapID = UUID()
+        let laterID = UUID()
+        func summary(_ id: UUID, _ text: String, start: Int) -> TurnSummary {
+            let ask = TranscriptEntry(id: id, kind: .userMessage(text))
+            return TurnSummary(id: id, start: start, end: start + 1, ask: ask, last: nil)
+        }
+        model.replaceTurns(with: TurnsPage(
+            turns: [summary(overlapID, "old", start: 10), summary(laterID, "later", start: 20)],
+            firstTurn: 1, openStart: 30))
+        model.prependTurns(TurnsPage(
+            turns: [summary(earlierID, "earlier", start: 0),
+                    summary(overlapID, "stale page copy", start: 10),
+                    summary(overlapID, "new page copy", start: 10)],
+            firstTurn: 0, openStart: 30))
+
+        #expect(model.turns.map(\.id) == [earlierID, overlapID, laterID])
+        let heldOverlap = try #require(model.turns.dropFirst().first)
+        #expect(heldOverlap.ask?.text == "old", "the already-held copy is newer than the earlier page")
+    }
+
+    @Test func storedAndLiveCopiesMakeOneChatRow() {
+        let id = UUID()
+        let stored = ChatTurn(id: id, ask: nil, items: [],
+                              storedOutcome: [TranscriptItem.entry(
+                                TranscriptEntry(kind: .agentMessage(messageID: "m", text: "old")))])
+        let live = ChatTurn(id: id, ask: nil,
+                            items: [.entry(TranscriptEntry(kind: .agentMessage(messageID: "m", text: "new")))])
+
+        let rows = [stored, live].keepingLastTurnWithEachID()
+
+        #expect(rows.count == 1)
+        #expect(rows.first?.items.first?.id == live.items.first?.id)
+    }
+
+    @Test func reconnectingEntryWithSameIDReplacesHeldAndCatchUpCopies() throws {
+        let model = AgentsModel()
+        let agentID = UUID()
+        let entryID = UUID()
+        model.watching = agentID
+        let old = TranscriptEntry(id: entryID, kind: .agentMessage(messageID: "m", text: "old"))
+        let new = TranscriptEntry(id: entryID, kind: .agentMessage(messageID: "m", text: "new"))
+        model.apply(.entry(DaemonAPI.EntryNotification(agentID: agentID, entry: old)))
+        model.apply(.entry(DaemonAPI.EntryNotification(agentID: agentID, entry: new)))
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 0, total: 1, entries: [old]))
+
+        #expect(model.entries.map(\.id) == [entryID])
+        #expect(model.entries.first?.text == "new")
+    }
+
     /// An agent's `cwd` is whatever it was started with and a project's folder is the
     /// resolved form. Comparing them raw is how a project looks empty while its agents
     /// are plainly running.

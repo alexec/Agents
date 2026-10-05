@@ -232,6 +232,42 @@ extension Array where Element == TranscriptItem {
     }
 }
 
+extension Array where Element == TurnSummary {
+    /// Keep one row for each turn, in its original position, with the latest copy's
+    /// outcome. Pages can overlap when a reconnect catches up with turns already held.
+    public func keepingLastTurnWithEachID() -> [TurnSummary] {
+        var positions: [UUID: Int] = [:]
+        var unique: [TurnSummary] = []
+        for turn in self {
+            if let position = positions[turn.id] {
+                unique[position] = turn
+            } else {
+                positions[turn.id] = unique.count
+                unique.append(turn)
+            }
+        }
+        return unique
+    }
+}
+
+extension Array where Element == ChatTurn {
+    /// A live transcript can overlap its last stored turn after reconnecting. Keep one
+    /// row at that position and let the live copy supply its current contents.
+    public func keepingLastTurnWithEachID() -> [ChatTurn] {
+        var positions: [UUID: Int] = [:]
+        var unique: [ChatTurn] = []
+        for turn in self {
+            if let position = positions[turn.id] {
+                unique[position] = turn
+            } else {
+                positions[turn.id] = unique.count
+                unique.append(turn)
+            }
+        }
+        return unique
+    }
+}
+
 extension ChatTurn {
     /// Whether this turn is the fold of `slice`, ask and all.
     fileprivate func matches(_ slice: [TranscriptItem]) -> Bool {
