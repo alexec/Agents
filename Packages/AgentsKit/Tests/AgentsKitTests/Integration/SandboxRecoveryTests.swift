@@ -82,6 +82,40 @@ struct SandboxRecoveryTests {
         await #expect(throws: JSONRPCError.self) { _ = try await core.answerSandbox(.init(agentID: id, carryOn: true)) }
     }
 
+    /// #224: an agent that ran tests printing the failure words, and then ended its turn
+    /// with finish_turn done, stays done. Neither the quoted words nor anything printed
+    /// before a recorded ending is a sandbox that could not start.
+    @Test func anAgentThatQuotesTheWordsAndFinishesDoneStaysDone() async throws {
+        let (locations, work) = try temporary()
+        let gate = TurnGate()
+        var script = FakeACPAgent.Script()
+        script.gate = gate
+        script.endsOnCancel = true
+        script.updates = command("t1", printing: """
+            ✔ Test aRealFailureIsRecognised(runtimeID:name:words:), case passing 3 arguments runtimeID → "claude", \
+            name → "claude-linux-missing-bwrap", words → "Sandbox required but unavailable" passed.
+            """) + command("t2", printing: try fixture("claude-linux-missing-bwrap"))
+        let launcher = FakeLauncher(script: script)
+        let core = try await makeCore(locations, launcher)
+        await core.setFinishGrace(FinishGrace(quiet: .milliseconds(200), afterCancel: .seconds(20)))
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "Fix it", sandbox: .on))
+        let token = UUID().uuidString
+        await core.bindAppToken(token, to: id)
+        await eventually("the fake is in its turn") { gate.turnsArrived == 1 }
+
+        _ = try await core.finishTurn(.init(token: token, outcome: "done", message: "Fixed.",
+                                            prompts: [], title: nil, waitingOn: nil))
+        await settled(core, id, "the turn ended after finish_turn")
+
+        let agent = try #require(await core.agent(id))
+        #expect(agent.state == .finished)
+        #expect(agent.endedReason == .endTurn)
+        #expect(agent.report?.outcome == .done)
+        #expect(agent.pendingSandboxFailure == nil)
+        #expect(try await cards(core, id).isEmpty)
+        gate.open()
+    }
+
     @Test func keepStoppedLeavesItStopped() async throws {
         let (locations, work) = try temporary()
         var script = FakeACPAgent.Script()
