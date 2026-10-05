@@ -14,6 +14,8 @@ test("a refusal from an older control plane, or a method a host doesn't know, sa
 test("anything else the host says is shown as it said it", () => {
   assert.equal(e.describe(new w.CallFailed(-32005, "No such agent.")), "No such agent.");
   assert.match(e.describe(new w.LinkDown()), /isn't answering/);
+  assert.match(e.describe(new w.CallTimedOut()), /took too long/);
+  assert.doesNotMatch(e.describe(new w.CallTimedOut()), /isn't answering/);
 });
 
 test("an offline host says so", () => {

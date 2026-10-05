@@ -3,7 +3,7 @@
 // across. Greyed when stale, with Move, Hide, Show, Remove and the tile's detail behind its ···
 // menu. Tiles drag within and between sections, and a section drags by its heading (#147).
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
 import {
@@ -11,7 +11,7 @@ import {
   moving, movingSection, neighbour, numberWords, rowDetail, sections, shownLevel, sparkline, stepping, updateLine,
 } from "../model/dashboard";
 import { isSafeLink, Markdown } from "../render/markdown";
-import type { DashboardOrder, DashboardSnapshot, DashboardUpdate, TileCell, TileLink, TileView } from "../protocol/generated";
+import type { DashboardOrder, DashboardSnapshot, DashboardUpdate, FileStamp, TileCell, TileLink, TileView } from "../protocol/generated";
 import { go } from "../route";
 import { fromWireDate, toWireDate } from "../protocol/dates";
 import { BackToList } from "./BackToList";
@@ -38,11 +38,14 @@ export function DashboardRow({ store, host, folder, chosen, onPick }: {
 export function DashboardPage({ store, host, folder, projectName, down }: {
   store: Store; host: string; folder: string; projectName: string; down: boolean;
 }) {
-  const key = `${host}|${folderKey(folder)}`;
-  const revision = store.dashboardRevisions.value[key] ?? 0;
   const showsHidden = useSignal(false);
   const detail = useSignal<string | null>(null);
-  useEffect(() => { void store.loadDashboard(host, folder); }, [host, folder, revision]);
+  // Asked for while the page is open, and let go when it leaves (#291). Changes settle in the store.
+  useEffect(() => {
+    void store.openDashboard(host, folder);
+    return () => store.closeDashboard(host, folder);
+  }, [host, folder]);
+  const key = `${host}|${folderKey(folder)}`;
   const snapshot = store.dashboards.value[key];
   const back = <BackToList />;
   const groups = snapshot ? sections(snapshot, showsHidden.value) : [];
@@ -331,13 +334,21 @@ function LinkValue({ host, folder, link }: { host: string; folder: string; link:
 function PageValue({ store, host, folder, file }: { store: Store; host: string; folder: string; file: string }) {
   const text = useSignal<string | null>(null);
   const problem = useSignal<string | null>(null);
+  const held = useRef<{ file: string; stamp?: FileStamp }>({ file: "" });
   const revision = store.pageRevisions.value[`${host}|${folderKey(folder)}`] ?? 0;
   useEffect(() => {
     let gone = false;
-    store.readPage(host, folder, file).then((r) => {
+    // The stamp of this file, so an unchanged page is not sent again (#291).
+    const known = held.current.file === file ? held.current.stamp : undefined;
+    store.readPage(host, folder, file, known).then((r) => {
       if (gone) return;
-      if (r.kind === "text") { text.value = r.text; problem.value = null; }
-      else if (r.kind !== "unchanged") problem.value = `${file} can't be shown as a page.`;
+      if (r.kind === "text") {
+        held.current = { file, stamp: r.stamp };
+        text.value = r.text;
+        problem.value = null;
+      } else if (r.kind === "unchanged") {
+        held.current = { file, stamp: r.stamp };
+      } else problem.value = `${file} can't be shown as a page.`;
     }).catch(() => { if (!gone) problem.value = `${file} isn't in the project folder.`; });
     return () => { gone = true; };
   }, [host, folder, file, revision]);

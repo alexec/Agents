@@ -64,6 +64,11 @@ export function Cards({ store, host, session, down = false }: {
   // effect clearing it ran after this one on the first render and wiped the cards a chat opened
   // with, so a question already waiting when the chat was opened was never shown.
   const heldFor = useRef<string | null>(null);
+  const lingering = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => {
+    for (const timer of lingering.current) clearTimeout(timer);
+    lingering.current = [];
+  }, []);
   useEffect(() => {
     if (heldFor.current !== session) {
       heldFor.current = session;
@@ -86,8 +91,11 @@ export function Cards({ store, host, session, down = false }: {
     const gone = next.filter((c) => settled(c) && !before.some((b) => b.request.id === c.request.id && settled(b)));
     if (gone.length) {
       const ids = new Set(gone.map((c) => c.request.id));
-      setTimeout(() => (held.value = held.value.filter((c) => !(ids.has(c.request.id) && settled(c)))),
-        answeredElsewhereShownFor);
+      const timer = setTimeout(() => {
+        lingering.current = lingering.current.filter((t) => t !== timer);
+        held.value = held.value.filter((c) => !(ids.has(c.request.id) && settled(c)));
+      }, answeredElsewhereShownFor);
+      lingering.current.push(timer);
     }
   }, [[...live].join(","), session]);
 

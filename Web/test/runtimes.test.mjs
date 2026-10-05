@@ -34,3 +34,11 @@ test("runtimes: a chooser's runs are available, out and cannot start", () => {
 for (const { name, input, expected } of (await import("./fixtures.mjs")).cases("runtimes/new-session.json")) {
   test(`runtimes: a new session opens on, ${name}`, () => assert.equal(r.newSessionRuntime(input.kept ?? undefined, input.available) ?? null, expected));
 }
+
+test("runtimes: a new session stays on the runtime it opened with (#291)", () => {
+  assert.equal(r.formRuntime("codex", undefined, ["claude", "codex"], "claude"), "codex", "a later listing does not move it");
+  assert.equal(r.formRuntime("codex", "claude", ["claude", "codex"], "codex"), "claude", "a pick here wins");
+  assert.equal(r.formRuntime("codex", undefined, ["claude"], "claude"), "claude", "one that can no longer start falls through");
+  assert.equal(r.formRuntime(undefined, undefined, ["codex"], undefined), "codex");
+  assert.equal(r.formRuntime(undefined, undefined, ["codex", "claude"], undefined), "claude");
+});

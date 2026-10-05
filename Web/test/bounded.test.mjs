@@ -3,7 +3,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const { Work, Store, archivedPage, searchShown, keepingTurns, effect } = await load("test/bounded.ts");
+const {
+  Work, Store, archivedPage, searchShown, keepingTurns, effect,
+  turnPage, openTurnsHeld, historyEntriesCap, historyTurnsCap, rememberOpen, quietSettle,
+} = await load("test/bounded.ts");
 const w = await load("test/wire.ts");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -310,7 +313,7 @@ test("two quick drops are sent one at a time, and the host and page end with the
   const shown = () => store.dashboards.value[key]?.order.sections[0].tiles.join("");
 
   // The page opens and a dashboard/changed refresh is out, from before the drops.
-  const opening = store.loadDashboard("mac", "file:///w/p");
+  const opening = store.openDashboard("mac", "file:///w/p");
   await link.answer("dashboard/get");
   await opening;
   const early = store.loadDashboard("mac", "file:///w/p");
@@ -402,4 +405,208 @@ test("a heartbeat answered with an error keeps the link (#214)", async () => {
   assert.equal(sockets[0].closed, null);
   assert.equal(l.state.kind, "open");
   l.stop();
+});
+
+test("a slow call waits longer than an ordinary one, unless a test says otherwise (#291)", () => {
+  assert.equal(w.callTimeoutFor("hosts/list"), 30_000);
+  assert.equal(w.callTimeoutFor("agents/prompt"), 30_000);
+  assert.ok(w.callTimeoutFor("projects/clone") > w.callTimeoutFor("agents/start"));
+  assert.equal(w.callTimeoutFor("agents/start"), 2 * 60_000);
+  assert.equal(w.callTimeoutFor("agents/options"), w.callTimeoutFor("agents/start"));
+  assert.equal(w.callTimeoutFor("dashboard/update"), w.callTimeoutFor("agents/start"));
+  assert.equal(w.callTimeoutFor("projects/clone", 20), 20);
+  assert.equal(w.callTimeoutFor("hosts/list", 20), 20);
+});
+
+test("one start keeps its request until it succeeds (#291)", () => {
+  const store = new Store(fakeLink(() => undefined));
+  const first = store.startRequestID("mac", "file:///w/p");
+  assert.equal(store.startRequestID("mac", "file:///w/p/"), first, "the same project, slash or none");
+  assert.notEqual(store.startRequestID("mac", "file:///w/q"), first);
+  store.finishStartRequest("mac", "file:///w/p");
+  assert.notEqual(store.startRequestID("mac", "file:///w/p"), first);
+});
+
+test("an opened turn asks for its last page, and a miss reports the turn's start (#291)", async () => {
+  const link = heldLink((method, params) => ({
+    entries: [said(params.before - 1)], firstIndex: Math.max(params.from, params.before - params.limit), total: params.before,
+  }));
+  const store = new Store(link);
+  const pending = store.turnEntries("mac", "s", { start: 0, end: 500 });
+  const call = await link.answer("agents/transcript");
+  assert.equal(call.params.limit, turnPage);
+  assert.equal(call.params.before, 500);
+  assert.equal(call.params.from, 0);
+  const page = await pending;
+  assert.equal(page.firstIndex, 500 - turnPage);
+  const earlier = store.turnEntries("mac", "s", { start: 0, end: page.firstIndex });
+  const again = await link.answer("agents/transcript");
+  assert.equal(again.params.before, page.firstIndex);
+  assert.equal(again.params.limit, turnPage);
+  await earlier;
+  const missed = await new Store(fakeLink(() => undefined)).turnEntries("mac", "s", { start: 4, end: 9 });
+  assert.deepEqual(missed, { entries: [], firstIndex: 4 });
+  const empty = await store.turnEntries("mac", "s", { start: 3, end: 3 });
+  assert.deepEqual(empty, { entries: [], firstIndex: 3 });
+  assert.equal(link.out.length, 0, "an empty span asks for nothing");
+});
+
+test("eight opened turns are kept, and the oldest goes (#291)", () => {
+  let held = {};
+  let order = [];
+  for (let i = 0; i < openTurnsHeld + 1; i++) ({ held, order } = rememberOpen(held, order, `t${i}`, i));
+  assert.equal(order.length, openTurnsHeld);
+  assert.equal(held.t0, undefined);
+  assert.equal(held[`t${openTurnsHeld}`], openTurnsHeld);
+  ({ held, order } = rememberOpen(held, order, "t1", 1));
+  assert.equal(order.at(-1), "t1", "opening it again makes it the newest");
+  assert.equal(order.length, openTurnsHeld);
+});
+
+test("history stops at its cap, and a full chat does not ask for another page (#291)", async () => {
+  const work = new Work();
+  work.watch("mac", "s");
+  const summary = (i) => ({ id: `t${i}`, start: i, end: i + 1 });
+  work.replaceTurns({ turns: Array.from({ length: historyTurnsCap }, (_, i) => summary(i)), firstTurn: 0, openStart: historyTurnsCap });
+  work.prependTurns({ turns: [summary(historyTurnsCap)], firstTurn: 0 });
+  assert.equal(work.turns.value.length, historyTurnsCap);
+  assert.equal(work.turns.value.some((t) => t.id === `t${historyTurnsCap}`), false);
+
+  const link = fakeLink(() => ({ entries: [], firstIndex: 0 }));
+  const store = new Store(link);
+  store.watch("mac", "s");
+  store.replaceTranscript({ entries: Array.from({ length: historyEntriesCap }, (_, n) => said(n)), firstIndex: 10 });
+  await store.loadEarlier();
+  assert.equal(link.asked.some((line) => line.endsWith("agents/transcript")), false);
+});
+
+test("a dashboard on screen settles its changes, and a closed one is dropped (#291)", async () => {
+  let gets = 0;
+  const link = fakeLink((method) => {
+    if (method !== "dashboard/get") return undefined;
+    gets += 1;
+    return { folder: "file:///w/p", tiles: [], now: gets, order: { sections: [] } };
+  });
+  const store = new Store(link);
+  await store.openDashboard("mac", "file:///w/p");
+  assert.equal(gets, 1);
+  const changed = (bad) => store.apply("dashboard/changed", { folder: "file:///w/p", summary: { bad } }, "mac");
+  changed(0);
+  changed(1);
+  await wait(100);
+  assert.equal(gets, 1, "a burst is one read");
+  await wait(quietSettle);
+  assert.equal(gets, 2);
+  store.closeDashboard("mac", "file:///w/p");
+  assert.equal(store.dashboards.value["mac|file:///w/p"], undefined);
+  changed(2);
+  await wait(quietSettle + 40);
+  assert.equal(gets, 2, "a closed dashboard is not read");
+});
+
+test("pages changed in a burst bump the revision once (#291)", async () => {
+  const work = new Work();
+  work.apply("pages/changed", { folder: "file:///w/p" }, "mac");
+  work.apply("pages/changed", { folder: "file:///w/p" }, "mac");
+  assert.equal(work.pageRevisions.value["mac|file:///w/p"], undefined);
+  await wait(quietSettle + 40);
+  assert.equal(work.pageRevisions.value["mac|file:///w/p"], 1);
+});
+
+test("a workflow change redraws that project's list and no other (#291)", async () => {
+  const link = fakeLink((method) => (method === "workflows/list" ? [] : undefined));
+  const store = new Store(link);
+  store.holdWorkflows("mac", "file:///w/p1");
+  store.holdWorkflows("mac", "file:///w/p2");
+  await wait(20);
+  const first = runs(() => store.projectWorkflows("mac", "file:///w/p1"));
+  const second = runs(() => store.projectWorkflows("mac", "file:///w/p2"));
+  store.apply("workflow/changed", { workflow: { folder: "file:///w/p1", workflowID: "w" } }, "mac");
+  assert.deepEqual([first.count, second.count], [1, 0]);
+  first.stop();
+  second.stop();
+});
+
+test("a reconnect lists the workflow folds still open, and no other (#291)", async () => {
+  const listed = [];
+  const link = fakeLink((method, params) => {
+    if (method === "hosts/list") return [{ id: "mac", state: "online" }];
+    if (method === "agents/list") return [];
+    if (method === "workflows/list") { listed.push(params.folder); return []; }
+    if (method.endsWith("/pending")) return [];
+    return undefined;
+  });
+  const store = new Store(link);
+  store.holdWorkflows("mac", "file:///w/kept");
+  store.holdWorkflows("mac", "file:///w/gone");
+  store.releaseWorkflows("mac", "file:///w/gone");
+  await wait(20);
+  listed.length = 0;
+  await store.load();
+  await wait(30);
+  assert.deepEqual(listed, ["file:///w/kept"]);
+});
+
+test("a host removed takes its dashboards, pages, runtimes and leases with it (#291)", async () => {
+  const hosts = [{ id: "mac", state: "online" }, { id: "box", state: "online" }];
+  const link = fakeLink((method) => (method === "hosts/list" ? hosts : undefined));
+  const store = new Store(link);
+  const dash = { folder: "file:///w/p", tiles: [], now: 0, order: { sections: [] } };
+  store.dashboards.value = { "box|file:///w/p": dash, "mac|file:///w/p": dash };
+  store.dashboardRevisions.value = { "box|file:///w/p": 2, "mac|file:///w/q": 1 };
+  store.pageRevisions.value = { "box|file:///w/p": 4, "mac|file:///w/p": 5 };
+  store.runtimes.value = { box: [], mac: [] };
+  store.accounts.value = { box: [], mac: [] };
+  store.leases.value = { box: {}, mac: {} };
+  store.workflows.value = { "box|file:///w/p": [], "mac|file:///w/p": [] };
+  hosts.pop();
+  link.notify("control/hostChanged", { host: "box", state: "removed" });
+  await wait(320);
+  assert.equal(store.dashboards.value["box|file:///w/p"], undefined);
+  assert.ok(store.dashboards.value["mac|file:///w/p"]);
+  assert.equal(store.dashboardRevisions.value["box|file:///w/p"], undefined);
+  assert.equal(store.dashboardRevisions.value["mac|file:///w/q"], 1);
+  assert.equal(store.pageRevisions.value["box|file:///w/p"], undefined);
+  assert.equal(store.pageRevisions.value["mac|file:///w/p"], 5);
+  assert.equal(store.runtimes.value.box, undefined);
+  assert.ok(store.runtimes.value.mac);
+  assert.equal(store.accounts.value.box, undefined);
+  assert.equal(store.leases.value.box, undefined);
+  assert.equal(store.workflows.value["box|file:///w/p"], undefined);
+  assert.ok(store.workflows.value["mac|file:///w/p"]);
+});
+
+test("loading a host and reloading it do not list its agents at once (#291)", async () => {
+  const hosts = [{ id: "mac", state: "online" }];
+  let inflight = 0;
+  let max = 0;
+  const held = [];
+  let notify = () => {};
+  const link = {
+    onNotification(listener) { notify = listener; },
+    onState() {},
+    call(method) {
+      if (method === "hosts/list") return Promise.resolve(hosts);
+      if (method === "agents/list") {
+        inflight += 1;
+        max = Math.max(max, inflight);
+        return new Promise((resolve) => held.push(() => { inflight -= 1; resolve([]); }));
+      }
+      if (String(method).endsWith("/pending")) return Promise.resolve([]);
+      return Promise.resolve(null);
+    },
+  };
+  const store = new Store(link);
+  const loading = store.load();
+  await wait(20);
+  assert.equal(inflight, 1);
+  notify("control/hostChanged", { host: "mac", state: "online" });
+  await wait(300);
+  assert.equal(max, 1, "the reload waits for the load");
+  while (held.length) held.shift()();
+  await loading;
+  await wait(30);
+  while (held.length) held.shift()();
+  await wait(30);
+  assert.equal(max, 1);
 });

@@ -15,16 +15,16 @@
 
 ## Counts
 
-Of 204 rows: **76 same**, **38 by design**, **90 delta** (after #238–#243 and #255–#257, #264–#266). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 205 rows: **81 same**, **38 by design**, **86 delta** (after #238–#244 and #255–#257, #264–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
 | Session rows and states | 10 | 2 | 11 |
-| Chat turns and turn detail | 4 | 3 | 15 |
+| Chat turns and turn detail | 4 | 3 | 16 |
 | Prompt bar and queued prompts | 7 | 2 | 11 |
 | Question and permission cards | 10 | 4 | 1 |
-| Start sheet and new project | 12 | 5 | 5 |
+| Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 5 | 6 | 10 |
 | Dashboard and pins | 8 | 0 | 6 |
 | Workflows page | 6 | 1 | 7 |
@@ -108,7 +108,8 @@ The deltas are tracked by 32 issues:
 | Plan; a withdrawn plan | `S/Chat/ChatBlocks.swift:177-223` | Shared, plus a current-plan strip: `R/Chat/PlanView.swift:13-69` | Withdrawn ignored: `W/views/chat/Rows.tsx:87-96` | **delta**: web #252; the plan strip #267 |
 | Switch note and handoff | `S/Chat/SwitchNote.swift:7-24` | Shared | Headline only: `W/views/chat/Rows.tsx:198-212` | **delta**: web #252 |
 | Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Only on news, *New messages ↓*: `W/views/Chat.tsx:221` | **delta**: web #252 |
-| First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts:27, 962` | **same** |
+| First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts` (`openingTurns`) | **same** |
+| A finished turn longer than a page | One call for up to the host's ceiling (1,000), kept for every turn opened: `A/AppModel.swift` turnEntries, `S/Chat/ChatTranscript.swift` fetchedTurns | The same: `R/RemoteModel.swift` turnEntries | The last 200, then Earlier steps; eight open turns kept: `W/model/store.ts` turnEntries, `W/views/Chat.tsx`, `W/views/chat/Rows.tsx` | **delta**: mac #285, remote #215 |
 | Coming back after a restart, in the chat | `S/Chat/ChatTranscript.swift:135-136` | Shared | Only *Working*: `W/views/Chat.tsx:216-218` | **delta**: web #251 |
 | A retired agent | `S/Retired/RetiredAgentPage.swift` with Started by: `A/ContentView.swift:106-108` | With Started by, worded by `K/Client/AgentsModel.swift` (`retiredStarterLabel`, #242) | *New session*, prompt off: `W/views/Chat.tsx:191, 225` | **delta**: web #253 |
 | Background work over the prompt, its ending line | Stop, Steps, Output: `S/Chat/BackgroundRows.swift:13-45, 228-262`, `A/Sidebar/BackgroundPane.swift` | Stop and Steps: `R/Chat/PromptBar.swift:54-63` | Names only; no Stop, no Steps: `W/views/Chat.tsx:309-328` | **delta**: web #253 |

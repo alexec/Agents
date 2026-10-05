@@ -25,6 +25,18 @@ export function newSessionRuntime(kept: string | undefined, available: readonly 
   return available.includes(defaultRuntimeID) ? defaultRuntimeID : available[0];
 }
 
+/**
+ * The runtime a new-session form stays on (#291). The one it opened with, until the person
+ * picks another or that one can no longer start. A later listing does not move it, so another
+ * agent's activity does not discard the draft and start a second runtime.
+ */
+export function formRuntime(opened: string | undefined, picked: string | undefined,
+                            startable: readonly string[], kept: string | undefined): string | undefined {
+  if (picked !== undefined && startable.includes(picked)) return picked;
+  if (opened !== undefined && startable.includes(opened)) return opened;
+  return newSessionRuntime(kept, startable);
+}
+
 /** RuntimeStatus.unavailableReason: why it cannot be started, in the runtime's own terms, or null. */
 export function unavailableReason(status: RuntimeStatus): string | null {
   const a = status.availability;
