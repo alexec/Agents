@@ -25,7 +25,8 @@ public final class FolderWatch: @unchecked Sendable {
     /// - Parameters:
     ///   - excluding: folders under `root` whose changes are never reported, such as build
     ///     output (#173). Dropped by FSEvents itself, so a build there does not wake us.
-    ///     Only the first `maximumExclusions` count.
+    ///     Only the first `maximumExclusions` reach FSEvents; a caller drops the rest
+    ///     itself in `onChange` (#216).
     ///   - onChange: the directories that changed, on an arbitrary queue.
     public init(root: URL, excluding: [URL] = [], onChange: @escaping @Sendable ([URL]) -> Void) {
         self.onChange = onChange

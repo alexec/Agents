@@ -118,7 +118,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.filesBrowse:
                 let request = try decode(params, as: DaemonAPI.FilesBrowseRequest.self) ?? .init()
-                return .success(try JSONValue.encoding(try browse(request)))
+                return .success(try JSONValue.encoding(try await browse(request)))
 
             case DaemonAPI.Method.daemonStatus:
                 return .success(try JSONValue.encoding(status()))
@@ -455,7 +455,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.filesList:
                 let request = try require(params, as: DaemonAPI.FilesListRequest.self)
-                return .success(try JSONValue.encoding(try listFiles(request)))
+                return .success(try JSONValue.encoding(try await listFiles(request)))
 
             case DaemonAPI.Method.filesRead:
                 let request = try require(params, as: DaemonAPI.FilesReadRequest.self)

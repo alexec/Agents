@@ -21,24 +21,25 @@ public enum DirectoryReader {
         guard let values else { throw Failure.gone }
         guard values.isDirectory == true else { throw Failure.notADirectory }
 
-        let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .nameKey]
-        guard let urls = try? FileManager.default.contentsOfDirectory(
-            at: url, includingPropertiesForKeys: keys, options: [.skipsSubdirectoryDescendants]
-        ) else {
+        // Names first, which is one read of the directory and no stat at all (#216).
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: url.path) else {
             // The directory was there a moment ago and is not now, or it cannot be
             // opened. Both are things the pane says out loud rather than showing empty.
             throw (FileManager.default.fileExists(atPath: url.path) ? Failure.notReadable : Failure.gone)
         }
 
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .nameKey]
+        let statted = candidates(names, limit: limit)
         var entries: [DirectoryEntry] = []
-        entries.reserveCapacity(min(urls.count, limit))
-        for child in urls {
+        entries.reserveCapacity(statted.count)
+        for name in statted {
             // An entry that vanished between listing the directory and asking about it
             // is simply not in the answer. It is not an error for the whole listing.
-            let values = try? child.resourceValues(forKeys: Set(keys))
+            let child = url.appending(path: name, directoryHint: .notDirectory)
+            let values = try? child.resourceValues(forKeys: keys)
             let isDirectory = values?.isDirectory ?? false
-            entries.append(DirectoryEntry(url: child,
-                                          name: values?.name ?? child.lastPathComponent,
+            entries.append(DirectoryEntry(url: isDirectory ? url.appending(path: name, directoryHint: .isDirectory) : child,
+                                          name: values?.name ?? name,
                                           isDirectory: isDirectory,
                                           size: isDirectory ? nil : values?.fileSize,
                                           modifiedAt: values?.contentModificationDate))
@@ -52,8 +53,17 @@ public enum DirectoryReader {
             return left.name.localizedStandardCompare(right.name) == .orderedAscending
         }
 
-        let omitted = max(0, entries.count - limit)
-        if omitted > 0 { entries = Array(entries.prefix(limit)) }
-        return DirectoryListing(url: url, entries: entries, omitted: omitted)
+        if entries.count > limit { entries = Array(entries.prefix(limit)) }
+        return DirectoryListing(url: url, entries: entries, omitted: max(0, names.count - entries.count))
+    }
+
+    /// The names worth a stat: all of them up to twice the limit, and past that the first
+    /// twice-the-limit by name (#216). Fifty thousand entries cost a list of names and ten
+    /// thousand stats, not fifty thousand. A folder that far over the limit may show a
+    /// subfolder late in the alphabet among the files left out; it says how many it left.
+    static func candidates(_ names: [String], limit: Int) -> [String] {
+        let most = max(limit, 0) * 2
+        guard names.count > most else { return names }
+        return names.map { ($0.lowercased(), $0) }.sorted { $0.0 < $1.0 }.prefix(most).map(\.1)
     }
 }

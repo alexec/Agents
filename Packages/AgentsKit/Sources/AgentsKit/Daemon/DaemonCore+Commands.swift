@@ -736,12 +736,24 @@ extension DaemonCore {
         let term = request.term
         guard !term.isEmpty else { return [] }
         let folders = [agent.cwd] + agent.additionalDirectories
-        let found = await Task.detached(priority: .userInitiated) {
-            FileMention.matching(term, in: folders)
-        }.value
+        // One walk per agent (#216): the newest keystroke's, and the one before is
+        // cancelled. Its caller is answered with nothing; it has already typed past it.
+        let walker = mentionWalker
+        let walk = UUID()
+        mentionWalks[request.agentID]?.task.cancel()
+        let task = Task.detached(priority: .userInitiated) { walker(term, folders) }
+        mentionWalks[request.agentID] = (walk, task)
+        let found = await task.value
+        if mentionWalks[request.agentID]?.id == walk { mentionWalks[request.agentID] = nil }
+        guard !task.isCancelled else { return [] }
         return found.map {
             DaemonAPI.FileMentionDTO(path: $0.url.path(percentEncoded: false), relativePath: $0.relativePath)
         }
+    }
+
+    /// For the tests: a walk they can hold open.
+    func setMentionWalker(_ walker: @escaping @Sendable (String, [URL]) -> [FileMention]) {
+        mentionWalker = walker
     }
 
     /// Send the next thing waiting, if the agent is free to take it.

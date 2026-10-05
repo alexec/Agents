@@ -29,6 +29,16 @@ final class DashboardStore: @unchecked Sendable {
     /// Each cached history file's modification date as read or written here, so the
     /// watch hearing this store's own write does not throw the points away (#173).
     private var pointStamps: [String: Date] = [:]
+    /// Each project's tile files as last read, with the stamp of their folder then (#216).
+    /// Every Dashboard read and every wake asked for all of them; now one stat answers
+    /// whether the copy is still good, and the watch drops it when a tile file changes
+    /// in place (`forgetTiles`).
+    private var tileCache: [URL: (stamp: Date?, tiles: [Found])] = [:]
+    /// How many tile files have been read, for the tests and the measure (#216).
+    private(set) var tileReads = 0
+    /// Each project's history in bytes, kept up as points are written (#216), and the
+    /// history folder's stamp as this store last left it.
+    private var historyTotals: [URL: (stamp: Date?, bytes: Int)] = [:]
 
     init(locations: StoreLocations) {
         root = locations.root.appendingPathComponent("dashboards", isDirectory: true)
@@ -58,24 +68,56 @@ final class DashboardStore: @unchecked Sendable {
     /// read: this is handed the project folder.
     func readTiles(_ project: URL) -> [Found] {
         let folder = Self.tilesFolder(project)
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        let stamp = Self.modified(folder)
+        if let held = tileCache[project], held.stamp == stamp { return held.tiles }
+        let tiles = tileIDs(project).compactMap { read(project, $0) }
+        tileCache[project] = (stamp, tiles)
+        return tiles
+    }
+
+    /// The tiles' ids, by their files' names alone: one listing, nothing read (#216).
+    func tileIDs(_ project: URL) -> [String] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: Self.tilesFolder(project).path)) ?? []
         return names.filter { $0.hasSuffix(".json") }.sorted().compactMap { name in
             let id = String(name.dropLast(5))
-            guard TileLimits.isValidID(id) else { return nil }
-            return read(project, id)
+            return TileLimits.isValidID(id) ? id : nil
         }
     }
 
+    /// A tile file changed where this store did not write it (the watch saw it): every
+    /// tile is read again when next asked.
+    func forgetTiles(_ project: URL) {
+        tileCache.removeValue(forKey: project)
+    }
+
+    /// What this store just wrote or removed, put straight into the held copy so the
+    /// next read does not go back to every file for one.
+    private func noteTile(_ found: Found?, id: String, in project: URL) {
+        guard var held = tileCache[project] else { return }
+        held.tiles.removeAll { $0.id == id }
+        if let found {
+            held.tiles.append(found)
+            held.tiles.sort { $0.id < $1.id }
+        }
+        held.stamp = Self.modified(Self.tilesFolder(project))
+        tileCache[project] = held
+    }
+
     func read(_ project: URL, _ id: String) -> Found? {
+        tileReads += 1
         guard let data = try? Data(contentsOf: Self.tileFile(project, id)) else { return nil }
-        let hash = Self.hash(data)
+        return Self.found(id, data)
+    }
+
+    private static func found(_ id: String, _ data: Data) -> Found {
+        let digest = Self.hash(data)
         if data.count > TileLimits.fileBytes {
-            return Found(id: id, tile: nil, problem: "The file is over \(TileLimits.fileBytes / 1024) KB.", hash: hash)
+            return Found(id: id, tile: nil, problem: "The file is over \(TileLimits.fileBytes / 1024) KB.", hash: digest)
         }
         do {
-            return Found(id: id, tile: try TileFile.read(data), problem: nil, hash: hash)
+            return Found(id: id, tile: try TileFile.read(data), problem: nil, hash: digest)
         } catch {
-            return Found(id: id, tile: nil, problem: Self.words(error), hash: hash)
+            return Found(id: id, tile: nil, problem: words(error), hash: digest)
         }
     }
 
@@ -87,6 +129,7 @@ final class DashboardStore: @unchecked Sendable {
         let url = Self.tileFile(project, id)
         if let old = try? Data(contentsOf: url), old == data { return (Self.hash(data), false) }
         try StoreFile.write(data, to: url)
+        noteTile(Self.found(id, data), id: id, in: project)
         return (Self.hash(data), true)
     }
 
@@ -94,6 +137,7 @@ final class DashboardStore: @unchecked Sendable {
         let url = Self.tileFile(project, id)
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         try FileManager.default.removeItem(at: url)
+        noteTile(nil, id: id, in: project)
     }
 
     // MARK: The order (#147)
@@ -138,6 +182,8 @@ final class DashboardStore: @unchecked Sendable {
         data.append(0x0A)
         if let old = try? Data(contentsOf: url), old == data { return }
         try StoreFile.write(data, to: url)
+        // The order is not a tile: the tiles held stay good across it.
+        noteTile(nil, id: DashboardOrder.fileName, in: project)
     }
 
     // MARK: The host's state
@@ -259,20 +305,36 @@ final class DashboardStore: @unchecked Sendable {
         let url = pointsFile(project, id)
         guard !all.isEmpty else {
             try StoreFile.requireWritable(url)
-            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            if FileManager.default.fileExists(atPath: url.path) {
+                let size = Self.size(url)
+                try FileManager.default.removeItem(at: url)
+                noteHistory(project, change: -size)
+            }
             return
         }
         var data = Data()
         for point in all { data.append(Self.line(point)) }
-        if let old = try? Data(contentsOf: url), old == data { return }
+        let old = try? Data(contentsOf: url)
+        if let old, old == data { return }
         try StoreFile.write(data, to: url)
+        noteHistory(project, change: data.count - (old?.count ?? 0))
+    }
+
+    /// Keep the running total up with a write or removal of this store's own.
+    private func noteHistory(_ project: URL, change: Int) {
+        guard var held = historyTotals[project] else { return }
+        held.bytes = max(0, held.bytes + change)
+        held.stamp = Self.modified(Self.historyFolder(project))
+        historyTotals[project] = held
     }
 
     func deletePoints(_ id: String, in project: URL) throws {
         pointCache.removeValue(forKey: Self.key(project) + "/" + id)
         for url in [pointsFile(project, id), hostPointsFile(project, id)]
         where FileManager.default.fileExists(atPath: url.path) {
+            let size = Self.size(url)
             try FileManager.default.removeItem(at: url)
+            if url == pointsFile(project, id) { noteHistory(project, change: -size) }
         }
     }
 
@@ -281,25 +343,37 @@ final class DashboardStore: @unchecked Sendable {
     /// hearing our own write (#173).
     func forgetPoints(_ project: URL) {
         let prefix = Self.key(project) + "/"
+        var outside = false
         for key in pointCache.keys where key.hasPrefix(prefix) {
             let id = String(key.dropFirst(prefix.count))
             guard let stamp = pointStamps[key], stamp == Self.modified(pointsFile(project, id)) else {
                 pointCache.removeValue(forKey: key)
                 pointStamps.removeValue(forKey: key)
+                outside = true
                 continue
             }
         }
+        // The total too, when a file changed or came or went that this store did not write.
+        if outside || historyTotals[project]?.stamp != Self.modified(Self.historyFolder(project)) {
+            historyTotals.removeValue(forKey: project)
+        }
     }
 
-    /// The project's history, in bytes (FR-021).
+    /// The project's history, in bytes (FR-021). Added up once, then kept up by this
+    /// store's own writes (#216); a change from outside makes it add up again.
     func historyBytes(_ project: URL) -> Int {
         let folder = Self.historyFolder(project)
+        let stamp = Self.modified(folder)
+        if let held = historyTotals[project], held.stamp == stamp { return held.bytes }
         // Only the histories: a `.corrupt-` copy an earlier build left here is not one.
         let names = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { $0.hasSuffix(".jsonl") }
-        return names.reduce(0) { total, name in
-            let size = (try? FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent(name).path)[.size]) as? Int
-            return total + (size ?? 0)
-        }
+        let bytes = names.reduce(0) { $0 + Self.size(folder.appendingPathComponent($1)) }
+        historyTotals[project] = (stamp, bytes)
+        return bytes
+    }
+
+    private static func size(_ url: URL) -> Int {
+        ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.intValue ?? 0
     }
 
     /// Whether the project has any history to fold, here or from before #127.
@@ -366,6 +440,8 @@ final class DashboardStore: @unchecked Sendable {
     /// included since #127, are left alone (FR-022).
     func deleteHistory(_ project: URL) {
         states.removeValue(forKey: project)
+        tileCache.removeValue(forKey: project)
+        historyTotals.removeValue(forKey: project)
         pointCache = pointCache.filter { !$0.key.hasPrefix(Self.key(project) + "/") }
         try? FileManager.default.removeItem(at: folder(for: project))
     }

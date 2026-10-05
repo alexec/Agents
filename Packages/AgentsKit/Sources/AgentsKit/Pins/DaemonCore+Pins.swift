@@ -322,9 +322,22 @@ extension DaemonCore {
     }
 
     /// Every pinned page and every page tile's file: what a screen may be showing.
+    ///
+    /// Two stats when nothing changed (#216): the pins and the tiles are each held, and
+    /// read again only when their own files change.
     func pagePaths(_ project: URL) -> [String] {
         let tiles = dashboardStore.readTiles(project).compactMap { $0.tile?.page?.file }.compactMap(PinRules.normalize)
         return readPins(project).pins.map(\.path) + tiles
+    }
+
+    /// The project's watch saw these folders change: what was read from them is read
+    /// again when next asked, and nothing else is (#216).
+    func forgetProjectFileCaches(_ changed: [URL], in project: URL) {
+        let agents = project.appending(path: ".agents").path
+        let tiles = DashboardStore.tilesFolder(project).path
+        let paths = Set(changed.map(\.path))
+        if paths.contains(agents) { pinsCache[project] = nil }
+        if paths.contains(tiles) { dashboardStore.forgetTiles(project) }
     }
 
     /// Tell every screen, at most once a second per project.
@@ -382,10 +395,19 @@ extension DaemonCore {
     /// The project's pins. One that does not read (a merge's conflict markers, a newer
     /// build's pinner, a read error) shows as none and is never written over: a copy goes
     /// under the daemon's root and every pin change is refused until it reads (#205).
+    ///
+    /// Read once per change of the file (#216): every wake in the project asks, and the
+    /// file's stamp — one stat — says whether the copy held here is still it.
     func readPins(_ project: URL) -> PinsFile {
-        let read = StoreFile.read(at: Self.pinsFileURL(project), meaning: "no pins show",
+        let url = Self.pinsFileURL(project)
+        let stamp = FileStamp(url)
+        if let held = pinsCache[project], held.stamp == stamp { return held.file }
+        pinsReads += 1
+        let read = StoreFile.read(at: url, meaning: "no pins show",
                                   outside: locations.root) { try PinsFile.read($0).file }
-        guard case .read(let file) = read else { return PinsFile() }
+        let file: PinsFile
+        if case .read(let found) = read { file = found } else { file = PinsFile() }
+        pinsCache[project] = (stamp, file)
         return file
     }
 
@@ -425,6 +447,7 @@ extension DaemonCore {
         } catch {
             throw pinRefusal("The pins could not be written in \(project.path)/.agents: \(error.localizedDescription)")
         }
+        pinsCache[project] = nil
         pinsChanged(project)
     }
 

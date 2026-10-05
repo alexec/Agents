@@ -193,6 +193,15 @@ public actor DaemonCore {
     /// it, and who is watching what (034). Nothing here outlives its connection.
     var fileWatches: [URL: FolderWatch] = [:]
     var fileInterests: [UUID: Set<FileInterest>] = [:]
+    /// What each watched root's watch leaves out (#216), and the excluded folders a
+    /// device asked to watch inside, which stay watched for as long as the watch runs.
+    var fileWatchExclusions: [URL: [URL]] = [:]
+    var fileWatchOpened: [URL: Set<URL>] = [:]
+    /// The one `files/mention` walk in flight per agent (#216): each keystroke's replaces
+    /// the last, which is cancelled rather than left to walk 20,000 entries for nobody.
+    var mentionWalks: [UUID: (id: UUID, task: Task<[FileMention], Never>)] = [:]
+    /// The walk itself; a test puts in one it can hold open.
+    var mentionWalker: @Sendable (String, [URL]) -> [FileMention] = { FileMention.matching($0, in: $1) }
     /// The plan files each agent has had shown, which a device may read although they
     /// sit outside the agent's folders (`~/.claude/plans`). The file, never its folder.
     var shownPlanFiles: [UUID: Set<String>] = [:]
@@ -420,6 +429,12 @@ public actor DaemonCore {
     /// A `pages/changed` waiting to go, per project, and the folders it will name.
     var pageBroadcasts: [URL: Task<Void, Never>] = [:]
     var pagesPending: [URL: Set<String>] = [:]
+    /// Each project's pins as last read, with the file's stamp, so a wake does not parse
+    /// `pins.json` again when it has not changed (#216). Dropped by a write here and by
+    /// the project's watch seeing `.agents` change.
+    var pinsCache: [URL: (stamp: FileStamp?, file: PinsFile)] = [:]
+    /// How many times `pins.json` has been read, for the tests and the measure (#216).
+    var pinsReads = 0
 
     // MARK: Events (042)
 
@@ -564,6 +579,16 @@ public actor DaemonCore {
     /// How many times the project index has been made (#204): what a test counts to
     /// know a project-wide call read it rather than made it again.
     var projectIndexBuilds = 0
+    /// The root's names when each project's watch last took its exclusions, so a wake
+    /// can tell the top level changed without working them all out again (#216).
+    var projectWatchTopLevel: [URL: Set<String>] = [:]
+    /// The pages each project's watch last took its exclusions around.
+    var projectWatchPages: [URL: [String]] = [:]
+    /// A look at the exclusions waiting out its second, and what it was asked about.
+    var projectExclusionChecks: [URL: Task<Void, Never>] = [:]
+    var projectExclusionPending: [URL: Set<String>] = [:]
+    /// How many of those looks ran, for the tests and the measure.
+    var exclusionChecks = 0
     /// Rescans waiting out their debounce, by project folder.
     var workflowRescans: [URL: Task<Void, Never>] = [:]
     /// The runs in flight, by `Workflow.id`. This is what a second fire collides with,

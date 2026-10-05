@@ -104,3 +104,22 @@ test("opening and typing warm a settled session once a while, however many keys 
   store.prewarm(host, "busy", "opened");
   assert.equal(calls.length, 2);
 });
+
+test("files/changed: a host's `many`, or a burst past 64 folders, settles as every pane reading again (#216)", async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+  const work = new Work();
+  work.apply("files/changed", { agentID: "A1", folders: ["/w/src"] }, host);
+  await settle();
+  assert.deepEqual({ ...work.filesChanged.value, at: 0 }, { host, agentID: "A1", folders: ["/w/src"], many: false, at: 0 });
+
+  work.apply("files/changed", { agentID: "A1", folders: ["/w/a"], many: true }, host);
+  work.apply("files/changed", { agentID: "A1", folders: ["/w/b"] }, host);
+  await settle();
+  assert.equal(work.filesChanged.value.many, true);
+  assert.deepEqual(work.filesChanged.value.folders, []);
+
+  for (let i = 0; i < 70; i++) work.apply("files/changed", { agentID: "A1", folders: [`/w/f${i}`] }, host);
+  await settle();
+  assert.equal(work.filesChanged.value.many, true);
+  assert.deepEqual(work.filesChanged.value.folders, []);
+});

@@ -42,6 +42,8 @@ const itemsKept = 100;
 /** How many finished turns a followed chat keeps above its entries; earlier ones come back as the top is reached. */
 const turnsKept = 100;
 
+/** The most folders a settling burst keeps by name before it is "many", as the host's own limit. */
+const filesNamedAtMost = 64;
 /** How long `files/changed` has to be quiet before the panes read the folders again. */
 const filesSettle = 250;
 
@@ -146,7 +148,7 @@ export class Work {
   /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
   /** The last folders said to have changed, for a pane watching them (`files/changed`). */
-  readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; at: number } | null>(null);
+  readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; many: boolean; at: number } | null>(null);
 
   /** Each project's Dashboard row by `host|folder` (074), kept by dashboard/changed. */
   readonly dashboardSummaries = signal<Record<string, DashboardSummary>>({});
@@ -196,7 +198,7 @@ export class Work {
     this.problem.value = this.problemsWaiting.shift() ?? null;
   }
 
-  private filesSettling = new Map<string, { folders: Set<string>; timer: ReturnType<typeof setTimeout> }>();
+  private filesSettling = new Map<string, { folders: Set<string>; many: boolean; timer: ReturnType<typeof setTimeout> }>();
   private display = new DisplayBuilder();
   private entryIDs = new Set<string>();
   private heardSincePage: TranscriptEntry[] = [];
@@ -281,11 +283,14 @@ export class Work {
         // A build writes hundreds of files in a burst: the panes read again once it settles (#170).
         const note = params as FilesChangedNotification;
         const key = `${host}|${note.agentID}`;
-        const folders = new Set([...(this.filesSettling.get(key)?.folders ?? []), ...note.folders]);
-        clearTimeout(this.filesSettling.get(key)?.timer);
-        this.filesSettling.set(key, { folders, timer: setTimeout(() => {
+        // Too many to name (#216): the host says `many`, and every pane for the agent reads again.
+        const settling = this.filesSettling.get(key);
+        const folders = new Set([...(settling?.folders ?? []), ...note.folders]);
+        const many = (settling?.many ?? false) || note.many === true || folders.size > filesNamedAtMost;
+        clearTimeout(settling?.timer);
+        this.filesSettling.set(key, { folders: many ? new Set() : folders, many, timer: setTimeout(() => {
           this.filesSettling.delete(key);
-          this.filesChanged.value = { host, agentID: note.agentID, folders: [...folders], at: Date.now() };
+          this.filesChanged.value = { host, agentID: note.agentID, folders: many ? [] : [...folders], many, at: Date.now() };
         }, filesSettle) });
         return true;
       }
