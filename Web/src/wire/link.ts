@@ -362,7 +362,10 @@ export class Link {
       this.failPending();
       this.down();
     }, this.options.heartbeat.within);
-    this.call("control/status", {} as Params<"control/status">).then(() => clearTimeout(timer), () => {});
+    // Any answer, an error too, is the control plane answering (#214); only silence is down.
+    this.call("control/status", {} as Params<"control/status">).then(() => clearTimeout(timer), (error) => {
+      if (error instanceof CallFailed) clearTimeout(timer);
+    });
   }
 
   private failPending(): void {
