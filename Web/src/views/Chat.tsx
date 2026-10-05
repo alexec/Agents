@@ -6,11 +6,11 @@
 // unless the person has scrolled up.
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
-import type { Store } from "../model/store";
+import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../model/background";
 import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
-import type { Agent } from "../protocol/generated";
+import type { Agent, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
@@ -35,6 +35,20 @@ import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWo
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 
 const detailKey = "agents.turnDetail";
+
+/** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
+interface HeldTurn {
+  entries: TranscriptEntry[];
+  items: Item[];
+  hasEarlier: boolean;
+  firstIndex: number;
+}
+
+/** A turn's lines, without the ask the turn already shows above its steps. */
+function shown(entries: TranscriptEntry[]): Item[] {
+  const items = display(entries);
+  return items[0] && isPersonsAsk(items[0]) ? items.slice(1) : items;
+}
 
 function savedDetail(): TurnDetail {
   const saved = localStorage.getItem(detailKey);
@@ -68,7 +82,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const level = useSignal<TurnDetail>(defaultDetail.value);
   /** Turns opened or closed by hand, kept until the chat is left. */
   const chosen = useSignal<Record<string, TurnDetail>>({});
-  const fetched = useSignal<Record<string, Item[]>>({});
+  /** The few opened turns whose entries are held, newest last (#291). */
+  const fetched = useSignal<Record<string, HeldTurn>>({});
+  const openedTurns = useRef<string[]>([]);
+  const earlierTurn = useRef<string | null>(null);
+  /** Which chat a turn's page was asked for, so a reply for one left behind is dropped. */
+  const watchingSession = useRef(`${host}|${session}`);
+  watchingSession.current = `${host}|${session}`;
   const newBelow = useSignal(false);
 
   // Each turn the same object until an entry lands in it, so only that one is drawn again (#170).
@@ -137,6 +157,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     void store.loadRuntimes(host);
     chosen.value = {};
     fetched.value = {};
+    openedTurns.current = [];
     following.current = true;
     store.setFollowingEnd(true);
     newBelow.value = false;
@@ -224,19 +245,75 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     chosen.value = { ...chosen.value, [turn.id]: now !== "outcome" ? "outcome" : open };
   };
 
-  const loadDetail = async (turn: ChatTurn) => {
-    if (!turn.range || fetched.value[turn.id]) return;
-    const items = display(await store.turnEntries(host, session, turn.range));
-    fetched.value = { ...fetched.value, [turn.id]: items[0] && isPersonsAsk(items[0]) ? items.slice(1) : items };
+  // A turn closed, or the level put back to outcome, lets its entries go (#291).
+  useEffect(() => {
+    const openNow = new Set<string>();
+    for (const turn of rows) if ((chosen.value[turn.id] ?? level.value) !== "outcome") openNow.add(turn.id);
+    const drop = openedTurns.current.filter((id) => !openNow.has(id));
+    if (!drop.length) return;
+    const next = { ...fetched.peek() };
+    let changed = false;
+    for (const id of drop) if (id in next) { delete next[id]; changed = true; }
+    openedTurns.current = openedTurns.current.filter((id) => openNow.has(id));
+    if (changed) fetched.value = next;
+  }, [rows, chosen.value, level.value]);
+
+  const hold = (id: string, value: HeldTurn) => {
+    const kept = rememberOpen(fetched.peek(), openedTurns.current, id, value);
+    openedTurns.current = kept.order;
+    fetched.value = kept.held;
   };
 
-  // The same two for every turn, for as long as the chat is open, so a turn's props change only
+  /** The last page of a finished turn. A miss is not held, so it can be asked again. */
+  const loadDetail = async (turn: ChatTurn) => {
+    if (!turn.range || fetched.peek()[turn.id]) return;
+    const stamp = `${host}|${session}`;
+    const page = await store.turnEntries(host, session, turn.range);
+    if (`${watchingSession.current}` !== stamp) return;
+    if (fetched.peek()[turn.id]) return;
+    const span = turn.range.end - turn.range.start;
+    if (!page.entries.length && page.firstIndex === turn.range.start && span > 0) return;
+    hold(turn.id, {
+      entries: page.entries, items: shown(page.entries),
+      hasEarlier: page.firstIndex > turn.range.start, firstIndex: page.firstIndex,
+    });
+  };
+
+  /** The page before the one held, put in front of it. */
+  const loadEarlierSteps = async (turn: ChatTurn) => {
+    const have = fetched.peek()[turn.id];
+    if (!turn.range || !have?.hasEarlier || earlierTurn.current === turn.id) return;
+    earlierTurn.current = turn.id;
+    const stamp = `${host}|${session}`;
+    try {
+      const page = await store.turnEntries(host, session, { start: turn.range.start, end: have.firstIndex });
+      if (`${watchingSession.current}` !== stamp) return;
+      const still = fetched.peek()[turn.id];
+      if (!still) return;
+      if (!page.entries.length) {
+        // Nothing before what is held. A failed read starts where the turn does, and can be tried again.
+        if (page.firstIndex >= still.firstIndex) hold(turn.id, { ...still, hasEarlier: false });
+        return;
+      }
+      const seen = new Set(still.entries.map((entry) => entry.id));
+      const entries = [...page.entries.filter((entry) => !seen.has(entry.id)), ...still.entries];
+      hold(turn.id, {
+        entries, items: shown(entries),
+        hasEarlier: page.firstIndex > turn.range.start, firstIndex: page.firstIndex,
+      });
+    } finally {
+      if (earlierTurn.current === turn.id) earlierTurn.current = null;
+    }
+  };
+
+  // The same three for every turn, for as long as the chat is open, so a turn's props change only
   // when the turn does; each calls the latest of the functions above.
-  const latest = useRef({ toggle, loadDetail });
-  latest.current = { toggle, loadDetail };
+  const latest = useRef({ toggle, loadDetail, loadEarlierSteps });
+  latest.current = { toggle, loadDetail, loadEarlierSteps };
   const turnActions = useMemo(() => ({
     toggle: (turn: ChatTurn) => latest.current.toggle(turn),
-    loadDetail: (turn: ChatTurn) => void latest.current.loadDetail(turn),
+    loadDetail: (turn: ChatTurn) => latest.current.loadDetail(turn),
+    loadEarlier: (turn: ChatTurn) => latest.current.loadEarlierSteps(turn),
   }), []);
 
   const choose = (detail: TurnDetail) => {
@@ -274,9 +351,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <div class="view-layer" ref={(el) => { layer.element = el; }} />
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, index) => (
-          <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value} fetched={fetched.value[turn.id]}
+          <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value}
+            fetched={fetched.value[turn.id]?.items} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
+            auto={index >= rows.length - openTurnsHeld}
             isLive={index === rows.length - 1 && live} background={background}
-            toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} />
+            toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}

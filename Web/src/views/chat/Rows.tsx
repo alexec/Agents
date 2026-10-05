@@ -3,7 +3,7 @@
 // the ported rules; agent text goes through the Markdown renderer and nowhere else.
 import { useSignal } from "@preact/signals";
 import { createContext } from "preact";
-import { useContext, useEffect } from "preact/hooks";
+import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
   AgentState, BackgroundItem, ContentBlock, EndedReason, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
   SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
@@ -403,13 +403,28 @@ function stepsWords(count: number | undefined, open: boolean): string {
  * One turn: the ask, the control into its steps, and its outcome (TurnView). Drawn again only
  * when one of its props changes: the chat keeps a turn the same object until an entry lands in
  * it, and hands every turn the same `toggle` and `loadDetail` (#170).
+ *
+ * Opening loads the last page once, and only for a turn near the end: every turn open at once
+ * would fetch them all. One the chat has let go shows a button instead of fetching itself (#291).
  */
-export const TurnView = memo(function TurnView({ turn, detail, fetched, isLive, background, toggle: toggleTurn, loadDetail: loadTurn }: {
-  turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; isLive: boolean;
-  background: readonly BackgroundItem[]; toggle: (turn: ChatTurn) => void; loadDetail: (turn: ChatTurn) => void;
+export const TurnView = memo(function TurnView({ turn, detail, fetched, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
+  turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; hasEarlier: boolean; auto: boolean; isLive: boolean;
+  background: readonly BackgroundItem[]; toggle: (turn: ChatTurn) => void;
+  loadDetail: (turn: ChatTurn) => Promise<void>; loadEarlier: (turn: ChatTurn) => Promise<void>;
 }) {
-  const toggle = () => toggleTurn(turn);
-  const loadDetail = () => loadTurn(turn);
+  const asked = useRef(false);
+  const loading = useSignal(false);
+  const load = useRef(loadTurn);
+  load.current = loadTurn;
+  const ask = () => {
+    asked.current = true;
+    loading.value = true;
+    void load.current(turn).finally(() => { loading.value = false; });
+  };
+  const toggle = () => {
+    if (detail === "outcome") ask();
+    toggleTurn(turn);
+  };
   const waiting = isSummaryOnly(turn) && fetched === undefined;
   const items = isSummaryOnly(turn) ? fetched ?? [] : turn.items;
   const parts = waiting ? undefined : turnParts(items, isLive);
@@ -419,8 +434,14 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, isLive, 
   const outcomeIDs = new Set((parts?.outcome ?? []).map((i) => i.id));
   const steps = drawnInTurn(items, isLive).filter((i) => !outcomeIDs.has(i.id) && (detail === "details" || !isThought(i)));
   useEffect(() => {
-    if (open && waiting) loadDetail();
-  }, [open, waiting]);
+    if (!open) asked.current = false;
+  }, [open]);
+  useEffect(() => {
+    // Once, and only while this turn is among the ones the chat will keep. A later eviction
+    // leaves `asked` set, so the effect does not fetch it straight back (#291).
+    if (!(open && waiting && auto) || asked.current) return;
+    ask();
+  }, [open, waiting, auto]);
   return (
     <article class="turn" aria-label="Turn">
       {turn.ask && <ItemRow item={turn.ask} background={background} />}
@@ -431,8 +452,10 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, isLive, 
         </button>
       )}
       {open && stepCount !== 0 ? (
-        waiting ? <p class="quiet">Loading…</p> : (
+        waiting ? (loading.value || (auto && !asked.current) ? <p class="quiet">Loading…</p>
+          : <button class="steps-control" onClick={ask}>Load steps</button>) : (
           <>
+            {hasEarlier && <button class="steps-control" onClick={() => void loadEarlier(turn)}>Earlier steps</button>}
             <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} open={detail === "details"} background={background} />)}</div>
             {outcome.map((item) => <StepRow key={item.id} item={item} open={false} background={background} />)}
           </>

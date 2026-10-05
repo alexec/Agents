@@ -170,9 +170,13 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const showsAllMatches = useSignal(false);
   useEffect(() => { showsAllMatches.value = false; }, [query]);
   const showsWorkflows = searching || folds.isOpen(host.id, folder, "workflows");
+  const online = store.hostIsOnline(host.id);
+  // The list is held while the project is open, and let go when it folds (#291).
   useEffect(() => {
-    if (unfolded && store.hostIsOnline(host.id)) void store.loadWorkflows(host.id, folder);
-  }, [unfolded, host.id, folder]);
+    if (!unfolded || !online) return;
+    store.holdWorkflows(host.id, folder);
+    return () => store.releaseWorkflows(host.id, folder);
+  }, [unfolded, online, host.id, folder]);
   // Archived sessions are held while their fold is open, a page of them, and let go when it closes.
   const archivedWasShown = useRef(false);
   useEffect(() => {
@@ -196,7 +200,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const archived = !unfolded ? [] : matching(view.archived);
   const runtimeName = (id: string) => (store.runtimes.value[host.id] ?? []).find((s) => s.runtime.id === id)?.runtime.name;
   // A search narrows workflows by name and what they are; one asking for a label leaves them out.
-  const allWorkflows = (unfolded ? store.workflows.value[`${host.id}|${folderKey(folder)}`] ?? [] : [])
+  const allWorkflows = (unfolded ? store.projectWorkflows(host.id, folder) : [])
     .filter((w) => !searching || parsed.label === null && (!parsed.text
       || [w.workflow.name, workflowSummary(w.workflow, runtimeName)].some((t) => t.toLowerCase().includes(parsed.text.toLowerCase()))))
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));

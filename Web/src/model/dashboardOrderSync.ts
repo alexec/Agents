@@ -53,6 +53,16 @@ export class DashboardOrderSync {
     return null;
   }
 
+  /** The page left this Dashboard: nothing arranged or fetched for it is still in play. */
+  forget(key: string): void {
+    this.arranged.delete(key);
+    this.unsent.delete(key);
+    this.sending.delete(key);
+    this.begun.delete(key);
+    this.kept.delete(key);
+    this.settledFrom.delete(key);
+  }
+
   /** A fetch is about to be asked for. Hand its ticket to `accept` with the reply. */
   beginFetch(key: string): number {
     const ticket = (this.begun.get(key) ?? 0) + 1;

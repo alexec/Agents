@@ -32,8 +32,30 @@ export class LinkDown extends Error {
   }
 }
 
-/** No answer within the call's time (#170): one hung host must not hold up everything waiting on it. */
+/** No answer within the call's time (#170): one hung host must not hold up everything waiting on it.
+ * Not a dropped link: the control plane may be fine, and this call may still be going (#291). */
 export class CallTimedOut extends LinkDown {}
+
+/** How long an ordinary call waits. A test passes a shorter one and every method takes that. */
+export const defaultCallTimeout = 30_000;
+
+/**
+ * Methods that do their work before they answer, and how long that can honestly take (#291).
+ * A clone is given an hour on the host; the page waits a little past that. Starting a runtime,
+ * a draft of one, or the dashboard's updater is the same kind of wait, shorter.
+ */
+const slowCallTimeout: Readonly<Record<string, number>> = {
+  "projects/clone": 65 * 60_000,
+  "agents/start": 2 * 60_000,
+  "agents/options": 2 * 60_000,
+  "dashboard/update": 2 * 60_000,
+};
+
+/** How long `method` waits. `override` is a test's one timeout for every method. */
+export function callTimeoutFor(method: string, override?: number): number {
+  if (override !== undefined) return override;
+  return slowCallTimeout[method] ?? defaultCallTimeout;
+}
 
 /** What a browser WebSocket gives; a fake one in the tests. */
 export interface SocketLike {
@@ -159,7 +181,7 @@ export class Link {
       backoff: [1, 2, 4, 8, 16, 30],
       heartbeat: { every: 5_000, within: 3_000 },
       random: Math.random,
-      callTimeout: 30_000,
+      callTimeout: defaultCallTimeout,
       stableAfter: 30_000,
       hidden: () => globalThis.document?.visibilityState === "hidden",
       patience: 120_000,
@@ -218,11 +240,12 @@ export class Link {
     const route = targetOf(method) === "host" ? host ?? "mac" : null;
     const line = route !== null ? JSON.stringify({ h: route, m: message }) : JSON.stringify({ m: message });
     return new Promise<Result<M>>((resolve, reject) => {
+      const timeout = callTimeoutFor(method, this.options.callTimeout === defaultCallTimeout ? undefined : this.options.callTimeout);
       const timer = setTimeout(() => {
         if (!this.pending.delete(id)) return;
         log("call.timedOut");
         reject(new CallTimedOut());
-      }, this.options.callTimeout);
+      }, timeout);
       this.pending.set(id, {
         resolve: (value) => { clearTimeout(timer); resolve(value as Result<M>); },
         reject: (error) => { clearTimeout(timer); reject(error); },
