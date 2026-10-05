@@ -20,8 +20,6 @@ import { elicitationTitle } from "./chat/Rows";
 import { askerFor } from "../model/asker";
 import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
-import { replace, route } from "../route";
-import { setPane } from "./files/paneState";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -130,6 +128,8 @@ export function Cards({ store, host, session, down = false }: {
     <div class="cards" aria-label="Waiting for you">
       {cards.map((card, index) => card.kind === "permission"
         ? <PermissionCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
+            // Shown as the host shows it: the page beside the chat, read again (the window's Show plan).
+            showPlan={(path) => (store.shownFile.value = { host, agentID: card.request.agentID, path, at: Date.now() })}
             hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
             answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
               { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
@@ -207,8 +207,9 @@ const numbered = (n: number) => (n < 9 ? { "data-answer": "", title: `⌥${n + 1
 
 const allows = (option: PermissionOption) => option.kind === "allow_once" || option.kind === "allow_always";
 
-function PermissionCard({ request, asker, hold, answer, active }: {
+function PermissionCard({ request, asker, hold, answer, active, showPlan }: {
   request: PermissionRequest; asker: string | null; hold: Hold; answer: (option: PermissionOption) => void; active: boolean;
+  showPlan: (path: string) => void;
 }) {
   const card = useRef<HTMLElement>(null);
   useCardKeys(card, active);
@@ -223,7 +224,7 @@ function PermissionCard({ request, asker, hold, answer, active }: {
         {request.toolCall.kind && !plan && <p class="quiet small">{request.toolCall.kind}</p>}
         {plan?.file && (
           <p class="plan-shown quiet small">The plan is open beside this conversation.{" "}
-            <button onClick={() => showPlan(request.agentID, plan.file!)}>Show plan</button></p>
+            <button onClick={() => showPlan(plan.file!)}>Show plan</button></p>
         )}
         {plan?.text && !plan.file && <div class="plan-text"><Markdown text={plan.text} /></div>}
       </div>
@@ -240,12 +241,6 @@ function PermissionCard({ request, asker, hold, answer, active }: {
       <AnsweredNote answered={hold.answered} />
     </section>
   );
-}
-
-/** The plan as a page in the files pane, beside the chat, as the window's Show plan opens it. */
-function showPlan(agentID: string, path: string) {
-  setPane(agentID, { tab: "page", page: path, line: undefined });
-  if (!route.peek().files) replace({ ...route.peek(), files: true });
 }
 
 // ElicitationSchema's rules (Model/Elicitation.swift): one-click forms, pages, and what will not do.
