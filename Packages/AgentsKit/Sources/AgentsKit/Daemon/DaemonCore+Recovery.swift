@@ -59,6 +59,19 @@ extension DaemonCore {
             // Before the move, so the transcript reads in the order it happened: the
             // explanation, and then the ending it explains.
             await record(.runtimeNote(RuntimeNote.stoppedWithDaemon), for: id)
+            // A chat whose last few pick-ups each went down with the daemon, though,
+            // and no turn of it finished in between (#209). That is the daemon dying
+            // while this chat is picked up, and launchd's KeepAlive starting it again
+            // only to pick the chat up again: a loop nobody is there to break. A
+            // daemon that shuts down cleanly — a ship, a quit — clears the count, so
+            // only crashes add up. `mayBePickedUpAfterRestart` says no to it, so the
+            // move below ends it as any stopped chat ends, its run let go; it stays
+            // stopped, which is Needs attention, and a message from the person picks
+            // it up as any stopped chat is picked up.
+            if agent.restartPickUps >= Agent.pickUpsBeforeLeavingAlone {
+                await record(.runtimeNote(RuntimeNote.notPickedUpAgain(agent.restartPickUps)), for: id)
+                DaemonLog.shared.write("left agent \(id) stopped: \(agent.restartPickUps) pick-ups in a row went down with the daemon")
+            }
             // Through the funnel, like every other ending. This is the whole of what
             // 020 closes: the record, the broadcast, the transcript line, the project
             // counts and the triggers all happen here now, because they all hang off
@@ -66,21 +79,9 @@ extension DaemonCore {
             await move(id, on: .foundDead)
             // Re-read: `mayBePickedUpAfterRestart` is a question about the record
             // after the ending, not the one this loop was handed. Every chat the
-            // daemon took comes back, however many times it has been through this —
-            // there is no "left alone" any more (Alex, 2026-09-21).
+            // daemon took comes back, however many builds it has been through (Alex,
+            // 2026-09-21) — all but the crash loop above.
             guard let updated = agents[id], updated.mayBePickedUpAfterRestart else { continue }
-            // Except a chat whose last few pick-ups each went down with the daemon,
-            // and no turn of it finished in between (#209). That is the daemon dying
-            // while this chat is picked up, and launchd's KeepAlive starting it again
-            // only to pick the chat up again: a loop nobody is there to break. A
-            // daemon that shuts down cleanly — a ship, a quit — clears the count, so
-            // only crashes add up. It stays stopped, which is Needs attention, and says why; a message from
-            // the person picks it up as any stopped chat is picked up.
-            if updated.restartPickUps >= Self.pickUpsBeforeLeavingAlone {
-                await record(.runtimeNote(RuntimeNote.notPickedUpAgain(updated.restartPickUps)), for: id)
-                DaemonLog.shared.write("left agent \(id) stopped: \(updated.restartPickUps) pick-ups in a row went down with the daemon")
-                continue
-            }
             // What it was doing, kept for as long as it takes to tell it: an agent cut
             // off mid-turn and one cut off holding a question open have different
             // things to be told.
@@ -151,10 +152,6 @@ extension DaemonCore {
             while await lanes.next() != nil { _ = next() }
         }
     }
-
-    /// How many pick-ups in a row may go down with the daemon, no turn of the chat
-    /// finishing between them, before a restart leaves the chat stopped (#209).
-    static let pickUpsBeforeLeavingAlone = 3
 
     /// How many pick-ups may be starting a runtime at once.
     static let pickUpLanes = 2

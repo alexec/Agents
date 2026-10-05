@@ -92,6 +92,30 @@ struct RuntimeProcessGroupTests {
         transport.close()
     }
 
+    /// A runtime that stops reading its stdin cannot keep a write, or the close behind
+    /// it, waiting for good: the write gives up once the transport is closed.
+    @Test func closingAPipeTransportEndsAWriteNobodyReads() async throws {
+        var output: [Int32] = [-1, -1], input: [Int32] = [-1, -1]
+        try #require(pipe(&output) == 0 && pipe(&input) == 0)
+        defer { close(output[1]); close(input[0]) }
+        // As `RuntimeProcess` sets a runtime's stdin.
+        _ = fcntl(input[1], F_SETFL, fcntl(input[1], F_GETFL) | O_NONBLOCK)
+        let transport = FDTransport(readFD: output[0], writeFD: input[1])
+        // Far more than a pipe holds, and nobody reads input[0].
+        let big = String(repeating: "x", count: 4 << 20)
+        let writing = Task.detached { () -> (any Error)? in
+            do { try transport.write(line: big); return nil } catch { return error }
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        let closed = Task.detached { transport.close() }
+        await closed.value
+        let failed = await writing.value
+        guard case .closed? = failed as? JSONRPCTransportError else {
+            Issue.record("the write gave up as closed: \(String(describing: failed))")
+            return
+        }
+    }
+
     // MARK: Helpers
 
     final class ChildPid: @unchecked Sendable {
@@ -113,10 +137,14 @@ struct RuntimeProcessGroupTests {
         }
     }
 
-    /// Found by what it is, not by number: tests beside this one reuse numbers.
+    /// A pipe's read end, found by what it is, not by number: tests beside this one reuse
+    /// numbers. Only read ends count, because on Linux both ends of a pipe are the one
+    /// inode, and the write end this test keeps open is not the reader's.
     private static func isOpen(_ wanted: Identity) -> Bool {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: "/dev/fd")) ?? []
-        return names.compactMap(Int32.init).contains { Identity($0) == wanted }
+        return names.compactMap(Int32.init).contains { fd in
+            Identity(fd) == wanted && fcntl(fd, F_GETFL) & O_ACCMODE == O_RDONLY
+        }
     }
 
     private func eventually(_ what: String, _ check: () async throws -> Bool) async throws {

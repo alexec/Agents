@@ -143,6 +143,51 @@ struct LineSplitterCutTests {
         #expect((params?["start"]?.stringValue?.utf8.count ?? .max) <= LineSplitter.cutStartKept)
     }
 
+    /// A line can go past the limit in the read that also ends it, and is cut all the same.
+    @Test func aLineEndedInTheReadThatTookItPastTheLimitIsCut() throws {
+        var splitter = LineSplitter(maximumLine: 1024, cutsLongLines: true)
+        #expect(feed(&splitter, [UInt8](repeating: UInt8(ascii: "x"), count: 1_000)).isEmpty)
+        let lines = feed(&splitter, [UInt8](repeating: UInt8(ascii: "x"), count: 50) + Array("\n{\"b\":2}\n".utf8))
+        try #require(lines.count == 2)
+        #expect(lines.first?.contains(LineSplitter.cutMethod) == true)
+        #expect(lines.first?.contains("1050") == true)
+        #expect(lines.last == "{\"b\":2}")
+    }
+
+    /// JSON-RPC does not put `id` first: a reply can end with it, and the stand-in still
+    /// says whose it was, while an `id` nested in its result is passed over.
+    @Test func aCutLineSaysItsIdWhereverItCame() throws {
+        var splitter = LineSplitter(maximumLine: 1024, cutsLongLines: true)
+        let long = Array(#"{"jsonrpc":"2.0","result":{"id":99,"text":""#.utf8)
+            + [UInt8](repeating: UInt8(ascii: "x"), count: 10_000) + Array(#"\"y"},"id":7}"#.utf8) + [0x0A]
+        var lines: [String] = []
+        for piece in stride(from: 0, to: long.count, by: 700) {
+            lines += feed(&splitter, Array(long[piece..<min(long.count, piece + 700)]))
+        }
+        let line = try #require(lines.first)
+        guard case .notification(_, let params) = try JSONRPCCodec.decode(line: line) else {
+            Issue.record("a stand-in"); return
+        }
+        #expect(params?["id"]?.intValue == 7)
+        #expect(params?["reply"] == .bool(true))
+        #expect(params?["method"] == nil)
+    }
+
+    /// And a request whose params come before its method and id is still a request.
+    @Test func aCutRequestSaysItsMethodAndIdAfterItsParams() throws {
+        var splitter = LineSplitter(maximumLine: 1024, cutsLongLines: true)
+        let long = Array(#"{"params":{"method":"no","id":1,"x":""#.utf8)
+            + [UInt8](repeating: UInt8(ascii: "x"), count: 10_000)
+            + Array(#""},"method":"fs/write_text_file","id":"q1","jsonrpc":"2.0"}"#.utf8) + [0x0A]
+        let line = try #require(feed(&splitter, long).first)
+        guard case .notification(_, let params) = try JSONRPCCodec.decode(line: line) else {
+            Issue.record("a stand-in"); return
+        }
+        #expect(params?["id"]?.stringValue == "q1")
+        #expect(params?["method"]?.stringValue == "fs/write_text_file")
+        #expect(params?["reply"] == nil)
+    }
+
     /// What is held while a line is being cut is its first bytes, not the line.
     @Test func whatIsHeldStaysSmall() {
         var splitter = LineSplitter(maximumLine: 1024, cutsLongLines: true)

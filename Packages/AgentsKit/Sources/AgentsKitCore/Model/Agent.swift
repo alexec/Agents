@@ -607,12 +607,17 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// Alex removed it (2026-09-21): a chat left stopped after a restart is work
     /// abandoned by nobody, and a daemon restarted a few times in a row — every build
     /// of the app is one — was leaving a trail of them. `restartPickUps` is still
-    /// counted, and the daemon's `recover` leaves a chat stopped only once several
-    /// pick-ups in a row have gone down with the daemon (#209): a crash loop, not a
-    /// few builds.
+    /// counted, and a chat is left stopped only once several pick-ups in a row have gone
+    /// down with the daemon (#209): a crash loop, not a few builds. Every gate reads it
+    /// here — recovery, the ending's events, a workflow's run — so one left stopped ends
+    /// as any stopped chat does and lets its run go.
     public var mayBePickedUpAfterRestart: Bool {
-        state == .stopped && endedReason == .daemonGone
+        state == .stopped && endedReason == .daemonGone && restartPickUps < Self.pickUpsBeforeLeavingAlone
     }
+
+    /// How many pick-ups in a row may go down with the daemon, no turn of the chat
+    /// finishing between them, before a restart leaves the chat stopped (#209).
+    public static let pickUpsBeforeLeavingAlone = 3
 
     // MARK: What the reader will allow
     //

@@ -175,10 +175,22 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
                 offset += written
             } else {
                 if errno == EINTR { continue }
+                if errno == EAGAIN {
+                    // A write end set not to block, and a reader not reading: wait for
+                    // room a moment at a time, so a `close` waiting for the lock is kept
+                    // that moment at most and this write stops once it comes (#209).
+                    var out = pollfd(fd: writeFD, events: Int16(POLLOUT), revents: 0)
+                    _ = poll(&out, 1, Self.writeWaitMilliseconds)
+                    if closed.isSet { throw JSONRPCTransportError.closed }
+                    continue
+                }
                 throw JSONRPCTransportError.writeFailed(errno: errno)
             }
         }
     }
+
+    /// How long a write waits for room before it looks again at whether it was closed.
+    static let writeWaitMilliseconds: Int32 = 100
 
     public func lines() -> AsyncThrowingStream<String, any Error> { stream }
 
@@ -195,7 +207,10 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
             shutdown(readFD, SHUT_RDWR)
             ends.letGoOfSocket(readFD)
         } else {
-            // The reading thread is woken by its pipe and closes `readFD` itself.
+            // The reading thread is woken by its pipe and closes `readFD` itself. A write
+            // in progress on a write end that does not block (a runtime's stdin) gives up
+            // within `writeWaitMilliseconds` of the latch above, so this waits that long
+            // at most.
             ends.writeLock.withLock { _ = POSIX.close(writeFD) }
             if ends.wake.write >= 0 { POSIX.close(ends.wake.write) }
         }
@@ -230,8 +245,9 @@ public struct LineSplitter {
     public private(set) var overflowed = false
     /// Whether a line past `maximumLine` is cut rather than given up on. See `cut`.
     public let cutsLongLines: Bool
-    /// The line being cut: its first bytes, kept to say what it was, and its length so far.
-    private var cutting: (start: [UInt8], bytes: Int)?
+    /// The line being cut: its first bytes, kept to say what it was, its length so far,
+    /// and its top-level `id` and `method` wherever in it they come.
+    private var cutting: (start: [UInt8], bytes: Int, fields: TopLevelFields)?
     /// Cut lines' stand-ins, to come out of `next` before anything read after them.
     private var cuts: [String] = []
     /// How much of a cut line is kept to say what it was.
@@ -254,13 +270,22 @@ public struct LineSplitter {
     /// here, and `JSONRPCConnection` answers for the line it replaced.
     public static let cutMethod = "jsonrpc/lineCut"
 
-    /// The stand-in for a line of `bytes` bytes that began with `start`.
-    public static func cut(start: [UInt8], bytes: Int, limit: Int) -> String {
-        let params: JSONValue = .object([
+    /// The stand-in for a line of `bytes` bytes that began with `start`. `fields` is what
+    /// was found at its top level, read from the whole line; without it, from `start`.
+    /// The stand-in carries them as `id`, `method` and `reply` (a `result` or an `error`
+    /// was there), so the connection can answer for the line whatever order its keys
+    /// came in.
+    public static func cut(start: [UInt8], bytes: Int, limit: Int, fields: TopLevelFields? = nil) -> String {
+        let fields = fields ?? start.withUnsafeBufferPointer { var scanned = TopLevelFields(); scanned.feed($0); return scanned }
+        var fieldsSaid: [String: JSONValue] = [
             "bytes": .int(bytes),
             "limit": .int(limit),
             "start": .string(String(decoding: start, as: UTF8.self)),
-        ])
+        ]
+        if let id = fields.id { fieldsSaid["id"] = id }
+        if let method = fields.method { fieldsSaid["method"] = .string(method) }
+        if fields.isReply { fieldsSaid["reply"] = .bool(true) }
+        let params: JSONValue = .object(fieldsSaid)
         return (try? JSONRPCCodec.encode(.notification(method: cutMethod, params: params)))
             ?? #"{"jsonrpc":"2.0","method":"\#(cutMethod)"}"#
     }
@@ -276,11 +301,14 @@ public struct LineSplitter {
             guard let base = bytes.baseAddress, !bytes.isEmpty,
                   let hit = memchr(base, Int32(UInt8(ascii: "\n")), bytes.count) else {
                 cutting!.bytes += bytes.count
+                cutting!.fields.feed(bytes)
                 return
             }
             let end = base.distance(to: hit.assumingMemoryBound(to: UInt8.self))
             cutting!.bytes += end
-            cuts.append(Self.cut(start: cutting!.start, bytes: cutting!.bytes, limit: maximumLine ?? 0))
+            cutting!.fields.feed(UnsafeBufferPointer(rebasing: bytes[..<end]))
+            cuts.append(Self.cut(start: cutting!.start, bytes: cutting!.bytes, limit: maximumLine ?? 0,
+                                 fields: cutting!.fields))
             cutting = nil
             bytes = UnsafeBufferPointer(rebasing: bytes[(end + 1)...])
         }
@@ -298,7 +326,9 @@ public struct LineSplitter {
                 // Nothing before `start` is waiting and nothing after it ends, so all of
                 // what is held is the one long line.
                 let kept = pending[start..<min(pending.count, start + Self.cutStartKept)]
-                cutting = (Array(kept), pending.count - start)
+                var fields = TopLevelFields()
+                pending.withUnsafeBufferPointer { fields.feed(UnsafeBufferPointer(rebasing: $0[start...])) }
+                cutting = (Array(kept), pending.count - start, fields)
             } else {
                 overflowed = true
             }
@@ -331,6 +361,21 @@ public struct LineSplitter {
                 searched = pending.count
                 return nil
             }
+            // A line that went past the limit in the same read that ended it is whole
+            // here, and is cut all the same: the limit is on the line, not on how it
+            // arrived.
+            if cutsLongLines, let maximumLine, end - start > maximumLine {
+                let cut = pending.withUnsafeBufferPointer { all -> String in
+                    let line = UnsafeBufferPointer(rebasing: all[start..<end])
+                    var fields = TopLevelFields()
+                    fields.feed(line)
+                    return Self.cut(start: Array(line.prefix(Self.cutStartKept)), bytes: line.count,
+                                    limit: maximumLine, fields: fields)
+                }
+                start = end + 1
+                searched = start
+                return cut
+            }
             let line = pending.withUnsafeBufferPointer { all -> String? in
                 var last = end
                 while last > start, Self.isSpace(all[last - 1]) { last -= 1 }
@@ -347,6 +392,115 @@ public struct LineSplitter {
 
     private static func isSpace(_ byte: UInt8) -> Bool {
         byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D
+    }
+}
+
+/// The top-level `id` and `method` of a JSON object read a byte at a time, and whether it
+/// has a `result` or an `error`: what a line too long to hold was, found without holding
+/// it (#209). JSON-RPC does not put `id` first, so a reply may end with it. Keys and
+/// values nested deeper are passed over, and a value too long to be an id or a method
+/// is not kept.
+public struct TopLevelFields: Sendable {
+    public private(set) var id: JSONValue?
+    public private(set) var method: String?
+    public private(set) var isReply = false
+
+    private var depth = 0
+    private var inString = false
+    private var escaped = false
+    private var expectingKey = false
+    /// A top-level key being read, and the last one read, waiting for its colon.
+    private var key: [UInt8]?
+    private var lastKey: String?
+    /// The top-level key whose value comes next, and that value as it is read.
+    private var valueFor: String?
+    private var value: [UInt8]?
+    static let valueKept = 256
+
+    public init() {}
+
+    public mutating func feed(_ bytes: UnsafeBufferPointer<UInt8>) {
+        for byte in bytes { feed(byte) }
+    }
+
+    private mutating func feed(_ byte: UInt8) {
+        if inString {
+            if escaped {
+                escaped = false
+            } else if byte == UInt8(ascii: "\\") {
+                escaped = true
+            } else if byte == UInt8(ascii: "\"") {
+                inString = false
+                if let read = key {
+                    lastKey = String(decoding: read, as: UTF8.self)
+                    key = nil
+                    return
+                }
+                keep(byte)
+                endValue()
+                return
+            }
+            if key != nil {
+                if key!.count < Self.valueKept { key!.append(byte) }
+            } else {
+                keep(byte)
+            }
+            return
+        }
+        switch byte {
+        case UInt8(ascii: "\""):
+            inString = true
+            if depth == 1, expectingKey {
+                key = []
+                expectingKey = false
+            } else if depth == 1, valueFor != nil {
+                value = [byte]
+            }
+        case UInt8(ascii: "{"), UInt8(ascii: "["):
+            // A nested value is neither an id nor a method.
+            if depth == 1 { valueFor = nil; value = nil }
+            depth += 1
+            if depth == 1, byte == UInt8(ascii: "{") { expectingKey = true }
+        case UInt8(ascii: "}"), UInt8(ascii: "]"):
+            if depth == 1 { endValue() }
+            depth -= 1
+        case UInt8(ascii: ","):
+            if depth == 1 { endValue(); expectingKey = true }
+        case UInt8(ascii: ":"):
+            if depth == 1, let read = lastKey {
+                lastKey = nil
+                if read == "result" || read == "error" { isReply = true }
+                if read == "id" || read == "method" { valueFor = read }
+            }
+        case 0x20, 0x09, 0x0A, 0x0D:
+            break
+        default:
+            if depth == 1, valueFor != nil {
+                if value == nil { value = [] }
+                keep(byte)
+            }
+        }
+    }
+
+    private mutating func keep(_ byte: UInt8) {
+        guard value != nil else { return }
+        if value!.count < Self.valueKept {
+            value!.append(byte)
+        } else {
+            value = nil
+            valueFor = nil
+        }
+    }
+
+    private mutating func endValue() {
+        defer { value = nil; valueFor = nil }
+        guard let raw = value, let name = valueFor,
+              let decoded = try? JSONDecoder().decode(JSONValue.self, from: Data(raw)) else { return }
+        if name == "id" {
+            id = decoded
+        } else if let text = decoded.stringValue {
+            method = text
+        }
     }
 }
 

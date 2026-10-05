@@ -135,66 +135,33 @@ public actor JSONRPCConnection {
         }
     }
 
-    /// A line the transport would not hold, too long to read (#209). What it was is
-    /// guessed from how it began: a reply to one of our calls fails that call, a request
-    /// is refused so the far end is not left waiting, and anything else — a notification
-    /// — goes on as the cut notification itself, for whoever reads them to note.
+    /// A line the transport would not hold, too long to read (#209). What it was is read
+    /// from its top level as it went by, wherever its keys came: a reply to one of our
+    /// calls fails that call, a request is refused so the far end is not left waiting,
+    /// and a notification goes on as the cut notification itself, for whoever reads
+    /// them to note. A reply whose id was never found cannot be matched to its call, so
+    /// the connection is closed, failing every call, rather than leave one waiting for good.
     private func answerForCutLine(_ params: JSONValue?) {
         let bytes = params?["bytes"]?.intValue ?? 0
-        let start = params?["start"]?.stringValue ?? ""
-        let (id, method) = Self.idAndMethod(beginning: start)
+        let id: JSONRPCID? = params?["id"].flatMap { value in
+            value.intValue.map(JSONRPCID.number) ?? value.stringValue.map(JSONRPCID.string)
+        }
+        let method = params?["method"]?.stringValue
+        let isReply = params?["reply"] == .bool(true)
         let error = JSONRPCError(code: JSONRPCError.invalidRequest,
                                  message: "A message of \(bytes) bytes was too long to read.")
-        WireLog.write("json-rpc: cut a line of \(bytes) bytes (\(method ?? (id == nil ? "?" : "a reply")))")
+        WireLog.write("json-rpc: cut a line of \(bytes) bytes (\(method ?? (isReply ? "a reply" : "?")))")
         switch (id, method) {
         case (let id?, nil):
             pending.removeValue(forKey: id)?.resume(throwing: error)
         case (let id?, _?):
             try? send(.failure(id: id, error: error))
+        case (nil, _) where isReply && params?["id"] == nil:
+            finish(with: error)
+            transport.close()
         case (nil, _):
             notificationsContinuation.yield((LineSplitter.cutMethod, params))
         }
-    }
-
-    /// The top-level `id` and `method` of a message, read from its first bytes: only those
-    /// before its `params`, `result` or `error`, where any other `id` would be nested.
-    static func idAndMethod(beginning start: String) -> (JSONRPCID?, String?) {
-        let body = ["\"params\"", "\"result\"", "\"error\""]
-            .compactMap { start.range(of: $0)?.lowerBound }.min()
-        let head = body.map { String(start[..<$0]) } ?? start
-        var id: JSONRPCID?
-        switch Self.value(of: "id", in: head) {
-        case let raw? where raw.hasPrefix("\""):
-            if let text = try? JSONDecoder().decode(String.self, from: Data(raw.utf8)) { id = .string(text) }
-        case let raw?:
-            if let number = Int(raw) { id = .number(number) }
-        case nil:
-            break
-        }
-        let method = Self.value(of: "method", in: head).flatMap {
-            try? JSONDecoder().decode(String.self, from: Data($0.utf8))
-        }
-        return (id, method)
-    }
-
-    /// The raw JSON of `key`'s value in `text` when it is a number or a string, as written.
-    private static func value(of key: String, in text: String) -> String? {
-        guard let found = text.range(of: "\"\(key)\"") else { return nil }
-        var rest = text[found.upperBound...].drop { $0 == " " || $0 == "\t" }
-        guard rest.first == ":" else { return nil }
-        rest = rest.dropFirst().drop { $0 == " " || $0 == "\t" }
-        if rest.first == "\"" {
-            var escaped = false
-            for index in rest.indices.dropFirst() {
-                let character = rest[index]
-                if escaped { escaped = false } else if character == "\\" { escaped = true } else if character == "\"" {
-                    return String(rest[...index])
-                }
-            }
-            return nil
-        }
-        let number = rest.prefix { $0 == "-" || $0.isNumber }
-        return number.isEmpty ? nil : String(number)
     }
 
     private func finish(with error: any Error) {

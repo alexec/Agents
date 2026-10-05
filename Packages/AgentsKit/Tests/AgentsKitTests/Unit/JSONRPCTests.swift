@@ -152,6 +152,21 @@ struct JSONRPCUnreadableLineTests {
         await client.close()
     }
 
+    /// A reply too long to read whose id was never found cannot be matched to its call,
+    /// so the connection closes and every call fails, rather than one waiting for good.
+    @Test func aCutReplyWithNoIdClosesTheConnection() async throws {
+        let (mine, theirs) = PairedTransport.pair()
+        let client = JSONRPCConnection(transport: mine)
+        await client.start()
+        let call = Task { try await client.call("session/load") }
+        var requests = theirs.lines().makeAsyncIterator()
+        _ = try #require(try await requests.next())
+        try theirs.write(line: LineSplitter.cut(start: Array(#"{"jsonrpc":"2.0","result":{"#.utf8),
+                                                bytes: 40 << 20, limit: 16 << 20))
+        await #expect(throws: (any Error).self) { try await call.value }
+        await client.close()
+    }
+
     /// A request too long to read is refused, so the far end is not left waiting either.
     @Test func aCutRequestIsRefused() async throws {
         let (mine, theirs) = PairedTransport.pair()

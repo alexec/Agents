@@ -90,6 +90,11 @@ public final class RuntimeProcess: @unchecked Sendable {
             throw CouldNotStart(executable: executable.path, reason: String(cString: strerror(status)))
         }
         processIdentifier = pid
+        // Written without blocking, so a runtime that stops reading its stdin cannot hold
+        // a write, and with it `close`, for good (#209): `FDTransport.write` waits for room
+        // a moment at a time and gives up once the transport is closed. The end is ours
+        // alone; the child's is the read end.
+        _ = fcntl(stdin.write, F_SETFL, fcntl(stdin.write, F_GETFL) | O_NONBLOCK)
         transport = FDTransport(readFD: stdout.read, writeFD: stdin.write,
                                 maximumLine: FDTransport.runtimeLineLimit)
         heldDescriptors = [stdout.read, stdin.write, stderr.read]

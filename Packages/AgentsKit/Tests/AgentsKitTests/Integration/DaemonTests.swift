@@ -712,9 +712,9 @@ struct DaemonTests {
         let (locations, work) = try temporary()
         let store = try AgentStore(locations: locations)
         let looping = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s",
-                            restartPickUps: DaemonCore.pickUpsBeforeLeavingAlone)
+                            restartPickUps: Agent.pickUpsBeforeLeavingAlone)
         let fine = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "t",
-                         restartPickUps: DaemonCore.pickUpsBeforeLeavingAlone - 1)
+                         restartPickUps: Agent.pickUpsBeforeLeavingAlone - 1)
         try await store.save(looping)
         try await store.save(fine)
 
@@ -740,7 +740,7 @@ struct DaemonTests {
         let (locations, work) = try temporary()
         let store = try AgentStore(locations: locations)
         let tried = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s",
-                          restartPickUps: DaemonCore.pickUpsBeforeLeavingAlone - 1)
+                          restartPickUps: Agent.pickUpsBeforeLeavingAlone - 1)
         try await store.save(tried)
 
         let core = try core(FakeLauncher(), locations: locations)
