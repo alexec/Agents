@@ -66,11 +66,13 @@ public enum SessionLookup {
     /// leasing one alone. The ones not archived come first; the page ends with how many
     /// follow and the `after` that gives them. `leftBehind` are retired sessions whose
     /// worktree is still there (#211), listed after the last page as `Retired`, so that
-    /// worktree is still somebody's to clean up.
+    /// worktree is still somebody's to clean up: a page's worth, newest first, since each
+    /// one cleaned up leaves the list and makes room for the next.
     public static func list(in project: URL, agents: some Sequence<Agent>, caller: UUID?,
                             holding: [UUID: [String]] = [:], limit: Int? = nil,
                             after: String? = nil, leftBehind: [Tombstone] = []) -> String {
-        let retired = retiredLines(leftBehind)
+        let size = min(max(1, limit ?? pageSize), largestPage)
+        let retired = retiredLines(leftBehind, limit: size)
         let sorted = sessions(in: project, agents: agents)
         guard !sorted.isEmpty else {
             return retired.isEmpty ? "There are no sessions in this project." : retired.joined(separator: "\n")
@@ -84,7 +86,6 @@ public enum SessionLookup {
             }
             from = at + 1
         }
-        let size = min(max(1, limit ?? pageSize), largestPage)
         let page = all[from..<min(from + size, all.count)]
         guard !page.isEmpty else {
             return retired.isEmpty ? "There are no more sessions in this project." : retired.joined(separator: "\n")
@@ -118,10 +119,11 @@ public enum SessionLookup {
         return text
     }
 
-    /// The retired sessions whose worktree is still there, under a line saying what they
-    /// are, or nothing when there are none.
-    static func retiredLines(_ leftBehind: [Tombstone]) -> [String] {
-        let lines = leftBehind.sorted { $0.retiredAt > $1.retiredAt }.compactMap { gone -> String? in
+    /// The newest `limit` retired sessions whose worktree is still there, under a line
+    /// saying what they are, and how many more there are; or nothing when there are none.
+    static func retiredLines(_ leftBehind: [Tombstone], limit: Int = largestPage) -> [String] {
+        let all = leftBehind.filter { $0.worktreeRoot != nil }.sorted { $0.retiredAt > $1.retiredAt }
+        var lines = all.prefix(max(1, limit)).compactMap { gone -> String? in
             guard let root = gone.worktreeRoot else { return nil }
             let name = gone.title.map { "\u{201C}\($0)\u{201D}" } ?? "Untitled"
             return "- \(gone.id.uuidString): \(name) — \(PoolWords.runtimeName(gone.runtimeID)), "
@@ -129,6 +131,10 @@ public enum SessionLookup {
                 + (gone.worktreeBranch.map { " on \($0)" } ?? "") + "."
         }
         guard !lines.isEmpty else { return [] }
+        if all.count > lines.count {
+            lines.append("\(all.count - lines.count) more retired sessions still have their worktree; "
+                         + "they are listed here as these are cleaned up.")
+        }
         return ["Retired sessions whose worktree is still there. Their conversations are gone; "
                 + "what is in each worktree was not committed when it retired."] + lines
     }

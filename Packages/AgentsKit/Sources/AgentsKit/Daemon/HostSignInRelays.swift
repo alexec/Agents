@@ -18,11 +18,21 @@ public final class HostSignInRelays: @unchecked Sendable {
     private var relays: [String: MacSignInRelay] = [:]
     private var sources: [String: any MacSignInSource] = [:]
     /// `hosts/relay.log`, rolled at 1 MB and kept open (#211).
-    private let log = DaemonLog(limit: 1024 * 1024)
+    private let log = DaemonLog(limit: HostSignInRelays.logLimit)
+    static let logLimit = 1024 * 1024
 
     public init(locations: StoreLocations) {
         self.locations = locations
         try? FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
+        // One written before the limit can be any size, and rolling would only move it to
+        // relay.previous.log whole: it goes, as it says only what was asked and answered.
+        for name in ["relay.log", "relay.previous.log"] {
+            let file = locations.hostsFolder.appendingPathComponent(name)
+            if let size = try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int,
+               size > Self.logLimit {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
         log.setDestination(locations.hostsFolder.appendingPathComponent("relay.log"))
     }
 

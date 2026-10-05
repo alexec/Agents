@@ -85,6 +85,31 @@ struct DiskBoundsTests {
         #expect(FileManager.default.fileExists(atPath: outside.appendingPathComponent("inside").path))
     }
 
+    /// A folder an agent replaced with a link, or reached through a link below the folder it
+    /// must be inside, is not swept: what the link points to is somebody else's (#211 review).
+    @Test func aFolderThatIsALinkIsNotSwept() throws {
+        let root = try root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let elsewhere = root.appendingPathComponent("elsewhere", isDirectory: true)
+        try make(elsewhere.appendingPathComponent("old.txt"), changed: now.addingTimeInterval(-60 * day))
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work.appendingPathComponent(".agents"), withIntermediateDirectories: true)
+        // The swept folder itself a link.
+        let attachments = work.appendingPathComponent(".agents/attachments")
+        try FileManager.default.createSymbolicLink(at: attachments, withDestinationURL: elsewhere)
+        #expect(DiskSweep.removeOlder(than: day, in: attachments, within: work, now: now) == 0)
+        // A link between the folder it must be inside and the swept one.
+        let linked = root.appendingPathComponent("linked", isDirectory: true)
+        try FileManager.default.createDirectory(at: linked, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: linked.appendingPathComponent(".agents"),
+                                                   withDestinationURL: root)
+        #expect(DiskSweep.removeOlder(than: day, in: linked.appendingPathComponent(".agents/elsewhere"),
+                                      within: linked, now: now) == 0)
+        #expect(names(in: elsewhere) == ["old.txt"])
+        // The same folder, really there, is swept.
+        #expect(DiskSweep.removeOlder(than: day, in: elsewhere, within: root, now: now) == 1)
+    }
+
     @Test func aMissingFolderIsNothingToSweep() {
         let nowhere = URL(fileURLWithPath: "/tmp/agd-none-\(UUID().uuidString)")
         #expect(DiskSweep.removeOlder(than: day, in: nowhere, now: now) == 0)
@@ -128,5 +153,25 @@ struct DiskBoundsTests {
         #expect(size(log) <= 1024 * 1024)
         #expect(size(previous) <= 1024 * 1024)
         #expect(size(previous) > 0)
+    }
+
+    /// A relay.log written before the limit is not moved whole to relay.previous.log, where
+    /// it would stay over the limit: it goes as the daemon starts (#211 review).
+    @Test func anOversizedRelayLogFromBeforeGoes() throws {
+        let root = try root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let locations = StoreLocations(root: root)
+        try FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
+        let log = locations.hostsFolder.appendingPathComponent("relay.log")
+        let previous = locations.hostsFolder.appendingPathComponent("relay.previous.log")
+        try Data(count: 3 * 1024 * 1024).write(to: log)
+        try Data(count: 2 * 1024 * 1024).write(to: previous)
+        let relays = HostSignInRelays(locations: locations)
+        relays.write("asked")
+
+        let size = { (url: URL) in (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0 }
+        #expect(size(log) <= 1024 * 1024)
+        #expect(size(log) > 0)
+        #expect(size(previous) <= 1024 * 1024)
     }
 }

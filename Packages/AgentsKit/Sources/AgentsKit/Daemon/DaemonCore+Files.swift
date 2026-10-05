@@ -72,7 +72,7 @@ extension DaemonCore {
         let folder = agent.cwd.appendingPathComponent(".agents/attachments", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
-        DiskSweep.removeOlder(than: DiskSweep.attachmentAge, in: folder, now: now())
+        DiskSweep.removeOlder(than: DiskSweep.attachmentAge, in: folder, within: agent.cwd, now: now())
         let file = folder.appendingPathComponent("\(UUID().uuidString.prefix(8))-\(name)")
         try request.data.write(to: file, options: .atomic)
         return DaemonAPI.FilesWriteResponse(path: file.path(percentEncoded: false))

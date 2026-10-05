@@ -4,7 +4,8 @@ import Foundation
 /// and among what filled it were folders only the app writes and nothing ever emptied.
 ///
 /// Each rule looks at one folder's own entries, never deeper, and never follows a link out
-/// of it: a link in the folder is removed as a link.
+/// of it: a link in the folder is removed as a link, and a folder that is itself a link, or
+/// is reached through one below `within`, is not swept at all.
 public enum DiskSweep {
     /// How long an entry in a runtime's own temporary folder is kept: OpenCode's fills
     /// with the `TemporaryDirectory.*` folders of every build its agents run.
@@ -26,16 +27,19 @@ public enum DiskSweep {
                   temporary.hasPrefix(RuntimeLaunch.rootPlaceholder) else { continue }
             let folder = URL(filePath: temporary.replacingOccurrences(of: RuntimeLaunch.rootPlaceholder, with: root),
                              directoryHint: .isDirectory)
-            removeOlder(than: temporaryAge, in: folder, now: now)
+            removeOlder(than: temporaryAge, in: folder, within: locations.root, now: now)
         }
     }
 
     /// Remove every entry of `folder` last changed more than `age` before `now`. Says how
-    /// many went. A folder that is not there is nothing to do.
+    /// many went. A folder that is not there is nothing to do. `within` is the folder it
+    /// must really be inside, with no link on the way: an agent can replace a folder in its
+    /// checkout with a link to anything.
     @discardableResult
-    public static func removeOlder(than age: TimeInterval, in folder: URL, now: Date = Date()) -> Int {
+    public static func removeOlder(than age: TimeInterval, in folder: URL, within: URL? = nil,
+                                   now: Date = Date()) -> Int {
         var removed = 0
-        for (entry, changed) in entries(of: folder) where now.timeIntervalSince(changed) > age {
+        for (entry, changed) in entries(of: folder, within: within) where now.timeIntervalSince(changed) > age {
             if (try? FileManager.default.removeItem(at: entry)) != nil { removed += 1 }
         }
         return removed
@@ -55,14 +59,39 @@ public enum DiskSweep {
     }
 
     /// `folder`'s own entries and when each last changed. `attributesOfItem` does not
-    /// follow a link, so a link is judged as the link, not as what it points to.
-    static func entries(of folder: URL) -> [(url: URL, changed: Date)] {
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else { return [] }
+    /// follow a link, so a link is judged as the link, not as what it points to. The
+    /// entries are named under the folder's real path, found once, so a link put in place
+    /// of the folder afterwards is not followed either.
+    static func entries(of folder: URL, within: URL? = nil) -> [(url: URL, changed: Date)] {
+        guard let real = realFolder(folder, within: within),
+              let names = try? FileManager.default.contentsOfDirectory(atPath: real.path) else { return [] }
+        let folder = real
         return names.compactMap { name in
             let url = folder.appendingPathComponent(name)
             guard let changed = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
             else { return nil }
             return (url, changed)
         }
+    }
+
+    /// `folder`'s real path, or nil when it is not there, is itself a link, or is not
+    /// really inside `within` by the same names (a link somewhere between them).
+    static func realFolder(_ folder: URL, within: URL?) -> URL? {
+        let path = folder.standardizedFileURL.path
+        var info = stat()
+        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+              let real = realPath(path) else { return nil }
+        if let within {
+            let base = within.standardizedFileURL.path
+            guard path.hasPrefix(base + "/"), let realBase = realPath(base),
+                  real == realBase + path.dropFirst(base.count) else { return nil }
+        }
+        return URL(filePath: real, directoryHint: .isDirectory)
+    }
+
+    private static func realPath(_ path: String) -> String? {
+        guard let resolved = realpath(path, nil) else { return nil }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 }
