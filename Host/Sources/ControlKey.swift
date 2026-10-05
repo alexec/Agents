@@ -27,6 +27,12 @@ enum HostSecrets {
         return made
     }
 
+    /// The control plane's key, written to `file` for the person to copy to another machine:
+    /// whole and synced, or not at all, and thrown when the disk refuses it (#212).
+    static func saveControlKey(_ paths: HostPaths, to file: URL) throws {
+        try StoreCoding.writeAtomically(try controlKey(paths), to: file, permissions: 0o600)
+    }
+
     static func bucketKeys(_ paths: HostPaths) -> BucketKeys? {
         let data = paths.scratch ? try? Data(contentsOf: bucketFile(paths)) : read(account: "bucket-keys")
         return data.flatMap { try? JSONDecoder().decode(BucketKeys.self, from: $0) }
@@ -35,8 +41,7 @@ enum HostSecrets {
     static func saveBucketKeys(_ keys: BucketKeys, _ paths: HostPaths) throws {
         let data = try JSONEncoder().encode(keys)
         if paths.scratch {
-            try FileManager.default.createDirectory(at: paths.controlHome, withIntermediateDirectories: true)
-            FileManager.default.createFile(atPath: bucketFile(paths).path, contents: data, attributes: [.posixPermissions: 0o600])
+            try StoreCoding.writeAtomically(data, to: bucketFile(paths), permissions: 0o600)
         } else {
             try write(data, account: "bucket-keys")
         }

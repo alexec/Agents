@@ -64,7 +64,14 @@ final class MachineReturn {
         if shared { return await checkShared() }
         // This Mac's copy: forwarding stops, the store from before is kept aside, and it
         // starts empty to receive.
-        if model.settings.receiving != true { aside = await model.prepareReturn() }
+        if model.settings.receiving != true {
+            do {
+                aside = try await model.prepareReturn()
+            } catch {
+                ready = .no("\(error)")
+                return
+            }
+        }
         for _ in 0..<40 {
             if let mine = await HandoverTool.status(["--at", "self"], model: model) {
                 ready = mine.phase == "receiving" && !mine.hasRecords ? .yes

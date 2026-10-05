@@ -54,8 +54,9 @@ enum ControlConfig {
         case .remote(let membership):
             guard let key = try? ControlAgreement.loadOrMake(file: keyFile),
                   let dial = try? ControlCodeUse.clientDial(membership, privateKey: key, kind: "mac", dial: dial, keep: { newer in
-                      // The control plane moved, or changed its certificate (R16): kept for next time.
-                      try? newer.save(membershipFile)
+                      // The control plane moved, or changed its certificate (R16): kept for next time,
+                      // and tried again at the next answer if the disk refused it (#212).
+                      try newer.save(membershipFile)
                   }) else { return nil }
             return ControlLink(dial: dial)
         }

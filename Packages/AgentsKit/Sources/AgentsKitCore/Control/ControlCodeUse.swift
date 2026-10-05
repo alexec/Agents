@@ -109,14 +109,17 @@ public enum ControlCodeUse {
 
 /// The endpoints a member dials, and the one that last answered, which it tries first
 /// (058, research R16). The control plane may give a newer list in any `ok`: the book
-/// takes it in place of its own, and hands the membership to `keep` to save.
+/// takes it in place of its own, and hands the membership to `keep` to save. A save that
+/// throws (a full disk, #212) is tried again at the next `ok`, so a move is not forgotten
+/// by the next launch because the disk refused it once.
 public final class EndpointBook: @unchecked Sendable {
-    public typealias Keep = @Sendable (ControlMembership) -> Void
+    public typealias Keep = @Sendable (ControlMembership) throws -> Void
 
     private let lock = NSLock()
     private var membership: ControlMembership
     private var lastAnswered: ControlEndpoint?
     private let keep: Keep?
+    private var unsaved = false
 
     public init(_ membership: ControlMembership, keep: Keep? = nil) {
         self.membership = membership
@@ -136,14 +139,22 @@ public final class EndpointBook: @unchecked Sendable {
         }
     }
 
+    /// Whether a newer list is held that `keep` could not save yet.
+    public var holdsUnsaved: Bool { lock.withLock { unsaved } }
+
     /// An endpoint answered with `ok`: remember it, and take a newer list if it gave one.
+    /// A list `keep` could not save is taken all the same, and handed to it again next time;
+    /// `keep` says why it could not.
     public func answered(at endpoint: ControlEndpoint, ok: ControlAuth.OK) {
         let changed = lock.withLock { () -> ControlMembership? in
             lastAnswered = endpoint
-            guard let newer = membership.adopting(ok.endpoints, epoch: ok.epoch) else { return nil }
-            membership = newer
-            return newer
+            if let newer = membership.adopting(ok.endpoints, epoch: ok.epoch) {
+                membership = newer
+                unsaved = true
+            }
+            return unsaved ? membership : nil
         }
-        if let changed { keep?(changed) }
+        guard let changed, let keep, (try? keep(changed)) != nil else { return }
+        lock.withLock { if membership == changed { unsaved = false } }
     }
 }

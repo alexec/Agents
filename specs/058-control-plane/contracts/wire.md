@@ -64,7 +64,11 @@ Three messages open every socket. Nothing else is accepted until the server's `o
 ```
 or `hosts/announce`. The reply carries the record. The socket then closes, and the party
 reconnects with its own identity. Using the code creates `codes/<id>.spent` first (store.md),
-so a second use is `refused: spent`.
+holding the announcing public key and the id it was given. A spent code still passes the
+handshake, and its announce decides (#212): the same public key again, before the code
+expires, is the same join, answered with the id it was given the first time, because a party
+whose disk refused to keep its membership must be able to try again. Any other key is refused
+with "This code has been used. Ask for a new one."
 
 **A relayed device (T096).** `agents-relay` opens a socket of its own to the control plane's
 address, with the pin, for each device session it carries, and proves nothing on it. It passes

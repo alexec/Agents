@@ -53,6 +53,11 @@ public enum PairingAttempt {
             return "Couldn’t reach the control plane. Check it’s running and \(device) can reach it, then try again."
         case is CancellationError:
             return "Stopped before it finished. Try again when you’re ready."
+        case _ where WriteFailure(error, keeping: "the pairing") != nil:
+            // Paired, and not kept (#212): the control plane takes the same code from the
+            // same key again until it runs out.
+            let failure = WriteFailure(error, keeping: "the pairing", machine: device.prefix(1).uppercased() + device.dropFirst())
+            return (failure?.message ?? "") + " The same code works until it runs out."
         default:
             return "The control plane didn’t take that code. It may have run out: show a new one and try again."
         }
