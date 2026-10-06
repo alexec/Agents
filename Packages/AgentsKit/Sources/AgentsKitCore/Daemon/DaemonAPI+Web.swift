@@ -45,6 +45,7 @@ public extension DaemonAPI {
                 Row(Method.projectsList, params: ProjectsListRequest.self, result: [ProjectSummary].self, kind: .hostRequest),
                 Row(Method.agentsList, params: ListRequest.self, result: [Agent].self, kind: .hostRequest),
                 Row(Method.agentsTranscript, params: TranscriptRequest.self, result: TranscriptPage.self, kind: .hostRequest),
+                Row(Method.agentsTouchedPaths, params: AgentRequest.self, result: [String].self, kind: .hostRequest),
                 Row(Method.agentsTurns, params: TurnsRequest.self, result: TurnsPage.self, kind: .hostRequest),
                 Row(Method.agentsOptions, params: OptionsRequest.self, result: OptionsResponse.self, kind: .hostRequest),
                 Row(Method.agentsDiscardDraft, params: DiscardDraftRequest.self, result: Empty.self, kind: .hostRequest),
