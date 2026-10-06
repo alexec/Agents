@@ -12,9 +12,15 @@ extension DaemonAPI.Method {
     /// A server not in the registry: connect to it before anything is written (#305).
     public static let mcpVerify = "mcp/verify"
     public static let mcpAddByHand = "mcp/add-by-hand"
+    /// Sign in to a server that asks for OAuth (#306): start it, wait on it, cancel it.
+    public static let mcpSignIn = "mcp/sign-in"
+    public static let mcpSignInWait = "mcp/sign-in/wait"
+    public static let mcpSignInCancel = "mcp/sign-in/cancel"
+    public static let mcpSignOut = "mcp/sign-out"
 
     public static let mcpCatalogMethods: [String] = [
         mcpPreview, mcpAdd, mcpList, mcpApprove, mcpSetSecret, mcpRemove, mcpVerify, mcpAddByHand,
+        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut,
     ]
 }
 
@@ -362,11 +368,15 @@ extension DaemonAPI {
         /// Every `${NAME}` the entry names, set or not.
         public var secretNames: [String]
         public var entryDigest: String
+        /// Signed in, or asking for a sign-in (#306). Nil for a server that never asked.
+        /// Never the grant itself.
+        public var signIn: MCPSignInState?
 
         public var id: String { name }
 
         public init(name: String, summary: String, managed: ManagedMCPServer?, approval: MCPApprovalState,
-                    missingSecrets: [String], secretNames: [String] = [], entryDigest: String) {
+                    missingSecrets: [String], secretNames: [String] = [], entryDigest: String,
+                    signIn: MCPSignInState? = nil) {
             self.name = name
             self.summary = summary
             self.managed = managed
@@ -374,6 +384,7 @@ extension DaemonAPI {
             self.missingSecrets = missingSecrets
             self.secretNames = secretNames
             self.entryDigest = entryDigest
+            self.signIn = signIn
         }
     }
 
@@ -404,6 +415,96 @@ extension DaemonAPI {
             self.name = name
             self.digest = digest
         }
+    }
+}
+
+// MARK: Signing in to a server (#306)
+
+extension DaemonAPI {
+    /// What a row says of a server's sign-in. The grant stays in the daemon.
+    public enum MCPSignInState: String, Codable, Hashable, Sendable {
+        case signedIn
+        case needsSignIn
+    }
+
+    /// The server to sign in to: one in an `mcp.json`, or one typed on the by-hand sheet
+    /// and not written yet.
+    public enum MCPSignInTarget: Codable, Hashable, Sendable {
+        case entry(destination: SkillDestination, name: String)
+        case url(name: String, url: String)
+
+        public var name: String {
+            switch self {
+            case .entry(_, let name), .url(let name, _): name
+            }
+        }
+    }
+
+    /// A client the person registered with the server's sign-in themselves, for one that
+    /// does not let apps register (GitHub's). The secret, when there is one, is kept with
+    /// the sign-ins and never shown again.
+    public struct MCPSignInClient: Codable, Hashable, Sendable {
+        public var id: String
+        public var secret: String?
+        public init(id: String, secret: String? = nil) {
+            self.id = id; self.secret = secret
+        }
+    }
+
+    public struct MCPSignInRequest: Codable, Sendable {
+        public var target: MCPSignInTarget
+        public var client: MCPSignInClient?
+        public init(target: MCPSignInTarget, client: MCPSignInClient? = nil) {
+            self.target = target; self.client = client
+        }
+    }
+
+    public struct MCPSignInAnswer: Codable, Sendable {
+        /// What to wait on.
+        public var flowID: UUID?
+        /// The page to open in the browser.
+        public var authorizationURL: String?
+        /// The sign-in has no registration: ask the person for a client of their own,
+        /// registered with this issuer, and start again with it.
+        public var needsClient: String?
+        /// The loopback address that client must allow as its callback.
+        public var callback: String?
+        /// Why it could not start, in words.
+        public var error: String?
+
+        public init(flowID: UUID? = nil, authorizationURL: String? = nil, needsClient: String? = nil,
+                    callback: String? = nil, error: String? = nil) {
+            self.flowID = flowID; self.authorizationURL = authorizationURL; self.needsClient = needsClient
+            self.callback = callback; self.error = error
+        }
+    }
+
+    public struct MCPSignInFlowRequest: Codable, Sendable {
+        public var flowID: UUID
+        public init(flowID: UUID) { self.flowID = flowID }
+    }
+
+    public enum MCPSignInStatus: Codable, Hashable, Sendable {
+        /// Still waiting for the browser: ask again.
+        case waiting
+        case signedIn
+        case failed(String)
+        case cancelled
+    }
+
+    public struct MCPSignInWaitAnswer: Codable, Sendable {
+        public var status: MCPSignInStatus
+        public init(status: MCPSignInStatus) { self.status = status }
+    }
+
+    public struct MCPSignOutRequest: Codable, Sendable {
+        public var target: MCPSignInTarget
+        public init(target: MCPSignInTarget) { self.target = target }
+    }
+
+    public struct MCPSignOutAnswer: Codable, Sendable {
+        public var error: String?
+        public init(error: String? = nil) { self.error = error }
     }
 }
 

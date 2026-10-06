@@ -166,7 +166,13 @@ extension DaemonCore {
         for (name, reason) in plan.dropped where reason != .mcpFileProblem {
             DaemonLog.shared.write("session servers: \(name) left out of a \(runtimeID) session: \(reason)")
         }
-        return await bridged(plan.servers, runtimeID: runtimeID, token: token, cwd: cwd)
+        // A server signed in to goes with a fresh bearer; one that still needs a sign-in is
+        // left out, as one with a secret not set is (#306).
+        let signedIn = await mcpSignIns.signedIn(plan.servers, except: [app.name])
+        for name in signedIn.leftOut {
+            DaemonLog.shared.write("session servers: \(name) left out of a \(runtimeID) session: needs sign-in")
+        }
+        return await bridged(signedIn.servers, runtimeID: runtimeID, token: token, cwd: cwd)
     }
 
     static func noHTTPRefusal(_ runtime: String) -> String {

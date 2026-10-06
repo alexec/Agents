@@ -109,6 +109,7 @@ private struct ProjectMCPRow: View {
     @State private var setting: [String] = []
     @State private var replacing = false
     @State private var removing = false
+    @State private var signingIn = false
 
     private var setSecrets: [String] {
         server.secretNames.filter { !server.missingSecrets.contains($0) }
@@ -118,7 +119,7 @@ private struct ProjectMCPRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .appText(.reading)
-                .foregroundStyle((isWaiting || !server.missingSecrets.isEmpty ? StateTint.attention : StateTint.none).style(or: .secondary))
+                .foregroundStyle((isWaiting || !server.missingSecrets.isEmpty || needsSignIn ? StateTint.attention : StateTint.none).style(or: .secondary))
                 .accessibilityLabel(isWaiting ? "Waiting for your OK" : "Server")
                 .padding(.top, 1)
 
@@ -132,6 +133,8 @@ private struct ProjectMCPRow: View {
                     ForEach(server.missingSecrets, id: \.self) { name in
                         SharedChip(text: "\(name) not set", tone: .attention)
                     }
+                    if needsSignIn { SharedChip(text: "needs sign-in", tone: .attention) }
+                    if server.signIn == .signedIn { SharedChip(text: "signed in", tone: .source) }
                 }
                 Text(detail).appText(.supporting).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 if let note {
@@ -160,6 +163,21 @@ private struct ProjectMCPRow: View {
                     Button("Replace…") {
                         replacing = true
                         setting = setSecrets
+                    }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+                }
+                if needsSignIn {
+                    Button("Sign in…") { signingIn = true }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
+                }
+                if server.signIn == .signedIn {
+                    Button("Sign out") {
+                        Task {
+                            failed(await model.mcpSignOut(signInTarget))
+                            changed()
+                        }
                     }
                     .buttonStyle(.paper)
                     .appText(.fine)
@@ -193,6 +211,9 @@ private struct ProjectMCPRow: View {
         .sheet(isPresented: Binding(get: { !setting.isEmpty }, set: { if !$0 { setting = [] } })) {
             SetSecretSheet(serverName: server.name, names: setting, replacing: replacing, onSaved: changed)
         }
+        .sheet(isPresented: $signingIn) {
+            MCPSignInSheet(target: signInTarget, onSignedIn: changed)
+        }
         .sheet(isPresented: $removing) {
             RemoveMCPServerSheet(server: server, destination: place.destination,
                                  forgettable: RemoveMCPServerSheet.forgettable(server, among: servers),
@@ -201,13 +222,19 @@ private struct ProjectMCPRow: View {
         }
     }
 
+    private var needsSignIn: Bool { server.signIn == .needsSignIn }
+
+    private var signInTarget: DaemonAPI.MCPSignInTarget {
+        .entry(destination: place.destination, name: server.name)
+    }
+
     private var isWaiting: Bool {
         if case .waiting = server.approval { true } else { false }
     }
 
     private var icon: String {
         if isWaiting { return "hand.raised" }
-        if !server.missingSecrets.isEmpty { return "exclamationmark.triangle" }
+        if !server.missingSecrets.isEmpty || needsSignIn { return "exclamationmark.triangle" }
         return "point.3.connected.trianglepath.dotted"
     }
 
@@ -226,6 +253,9 @@ private struct ProjectMCPRow: View {
         if let name = server.missingSecrets.first {
             let extra = server.missingSecrets.count > 1 ? " (and \(server.missingSecrets.dropFirst().joined(separator: ", ")))" : ""
             return "Agents here start without it until you set \(name)\(extra)."
+        }
+        if needsSignIn {
+            return "It asks you to sign in. Agents start without it until you do."
         }
         return nil
     }
