@@ -524,6 +524,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.TranscriptRequest.self)
                 return .success(try JSONValue.encoding(try await transcript(request)))
 
+            case DaemonAPI.Method.agentsTouchedPaths:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                return .success(try JSONValue.encoding(try await touchedPaths(request)))
+
             case DaemonAPI.Method.agentsTurns:
                 let request = try require(params, as: DaemonAPI.TurnsRequest.self)
                 return .success(try JSONValue.encoding(try await turns(request)))

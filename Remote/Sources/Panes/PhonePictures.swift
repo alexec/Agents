@@ -1,6 +1,7 @@
 import AgentsKitCore
 import UIKit
 import WebKit
+import ImageIO
 
 /// The pictures a page shows, read from the Mac and kept while they are recently used (034).
 ///
@@ -25,9 +26,13 @@ final class PhonePictures {
 
     /// About a page or two of diagrams.
     static let limit = 24
+    private static let byteLimit = 64 * 1_024 * 1_024
 
     private let files: RemoteFiles
-    private var held = LRUCache<URL, Held>(limit: PhonePictures.limit)
+    private var held = LRUCache<URL, Held>(limit: 100_000)
+    private var costs: [URL: Int] = [:]
+    private var heldBytes = 0
+    private var recency: [URL] = []
     private var memoryWarnings: (any NSObjectProtocol)?
     /// One read and draw per picture at a time. The page asks for a picture's stamp and
     /// for the picture itself at the same moment, and two web views drawing the same
@@ -42,6 +47,9 @@ final class PhonePictures {
             MainActor.assumeIsolated {
                 note("pictures: memory is short; letting \(self?.held.count ?? 0) go")
                 self?.held.removeAll()
+                self?.costs.removeAll()
+                self?.heldBytes = 0
+                self?.recency.removeAll()
             }
         }
     }
@@ -56,7 +64,7 @@ final class PhonePictures {
     }
 
     func image(agentID: UUID, url: URL) async -> UIImage? {
-        if let image = held.value(for: url)?.image { return image }
+        if let image = held.value(for: url)?.image { touch(url); return image }
         return await refresh(agentID: agentID, url: url)?.image
     }
 
@@ -79,7 +87,7 @@ final class PhonePictures {
                 retry.image = image
                 retry.undrawn = nil
             }
-            held.set(retry, for: url)
+            store(retry, for: url)
             return retry
         }
         guard let reading = try? await files.read(agentID: agentID, path: url.path, known: known?.stamp) else {
@@ -91,7 +99,7 @@ final class PhonePictures {
         case .image(let bytes, _, let stamp):
             let image = await Self.decode(bytes, isSVG: Self.isSVG(url))
             let fresh = Held(stamp: stamp, image: image, undrawn: image == nil ? bytes : nil, attempts: 1)
-            held.set(fresh, for: url)
+            store(fresh, for: url)
             return fresh
         case .text(_, _, _, let stamp), .other(_, _, let stamp):
             let fresh = Held(stamp: stamp, image: nil)
@@ -100,11 +108,50 @@ final class PhonePictures {
         }
     }
 
+    private func store(_ value: Held, for url: URL) {
+        if let old = held.peek(url) { heldBytes -= costs[url] ?? Self.cost(old) }
+        let cost = Self.cost(value)
+        guard cost <= Self.byteLimit else {
+            _ = held.remove(url)
+            costs[url] = nil
+            heldBytes = max(0, heldBytes)
+            recency.removeAll { $0 == url }
+            return
+        }
+        held.set(value, for: url)
+        costs[url] = cost
+        heldBytes += cost
+        touch(url)
+        while heldBytes > Self.byteLimit, let victim = recency.first {
+            if let old = held.remove(victim) { heldBytes -= costs.removeValue(forKey: victim) ?? Self.cost(old) }
+            recency.removeAll { $0 == victim }
+        }
+        while held.count > Self.limit, let victim = recency.first {
+            if let old = held.remove(victim) { heldBytes -= costs.removeValue(forKey: victim) ?? Self.cost(old) }
+            recency.removeAll { $0 == victim }
+        }
+    }
+
+    private func touch(_ url: URL) {
+        recency.removeAll { $0 == url }
+        recency.append(url)
+    }
+
+    private static func cost(_ held: Held) -> Int {
+        held.image?.cgImage.map { $0.bytesPerRow * $0.height } ?? held.undrawn?.count ?? 0
+    }
+
     private static func isSVG(_ url: URL) -> Bool { url.pathExtension.lowercased() == "svg" }
 
     private static func decode(_ bytes: Data, isSVG: Bool) async -> UIImage? {
         if isSVG { return await SVGRaster.image(from: bytes) }
-        return UIImage(data: bytes)
+        guard let source = CGImageSourceCreateWithData(bytes as CFData, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: Int(SVGRaster.widest * 3),
+              ] as CFDictionary) else { return nil }
+        return UIImage(cgImage: image)
     }
 }
 
@@ -229,6 +276,10 @@ enum SVGRaster {
 
         func finished() async -> Bool {
             if let result { return result }
+            Task {
+                try? await Task.sleep(for: .seconds(10))
+                end(false)
+            }
             return await withCheckedContinuation { continuation = $0 }
         }
 

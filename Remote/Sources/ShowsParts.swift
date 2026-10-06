@@ -16,7 +16,7 @@ private struct ShowsParts: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onAppear { Task { await model.showing(parts) } }
+            .task { await model.showing(parts) }
             .onDisappear { model.notShowing(parts) }
     }
 }

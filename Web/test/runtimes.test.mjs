@@ -35,6 +35,24 @@ for (const { name, input, expected } of (await import("./fixtures.mjs")).cases("
   test(`runtimes: a new session opens on, ${name}`, () => assert.equal(r.newSessionRuntime(input.kept ?? undefined, input.available) ?? null, expected));
 }
 
+test("runtimes: an empty list says so when nothing on this Mac can start (#257)", () => {
+  assert.equal(r.noAgentRuntime(undefined), false, "not yet listed is not none");
+  assert.equal(r.noAgentRuntime([]), true);
+  assert.equal(r.noAgentRuntime([status("claude", "Claude", false)]), true);
+  assert.equal(r.noAgentRuntime([status("claude", "Claude"), status("codex", "Codex", false)]), false, "one that can start is enough");
+  const missing = status("goose", "Goose", false);
+  missing.runtime.installPage = "https://example.com/goose";
+  assert.deepEqual(r.emptyListRuntimeLine(missing), { line: "Not on this Mac", failed: false, page: "https://example.com/goose" });
+  missing.runtime.install = { toolset: { runtimeID: "goose" } };
+  assert.deepEqual(r.emptyListRuntimeLine(missing), { line: "Not on this Mac", failed: false }, "Install stays on the Mac");
+  const failed = { ...status("codex", "Codex", false), availability: { installFailed: { reason: "disk full" } }, runtime: { ...status("codex", "Codex").runtime, installPage: "https://example.com/codex", install: { toolset: { runtimeID: "codex" } } } };
+  assert.deepEqual(r.emptyListRuntimeLine(failed), { line: "disk full", failed: true, page: "https://example.com/codex" });
+  const signing = { ...status("claude", "Claude", false), availability: { needsSignIn: { authMethods: [] } } };
+  assert.equal(r.emptyListRuntimeLine(signing).line, "Signed out.");
+  const installing = { ...status("gemini", "Gemini", false), availability: { installing: { progress: "Fetching" } } };
+  assert.deepEqual(r.emptyListRuntimeLine(installing), { line: "Fetching…", failed: false });
+});
+
 test("runtimes: a new session stays on the runtime it opened with (#291)", () => {
   assert.equal(r.formRuntime("codex", undefined, ["claude", "codex"], "claude"), "codex", "a later listing does not move it");
   assert.equal(r.formRuntime("codex", "claude", ["claude", "codex"], "codex"), "claude", "a pick here wins");

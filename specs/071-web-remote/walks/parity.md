@@ -191,7 +191,7 @@ The deltas are tracked by 29 issues:
 | Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | Actions on the empty-project screen: `R/Sidebar/ProjectRow.swift`, `R/RemoteModel.swift` | `W/views/NewProject.tsx:34-260` | **same** |
 | Add Server… | `A/Control/ControlAddServerSheet.swift` | None | None | **by design** (installs over ssh from the Mac) |
 | Add Folder on this Mac: Finder drag, the clipboard's URL | Yes | n/a | Browses the host instead | **by design** (#115: no drag from Finder, no clipboard read) |
-| No projects yet | Words and buttons, or *No agent runtime found*: `A/Projects/ProjectListView.swift:81-84, 636-655` | Empty-state words and Add Folder / Clone Git URL actions: `R/Sidebar/ProjectRow.swift` | *No projects yet* only: `W/views/NewProject.tsx:85-103` | **same** (web #257; *No agent runtime found* remains window-only) |
+| No projects yet | Words and buttons, or *No agent runtime found* and each runtime's standing: `A/Projects/ProjectListView.swift:593-623` | Empty-state words and Add Folder / Clone Git URL actions: `R/Sidebar/ProjectRow.swift:141-159` | *No projects yet*, or *No agent runtime found* when this Mac has none that can start: `W/views/NewProject.tsx:89-156` | **same** (#257; Install stays on the Mac. The Remote's empty list does not switch, by design: a phone does not install a runtime) |
 | Continue in the project folder (#119, 065) | `A/AppModel.swift:2944-2958` | `R/RemoteModel.swift:2387-2407` | `W/model/store.ts:1088-1091` | **same** |
 
 ## Worktrees and Files
