@@ -28,7 +28,7 @@ const slowSend = 400;
 const mentionPause = 150;
 
 export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
-  stop, queues = false, suggestion, commands = [], findFiles }: {
+  stop, queues = false, suggestion, commands = [], findFiles, banner }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -60,6 +60,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   commands?: readonly SlashCommand[] | undefined;
   /** Files under the agent's folders matching what follows an `@`, found by its host. */
   findFiles?: ((term: string) => Promise<FileMentionDTO[]>) | undefined;
+  /** A limit notice, above the field as in both Swift clients. */
+  banner?: ComponentChildren;
 }) {
   const kept = store.drafts.get(draftKey);
   const text = useSignal(kept?.text ?? "");
@@ -198,6 +200,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
           {runtime && <div class="bar-runtime">{runtime}</div>}
         </div>
       )}
+      {banner}
       {sending.value && (starting || slow.value) && (
         <Telling recipient={recipient} doing={starting ? "Starting" : "Sending"} />
       )}
